@@ -48,6 +48,16 @@ Run it in the checkout whose files you will commit: from a linked worktree it wr
 worktree does not have yet can be given locally without a commit through `.claude/settings.local.json` (git-ignored).
 The steps below are what it does, for a project that wants to do it by hand.
 
+**Every repository and folder, with nothing per project:** `python3 ~/.claude/scripts/board/board.py enable --user`
+wires the same hook block into the USER settings (`~/.claude/settings.json`; the old file is copied to
+`~/.claude/backups/` first, other settings and hooks are kept, a file that is not valid JSON is never touched).
+From then on a session started in ANY repository or folder lists it on the page, and a project that also
+enabled the hooks itself still fires each hook once (identical command strings from two settings sources are
+de-duplicated — measured 01/10/2026). Two guards come with it: the home directory and `/` are never a board
+(`board_config.boardable`; a board in `~` would land in `~/.claude`), and a board created by a hook alone is
+hidden from `git status` through the repository's own `.git/info/exclude` (local, nothing to commit; a project
+that ignores `.claude/board/` already is left alone).
+
 **A project is listed as soon as its board is written** — by `board.py plan|add|set` or by any hook event —
 not only by the `SessionStart` hook (`board_registry.register_if_missing`; not when `BOARD_DIR` overrides the
 directory). Seen live 30/09/2026: ryan had ten tasks on a board and no `.claude/settings.json`, so no page

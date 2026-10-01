@@ -38,6 +38,16 @@ python3 $B set T-1 --status waiting --note "tests later"
 python3 $B list
 ```
 
+### Every repository and folder, automatically
+
+```bash
+python3 ~/.claude/scripts/board/board.py enable --user
+```
+
+wires the hooks into `~/.claude/settings.json` (a backup is taken first), so a session in any new
+repository or folder is listed on the board with nothing to enable per project. `~` and `/` are never
+a board, and a board created by the hooks is kept out of `git status`.
+
 ## Layout
 
 | Path | What |

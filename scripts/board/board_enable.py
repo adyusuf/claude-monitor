@@ -8,7 +8,9 @@ everything else in the settings file (other hooks, permissions, ...) is kept.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 SETTINGS = Path(".claude") / "settings.json"
@@ -69,6 +71,32 @@ def merge(settings: dict) -> tuple[dict, list[str]]:
             current.extend(entries)
             added.append(event)
     return settings, added
+
+
+def enable_user(home: Path) -> list[str]:
+    """Wire the hooks into the USER settings (~/.claude/settings.json), so every session in every
+    repository or folder lists its project on the board with nothing to enable per project. The same
+    command strings as a project's own block, so a project that also enabled it fires each hook ONCE
+    (measured: identical commands from two settings sources are de-duplicated). The old file is copied
+    to ~/.claude/backups first; an unparsable file aborts with nothing touched."""
+    path = home / ".claude" / "settings.json"
+    try:
+        settings = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{path} is not valid JSON, not touching it: {exc}") from exc
+    if not isinstance(settings, dict):
+        raise ValueError(f"{path}: top level is not an object, not touching it")
+    settings, added = merge(settings)
+    if not added:
+        return []
+    if path.exists():
+        backups = home / ".claude" / "backups"
+        backups.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        shutil.copy2(path, backups / f"settings.json.{stamp}.bak")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return [f"{path}: added hooks {', '.join(added)}"]
 
 
 def enable(root: Path) -> list[str]:

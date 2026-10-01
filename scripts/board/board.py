@@ -18,10 +18,11 @@ import argparse
 import os
 import re
 import sys
+from pathlib import Path
 
 from board_config import (AGENT_ID_PATTERN, AUTO_TASK_ID, CHOICE_MAX, COMMIT_PATTERN, EST_COST_MAX_USD,
                           ETA_MAX_MIN, EVENTS_FILE, ROLE_PATTERN, TASK_ID_PATTERN, TaskStatus, board_dir)
-from board_enable import checkout_root, enable
+from board_enable import checkout_root, enable, enable_user
 from board_registry import register, register_if_missing
 from board_store import append_event, fold, read_control, read_events
 from board_tasks import TaskExists, add_task
@@ -114,7 +115,10 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--est-cost", dest="est_cost", type=_usd, help="estimated dollars for the task")
     st.add_argument("--agent", type=_agent, help="count this agent's cost for the task")
     sub.add_parser("list")
-    sub.add_parser("enable", help="turn the live board on in this repository: hooks, .gitignore, listing")
+    en = sub.add_parser("enable", help="turn the live board on in this repository: hooks, .gitignore, listing")
+    en.add_argument("--user", action="store_true",
+                    help="wire the hooks into ~/.claude/settings.json instead: every repository and folder is "
+                         "listed automatically, with nothing to enable per project")
     return p
 
 
@@ -130,6 +134,16 @@ def run(argv: list[str]) -> int:
               "from the repository whose board you mean, or pass --init to create one here.",
               file=sys.stderr)
         return 2
+    if args.cmd == "enable" and args.user:
+        try:
+            changes = enable_user(Path.home())
+        except ValueError as exc:
+            print(f"board: {exc}", file=sys.stderr)
+            return 2
+        print("\n".join(changes) if changes else "the hooks are in the user settings already: nothing to change")
+        print("Every session, in any repository or folder, now lists its project on the board; a running "
+              "session picks the hooks up, the server auto-starts from the next session.")
+        return 0
     if args.cmd == "enable":
         root = bdir.parent.parent  # the main checkout: where the board is listed
         try:

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,8 +17,34 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _hide_from_git(bdir: Path) -> None:
+    """A board created by the hooks alone (they are in the USER settings, so no project ever ran
+    `enable`) must not show up in `git status`. The repository's own .git/info/exclude is local:
+    nothing to commit, nothing to review, and a project that ignores the folder already is left alone."""
+    if bdir.name != "board" or bdir.parent.name != ".claude":
+        return  # BOARD_DIR override: not our layout
+    root = bdir.parent.parent
+    try:
+        if subprocess.run(["git", "-C", str(root), "check-ignore", "-q", ".claude/board/events.jsonl"],
+                          capture_output=True, timeout=5).returncode == 0:
+            return
+        common = subprocess.run(["git", "-C", str(root), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                                capture_output=True, text=True, timeout=5, check=True).stdout.strip()
+        exclude = Path(common) / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        with exclude.open("a", encoding="utf-8") as f:
+            f.write(".claude/board/\n")
+    except subprocess.CalledProcessError:
+        return  # not a git repository: nothing to hide it from
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"board: could not hide {bdir} from git: {exc}", file=sys.stderr)
+
+
 def append_event(bdir: Path, event: dict) -> None:
+    fresh = not bdir.exists()
     bdir.mkdir(parents=True, exist_ok=True)
+    if fresh:
+        _hide_from_git(bdir)
     event = {"ts": now_iso(), **event}
     line = (json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8")
     # One O_APPEND write per event keeps parallel sessions from interleaving lines.
