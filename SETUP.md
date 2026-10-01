@@ -24,7 +24,8 @@ If `~/.claude/scripts` already exists as a directory with other tools, link the 
 points instead (`board.py`, `board_ensure.py`, `board_hook.py`, `board_open.py`, `board_server.py`
 resolving to this clone), or keep a launcher at those names.
 
-Enable a repository: `python3 ~/.claude/scripts/board/board.py enable` (idempotent), commit
+Every repository and folder at once: `python3 ~/.claude/scripts/board/board.py enable --user` (writes
+`~/.claude/settings.json`, backup in `~/.claude/backups/`). Or enable a single repository: `python3 ~/.claude/scripts/board/board.py enable` (idempotent), commit
 `.claude/settings.json` and `.gitignore`. Details: [`docs/live-board.md`](docs/live-board.md) §2.
 
 ## Development
