@@ -79,4 +79,10 @@ it as private. Nothing to rotate. If a future change adds a credential, it goes 
 
 ## Backup
 
-Nothing here needs a backup: the runtime data is derived and disposable, the code is in git.
+The code is in git and needs no backup. The runtime data does **not** regenerate itself:
+`.claude/board/events.jsonl` is the primary, append-only record of a project's tasks, notes, decisions and
+agent activity, and the board page is a fold over it (`control.json` holds what the page asked of the
+sessions). The registry (`~/.cache/claude-board/projects.json`) can be rebuilt by starting a session in each
+project. Losing `events.jsonl` loses that project's board history and nothing else, and that is accepted:
+the board is a progress view, not a system of record, and there is no scheduled backup, offsite copy or
+restore drill. Copy a project's `.claude/board/` directory first if you want to keep one.

@@ -62,6 +62,8 @@ a board, and a board created by the hooks is kept out of `git status`.
 | `scripts/tests/` | Unit tests: `python3 -m unittest discover -s scripts/tests -p 'test_*.py'` and `node --test 'scripts/tests/**/*.test.js'` |
 | `scripts/gate-core.sh`, `scripts/merge-gate.sh` | The local merge gate: tests, line coverage ≥ 80% per codebase, secret scan, SAST |
 | `docs/live-board.md` | Design reference |
+| `docs/release.md` | Promotion, how a new version takes effect, rollback, what a rollback does to the data |
+| `docs/security.md` | Threat model, assumptions and the OWASP Top 10 mapping |
 
 ## Tests and the gate
 
