@@ -2,7 +2,7 @@
 
   python3 ~/.claude/scripts/board/board_server.py [--port N] [--dir <project>/.claude/board]
 Serves board.html, the project list, each project's folded state, and takes the
-user's controls. Binds to localhost only. Standard library, no dependencies.
+user's controls. Binds to loopback only (BOARD_ALLOW_REMOTE=1 opts out). Standard library, no dependencies.
 Started automatically by board_ensure.py (SessionStart hook, docs/live-board.md).
 """
 from __future__ import annotations
@@ -19,9 +19,10 @@ from board_api import apply, decision_fields, list_skills, validate_control  # n
 from board_app import SVG_ICON_PATH, icon_png, icon_size, icon_svg, manifest
 from board_channel_ack import peek_changes
 from board_channel_reg import reachable
-from board_config import (API_VERSION, CHANNEL_SERVER, DECISION_WAIT_S, HOST, MODES, PORT, QUEUE_TEXT_MAX, REGISTRY,
+from board_config import (ALLOW_REMOTE, API_VERSION, CHANNEL_SERVER, DECISION_WAIT_S, HOST, MODES, PORT, QUEUE_TEXT_MAX, REGISTRY,
                           SKILLS_DIR, ControlAction, DecisionChoice, code_build)
 from board_cost import Cache
+from board_http_guard import SECURITY_HEADERS, SERVER_NAME, bind_allowed, host_header_ok
 from board_merge import merged
 from board_registry import load, project_id, summary
 from board_sessions import board_costs
@@ -85,13 +86,18 @@ def project_state(entry: dict, now: float | None = None) -> dict:
 
 
 def make_handler(registry: Path | None = None, extra_dir: Path | None = None,
-                 skills_dir: Path | None = None):
+                 skills_dir: Path | None = None, allow_remote: bool = ALLOW_REMOTE):
     skills_dir = skills_dir or SKILLS_DIR
     class Handler(BaseHTTPRequestHandler):
+        def version_string(self) -> str:
+            return SERVER_NAME  # not "BaseHTTP/0.6 Python/x.y.z"
+
         def _send(self, code: int, body: bytes, ctype: str) -> None:
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Cache-Control", "no-store")
+            for name, value in SECURITY_HEADERS:
+                self.send_header(name, value)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -100,7 +106,17 @@ def make_handler(registry: Path | None = None, extra_dir: Path | None = None,
             self._send(code, json.dumps(data, ensure_ascii=False).encode("utf-8"),
                        "application/json; charset=utf-8")
 
+        def _host_refused(self) -> bool:
+            """DNS rebinding: a page whose own name points at 127.0.0.1 passes the Origin check, so the Host
+            has to be a loopback name too. Answers 403 and returns True when it is not."""
+            if host_header_ok(self.headers.get("Host"), self.server.server_address[1], allow_remote):
+                return False
+            self._json(403, {"error": "host not allowed"})
+            return True
+
         def do_GET(self):
+            if self._host_refused():
+                return
             url = urlsplit(self.path)
             query = parse_qs(url.query)
             if url.path in STATIC:
@@ -130,6 +146,8 @@ def make_handler(registry: Path | None = None, extra_dir: Path | None = None,
             return self._json(404, {"error": "not found"})
 
         def do_POST(self):
+            if self._host_refused():
+                return
             if urlsplit(self.path).path != "/api/control":
                 return self._json(404, {"error": "not found"})
             # Same-origin only: a foreign page cannot send JSON here without a preflight we never answer.
@@ -167,6 +185,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=PORT)
     p.add_argument("--dir", help="also show this board directory (optional)")
     args = p.parse_args(argv)
+    if not bind_allowed(HOST, ALLOW_REMOTE):
+        print(f"board: refusing to listen on '{HOST}': the board has no authentication, so it binds to loopback only. "
+              "Set BOARD_HOST=127.0.0.1, or BOARD_ALLOW_REMOTE=1 to expose it on purpose.", file=sys.stderr)
+        return 2
     extra = Path(args.dir) if args.dir else None
     server = ThreadingHTTPServer((HOST, args.port), make_handler(REGISTRY, extra))
     print(f"board: http://{HOST}:{args.port}  (registry: {REGISTRY})", flush=True)

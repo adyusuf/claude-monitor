@@ -92,7 +92,9 @@ listed it. Without the hooks the page shows the tasks but no sessions, agents or
    running after the session ends; after a reboot the next session starts it again.
    By hand, if ever needed: `python3 ~/.claude/scripts/board/board_ensure.py < /dev/null`.
    `BOARD_DIR`, `BOARD_HOST`, `BOARD_PORT`, `BOARD_REGISTRY` override the defaults
-   (single source: `scripts/board/board_config.py`). The server's own log is
+   (single source: `scripts/board/board_config.py`). The server answers only requests whose `Host` is a loopback
+   name with its own port (DNS rebinding), and refuses to start on a non-loopback `BOARD_HOST` unless
+   `BOARD_ALLOW_REMOTE=1` is set; with that opt-in the board is exposed with no authentication. The server's own log is
    `~/.cache/claude-board/server.log`.
 5. If the auto-start reports an **older** board server on the port (one project per
    server, before 29/09/2026), stop that process once; the next session starts the

@@ -17,6 +17,8 @@ _BOARD_SUBDIR = Path(".claude") / "board"
 _DEFAULT_REGISTRY = Path.home() / ".cache" / "claude-board" / "projects.json"
 
 HOST = os.environ.get("BOARD_HOST", _DEFAULT_HOST)
+# The board has no authentication, so it binds to loopback only unless this is set to "1" on purpose.
+ALLOW_REMOTE = os.environ.get("BOARD_ALLOW_REMOTE") == "1"
 PORT = int(os.environ.get("BOARD_PORT", _DEFAULT_PORT))
 REGISTRY = Path(os.environ.get("BOARD_REGISTRY", _DEFAULT_REGISTRY))
 PROJECT_ID_PATTERN = r"^[0-9a-f]{10}$"
