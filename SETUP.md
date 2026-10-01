@@ -6,12 +6,13 @@ A clean machine is set up by following this file.
 
 | Tool | Why | Check |
 |---|---|---|
+| macOS or Linux, with `lsof` and `ps` | replacing a stale server at session start; Windows is not supported | `lsof -v`, `ps -p $$` |
 | Python 3.9+ | the hooks, CLI and server (standard library only) | `python3 --version` |
 | git | project roots and worktrees | `git --version` |
 | Claude Code | the source of the hooks and transcripts | `claude --version` |
 | Node 20+ | only to run the page's tests | `node --version` |
 | `coverage` (Python package, in a venv outside the repository) | the coverage gate | see below |
-| gitleaks, CodeQL CLI | the secret scan and SAST steps of the local gate | `gitleaks version`, `codeql version` |
+| gitleaks, ShellCheck, CodeQL CLI | the secret scan, and SAST for the shell and Python | `gitleaks version`, `shellcheck --version`, `codeql version` |
 
 ## Install
 
@@ -28,12 +29,41 @@ Every repository and folder at once: `python3 ~/.claude/scripts/board/board.py e
 `~/.claude/settings.json`, backup in `~/.claude/backups/`). Or enable a single repository: `python3 ~/.claude/scripts/board/board.py enable` (idempotent), commit
 `.claude/settings.json` and `.gitignore`. Details: [`docs/live-board.md`](docs/live-board.md) §2.
 
+## Commit hooks
+
+This repository is public, so a commit is checked before it exists: the `CLAUDE.md` size budget, a
+`gitleaks` scan of the staged content, and a **real-project-name check** over the staged file names,
+added lines and the commit message. Install once, in the main checkout (not in a linked worktree,
+where `.git` is a file and the installer cannot write):
+
+```bash
+bash scripts/pre-commit.sh --install
+```
+
+The hooks are symlinks to `scripts/` of that checkout, so they run whatever branch the main checkout
+has. The name check needs a local, git-ignored map of the names to look for. Point it at yours:
+
+```bash
+ln -s <your>/project-nicknames.tsv docs/project-nicknames.tsv   # or: export REAL_NAMES_MAP=<path>
+```
+
+Without a map the check prints "NOT RUN" and passes; `REAL_NAMES_STRICT=1` makes that a failure. The
+format of the map is described in `scripts/real-name-check.sh`. A deliberate exception is
+`git commit --no-verify`, and it is the maintainer's call.
+
 ## Development
 
 ```bash
 python3 -m venv ~/.cache/claude-monitor/venv && ~/.cache/claude-monitor/venv/bin/pip install coverage
 bash scripts/merge-gate.sh dev
 ```
+
+## CI
+
+`.github/workflows/ci.yml` runs `bash scripts/gate-core.sh dev` on every push to `dev`, `test` and `prod`
+and on every pull request: the same script and the same thresholds as a local `scripts/merge-gate.sh dev`,
+never a second rule set. Third-party actions are pinned to a commit SHA and gitleaks is
+checksum-verified. To change a version, change it there and in the Prerequisites table above.
 
 ## Environment variables
 

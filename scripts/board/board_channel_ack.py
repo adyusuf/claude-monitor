@@ -14,8 +14,9 @@ from pathlib import Path
 
 from board_config import (ACK_FILE, CHANNEL_CONFIRM_S, CHANNEL_DELIVERED_FILE, CHANNEL_DELIVERED_KEPT,
                           ControlAction)
-from board_store import _acks, atomic_write
-from board_store import peek_changes as _peek
+from board_store import atomic_write
+from board_control import _acks
+from board_control import peek_changes as _peek
 
 
 def _read(bdir: Path) -> dict:
@@ -79,7 +80,7 @@ def held_back(bdir: Path, session: str, now: float | None = None) -> set:
 
 
 def peek_changes(bdir: Path, session: str, now: float | None = None) -> list[dict]:
-    """board_store.peek_changes minus the tasks a channel already delivered to this session."""
+    """board_control.peek_changes minus the tasks a channel already delivered to this session."""
     gone = held_back(bdir, session, now)
     return [c for c in _peek(bdir, session)
             if not (c["v"] in gone and c["action"] in ControlAction.FOR_ONE_SESSION
@@ -87,7 +88,7 @@ def peek_changes(bdir: Path, session: str, now: float | None = None) -> list[dic
 
 
 def unseen_changes(bdir: Path, session: str) -> list[dict]:
-    """Like board_store.unseen_changes, over the filtered list; marks what it returns as seen."""
+    """Like board_control.unseen_changes, over the filtered list; marks what it returns as seen."""
     fresh = peek_changes(bdir, session)
     if fresh:
         acks = _acks(bdir)

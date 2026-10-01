@@ -23,8 +23,8 @@ from board_api import TEXT_CONTROL_CHARS
 from board_channel_ack import mark, peek_changes, pushed, unmark
 from board_channel_reg import launched_with_channel, register, unregister
 from board_config import (CHANNEL_BEAT_S, CHANNEL_CAPABILITY, CHANNEL_FALLBACK_PROTOCOL, CHANNEL_METHOD,
-                          CHANNEL_POLL_S, CHANNEL_SERVER, CHANNEL_SESSION_ENV, QUEUE_TEXT_MAX,
-                          SESSION_ID_PATTERN, ControlAction, SessionState, board_dir)
+                          CHANNEL_POLL_S, CHANNEL_SERVER, QUEUE_TEXT_MAX, SESSION_ID_PATTERN,
+                          ControlAction, SessionState, board_dir, channel_session_id)
 from board_store import fold, read_events
 
 VERSION = "1.0.0"
@@ -145,7 +145,7 @@ def serve(channel: Channel, stdin, stdout, stop: threading.Event) -> None:
 
 
 def main() -> int:
-    session = os.environ.get(CHANNEL_SESSION_ENV, "")
+    session = channel_session_id()
     enabled = launched_with_channel(os.getppid())
     channel = Channel(board_dir(), session, enabled)
     if not channel.enabled:
