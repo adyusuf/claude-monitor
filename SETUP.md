@@ -6,6 +6,7 @@ A clean machine is set up by following this file.
 
 | Tool | Why | Check |
 |---|---|---|
+| macOS or Linux, with `lsof` and `ps` | replacing a stale server at session start; Windows is not supported | `lsof -v`, `ps -p $$` |
 | Python 3.9+ | the hooks, CLI and server (standard library only) | `python3 --version` |
 | git | project roots and worktrees | `git --version` |
 | Claude Code | the source of the hooks and transcripts | `claude --version` |

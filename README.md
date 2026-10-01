@@ -16,6 +16,12 @@ what finished — and lets you queue work, switch an agent off or answer a decis
 The full design (data model, controls, cost, channels) is in [`docs/live-board.md`](docs/live-board.md).
 Setup and the list of environment variables are in [`SETUP.md`](SETUP.md).
 
+## Platform
+
+macOS and Linux. The server replacement at session start (`board_ensure.py`) uses `fcntl`, `lsof` and
+`ps`, which Windows does not have, so Windows is not supported (no native Windows run has been tried).
+The tests were last run on macOS; CI runs them on Ubuntu.
+
 ## Quick start
 
 ```bash
