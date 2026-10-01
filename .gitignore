@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .coverage*
+!.coveragerc
 .claude/board/
 .claude/settings.local.json
 .codeql/

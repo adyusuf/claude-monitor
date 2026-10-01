@@ -1,0 +1,15 @@
+# Line coverage of the Python scripts (global rule #29). The DENOMINATOR is every
+# hand-written script: only the tests themselves are omitted (they are the measurement,
+# not the product). Nothing else is excluded — no `pragma: no cover`, no main-guard carve-out.
+# Paths come from the environment so subprocesses started by the tests (which run in
+# temporary directories) write into the same data set.
+[run]
+source = ${COVERAGE_SRC}
+omit = */tests/*
+parallel = True
+data_file = ${COVERAGE_DATA}
+
+[report]
+fail_under = 80
+show_missing = True
+skip_empty = True
