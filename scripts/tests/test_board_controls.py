@@ -1,9 +1,12 @@
 """Sending work to a session from the live board (scripts/board/board_api.py + board_hook.py,
 docs/live-board.md §2d): queue a task, run a skill, switch the mode — validated
 fail-closed, delivered only to the session it is meant for."""
+from __future__ import annotations
+
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -186,6 +189,33 @@ class DeliveryTests(ControlCase):
         events = read_events(self.bdir)
         self.assertEqual([e.get("agent_id") for e in events if e["type"] == "agent_post"], ["fg1", None])
         self.assertEqual(fold(events)["agent_transcripts"], {"fg1": "/t/s1/subagents/agent-fg1.jsonl"})
+
+
+class HookProcessTests(ControlCase):
+    """The hook as Claude Code runs it: a real process, JSON on stdin, JSON on stdout."""
+
+    def run_hook(self, payload: dict) -> dict | None:
+        script = Path(__file__).resolve().parent.parent / "board" / "board_hook.py"
+        env = {**os.environ, "BOARD_DIR": str(self.bdir)}
+        done = subprocess.run([sys.executable, str(script)], input=json.dumps(payload),
+                              capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual((done.returncode, done.stderr), (0, ""))
+        return json.loads(done.stdout) if done.stdout.strip() else None
+
+    def test_a_queued_task_is_delivered_once_to_the_main_thread_of_its_session_only(self):
+        self.apply(action="queue_task", value=S1, text="write the release notes")
+        post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "cwd": str(self.root)}
+        self.assertIsNone(self.run_hook({**post, "session_id": S1, "agent_id": "sub1"}))
+        self.assertIsNone(self.run_hook({**post, "session_id": S2}))
+        out = self.run_hook({**post, "session_id": S1})
+        self.assertIn("write the release notes", out["hookSpecificOutput"]["additionalContext"])
+        self.assertIsNone(self.run_hook({**post, "session_id": S1}))
+
+    def test_stop_blocks_with_the_queued_task_as_the_reason(self):
+        self.apply(action="queue_task", value=S1, text="one more thing")
+        out = self.run_hook({"hook_event_name": "Stop", "session_id": S1, "cwd": str(self.root)})
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("one more thing", out["reason"])
 
 
 if __name__ == "__main__":

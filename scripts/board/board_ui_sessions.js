@@ -11,7 +11,8 @@
     root.BoardSessions = api;
   }
 })(typeof window !== "undefined" ? window : globalThis, function (text) {
-  const { esc, fmtDur, fill } = text;
+  const { esc, fmtDur, fmtStamp, fill } = text;
+  const AGENT_ROWS_SHOWN = 30;  // the table shows the newest rows; the total row still counts every agent
   const CENT = 0.01;
   const MILLION = 1e6;
   const THOUSAND = 1e3;
@@ -155,6 +156,26 @@
       tokenBreakdown(t, s.tokens)}</td><td><b>${esc(fmtUsd(t, s.cost))}</b>${missing}</td><td></td></tr>`;
   }
 
+  /** The Agent-activity table body: the newest AGENT_ROWS_SHOWN rows, then the total row. A denied
+      agent never ran, so its cost cells are a dash. */
+  function agentsTableHtml(t, agentList, agentRows, badge, now) {
+    if (!agentList.length) return `<tr><td colspan="8" class="empty">${esc(t("noAgents"))}</td></tr>`;
+    const rows = agentList.slice(0, AGENT_ROWS_SHOWN).map((a) => `<tr><td>${esc(a.type)}</td><td>${esc(a.task || "—")}</td>
+      <td>${badge(a.status)}</td><td class="muted">${esc(fmtStamp(a.started, now))}</td>
+      <td class="muted">${esc(a.status === "denied" ? "—" : fmtDur(t, a.started, a.ended, now))}</td>
+      ${a.status === "denied" ? `<td class="muted" colspan="2">—</td>` : agentCostCells(t, agentRows.rows[a.key])}
+      <td>${esc(a.reason || a.description)}</td></tr>`).join("");
+    return rows + agentTotalRow(t, agentRows);
+  }
+
+  /** The notes under the Agent-activity table; says so when older rows are not listed. */
+  function agentsHelpHtml(t, count) {
+    if (!count) return "";
+    const trimmed = count > AGENT_ROWS_SHOWN
+      ? `<p>${esc(fill(t("agentsTrimmed"), { shown: AGENT_ROWS_SHOWN, total: count }))}</p>` : "";
+    return `<p>${esc(t("undercount"))}</p><p>${esc(t("agentRowsNote"))}</p>${trimmed}`;
+  }
+
   /** What a role's agents have cost so far, for the roles panel; empty until one is measured. */
   function roleCostText(t, agentRows, role) {
     const s = agentRows && agentRows.by_type[role];
@@ -168,5 +189,5 @@
       `<button class="act mode${m === st.mode ? " on" : ""}" data-mode="${esc(m)}" aria-pressed="${m === st.mode}">${esc(m)}</button>`).join("")}${note}`;
   }
 
-  return { fmtUsd, fmtTok, tokenBreakdown, agentCostCells, agentTotalRow, roleCostText, sessionsHtml, helpHtml, taskCostHtml, modesHtml, contextHtml, costHtml, projectionHtml };
+  return { fmtUsd, fmtTok, tokenBreakdown, agentCostCells, agentTotalRow, roleCostText, agentsTableHtml, agentsHelpHtml, sessionsHtml, helpHtml, taskCostHtml, modesHtml, contextHtml, costHtml, projectionHtml };
 });

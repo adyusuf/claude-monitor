@@ -164,3 +164,26 @@ test("the page writes agentsHelp and the agent rows into their elements", async 
   assert.match(page.els.agentsHelp.innerHTML, /T-2/);
   assert.match(page.els.agents.innerHTML, /class="total"/);
 });
+
+const many = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`,
+  agent(`k${i}`, { started: ago(1000 - i), description: `desc-${i}` })]));
+
+test("view: only the newest 30 agents are listed and the total row still counts every one", () => {
+  const list = trs(ui.view(withCosts(many(35), agentRows({ total: summary({ cost: 99 }) })), tr, NOW).agentsHtml);
+  assert.equal(list.length, 31);                       // 30 rows + the total row
+  assert.match(list[0], /desc-34/);                    // newest first
+  assert.match(list[29], /desc-5</);                   // desc-0..4 are the five that fell off
+  assert.doesNotMatch(list.join(""), /desc-4</);
+  assert.match(list[30], /<b>\$99\.00<\/b>/);          // the total is the server's, over all 35
+});
+
+test("view: exactly 30 agents show no 'trimmed' note; 31 do, with both numbers", () => {
+  const at30 = ui.view(withCosts(many(30), agentRows()), tr, NOW);
+  assert.equal(trs(at30.agentsHtml).length, 31);
+  assert.doesNotMatch(at30.agentsHelp, /en yeni/);
+  const at31 = ui.view(withCosts(many(31), agentRows()), tr, NOW);
+  assert.equal(trs(at31.agentsHtml).length, 31);
+  assert.match(at31.agentsHelp, /en yeni 30 satır listelenir \(toplam 31 ajan\)/);
+  assert.match(ui.view(withCosts(many(31), agentRows()), en, NOW).agentsHelp,
+    /newest 30 rows \(31 agents in all\)/);
+});

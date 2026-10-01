@@ -126,13 +126,8 @@
             <td><button class="act" data-task="${esc(x.id)}" data-action="${removed ? "restore_task" : "remove_task"}">
               ${esc(removed ? t("restore") : t("remove"))}</button></td></tr>`;
         }).join(""),
-      agentsHtml: !agentList.length ? `<tr><td colspan="8" class="empty">${esc(t("noAgents"))}</td></tr>` :
-        agentList.slice(0, 30).map((a) => `<tr><td>${esc(a.type)}</td><td>${esc(a.task || "—")}</td>
-          <td>${badge(t, a.status)}</td><td class="muted">${esc(fmtStamp(a.started, now))}</td>
-          <td class="muted">${esc(a.status === "denied" ? "—" : fmtDur(t, a.started, a.ended, now))}</td>
-          ${a.status === "denied" ? `<td class="muted" colspan="2">—</td>` : panel.agentCostCells(t, agentRows.rows[a.key])}
-          <td>${esc(a.reason || a.description)}</td></tr>`).join("") + panel.agentTotalRow(t, agentRows),
-      agentsHelp: agentList.length ? `<p>${esc(t("undercount"))}</p><p>${esc(t("agentRowsNote"))}</p>` : "",
+      agentsHtml: panel.agentsTableHtml(t, agentList, agentRows, (s) => badge(t, s), now),
+      agentsHelp: panel.agentsHelpHtml(t, agentList.length),
     };
   }
 
