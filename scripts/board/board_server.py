@@ -22,6 +22,7 @@ from board_channel_reg import reachable
 from board_config import (API_VERSION, CHANNEL_SERVER, DECISION_WAIT_S, HOST, MODES, PORT, QUEUE_TEXT_MAX, REGISTRY,
                           SKILLS_DIR, ControlAction, DecisionChoice, code_build)
 from board_cost import Cache
+from board_http_guard import host_header_ok
 from board_merge import merged
 from board_registry import load, project_id, summary
 from board_sessions import board_costs
@@ -100,7 +101,17 @@ def make_handler(registry: Path | None = None, extra_dir: Path | None = None,
             self._send(code, json.dumps(data, ensure_ascii=False).encode("utf-8"),
                        "application/json; charset=utf-8")
 
+        def _host_refused(self) -> bool:
+            """DNS rebinding: a page whose own name points at 127.0.0.1 passes the Origin check, so the Host
+            has to be a loopback name too. Answers 403 and returns True when it is not."""
+            if host_header_ok(self.headers.get("Host"), self.server.server_address[1]):
+                return False
+            self._json(403, {"error": "host not allowed"})
+            return True
+
         def do_GET(self):
+            if self._host_refused():
+                return
             url = urlsplit(self.path)
             query = parse_qs(url.query)
             if url.path in STATIC:
@@ -130,6 +141,8 @@ def make_handler(registry: Path | None = None, extra_dir: Path | None = None,
             return self._json(404, {"error": "not found"})
 
         def do_POST(self):
+            if self._host_refused():
+                return
             if urlsplit(self.path).path != "/api/control":
                 return self._json(404, {"error": "not found"})
             # Same-origin only: a foreign page cannot send JSON here without a preflight we never answer.
