@@ -120,12 +120,11 @@ def _restart_lock(log_dir: Path):
             fcntl.flock(lock, fcntl.LOCK_UN)
 
 
-def ensure(cwd: str | None, wait: float = START_WAIT_S):
-    """Returns (the line for the session, the server process if this call started one)."""
-    bdir = board_dir(cwd)
-    if not boardable(bdir.parent.parent):
-        return "", None  # ~ and / are not projects: no listing, and no server started on their account
-    entry = register(bdir.parent.parent, bdir)
+def ensure_server(wait: float = START_WAIT_S):
+    """Makes sure a current board server answers, replacing a stale one. Returns (found, replaced,
+    proc): `found` is Found.BOARD once it answers, anything else says why it does not; `proc` is the
+    process this call started, if any. No project is registered here (the desktop window needs
+    the server with no project on hand)."""
     found = probe()
     replaced = False
     if found in (Found.STALE, Found.OLD_BOARD):
@@ -135,8 +134,29 @@ def ensure(cwd: str | None, wait: float = START_WAIT_S):
             found = probe()  # another session may have done it while this one waited
             if found in (Found.STALE, Found.OLD_BOARD) and stop_server():
                 found, replaced = Found.NOTHING, True
-    if found == Found.BOARD:
+    if found != Found.NOTHING:
+        return found, replaced, None
+    proc = start(REGISTRY.parent)
+    deadline = time.monotonic() + wait
+    while time.monotonic() < deadline:
+        if probe(timeout=0.3) == Found.BOARD:
+            return Found.BOARD, replaced, proc
+        time.sleep(0.1)
+    return Found.NOTHING, replaced, proc
+
+
+def ensure(cwd: str | None, wait: float = START_WAIT_S):
+    """Returns (the line for the session, the server process if this call started one)."""
+    bdir = board_dir(cwd)
+    if not boardable(bdir.parent.parent):
+        return "", None  # ~ and / are not projects: no listing, and no server started on their account
+    entry = register(bdir.parent.parent, bdir)
+    found, replaced, proc = ensure_server(wait)
+    if found == Found.BOARD and proc is None:
         return f"Claude Monitor: {url()} (running; project '{entry['name']}' is on it)", None
+    if found == Found.BOARD:
+        how = "restarted: it was running older code" if replaced else "started"
+        return f"Claude Monitor: {url()} ({how}; project '{entry['name']}' is on it)", proc
     if found == Found.OLD_BOARD:
         return (f"Claude Monitor: an OLDER board server holds {url()} and shows one project only — "
                 f"stop it and start a new session to get every project on one page"), None
@@ -145,13 +165,6 @@ def ensure(cwd: str | None, wait: float = START_WAIT_S):
                 f"stop it and start a new session"), None
     if found == Found.OTHER:
         return f"Claude Monitor NOT started: something else holds {url()} (set BOARD_PORT)", None
-    proc = start(REGISTRY.parent)
-    deadline = time.monotonic() + wait
-    while time.monotonic() < deadline:
-        if probe(timeout=0.3) == Found.BOARD:
-            how = "restarted: it was running older code" if replaced else "started"
-            return f"Claude Monitor: {url()} ({how}; project '{entry['name']}' is on it)", proc
-        time.sleep(0.1)
     return f"Claude Monitor did NOT come up on {url()} — see {REGISTRY.parent / LOG_FILE}", proc
 
 
