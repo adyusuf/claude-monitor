@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "board"))
 import board_server  # noqa: E402
-from board_http_guard import host_header_ok  # noqa: E402
+from board_http_guard import SECURITY_HEADERS, SERVER_NAME, host_header_ok  # noqa: E402
 
 
 class HostHeaderTests(unittest.TestCase):
@@ -33,7 +33,9 @@ class HostHeaderTests(unittest.TestCase):
         self.assertFalse(host_header_ok("localhost", 8765))
 
 
-class ServerRefusesForeignHosts(unittest.TestCase):
+class _LoopbackServer(unittest.TestCase):
+    """A real board server on an ephemeral loopback port; tests talk to it with raw http.client."""
+
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -57,6 +59,8 @@ class ServerRefusesForeignHosts(unittest.TestCase):
         conn.close()
         return res.status, data
 
+
+class ServerRefusesForeignHosts(_LoopbackServer):
     def test_a_rebound_name_cannot_read_the_page_or_the_api(self):
         for path in ("/", "/board_ui.js", "/api/info", "/api/projects", "/api/state"):
             status, data = self.send("GET", path, f"evil.example:{self.port}")
@@ -76,6 +80,40 @@ class ServerRefusesForeignHosts(unittest.TestCase):
     def test_the_loopback_host_still_works(self):
         for host in (f"127.0.0.1:{self.port}", f"localhost:{self.port}"):
             self.assertEqual(self.send("GET", "/api/info", host)[0], 200, host)
+
+
+class ResponseHeaders(_LoopbackServer):
+    """The same server on its real loopback host; every kind of response carries the security headers."""
+
+    def headers_of(self, method, path, **kw):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request(method, path, **kw)
+        res = conn.getresponse()
+        res.read()
+        headers = {k.lower(): v for k, v in res.getheaders()}
+        conn.close()
+        return res.status, headers
+
+    def test_page_script_api_error_and_refusal_all_carry_the_security_headers(self):
+        for path in ("/", "/board_ui.js", "/api/info", "/api/projects", "/nope"):
+            status, headers = self.headers_of("GET", path)
+            for name, value in SECURITY_HEADERS:
+                self.assertEqual(headers.get(name.lower()), value, f"{path} ({status}) {name}")
+        status, headers = self.headers_of("GET", "/api/info", headers={"Host": "evil.example"})
+        self.assertEqual(status, 403)
+        self.assertEqual(headers.get("x-frame-options"), "DENY")
+
+    def test_the_csp_allows_no_inline_script_and_no_framing(self):
+        csp = dict(SECURITY_HEADERS)["Content-Security-Policy"]
+        self.assertIn("script-src 'self';", csp)
+        self.assertNotIn("unsafe-eval", csp)
+        self.assertNotRegex(csp, r"script-src[^;]*unsafe-inline")
+        self.assertIn("frame-ancestors 'none'", csp)
+
+    def test_the_server_header_names_the_app_and_not_the_python_version(self):
+        _, headers = self.headers_of("GET", "/api/info")
+        self.assertEqual(headers["server"], SERVER_NAME)
+        self.assertNotIn("Python", headers["server"])
 
 
 if __name__ == "__main__":

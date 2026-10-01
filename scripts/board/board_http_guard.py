@@ -37,3 +37,19 @@ def host_header_ok(header: str | None, port: int) -> bool:
     if not _is_loopback_name(host):
         return False
     return port_text == str(port) or (port_text == "" and port == 80)
+
+
+SERVER_NAME = "claude-monitor"  # the Server header: the application, not the Python version behind it
+
+# Sent with every response. The page has one inline <style> block and external scripts only, so scripts are
+# 'self' (no inline script, no handler attributes) and only styles may be inline. The board is never framed.
+SECURITY_HEADERS = (
+    ("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+     "img-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
+     "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Referrer-Policy", "no-referrer"),
+    ("Permissions-Policy", "camera=(), microphone=(), geolocation=()"),
+    ("Cross-Origin-Resource-Policy", "same-origin"),
+)

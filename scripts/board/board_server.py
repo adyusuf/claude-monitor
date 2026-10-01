@@ -22,7 +22,7 @@ from board_channel_reg import reachable
 from board_config import (API_VERSION, CHANNEL_SERVER, DECISION_WAIT_S, HOST, MODES, PORT, QUEUE_TEXT_MAX, REGISTRY,
                           SKILLS_DIR, ControlAction, DecisionChoice, code_build)
 from board_cost import Cache
-from board_http_guard import host_header_ok
+from board_http_guard import SECURITY_HEADERS, SERVER_NAME, host_header_ok
 from board_merge import merged
 from board_registry import load, project_id, summary
 from board_sessions import board_costs
@@ -89,10 +89,15 @@ def make_handler(registry: Path | None = None, extra_dir: Path | None = None,
                  skills_dir: Path | None = None):
     skills_dir = skills_dir or SKILLS_DIR
     class Handler(BaseHTTPRequestHandler):
+        def version_string(self) -> str:
+            return SERVER_NAME  # not "BaseHTTP/0.6 Python/x.y.z"
+
         def _send(self, code: int, body: bytes, ctype: str) -> None:
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Cache-Control", "no-store")
+            for name, value in SECURITY_HEADERS:
+                self.send_header(name, value)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
