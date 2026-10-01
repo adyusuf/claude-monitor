@@ -1,0 +1,25 @@
+# CLAUDE.md size budget — a RATCHET.
+#
+# ⚠️ WHAT THIS FILE COVERS IS THE HIGHEST-LEVERAGE FILE THERE IS: ~/.claude/CLAUDE.md
+# enters context in EVERY project, EVERY session and EVERY subagent turn. The cost
+# of a line added here is paid not once in one project but in every project, in
+# every session and in every agent turn. It is more expensive than any project's
+# own CLAUDE.md.
+#
+# How it works: CEILING = today's size; the gate only ever refuses GROWTH.
+#   audit : bash ~/.claude/scripts/md-size-gate.sh
+#   lower : bash ~/.claude/scripts/md-size-gate.sh --update
+# RAISING the ceiling is not free: first try moving the rule into
+# ~/.claude/standards/<topic>.md. If you really are adding A NEW RULE that has to
+# live here, raise the ceiling and write the REASON in the note column.
+#
+# ⚠️ Simplifying means MOVING, not deleting or summarising. Afterwards, measure
+# the rule loss:  python3 ~/.claude/scripts/md-rule-gate.py <old.md> <new.md>
+#
+# Discovery exclusions — third-party, untracked trees that are NOT loaded as
+# project instructions (a plugin cache, a skill that has its own repository):
+# exclude:plugins
+# exclude:skills/addy
+#
+# Columns:  path <TAB> ceilingKB <TAB> targetKB <TAB> note
+CLAUDE.md	2	23	This is the ENGLISH edition of the same rule set, and the translation runs about 1 KB longer than the Turkish original (23.3 KB), so the ceiling was raised from 22 to 23 with this reason recorded — no rule was added. The live configuration keeps its own 22 KB ceiling. The goal is not to shrink the file but to stop it growing: a new permanent rule goes into standards/ first.
