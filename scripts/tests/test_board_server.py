@@ -21,7 +21,8 @@ sys.path.insert(0, str(BOARD))
 import board_server  # noqa: E402
 from board_config import board_dir, code_build, project_root  # noqa: E402
 from board_registry import project_id, register  # noqa: E402
-from board_store import append_event, read_control  # noqa: E402
+from board_store import append_event  # noqa: E402
+from board_control import read_control  # noqa: E402
 
 
 def free_port() -> int:

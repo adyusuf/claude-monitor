@@ -10,7 +10,8 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "board"))
 
 import board_hook  # noqa: E402
-from board_store import append_event, fold, read_control, read_events  # noqa: E402
+from board_store import append_event, fold, read_events  # noqa: E402
+from board_control import read_control  # noqa: E402
 
 
 def start(agent_id, agent_type, session="s1"):

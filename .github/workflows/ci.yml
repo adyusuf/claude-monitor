@@ -1,0 +1,74 @@
+# CI runs the SAME gate as a local run: scripts/gate-core.sh, with the thresholds in
+# scripts/merge-gate.conf — never a second set of rules in this file (rule #19).
+# Fast gate only: everything except e2e (this repository has none). Locally: bash scripts/merge-gate.sh dev
+name: CI
+
+on:
+  push:
+    branches: [dev, test, prod]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Gate (dev)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Third-party actions are pinned to a full commit SHA (the tag is in the comment).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # the secret scan reads the history
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.9"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: CodeQL CLI
+        id: codeql
+        uses: github/codeql-action/setup-codeql@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+
+      - name: Put the CodeQL CLI on PATH
+        env:
+          CODEQL_BIN: ${{ steps.codeql.outputs.codeql-path }}
+        run: dirname "$CODEQL_BIN" >> "$GITHUB_PATH"
+
+      - name: gitleaks 8.30.1 (checksum-verified)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          sudo tar -xzf gitleaks.tar.gz -C /usr/local/bin gitleaks
+          rm gitleaks.tar.gz
+
+      - name: Python coverage venv (outside the repository, as scripts/coverage.sh expects)
+        run: |
+          python3 -m venv "$HOME/.cache/claude-monitor/venv"
+          "$HOME/.cache/claude-monitor/venv/bin/pip" install coverage==7.10.7
+
+      - name: Tool versions
+        run: |
+          python3 --version
+          node --version
+          gitleaks version
+          codeql version | head -1
+          shellcheck --version | sed -n 2p
+
+      - name: Identity for the tests that make commits in temporary repositories
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@users.noreply.github.com"
+
+      - name: Gate
+        run: bash scripts/gate-core.sh dev

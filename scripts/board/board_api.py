@@ -12,8 +12,8 @@ from board_config import (CHOICE_MAX, COMMAND_SUFFIX, MODE_BY_BOARD, MODE_FILE, 
                           NOTE_MAX, PLUGIN_COMMANDS, PLUGIN_MANIFEST, PLUGIN_SKILLS,
                           PROJECT_ID_PATTERN, QUEUE_TEXT_MAX, ROLE_PATTERN, SESSION_ID_PATTERN,
                           SKILL_FILE, SKILL_PATTERN, TASK_ID_PATTERN, ControlAction)
-from board_store import (append_event, apply_control, fold, read_control, read_events,
-                         record_change)
+from board_store import append_event, fold, read_events
+from board_control import apply_control, read_control, record_change
 
 VALUE_PATTERNS = {
     ControlAction.REMOVE_TASK: TASK_ID_PATTERN, ControlAction.RESTORE_TASK: TASK_ID_PATTERN,

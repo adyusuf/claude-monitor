@@ -6,3 +6,5 @@ __pycache__/
 .codeql/
 node_modules/
 .DS_Store
+# Local map of real project names for scripts/real-name-check.sh — never committed
+docs/project-nicknames.tsv

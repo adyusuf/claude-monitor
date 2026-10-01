@@ -19,7 +19,7 @@ import board_channel_ack as ack  # noqa: E402
 import board_channel_reg as reg  # noqa: E402
 from board_config import (CHANNEL_CAPABILITY, CHANNEL_CONFIRM_S, CHANNEL_METHOD, CHANNEL_SERVER,  # noqa: E402
                           QUEUE_TEXT_MAX)
-from board_store import read_control, record_change  # noqa: E402
+from board_control import read_control, record_change  # noqa: E402
 from channel_case import S1, S2, ServerCase, request  # noqa: E402
 
 

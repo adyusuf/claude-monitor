@@ -18,7 +18,8 @@ import board_channel_reg as reg  # noqa: E402
 import board_hook  # noqa: E402
 from board_config import (ACK_FILE, CHANNEL_CONFIRM_S, CHANNEL_DELIVERED_FILE, CHANNEL_DELIVERED_KEPT,  # noqa: E402
                           CHANNEL_DIR, CHANNEL_TTL_S, ControlAction)
-from board_store import append_event, read_control, record_change  # noqa: E402
+from board_store import append_event  # noqa: E402
+from board_control import read_control, record_change  # noqa: E402
 
 S1, S2 = "11111111-aaaa", "22222222-bbbb"
 

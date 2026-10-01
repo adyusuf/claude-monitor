@@ -68,3 +68,26 @@ class BoardableTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EnvironmentAccessorTests(unittest.TestCase):
+    """The only reads of BOARD_DIR and of the channel's session id: board_config, at call time."""
+
+    def test_the_board_dir_override_is_read_when_asked_and_empty_when_unset(self):
+        with mock.patch.dict(os.environ, {"BOARD_DIR": "/somewhere/board"}):
+            self.assertEqual(board_config.explicit_board_dir(), "/somewhere/board")
+            self.assertEqual(board_config.board_dir("/ignored"), Path("/somewhere/board"))
+        with mock.patch.dict(os.environ, clear=False) as env:
+            env.pop("BOARD_DIR", None)
+            self.assertEqual(board_config.explicit_board_dir(), "")
+
+    def test_an_empty_override_does_not_count_as_set(self):
+        with mock.patch.dict(os.environ, {"BOARD_DIR": ""}):
+            self.assertEqual(board_config.explicit_board_dir(), "")
+
+    def test_the_channel_session_id_comes_from_the_variable_claude_code_sets(self):
+        with mock.patch.dict(os.environ, {board_config.CHANNEL_SESSION_ENV: "abc-123"}):
+            self.assertEqual(board_config.channel_session_id(), "abc-123")
+        with mock.patch.dict(os.environ, clear=False) as env:
+            env.pop(board_config.CHANNEL_SESSION_ENV, None)
+            self.assertEqual(board_config.channel_session_id(), "")
