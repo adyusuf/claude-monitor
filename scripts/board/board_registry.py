@@ -12,7 +12,8 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from board_config import REGISTRY
-from board_store import atomic_write, fold, now_iso, read_control, read_events
+from board_store import atomic_write, fold, now_iso, read_events
+from board_control import read_control
 
 
 def project_id(root: Path) -> str:

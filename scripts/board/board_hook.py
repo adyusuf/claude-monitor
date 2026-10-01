@@ -22,7 +22,8 @@ from board_registry import register_if_missing
 from board_channel_ack import confirm as _channel_confirm
 from board_channel_ack import peek_changes as _peek_changes
 from board_channel_ack import unseen_changes
-from board_store import append_event, fold, read_control, read_events
+from board_store import append_event, fold, read_events
+from board_control import read_control
 
 
 def task_tag(text: str) -> str | None:

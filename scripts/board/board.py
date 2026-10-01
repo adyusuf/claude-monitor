@@ -24,7 +24,8 @@ from board_config import (AGENT_ID_PATTERN, AUTO_TASK_ID, CHOICE_MAX, COMMIT_PAT
                           ETA_MAX_MIN, EVENTS_FILE, ROLE_PATTERN, TASK_ID_PATTERN, TaskStatus, board_dir)
 from board_enable import checkout_root, enable, enable_user
 from board_registry import register, register_if_missing
-from board_store import append_event, fold, read_control, read_events
+from board_store import append_event, fold, read_events
+from board_control import read_control
 from board_tasks import TaskExists, add_task
 
 
