@@ -289,7 +289,7 @@ page); if it fails, the reason is shown on that page (the URL fragment).
 - **Tests:** `cargo test` (logic in `board.rs`, `config.rs`), `scripts/tests/desktop_splash.test.js`;
   line coverage ≥ 80 % for the Rust crate is measured by `scripts/coverage.sh` with `cargo-llvm-cov`.
   The window glue (`lib.rs`, `main.rs`) is counted and has no unit test; it is checked by running the app.
-- **Not verified:** that `sw.js` and notifications behave in macOS WKWebView as in Chrome.
+- **Checked in the macOS window (01/10/2026):** `sw.js` registers (service workers work in the Tauri WKWebView on an `http://127.0.0.1` page). `Notification.requestPermission()` answers `denied` without a prompt, and the board uses no notifications, so nothing is lost. The failure page shows the reason (a missing scripts directory was tried).
 
 ## 2f. Task ids and where the CLI writes (T-28, 30/09/2026)
 

@@ -71,6 +71,9 @@ jobs:
       - name: cargo-llvm-cov 0.9.1
         run: ~/.cargo/bin/cargo install cargo-llvm-cov --version 0.9.1 --locked
 
+      - name: cargo-audit 0.22.2 (dependency CVE for desktop/Cargo.lock)
+        run: ~/.cargo/bin/cargo install cargo-audit --version 0.22.2 --locked
+
       - name: Tool versions
         run: |
           python3 --version
