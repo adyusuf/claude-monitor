@@ -16,9 +16,18 @@ def _is_loopback_name(name: str) -> bool:
         return False
 
 
-def host_header_ok(header: str | None, port: int) -> bool:
+def bind_allowed(host: str, allow_remote: bool) -> bool:
+    """The board has no authentication, so it may only listen on a loopback address (127.0.0.1, localhost, ::1)
+    unless the operator opted in. An empty host or 0.0.0.0 means every interface and is not loopback."""
+    return allow_remote or _is_loopback_name(host)
+
+
+def host_header_ok(header: str | None, port: int, allow_remote: bool = False) -> bool:
     """True only for a loopback name (127.0.0.1, localhost, [::1]) with this server's own port.
-    A missing or malformed header is refused: nothing a browser sends for this board looks like it."""
+    A missing or malformed header is refused: nothing a browser sends for this board looks like it.
+    With the remote opt-in the operator chose to expose the board and no name can be listed, so any Host passes."""
+    if allow_remote:
+        return True
     if not header:
         return False
     host, port_text = header, ""

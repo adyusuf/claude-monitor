@@ -5,12 +5,15 @@ import sys
 import tempfile
 import threading
 import unittest
+from contextlib import redirect_stderr
 from http.server import ThreadingHTTPServer
+from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "board"))
 import board_server  # noqa: E402
-from board_http_guard import SECURITY_HEADERS, SERVER_NAME, host_header_ok  # noqa: E402
+from board_http_guard import SECURITY_HEADERS, SERVER_NAME, bind_allowed, host_header_ok  # noqa: E402
 
 
 class HostHeaderTests(unittest.TestCase):
@@ -114,6 +117,46 @@ class ResponseHeaders(_LoopbackServer):
         _, headers = self.headers_of("GET", "/api/info")
         self.assertEqual(headers["server"], SERVER_NAME)
         self.assertNotIn("Python", headers["server"])
+
+
+class BindTests(unittest.TestCase):
+    def test_only_loopback_addresses_may_be_bound_by_default(self):
+        for host in ("127.0.0.1", "localhost", "::1", "127.0.0.2"):
+            self.assertTrue(bind_allowed(host, False), host)
+        for host in ("0.0.0.0", "", "::", "192.168.1.5", "board.example"):
+            self.assertFalse(bind_allowed(host, False), repr(host))
+
+    def test_the_opt_in_allows_any_address_and_any_host_header(self):
+        self.assertTrue(bind_allowed("0.0.0.0", True))
+        self.assertTrue(host_header_ok("board.example:8765", 8765, allow_remote=True))
+        self.assertFalse(host_header_ok("board.example:8765", 8765))
+
+    def test_the_server_refuses_to_start_on_a_public_address_and_binds_nothing(self):
+        err = StringIO()
+        with mock.patch.object(board_server, "HOST", "0.0.0.0"), mock.patch.object(board_server, "ALLOW_REMOTE", False), \
+                mock.patch.object(board_server, "ThreadingHTTPServer") as server, redirect_stderr(err):
+            self.assertEqual(board_server.main([]), 2)
+        server.assert_not_called()
+        self.assertIn("BOARD_ALLOW_REMOTE=1", err.getvalue())
+
+    def test_the_server_starts_on_a_public_address_only_with_the_opt_in(self):
+        server = mock.MagicMock()
+        server.serve_forever.side_effect = KeyboardInterrupt
+        with mock.patch.object(board_server, "HOST", "0.0.0.0"), mock.patch.object(board_server, "ALLOW_REMOTE", True), \
+                mock.patch.object(board_server, "ThreadingHTTPServer", return_value=server) as cls:
+            self.assertEqual(board_server.main(["--port", "0"]), 0)
+        self.assertEqual(cls.call_args[0][0], ("0.0.0.0", 0))
+
+    def test_a_handler_built_with_the_opt_in_accepts_a_foreign_host(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            srv = ThreadingHTTPServer(("127.0.0.1", 0), board_server.make_handler(Path(tmp) / "p.json", allow_remote=True))
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            self.addCleanup(srv.server_close)
+            self.addCleanup(srv.shutdown)
+            conn = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=5)
+            conn.request("GET", "/api/info", headers={"Host": "board.example"})
+            self.assertEqual(conn.getresponse().status, 200)
+            conn.close()
 
 
 if __name__ == "__main__":
