@@ -15,13 +15,13 @@ Agents are linked to a task by putting "[T-1]" in the Agent tool's description.
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
 
 from board_config import (AGENT_ID_PATTERN, AUTO_TASK_ID, CHOICE_MAX, COMMIT_PATTERN, EST_COST_MAX_USD,
-                          ETA_MAX_MIN, EVENTS_FILE, ROLE_PATTERN, TASK_ID_PATTERN, TaskStatus, board_dir)
+                          ETA_MAX_MIN, EVENTS_FILE, ROLE_PATTERN, TASK_ID_PATTERN, TaskStatus, board_dir,
+                          explicit_board_dir)
 from board_enable import checkout_root, enable, enable_user
 from board_registry import register, register_if_missing
 from board_store import append_event, fold, read_events
@@ -129,7 +129,7 @@ def run(argv: list[str]) -> int:
     # The board is found from the working directory's repository, so a command typed from another
     # project's tree used to create a stray .claude/board/ there. A repository whose hooks are
     # wired already has one (the first hook event creates it); anything else needs --init.
-    if (args.cmd not in ("list", "enable") and not args.init and not os.environ.get("BOARD_DIR")
+    if (args.cmd not in ("list", "enable") and not args.init and not explicit_board_dir()
             and not (bdir / EVENTS_FILE).exists()):
         print(f"board: no live board at {bdir}. This repository has no board hooks; run the command "
               "from the repository whose board you mean, or pass --init to create one here.",
@@ -157,7 +157,7 @@ def run(argv: list[str]) -> int:
         print(f"listed: {root.name}. Commit .claude/settings.json (and .gitignore); a running session picks the hooks "
               "up, SessionStart (auto-start of the server) applies from the next session.")
         return 0
-    if args.cmd != "list" and not os.environ.get("BOARD_DIR"):
+    if args.cmd != "list" and not explicit_board_dir():
         # Not through the SessionStart hook alone: ryan had a board full of tasks that no page listed
         # because its repository had no hooks. BOARD_DIR is an override (tests, odd layouts): no project root to list.
         register_if_missing(bdir.parent.parent, bdir)
