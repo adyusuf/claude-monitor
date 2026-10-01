@@ -20,7 +20,7 @@ from board_app import SVG_ICON_PATH, icon_png, icon_size, icon_svg, manifest
 from board_channel_ack import peek_changes
 from board_channel_reg import reachable
 from board_config import (API_VERSION, CHANNEL_SERVER, DECISION_WAIT_S, HOST, MODES, PORT, QUEUE_TEXT_MAX, REGISTRY,
-                          SKILLS_DIR, ControlAction, DecisionChoice)
+                          SKILLS_DIR, ControlAction, DecisionChoice, code_build)
 from board_cost import Cache
 from board_merge import merged
 from board_registry import load, project_id, summary
@@ -32,6 +32,7 @@ STATIC = {"/": ("board.html", "text/html; charset=utf-8"),
           "/board_ui.js": ("board_ui.js", JS), "/board_ui_text.js": ("board_ui_text.js", JS),
           "/board_ui_sessions.js": ("board_ui_sessions.js", JS), "/sw.js": ("sw.js", JS)}
 MAX_BODY = 4096
+BUILD = code_build()  # the code this process was started with (see board_ensure: a stale server is replaced)
 TRANSCRIPTS = Cache()  # parsed incrementally, shared by every request thread
 
 
@@ -105,7 +106,7 @@ def make_handler(registry: Path | None = None, extra_dir: Path | None = None,
                 name, ctype = STATIC[url.path]
                 return self._send(200, Path(__file__).with_name(name).read_bytes(), ctype)
             if url.path == "/api/info":
-                return self._json(200, {"version": API_VERSION})
+                return self._json(200, {"version": API_VERSION, "build": BUILD})
             if url.path == "/manifest.webmanifest":
                 return self._send(200, json.dumps(manifest()).encode("utf-8"),
                                   "application/manifest+json")

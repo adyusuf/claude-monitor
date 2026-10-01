@@ -19,7 +19,7 @@ BOARD = Path(__file__).resolve().parent.parent / "board"
 sys.path.insert(0, str(BOARD))
 
 import board_server  # noqa: E402
-from board_config import board_dir, project_root  # noqa: E402
+from board_config import board_dir, code_build, project_root  # noqa: E402
 from board_registry import project_id, register  # noqa: E402
 from board_store import append_event, read_control  # noqa: E402
 
@@ -115,7 +115,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.request("/")[0], 200)
         status, body = self.request("/board_ui.js")
         self.assertIn(b"projectsHtml", body)
-        self.assertEqual(self.request("/api/info"), (200, {"version": 2}))
+        self.assertEqual(self.request("/api/info"), (200, {"version": 2, "build": code_build()}))
         self.assertEqual(self.request("/etc/passwd")[0], 404)
 
     def test_projects_lists_every_board_most_recent_first(self):

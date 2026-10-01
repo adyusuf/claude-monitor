@@ -6,7 +6,10 @@ write to the user's real ~/.cache/claude-board/projects.json or start a server o
 import io
 import json
 import os
+import shutil
+import signal
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -17,6 +20,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "board"))
 
+import board_config  # noqa: E402
 import board_ensure  # noqa: E402
 import board_registry  # noqa: E402
 from board_store import append_event  # noqa: E402
@@ -156,6 +160,133 @@ class EnsureTests(Isolated):
                 mock.patch.object(sys, "stderr", io.StringIO()) as err:
             self.assertEqual(board_ensure.main(), 0)
         self.assertIn("board ensure error", err.getvalue())
+
+
+BOARD_DIR_SRC = Path(__file__).resolve().parent.parent / "board"
+
+
+class CodeBuildTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        (self.dir / "a.py").write_text("x = 1\n")
+        (self.dir / "page.html").write_text("<p>hi</p>")
+
+    def test_the_fingerprint_is_stable_and_follows_the_content_of_the_code_files(self):
+        first = board_config.code_build(self.dir)
+        self.assertEqual(first, board_config.code_build(self.dir))
+        (self.dir / "a.py").write_text("x = 2\n")
+        self.assertNotEqual(first, board_config.code_build(self.dir))
+
+    def test_a_file_name_change_and_a_new_code_file_both_change_it(self):
+        first = board_config.code_build(self.dir)
+        (self.dir / "b.js").write_text("1")
+        with_js = board_config.code_build(self.dir)
+        self.assertNotEqual(first, with_js)
+        (self.dir / "b.js").rename(self.dir / "c.js")
+        self.assertNotEqual(with_js, board_config.code_build(self.dir))
+
+    def test_files_that_are_not_code_and_folders_are_ignored(self):
+        first = board_config.code_build(self.dir)
+        (self.dir / "notes.txt").write_text("anything")
+        (self.dir / "__pycache__").mkdir()
+        (self.dir / "__pycache__" / "a.cpython.pyc").write_bytes(b"\0")
+        self.assertEqual(first, board_config.code_build(self.dir))
+
+
+class StaleServerTests(Isolated):
+    """T-32: a server that keeps running while the code changes is replaced by the next session start."""
+
+    def start_old_server(self):
+        """A REAL board server started from a copy of the code with one changed line, so its build
+        differs from the code on disk."""
+        copy = self.base / "old-code"
+        shutil.copytree(BOARD_DIR_SRC, copy, ignore=shutil.ignore_patterns("__pycache__"))
+        with open(copy / "board_config.py", "a") as f:
+            f.write("\n# an older edit\n")
+        proc = subprocess.Popen([sys.executable, str(copy / "board_server.py"), "--port", str(self.port)],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                env={**os.environ, "BOARD_REGISTRY": str(self.registry)})
+        self.addCleanup(proc.wait)
+        self.addCleanup(proc.kill)
+        for _ in range(100):
+            if board_ensure.probe(timeout=0.3) != board_ensure.Found.NOTHING:
+                return proc
+            import time
+            time.sleep(0.1)
+        self.fail("the old server did not come up")
+
+    def ensure(self, name="alpha"):
+        line, proc = board_ensure.ensure(str(self.project(name)))
+        if proc is not None:
+            self.addCleanup(proc.wait)
+            self.addCleanup(proc.terminate)
+        return line
+
+    def test_a_server_running_older_code_is_noticed(self):
+        self.start_old_server()
+        self.assertEqual(board_ensure.probe(), board_ensure.Found.STALE)
+
+    def test_a_server_running_older_code_is_stopped_and_replaced(self):
+        old = self.start_old_server()
+        line = self.ensure()
+        self.assertIn("restarted: it was running older code", line)
+        self.assertEqual(board_ensure.probe(), board_ensure.Found.BOARD)
+        self.assertIsNotNone(old.wait(timeout=5))  # the old process is gone
+
+    def test_a_current_server_is_left_alone(self):
+        self.assertIn("started", self.ensure("alpha"))
+        self.assertIn("(running; project 'beta'", self.ensure("beta"))
+
+    def test_a_server_another_session_just_replaced_is_not_stopped_again(self):
+        # the first probe sees stale code; by the time this session has the lock, another one restarted it
+        with mock.patch.object(board_ensure, "probe",
+                               side_effect=[board_ensure.Found.STALE, board_ensure.Found.BOARD]), \
+                mock.patch.object(board_ensure, "stop_server") as stop:
+            line = self.ensure()
+        stop.assert_not_called()
+        self.assertIn("(running; project 'alpha'", line)
+
+    def test_a_foreign_service_claiming_to_be_stale_is_never_signalled(self):
+        fake_server(self, self.port, {"/api/info": (200, {"version": 2, "build": "other"})})
+        with mock.patch.object(os, "kill") as kill:
+            line = self.ensure()
+        kill.assert_not_called()
+        self.assertIn("OLDER code", line)
+        self.assertIn("could not be stopped", line)
+
+    def test_no_lsof_means_it_is_reported_not_guessed(self):
+        fake_server(self, self.port, {"/api/info": (200, {"version": 2, "build": "other"})})
+        with mock.patch.object(subprocess, "run", side_effect=FileNotFoundError("lsof")):
+            self.assertEqual(board_ensure._listeners(), [])
+            self.assertFalse(board_ensure.stop_server())
+
+    def test_a_process_that_is_not_a_board_server_is_not_stopped(self):
+        with mock.patch.object(board_ensure, "_listeners", return_value=[os.getpid()]), \
+                mock.patch.object(os, "kill") as kill:
+            self.assertFalse(board_ensure.stop_server())
+        kill.assert_not_called()
+
+    def test_a_listener_that_is_already_gone_is_not_an_error(self):
+        with mock.patch.object(board_ensure, "_listeners", return_value=[999999]), \
+                mock.patch.object(board_ensure, "_is_board_server", return_value=True), \
+                mock.patch.object(os, "kill", side_effect=ProcessLookupError), \
+                mock.patch.object(board_ensure, "probe", return_value=board_ensure.Found.NOTHING):
+            self.assertTrue(board_ensure.stop_server())
+
+    def test_a_server_that_will_not_die_is_reported_as_not_stopped(self):
+        with mock.patch.object(board_ensure, "_listeners", return_value=[999999]), \
+                mock.patch.object(board_ensure, "_is_board_server", return_value=True), \
+                mock.patch.object(os, "kill") as kill, \
+                mock.patch.object(board_ensure, "probe", return_value=board_ensure.Found.STALE), \
+                mock.patch.object(board_ensure, "STOP_WAIT_S", 0.2):
+            self.assertFalse(board_ensure.stop_server())
+        kill.assert_called_once_with(999999, signal.SIGTERM)
+
+    def test_a_ps_that_fails_means_not_a_board_server(self):
+        with mock.patch.object(subprocess, "run", side_effect=OSError("no ps")):
+            self.assertFalse(board_ensure._is_board_server(1))
 
 
 if __name__ == "__main__":
