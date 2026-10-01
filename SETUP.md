@@ -11,7 +11,7 @@ A clean machine is set up by following this file.
 | Claude Code | the source of the hooks and transcripts | `claude --version` |
 | Node 20+ | only to run the page's tests | `node --version` |
 | `coverage` (Python package, in a venv outside the repository) | the coverage gate | see below |
-| gitleaks, CodeQL CLI | the secret scan and SAST steps of the local gate | `gitleaks version`, `codeql version` |
+| gitleaks, ShellCheck, CodeQL CLI | the secret scan, and SAST for the shell and Python | `gitleaks version`, `shellcheck --version`, `codeql version` |
 
 ## Install
 
@@ -27,6 +27,28 @@ resolving to this clone), or keep a launcher at those names.
 Every repository and folder at once: `python3 ~/.claude/scripts/board/board.py enable --user` (writes
 `~/.claude/settings.json`, backup in `~/.claude/backups/`). Or enable a single repository: `python3 ~/.claude/scripts/board/board.py enable` (idempotent), commit
 `.claude/settings.json` and `.gitignore`. Details: [`docs/live-board.md`](docs/live-board.md) §2.
+
+## Commit hooks
+
+This repository is public, so a commit is checked before it exists: the `CLAUDE.md` size budget, a
+`gitleaks` scan of the staged content, and a **real-project-name check** over the staged file names,
+added lines and the commit message. Install once, in the main checkout (not in a linked worktree,
+where `.git` is a file and the installer cannot write):
+
+```bash
+bash scripts/pre-commit.sh --install
+```
+
+The hooks are symlinks to `scripts/` of that checkout, so they run whatever branch the main checkout
+has. The name check needs a local, git-ignored map of the names to look for. Point it at yours:
+
+```bash
+ln -s <your>/project-nicknames.tsv docs/project-nicknames.tsv   # or: export REAL_NAMES_MAP=<path>
+```
+
+Without a map the check prints "NOT RUN" and passes; `REAL_NAMES_STRICT=1` makes that a failure. The
+format of the map is described in `scripts/real-name-check.sh`. A deliberate exception is
+`git commit --no-verify`, and it is the maintainer's call.
 
 ## Development
 
