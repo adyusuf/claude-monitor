@@ -3,7 +3,7 @@
 // Run: node --test scripts/tests/  — measured by scripts/coverage.sh (#29).
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { ui, tr, en, NOW, iso, ago, state, fakePage, target } = require("./board_ui_fixtures.js");
+const { ui, tr, en, NOW, iso, ago, state, SHOW_ALL, fakePage, target } = require("./board_ui_fixtures.js");
 
 
 test("dates are dd/mm/yyyy and times 24h, built by hand (#12)", () => {
@@ -39,7 +39,7 @@ test("view counts tasks and reports the turn state", () => {
     },
     sessions: { s: { turn_open: true } },
   });
-  const v = ui.view(st, tr, NOW);
+  const v = ui.view(st, tr, NOW, { lists: SHOW_ALL });
   assert.match(v.statsHtml, /<div class="n">1<\/div><div class="l">Çalışıyor/);
   assert.match(v.statsHtml, /<div class="n">1<\/div><div class="l">Bekliyor/);
   assert.equal(v.turnText, "Claude çalışıyor");
@@ -69,7 +69,7 @@ test("the banner shows only when every kept task is done and no agent is live", 
   assert.equal(ui.view(state({ tasks, agents }), tr, NOW).allDone, false);
   agents.a.status = "done";
   agents.a.ended = ago(1);
-  const v = ui.view(state({ tasks, agents }), tr, NOW);
+  const v = ui.view(state({ tasks, agents }), tr, NOW, { lists: SHOW_ALL });
   assert.equal(v.allDone, true);
   assert.match(v.tasksHtml, /4 sn/);
 });

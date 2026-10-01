@@ -12,7 +12,6 @@
   }
 })(typeof window !== "undefined" ? window : globalThis, function (text) {
   const { esc, fmtDur, fmtStamp, fill } = text;
-  const AGENT_ROWS_SHOWN = 30;  // the table shows the newest rows; the total row still counts every agent
   const CENT = 0.01;
   const MILLION = 1e6;
   const THOUSAND = 1e3;
@@ -81,10 +80,10 @@
   const reachable = (costs) => ((costs && costs.sessions) || []).filter((s) => s.channel);
 
   /** The sessions table body: one row per session the server shows, or only the ones a channel
-      server can reach when `channelOnly` (the page's checkbox). */
-  function sessionsHtml(t, st, skills, drafts, now, channelOnly = false) {
+      server can reach when `channelOnly` (the page's checkbox). `rows` is the already ordered page. */
+  function sessionsHtml(t, st, skills, drafts, now, channelOnly = false, rows = null) {
     const costs = st.costs;
-    const list = channelOnly ? reachable(costs) : (costs && costs.sessions) || [];
+    const list = rows || (channelOnly ? reachable(costs) : (costs && costs.sessions) || []);
     if (!list.length) return `<tr><td colspan="7" class="empty">${esc(t(channelOnly ? "noChannelSessions" : "noSessions"))}</td></tr>`;
     return list.map((s) => `<tr><td>${s.title ? `<div class="sname" title="${esc(s.title)}">${esc(s.title)}</div>` : ""}<code title="${esc(s.id)}">${esc(s.id.slice(0, 8))}</code></td>
       <td>${stateHtml(t, s, now)}</td><td>${contextHtml(t, s)}</td><td>${costHtml(t, s)}</td>
@@ -156,11 +155,12 @@
       tokenBreakdown(t, s.tokens)}</td><td><b>${esc(fmtUsd(t, s.cost))}</b>${missing}</td><td></td></tr>`;
   }
 
-  /** The Agent-activity table body: the newest AGENT_ROWS_SHOWN rows, then the total row. A denied
-      agent never ran, so its cost cells are a dash. */
-  function agentsTableHtml(t, agentList, agentRows, badge, now) {
-    if (!agentList.length) return `<tr><td colspan="8" class="empty">${esc(t("noAgents"))}</td></tr>`;
-    const rows = agentList.slice(0, AGENT_ROWS_SHOWN).map((a) => `<tr><td>${esc(a.type)}</td><td>${esc(a.task || "—")}</td>
+  /** The Agent-activity table body: the page's rows (already ordered), then the total row, which
+      counts every agent, not only this page. A denied agent never ran, so its cost cells are a dash.
+      `emptyRow` is shown when the page has no rows. */
+  function agentsTableHtml(t, agentList, agentRows, badge, now, emptyRow) {
+    if (!agentList.length) return emptyRow + agentTotalRow(t, agentRows);
+    const rows = agentList.map((a) => `<tr><td>${esc(a.type)}</td><td>${esc(a.task || "—")}</td>
       <td>${badge(a.status)}</td><td class="muted">${esc(fmtStamp(a.started, now))}</td>
       <td class="muted">${esc(a.status === "denied" ? "—" : fmtDur(t, a.started, a.ended, now))}</td>
       ${a.status === "denied" ? `<td class="muted" colspan="2">—</td>` : agentCostCells(t, agentRows.rows[a.key])}
@@ -168,12 +168,9 @@
     return rows + agentTotalRow(t, agentRows);
   }
 
-  /** The notes under the Agent-activity table; says so when older rows are not listed. */
+  /** The notes under the Agent-activity table. */
   function agentsHelpHtml(t, count) {
-    if (!count) return "";
-    const trimmed = count > AGENT_ROWS_SHOWN
-      ? `<p>${esc(fill(t("agentsTrimmed"), { shown: AGENT_ROWS_SHOWN, total: count }))}</p>` : "";
-    return `<p>${esc(t("undercount"))}</p><p>${esc(t("agentRowsNote"))}</p>${trimmed}`;
+    return count ? `<p>${esc(t("undercount"))}</p><p>${esc(t("agentRowsNote"))}</p>` : "";
   }
 
   /** What a role's agents have cost so far, for the roles panel; empty until one is measured. */
