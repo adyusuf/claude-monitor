@@ -7,6 +7,9 @@ this repository's own.
 ## Rules
 
 - **Standard library only.** No runtime dependency is added without asking first (global #10).
+- **One exception: `desktop/`.** The desktop window is a thin Tauri shell (approved by the
+  maintainer). Its Rust crates live only there; it holds no logic, no URL and no port of its own,
+  and asks `scripts/board/` for them. Everything else stays standard-library.
 - **One config module.** `scripts/board/board_config.py` is the only place that reads the
   environment or holds a URL, port, path or price; every other file imports from it (#2).
 - **Loopback only.** The server binds `127.0.0.1`; the page's controls accept same-origin,

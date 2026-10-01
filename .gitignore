@@ -9,3 +9,7 @@ node_modules/
 .DS_Store
 # Local map of real project names for scripts/real-name-check.sh — never committed
 docs/project-nicknames.tsv
+# The desktop window: build output, and the icon drawn by desktop/make_icon.py
+desktop/target/
+desktop/icons/
+desktop/gen/
