@@ -136,23 +136,23 @@ def ensure(cwd: str | None, wait: float = START_WAIT_S):
             if found in (Found.STALE, Found.OLD_BOARD) and stop_server():
                 found, replaced = Found.NOTHING, True
     if found == Found.BOARD:
-        return f"Live board: {url()} (running; project '{entry['name']}' is on it)", None
+        return f"Claude Monitor: {url()} (running; project '{entry['name']}' is on it)", None
     if found == Found.OLD_BOARD:
-        return (f"Live board: an OLDER board server holds {url()} and shows one project only — "
+        return (f"Claude Monitor: an OLDER board server holds {url()} and shows one project only — "
                 f"stop it and start a new session to get every project on one page"), None
     if found == Found.STALE:
-        return (f"Live board: a server running OLDER code holds {url()} and could not be stopped from here — "
+        return (f"Claude Monitor: a server running OLDER code holds {url()} and could not be stopped from here — "
                 f"stop it and start a new session"), None
     if found == Found.OTHER:
-        return f"Live board NOT started: something else holds {url()} (set BOARD_PORT)", None
+        return f"Claude Monitor NOT started: something else holds {url()} (set BOARD_PORT)", None
     proc = start(REGISTRY.parent)
     deadline = time.monotonic() + wait
     while time.monotonic() < deadline:
         if probe(timeout=0.3) == Found.BOARD:
             how = "restarted: it was running older code" if replaced else "started"
-            return f"Live board: {url()} ({how}; project '{entry['name']}' is on it)", proc
+            return f"Claude Monitor: {url()} ({how}; project '{entry['name']}' is on it)", proc
         time.sleep(0.1)
-    return f"Live board did NOT come up on {url()} — see {REGISTRY.parent / LOG_FILE}", proc
+    return f"Claude Monitor did NOT come up on {url()} — see {REGISTRY.parent / LOG_FILE}", proc
 
 
 def main() -> int:

@@ -12,7 +12,7 @@
 })(typeof window !== "undefined" ? window : globalThis, function () {
   const I18N = {
     tr: {
-      title: "Canlı İş Panosu", mode: "Mod", lastEvent: "son olay:", agentsHdr: "Ajanlar",
+      title: "Claude Monitor", mode: "Mod", lastEvent: "son olay:", agentsHdr: "Ajanlar",
       tasksHdr: "İşler", activityHdr: "Ajan hareketleri", colTask: "İş", colBranch: "Dal",
       colRole: "Rol / ajan", colStatus: "Durum", colTime: "Süre", colNote: "Not",
       colAgent: "Ajan", colStarted: "Başladı", turnOpen: "Claude çalışıyor", turnClosed: "Tur bitti",
@@ -50,7 +50,7 @@
       basisSession: "tahmin: son 60 dk $/sa × açık işlerin kalan ETA'sı ({h} sa, {n} iş; ETA'sız {m} iş sayılmadı)",
     },
     en: {
-      title: "Live Work Board", mode: "Mode", lastEvent: "last event:", agentsHdr: "Agents",
+      title: "Claude Monitor", mode: "Mode", lastEvent: "last event:", agentsHdr: "Agents",
       tasksHdr: "Tasks", activityHdr: "Agent activity", colTask: "Task", colBranch: "Branch",
       colRole: "Role / agent", colStatus: "Status", colTime: "Time", colNote: "Note",
       colAgent: "Agent", colStarted: "Started", turnOpen: "Claude is working", turnClosed: "Turn finished",

@@ -97,7 +97,7 @@ test("start renders the first state in Turkish by default", async () => {
   await page.app.first;
   assert.equal(page.app.lang(), "tr");
   assert.equal(page.doc.documentElement.lang, "tr");
-  assert.equal(page.labels[0].textContent, "Canlı İş Panosu");
+  assert.equal(page.labels[0].textContent, "Claude Monitor");
   assert.equal(page.els.lang.textContent, "EN");
   assert.equal(page.els.mode.textContent, "C");
   assert.equal(page.els.dot.className, "dot on");
