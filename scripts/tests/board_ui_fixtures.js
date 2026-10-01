@@ -86,6 +86,9 @@ function fakePage({ stored = {}, storageThrows = false, fetchImpl, server, notes
     change: (t) => fire("change", { target: t }) };
 }
 
+// The lists state with finished rows shown (they are hidden by default): view(st, t, now, { lists: SHOW_ALL }).
+const SHOW_ALL = { tasks: { page: 1, showDone: true }, agents: { page: 1, showDone: true }, sessions: { page: 1 } };
+
 const target = (over = {}) => ({ id: "", closest: () => null, ...over });
 
-module.exports = { ui, tr, en, NOW, iso, ago, state, PROJECTS, SKILLS, serverLike, fakePage, target };
+module.exports = { ui, tr, en, NOW, iso, ago, state, PROJECTS, SKILLS, SHOW_ALL, serverLike, fakePage, target };

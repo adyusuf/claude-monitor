@@ -5,7 +5,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { ui, tr, en, NOW, ago, state, fakePage } = require("./board_ui_fixtures.js");
+const { ui, tr, en, NOW, ago, state, SHOW_ALL, fakePage } = require("./board_ui_fixtures.js");
 const panel = require(path.join(__dirname, "..", "board", "board_ui_sessions.js"));
 
 const tokens = (over = {}) => ({ input: 1500, output: 2000000, cache_read: 430000, cache_write_5m: 100, cache_write_1h: 250, ...over });
@@ -96,7 +96,7 @@ test("roleCostText: empty without data or for a role that has no measured agent,
 test("view: the agents table has 8 columns, measured and unmeasured rows, and the total row last", () => {
   const agents = { a: agent("a"), b: agent("b", { started: ago(120), type: "qa" }) };
   const rows = agentRows({ rows: { a: measured(), b: NOT_YET }, unmeasured: 1 });
-  const list = trs(ui.view(withCosts(agents, rows), tr, NOW).agentsHtml);
+  const list = trs(ui.view(withCosts(agents, rows), tr, NOW, { lists: SHOW_ALL }).agentsHtml);
   assert.equal(list.length, 3);
   assert.match(list[0], /desc-a/);
   assert.match(list[1], /desc-b/);
@@ -108,16 +108,16 @@ test("view: the agents table has 8 columns, measured and unmeasured rows, and th
 });
 
 test("view: a row that reached the page before its costs shows 'cannot be measured yet'", () => {
-  const html = ui.view(withCosts({ a: agent("a") }, agentRows({ rows: {} })), tr, NOW).agentsHtml;
+  const html = ui.view(withCosts({ a: agent("a") }, agentRows({ rows: {} })), tr, NOW, { lists: SHOW_ALL }).agentsHtml;
   assert.match(trs(html)[0], /colspan="2">henüz ölçülemiyor/);
 });
 
 test("view: an older server without costs still lists the agents and adds no total row", () => {
-  const html = ui.view(state({ agents: { a: agent("a") } }), tr, NOW).agentsHtml;
+  const html = ui.view(state({ agents: { a: agent("a") } }), tr, NOW, { lists: SHOW_ALL }).agentsHtml;
   assert.equal(trs(html).length, 1);
   assert.match(html, /colspan="2">henüz ölçülemiyor/);
   assert.doesNotMatch(html, /class="total"/);
-  const partial = ui.view(state({ agents: { a: agent("a") }, costs: { sessions: [] } }), tr, NOW).agentsHtml;
+  const partial = ui.view(state({ agents: { a: agent("a") }, costs: { sessions: [] } }), tr, NOW, { lists: SHOW_ALL }).agentsHtml;
   assert.doesNotMatch(partial, /class="total"/);
 });
 
@@ -125,13 +125,13 @@ test("view: the empty agents table spans all 8 columns and has no total row", ()
   const html = ui.view(state(), tr, NOW).agentsHtml;
   assert.match(html, /<td colspan="8" class="empty">Henüz ajan başlatılmadı/);
   assert.doesNotMatch(html, /total/);
-  const withEmptyCosts = ui.view(withCosts({}, agentRows()), tr, NOW).agentsHtml;
+  const withEmptyCosts = ui.view(withCosts({}, agentRows()), tr, NOW, { lists: SHOW_ALL }).agentsHtml;
   assert.match(withEmptyCosts, /<td colspan="8" class="empty">/);
 });
 
 test("view: a denied agent keeps its reason and shows a dash, not 'cannot be measured yet'", () => {
   const denied = agent("d", { status: "denied", reason: "outside mode", type: "security" });
-  const html = ui.view(withCosts({ d: denied }, agentRows({ rows: { d: NOT_YET }, unmeasured: 0 })), tr, NOW).agentsHtml;
+  const html = ui.view(withCosts({ d: denied }, agentRows({ rows: { d: NOT_YET }, unmeasured: 0 })), tr, NOW, { lists: SHOW_ALL }).agentsHtml;
   assert.match(html, /outside mode/);
   assert.match(trs(html)[0], /<td class="muted" colspan="2">—<\/td>/);
   assert.doesNotMatch(trs(html)[0], /henüz ölçülemiyor/);
@@ -168,22 +168,16 @@ test("the page writes agentsHelp and the agent rows into their elements", async 
 const many = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`,
   agent(`k${i}`, { started: ago(1000 - i), description: `desc-${i}` })]));
 
-test("view: only the newest 30 agents are listed and the total row still counts every one", () => {
-  const list = trs(ui.view(withCosts(many(35), agentRows({ total: summary({ cost: 99 }) })), tr, NOW).agentsHtml);
+test("view: a page holds 30 agents, newest first, and the total row counts every one", () => {
+  const st = withCosts(many(35), agentRows({ total: summary({ cost: 99 }) }));
+  const list = trs(ui.view(st, tr, NOW, { lists: SHOW_ALL }).agentsHtml);
   assert.equal(list.length, 31);                       // 30 rows + the total row
   assert.match(list[0], /desc-34/);                    // newest first
-  assert.match(list[29], /desc-5</);                   // desc-0..4 are the five that fell off
+  assert.match(list[29], /desc-5</);                   // desc-0..4 are on the next page
   assert.doesNotMatch(list.join(""), /desc-4</);
   assert.match(list[30], /<b>\$99\.00<\/b>/);          // the total is the server's, over all 35
-});
-
-test("view: exactly 30 agents show no 'trimmed' note; 31 do, with both numbers", () => {
-  const at30 = ui.view(withCosts(many(30), agentRows()), tr, NOW);
-  assert.equal(trs(at30.agentsHtml).length, 31);
-  assert.doesNotMatch(at30.agentsHelp, /en yeni/);
-  const at31 = ui.view(withCosts(many(31), agentRows()), tr, NOW);
-  assert.equal(trs(at31.agentsHtml).length, 31);
-  assert.match(at31.agentsHelp, /en yeni 30 satır listelenir \(toplam 31 ajan\)/);
-  assert.match(ui.view(withCosts(many(31), agentRows()), en, NOW).agentsHelp,
-    /newest 30 rows \(31 agents in all\)/);
+  const second = trs(ui.view(st, tr, NOW, { lists: { ...SHOW_ALL, agents: { page: 2, showDone: true } } }).agentsHtml);
+  assert.equal(second.length, 6);                      // 5 rows + the same total row
+  assert.match(second[0], /desc-4</);
+  assert.match(second[5], /<b>\$99\.00<\/b>/);
 });

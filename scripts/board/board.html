@@ -77,6 +77,9 @@ button.act:hover{border-color:var(--muted)}
 .modes{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
 button.mode.on{border-color:var(--run);color:var(--run);font-weight:650}
 tr.total td{background:var(--chip);border-top:1px solid var(--line)}
+.pager{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 2px 0;font-size:13px}
+.pager:empty{display:none}
+button.act:disabled{opacity:.5;cursor:default}
 .help{font-size:12px;color:var(--muted);margin:6px 2px 0}.help p{margin:3px 0}
 </style>
 </head>
@@ -108,26 +111,33 @@ tr.total td{background:var(--chip);border-top:1px solid var(--line)}
       <th data-i18n="colCost"></th><th data-i18n="colRate"></th><th data-i18n="colProjection"></th><th data-i18n="colSend"></th></tr></thead>
     <tbody id="sessions"></tbody>
   </table></div>
+  <div class="pager" id="sessionsPager"></div>
   <div class="help" id="sessionsHelp"></div>
 
   <h2 data-i18n="tasksHdr"></h2>
+  <label class="chk"><input type="checkbox" id="showDoneTasks"> <span data-i18n="showDoneTasks"></span></label>
   <div class="card"><table>
     <thead><tr><th data-i18n="colTask"></th><th data-i18n="colBranch"></th><th data-i18n="colRole"></th>
       <th data-i18n="colStatus"></th><th data-i18n="colTime"></th><th data-i18n="colMerge"></th><th data-i18n="colCostEta"></th><th data-i18n="colNote"></th><th></th></tr></thead>
     <tbody id="tasks"></tbody>
   </table></div>
+  <div class="pager" id="tasksPager"></div>
 
   <h2 data-i18n="activityHdr"></h2>
+  <label class="chk"><input type="checkbox" id="showDoneAgents"> <span data-i18n="showDoneAgents"></span></label>
   <div class="card"><table>
     <thead><tr><th data-i18n="colAgent"></th><th data-i18n="colTask"></th><th data-i18n="colStatus"></th>
       <th data-i18n="colStarted"></th><th data-i18n="colTime"></th><th data-i18n="colTokens"></th>
       <th data-i18n="colCost"></th><th data-i18n="colNote"></th></tr></thead>
     <tbody id="agents"></tbody>
   </table></div>
+  <div class="pager" id="agentsPager"></div>
   <div class="help" id="agentsHelp"></div>
 </main>
 <script src="board_ui_text.js"></script>
 <script src="board_ui_sessions.js"></script>
+<script src="board_ui_tasks.js"></script>
+<script src="board_ui_lists.js"></script>
 <script src="board_ui.js"></script>
 </body>
 </html>

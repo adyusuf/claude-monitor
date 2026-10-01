@@ -180,7 +180,7 @@ class ServerRouteTests(unittest.TestCase):
         self.assertEqual(self.get("/manifest.webmanifest")[0], "application/manifest+json")
         self.assertEqual(self.get("/icon-512.png")[0], "image/png")
         self.assertEqual(self.get("/icon.svg")[0], "image/svg+xml")
-        for js in ("/sw.js", "/board_ui_text.js", "/board_ui_sessions.js"):
+        for js in ("/sw.js", "/board_ui_text.js", "/board_ui_sessions.js", "/board_ui_tasks.js", "/board_ui_lists.js"):
             self.assertTrue(self.get(js)[0].startswith("text/javascript"))
         self.assertEqual(json.loads(self.get("/api/skills")[1]), ["plain"])
         with self.assertRaises(urllib.error.HTTPError):
