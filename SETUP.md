@@ -35,6 +35,13 @@ python3 -m venv ~/.cache/claude-monitor/venv && ~/.cache/claude-monitor/venv/bin
 bash scripts/merge-gate.sh dev
 ```
 
+## CI
+
+`.github/workflows/ci.yml` runs `bash scripts/gate-core.sh dev` on every push to `dev`, `test` and `prod`
+and on every pull request: the same script and the same thresholds as a local `scripts/merge-gate.sh dev`,
+never a second rule set. Third-party actions are pinned to a commit SHA and gitleaks is
+checksum-verified. To change a version, change it there and in the Prerequisites table above.
+
 ## Environment variables
 
 None is required; defaults are in `scripts/board/board_config.py`, the single configuration module.
