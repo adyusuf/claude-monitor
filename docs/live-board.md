@@ -19,7 +19,7 @@ comes up by itself when a Claude session starts in any project that enables the 
 |---|---|---|
 | Hooks (`board_hook.py`) | Record every `Agent` start and finish; deny an agent that is switched off, a call for a removed task, or a role outside the declared mode set; tell Claude about board changes | Claude Code, automatically |
 | CLI (`board.py`) | Writes the plan: mode + role set, one row per task, the semantic status (`done`, `waiting`, `failed`) | Claude, per the `board-plan` skill |
-| Auto-start (`board_ensure.py`) | On `SessionStart`: registers the project, starts the server if nothing answers, says where the board is — never blocks a session | Claude Code, automatically |
+| Auto-start (`board_ensure.py`) | On `SessionStart`: registers the project, starts the server if nothing answers, **replaces one that runs older code** (`/api/info` reports the build the server started with, `board_config.code_build`; the auto-start compares it with the files on disk, stops only a process whose command line names `board_server.py`, under a lock), says where the board is — never blocks a session | Claude Code, automatically |
 | Registry (`board_registry.py`) | The machine-wide list of boards: `~/.cache/claude-board/projects.json` (id, name, path — runtime data, outside every repository) | the auto-start |
 | Server (`board_server.py`) | ONE server for every registered project: the tabs, each project's state, the user's controls (same-origin JSON only, validated) | the auto-start |
 | Cost (`board_cost.py`) | Parses Claude Code transcripts incrementally to read tokens and cost (prices from `board_config.py`); caches to avoid re-parsing | automatic, once per API call |

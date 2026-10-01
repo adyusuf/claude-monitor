@@ -4,6 +4,7 @@ The board is described in docs/live-board.md.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 from pathlib import Path
@@ -46,6 +47,18 @@ MERGE_BRANCHES = ("dev", "test", "prod")
 MERGE_TIP_TTL_S = 10.0  # branch tips are re-read at most this often (the page polls every 1.5 s)
 COMMIT_PATTERN = r"^[0-9a-f]{7,40}$"
 API_VERSION = 2  # 2 = one server for every registered project
+BUILD_SUFFIXES = (".py", ".html", ".js")  # the files whose content makes up the build fingerprint
+
+
+def code_build(directory: Path | None = None) -> str:
+    """A fingerprint of the application's own files. The server reports the one it started with
+    (/api/info) and the auto-start compares it with what is on disk now, so a server that has been
+    running while the code changed is noticed and replaced instead of silently serving old behaviour."""
+    directory = directory or Path(__file__).resolve().parent
+    digest = hashlib.sha1()
+    for path in sorted(p for p in directory.iterdir() if p.is_file() and p.suffix in BUILD_SUFFIXES):
+        digest.update(path.name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()[:12]
 
 
 def project_root(start: str) -> Path:
