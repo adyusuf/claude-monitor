@@ -73,10 +73,15 @@ def project_root(start: str) -> Path:
     return Path(common).parent
 
 
+def explicit_board_dir() -> str:
+    """BOARD_DIR as set in the environment ("" when unset), read at call time so a test can set it."""
+    return os.environ.get("BOARD_DIR", "")
+
+
 def board_dir(cwd: str | None = None) -> Path:
     """BOARD_DIR wins; otherwise <main checkout>/.claude/board.
     CLAUDE_PROJECT_DIR is set for hooks; the CLI falls back to the current directory."""
-    explicit = os.environ.get("BOARD_DIR")
+    explicit = explicit_board_dir()
     if explicit:
         return Path(explicit)
     start = os.environ.get("CLAUDE_PROJECT_DIR") or cwd or os.getcwd()
@@ -231,6 +236,11 @@ CHANNEL_SERVER = "board-channel"        # the MCP server name; `server:<this>` i
 CHANNEL_CAPABILITY = "claude/channel"   # experimental capability, and the notification's method prefix
 CHANNEL_METHOD = "notifications/claude/channel"
 CHANNEL_SESSION_ENV = "CLAUDE_CODE_SESSION_ID"  # set by Claude Code for its MCP children (measured 30/09/2026)
+
+
+def channel_session_id() -> str:
+    """The id of the Claude Code session that started this channel server ("" when it did not pass one)."""
+    return os.environ.get(CHANNEL_SESSION_ENV, "")
 CHANNEL_FLAGS = ("--dangerously-load-development-channels", "--channels")
 CHANNEL_DIR = "channels"                # <board dir>/channels/<session>.json — one file per live server
 CHANNEL_DELIVERED_FILE = "channel_delivered.json"

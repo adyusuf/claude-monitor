@@ -15,8 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "board"))
 import board  # noqa: E402
 import board_hook  # noqa: E402
 from board_config import EVENTS_FILE  # noqa: E402
-from board_store import (apply_control, fold, read_control, read_events,  # noqa: E402
-                         unseen_changes)
+from board_store import fold, read_events  # noqa: E402
+from board_control import apply_control, read_control, unseen_changes  # noqa: E402
 
 
 def pre(tuid, agent_type, desc, bg=True, session="s1"):

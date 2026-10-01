@@ -8,7 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "board"))
 
 import board_channel as bc  # noqa: E402
 from board_config import CHANNEL_SERVER, ControlAction  # noqa: E402
-from board_store import append_event, read_control, record_change  # noqa: E402
+from board_store import append_event  # noqa: E402
+from board_control import read_control, record_change  # noqa: E402
 
 S1, S2 = "11111111-aaaa", "22222222-bbbb"
 FLAG = f"--dangerously-load-development-channels server:{CHANNEL_SERVER}"

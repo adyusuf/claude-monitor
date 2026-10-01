@@ -16,7 +16,8 @@ from pathlib import Path
 BOARD = Path(__file__).resolve().parent.parent / "board"
 sys.path.insert(0, str(BOARD))
 
-from board_store import fold, read_control, read_events  # noqa: E402
+from board_store import fold, read_events  # noqa: E402
+from board_control import read_control  # noqa: E402
 
 CLI = str(BOARD / "board.py")
 

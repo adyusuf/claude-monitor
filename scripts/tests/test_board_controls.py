@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "board"))
 import board_api  # noqa: E402
 import board_hook  # noqa: E402
 from board_config import MODE_FILE, QUEUE_TEXT_MAX  # noqa: E402
-from board_store import append_event, fold, peek_changes, read_control, read_events  # noqa: E402
+from board_store import append_event, fold, read_events  # noqa: E402
+from board_control import peek_changes, read_control  # noqa: E402
 
 S1, S2 = "11111111-aaaa", "22222222-bbbb"
 
