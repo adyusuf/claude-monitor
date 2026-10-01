@@ -12,6 +12,7 @@ A clean machine is set up by following this file.
 | Claude Code | the source of the hooks and transcripts | `claude --version` |
 | Node 20+ | only to run the page's tests | `node --version` |
 | `coverage` (Python package, in a venv outside the repository) | the coverage gate | see below |
+| Rust (rustup) with `llvm-tools-preview`, `cargo-llvm-cov` | only for the desktop window (`desktop/`) and its coverage | `rustc --version`, `cargo llvm-cov --version` |
 | gitleaks, ShellCheck, CodeQL CLI | the secret scan, and SAST for the shell and Python | `gitleaks version`, `shellcheck --version`, `codeql version` |
 
 ## Install
@@ -28,6 +29,24 @@ resolving to this clone), or keep a launcher at those names.
 Every repository and folder at once: `python3 ~/.claude/scripts/board/board.py enable --user` (writes
 `~/.claude/settings.json`, backup in `~/.claude/backups/`). Or enable a single repository: `python3 ~/.claude/scripts/board/board.py enable` (idempotent), commit
 `.claude/settings.json` and `.gitignore`. Details: [`docs/live-board.md`](docs/live-board.md) §2.
+
+## Desktop window
+
+An optional native window around the board (docs/live-board.md §2g). Skip it if the browser's
+"Install" menu or `board_open.py` is enough.
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init.sh   # read it, then:
+sh rustup-init.sh -y --profile minimal -c llvm-tools-preview
+cargo install cargo-llvm-cov --locked            # coverage only
+python3 desktop/make_icon.py                     # draws desktop/icons/icon.png (git-ignored)
+cd desktop && cargo run                          # opens the window (starts the board server if needed)
+```
+
+macOS and Linux only. On Linux Tauri also needs the WebKitGTK development packages (see CI).
+`BOARD_SCRIPTS_DIR` points at `scripts/board` if it is not linked at `~/.claude/scripts/board`.
+`cargo install tauri-cli --locked` and `cargo tauri build` produce a `.app`; it is unsigned, so macOS
+asks you to confirm the first start.
 
 ## Commit hooks
 

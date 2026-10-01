@@ -25,7 +25,7 @@ comes up by itself when a Claude session starts in any project that enables the 
 | Cost (`board_cost.py`) | Parses Claude Code transcripts incrementally to read tokens and cost (prices from `board_config.py`); caches to avoid re-parsing | automatic, once per API call |
 | Sessions (`board_sessions.py`) | Computes per-session/per-task cost, context use, projections (estimates carrying their basis) | automatic, once per API request |
 | Controls (`board_api.py`) | Validates and applies user controls: task queue, skill run, mode switch, fail-closed; writes `.claude/mode` for selections | the user, via the page |
-| App (`board_app.py`, `board_open.py`) | Web app manifest, drawn icons (no binary files), service worker, and the command to open as a Chrome app window | on-demand, or via browser Install menu |
+| App (`board_app.py`, `board_open.py`, `desktop/`) | Web app manifest, drawn icons (no binary files), service worker, and the command to open as a Chrome app window | on-demand, or via browser Install menu |
 | Page (`board.html`, `board_ui.js`) | Polls every 1.5 s; Turkish first, English switch; dates `dd/mm/yyyy` | the user's browser |
 
 Data lives in `<main checkout>/.claude/board/` — the **main** checkout, so every
@@ -270,6 +270,26 @@ files in the repository** — icons are generated on request from the server.
 
 **Service worker** (`/sw.js`): caches nothing. The board is ephemeral and always fresh; a
 stale cache would be worse than a reload.
+
+## 2g. Desktop window (Tauri)
+
+`desktop/` is a thin [Tauri](https://tauri.app) shell: a native window around the board. It holds
+**no logic, no URL and no port** (`CLAUDE.md`): at start it runs `python3 <scripts>/board_open.py --url`,
+which makes sure the server is up (`board_ensure.ensure_server`, no project is registered) and prints
+the address, then navigates the window there. While that runs, the window shows `desktop/ui/` (a splash
+page); if it fails, the reason is shown on that page (the URL fragment).
+
+- **Fail-closed navigation:** the window follows only its own splash page and an `http` address on
+  this machine (127.0.0.0/8, `::1`, `localhost`); an address the script prints that is anywhere else
+  is refused, and the webview has no Tauri IPC permission at all (no capability is granted).
+- **Where the scripts are:** `BOARD_SCRIPTS_DIR`, else `~/.claude/scripts/board` (`desktop/src/config.rs`,
+  the shell's only configuration).
+- **The icon** is drawn by `desktop/make_icon.py` from `board_app.icon_png` (no binary file in git).
+- **Build / run:** SETUP.md "Desktop window". A `.app` bundle needs `cargo tauri build`.
+- **Tests:** `cargo test` (logic in `board.rs`, `config.rs`), `scripts/tests/desktop_splash.test.js`;
+  line coverage ≥ 80 % for the Rust crate is measured by `scripts/coverage.sh` with `cargo-llvm-cov`.
+  The window glue (`lib.rs`, `main.rs`) is counted and has no unit test; it is checked by running the app.
+- **Not verified:** that `sw.js` and notifications behave in macOS WKWebView as in Chrome.
 
 ## 2f. Task ids and where the CLI writes (T-28, 30/09/2026)
 
