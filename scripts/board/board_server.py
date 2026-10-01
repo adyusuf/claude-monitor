@@ -25,7 +25,8 @@ from board_cost import Cache
 from board_merge import merged
 from board_registry import load, project_id, summary
 from board_sessions import board_costs
-from board_store import fold, read_control, read_events
+from board_store import fold, read_events
+from board_control import read_control
 
 JS = "text/javascript; charset=utf-8"
 STATIC = {"/": ("board.html", "text/html; charset=utf-8"),

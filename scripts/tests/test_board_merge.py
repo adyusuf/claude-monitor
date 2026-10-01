@@ -20,7 +20,8 @@ import board  # noqa: E402
 import board_merge  # noqa: E402
 import board_server  # noqa: E402
 from board_registry import register  # noqa: E402
-from board_store import fold, read_control, read_events  # noqa: E402
+from board_store import fold, read_events  # noqa: E402
+from board_control import read_control  # noqa: E402
 
 GIT = ["git", "-c", "user.email=t@t", "-c", "user.name=t"]
 

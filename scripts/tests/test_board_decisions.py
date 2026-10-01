@@ -19,7 +19,8 @@ import board  # noqa: E402
 import board_config  # noqa: E402
 import board_hook  # noqa: E402
 import board_server  # noqa: E402
-from board_store import apply_control, fold, peek_changes, read_control, read_events  # noqa: E402
+from board_store import fold, read_events  # noqa: E402
+from board_control import apply_control, peek_changes, read_control  # noqa: E402
 
 
 class DecisionCase(unittest.TestCase):
