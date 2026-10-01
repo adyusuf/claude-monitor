@@ -4,6 +4,10 @@
 Makes sure the server is up (the SessionStart auto-start's own logic), then opens the page in
 a Chrome app window (`--app=<url>`: no tabs, no address bar); without Chrome, in the default
 browser. Installing it from the browser's "Install" menu (the board is a web app) works too.
+
+  python3 ~/.claude/scripts/board/board_open.py --url
+Only makes sure the server is up and prints its address. The desktop window (desktop/) asks
+for it this way: it owns no URL or port.
 """
 from __future__ import annotations
 
@@ -14,9 +18,10 @@ import sys
 import webbrowser
 
 from board_config import CHROME_BINARIES, MAC_CHROME_APP, OPEN_TIMEOUT_S
-from board_ensure import Found, ensure, probe, url
+from board_ensure import Found, ensure, ensure_server, probe, url
 
 MAC = "darwin"
+URL_FLAG = "--url"
 
 
 def app_command(target: str, platform: str = sys.platform, which=shutil.which) -> list | None:
@@ -48,5 +53,15 @@ def open_board(cwd: str, run=subprocess.run, browser=webbrowser.open, ensure_fn=
     return 0 if browser(target) else 1
 
 
+def print_url(ensure_fn=ensure_server) -> int:
+    """stdout carries the address and nothing else, so a caller can read it as one line."""
+    found = ensure_fn()[0]
+    if found != Found.BOARD:
+        print(f"board_open: no current board server answers on {url()} ({found})", file=sys.stderr)
+        return 1
+    print(url())
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(open_board(os.getcwd()))
+    sys.exit(print_url() if URL_FLAG in sys.argv[1:] else open_board(os.getcwd()))

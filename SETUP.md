@@ -12,6 +12,7 @@ A clean machine is set up by following this file.
 | Claude Code | the source of the hooks and transcripts | `claude --version` |
 | Node 20+ | only to run the page's tests | `node --version` |
 | `coverage` (Python package, in a venv outside the repository) | the coverage gate | see below |
+| Rust (rustup) with `llvm-tools-preview`, `cargo-llvm-cov`, `cargo-audit` | only for the desktop window (`desktop/`), its coverage and its dependency scan | `rustc --version`, `cargo llvm-cov --version`, `cargo audit --version` |
 | gitleaks, ShellCheck, CodeQL CLI | the secret scan, and SAST for the shell and Python | `gitleaks version`, `shellcheck --version`, `codeql version` |
 
 ## Install
@@ -28,6 +29,27 @@ resolving to this clone), or keep a launcher at those names.
 Every repository and folder at once: `python3 ~/.claude/scripts/board/board.py enable --user` (writes
 `~/.claude/settings.json`, backup in `~/.claude/backups/`). Or enable a single repository: `python3 ~/.claude/scripts/board/board.py enable` (idempotent), commit
 `.claude/settings.json` and `.gitignore`. Details: [`docs/live-board.md`](docs/live-board.md) §2.
+
+## Desktop window
+
+An optional native window around the board (docs/live-board.md §2g). Skip it if the browser's
+"Install" menu or `board_open.py` is enough.
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init.sh   # read it, then:
+sh rustup-init.sh -y --profile minimal -c llvm-tools-preview
+cargo install cargo-llvm-cov cargo-audit --locked   # the gate: coverage, dependency CVE
+python3 desktop/make_icon.py                     # draws desktop/icons/icon.png (git-ignored)
+cd desktop && cargo run                          # opens the window (starts the board server if needed)
+```
+
+macOS and Linux only. On Linux Tauri also needs the WebKitGTK development packages (see CI).
+`BOARD_SCRIPTS_DIR` points at `scripts/board` if it is not linked at `~/.claude/scripts/board`.
+An app bundle: `cargo install tauri-cli --locked --version '^2'`, then `cd desktop && cargo tauri build`
+writes `desktop/target/release/bundle/macos/Claude Monitor.app`. It is unsigned, so macOS asks you to
+confirm the first start (right-click, Open). A Finder-started app has a minimal `PATH`: it needs
+`/usr/bin/python3` and finds the scripts at `~/.claude/scripts/board` (or `BOARD_SCRIPTS_DIR`, which a
+Finder-started app does not inherit from your shell, so link the clone there).
 
 ## Commit hooks
 
@@ -79,4 +101,10 @@ it as private. Nothing to rotate. If a future change adds a credential, it goes 
 
 ## Backup
 
-Nothing here needs a backup: the runtime data is derived and disposable, the code is in git.
+The code is in git and needs no backup. The runtime data does **not** regenerate itself:
+`.claude/board/events.jsonl` is the primary, append-only record of a project's tasks, notes, decisions and
+agent activity, and the board page is a fold over it (`control.json` holds what the page asked of the
+sessions). The registry (`~/.cache/claude-board/projects.json`) can be rebuilt by starting a session in each
+project. Losing `events.jsonl` loses that project's board history and nothing else, and that is accepted:
+the board is a progress view, not a system of record, and there is no scheduled backup, offsite copy or
+restore drill. Copy a project's `.claude/board/` directory first if you want to keep one.

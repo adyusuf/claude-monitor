@@ -35,12 +35,14 @@ def _chunk(kind: bytes, data: bytes) -> bytes:
             + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
 
 
-@lru_cache(maxsize=len(APP_ICON_SIZES))
-def icon_png(size: int) -> bytes:
-    """A size x size RGB PNG: the theme colour with three white board columns."""
+@lru_cache(maxsize=2 * len(APP_ICON_SIZES))
+def icon_png(size: int, alpha: bool = False) -> bytes:
+    """A size x size PNG: the theme colour with three white board columns. RGB, or RGBA with
+    alpha=True (the desktop window's icon, desktop/make_icon.py, must have an alpha channel)."""
     if size not in APP_ICON_SIZES:
         raise ValueError(f"no icon of size {size}")
-    bg, fg = bytes(_rgb(APP_THEME_COLOR)), bytes(COLUMN_FILL)
+    opaque = b"\xff" if alpha else b""
+    bg, fg = bytes(_rgb(APP_THEME_COLOR)) + opaque, bytes(COLUMN_FILL) + opaque
     lo, hi = int(size * MARGIN), size - int(size * MARGIN)
     gap = int(size * GAP)
     col = (hi - lo - gap * (COLUMNS - 1)) // COLUMNS
@@ -48,7 +50,7 @@ def icon_png(size: int) -> bytes:
     row_band = b"".join(fg if any(s <= x < s + col for s in starts) else bg for x in range(size))
     row_plain = bg * size
     raw = b"".join(b"\x00" + (row_band if lo <= y < hi else row_plain) for y in range(size))
-    header = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)  # 8-bit RGB
+    header = struct.pack(">IIBBBBB", size, size, 8, 6 if alpha else 2, 0, 0, 0)  # 8-bit RGB(A)
     return (b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", header)
             + _chunk(b"IDAT", zlib.compress(raw, 9)) + _chunk(b"IEND", b""))
 

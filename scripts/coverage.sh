@@ -56,12 +56,12 @@ else
 fi
 
 # JavaScript: MEASURED with Node's built-in coverage, so there is no package to
-# install. The live board's page script (scripts/board/, standards/22-live-board.md) is the
-# JavaScript here. Node only reports files a test LOADED, so a file no test touches
+# install. The live board's page script (scripts/board/, standards/22-live-board.md) and the
+# desktop window's splash page (desktop/ui/) are the JavaScript here. Node only reports files a test LOADED, so a file no test touches
 # would silently leave the denominator: every file must appear in the report, or
 # the codebase is NOT MEASURED (#29).
 echo "▶ JavaScript (threshold ${min}%)"
-js_files="$(find scripts -name '*.js' -not -path '*/tests/*' -not -path '*/node_modules/*' 2>/dev/null | sort)"
+js_files="$(find scripts desktop/ui -name '*.js' -not -path '*/tests/*' -not -path '*/node_modules/*' 2>/dev/null | sort)"
 js_status=0
 if [ -z "$js_files" ]; then
   echo "  n/a: no JavaScript here"
@@ -70,7 +70,7 @@ elif ! command -v node >/dev/null 2>&1; then
   js_status=3
 else
   js_log="$(mktemp)"
-  node --test --experimental-test-coverage --test-coverage-include='scripts/**/*.js' \
+  node --test --experimental-test-coverage --test-coverage-include='scripts/**/*.js' --test-coverage-include='desktop/ui/*.js' \
        --test-coverage-exclude='scripts/tests/**' --test-coverage-lines="$min" \
        'scripts/tests/**/*.test.js' >"$js_log" 2>&1
   js_run=$?
@@ -95,5 +95,39 @@ else
   rm -f "$js_log"
 fi
 if [ "$js_status" != 0 ] && [ "$status" = 0 ]; then status="$js_status"; fi
+
+# Rust: the desktop window (desktop/), a codebase of its own, measured on its own with cargo-llvm-cov
+# (rustup component llvm-tools-preview; SETUP.md). Only generated code is left out: build.rs is the
+# two-line Tauri build hook, whose body is generated. main.rs and lib.rs ARE counted.
+echo "▶ Rust, desktop window (threshold ${min}%)"
+cargo_bin="${CARGO_HOME:-$HOME/.cargo}/bin"
+PATH="$cargo_bin:$PATH"
+rust_status=0
+if [ ! -f desktop/Cargo.toml ]; then
+  echo "  n/a: no Rust here"
+elif ! command -v cargo-llvm-cov >/dev/null 2>&1; then
+  echo "  NOT MEASURED: cargo-llvm-cov is not installed (rustup component add llvm-tools-preview; cargo install cargo-llvm-cov --locked)"
+  rust_status=3
+elif ! python3 desktop/make_icon.py >/dev/null; then
+  echo "  NOT MEASURED: the window icon could not be drawn (desktop/make_icon.py)"
+  rust_status=3
+else
+  rust_log="$(mktemp)"
+  if ! (cd desktop && cargo llvm-cov --ignore-filename-regex 'build\.rs$' --fail-under-lines "$min" >"$rust_log" 2>&1); then
+    if grep -q '^test result: FAILED\|^error' "$rust_log"; then
+      tail -25 "$rust_log" | sed 's/^/  /'
+      echo "  ✗ the tests are red or the crate does not build — coverage of that is not a measurement"
+    else
+      grep -E '^(TOTAL|Filename)|\.rs ' "$rust_log" | sed 's/^/  /'
+      echo "  ✗ below ${min}%"
+    fi
+    rust_status=1
+  else
+    grep -E '^(TOTAL|Filename)|\.rs ' "$rust_log" | sed 's/^/  /'
+    echo "  ✓ at or above ${min}%"
+  fi
+  rm -f "$rust_log"
+fi
+if [ "$rust_status" != 0 ] && [ "$status" = 0 ]; then status="$rust_status"; fi
 
 exit "$status"

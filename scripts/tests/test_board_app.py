@@ -62,6 +62,21 @@ class AppTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             board_app.icon_png(100)
 
+    def test_the_rgba_icon_has_an_alpha_channel_and_the_same_picture(self):
+        def pixels(png):
+            width = struct.unpack(">I", png[16:20])[0]
+            color_type = png[25]
+            idat = png[png.index(b"IDAT") + 4:png.index(b"IEND") - 8]
+            raw = zlib.decompress(idat)
+            step = 4 if color_type == 6 else 3
+            return color_type, [raw[1 + y * (1 + width * step):(y + 1) * (1 + width * step)]
+                                for y in range(width)], step
+        rgb_type, rgb, _ = pixels(board_app.icon_png(192))
+        rgba_type, rgba, step = pixels(board_app.icon_png(192, alpha=True))
+        self.assertEqual((rgb_type, rgba_type, step), (2, 6, 4))
+        self.assertEqual([bytes(r[i] for i in range(len(r)) if i % 4 != 3) for r in rgba], rgb)
+        self.assertTrue(all(r[3::4] == b"\xff" * 192 for r in rgba))
+
     def test_svg_icon_and_icon_paths(self):
         svg = board_app.icon_svg().decode()
         self.assertIn(APP_THEME_COLOR, svg)
@@ -180,7 +195,7 @@ class ServerRouteTests(unittest.TestCase):
         self.assertEqual(self.get("/manifest.webmanifest")[0], "application/manifest+json")
         self.assertEqual(self.get("/icon-512.png")[0], "image/png")
         self.assertEqual(self.get("/icon.svg")[0], "image/svg+xml")
-        for js in ("/sw.js", "/board_ui_text.js", "/board_ui_sessions.js"):
+        for js in ("/sw.js", "/board_ui_text.js", "/board_ui_sessions.js", "/board_ui_tasks.js", "/board_ui_lists.js"):
             self.assertTrue(self.get(js)[0].startswith("text/javascript"))
         self.assertEqual(json.loads(self.get("/api/skills")[1]), ["plain"])
         with self.assertRaises(urllib.error.HTTPError):
@@ -206,3 +221,21 @@ class ServerRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class PrintUrlTests(unittest.TestCase):
+    def run_url(self, found):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = board_open.print_url(ensure_fn=lambda: (found, False, None))
+        return code, out.getvalue(), err.getvalue()
+
+    def test_a_current_server_prints_its_address_and_nothing_else(self):
+        code, out, err = self.run_url(Found.BOARD)
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(out, board_open.url() + "\n")
+
+    def test_any_other_state_prints_no_address(self):
+        for found in (Found.NOTHING, Found.OTHER, Found.STALE, Found.OLD_BOARD):
+            code, out, err = self.run_url(found)
+            self.assertEqual((code, out), (1, ""), found)
+            self.assertIn(found, err)
