@@ -242,6 +242,10 @@
       }
       const sw = e.target.closest("[data-role]");
       if (sw) return control(sw.getAttribute("aria-checked") === "true" ? "disable_role" : "enable_role", sw.dataset.role);
+      const ask = e.target.closest("[data-ask-task]");
+      if (ask) {
+        return control("queue_task", ask.dataset.askSession, { text: fill(t("askStatusMsg"), { id: ask.dataset.askTask }) });
+      }
       const btn = e.target.closest("[data-task]");
       return btn ? control(btn.dataset.action, btn.dataset.task) : null;
     }
