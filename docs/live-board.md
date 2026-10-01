@@ -357,6 +357,26 @@ session can be reached through an MCP **channel**: a stdio server that declares
 - **Fail-closed rule for any board channel server:** it pushes only text the board queued
   for a registered session — never arbitrary text.
 
+## 2g. Desktop window (Tauri)
+
+`desktop/` is a thin [Tauri](https://tauri.app) shell: a native window around the board. It holds
+**no logic, no URL and no port** (`CLAUDE.md`): at start it runs `python3 <scripts>/board_open.py --url`,
+which makes sure the server is up (`board_ensure.ensure_server`, no project is registered) and prints
+the address, then navigates the window there. While that runs, the window shows `desktop/ui/` (a splash
+page); if it fails, the reason is shown on that page (the URL fragment).
+
+- **Fail-closed navigation:** the window follows only its own splash page and an `http` address on
+  this machine (127.0.0.0/8, `::1`, `localhost`); an address the script prints that is anywhere else
+  is refused, and the webview has no Tauri IPC permission at all (no capability is granted).
+- **Where the scripts are:** `BOARD_SCRIPTS_DIR`, else `~/.claude/scripts/board` (`desktop/src/config.rs`,
+  the shell's only configuration).
+- **The icon** is drawn by `desktop/make_icon.py` from `board_app.icon_png` (no binary file in git).
+- **Build / run:** SETUP.md "Desktop window". A `.app` bundle needs `cargo tauri build`.
+- **Tests:** `cargo test` (logic in `board.rs`, `config.rs`), `scripts/tests/desktop_splash.test.js`;
+  line coverage ≥ 80 % for the Rust crate is measured by `scripts/coverage.sh` with `cargo-llvm-cov`.
+  The window glue (`lib.rs`, `main.rs`) is counted and has no unit test; it is checked by running the app.
+- **Checked in the macOS window (01/10/2026):** `sw.js` registers (service workers work in the Tauri WKWebView on an `http://127.0.0.1` page). `Notification.requestPermission()` answers `denied` without a prompt, and the board uses no notifications, so nothing is lost. The failure page shows the reason (a missing scripts directory was tried).
+
 ## 2h. Table order, finished rows and pages
 
 The three tables (Sessions, Tasks, Agent activity) are ordered, filtered and paged in the page itself
@@ -377,23 +397,3 @@ The three tables (Sessions, Tasks, Agent activity) are ordered, filtered and pag
   only (not stored), like the box states.
 - **A table whose HTML did not change is not rewritten** on the 1.5 s poll, so a focused pager button
   keeps its focus. A task row is still not redrawn while a note is being typed in it.
-
-## 2g. Desktop window (Tauri)
-
-`desktop/` is a thin [Tauri](https://tauri.app) shell: a native window around the board. It holds
-**no logic, no URL and no port** (`CLAUDE.md`): at start it runs `python3 <scripts>/board_open.py --url`,
-which makes sure the server is up (`board_ensure.ensure_server`, no project is registered) and prints
-the address, then navigates the window there. While that runs, the window shows `desktop/ui/` (a splash
-page); if it fails, the reason is shown on that page (the URL fragment).
-
-- **Fail-closed navigation:** the window follows only its own splash page and an `http` address on
-  this machine (127.0.0.0/8, `::1`, `localhost`); an address the script prints that is anywhere else
-  is refused, and the webview has no Tauri IPC permission at all (no capability is granted).
-- **Where the scripts are:** `BOARD_SCRIPTS_DIR`, else `~/.claude/scripts/board` (`desktop/src/config.rs`,
-  the shell's only configuration).
-- **The icon** is drawn by `desktop/make_icon.py` from `board_app.icon_png` (no binary file in git).
-- **Build / run:** SETUP.md "Desktop window". A `.app` bundle needs `cargo tauri build`.
-- **Tests:** `cargo test` (logic in `board.rs`, `config.rs`), `scripts/tests/desktop_splash.test.js`;
-  line coverage ≥ 80 % for the Rust crate is measured by `scripts/coverage.sh` with `cargo-llvm-cov`.
-  The window glue (`lib.rs`, `main.rs`) is counted and has no unit test; it is checked by running the app.
-- **Checked in the macOS window (01/10/2026):** `sw.js` registers (service workers work in the Tauri WKWebView on an `http://127.0.0.1` page). `Notification.requestPermission()` answers `denied` without a prompt, and the board uses no notifications, so nothing is lost. The failure page shows the reason (a missing scripts directory was tried).
