@@ -20,7 +20,7 @@ jobs:
   gate:
     name: Gate (dev)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       # Third-party actions are pinned to a full commit SHA (the tag is in the comment).
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -57,9 +57,27 @@ jobs:
           python3 -m venv "$HOME/.cache/claude-monitor/venv"
           "$HOME/.cache/claude-monitor/venv/bin/pip" install coverage==7.10.7
 
+      # The desktop window (desktop/) is a Rust codebase of its own; the coverage step measures it (#29).
+      # Versions are pinned here and in SETUP.md. Tauri on Linux needs the WebKitGTK development packages.
+      - name: Rust 1.99.0 and the libraries Tauri needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev librsvg2-dev
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init.sh
+          sh rustup-init.sh -y --profile minimal --default-toolchain 1.99.0 -c llvm-tools-preview
+          rm rustup-init.sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: cargo-llvm-cov 0.9.1
+        run: ~/.cargo/bin/cargo install cargo-llvm-cov --version 0.9.1 --locked
+
+      - name: cargo-audit 0.22.2 (dependency CVE for desktop/Cargo.lock)
+        run: ~/.cargo/bin/cargo install cargo-audit --version 0.22.2 --locked
+
       - name: Tool versions
         run: |
           python3 --version
+          ~/.cargo/bin/rustc --version
           node --version
           gitleaks version
           codeql version | head -1

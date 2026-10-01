@@ -32,7 +32,9 @@ from board_control import read_control
 JS = "text/javascript; charset=utf-8"
 STATIC = {"/": ("board.html", "text/html; charset=utf-8"),
           "/board_ui.js": ("board_ui.js", JS), "/board_ui_text.js": ("board_ui_text.js", JS),
-          "/board_ui_sessions.js": ("board_ui_sessions.js", JS), "/sw.js": ("sw.js", JS)}
+          "/board_ui_sessions.js": ("board_ui_sessions.js", JS),
+          "/board_ui_tasks.js": ("board_ui_tasks.js", JS), "/board_ui_lists.js": ("board_ui_lists.js", JS),
+          "/sw.js": ("sw.js", JS)}
 MAX_BODY = 4096
 BUILD = code_build()  # the code this process was started with (see board_ensure: a stale server is replaced)
 TRANSCRIPTS = Cache()  # parsed incrementally, shared by every request thread

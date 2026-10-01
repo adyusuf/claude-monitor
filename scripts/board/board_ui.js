@@ -14,51 +14,15 @@
   const POLL_MS = 1500;
   const LANG_KEY = "board.lang";
   const PROJECT_KEY = "board.project";
-  const LIVE = new Set(["starting", "running"]);
-  const text = typeof module === "object" && module.exports
-    ? require("./board_ui_text.js") : globalThis.BoardText;
-  const panel = typeof module === "object" && module.exports
-    ? require("./board_ui_sessions.js") : globalThis.BoardSessions;
+  const node = typeof module === "object" && module.exports;
+  const text = node ? require("./board_ui_text.js") : globalThis.BoardText;
+  const panel = node ? require("./board_ui_sessions.js") : globalThis.BoardSessions;
+  const lists = node ? require("./board_ui_lists.js") : globalThis.BoardLists;
+  const { LIVE, badge, decisionHtml, mergeHtml, taskRowsHtml } = node
+    ? require("./board_ui_tasks.js") : globalThis.BoardTasks;
   const { I18N, makeT, esc, fmtDate, fmtTime, fmtStamp, fmtDur, fill } = text;
   const SW_PATH = "/sw.js";
-
-  const badge = (t, status) => `<span class="badge s-${esc(status)}">${esc(t("s_" + status))}</span>`;
-
-  function taskSpan(task, agents) {
-    const own = task.agents.map((k) => agents[k]).filter(Boolean);
-    if (!own.length) return [null, null];
-    const start = own.map((a) => a.started).sort()[0];
-    const live = own.some((a) => LIVE.has(a.status));
-    const end = live ? null : own.map((a) => a.ended).filter(Boolean).sort().pop();
-    return [start, end];
-  }
-
-  function liveAgents(task, agents) {
-    const live = task.agents.map((k) => agents[k]).filter((a) => a && LIVE.has(a.status));
-    return live.length ? `<div class="live-agents">${live.map((a) =>
-      `<span class="agent-chip"><span class="dot on"></span>${esc(a.type)}</span>`).join("")}</div>` : "";
-  }
-
-  /** A question Claude put on the board: its choices and a note field, or the answer given. */
-  function decisionHtml(task, defaults, t) {
-    if (task.status !== "needs_decision") return "";
-    if (task.decision) {
-      return `<div class="decided">${esc(t("decided"))}: <b>${esc(task.decision.choice)}</b>${
-        task.decision.note ? ` — ${esc(task.decision.note)}` : ""}</div>`;
-    }
-    const choices = task.options && task.options.length
-      ? task.options.map((o) => [o, o]) : defaults.map((d) => [d, t(d)]);
-    return `<div class="decide" data-decide-task="${esc(task.id)}">${choices.map(([value, label]) =>
-      `<button class="act" data-choice="${esc(value)}">${esc(label)}</button>`).join("")}
-      <input class="dnote" data-note-for="${esc(task.id)}" maxlength="500" placeholder="${esc(t("notePh"))}"></div>`;
-  }
-
-  /** Where the task's commits are, per branch, as the server read it from git. */
-  function mergeHtml(task) {
-    const entries = Object.entries(task.merged || {}).filter(([, ok]) => ok !== null);
-    return entries.length ? entries.map(([branch, ok]) =>
-      `<span class="mg${ok ? " on" : ""}">${esc(branch)} ${ok ? "✓" : "—"}</span>`).join(" ") : "—";
-  }
+  const SHOW_DONE = { showDoneTasks: "tasks", showDoneAgents: "agents" };  // checkbox id -> table
 
   /** The project tabs: name, live-agent dot, running count; the selected one marked. */
   function projectsHtml(projects, selected, t) {
@@ -72,11 +36,18 @@
   function view(st, t, now = new Date(), extra = {}) {
     const skills = extra.skills || [];
     const drafts = extra.drafts || {};
-    const taskCosts = (st.costs && st.costs.tasks) || {};
     const agentRows = (st.costs && st.costs.agent_rows) || { rows: {}, by_type: {}, unmeasured: 0, total: null };
     const tasks = Object.values(st.tasks);
     const agents = st.agents;
-    const agentList = Object.values(agents).sort((a, b) => (b.started || "").localeCompare(a.started || ""));
+    const agentList = Object.values(agents);
+    // Tables: active rows first, then newest first; finished rows hidden until asked for; 30-row pages.
+    const paging = extra.lists || lists.makeLists().state();
+    const taskSel = lists.select(tasks, { order: lists.orderTasks, finished: lists.isFinishedTask, state: paging.tasks });
+    const agentSel = lists.select(agentList, { order: lists.orderAgents, finished: lists.isFinishedAgent, state: paging.agents });
+    const channelSessions = ((st.costs && st.costs.sessions) || []).filter((s) => !extra.channelOnly || s.channel);
+    const sessionSel = lists.select(channelSessions, { order: lists.orderSessions, state: paging.sessions });
+    const empty = (cols, sel, none) => `<tr><td colspan="${cols}" class="empty">${esc(
+      sel.all ? fill(t("onlyFinished"), { n: sel.hidden }) : t(none))}</td></tr>`;
     const sessions = Object.values(st.sessions);
     const turnOpen = sessions.some((s) => s.turn_open);
     const count = (pred) => tasks.filter(pred).length;
@@ -109,30 +80,16 @@
           aria-label="${esc(r)} ${esc(on ? t("roleOn") : t("roleOff"))}" data-role="${esc(r)}"></button>
           <span>${esc(r)}</span><span class="cnt">${n} ${esc(t("running"))}${esc(panel.roleCostText(t, st.costs && st.costs.agent_rows, r))}</span></div>`;
       }).join(""),
-      sessionsHtml: panel.sessionsHtml(t, st, skills, drafts, now, extra.channelOnly),
+      sessionsHtml: panel.sessionsHtml(t, st, skills, drafts, now, extra.channelOnly, sessionSel.rows),
       sessionsHelp: panel.helpHtml(t, st.costs, st.stop_wait_s),
       modesHtml: panel.modesHtml(t, st),
-      tasksHtml: !tasks.length ? `<tr><td colspan="9" class="empty">${esc(t("noTasks"))}</td></tr>` :
-        tasks.map((x) => {
-          const [start, end] = taskSpan(x, agents);
-          const removed = x.status === "removed";
-          return `<tr class="${removed ? "removed" : ""}">
-            <td><span class="tid">${esc(x.id)}</span><span class="title">${esc(x.title)}</span></td>
-            <td>${x.branch ? `<code>${esc(x.branch)}</code>` : "—"}</td>
-            <td>${esc(x.role || "—")}${liveAgents(x, agents)}</td><td>${badge(t, x.status)}</td>
-            <td class="muted">${start ? esc(fmtDur(t, start, end, now)) : "—"}</td>
-            <td>${mergeHtml(x)}</td><td>${panel.taskCostHtml(t, x, taskCosts[x.id])}</td>
-            <td>${esc(x.note)}${decisionHtml(x, st.decision_defaults || [], t)}</td>
-            <td><button class="act" data-task="${esc(x.id)}" data-action="${removed ? "restore_task" : "remove_task"}">
-              ${esc(removed ? t("restore") : t("remove"))}</button></td></tr>`;
-        }).join(""),
-      agentsHtml: !agentList.length ? `<tr><td colspan="8" class="empty">${esc(t("noAgents"))}</td></tr>` :
-        agentList.slice(0, 30).map((a) => `<tr><td>${esc(a.type)}</td><td>${esc(a.task || "—")}</td>
-          <td>${badge(t, a.status)}</td><td class="muted">${esc(fmtStamp(a.started, now))}</td>
-          <td class="muted">${esc(a.status === "denied" ? "—" : fmtDur(t, a.started, a.ended, now))}</td>
-          ${a.status === "denied" ? `<td class="muted" colspan="2">—</td>` : panel.agentCostCells(t, agentRows.rows[a.key])}
-          <td>${esc(a.reason || a.description)}</td></tr>`).join("") + panel.agentTotalRow(t, agentRows),
-      agentsHelp: agentList.length ? `<p>${esc(t("undercount"))}</p><p>${esc(t("agentRowsNote"))}</p>` : "",
+      tasksHtml: taskSel.rows.length ? taskRowsHtml(t, taskSel.rows, st, now) : empty(9, taskSel, "noTasks"),
+      agentsHtml: panel.agentsTableHtml(t, agentSel.rows, agentRows, (s) => badge(t, s), now,
+        empty(8, agentSel, "noAgents")),
+      pagers: { tasks: lists.pagerHtml(t, "tasks", taskSel), agents: lists.pagerHtml(t, "agents", agentSel),
+        sessions: lists.pagerHtml(t, "sessions", sessionSel) },
+      pages: { tasks: taskSel.page, agents: agentSel.page, sessions: sessionSel.page },
+      agentsHelp: panel.agentsHelpHtml(t, agentList.length),
     };
   }
 
@@ -153,9 +110,13 @@
     let project = readKey(win, PROJECT_KEY);
     let skills = [];
     const drafts = { queue: {}, skill: {} };  // what the user typed or picked, kept across redraws
+    const paging = lists.makeLists();         // each table's page and "show finished" choice
+    const written = {};                       // the last HTML put in each element: an unchanged one is not rewritten
     const $ = (id) => doc.getElementById(id);
     const focused = (key) => Boolean(doc.activeElement && doc.activeElement.dataset &&
       doc.activeElement.dataset[key]);
+    // The page polls every 1.5 s. Rewriting an identical table would drop the focus on a pager button.
+    const put = (id, html) => { if (written[id] !== html) { $(id).innerHTML = html; written[id] = html; } };
 
     function applyStatic() {
       doc.documentElement.lang = lang;
@@ -166,7 +127,9 @@
 
     function render(st) {
       lastState = st;
-      const v = view(st, t, new Date(), { skills, drafts, channelOnly: Boolean($("channelOnly").checked) });
+      const v = view(st, t, new Date(), { skills, drafts, channelOnly: Boolean($("channelOnly").checked),
+        lists: paging.state() });
+      paging.remember(v.pages);  // a page that no longer exists (the table shrank) is held inside the range
       $("mode").textContent = v.mode;
       $("modes").innerHTML = v.modesHtml;
       $("last").textContent = v.last;
@@ -176,11 +139,12 @@
       $("banner").classList.toggle("show", v.allDone);
       $("roles").innerHTML = v.rolesHtml;
       // Typing a note: do not redraw the table under the cursor, or the text is lost.
-      if (!focused("noteFor")) $("tasks").innerHTML = v.tasksHtml;
-      if (!focused("queueFor") && !focused("skillFor")) $("sessions").innerHTML = v.sessionsHtml;
-      $("sessionsHelp").innerHTML = v.sessionsHelp;
-      $("agents").innerHTML = v.agentsHtml;
-      $("agentsHelp").innerHTML = v.agentsHelp;
+      if (!focused("noteFor")) put("tasks", v.tasksHtml);
+      if (!focused("queueFor") && !focused("skillFor")) put("sessions", v.sessionsHtml);
+      put("sessionsHelp", v.sessionsHelp);
+      put("agents", v.agentsHtml);
+      put("agentsHelp", v.agentsHelp);
+      for (const key of lists.TABLES) put(`${key}Pager`, v.pagers[key]);
     }
 
     async function refresh() {
@@ -220,7 +184,10 @@
 
     function onInput(e) {
       const d = e.target.dataset || {};
-      if (e.target.id === "channelOnly" && lastState) render(lastState);
+      const table = SHOW_DONE[e.target.id];
+      if (table) paging.showDone(table, e.target.checked);
+      if (e.target.id === "channelOnly") paging.firstPage("sessions");
+      if ((table || e.target.id === "channelOnly") && lastState) render(lastState);
       if (d.queueFor) drafts.queue[d.queueFor] = e.target.value;
       if (d.skillFor) drafts.skill[d.skillFor] = e.target.value;
     }
@@ -234,9 +201,16 @@
         if (lastState) render(lastState);
         return null;
       }
+      const pager = e.target.closest("[data-page]");
+      if (pager) {
+        paging.turn(pager.dataset.page, pager.dataset.dir);
+        if (lastState) render(lastState);
+        return null;
+      }
       const tab = e.target.closest("[data-project]");
       if (tab) {
         project = tab.dataset.project;
+        paging.reset();
         writeKey(win, PROJECT_KEY, project);
         return refresh();
       }

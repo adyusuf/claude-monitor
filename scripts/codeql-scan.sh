@@ -5,8 +5,9 @@
 # thresholds CI uses — never two different rules in two places. gate-core.sh
 # calls this file through SAST_CMD in scripts/merge-gate.conf.
 #
-# Scope: Python and JavaScript via CodeQL, shell via ShellCheck. The JavaScript is
-# the live board's page script (scripts/board/, standards/22-live-board.md).
+# Scope: Python, JavaScript and Rust via CodeQL, shell via ShellCheck. The JavaScript is
+# the live board's page script (scripts/board/, standards/22-live-board.md); the Rust is the
+# desktop window (desktop/).
 # CodeQL has no shell analyser, and this repository is mostly shell — "SAST passed" would have read as
 # "everything was scanned" while more than half the code was never looked at.
 # ShellCheck closes that half. Both tools are PROBED; a missing one is reported
@@ -119,6 +120,14 @@ codeql_pass javascript JavaScript '*.js' \
 js_status=$?
 if [ "$js_status" = 3 ]; then exit 3; fi
 if [ "$js_status" != 0 ] && [ "$status" = 0 ]; then status="$js_status"; fi
+
+echo
+codeql_pass rust Rust '*.rs' \
+  "codeql/rust-queries:codeql-suites/rust-security-extended.qls" \
+  "$root/.codeql/db-rust" "$root/.codeql/results-rust.sarif"
+rust_status=$?
+if [ "$rust_status" = 3 ]; then exit 3; fi
+if [ "$rust_status" != 0 ] && [ "$status" = 0 ]; then status="$rust_status"; fi
 
 echo
 echo "▶ SAST (ShellCheck, shell)"
