@@ -27,6 +27,22 @@ that user's own machine and pages; they are reviewed against the OWASP Top 10 be
 | A09 | Logging and monitoring failures | The server logs 4xx and 5xx responses to `server.log`; control changes are numbered in `control.json`. There is no audit log and no alerting, and none is needed for a local tool. |
 | A10 | Server-side request forgery | The server makes no outbound request. The one HTTP client call (`board_ensure.py`) asks the board's own loopback port for `/api/info`. |
 
+## Known advisory warnings (cargo audit, checked 02/10/2026)
+
+`cargo audit` reports two warnings on `desktop/Cargo.lock`. Neither is a vulnerability, neither blocks the gate.
+
+| Advisory | Crate | Why it stays |
+|---|---|---|
+| RUSTSEC-2024-0370 (unmaintained) | `proc-macro-error` | Pulled in by the GTK3 bindings Tauri uses on Linux only. |
+| RUSTSEC-2024-0429 (unsound) | `glib` | The same Linux-only GTK3 stack. |
+
+- **Not in the macOS build:** `cargo tree --target aarch64-apple-darwin -i glib` (and `-i proc-macro-error`) prints
+  nothing. The Linux build is what CI compiles and tests; no Linux bundle is shipped.
+- **Not fixable here:** `cargo update` leaves `Cargo.lock` unchanged (already the highest compatible versions); the
+  fix is Tauri / wry moving off GTK3, which is upstream.
+- **When to look again:** at every Tauri bump, and before anyone ships a Linux bundle. Re-run
+  `cd desktop && cargo audit`; if either warning is still there, this section stays true.
+
 ## Reporting a problem
 
 Open an issue that says only that you found one; the details are exchanged privately.
