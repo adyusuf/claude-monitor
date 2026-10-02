@@ -105,6 +105,7 @@ format of the map is described in `scripts/real-name-check.sh`. A deliberate exc
 ```bash
 python3 -m venv ~/.cache/claude-monitor/venv && ~/.cache/claude-monitor/venv/bin/pip install coverage
 bash scripts/merge-gate.sh dev
+python3 scripts/mutation_check.py scripts/board/board_store.py --tests test_board   # before a release: docs/release.md
 ```
 
 ## CI
