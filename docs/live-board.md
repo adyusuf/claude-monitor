@@ -35,6 +35,12 @@ worktree of the project writes to one board. `events.jsonl` is append-only;
 `control.json` holds the user's controls. Both are created `0600` and are runtime
 data: add `.claude/board/` to the project's `.gitignore`.
 
+**A damaged log does not take the board down.** A line that is cut off, is not text or is not an object
+is skipped; an event of the right shape but the wrong content (an id that is a list, a task with no id,
+an agent call with no `tool_use_id`) is skipped whole, before it changes anything. Each is reported on
+stderr once per kind of problem, not on every poll. Pinned by `scripts/tests/test_board_fuzz.py`
+(seeded random damage, so a failure reproduces).
+
 Measured against Claude Code 2.1.281 (read from the binary, not the docs, whose
 summary was wrong twice): the tool is `Agent`; a background call's `PostToolUse`
 carries `tool_response.status == "async_launched"` and `agentId`, which binds the
