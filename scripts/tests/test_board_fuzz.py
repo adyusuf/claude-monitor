@@ -41,7 +41,7 @@ FIELDS = ["ts", "session", "id", "title", "branch", "role", "note", "status", "m
           "options", "eta_min", "est_cost", "agent", "task", "tool_use_id", "agent_id", "agent_type",
           "description", "reason", "background", "launched", "transcript", "agent_transcript", "todos", "item", "change"]
 VALUES = [None, "", "T-1", "T-2", "u1", "a1", "s1", "running", "done", "B", "2026-10-02T10:00:00Z", 0, 1, -1, 3.5,
-          10 ** 30, True, False, [], ["T-1"], ["a", 1], {}, {"id": "T-1"}, [{"content": "x", "status": "pending"}],
+          float("nan"), float("inf"), float("-inf"), 10 ** 30, True, False, [], ["T-1"], ["a", 1], {}, {"id": "T-1"}, [{"content": "x", "status": "pending"}],
           [{"id": "T-1"}], {"id": "T-1", "content": "c"}, {"id": "T-1", "status": "deleted"},
           {"id": "T-1", "status": "in_progress", "content": "c"}, [{"id": "T-1", "content": "c", "status": "pending"}] * 80,
           "x" * 5000, "\x00", "é", "<script>alert(1)</script>"]
@@ -116,7 +116,7 @@ class Folding(unittest.TestCase):
             events = [random_event(rng) for _ in range(300)]
             with redirect_stderr(io.StringIO()):
                 state = fold(events)
-            json.dumps(state)                       # the server serialises exactly this
+            json.dumps(state, allow_nan=False)      # the server serialises exactly this; a browser cannot read NaN
             self.assertIsInstance(state["tasks"], dict, f"seed {seed}")
 
     def test_an_update_of_an_item_that_has_no_status_does_not_raise(self):
@@ -150,7 +150,10 @@ class TheEventCheck(unittest.TestCase):
             self.assertIsNone(check.problem(ev), ev)
         bad = [5, None, [], {"type": "task_add"}, {"type": "task_set", "id": ["T-1"]}, {"type": "agent_post"},
                {"type": "plan", "roles": "B"}, {"type": "task_set", "id": "T-1", "eta_min": True},
-               {"type": "task_set", "id": "T-1", "est_cost": "3"}, {"type": "todo_sync", "todos": "x"},
+               {"type": "task_set", "id": "T-1", "est_cost": "3"},
+               {"type": "task_set", "id": "T-1", "eta_min": float("nan")},
+               {"type": "task_set", "id": "T-1", "est_cost": float("inf")},
+               {"type": "task_set", "id": "T-1", "est_cost": float("-inf")}, {"type": "todo_sync", "todos": "x"},
                {"type": "todo_sync", "todos": [1]}, {"type": "todo_add", "item": []},
                {"type": "todo_update", "change": {"content": "c"}}]
         for ev in bad:
@@ -167,6 +170,36 @@ class TheEventCheck(unittest.TestCase):
         self.assertEqual(err.getvalue().count("skipping a malformed"), 2)      # task_add once, task_set once
 
 
+class TheReport(unittest.TestCase):
+    def test_a_log_full_of_distinct_junk_prints_a_bounded_number_of_lines(self):
+        import board_event_check as check
+        check._reported.clear()
+        err = io.StringIO()
+        with redirect_stderr(err):
+            for i in range(300):
+                fold([{"type": f"kind-{i}", "id": ["x"]}])
+        lines = err.getvalue().splitlines()
+        self.assertLessEqual(len(lines), check.REPORT_LIMIT + 1)
+        self.assertEqual(sum("more than" in ln for ln in lines), 1)               # the note, once
+        self.assertLessEqual(len(check._reported), check.REPORT_LIMIT + 1)         # memory is bounded too
+
+    def test_a_long_type_is_cut_before_it_is_printed(self):
+        import board_event_check as check
+        check._reported.clear()
+        err = io.StringIO()
+        with redirect_stderr(err):
+            fold([{"type": "A" * 100000, "id": ["x"]}])
+        self.assertLess(len(err.getvalue()), 300)
+
+    def test_a_non_text_type_is_cut_too(self):
+        import board_event_check as check
+        check._reported.clear()
+        err = io.StringIO()
+        with redirect_stderr(err):
+            fold([{"type": list(range(5000))}])
+        self.assertLess(len(err.getvalue()), 300)
+
+
 class TheServerOverADamagedLog(unittest.TestCase):
     def test_state_stays_200_and_json(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -181,9 +214,11 @@ class TheServerOverADamagedLog(unittest.TestCase):
             self.addCleanup(server.server_close)
             self.addCleanup(server.shutdown)
             url = f"http://127.0.0.1:{server.server_address[1]}/api/state?p={pid}"
+            def refuse(token):                  # what a browser's JSON.parse does with NaN and Infinity
+                raise ValueError(token)
             with redirect_stderr(io.StringIO()), urllib.request.urlopen(url) as res:
                 self.assertEqual(res.status, 200)
-                self.assertIn("tasks", json.loads(res.read()))
+                self.assertIn("tasks", json.loads(res.read(), parse_constant=refuse))
 
 
 HOOK_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "SubagentStart",

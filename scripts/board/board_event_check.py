@@ -6,33 +6,41 @@ file. An event that is not well formed is skipped whole - before it changes anyt
 shapes - and reported once per kind of problem, not on every poll."""
 from __future__ import annotations
 
+import math
 import sys
 
 from board_todos import TODO_EVENTS
 
-STRINGS = ("type", "ts", "session", "id", "title", "branch", "role", "note", "status", "mode", "by", "agent",
-           "task", "tool_use_id", "agent_id", "agent_type", "description", "reason", "transcript",
-           "agent_transcript")
-LISTS = ("roles", "commits", "options")
-NUMBERS = ("eta_min", "est_cost")
+STRINGS = frozenset(("type", "ts", "session", "id", "title", "branch", "role", "note", "status", "mode", "by",
+                     "agent", "task", "tool_use_id", "agent_id", "agent_type", "description", "reason",
+                     "transcript", "agent_transcript"))
+LISTS = frozenset(("roles", "commits", "options"))
+NUMBERS = frozenset(("eta_min", "est_cost"))
 NEEDS_ID = ("task_add", "task_set")
 NEEDS_TOOL_USE = ("agent_pre", "agent_denied", "agent_post")
+REPORT_LIMIT, SHOWN = 50, 40
 _reported: set[tuple[str, str]] = set()
 
 
 def problem(ev) -> str | None:
-    """Why the fold must not apply this event, or None when it may."""
+    """Why the fold must not apply this event, or None when it may. Walks the event's own fields (a handful),
+    not the whole field list: the server folds the entire log on every poll."""
     if not isinstance(ev, dict):
         return "not an object"
-    for name in STRINGS:
-        if ev.get(name) is not None and not isinstance(ev[name], str):
-            return f"{name} is not text"
-    for name in LISTS:
-        if ev.get(name) is not None and not isinstance(ev[name], list):
-            return f"{name} is not a list"
-    for name in NUMBERS:
-        if ev.get(name) is not None and (isinstance(ev[name], bool) or not isinstance(ev[name], (int, float))):
-            return f"{name} is not a number"
+    for name, value in ev.items():
+        if value is None:
+            continue
+        if name in STRINGS:
+            if not isinstance(value, str):
+                return f"{name} is not text"
+        elif name in LISTS:
+            if not isinstance(value, list):
+                return f"{name} is not a list"
+        elif name in NUMBERS:
+            # NaN and Infinity are "numbers" to Python's json but not to a browser: json.dumps would hand the
+            # page text it cannot parse, and the whole board would go blank.
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                return f"{name} is not a finite number"
     kind = ev.get("type")
     if kind in NEEDS_ID and not ev.get("id"):
         return "no id"
@@ -50,8 +58,16 @@ def problem(ev) -> str | None:
 
 
 def report(ev, why: str) -> None:
-    """Once per (kind, problem) for the life of the process: the server folds the log on every poll."""
-    key = (str(ev.get("type")) if isinstance(ev, dict) else "?", why)
-    if key not in _reported:
-        _reported.add(key)
-        print(f"board: skipping a malformed {key[0]} event ({why}); the rest of the log is used", file=sys.stderr)
+    """Once per (kind, problem) for the life of the process: the server folds the log on every poll. Bounded: a
+    log full of distinct junk prints REPORT_LIMIT lines and one note, and a long `type` is cut to SHOWN characters."""
+    kind = ev.get("type") if isinstance(ev, dict) else None
+    key = (repr(kind)[:SHOWN] if kind is not None else "?", why)
+    if key in _reported:
+        return
+    if len(_reported) >= REPORT_LIMIT:
+        if len(_reported) == REPORT_LIMIT:
+            _reported.add(("", "limit"))
+            print(f"board: more than {REPORT_LIMIT} kinds of malformed event; the rest are skipped silently", file=sys.stderr)
+        return
+    _reported.add(key)
+    print(f"board: skipping a malformed {key[0]} event ({why}); the rest of the log is used", file=sys.stderr)
