@@ -51,6 +51,18 @@ confirm the first start (right-click, Open). A Finder-started app has a minimal 
 `/usr/bin/python3` and finds the scripts at `~/.claude/scripts/board` (or `BOARD_SCRIPTS_DIR`, which a
 Finder-started app does not inherit from your shell, so link the clone there).
 
+## Where Claude Code runs it
+
+The board is fed by Claude Code's hooks, so it works wherever the hooks fire. Checked on 02/10/2026:
+
+| Surface | Status | Evidence |
+|---|---|---|
+| Desktop app | works | boards on this machine hold sessions whose transcript entrypoint is `claude-desktop` |
+| Terminal (`claude`) | hooks fire | a headless `claude -p` run in a temporary folder wrote `turn_start` and `turn_stop` to its board. An interactive terminal session was not driven by hand. |
+| VS Code extension | **not verified** | no VS Code session exists on this machine, so none could be observed. It should behave like the others (same hooks), but that is an assumption. |
+
+How a queued message reaches an idle session differs per surface: `docs/live-board.md` §2d.
+
 ## Commit hooks
 
 This repository is public, so a commit is checked before it exists: the `CLAUDE.md` size budget, a
