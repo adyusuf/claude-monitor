@@ -1,5 +1,5 @@
 """Sessions, per-task cost and projections (scripts/board/board_store.py fold +
-scripts/board/board_sessions.py, docs/live-board.md §2c)."""
+scripts/board/board_sessions.py, docs/live-board-sessions.md §2c)."""
 import json
 import sys
 import tempfile

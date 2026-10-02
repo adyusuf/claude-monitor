@@ -1,4 +1,4 @@
-"""Tokens and dollar cost read from Claude Code transcripts (docs/live-board.md §2c).
+"""Tokens and dollar cost read from Claude Code transcripts (docs/live-board-sessions.md §2c).
 
 A transcript is JSONL; every `assistant` entry carries message.usage and message.model.
 Streaming writes one message several times, so entries are deduplicated by message.id

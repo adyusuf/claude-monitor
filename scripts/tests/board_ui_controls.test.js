@@ -1,7 +1,7 @@
 "use strict";
 // The live board's session controls, driven through start() with a fake document: queueing a
 // task, running a skill, switching the mode, drafts kept across redraws, the skill list and the
-// service worker registration (scripts/board/board_ui.js, docs/live-board.md §2c-§2e).
+// service worker registration (scripts/board/board_ui.js, docs/live-board-sessions.md §2c, docs/live-board.md §2e).
 // Run: node --test scripts/tests/  — measured by scripts/coverage.sh (#29).
 const test = require("node:test");
 const assert = require("node:assert/strict");

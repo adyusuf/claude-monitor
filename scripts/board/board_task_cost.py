@@ -1,4 +1,4 @@
-"""What a task cost its ORCHESTRATOR when no agent is linked to it (docs/live-board.md §2c, T-35).
+"""What a task cost its ORCHESTRATOR when no agent is linked to it (docs/live-board-sessions.md §2c, T-35).
 
 A session that runs `board.py add|set T-n` is recorded against the task (board_hook: task_session). The
 task's orchestrator cost is that session's MAIN transcript inside the task's time window — an ESTIMATE:
