@@ -397,3 +397,18 @@ The three tables (Sessions, Tasks, Agent activity) are ordered, filtered and pag
   only (not stored), like the box states.
 - **A table whose HTML did not change is not rewritten** on the 1.5 s poll, so a focused pager button
   keeps its focus. A task row is still not redrawn while a note is being typed in it.
+
+## 2i. Asking a task for its status
+
+A task the board cannot read the state of - `waiting`, `agent_done`, or a status this page does not know -
+gets an **Ask status** button in its row. It queues one message (the existing `queue_task` control, so the
+same server-side checks apply) for the session that touched the task last (`task.sessions`, the newest
+`last`): "write the real status of T-n to the board with `board.py set T-n --status ... --note ...`".
+
+- **It asks; it does not know.** The button changes nothing on the board. The answer arrives when the
+  session acts on the message and runs `board.py set`.
+- **When the session sees it** is the same as for any queued message (§2d): a busy session on its next tool
+  call; an idle terminal session started with the channel flag at once; an idle desktop-app or IDE session
+  only when it next runs a turn (or inside the Stop hook's wait window). The Sessions table shows the
+  message as queued.
+- **No linked session** (the task was only ever planned from the CLI): the button is disabled and says so.

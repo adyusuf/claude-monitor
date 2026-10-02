@@ -13,6 +13,10 @@
 })(typeof window !== "undefined" ? window : globalThis, function (text, panel) {
   const { esc, fmtDur } = text;
   const LIVE = new Set(["starting", "running"]);
+  // A task the board cannot tell the state of: parked, handed back, or a status this page has never seen.
+  const KNOWN = new Set(["planned", "running", "agent_done", "waiting", "done", "failed", "removed", "needs_decision"]);
+  const ASKABLE = new Set(["waiting", "agent_done"]);
+  const askable = (task) => ASKABLE.has(task.status) || !KNOWN.has(task.status);
 
   const badge = (t, status) => `<span class="badge s-${esc(status)}">${esc(t("s_" + status))}</span>`;
 
@@ -52,6 +56,22 @@
       `<span class="mg${ok ? " on" : ""}">${esc(branch)} ${ok ? "✓" : "—"}</span>`).join(" ") : "—";
   }
 
+  /** The session that touched the task last, or null: the one a status question is queued for. */
+  function askSession(task) {
+    const seen = Object.entries(task.sessions || {});
+    seen.sort((a, b) => String((b[1] || {}).last || "").localeCompare(String((a[1] || {}).last || "")));
+    return seen.length ? seen[0][0] : null;
+  }
+
+  /** "Ask for the status" under a waiting or unclear task: queues a question for its session. */
+  function askHtml(task, t) {
+    if (!askable(task)) return "";
+    const sid = askSession(task);
+    if (!sid) return `<button class="act ask" type="button" disabled title="${esc(t("askNoSession"))}">${esc(t("askStatus"))}</button>`;
+    return `<button class="act ask" type="button" data-ask-task="${esc(task.id)}" data-ask-session="${esc(sid)}"
+      title="${esc(t("askStatusTitle"))}">${esc(t("askStatus"))}</button>`;
+  }
+
   /** The tasks table body for the given rows (already ordered and cut to the page). */
   function taskRowsHtml(t, rows, st, now) {
     const taskCosts = (st.costs && st.costs.tasks) || {};
@@ -66,9 +86,9 @@
         <td>${mergeHtml(x)}</td><td>${panel.taskCostHtml(t, x, taskCosts[x.id])}</td>
         <td>${esc(x.note)}${decisionHtml(x, st.decision_defaults || [], t)}</td>
         <td><button class="act" data-task="${esc(x.id)}" data-action="${removed ? "restore_task" : "remove_task"}">
-          ${esc(removed ? t("restore") : t("remove"))}</button></td></tr>`;
+          ${esc(removed ? t("restore") : t("remove"))}</button>${askHtml(x, t)}</td></tr>`;
     }).join("");
   }
 
-  return { LIVE, badge, decisionHtml, mergeHtml, taskRowsHtml };
+  return { LIVE, badge, decisionHtml, mergeHtml, askSession, askHtml, taskRowsHtml };
 });
