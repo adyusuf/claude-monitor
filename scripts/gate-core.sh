@@ -13,7 +13,7 @@
 # ⚠️ The canonical copy lives in the configuration repository; every project takes
 # a COPY into its own scripts/ and commits it. A project's gate cannot depend on a
 # path outside the repository — CI runners do not have the configuration checked
-# out. The drift test in md-hook.sh covers this file too.
+# out. The drift tests cover this file and its libraries (scripts/twins.txt).
 #
 # What runs where:
 #
@@ -77,6 +77,10 @@
 # exceptions and says a project cannot override it, so listing it in
 # ACCEPTED_GAPS does nothing but print that it cannot be accepted, and the gate
 # stays INCOMPLETE. Install the measurement (scripts/coverage.sh) instead.
+#
+# The gate is split over four files so that none passes 300 lines (global rule #9): this one
+# orchestrates, gate-lib.sh holds the helpers, stack detection and the verdict, gate-lib-node.sh the
+# Node steps, gate-lib-prod.sh the test -> prod steps. They are TWINS: copy all four (scripts/twins.txt).
 set -uo pipefail
 
 TARGET="${1:-}"
@@ -87,6 +91,7 @@ case "$TARGET" in
   *) echo "usage: $0 <dev|test|prod> [--list]"; exit 2 ;;
 esac
 
+GATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT" || exit 2
 # shellcheck source=/dev/null  # the conf is per-project and may not exist; its
@@ -94,225 +99,15 @@ cd "$ROOT" || exit 2
 [ -f scripts/merge-gate.conf ] && . scripts/merge-gate.conf
 COVERAGE_MIN="${COVERAGE_MIN:-80}"
 
-PASS=(); FAIL=(); SKIP=(); WARN=()
-say()  { printf '\n\033[1m▶ %s\033[0m\n' "$1"; }
-ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; PASS+=("$1"); }
-bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; FAIL+=("$1"); }
-NA=()
-na()   { printf '  \033[90m–\033[0m n/a: %s\n' "$1"; NA+=("$1"); }   # nothing to check here — not a gap
-ACCEPTED=()
-# Rule #29 grants the coverage threshold NO exceptions and says a project cannot
-# override it — so ACCEPTED_GAPS cannot waive it either. That was where the rule
-# was quietly losing: several projects listed `coverage` as an accepted gap and
-# their gates printed GREEN while nothing measured coverage at all. Measured on
-# It was measured across the projects carrying this gate.
-NEVER_ACCEPTABLE='coverage'
-skip() {
-  local what="$1"
-  if [ -n "${ACCEPTED_GAPS:-}" ] && [ -n "${ACCEPTED_GAPS_REASON:-}" ] && printf '%s' "$what" | grep -qiE "${ACCEPTED_GAPS}"; then
-    if printf '%s' "$what" | grep -qiE "$NEVER_ACCEPTABLE"; then
-      printf '  \033[33m·\033[0m SKIPPED (this gap CANNOT be accepted — rule #29): %s\n' "$what"; SKIP+=("$what"); return 0
-    fi
-    printf '  \033[33m~\033[0m ACCEPTED GAP: %s\n' "$what"; ACCEPTED+=("$what"); return 0
+# Fail closed: a copy of this file without its libraries must not run a partial gate.
+for lib in gate-lib.sh gate-lib-node.sh gate-lib-prod.sh; do
+  if [ ! -f "$GATE_DIR/$lib" ]; then
+    echo "gate-core.sh: $lib is missing next to it - the gate is four twin files (scripts/twins.txt); copy them all" >&2
+    exit 2
   fi
-  printf '  \033[33m·\033[0m SKIPPED: %s\n' "$what"; SKIP+=("$what")
-}
-warn() { printf '  \033[33m!\033[0m %s\n' "$1"; WARN+=("$1"); }
-have() { command -v "$1" >/dev/null 2>&1; }
-run()  { # run <label> <command...>
-  local label="$1"; shift
-  if [ "$LIST_ONLY" = 1 ]; then printf '  → %-42s %s\n' "$label" "$*"; PASS+=("$label"); return 0; fi
-  local out; out="$(mktemp)"   # not $$: the node track runs in a subshell that shares the parent's $$
-  if "$@" >"$out" 2>&1; then ok "$label"; else bad "$label"; tail -20 "$out" | sed 's/^/      /'; fi
-  rm -f "$out"
-}
-
-# ── Stack detection ──────────────────────────────────────────────────────────
-#
-# ⚠️ This block decides whether a whole tier is checked AT ALL, so a miss here is
-# silent and total. Both halves used to miss:
-#   · `ls ./*.sln` did not know about `.slnx`, the newer solution format;
-#   · `ls ./**/*.csproj` is ONE level deep in a plain shell (globstar is off), so
-#     a project at src/Api/X.csproj was invisible.
-# Measured: a repository with a .slnx, 673 backend tests, a build
-# that was RED and two high-severity advisories reported GATE GREEN, because
-# HAS_DOTNET came out 0 and not one .NET step ran.
-# The build target. Detection finding a project is not enough: `dotnet build`
-# with no argument builds the CURRENT directory, so in a repository whose
-# solution lives under api/ or backend/ it failed with
-#   MSBUILD : error MSB1003: Specify a project or solution file.
-# — a confusing error in place of a build. Measured: four of five
-# .NET repositories here keep their solution below the root.
-# shellcheck disable=SC2012  # `ls` on a glob is intentional: it answers "is
-# there a solution AT THE ROOT" cheaply, and the `find` below covers every case
-# ls cannot — including the filenames SC2012 is about.
-SLN="$(ls ./*.sln ./*.slnx 2>/dev/null | head -1)"
-if [ -z "$SLN" ]; then
-  SLN="$(find . -maxdepth 4 \( -name '*.sln' -o -name '*.slnx' \) \
-          -not -path '*/obj/*' -not -path '*/bin/*' -not -path '*/node_modules/*' \
-          -print 2>/dev/null | sort | head -1)"
-fi
-if [ -z "$SLN" ]; then
-  # No solution anywhere: build the project itself rather than the directory.
-  SLN="$(find . -maxdepth 4 -name '*.csproj' \
-          -not -path '*/obj/*' -not -path '*/bin/*' -not -path '*/node_modules/*' \
-          -print 2>/dev/null | sort | head -1)"
-fi
-HAS_DOTNET=0
-if [ -n "$SLN" ] || [ -n "$(find . -name '*.csproj' -not -path '*/obj/*' -not -path '*/bin/*' -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ]; then
-  HAS_DOTNET=1
-fi
-# Node detection is only used for the rule-#16 document step (below), and it was
-# root-only while .NET detection now looks at any depth. A repository whose only
-# JS lives in frontend/ therefore skipped that step entirely — measured
-# One repo had no SETUP.md and its gate said "no stack at the
-# repository root, nothing to check". WEB_DIR/MOBILE_DIR keep their own job of
-# deciding WHICH tier gets linted, built and tested.
-HAS_NODE=0
-if [ -f package.json ] || [ -n "$(find . -maxdepth 3 -name package.json -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ]; then
-  HAS_NODE=1
-fi
-WEB_DIR=""; for d in web frontend .; do [ -f "$d/package.json" ] && { WEB_DIR="$d"; break; }; done
-MOBILE_DIR=""; for d in mobile app; do [ -f "$d/package.json" ] && { MOBILE_DIR="$d"; break; }; done
-case " ${SKIP_STACKS:-} " in *" mobile "*) MOBILE_DIR="" ;; esac
-HAS_E2E_WEB=0;    [ -d e2e ] || [ -d tests/e2e ] && HAS_E2E_WEB=1
-HAS_E2E_MOBILE=0; [ -d .maestro ] || [ -d "${MOBILE_DIR:-mobile}/.maestro" ] && HAS_E2E_MOBILE=1
-
-echo "merge gate → $TARGET   ($(git rev-parse --short HEAD), $ROOT)"
-echo "stacks: dotnet=$HAS_DOTNET${SLN:+ (${SLN#./})} node=$HAS_NODE web=${WEB_DIR:-none} mobile=${MOBILE_DIR:-none} e2e=web:$HAS_E2E_WEB/mobile:$HAS_E2E_MOBILE"
-
-# ── Node steps as functions ──────────────────────────────────────────────────
-# Serial mode calls each one where its section is; GATE_PARALLEL_NODE=1 runs them
-# all as one track beside the .NET steps (node_start / node_join below).
-node_lint() {
-  for d in "$WEB_DIR" "$MOBILE_DIR"; do
-    [ -n "$d" ] || continue
-    if [ -f "$d/node_modules/.bin/eslint" ] || grep -q '"lint"' "$d/package.json" 2>/dev/null; then
-      run "lint ($d)" npm --prefix "$d" run lint
-    else skip "lint ($d): no lint script"; fi
-  done
-}
-node_typecheck() {
-  for d in "$WEB_DIR" "$MOBILE_DIR"; do
-    [ -n "$d" ] || continue
-    # A solution-style root tsconfig ("files": [] + "references", the Vite
-    # template) holds no files itself: `tsc -p` on it checks NOTHING and always
-    # passes. Only build mode follows the references into the real projects.
-    if [ ! -f "$d/tsconfig.json" ]; then skip "tsc ($d): no tsconfig"
-    elif grep -q '"references"' "$d/tsconfig.json"; then
-      run "tsc -b ($d)" npx --prefix "$d" tsc -b "$d" --noEmit
-    else run "tsc ($d)" npx --prefix "$d" tsc -p "$d" --noEmit; fi
-  done
-}
-node_build() {
-  for d in "$WEB_DIR" "$MOBILE_DIR"; do
-    [ -n "$d" ] || continue
-    if grep -q '"build"' "$d/package.json" 2>/dev/null; then run "build ($d)" npm --prefix "$d" run build
-    else skip "build ($d): no build script"; fi
-  done
-}
-node_test() {
-  for d in "$WEB_DIR" "$MOBILE_DIR"; do
-    [ -n "$d" ] || continue
-    if grep -q '"test"' "$d/package.json" 2>/dev/null; then
-      # `--run` belongs to VITEST. Handing it to a jest project fails with
-      # "Unrecognized option run", and the gate then reports a green test suite
-      # as FAILING — Measured: one project's 10 mobile tests pass on
-      # their own and this step called them red, purely because of this argument.
-      # CI=true is what both runners understand: vitest does a single run instead
-      # of watching, and jest is single-run anyway.
-      if grep -qE '"test"[[:space:]]*:[[:space:]]*"[^"]*vitest' "$d/package.json"; then
-        run "test ($d)" env CI=true npm --prefix "$d" test -- --run
-      else
-        run "test ($d)" env CI=true npm --prefix "$d" test
-      fi
-    else skip "test ($d): no test script"; fi
-  done
-}
-node_audit() {
-  for d in "$WEB_DIR" "$MOBILE_DIR"; do
-    [ -n "$d" ] || continue
-    # A pnpm workspace has pnpm-lock.yaml and NO package-lock.json, so `npm audit` fails with
-    # ENOLOCK on every run: the step "failed" for the wrong reason and the dependencies were never
-    # scanned (30/09/2026: 2 critical + 27 high production advisories nobody had seen). Use the
-    # tool that owns the lockfile; a missing pnpm is SKIPPED, never a pass.
-    if [ -f "$d/pnpm-lock.yaml" ] || { [ "$d" != "." ] && [ -f "pnpm-lock.yaml" ]; }; then
-      if have pnpm; then
-        local out; out="$(mktemp)"
-        if pnpm --dir "$d" audit --audit-level=high >"$out" 2>&1; then ok "pnpm audit ($d)"; else bad "pnpm audit ($d): high or critical"; tail -10 "$out" | sed 's/^/      /'; fi
-        rm -f "$out"
-      else skip "pnpm audit ($d): pnpm missing"; fi
-    elif have npm; then
-      local out; out="$(mktemp)"
-      if npm --prefix "$d" audit --audit-level=high >"$out" 2>&1; then ok "npm audit ($d)"
-      elif [ -f "$ROOT/scripts/audit-triage.tsv" ] && [ -f "$ROOT/scripts/audit-triage.py" ] && have python3 \
-           && { npm --prefix "$d" audit --audit-level=high --json >"$out.j" 2>/dev/null; true; } \
-           && python3 "$ROOT/scripts/audit-triage.py" "$ROOT/scripts/audit-triage.tsv" <"$out.j" >"$out.t" 2>&1; then
-        ok "npm audit ($d): every high advisory is triaged in scripts/audit-triage.tsv"; sed 's/^/      /' "$out.t"
-      else
-        bad "npm audit ($d): high or critical"; tail -10 "$out" | sed 's/^/      /'; [ -s "$out.t" ] && sed 's/^/      /' "$out.t"
-      fi
-      rm -f "$out.t" "$out.j"
-      rm -f "$out"
-    else skip "npm audit ($d): npm missing"; fi
-  done
-}
-
-# ── Node track beside the .NET steps (opt-in: GATE_PARALLEL_NODE=1) ──────────
-# The Node steps never touch what the .NET steps touch, so on a machine with
-# spare cores they cost nothing extra. The track runs in a subshell, prints to a
-# log and writes its results as tagged lines; node_join replays both in the
-# parent. Fail-closed: no DONE marker in the results means the track did not
-# finish, and that is a failure. It is joined BEFORE the coverage step, which
-# runs the frontend suite again and must not overlap it.
-NODE_PARALLEL_ACTIVE=0; NODE_JOINED=0; NODE_PID=""; NODE_LOG=""; NODE_RES=""
-if [ "${GATE_PARALLEL_NODE:-0}" = 1 ] && [ "$TARGET" != "prod" ] && [ "$LIST_ONLY" = 0 ] \
-   && [ "$HAS_DOTNET" = 1 ] && { [ -n "$WEB_DIR" ] || [ -n "$MOBILE_DIR" ]; }; then
-  NODE_PARALLEL_ACTIVE=1
-fi
-node_track() {
-  local t0=$SECONDS
-  say "node track — lint · typecheck · build · test · audit (ran beside the .NET steps)"
-  node_lint; node_typecheck; node_build; node_test; node_audit
-  printf '  node track: %ds\n' $((SECONDS - t0))
-}
-node_start() {
-  [ "$NODE_PARALLEL_ACTIVE" = 1 ] || return 0
-  NODE_LOG="$(mktemp)"; NODE_RES="$(mktemp)"
-  (
-    node_track
-    {
-      for x in "${PASS[@]+"${PASS[@]}"}"; do printf 'P\t%s\n' "$x"; done
-      for x in "${FAIL[@]+"${FAIL[@]}"}"; do printf 'F\t%s\n' "$x"; done
-      for x in "${SKIP[@]+"${SKIP[@]}"}"; do printf 'S\t%s\n' "$x"; done
-      for x in "${ACCEPTED[@]+"${ACCEPTED[@]}"}"; do printf 'A\t%s\n' "$x"; done
-      for x in "${NA[@]+"${NA[@]}"}"; do printf 'N\t%s\n' "$x"; done
-      for x in "${WARN[@]+"${WARN[@]}"}"; do printf 'W\t%s\n' "$x"; done
-      echo DONE
-    } >"$NODE_RES"
-  ) >"$NODE_LOG" 2>&1 &
-  NODE_PID=$!
-  trap '[ -n "$NODE_PID" ] && kill "$NODE_PID" 2>/dev/null; rm -f "$NODE_LOG" "$NODE_RES"' EXIT
-  echo "  node track started beside the .NET steps (GATE_PARALLEL_NODE=1)"
-}
-node_join() {
-  [ "$NODE_PARALLEL_ACTIVE" = 1 ] && [ "$NODE_JOINED" = 0 ] || return 0
-  NODE_JOINED=1
-  wait "$NODE_PID" 2>/dev/null
-  cat "$NODE_LOG"
-  if grep -qx DONE "$NODE_RES" 2>/dev/null; then
-    local kind label
-    while IFS=$'\t' read -r kind label; do
-      case "$kind" in
-        P) PASS+=("$label") ;; F) FAIL+=("$label") ;; S) SKIP+=("$label") ;;
-        A) ACCEPTED+=("$label") ;; N) NA+=("$label") ;; W) WARN+=("$label") ;;
-      esac
-    done <"$NODE_RES"
-  else
-    bad "node track did not report a result — a track that did not finish did not pass"
-  fi
-  rm -f "$NODE_LOG" "$NODE_RES"
-}
+  # shellcheck source=/dev/null  # the path is resolved at run time, beside this file
+  . "$GATE_DIR/$lib"
+done
 
 # ── Everything except e2e: dev and test ──────────────────────────────────────
 if [ "$TARGET" != "prod" ]; then
@@ -458,97 +253,7 @@ if [ "$TARGET" != "prod" ]; then
 fi
 
 # ── prod: deployed to test, then the full e2e suite ──────────────────────────
-if [ "$TARGET" = "prod" ]; then
-
-  say "is this code deployed to the TEST environment?"
-  HEAD_SHA="$(git rev-parse HEAD)"
-  if [ "$LIST_ONLY" = 1 ]; then
-    if [ -n "${TEST_DEPLOY_SHA_CMD:-}" ]; then
-      printf '  → %-42s %s\n' "deploy verification" "$TEST_DEPLOY_SHA_CMD"; PASS+=("deploy verification")
-    elif [ -n "${TEST_VERSION_URL:-}" ]; then
-      printf '  → %-42s %s\n' "deploy verification" "curl ${TEST_VERSION_URL} == ${HEAD_SHA:0:7}"; PASS+=("deploy verification")
-    else
-      # ⚠️ This used to count as PASS whatever was configured, so --list printed
-      # "<no source configured — would block>" and then reported GATE GREEN while
-      # the real run reported INCOMPLETE. A dry run that disagrees with the gate is
-      # worse than no dry run: it is the one people read before asking for a
-      # promotion. It now skips exactly as the real run does.
-      skip "the deployed SHA cannot be read: set TEST_VERSION_URL (a /version endpoint per standards/17 §6) or TEST_DEPLOY_SHA_CMD in scripts/merge-gate.conf"
-    fi
-  else
-    deployed=""
-    if [ -n "${TEST_DEPLOY_SHA_CMD:-}" ]; then
-      # A project-specific command that prints the SHA deployed to test, e.g. a
-      # deploy record on the server or a GitHub deployment API query.
-      deployed="$(bash -c "$TEST_DEPLOY_SHA_CMD" 2>/dev/null | grep -oE '[0-9a-f]{7,40}' | head -1)"
-    elif [ -n "${TEST_VERSION_URL:-}" ]; then
-      # Every URL in the list must report the same SHA: a project with several
-      # sites on test is only "deployed" when all of them are.
-      allsame=1
-      for u in $TEST_VERSION_URL; do
-        body="$(curl -fsS --max-time 10 "$u" 2>/dev/null)"
-        case "$body" in *'<!doctype'*|*'<!DOCTYPE'*) bad "$u returned HTML, not a version — the SPA fallback is swallowing it (standards/14 §8)"; allsame=0; continue ;; esac
-        one="$(printf '%s' "$body" | grep -oE '[0-9a-f]{7,40}' | head -1)"
-        if [ -z "$one" ]; then bad "$u reports no commit SHA"; allsame=0; continue; fi
-        [ -z "$deployed" ] && deployed="$one"
-        [ "$one" != "$deployed" ] && { bad "$u reports $one while another site reports $deployed"; allsame=0; }
-      done
-      [ "$allsame" = 0 ] && deployed=""
-    fi
-    if [ -z "$deployed" ]; then
-      skip "the deployed SHA cannot be read: set TEST_VERSION_URL (a /version endpoint per standards/17 §6) or TEST_DEPLOY_SHA_CMD in scripts/merge-gate.conf"
-    # ⚠️ The patterns are QUOTED. Unquoted, `${HEAD_SHA#$deployed}` treats the
-    # value as a GLOB, so a `*` or `[` arriving from a project's
-    # TEST_DEPLOY_SHA_CMD would change what "is this SHA a prefix of that one"
-    # means — on the step that decides whether prod may carry this code.
-    elif [ "${HEAD_SHA#"$deployed"}" != "$HEAD_SHA" ] || [ "${deployed#"${HEAD_SHA:0:7}"}" != "$deployed" ]; then
-      ok "the test environment is running this code ($deployed)"
-    else
-      bad "the test environment is running $deployed, not ${HEAD_SHA:0:7} — deploy to test first and wait for it"
-    fi
-  fi
-
-  say "full e2e suite against the test environment"
-  ran=0
-  if [ "$HAS_E2E_WEB" = 1 ]; then
-    ran=1
-    if [ -n "${E2E_WEB_CMD:-}" ]; then run "web e2e ($E2E_WEB_CMD)" bash -c "$E2E_WEB_CMD"
-    else run "web e2e (playwright)" npx playwright test; fi
-  fi
-  if [ "$HAS_E2E_MOBILE" = 1 ]; then
-    ran=1
-    if [ -n "${E2E_MOBILE_CMD:-}" ]; then run "mobile e2e ($E2E_MOBILE_CMD)" bash -c "$E2E_MOBILE_CMD"
-    else skip "mobile e2e: set E2E_MOBILE_CMD (maestro needs a device/emulator)"; fi
-  fi
-  [ "$ran" = 0 ] && skip "e2e: this project has no e2e suite — nothing proves this promotion"
-fi
+if [ "$TARGET" = "prod" ]; then gate_prod; fi
 
 # ── Result ───────────────────────────────────────────────────────────────────
-printf '\n\033[1m── result ──\033[0m\n'
-printf '  passed  : %d\n' "${#PASS[@]}"
-printf '  warnings: %d\n' "${#WARN[@]}"
-printf '  n/a     : %d\n' "${#NA[@]}"
-printf '  accepted: %d\n' "${#ACCEPTED[@]}"
-printf '  skipped : %d\n' "${#SKIP[@]}"
-printf '  failed  : %d\n' "${#FAIL[@]}"
-for x in "${WARN[@]+"${WARN[@]}"}"; do printf '  ! %s\n' "$x"; done
-for x in "${ACCEPTED[@]+"${ACCEPTED[@]}"}"; do printf '  ~ ACCEPTED GAP %s\n' "$x"; done
-[ "${#ACCEPTED[@]}" -gt 0 ] && printf '    reason: %s\n' "${ACCEPTED_GAPS_REASON:-}"
-for x in "${SKIP[@]+"${SKIP[@]}"}"; do printf '  · SKIPPED %s\n' "$x"; done
-for x in "${FAIL[@]+"${FAIL[@]}"}"; do printf '  ✗ %s\n' "$x"; done
-
-if [ "${#FAIL[@]}" -gt 0 ]; then
-  printf '\n\033[31mGATE CLOSED\033[0m — %d step(s) failed. No merge to %s.\n' "${#FAIL[@]}" "$TARGET"
-  exit 1
-fi
-if [ "${#SKIP[@]}" -gt 0 ]; then
-  printf '\n\033[33mGATE INCOMPLETE\033[0m — %d step(s) did not run. A step that did not run did not pass;\n' "${#SKIP[@]}"
-  printf 'the result is not green. Install the tool, or record the reason and get the user to accept it.\n'
-  exit 1
-fi
-if [ "${#ACCEPTED[@]}" -gt 0 ]; then
-  printf '\n\033[32mGATE GREEN\033[0m (with %d accepted gap(s)) — %s promotion is allowed.\n' "${#ACCEPTED[@]}" "$TARGET"
-  exit 0
-fi
-printf '\n\033[32mGATE GREEN\033[0m — every applicable step passed. %s promotion is allowed.\n' "$TARGET"
-exit 0
+gate_result
