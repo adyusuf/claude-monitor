@@ -374,7 +374,8 @@ page); if it fails, the reason is shown on that page (the URL fragment).
 - **Build / run:** SETUP.md "Desktop window". A `.app` bundle needs `cargo tauri build`.
 - **Tests:** `cargo test` (logic in `board.rs`, `config.rs`), `scripts/tests/desktop_splash.test.js`;
   line coverage ≥ 80 % for the Rust crate is measured by `scripts/coverage.sh` with `cargo-llvm-cov`.
-  The window glue (`lib.rs`, `main.rs`) is counted and has no unit test; it is checked by running the app.
+  The window setup (`lib.rs`) is tested on Tauri's mock runtime with the board lookup injected, so no test
+  starts a real server; only `run()` and `main()` (about 3 lines each) are checked by running the app.
 - **Checked in the macOS window (01/10/2026):** `sw.js` registers (service workers work in the Tauri WKWebView on an `http://127.0.0.1` page). `Notification.requestPermission()` answers `denied` without a prompt, and the board uses no notifications, so nothing is lost. The failure page shows the reason (a missing scripts directory was tried).
 
 ## 2h. Table order, finished rows and pages
