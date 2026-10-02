@@ -1,5 +1,5 @@
 """Tokens and dollar cost read from transcripts (scripts/board/board_cost.py,
-docs/live-board.md §2c): pricing, deduplication, incremental reading, context use."""
+docs/live-board-sessions.md §2c): pricing, deduplication, incremental reading, context use."""
 import json
 import sys
 import tempfile

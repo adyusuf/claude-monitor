@@ -1,5 +1,5 @@
 "use strict";
-/* The live board's sessions panel and cost / ETA cells (docs/live-board.md §2c-§2d).
+/* The live board's sessions panel and cost / ETA cells (docs/live-board-sessions.md §2c, docs/live-board.md §2d).
    Pure functions from the server's `costs` block to HTML; no DOM access. Every projection is
    labelled an estimate with its basis; a figure the server could not measure says so. */
 (function (root, factory) {

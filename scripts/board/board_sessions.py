@@ -1,4 +1,4 @@
-"""The sessions panel and the cost / ETA figures the board shows (docs/live-board.md §2c).
+"""The sessions panel and the cost / ETA figures the board shows (docs/live-board-sessions.md §2c).
 
 Pure functions over the folded state plus a board_cost.Cache: which sessions are busy or
 idle and since when, what each session and each task has cost, how full the context is,

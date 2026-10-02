@@ -4,7 +4,7 @@
 
 An MCP stdio server (standard library only) that declares the `claude/channel` capability and
 sends `notifications/claude/channel`. Hooks reach a BUSY session; this reaches an idle one
-(docs/live-board.md §5). It is fail-closed (#6): it serves ONE session — the one in
+(docs/live-board-sessions.md §5). It is fail-closed (#6): it serves ONE session — the one in
 CLAUDE_CODE_SESSION_ID — and pushes only a task or skill the user queued on the board for that
 session, re-validated here, never anything else. It pushes nothing, and registers nothing,
 unless its parent Claude Code was started with the channel flag naming it.

@@ -1,5 +1,5 @@
 """The board channel server as the page and the OS see it (scripts/board/board_channel.py,
-board_server.py, docs/live-board.md §5): the state the page is served and the real stdio
+board_server.py, docs/live-board-sessions.md §5): the state the page is served and the real stdio
 process, started by a parent whose command line carries (or lacks) the channel flag."""
 import json
 import os

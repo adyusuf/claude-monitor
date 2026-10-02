@@ -1,6 +1,6 @@
 "use strict";
 // The live board's sessions panel and cost / ETA cells (scripts/board/board_ui_sessions.js,
-// docs/live-board.md §2c-§2d): pure functions from the server's `costs` block to HTML.
+// docs/live-board-sessions.md §2c, docs/live-board.md §2d): pure functions from the server's `costs` block to HTML.
 // Run: node --test scripts/tests/  — measured by scripts/coverage.sh (#29).
 const test = require("node:test");
 const assert = require("node:assert/strict");

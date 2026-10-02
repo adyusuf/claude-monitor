@@ -1,5 +1,5 @@
 """The Agent-activity cost figures (scripts/board/board_sessions.py agent_costs and its use in
-board_costs()["agent_rows"], docs/live-board.md §2c): per row, total, unmeasured, by type."""
+board_costs()["agent_rows"], docs/live-board-sessions.md §2c): per row, total, unmeasured, by type."""
 import json
 import sys
 import tempfile
