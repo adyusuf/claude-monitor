@@ -413,3 +413,6 @@ same server-side checks apply) for the session that touched the task last (`task
   only when it next runs a turn (or inside the Stop hook's wait window). The Sessions table shows the
   message as queued.
 - **No linked session** (the task was only ever planned from the CLI): the button is disabled and says so.
+- **Tested end to end** (`scripts/tests/test_board_ask_flow.py`): a real server, the page's own modules
+  run by Node, the real hook process and `board.py set`, with nothing mocked between them. A real
+  Claude Code session has not been driven by hand; the hook payload shapes are the ones the CLI sends.
