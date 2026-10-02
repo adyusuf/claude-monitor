@@ -32,6 +32,10 @@ Read each survivor: write the missing test, or note why the change is harmless (
 example `split("-", 1)` -> `split("-", 2)` on an id that has one dash). A file mode such as `0o600` showing up
 as a survivor means no test reads the mode. The working tree is never touched.
 
+First use, on `board_store.py`: 33 of 60 changes caught (55%). The 27 survivors became 18 tests
+(`test_board_store_behaviour.py`) and the rate went to 56 of 60 (93%); what is left is a subprocess timeout
+(`5` -> `6`), the JSON `indent`, and one guard no event sequence can reach.
+
 ## How a new version takes effect
 
 The hooks start no new code by themselves; the next Claude session start does. `board_ensure.py` compares the
