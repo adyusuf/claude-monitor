@@ -1,4 +1,4 @@
-"""Which sessions a board channel server can reach (docs/live-board.md §5).
+"""Which sessions a board channel server can reach (docs/live-board-sessions.md §5).
 
 A server registers one small file per session. "Reachable" is only claimed when the file is
 fresh, its process is alive AND the Claude Code process that started the server was launched with

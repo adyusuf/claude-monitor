@@ -1,4 +1,4 @@
-"""The board channel server (scripts/board/board_channel.py, docs/live-board.md §5):
+"""The board channel server (scripts/board/board_channel.py, docs/live-board-sessions.md §5):
 the MCP handshake, what it will push (only a board-queued task for ITS session, only while that
 session is idle, at most once per change) — the real process and the served state are in
 test_board_channel_process.py."""

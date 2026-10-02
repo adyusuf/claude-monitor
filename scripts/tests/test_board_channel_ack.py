@@ -1,5 +1,5 @@
 """The channel ledger and registry (scripts/board/board_channel_ack.py, board_channel_reg.py,
-docs/live-board.md §5): a task pushed into an idle session is held back from the hooks
+docs/live-board-sessions.md §5): a task pushed into an idle session is held back from the hooks
 only while the push is believed to have worked; reachability is claimed only when verified."""
 import json
 import os
