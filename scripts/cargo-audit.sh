@@ -7,6 +7,9 @@
 # yanked) are printed and do not block - the Linux-only GTK crates Tauri pulls in are unmaintained.
 # A vulnerability that cannot be fixed is ignored only in desktop/.cargo/audit.toml, with a reason.
 #
+# The advisory database is fetched over the network, so a transient failure is retried
+# (AUDIT_FETCH_TRIES attempts, AUDIT_FETCH_PAUSE seconds apart) before the run is called NOT RUN.
+#
 # Exit codes: 0 clean or n/a · 1 a vulnerability · 3 NOT RUN (no cargo-audit, or the advisory
 # database could not be read) - which blocks exactly like a failure: a gate that did not run did
 # not pass (#19).
@@ -26,10 +29,20 @@ if ! command -v cargo-audit >/dev/null 2>&1; then
   exit 3
 fi
 
+tries="${AUDIT_FETCH_TRIES:-3}"
+pause="${AUDIT_FETCH_PAUSE:-5}"
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
-(cd desktop && cargo audit --file Cargo.lock) >"$log" 2>&1
-rc=$?
+attempt=1
+while :; do
+  (cd desktop && cargo audit --file Cargo.lock) >"$log" 2>&1
+  rc=$?
+  grep -q 'Scanning Cargo.lock for vulnerabilities' "$log" && break
+  [ "$attempt" -ge "$tries" ] && break
+  echo "  advisory database unreachable (attempt $attempt of $tries), retrying in ${pause}s"
+  attempt=$((attempt + 1))
+  sleep "$pause"
+done
 if ! grep -q 'Scanning Cargo.lock for vulnerabilities' "$log"; then
   tail -10 "$log" | sed 's/^/    /'
   echo "  NOT RUN: cargo audit gave no verdict (advisory database unreachable?)"
