@@ -16,6 +16,22 @@ git tag -a prod-DD-MM-YYYY -m "<one line: what shipped>" <sha> && git push origi
 
 A second promotion on the same day appends `-2`. A hotfix says so in the tag message.
 
+## Before a release: does the suite notice a fault?
+
+Coverage says a line ran, not that anything checks it. `scripts/mutation_check.py` changes one thing at a
+time in a module (a comparison flipped, `and` for `or`, a boolean inverted, a number moved by one, a `not`
+dropped) in a throw-away copy and runs the module's tests; a change nothing notices is a **survivor**.
+It takes minutes, so it is run by hand on the modules a release touched, not in the gate:
+
+```bash
+python3 scripts/mutation_check.py scripts/board/board_store.py --tests test_board test_board_fuzz
+python3 scripts/mutation_check.py scripts/board/board_tasks.py --tests test_board_tasks --max 40 --min-score 0.8
+```
+
+Read each survivor: write the missing test, or note why the change is harmless (an *equivalent mutant*: for
+example `split("-", 1)` -> `split("-", 2)` on an id that has one dash). A file mode such as `0o600` showing up
+as a survivor means no test reads the mode. The working tree is never touched.
+
 ## How a new version takes effect
 
 The hooks start no new code by themselves; the next Claude session start does. `board_ensure.py` compares the
