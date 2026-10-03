@@ -1,5 +1,6 @@
 "use strict";
-const { test, expect, openBoard, taskRow } = require("./fixtures.js");
+const { test, expect, openBoard, taskRow, taskIds, goToTaskPage } = require("./fixtures.js");
+const { PAGE_SIZE } = require("../config.js");
 
 const SLOW = 15000;   // a budget, not a retry: the page polls every 1.5 s, a loaded machine can stall for seconds
 
@@ -12,33 +13,40 @@ test.describe("the board page", () => {
     await expect(page.locator("#err")).toHaveText("");
   });
 
-  test("shows active work first and hides finished rows until asked", async ({ page }) => {
+  test("lists tasks newest first by date, and hides finished rows until asked", async ({ page }) => {
     await openBoard(page);
-    await expect(taskRow(page, "T-3")).toHaveCount(0);                 // done: hidden by default
-    const firstId = await page.locator("#tasks tr .tid").first().textContent();
-    expect(["T-1", "T-2", "T-4"]).toContain(firstId);                  // running or waiting, not a planned one
+    // T-1..T-4 were updated last (T-4 newest); the rest follow by when they were added; T-3 is done and hidden
+    const first = await taskIds(page);
+    expect(first).toEqual(["T-4", "T-2", "T-1", "T-45", "T-44", "T-43", "T-42", "T-41", "T-40", "T-39"]);
     await page.locator("#showDoneTasks").check();
     await expect(page.locator("#tasksPager")).toContainText("45 rows");         // the done row is counted again
-    await page.locator("#tasksPager").getByRole("button", { name: /next/ }).click();
-    await expect(taskRow(page, "T-3")).toHaveCount(1);                         // finished rows sort last
+    expect((await taskIds(page)).slice(0, 4)).toEqual(["T-4", "T-3", "T-2", "T-1"]);   // by date, not by status
     await page.locator("#showDoneTasks").uncheck();
     await expect(page.locator("#tasksPager")).toContainText("44 rows");
-    await page.locator("#tasksPager").getByRole("button", { name: /next/ }).click();
     await expect(taskRow(page, "T-3")).toHaveCount(0);
   });
 
-  test("pages the tasks by 30 and keeps the previous button off on the first page", async ({ page }) => {
+  test("lists sessions newest state change first", async ({ page }) => {
+    await openBoard(page);
+    const ids = await page.locator("#sessions tr").evaluateAll((rows) => rows.map((r) => r.textContent));
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toContain("e2e0bbbb");     // the idle one changed state last
+    expect(ids[1]).toContain("e2e0aaaa");
+  });
+
+  test("pages the tasks by 10 and keeps the previous button off on the first page", async ({ page }) => {
     await openBoard(page);
     const pager = page.locator("#tasksPager");
-    await expect(pager).toContainText("Page 1 / 2");
-    await expect(page.locator("#tasks tr")).toHaveCount(30);
+    await expect(pager).toContainText("Page 1 / 5");
+    await expect(page.locator("#tasks tr")).toHaveCount(PAGE_SIZE);
     await expect(pager.getByRole("button", { name: /previous/ })).toBeDisabled();
-    await pager.getByRole("button", { name: /next/ }).click();
-    await expect(pager).toContainText("Page 2 / 2");
-    await expect(page.locator("#tasks tr")).toHaveCount(14);           // 44 shown (T-3 is done and hidden)
+    await goToTaskPage(page, 5);
+    await expect(pager).toContainText("Page 5 / 5");
+    await expect(page.locator("#tasks tr")).toHaveCount(4);            // 44 shown rows: 4 pages of 10 and 4 left
+    expect(await taskIds(page)).toEqual(["T-8", "T-7", "T-6", "T-5"]);  // the oldest are last
     await expect(pager.getByRole("button", { name: /next/ })).toBeDisabled();
     await pager.getByRole("button", { name: /previous/ }).click();
-    await expect(pager).toContainText("Page 1 / 2");
+    await expect(pager).toContainText("Page 4 / 5");
   });
 
   test("a focused pager button keeps its focus across polls", async ({ page }) => {

@@ -168,16 +168,16 @@ test("the page writes agentsHelp and the agent rows into their elements", async 
 const many = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`,
   agent(`k${i}`, { started: ago(1000 - i), description: `desc-${i}` })]));
 
-test("view: a page holds 30 agents, newest first, and the total row counts every one", () => {
+test("view: a page holds 10 agents, newest first, and the total row counts every one", () => {
   const st = withCosts(many(35), agentRows({ total: summary({ cost: 99 }) }));
   const list = trs(ui.view(st, tr, NOW, { lists: SHOW_ALL }).agentsHtml);
-  assert.equal(list.length, 31);                       // 30 rows + the total row
+  assert.equal(list.length, 11);                       // 10 rows + the total row
   assert.match(list[0], /desc-34/);                    // newest first
-  assert.match(list[29], /desc-5</);                   // desc-0..4 are on the next page
-  assert.doesNotMatch(list.join(""), /desc-4</);
-  assert.match(list[30], /<b>\$99\.00<\/b>/);          // the total is the server's, over all 35
-  const second = trs(ui.view(st, tr, NOW, { lists: { ...SHOW_ALL, agents: { page: 2, showDone: true } } }).agentsHtml);
-  assert.equal(second.length, 6);                      // 5 rows + the same total row
-  assert.match(second[0], /desc-4</);
-  assert.match(second[5], /<b>\$99\.00<\/b>/);
+  assert.match(list[9], /desc-25</);                   // desc-0..24 are on the next pages
+  assert.doesNotMatch(list.join(""), /desc-24</);
+  assert.match(list[10], /<b>\$99\.00<\/b>/);          // the total is the server's, over all 35
+  const last = trs(ui.view(st, tr, NOW, { lists: { ...SHOW_ALL, agents: { page: 4, showDone: true } } }).agentsHtml);
+  assert.equal(last.length, 6);                        // 5 rows + the same total row
+  assert.match(last[0], /desc-4</);
+  assert.match(last[5], /<b>\$99\.00<\/b>/);
 });
