@@ -13,7 +13,7 @@ A clean machine is set up by following this file.
 | Node 20+ | the page's tests, and the browser tests (`e2e/`) | `node --version` |
 | `coverage` (Python package, in a venv outside the repository) | the coverage gate | see below |
 | Rust (rustup) with `llvm-tools-preview`, `cargo-llvm-cov`, `cargo-audit` | only for the desktop window (`desktop/`), its coverage and its dependency scan | `rustc --version`, `cargo llvm-cov --version`, `cargo audit --version` |
-| Playwright's Chromium (about 80 MB, from `e2e/package.json`) | only the browser tests, at the `test -> prod` gate | `cd e2e && npx playwright install chromium` |
+| Playwright's Chromium and WebKit (about 150 MB, from `e2e/package.json`) | only the browser tests, at the `test -> prod` gate | `cd e2e && npx playwright install chromium webkit` |
 | gitleaks, ShellCheck, CodeQL CLI | the secret scan, and SAST for the shell and Python | `gitleaks version`, `shellcheck --version`, `codeql version` |
 
 ## Install
@@ -81,14 +81,14 @@ How a queued message reaches an idle session differs per surface: `docs/live-boa
 
 ## Browser tests (e2e)
 
-Playwright drives a real Chromium against a real board server that `e2e/serve.py` starts on a seeded
+Playwright drives a real Chromium and a real WebKit (the engine of the desktop window's WKWebView and of Safari) against a real board server that `e2e/serve.py` starts on a seeded
 temporary project (its own registry, transcripts and skills folder, removed on exit): the user's boards are
 never touched. Dev-only; nothing here ships. Written and run at the `test -> prod` gate (global #33); the gate
 runs it through `E2E_WEB_CMD` in `scripts/merge-gate.conf`.
 
 ```bash
-cd e2e && npm ci && npx playwright install chromium   # once
-npm test                                              # 13 tests, about 15 s; E2E_PORT / E2E_PYTHON in .env.example
+cd e2e && npm ci && npx playwright install chromium webkit   # once
+npm test                                              # 13 tests x 2 engines, about 30 s; E2E_PORT / E2E_PYTHON in .env.example
 ```
 
 The board's service worker passes every request through, and Playwright cannot intercept a request a service

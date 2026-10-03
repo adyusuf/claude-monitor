@@ -12,8 +12,12 @@ module.exports = defineConfig({
   retries: 0,            // a flaky test is fixed, not retried (global: no retry to hide flakiness)
   timeout: 30000,
   reporter: [["list"]],
-  use: { baseURL: BASE_URL, trace: "retain-on-failure", ...devices["Desktop Chrome"] },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  use: { baseURL: BASE_URL, trace: "retain-on-failure" },
+  // WebKit is the engine of the macOS desktop window (Tauri's WKWebView) and of Safari: the page runs in both.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  ],
   webServer: {
     command: `${PYTHON} serve.py`,
     url: `${BASE_URL}/api/projects`,
