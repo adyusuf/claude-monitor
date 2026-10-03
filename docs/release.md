@@ -24,9 +24,9 @@ A second promotion on the same day appends `-2`. A hotfix says so in the tag mes
 - **A change on `dev` or `test`:** a revert commit through the gate, like any other change. Nothing is ever
   force-pushed.
 - **The old board:** `git switch --detach archive/board-final` in the clone the hooks run.
-- **The hosted API and database** (from phase 4): the deploy and rollback procedure, and what a rollback does to
-  the data, are written here with the first deploy. Migrations are additive only (global #4), so an older API
-  runs on a newer schema.
+- **The hosted API and database:** `deploy/windows/deploy.ps1` rolls back by itself when the new release does not
+  report its commit; a later rollback deploys the previous package again (`docs/deploy-windows.md`). Migrations are
+  additive only (global #4), so an older API runs on a newer schema and no data is reversed.
 
 ## Flags
 
