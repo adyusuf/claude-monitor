@@ -53,19 +53,32 @@ confirm the first start (right-click, Open). A Finder-started app has a minimal 
 Finder-started app does not inherit from your shell, so link the clone there).
 
 **A signed, notarised build** (only needed to hand the `.app` to someone else; a locally built one opens
-without it). It needs an Apple Developer account, which this repository does not have set up: the build
-reads its credentials from the environment (Tauri's standard variables) and nothing goes into the
-repository or `tauri.conf.json`.
+without it). Done once on 03/10/2026, outside the Mac App Store (`docs/adr-0001-mac-app-store.md` explains
+why the store does not fit this design as it stands). It needs a paid Apple Developer Program membership and
+two things in the maintainer's own keychain, so no secret ever enters the repository, the shell environment
+or a tool's context:
+
+1. a **Developer ID Application** certificate (developer.apple.com, Certificates; the CSR comes from Keychain
+   Access with the `login` keychain selected). Check: `security find-identity -v -p codesigning`.
+2. a **`notarytool` profile**, stored once by the maintainer with an App Store Connect API key (Users and Access,
+   Integrations, App Store Connect API; the `.p8` downloads only once):
+   `xcrun notarytool store-credentials claude-monitor-notary --key <path to .p8> --key-id <KEY_ID> --issuer <ISSUER_ID>`
+   (the `<...>` are replaced by the real values, without the angle brackets).
 
 ```bash
-export APPLE_SIGNING_IDENTITY="Developer ID Application: <name> (<TEAMID>)"   # `security find-identity -v -p codesigning`
-export APPLE_API_ISSUER=… APPLE_API_KEY=… APPLE_API_KEY_PATH=…                 # notarisation: an App Store Connect API key
-#   or APPLE_ID=… APPLE_PASSWORD=<app-specific password> APPLE_TEAM_ID=…
-cd desktop && cargo tauri build && spctl -a -vv "target/release/bundle/macos/Claude Monitor.app"
+cd desktop
+APPLE_SIGNING_IDENTITY="Developer ID Application: <name> (<TEAMID>)" cargo tauri build --bundles app
+# Tauri signs with the hardened runtime and a secure timestamp; it skips its own notarisation because no APPLE_* credentials are set
+APP="target/release/bundle/macos/Claude Monitor.app"
+ditto -c -k --keepParent "$APP" /tmp/ClaudeMonitor.zip
+xcrun notarytool submit /tmp/ClaudeMonitor.zip --keychain-profile claude-monitor-notary --wait   # the first submission took over an hour
+xcrun stapler staple "$APP" && spctl -a -vv -t exec "$APP"
 ```
 
-`spctl` should print `accepted` and `source=Notarized Developer ID`. Not done yet: the keychain on the
-maintainer's machine holds only a revoked certificate.
+`spctl` should print `accepted` and `source=Notarized Developer ID`. If `--wait` is cut short, the submission is
+still on Apple's side: `xcrun notarytool info <id> --keychain-profile claude-monitor-notary`, never a second
+submission. A rejected one: `xcrun notarytool log <id> --keychain-profile claude-monitor-notary`. The identity
+and profile names are recorded in the maintainer's notes, not secrets; the key and the `.p8` never are.
 
 ## Where Claude Code runs it
 
@@ -150,6 +163,7 @@ the repository, and CI does not use them.
 
 | Secret | What it is | Where to get it | Stored | Owner | Rotation |
 |---|---|---|---|---|---|
+| the `claude-monitor-notary` keychain profile | the stored App Store Connect API credentials `notarytool` uses | created by `store-credentials` on the maintainer's machine | the macOS keychain | the maintainer | revoke the API key in App Store Connect and store a new profile |
 | `APPLE_SIGNING_IDENTITY` | the name of a Developer ID Application certificate | Apple Developer account, Certificates | the macOS keychain (the name itself is not secret) | the maintainer | when the certificate expires or is revoked (yearly to five-yearly) |
 | `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_PATH` | App Store Connect API key used to notarise | App Store Connect, Users and Access, Keys | the `.p8` file outside the repository, `chmod 600` | the maintainer | revoke and reissue yearly, or on any leak |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | the alternative to the API key (an app-specific password) | appleid.apple.com | your shell session only | the maintainer | revoke the app-specific password after the build |
