@@ -25,3 +25,4 @@ coverage-report/
 web/dist/
 web/coverage/
 out/
+web/tsconfig.tsbuildinfo

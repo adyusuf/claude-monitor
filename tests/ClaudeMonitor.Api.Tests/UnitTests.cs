@@ -117,8 +117,12 @@ public sealed class UnitTests
 
         IConfiguration With(string origin) => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["MONITOR_DB"] = "Host=db", ["MONITOR_PUBLIC_ORIGIN"] = origin, ["MONITOR_SMTP_HOST"] = "smtp", ["MONITOR_SMTP_PORT"] = "587",
-            ["MONITOR_SMTP_FROM"] = "a@b.invalid", ["MONITOR_ARCHIVE_DIR"] = "/var/archive",
+            ["MONITOR_DB"] = "Host=db",
+            ["MONITOR_PUBLIC_ORIGIN"] = origin,
+            ["MONITOR_SMTP_HOST"] = "smtp",
+            ["MONITOR_SMTP_PORT"] = "587",
+            ["MONITOR_SMTP_FROM"] = "a@b.invalid",
+            ["MONITOR_ARCHIVE_DIR"] = "/var/archive",
         }).Build();
         Assert.Throws<InvalidOperationException>(() => ApiConfig.From(With("http://monitor.invalid"), development: false));
         Assert.False(ApiConfig.From(With("http://localhost:5190"), development: false).SecureCookies);
