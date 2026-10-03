@@ -1,5 +1,5 @@
 "use strict";
-const { test, expect, openBoard, taskRow } = require("./fixtures.js");
+const { test, expect, openBoard, taskRow, goToTaskPage } = require("./fixtures.js");
 
 // These change the shared seeded board, each on rows of its own (T-2 and S_IDLE; T-5).
 
@@ -36,17 +36,17 @@ test.describe("the page's controls", () => {
 
   test("removing a task takes it off the list and Restore brings it back", async ({ page }) => {
     await openBoard(page);
-    await page.locator("#tasksPager").getByRole("button", { name: /next/ }).click();   // T-5 is on page 2
+    await goToTaskPage(page, 5);                                            // T-5 is the oldest: the last page
     await expect(taskRow(page, "T-5")).toHaveCount(1);
     await taskRow(page, "T-5").getByRole("button", { name: "Remove" }).click();
     await expect(taskRow(page, "T-5")).toHaveCount(0);
     await page.locator("#showDoneTasks").check();
-    await page.locator("#tasksPager").getByRole("button", { name: /next/ }).click();   // removed rows sort last
+    await goToTaskPage(page, 5);                                            // removed rows keep their date: still last
     const removed = taskRow(page, "T-5");
     await expect(removed).toHaveCount(1);
     await removed.getByRole("button", { name: "Restore" }).click();
     await page.locator("#showDoneTasks").uncheck();
-    await expect(page.locator("#tasksPager")).toContainText("44 rows");               // back among the live ones
+    await expect(page.locator("#tasksPager")).toContainText("44 rows");     // back among the live ones
     await expect(page.locator("#err")).toHaveText("");
   });
 

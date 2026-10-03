@@ -21,4 +21,12 @@ async function openBoard(page) {
 
 const taskRow = (page, id) => page.locator("#tasks tr", { has: page.locator(".tid", { hasText: new RegExp(`^${id}$`) }) });
 
-module.exports = { test, expect: base.expect, openBoard, taskRow };
+/** The ids in the tasks table, top to bottom, on the page that is showing. */
+const taskIds = (page) => page.locator("#tasks tr .tid").allTextContents();
+
+/** Press the pager's "next" until page `n` of the tasks table is showing. */
+async function goToTaskPage(page, n) {
+  for (let at = 1; at < n; at += 1) await page.locator("#tasksPager").getByRole("button", { name: /next/ }).click();
+}
+
+module.exports = { test, expect: base.expect, openBoard, taskRow, taskIds, goToTaskPage };
