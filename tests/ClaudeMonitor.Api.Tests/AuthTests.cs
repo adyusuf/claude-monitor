@@ -11,10 +11,10 @@ public sealed class AuthTests(ApiFactory api)
     [Fact]
     public async Task Sign_up_verify_sign_in_and_read_me()
     {
-        var user = await api.NewClient().SignedUpAsync("signup", "Ayşe Şişman");
+        var user = await api.NewClient().SignedUpAsync("signup", "Örnek Şişman");
         var me = await user.GetJsonAsync("/api/me");
         Assert.Equal(user.Email, me.GetProperty("email").GetString());
-        Assert.Equal("Ayşe Şişman", me.GetProperty("displayName").GetString());
+        Assert.Equal("Örnek Şişman", me.GetProperty("displayName").GetString());
         Assert.True(me.GetProperty("hasPassword").GetBoolean());
         Assert.Equal("owner", me.GetProperty("workspaces")[0].GetProperty("role").GetString());
         Assert.Equal(0, me.GetProperty("providers").GetArrayLength());
