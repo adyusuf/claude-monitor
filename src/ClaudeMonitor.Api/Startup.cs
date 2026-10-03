@@ -60,6 +60,18 @@ public static class Startup
         app.UseExceptionHandler();
         app.Use(SecurityHeaders);
         app.Use((http, next) => Csrf(http, next, config));
+        var files = config.WebRoot is { Length: > 0 } root && Directory.Exists(root)
+            ? new PhysicalFileProvider(Path.GetFullPath(root))
+            : null;
+        if (files is not null)
+        {
+            // Before routing: once the SPA fallback below has matched a path, the static-file middleware stands
+            // aside, and the built scripts would be answered with index.html.
+            app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
+            app.UseStaticFiles(new StaticFileOptions { FileProvider = files });
+        }
+
+        app.UseRouting();
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
@@ -77,12 +89,8 @@ public static class Startup
         SessionEndpoints.Map(api);
         CommandEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
-
-        if (config.WebRoot is { Length: > 0 } root && Directory.Exists(root))
+        if (files is not null)
         {
-            var files = new PhysicalFileProvider(Path.GetFullPath(root));
-            app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
-            app.UseStaticFiles(new StaticFileOptions { FileProvider = files });
             // The single-page app answers every non-API path; /api/* never falls through to it (global #17).
             app.MapFallbackToFile("{*path:regex(^(?!api/).*$)}", "index.html", new StaticFileOptions { FileProvider = files });
         }

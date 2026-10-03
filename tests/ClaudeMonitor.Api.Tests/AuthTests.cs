@@ -144,4 +144,20 @@ public sealed class AuthTests(ApiFactory api)
         api.Clock.Advance(TimeSpan.FromDays(15));
         Assert.Equal(HttpStatusCode.Unauthorized, (await user.Http.GetAsync("/api/me")).StatusCode);
     }
+
+    [Fact]
+    public async Task The_web_app_is_served_on_the_same_origin_and_never_answers_for_the_api()
+    {
+        var http = api.NewClient().Http;
+        var script = await http.GetAsync("/assets/app.js");
+        Assert.Equal(HttpStatusCode.OK, script.StatusCode);
+        Assert.Contains("javascript", script.Content.Headers.ContentType!.MediaType, StringComparison.Ordinal);
+        var page = await http.GetAsync("/w/123/sessions");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Contains("<title>app</title>", await page.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal("<!doctype html><title>app</title>", await http.GetStringAsync("/"));
+        var api_ = await http.GetAsync("/api/nothing-here");
+        Assert.Equal(HttpStatusCode.NotFound, api_.StatusCode);
+        Assert.DoesNotContain("<title>", await api_.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
 }
