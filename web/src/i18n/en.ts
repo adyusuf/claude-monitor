@@ -33,6 +33,7 @@ export const en = {
     forbidden: "You are not allowed to do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
     request_failed: "The request failed.", network: "The server cannot be reached.",
+    confirm_required: "Type the confirmation word exactly.", sole_owner: "You are the only owner of a shared workspace: make someone else owner first.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", m: "m", h: "h", d: "d" },
@@ -82,6 +83,9 @@ export const en = {
   account: {
     title: "Account", providers: "Sign-in methods", linked: "Linked", link: "Link {provider}", password: "Password",
     hasPassword: "Set", noPassword: "Not set (sign in with a provider, or reset to set one)",
+    data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
+    deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",
+    deleteConfirm: "Type {word} to confirm", deleteButton: "Delete my account", deleted: "Your account is deleted.",
   },
   invitation: { accepting: "Joining the workspace…", accepted: "You joined the workspace." },
   download: {

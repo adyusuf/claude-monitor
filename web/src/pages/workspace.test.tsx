@@ -182,3 +182,31 @@ describe("the frame", () => {
     expect(calls.some((c) => c.path === "/auth/logout")).toBe(true);
   });
 });
+
+describe("the user's own data", () => {
+  it("offers the export and deletes the account with the password and the word", async () => {
+    const calls = mockApi({ "GET /me": { body: ME }, "POST /me/delete": { status: 204 } });
+    renderAt("/account", [{ path: "/account", element: <AccountPage /> }]);
+    expect(await screen.findByRole("link", { name: "Download my data" })).toHaveAttribute("href", "/api/me/export");
+    await userEvent.type(screen.getByLabelText("Password"), "my password!!");
+    await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "delete");
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    expect(screen.getByText("Type the confirmation word exactly.")).toBeInTheDocument();
+    expect(calls.some((c) => c.path === "/me/delete")).toBe(false);
+    await userEvent.clear(screen.getByLabelText("Type DELETE to confirm"));
+    await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "DELETE");
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    expect(await screen.findByText("Your account is deleted.")).toBeInTheDocument();
+    expect(calls.find((c) => c.path === "/me/delete")?.body).toEqual({ password: "my password!!", confirm: "DELETE" });
+  });
+
+  it("explains why a sole owner cannot leave yet, and asks no password of a provider-only account", async () => {
+    const calls = mockApi({ "GET /me": { body: { ...ME, hasPassword: false } }, "POST /me/delete": { status: 409, body: { title: "sole_owner" } } });
+    renderAt("/account", [{ path: "/account", element: <AccountPage /> }]);
+    await userEvent.type(await screen.findByLabelText("Type DELETE to confirm"), "DELETE");
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    expect(await screen.findByText(/only owner of a shared workspace/)).toBeInTheDocument();
+    expect(calls.find((c) => c.path === "/me/delete")?.body).toEqual({ confirm: "DELETE" });
+  });
+});

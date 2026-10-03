@@ -109,9 +109,17 @@ harness_sessions 1-n session_events, session_tasks, subagent_runs, session_usage
 workspaces 1-n event_archives
 ```
 
-## Account deletion
+## Your data: export and account deletion
 
-`users.status = 'deleted'` starts it: personal fields are cleared (e-mail, name, password hash, provider
-links), tokens and login sessions are revoked, the user's agents are revoked, and the captured content of the
-user's sessions is deleted. Audit rows keep the user id only. Workspace data the user created that others still
-use stays with the workspace. (The legal side is open in ADR-0002.)
+- **Export** (`GET /api/me/export`): one JSON file, streamed: the profile, sign-in providers, memberships, machines,
+  commands sent, the user's own audit trail, and every session run on the user's machines with its tasks, usage and
+  events.
+- **Deletion** (`POST /api/me/delete`, with the password when there is one and the word `DELETE`): refused (409
+  `sole_owner`) while the user is the only owner of a workspace that has other members. Otherwise, in one transaction:
+  the personal fields are cleared (`users.email`, name, password hash; status `deleted`), provider links deleted,
+  login sessions, mail tokens, agents and agent tokens revoked, open invitations to the address revoked, memberships
+  ended, workspaces with no other member archived; the captured content of the user's sessions is deleted (events,
+  tasks) or emptied (titles, subagent descriptions, command bodies, permission inputs). Ids, times, usage and audit
+  rows stay, so other people's records still make sense. The address is free for a new sign-up.
+- **Not covered yet:** day files already archived past retention (`event_archives`) still hold the user's events
+  until they are deleted by hand; the legal side (privacy policy, retention of archives) is open in ADR-0002.

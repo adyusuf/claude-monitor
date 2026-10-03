@@ -3,6 +3,7 @@ import { api, providerUrl } from "../api/endpoints";
 import { useSession } from "../auth/session";
 import { Card, CopyText, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
+import { AccountDataCards } from "./AccountData";
 import { useTokenOnce } from "./AuthPages";
 
 const PROVIDERS = [{ id: "github", name: "GitHub" }, { id: "google", name: "Google" }];
@@ -34,6 +35,7 @@ export function AccountPage() {
           ))}
         </ul>
       </Card>
+      <AccountDataCards />
     </div>
   );
 }

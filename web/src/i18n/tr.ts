@@ -35,6 +35,7 @@ export const tr: Dictionary = {
     forbidden: "Bunu yapma izniniz yok.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
+    confirm_required: "Onay kelimesini tam olarak yazın.", sole_owner: "Paylaşılan bir çalışma alanının tek sahibisiniz: önce başka birini sahip yapın.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
   time: { now: "şimdi", m: "dk", h: "sa", d: "g" },
@@ -84,6 +85,9 @@ export const tr: Dictionary = {
   account: {
     title: "Hesap", providers: "Giriş yöntemleri", linked: "Bağlı", link: "{provider} bağla", password: "Parola",
     hasPassword: "Ayarlı", noPassword: "Ayarlı değil (bir sağlayıcıyla giriş yapın ya da sıfırlayarak ayarlayın)",
+    data: "Verileriniz", exportHint: "Sizinle ve oturumlarınızla ilgili her şey, tek bir JSON dosyası olarak.", export: "Verilerimi indir",
+    deleteTitle: "Hesabı sil", deleteHint: "Adınız, adresiniz, giriş yöntemleriniz ve makinelerinizin yakaladığı her şey silinir; makinelerinizin bağlantısı kesilir. Geri alınamaz.",
+    deleteConfirm: "Onaylamak için {word} yazın", deleteButton: "Hesabımı sil", deleted: "Hesabınız silindi.",
   },
   invitation: { accepting: "Çalışma alanına katılınıyor…", accepted: "Çalışma alanına katıldınız." },
   download: {
