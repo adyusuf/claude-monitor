@@ -1,6 +1,6 @@
 # CI runs the SAME gate as a local run: scripts/gate-core.sh, with the thresholds in
 # scripts/merge-gate.conf — never a second set of rules in this file (rule #19).
-# .NET 10 for the API and the agent (ADR-0002); Node and the e2e browsers arrive with the web app.
+# .NET 10 for the API and the agent, Node 22 for the web app (ADR-0002). The e2e suite runs at the test -> prod gate.
 # Locally: bash scripts/merge-gate.sh dev
 name: CI
 
@@ -37,6 +37,11 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      # The web app: lint, typecheck, build, tests and coverage run through the same gate.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
       - name: CodeQL CLI
         id: codeql
         uses: github/codeql-action/setup-codeql@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
@@ -58,6 +63,7 @@ jobs:
         run: |
           python3 --version
           dotnet --version
+          node --version
           docker version --format '{{.Server.Version}}'
           gitleaks version
           codeql version | head -1
