@@ -64,7 +64,8 @@ export APPLE_API_ISSUER=… APPLE_API_KEY=… APPLE_API_KEY_PATH=…            
 cd desktop && cargo tauri build && spctl -a -vv "target/release/bundle/macos/Claude Monitor.app"
 ```
 
-`spctl` should print `accepted` and `source=Notarized Developer ID`. Not done yet: the keychain on the
+`spctl` should print `accepted` and `source=Notarized Developer ID`. The Mac App Store is a different
+path and does not fit this design as it stands: `docs/adr-0001-mac-app-store.md` (a proposal, not a decision). Not done yet: the keychain on the
 maintainer's machine holds only a revoked certificate.
 
 ## Where Claude Code runs it
