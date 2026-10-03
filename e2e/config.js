@@ -8,5 +8,5 @@ module.exports = {
   PYTHON: process.env.E2E_PYTHON || "python3",
   LANG_KEY: "board.lang",   // the page's own localStorage key (scripts/board/board_ui.js)
   LANG: "en",
-  PAGE_SIZE: 30,            // scripts/board/board_ui_lists.js
+  PAGE_SIZE: 10,            // scripts/board/board_ui_lists.js
 };

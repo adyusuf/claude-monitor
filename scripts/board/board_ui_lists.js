@@ -1,7 +1,7 @@
 "use strict";
 /* The live board's table lists (docs/live-board.md §2h): which rows come first, which are hidden
-   until asked for, and the 30-row pages. Pure functions plus the small page / toggle state the page
-   keeps between redraws; no DOM access. Active rows first, then newest first. */
+   until asked for, and the 10-row pages. Pure functions plus the small page / toggle state the page
+   keeps between redraws; no DOM access. Newest first, by date alone. */
 (function (root, factory) {
   const api = factory(typeof module === "object" && module.exports
     ? require("./board_ui_text.js") : root.BoardText);
@@ -12,39 +12,25 @@
   }
 })(typeof window !== "undefined" ? window : globalThis, function (text) {
   const { esc, fill } = text;
-  const PAGE_SIZE = 30;
+  const PAGE_SIZE = 10;
   const TABLES = ["tasks", "agents", "sessions"];
 
-  // Lower rank = shown earlier. A status this page does not know sorts after the active ones and
-  // before the finished ones, so a new server status is never buried (enum switches keep a default).
-  const TASK_RANK = { needs_decision: 0, running: 1, waiting: 2, agent_done: 2, planned: 3, done: 5, removed: 6 };
-  const TASK_UNKNOWN = 4;
-  const AGENT_RANK = { starting: 0, running: 0, done: 2 };
-  const AGENT_UNKNOWN = 1;  // failed, denied, anything new
-  const SESSION_RANK = { busy: 0, unknown: 1, idle: 2 };
-  const SESSION_UNKNOWN = 1;
   const FINISHED_TASK = new Set(["done", "removed"]);
   const FINISHED_AGENT = new Set(["done"]);
 
-  const rankOf = (table, unknown) => (status) => (status in table ? table[status] : unknown);
-  const taskRank = rankOf(TASK_RANK, TASK_UNKNOWN);
-  const agentRank = rankOf(AGENT_RANK, AGENT_UNKNOWN);
-  const sessionRank = rankOf(SESSION_RANK, SESSION_UNKNOWN);
   const idNumber = (id) => Number(String(id).replace(/\D/g, "")) || 0;
 
   // ISO-8601 stamps of one format compare correctly as plain strings; no stamp sorts last.
   const newer = (sa, sb) => (sb > sa) - (sb < sa);
 
-  /** A copy of `list` ordered by rank, then newest stamp first, then highest id first. */
-  function order(list, rank, stamp, id) {
-    return [...list].sort((a, b) => rank(a) - rank(b)
-      || newer(stamp(a) || "", stamp(b) || "")
-      || idNumber(id(b)) - idNumber(id(a)));
+  /** A copy of `list`, newest stamp first, the higher id first on a tie. A row with no stamp sorts last. */
+  function order(list, stamp, id) {
+    return [...list].sort((a, b) => newer(stamp(a) || "", stamp(b) || "") || idNumber(id(b)) - idNumber(id(a)));
   }
 
-  const orderTasks = (list) => order(list, (x) => taskRank(x.status), (x) => x.updated || x.started, (x) => x.id);
-  const orderAgents = (list) => order(list, (a) => agentRank(a.status), (a) => a.started, (a) => a.key);
-  const orderSessions = (list) => order(list, (s) => sessionRank(s.state), (s) => s.since, (s) => s.id);
+  const orderTasks = (list) => order(list, (x) => x.updated || x.started, (x) => x.id);
+  const orderAgents = (list) => order(list, (a) => a.started, (a) => a.key);
+  const orderSessions = (list) => order(list, (s) => s.since, (s) => s.id);
 
   const isFinishedTask = (x) => FINISHED_TASK.has(x.status);
   const isFinishedAgent = (a) => FINISHED_AGENT.has(a.status);

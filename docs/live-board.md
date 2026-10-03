@@ -263,16 +263,16 @@ page); if it fails, the reason is shown on that page (the URL fragment).
 The three tables (Sessions, Tasks, Agent activity) are ordered, filtered and paged in the page itself
 (`board_ui_lists.js`; the server sends everything and nothing about the order is stored).
 
-- **Order: active first, then newest first.** Tasks: needs a decision, running, waiting / agent done,
-  planned, any status the page does not know, done, removed; newest `updated` (else `started`) first
-  inside a group, the higher id on a tie. Agents: starting / running, failed / denied / other, done;
-  newest `started` first. Sessions: busy, unknown, idle; newest `since` first.
+- **Order: newest first, by date alone.** The status does not move a row: a task that has been running
+  since yesterday sits below one planned a minute ago. Tasks by `updated` (else `started`); agents by
+  `started`; sessions by `since`, the moment their busy / idle state began. A row with no date sorts
+  last, and the higher id comes first when two dates are equal. (Until 03/10/2026 active rows came first.)
 - **Finished rows are hidden at first.** Tasks: done and removed; agents: done. A checkbox above the
   table shows them again ("show done and removed tasks", "show finished agents") and a note under the
   table says how many are hidden. The stat tiles and the "all done" banner still count every task, and
   the Agent-activity **total row** is measured by the server over every agent, so it is the same on
   every page and with the box ticked or not. Sessions have no finished state, so only order and pages.
-- **Pages of 30 rows,** previous / next buttons under each table and "Page p / n · N rows". A page that
+- **Pages of 10 rows,** previous / next buttons under each table and "Page p / n · N rows". A page that
   no longer exists (the table shrank while you were on it) is held on the last one; a project switch,
   a ticked box and the "channel only" box all go back to page 1. The page choice lives in the open page
   only (not stored), like the box states.
