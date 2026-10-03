@@ -13,6 +13,7 @@ public static class AuditActions
     public const string SignOut = "user.sign_out";
     public const string PasswordReset = "user.password_reset";
     public const string ProviderLinked = "user.provider_linked";
+    public const string AccountDeleted = "user.account_deleted";
     public const string WorkspaceCreated = "workspace.created";
     public const string InvitationCreated = "workspace.invitation_created";
     public const string InvitationAccepted = "workspace.invitation_accepted";

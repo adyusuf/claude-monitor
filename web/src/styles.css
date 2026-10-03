@@ -76,6 +76,7 @@ code, pre { font-family: var(--mono); font-size: 12.5px; }
 /* ---- components ---- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.card-danger { border-color: var(--danger-soft); }
 .card-attention { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid transparent; font: 600 13.5px var(--font); cursor: pointer; white-space: nowrap; }
 .btn:disabled { opacity: 0.6; cursor: default; }
