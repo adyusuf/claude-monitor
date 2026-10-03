@@ -48,7 +48,7 @@ describe("register", () => {
     expect(screen.getByText("Use at least 10 characters.")).toBeInTheDocument();
     expect(screen.getByText("Enter a name (up to 100 characters).")).toBeInTheDocument();
     expect(calls.some((c) => c.path === "/auth/register")).toBe(false);
-    await userEvent.type(screen.getByLabelText("Your name"), "Ayşe");
+    await userEvent.type(screen.getByLabelText("Your name"), "Örnek Kişi");
     await userEvent.type(screen.getByLabelText("E-mail"), "ayse+r@gmail.com");
     await userEvent.type(screen.getByLabelText("Password"), "long enough pw");
     await userEvent.click(screen.getByRole("button", { name: "Create account" }));

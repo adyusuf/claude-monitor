@@ -53,7 +53,7 @@ export function useLive(workspaceId: string | undefined, onMessage: (m: LiveMess
 }
 
 /** Runs fn at most once per wait, after the last call (for bursts of live messages). */
-export function debounce(fn: () => void, wait = config.liveDebounceMs): () => void {
+export function debounce(fn: () => void, wait: number = config.liveDebounceMs): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return () => {
     clearTimeout(timer);
