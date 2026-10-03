@@ -73,6 +73,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         {
             ["name"] = AgentConfig.MarketplaceName,
             ["owner"] = new JsonObject { ["name"] = "Claude Monitor" },
+            ["description"] = "The Claude Monitor agent installed on this machine (one plugin: hooks and an MCP server).",
             ["plugins"] = new JsonArray(new JsonObject
             {
                 ["name"] = AgentConfig.PluginName,

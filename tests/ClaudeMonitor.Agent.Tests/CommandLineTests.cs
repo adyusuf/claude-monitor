@@ -135,7 +135,9 @@ public sealed class CommandLineTests : IDisposable
         Assert.True(hooks["PostToolUse"]![0]!["hooks"]![0]!["async"]!.GetValue<bool>());
         var mcp = JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "monitor-agent", ".mcp.json")))!;
         Assert.Equal("mcp", mcp["mcpServers"]!["claude-monitor"]!["args"]![0]!.GetValue<string>());
-        Assert.Equal("monitor-agent-local", JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, ".claude-plugin", "marketplace.json")))!["name"]!.GetValue<string>());
+        var marketplace = JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, ".claude-plugin", "marketplace.json")))!;
+        Assert.Equal("monitor-agent-local", marketplace["name"]!.GetValue<string>());
+        Assert.False(string.IsNullOrWhiteSpace(marketplace["description"]?.GetValue<string>()));
 
         Assert.Equal(0, installer.Uninstall());
         Assert.Contains("claude plugin uninstall monitor-agent@monitor-agent-local", calls);
