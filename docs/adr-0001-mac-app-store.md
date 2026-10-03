@@ -1,6 +1,7 @@
 # ADR-0001: Distributing the desktop window through the Mac App Store
 
-**Status:** Proposed. A draft for the maintainer to decide; nothing here is built.
+**Status:** Superseded by [ADR-0002](adr-0002-agent-platform.md) (03/10/2026): the desktop window it is about was
+removed. Kept as a record; the guideline analysis still applies to any future store build.
 **Date:** 03/10/2026
 **Deciders:** the maintainer (the Apple Developer Program account holder).
 
