@@ -16,6 +16,7 @@ import time
 from board_config import (AGENT_TOOL, DECISION_POLL_S, DECISION_WAIT_S, TASK_TAG_PATTERN,
                           BASH_TOOL, BOARD_CMD_PATTERN, TASK_CREATE_TOOL, TASK_UPDATE_TOOL, TODO_TOOL,
                           ControlAction, TaskStatus, board_dir, boardable, explicit_board_dir)
+import board_nudge
 import board_todos
 from board_registry import register_if_missing
 from board_channel_ack import confirm as _channel_confirm
@@ -166,6 +167,8 @@ def handle(payload: dict) -> dict | None:
             # for the orchestrator, or the orchestrator would never see the change.
             return None
         text = _change_text(unseen_changes(bdir, session), session)
+        reminder = board_nudge.tick(bdir, session)  # once per session, never blocks
+        text = "\n".join(t for t in (text, reminder) if t) or None
         return _context("PostToolUse", text) if text else None
 
     if event == "SubagentStart":

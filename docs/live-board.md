@@ -279,6 +279,16 @@ The three tables (Sessions, Tasks, Agent activity) are ordered, filtered and pag
 - **A table whose HTML did not change is not rewritten** on the 1.5 s poll, so a focused pager button
   keeps its focus. A task row is still not redrawn while a note is being typed in it.
 
+## 2j. The plan reminder (T-23, 03/10/2026)
+
+Seen live: a session made 60+ tool calls in a project with the board enabled and the page showed no task.
+The hooks record agents by themselves, but the plan only exists when the session runs `board.py add|set`
+(the `board-plan` skill), and nothing asked for it. Now the `PostToolUse` hook counts the main session's tool
+calls (`board_nudge.py`, state in `nudge.json`, mode `0600`); after `BOARD_NUDGE_AFTER` calls (default **8**,
+`0` = off) in which that session never ran `board.py add|set`, it adds one line of context pointing at
+`/adyusuf:board-plan`. It is said **once per session**, never blocks, ignores subagents' calls, and a
+session that has touched the board is not told. A damaged or unwritable state file only means no reminder.
+
 ## 2i. Asking a task for its status
 
 A task the board cannot read the state of - `waiting`, `agent_done`, or a status this page does not know -
