@@ -86,7 +86,12 @@ fi
 WEB_DIR=""; for d in web frontend .; do [ -f "$d/package.json" ] && { WEB_DIR="$d"; break; }; done
 MOBILE_DIR=""; for d in mobile app; do [ -f "$d/package.json" ] && { MOBILE_DIR="$d"; break; }; done
 case " ${SKIP_STACKS:-} " in *" mobile "*) MOBILE_DIR="" ;; esac
-HAS_E2E_WEB=0;    [ -d e2e ] || [ -d tests/e2e ] && HAS_E2E_WEB=1
+# The web suite is e2e/ or tests/e2e/ at the root, OR e2e/ inside the web tier (web/e2e, frontend/e2e):
+# a project that keeps its Playwright suite next to the app used to be reported as "no e2e suite".
+E2E_WEB_DIR=""
+if [ -d e2e ] || [ -d tests/e2e ]; then E2E_WEB_DIR="."
+elif [ -n "$WEB_DIR" ] && [ "$WEB_DIR" != "." ] && [ -d "$WEB_DIR/e2e" ]; then E2E_WEB_DIR="$WEB_DIR"; fi
+HAS_E2E_WEB=0;    [ -n "$E2E_WEB_DIR" ] && HAS_E2E_WEB=1
 HAS_E2E_MOBILE=0; [ -d .maestro ] || [ -d "${MOBILE_DIR:-mobile}/.maestro" ] && HAS_E2E_MOBILE=1
 
 echo "merge gate → $TARGET   ($(git rev-parse --short HEAD), $ROOT)"

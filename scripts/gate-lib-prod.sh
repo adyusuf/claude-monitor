@@ -59,7 +59,7 @@ gate_prod() {
     if [ "$HAS_E2E_WEB" = 1 ]; then
       ran=1
       if [ -n "${E2E_WEB_CMD:-}" ]; then run "web e2e ($E2E_WEB_CMD)" bash -c "$E2E_WEB_CMD"
-      else run "web e2e (playwright)" npx playwright test; fi
+      else run "web e2e (playwright)" bash -c "cd \"$E2E_WEB_DIR\" && npx playwright test"; fi
     fi
     if [ "$HAS_E2E_MOBILE" = 1 ]; then
       ran=1
