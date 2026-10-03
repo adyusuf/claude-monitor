@@ -44,7 +44,8 @@
 #                                                       # alternative source when there is no
 #                                                       # /version endpoint yet
 #   TEST_BASE_URL=https://test.example.com              # documentation + the e2e base URL
-#   E2E_WEB_CMD="npx playwright test"                   # default when e2e/ exists
+#   E2E_WEB_CMD="npx playwright test"                   # default when e2e/ (root, tests/e2e or <web tier>/e2e) exists;
+#                                                       # it runs from the directory that holds the suite
 #   E2E_MOBILE_CMD="bash scripts/mobile-e2e.sh"         # default when .maestro/ exists
 #   COVERAGE_CMD="node scripts/coverage-budget.cjs"     # must exit non-zero below the threshold
 #   COVERAGE_MIN=80
@@ -225,8 +226,8 @@ if [ "$TARGET" != "prod" ]; then
   if [ "$HAS_E2E_WEB" = 1 ] || [ "$HAS_E2E_MOBILE" = 1 ]; then
     base="$(git merge-base HEAD "origin/$TARGET" 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
     changed="$(git diff --name-only "$base"..HEAD 2>/dev/null)"
-    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
-    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
+    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|[^/]+/e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
+    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|[^/]+/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
     if [ -n "$behaviour" ] && [ -z "$specs_touched" ]; then
       missing=1
       warn "behaviour changed in $(printf '%s\n' "$behaviour" | wc -l | tr -d ' ') file(s) but no e2e spec was touched"
