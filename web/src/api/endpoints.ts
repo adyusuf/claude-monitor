@@ -20,6 +20,7 @@ export const api = {
   verifyEmail: (token: string) => request<void>("POST", "/auth/verify-email", { token }),
   login: (email: string, password: string) => request<void>("POST", "/auth/login", { email, password }),
   logout: () => request<void>("POST", "/auth/logout"),
+  deleteAccount: (password: string | undefined, confirm: string) => request<void>("POST", "/me/delete", { password, confirm }),
   forgot: (email: string) => request<void>("POST", "/auth/password/forgot", { email }),
   reset: (token: string, password: string) => request<void>("POST", "/auth/password/reset", { token, password }),
 
@@ -58,4 +59,5 @@ export const api = {
 
 /** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */
 export const providerUrl = (provider: string, mode: "signin" | "link") => `/api/auth/external/${provider}?mode=${mode}`;
+export const exportUrl = "/api/me/export";
 export const streamUrl = (workspaceId: string) => `/api/workspaces/${workspaceId}/stream`;
