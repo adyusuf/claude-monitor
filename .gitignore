@@ -20,3 +20,9 @@ obj/
 *.user
 TestResults/
 coverage-report/
+
+# Web build output and coverage
+web/dist/
+web/coverage/
+out/
+web/tsconfig.tsbuildinfo

@@ -6,8 +6,8 @@
 # calls this file through SAST_CMD in scripts/merge-gate.conf.
 #
 # Scope: C#, Python and JavaScript/TypeScript via CodeQL (each n/a while the repository has none), shell via
-# ShellCheck. C# is extracted without a build (--build-mode=none) from src/ only: the product code, without
-# walking build output or the tests (which are not shipped).
+# ShellCheck. C# is extracted without a build (--build-mode=none) from src/ only, and TypeScript from web/src only:
+# the product code, without walking build output, dependencies or the tests (which are not shipped).
 # CodeQL has no shell analyser, and this repository is mostly shell — "SAST passed" would have read as
 # "everything was scanned" while more than half the code was never looked at.
 # ShellCheck closes that half. Both tools are PROBED; a missing one is reported
@@ -122,9 +122,9 @@ if [ "$status" = 3 ]; then exit 3; fi
 if [ "$cs_status" != 0 ] && [ "$status" = 0 ]; then status="$cs_status"; fi
 
 echo
-codeql_pass javascript JavaScript '*.js' \
+codeql_pass javascript 'JavaScript/TypeScript (web)' '*.tsx' \
   "codeql/javascript-queries:codeql-suites/javascript-security-extended.qls" \
-  "$root/.codeql/db-javascript" "$root/.codeql/results-javascript.sarif"
+  "$root/.codeql/db-javascript" "$root/.codeql/results-javascript.sarif" "" "$root/web/src"
 js_status=$?
 if [ "$js_status" = 3 ]; then exit 3; fi
 if [ "$js_status" != 0 ] && [ "$status" = 0 ]; then status="$js_status"; fi

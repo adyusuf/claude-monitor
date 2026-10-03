@@ -25,6 +25,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public FakeMailer Mail { get; } = new();
     // Starts at the real time: cookies carry expiry dates and the test client's cookie jar judges them by the wall clock.
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
+    public string WebRoot { get; } = Path.Combine(Path.GetTempPath(), "cm-web-" + Guid.NewGuid().ToString("N"));
     public string ArchiveDir { get; } = Path.Combine(Path.GetTempPath(), "cm-archive-" + Guid.NewGuid().ToString("N"));
 
     public async Task InitializeAsync()
@@ -35,6 +36,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("MONITOR_BACKGROUND_JOBS", "off");
         Environment.SetEnvironmentVariable("MONITOR_ARCHIVE_DIR", ArchiveDir);
         Environment.SetEnvironmentVariable("MONITOR_COMMIT", "test-sha");
+        Directory.CreateDirectory(Path.Combine(WebRoot, "assets"));
+        await File.WriteAllTextAsync(Path.Combine(WebRoot, "index.html"), "<!doctype html><title>app</title>");
+        await File.WriteAllTextAsync(Path.Combine(WebRoot, "assets", "app.js"), "console.log('app');");
+        Environment.SetEnvironmentVariable("MONITOR_WEB_ROOT", WebRoot);
         Environment.SetEnvironmentVariable("MONITOR_AUTH_RATE_PER_MINUTE", "100000");
         Environment.SetEnvironmentVariable("MONITOR_MIN_AGENT_VERSION", "0.2.0");
         Environment.SetEnvironmentVariable("MONITOR_GITHUB_CLIENT_ID", "gh-id");
@@ -53,6 +58,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await base.DisposeAsync();
         await db.DisposeAsync();
         if (Directory.Exists(ArchiveDir)) Directory.Delete(ArchiveDir, recursive: true);
+        if (Directory.Exists(WebRoot)) Directory.Delete(WebRoot, recursive: true);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

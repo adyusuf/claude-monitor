@@ -63,10 +63,19 @@ public sealed record ApiConfig
                 ? new OAuthClient(id, secret)
                 : null;
 
+        // Outside development the site must be https; plain http is accepted only on the machine itself (the local
+        // e2e stack), and cookies are Secure exactly when the site is https.
+        var origin = Required("MONITOR_PUBLIC_ORIGIN", "http://localhost:5173").TrimEnd('/');
+        var loopback = Uri.TryCreate(origin, UriKind.Absolute, out var originUri) && originUri.IsLoopback;
+        if (!development && !origin.StartsWith("https://", StringComparison.Ordinal) && !loopback)
+        {
+            throw new InvalidOperationException("MONITOR_PUBLIC_ORIGIN must be https outside development (see .env.example)");
+        }
+
         return new ApiConfig
         {
             DatabaseUrl = Required("MONITOR_DB", "Host=localhost;Port=55432;Database=monitor;Username=monitor;Password=monitor"),
-            PublicOrigin = Required("MONITOR_PUBLIC_ORIGIN", "http://localhost:5173").TrimEnd('/'),
+            PublicOrigin = origin,
             Smtp = new SmtpSettings(
                 Required("MONITOR_SMTP_HOST", "localhost"),
                 int.Parse(Required("MONITOR_SMTP_PORT", "1025"), System.Globalization.CultureInfo.InvariantCulture),
@@ -80,7 +89,7 @@ public sealed record ApiConfig
             WebRoot = env["MONITOR_WEB_ROOT"],
             Commit = env["MONITOR_COMMIT"] is { Length: > 0 } c ? c : "dev",
             MinimumAgentVersion = Version.Parse(env["MONITOR_MIN_AGENT_VERSION"] is { Length: > 0 } m ? m : "0.1.0"),
-            SecureCookies = !development,
+            SecureCookies = origin.StartsWith("https://", StringComparison.Ordinal),
             BackgroundJobs = env["MONITOR_BACKGROUND_JOBS"] != "off",
             TrustProxy = env["MONITOR_TRUST_PROXY"] == "true",
             AuthRequestsPerMinute = int.TryParse(env["MONITOR_AUTH_RATE_PER_MINUTE"], out var rate) && rate > 0 ? rate : 20,
