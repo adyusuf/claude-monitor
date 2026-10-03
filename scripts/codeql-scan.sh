@@ -5,8 +5,9 @@
 # thresholds CI uses — never two different rules in two places. gate-core.sh
 # calls this file through SAST_CMD in scripts/merge-gate.conf.
 #
-# Scope: Python and JavaScript via CodeQL (each n/a while the repository has none), shell via
-# ShellCheck. C# joins with the first .NET project (ADR-0002, phase 1).
+# Scope: C#, Python and JavaScript/TypeScript via CodeQL (each n/a while the repository has none), shell via
+# ShellCheck. C# is extracted without a build (--build-mode=none) from src/ only: the product code, without
+# walking build output or the tests (which are not shipped).
 # CodeQL has no shell analyser, and this repository is mostly shell — "SAST passed" would have read as
 # "everything was scanned" while more than half the code was never looked at.
 # ShellCheck closes that half. Both tools are PROBED; a missing one is reported
@@ -39,7 +40,7 @@ trap 'rm -f "$log"' EXIT
 # One CodeQL pass: $1 language, $2 label, $3 file pattern, $4 query suite, $5 database,
 # $6 SARIF output. Returns 0 clean or n/a · 1 high/critical · 3 NOT RUN.
 codeql_pass() {
-  local lang="$1" label="$2" pattern="$3" suite="$4" db="$5" out="$6"
+  local lang="$1" label="$2" pattern="$3" suite="$4" db="$5" out="$6" mode="${7:-}" source="${8:-$root}"
   echo "▶ SAST (CodeQL, $label)"
   if [ -z "$(find . -name "$pattern" -not -path './.codeql/*' -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ]; then
     echo "  n/a: this repository has no $label"
@@ -47,8 +48,8 @@ codeql_pass() {
   fi
   mkdir -p "$(dirname "$db")"
   rm -rf "$db"
-  if ! codeql database create "$db" --language="$lang" --source-root="$root" \
-        --overwrite >"$log" 2>&1; then
+  if ! codeql database create "$db" --language="$lang" --source-root="$source" \
+        ${mode:+--build-mode="$mode"} --overwrite >"$log" 2>&1; then
     tail -15 "$log" | sed 's/^/    /'
     echo "  NOT RUN: the CodeQL database could not be built"
     return 3
@@ -106,11 +107,19 @@ print('  ✓ no high or critical finding')
 REPORT
 }
 
+codeql_pass csharp 'C#' '*.cs' \
+  "codeql/csharp-queries:codeql-suites/csharp-security-extended.qls" \
+  "$root/.codeql/db-csharp" "$root/.codeql/results-csharp.sarif" none "$root/src"
+cs_status=$?
+if [ "$cs_status" = 3 ]; then exit 3; fi
+
+echo
 codeql_pass python Python '*.py' \
   "${CODEQL_SUITE:-codeql/python-queries:codeql-suites/python-security-extended.qls}" \
   "${CODEQL_DB:-$root/.codeql/db}" "${CODEQL_SARIF:-$root/.codeql/results.sarif}"
 status=$?
 if [ "$status" = 3 ]; then exit 3; fi
+if [ "$cs_status" != 0 ] && [ "$status" = 0 ]; then status="$cs_status"; fi
 
 echo
 codeql_pass javascript JavaScript '*.js' \
