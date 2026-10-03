@@ -14,6 +14,10 @@ rollback target has a name:
 git tag -a prod-DD-MM-YYYY -m "<one line: what shipped>" <sha> && git push origin prod-DD-MM-YYYY
 ```
 
+The `test` -> `prod` gate also runs the browser tests (`e2e/`, Playwright; `SETUP.md`): there is no deployed
+test environment for a local tool, so they start a real board server on a seeded temporary project. Nothing
+reaches `prod` without them green; only a maintainer-declared hotfix skips them, and the tag message says so.
+
 A second promotion on the same day appends `-2`. A hotfix says so in the tag message.
 
 ## Before a release: does the suite notice a fault?
@@ -31,6 +35,10 @@ python3 scripts/mutation_check.py scripts/board/board_tasks.py --tests test_boar
 Read each survivor: write the missing test, or note why the change is harmless (an *equivalent mutant*: for
 example `split("-", 1)` -> `split("-", 2)` on an id that has one dash). A file mode such as `0o600` showing up
 as a survivor means no test reads the mode. The working tree is never touched.
+
+First use, on `board_store.py`: 33 of 60 changes caught (55%). The 27 survivors became 18 tests
+(`test_board_store_behaviour.py`) and the rate went to 56 of 60 (93%); what is left is a subprocess timeout
+(`5` -> `6`), the JSON `indent`, and one guard no event sequence can reach.
 
 ## How a new version takes effect
 

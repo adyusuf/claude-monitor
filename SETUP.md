@@ -10,9 +10,10 @@ A clean machine is set up by following this file.
 | Python 3.9+ | the hooks, CLI and server (standard library only) | `python3 --version` |
 | git | project roots and worktrees | `git --version` |
 | Claude Code | the source of the hooks and transcripts | `claude --version` |
-| Node 20+ | only to run the page's tests | `node --version` |
+| Node 20+ | the page's tests, and the browser tests (`e2e/`) | `node --version` |
 | `coverage` (Python package, in a venv outside the repository) | the coverage gate | see below |
 | Rust (rustup) with `llvm-tools-preview`, `cargo-llvm-cov`, `cargo-audit` | only for the desktop window (`desktop/`), its coverage and its dependency scan | `rustc --version`, `cargo llvm-cov --version`, `cargo audit --version` |
+| Playwright's Chromium (about 80 MB, from `e2e/package.json`) | only the browser tests, at the `test -> prod` gate | `cd e2e && npx playwright install chromium` |
 | gitleaks, ShellCheck, CodeQL CLI | the secret scan, and SAST for the shell and Python | `gitleaks version`, `shellcheck --version`, `codeql version` |
 
 ## Install
@@ -77,6 +78,23 @@ The board is fed by Claude Code's hooks, so it works wherever the hooks fire. Ch
 | VS Code extension | **not verified** | no VS Code session exists on this machine, so none could be observed. It should behave like the others (same hooks), but that is an assumption. |
 
 How a queued message reaches an idle session differs per surface: `docs/live-board.md` §2d.
+
+## Browser tests (e2e)
+
+Playwright drives a real Chromium against a real board server that `e2e/serve.py` starts on a seeded
+temporary project (its own registry, transcripts and skills folder, removed on exit): the user's boards are
+never touched. Dev-only; nothing here ships. Written and run at the `test -> prod` gate (global #33); the gate
+runs it through `E2E_WEB_CMD` in `scripts/merge-gate.conf`.
+
+```bash
+cd e2e && npm ci && npx playwright install chromium   # once
+npm test                                              # 13 tests, about 15 s; E2E_PORT / E2E_PYTHON in .env.example
+```
+
+The board's service worker passes every request through, and Playwright cannot intercept a request a service
+worker makes, so the two specs that fake a failed request run with the worker blocked (`test.use`). The
+suite changes the seeded board (removes a task, queues a message), each on rows of its own, so it can be
+repeated on one server (`--repeat-each`).
 
 ## Commit hooks
 
