@@ -40,7 +40,7 @@
     const tasks = Object.values(st.tasks);
     const agents = st.agents;
     const agentList = Object.values(agents);
-    // Tables: active rows first, then newest first; finished rows hidden until asked for; 30-row pages.
+    // Tables: newest first by date; finished rows hidden until asked for; 10-row pages.
     const paging = extra.lists || lists.makeLists().state();
     const taskSel = lists.select(tasks, { order: lists.orderTasks, finished: lists.isFinishedTask, state: paging.tasks });
     const agentSel = lists.select(agentList, { order: lists.orderAgents, finished: lists.isFinishedAgent, state: paging.agents });

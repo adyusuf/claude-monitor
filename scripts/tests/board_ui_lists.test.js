@@ -1,6 +1,6 @@
 "use strict";
 // The board's table lists (scripts/board/board_ui_lists.js, docs/live-board.md §2h): ordering,
-// finished rows hidden by default, 30-row pages, and the click / checkbox flow through start().
+// newest-first order, finished rows hidden by default, 10-row pages, and the click / checkbox flow through start().
 // Run: node --test scripts/tests/*.test.js  — measured by scripts/coverage.sh (#29).
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -24,11 +24,14 @@ const hit = (selector, el) => target({ closest: (sel) => (sel === selector ? el 
 const pagerBtn = (key, dir) => hit("[data-page]", { dataset: { page: key, dir: String(dir) } });
 const many = (n, status, make = task) => Array.from({ length: n }, (_, i) => make(i + 1, status));
 
-test("tasks: needs a decision, running, waiting, planned, unknown, done, removed - newest first inside a group", () => {
+test("tasks: newest first by date alone - the status does not move a row", () => {
   const list = [task(1, "done"), task(2, "planned"), task(3, "removed"), task(4, "running"), task(5, "agent_done"),
     task(6, "needs_decision"), task(7, "brand_new_status"), task(8, "running", { updated: ago(5) }), task(9, "waiting")];
   assert.deepEqual(ids(lists.orderTasks(list)),
-    ["T-6", "T-8", "T-4", "T-9", "T-5", "T-2", "T-7", "T-1", "T-3"]);
+    ["T-8", "T-9", "T-7", "T-6", "T-5", "T-4", "T-3", "T-2", "T-1"]);
+  // an old task that is still running sits below newer ones, planned or not
+  const old = [task(1, "running", { updated: ago(900) }), task(2, "planned", { updated: ago(10) }), task(3, "done", { updated: ago(500) })];
+  assert.deepEqual(ids(lists.orderTasks(old)), ["T-2", "T-3", "T-1"]);
 });
 
 test("tasks: with no stamp the start time orders them, and the higher id wins a tie", () => {
@@ -37,15 +40,17 @@ test("tasks: with no stamp the start time orders them, and the higher id wins a 
   assert.deepEqual(ids(lists.orderTasks(list)), ["T-2", "T-1", "T-10", "T-9"]);
 });
 
-test("agents: running or starting, then failed / denied / unknown, then done - newest first", () => {
+test("agents: newest start first - the status does not move a row", () => {
   const list = [agent(1, "done"), agent(2, "denied"), agent(3, "running"), agent(4, "starting"), agent(5, "failed"), agent(6, "done")];
-  assert.deepEqual(lists.orderAgents(list).map((a) => a.key), ["k4", "k3", "k5", "k2", "k6", "k1"]);
+  assert.deepEqual(lists.orderAgents(list).map((a) => a.key), ["k6", "k5", "k4", "k3", "k2", "k1"]);
+  const old = [agent(1, "running", { started: ago(900) }), agent(2, "done", { started: ago(10) })];
+  assert.deepEqual(lists.orderAgents(old).map((a) => a.key), ["k2", "k1"]);
 });
 
-test("sessions: busy, then unknown, then idle - newest first", () => {
+test("sessions: newest state change first - busy or idle does not move a row", () => {
   const list = [session(1, "idle"), session(2, "busy"), session(3, "unknown"), session(4, "idle"), session(5, "busy"), session(6, "odd")];
-  assert.deepEqual(lists.orderSessions(list).map((s) => s.state), ["busy", "busy", "odd", "unknown", "idle", "idle"]);
-  assert.equal(lists.orderSessions(list)[0].id.slice(0, 8), "s0000005");
+  assert.deepEqual(lists.orderSessions(list).map((s) => s.state), ["odd", "busy", "idle", "unknown", "busy", "idle"]);
+  assert.equal(lists.orderSessions(list)[0].id.slice(0, 8), "s0000006");
 });
 
 test("ordering returns a copy and leaves the input alone", () => {
@@ -55,16 +60,17 @@ test("ordering returns a copy and leaves the input alone", () => {
   assert.deepEqual(ids(list), ["T-1", "T-2"]);
 });
 
-test("paginate: 30 rows are one page, 31 are two, 65 are three with 5 on the last", () => {
+test("paginate: 10 rows are one page, 11 are two, 25 are three with 5 on the last", () => {
   const of = (n) => lists.paginate(Array.from({ length: n }, (_, i) => i), 1);
-  assert.deepEqual([of(0).pages, of(30).pages, of(31).pages, of(65).pages], [1, 1, 2, 3]);
-  assert.equal(of(30).rows.length, 30);
-  const last = lists.paginate(Array.from({ length: 65 }, (_, i) => i), 3);
-  assert.deepEqual([last.rows.length, last.rows[0], last.page, last.total], [5, 60, 3, 65]);
+  assert.deepEqual([of(0).pages, of(10).pages, of(11).pages, of(25).pages], [1, 1, 2, 3]);
+  assert.equal(of(10).rows.length, 10);
+  assert.equal(lists.PAGE_SIZE, 10);
+  const last = lists.paginate(Array.from({ length: 25 }, (_, i) => i), 3);
+  assert.deepEqual([last.rows.length, last.rows[0], last.page, last.total], [5, 20, 3, 25]);
 });
 
 test("paginate: a page outside the range, or not a number, is held inside it", () => {
-  const list = Array.from({ length: 65 }, (_, i) => i);
+  const list = Array.from({ length: 25 }, (_, i) => i);
   assert.equal(lists.paginate(list, 99).page, 3);
   assert.equal(lists.paginate(list, 0).page, 1);
   assert.equal(lists.paginate(list, -4).page, 1);
@@ -79,7 +85,7 @@ test("select: finished rows are hidden and counted until the toggle is on", () =
   const hidden = lists.select(list, opts(false));
   assert.deepEqual([ids(hidden.rows), hidden.hidden, hidden.all], [["T-3"], 2, 3]);
   const shown = lists.select(list, opts(true));
-  assert.deepEqual([ids(shown.rows), shown.hidden], [["T-3", "T-1", "T-2"], 0]);
+  assert.deepEqual([ids(shown.rows), shown.hidden], [["T-3", "T-2", "T-1"], 0]);
   const noFilter = lists.select(list, { order: lists.orderTasks, state: { page: 1 } });
   assert.equal(noFilter.rows.length, 3);
   assert.equal(lists.isFinishedAgent({ status: "done" }) && !lists.isFinishedAgent({ status: "failed" }), true);
@@ -132,26 +138,32 @@ test("view: done and removed tasks are hidden by default, but the stats and the 
   assert.match(ui.view(state({ tasks: finished }), en, NOW).tasksHtml, /Only finished rows exist \(2\)/);
 });
 
-test("view: tasks come in pages of 30, active first, and a page past the end is clamped", () => {
-  const tasks = byKey([...many(40, "running"), ...many(30, "planned").map((x) => ({ ...x, id: `T-${100 + Number(x.id.slice(2))}` }))], "id");
+test("view: tasks come in pages of 10, newest first, and a page past the end is clamped", () => {
+  const tasks = byKey(many(25, "running"), "id");
   const st = state({ tasks });
   const first = ui.view(st, tr, NOW);
-  assert.equal(rows(first.tasksHtml).length, 30);
-  assert.match(rows(first.tasksHtml)[0], /T-40/);             // newest running first
+  assert.equal(rows(first.tasksHtml).length, 10);
+  assert.match(rows(first.tasksHtml)[0], /T-25/);             // the newest first
+  assert.match(rows(first.tasksHtml)[9], /T-16/);
   assert.equal(first.pages.tasks, 1);
   const third = ui.view(st, tr, NOW, { lists: { ...SHOW_ALL, tasks: { page: 3, showDone: false } } });
-  assert.equal(rows(third.tasksHtml).length, 10);
-  assert.match(third.tasksHtml, /title-1</);                  // the planned ones come after the 40 running
-  assert.doesNotMatch(third.tasksHtml, /title-30</);
+  assert.equal(rows(third.tasksHtml).length, 5);
+  assert.match(third.tasksHtml, /title-1</);                  // the oldest are on the last page
+  assert.doesNotMatch(third.tasksHtml, /title-6</);
   const past = ui.view(st, tr, NOW, { lists: { ...SHOW_ALL, tasks: { page: 9, showDone: false } } });
   assert.equal(past.pages.tasks, 3);
+});
+
+test("view: a newer planned task is listed above an older running one", () => {
+  const tasks = byKey([task(1, "running", { updated: ago(900) }), task(2, "planned", { updated: ago(10) })], "id");
+  assert.deepEqual(rows(ui.view(state({ tasks }), tr, NOW).tasksHtml).map((r) => /title-(\d)/.exec(r)[1]), ["2", "1"]);
 });
 
 test("view: agents hide the done ones by default; the total row and the notes stay", () => {
   const agents = byKey([agent(1, "done"), agent(2, "running"), agent(3, "denied")], "key");
   const st = state({ agents, costs: { ...costs(), agent_rows: { rows: {}, by_type: {}, unmeasured: 0, total: null } } });
   const v = ui.view(st, tr, NOW);
-  assert.deepEqual(rows(v.agentsHtml).map((r) => /desc-(\d)/.exec(r)[1]), ["2", "3"]);
+  assert.deepEqual(rows(v.agentsHtml).map((r) => /desc-(\d)/.exec(r)[1]), ["3", "2"]);
   assert.match(v.pagers.agents, /1 biten gizli/);
   const done = ui.view(state({ agents: byKey([agent(1, "done")], "key"), costs: costs() }), en, NOW);
   assert.match(done.agentsHtml, /Only finished rows exist \(1\)/);
@@ -162,14 +174,15 @@ test("view: sessions are ordered, paged and filtered by the channel checkbox", (
   const list = [...Array.from({ length: 32 }, (_, i) => session(i + 1, "idle", { channel: i % 2 === 0 })), session(40, "busy")];
   const st = state({ costs: costs(list) });
   const v = ui.view(st, tr, NOW);
-  assert.equal(rows(v.sessionsHtml).length, 30);
-  assert.match(rows(v.sessionsHtml)[0], /s0000040/);          // the busy one is first
+  assert.equal(rows(v.sessionsHtml).length, 10);
+  assert.match(rows(v.sessionsHtml)[0], /s0000040/);          // the newest state change is first
   assert.equal(v.pages.sessions, 1);
-  assert.match(v.pagers.sessions, /Sayfa 1 \/ 2 · 33 satır/);
-  const second = ui.view(st, tr, NOW, { lists: { ...SHOW_ALL, sessions: { page: 2 } } });
-  assert.equal(rows(second.sessionsHtml).length, 3);
+  assert.match(v.pagers.sessions, /Sayfa 1 \/ 4 · 33 satır/);
+  const last = ui.view(st, tr, NOW, { lists: { ...SHOW_ALL, sessions: { page: 4 } } });
+  assert.equal(rows(last.sessionsHtml).length, 3);
   const channel = ui.view(st, tr, NOW, { channelOnly: true });
-  assert.equal(rows(channel.sessionsHtml).length, 16);
+  assert.equal(rows(channel.sessionsHtml).length, 10);
+  assert.match(channel.pagers.sessions, /Sayfa 1 \/ 2 · 16 satır/);
   assert.match(ui.view(state({ costs: costs([session(1, "idle")]) }), tr, NOW, { channelOnly: true }).sessionsHtml, /Kanalla ulaşılabilen oturum yok/);
 });
 
@@ -179,19 +192,19 @@ const bigBoard = (over = {}) => state({ tasks: byKey(many(65, "running"), "id"),
 test("page: the pager buttons turn the pages and the pager text follows", async () => {
   const page = fakePage({ server: { state: bigBoard() } });
   await page.app.first;
-  assert.equal(rows(page.els.tasks.innerHTML).length, 30);
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 1 \/ 3 · 65 satır/);
+  assert.equal(rows(page.els.tasks.innerHTML).length, 10);
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 1 \/ 7 · 65 satır/);
   assert.match(page.els.tasksPager.innerHTML, /data-dir="-1" disabled/);
   assert.equal(page.click(pagerBtn("tasks", 1)), null);
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 2 \/ 3/);
-  page.click(pagerBtn("tasks", 1));
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 2 \/ 7/);
+  for (let i = 0; i < 5; i += 1) page.click(pagerBtn("tasks", 1));
   assert.equal(rows(page.els.tasks.innerHTML).length, 5);
   assert.match(page.els.tasksPager.innerHTML, /data-dir="1" disabled/);
   page.click(pagerBtn("tasks", 1));                              // past the end: held on the last page
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 3 \/ 3/);
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 7 \/ 7/);
   page.click(pagerBtn("agents", 1)); page.click(pagerBtn("sessions", 1));
-  assert.match(page.els.agentsPager.innerHTML, /Sayfa 2 \/ 2 · 40 satır/);
-  assert.match(page.els.sessionsPager.innerHTML, /Sayfa 2 \/ 2 · 35 satır/);
+  assert.match(page.els.agentsPager.innerHTML, /Sayfa 2 \/ 4 · 40 satır/);
+  assert.match(page.els.sessionsPager.innerHTML, /Sayfa 2 \/ 4 · 35 satır/);
 });
 
 test("page: the finished-rows checkboxes show them and go back to page 1", async () => {
@@ -201,9 +214,9 @@ test("page: the finished-rows checkboxes show them and go back to page 1", async
   assert.equal(rows(page.els.tasks.innerHTML).length, 3);
   assert.match(page.els.tasksPager.innerHTML, /40 biten gizli/);
   page.change({ id: "showDoneTasks", checked: true, dataset: {} });
-  assert.equal(rows(page.els.tasks.innerHTML).length, 30);
-  page.click(pagerBtn("tasks", 1));
-  assert.equal(rows(page.els.tasks.innerHTML).length, 13);
+  assert.equal(rows(page.els.tasks.innerHTML).length, 10);
+  page.click(pagerBtn("tasks", 1)); page.click(pagerBtn("tasks", 1)); page.click(pagerBtn("tasks", 1)); page.click(pagerBtn("tasks", 1));
+  assert.equal(rows(page.els.tasks.innerHTML).length, 3);       // 43 rows: the fifth page holds three
   page.change({ id: "showDoneTasks", checked: false, dataset: {} });
   assert.equal(rows(page.els.tasks.innerHTML).length, 3);
   assert.equal(rows(page.els.agents.innerHTML).length, 1);
@@ -215,31 +228,32 @@ test("page: the channel checkbox goes back to the first sessions page", async ()
   const page = fakePage({ server: { state: bigBoard() } });
   await page.app.first;
   page.click(pagerBtn("sessions", 1));
-  assert.match(page.els.sessionsPager.innerHTML, /Sayfa 2 \/ 2/);
+  assert.match(page.els.sessionsPager.innerHTML, /Sayfa 2 \/ 4/);
   page.els.channelOnly.checked = false;
   page.change({ id: "channelOnly", dataset: {} });
   assert.equal(page.app.project(), "aaaaaaaaaa");
-  assert.doesNotMatch(page.els.sessionsPager.innerHTML, /Sayfa 2 \/ 2/);
+  assert.doesNotMatch(page.els.sessionsPager.innerHTML, /Sayfa 2 \/ 4/);
+  assert.match(page.els.sessionsPager.innerHTML, /Sayfa 1 \/ 4/);
 });
 
 test("page: switching project starts every table on its first page again", async () => {
   const page = fakePage({ server: { state: bigBoard() } });
   await page.app.first;
   page.click(pagerBtn("tasks", 1));
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 2 \/ 3/);
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 2 \/ 7/);
   await page.click(hit("[data-project]", { dataset: { project: "bbbbbbbbbb" } }));
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 1 \/ 3/);
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 1 \/ 7/);
 });
 
 test("page: a table that shrinks pulls the reader back into range", async () => {
   let current = bigBoard();
   const page = fakePage({ server: { get state() { return current; } } });
   await page.app.first;
-  page.click(pagerBtn("tasks", 1)); page.click(pagerBtn("tasks", 1));
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 3 \/ 3/);
-  current = bigBoard({ tasks: byKey(many(40, "running"), "id") });  // 65 -> 40 rows: two pages
+  for (let i = 0; i < 6; i += 1) page.click(pagerBtn("tasks", 1));
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 7 \/ 7/);
+  current = bigBoard({ tasks: byKey(many(40, "running"), "id") });  // 65 -> 40 rows: four pages
   await page.app.refresh();
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 2 \/ 2 · 40 satır/);
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 4 \/ 4 · 40 satır/);
   assert.equal(rows(page.els.tasks.innerHTML).length, 10);
 });
 
@@ -257,5 +271,5 @@ test("page: while a note is being typed the tasks table is left alone, the pager
   const page = fakePage({ server: { state: bigBoard() }, active: { dataset: { noteFor: "T-1" } } });
   await page.app.first;
   assert.equal(page.els.tasks, undefined);                       // never written
-  assert.match(page.els.tasksPager.innerHTML, /Sayfa 1 \/ 3/);
+  assert.match(page.els.tasksPager.innerHTML, /Sayfa 1 \/ 7/);
 });
