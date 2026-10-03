@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from board_event_check import problem, report
 from board_todos import TODO_EVENTS, apply as apply_todo
 from board_config import EVENTS_FILE, AgentStatus, SessionState, TaskStatus
 
@@ -59,15 +60,20 @@ def read_events(bdir: Path) -> list[dict]:
     if not path.exists():
         return []
     events = []
-    with path.open(encoding="utf-8") as f:
+    with path.open(encoding="utf-8", errors="replace") as f:   # a stray byte costs one line, not the board
         for n, line in enumerate(f, 1):
             line = line.strip()
             if not line:
                 continue
             try:
-                events.append(json.loads(line))
+                event = json.loads(line)
             except json.JSONDecodeError as exc:
                 print(f"board: skipping corrupt event line {n}: {exc}", file=sys.stderr)
+                continue
+            if isinstance(event, dict):
+                events.append(event)
+            else:
+                print(f"board: skipping event line {n}: not an object", file=sys.stderr)
     return events
 
 
@@ -117,6 +123,10 @@ def fold(events: list[dict], control: dict | None = None) -> dict:
              "last_event": None, "mode_by": None, "agent_links": {}, "agent_transcripts": {}}
     by_agent_id: dict[str, str] = {}
     for ev in events:
+        why = problem(ev)
+        if why:
+            report(ev, why)
+            continue
         kind, ts = ev.get("type"), ev.get("ts")
         state["last_event"] = ts
         sid = ev.get("session")
@@ -124,7 +134,7 @@ def fold(events: list[dict], control: dict | None = None) -> dict:
             _session(state, sid, kind, ev)
         if kind == "plan":
             state["mode"] = ev.get("mode")
-            state["roles"] = list(ev.get("roles", []))
+            state["roles"] = list(ev.get("roles") or [])
             state["mode_by"] = None
         elif kind in TODO_EVENTS and sid:  # the session's todo list (board_todos.py)
             apply_todo(state["sessions"][sid], kind, ev)

@@ -10,6 +10,9 @@ this repository's own.
 - **One exception: `desktop/`.** The desktop window is a thin Tauri shell (approved by the
   maintainer). Its Rust crates live only there; it holds no logic, no URL and no port of its own,
   and asks `scripts/board/` for them. Everything else stays standard-library.
+- **Second exception: `e2e/`.** Playwright is a dev-only dependency of the browser tests (approved by the
+  maintainer, 02/10/2026). It never ships; the server stays standard-library. Specs are written and run
+  at the `test -> prod` gate (#33), not on `dev`.
 - **One config module.** `scripts/board/board_config.py` is the only place that reads the
   environment or holds a URL, port, path or price; every other file imports from it (#2).
 - **Loopback only.** The server binds `127.0.0.1`; the page's controls accept same-origin,

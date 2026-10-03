@@ -162,7 +162,7 @@ class DecisionChoice:
     DEFAULTS = (CONTINUE, REJECT)
 
 
-# ---- Sessions, cost, context (docs/live-board.md §2c) ----
+# ---- Sessions, cost, context (docs/live-board-sessions.md §2c) ----
 
 class TodoStatus:
     PENDING = "pending"
@@ -233,7 +233,7 @@ MAC_CHROME_APP = "Google Chrome"
 CHROME_BINARIES = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser")
 OPEN_TIMEOUT_S = 15
 
-# ---- Channel: pushing a queued task into an IDLE session (docs/live-board.md §5) ----
+# ---- Channel: pushing a queued task into an IDLE session (docs/live-board-sessions.md §5) ----
 CHANNEL_SERVER = "board-channel"        # the MCP server name; `server:<this>` in the start flag
 CHANNEL_CAPABILITY = "claude/channel"   # experimental capability, and the notification's method prefix
 CHANNEL_METHOD = "notifications/claude/channel"

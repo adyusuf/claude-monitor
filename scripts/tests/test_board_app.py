@@ -1,5 +1,5 @@
 """App mode, the CLI's ETA/cost flags and the new server routes (scripts/board/board_app.py,
-board_open.py, board.py, board_server.py; docs/live-board.md §2c-§2e)."""
+board_open.py, board.py, board_server.py; docs/live-board-sessions.md §2c, docs/live-board.md §2e)."""
 import io
 import json
 import os

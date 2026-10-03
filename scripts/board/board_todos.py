@@ -79,5 +79,5 @@ def apply(sess: dict, kind: str, ev: dict) -> None:
             todos.remove(target)
             return
         target.update({k: v for k, v in ch.items() if k != "id"})
-        if "content" in ch and "active" not in ch and target["status"] != TodoStatus.IN_PROGRESS:
+        if "content" in ch and "active" not in ch and target.get("status") != TodoStatus.IN_PROGRESS:
             target["active"] = target["content"]

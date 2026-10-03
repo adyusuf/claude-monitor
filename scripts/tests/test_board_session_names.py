@@ -1,5 +1,5 @@
 """A session's name in the sessions table (read from its transcript) and finding the transcript of a
-session whose events never carried a path (T-33/T-34, docs/live-board.md §2c)."""
+session whose events never carried a path (T-33/T-34, docs/live-board-sessions.md §2c)."""
 import json
 import sys
 import tempfile

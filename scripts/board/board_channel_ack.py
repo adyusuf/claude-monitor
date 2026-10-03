@@ -4,7 +4,7 @@ A push is only a push once the session acted on it: Claude Code drops a channel 
 silently when the channel is gated (org policy, protocol) — the server cannot see that. So a
 pushed change is held back from the hooks for CHANNEL_CONFIRM_S and stays held back only if
 the session then recorded a turn event (`confirm`, called by the hooks). Unconfirmed after
-that, the hooks deliver it like any other queued task — a task is never lost (#6, docs/live-board.md §5).
+that, the hooks deliver it like any other queued task — a task is never lost (#6, docs/live-board-sessions.md §5).
 """
 from __future__ import annotations
 

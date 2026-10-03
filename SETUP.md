@@ -10,9 +10,10 @@ A clean machine is set up by following this file.
 | Python 3.9+ | the hooks, CLI and server (standard library only) | `python3 --version` |
 | git | project roots and worktrees | `git --version` |
 | Claude Code | the source of the hooks and transcripts | `claude --version` |
-| Node 20+ | only to run the page's tests | `node --version` |
+| Node 20+ | the page's tests, and the browser tests (`e2e/`) | `node --version` |
 | `coverage` (Python package, in a venv outside the repository) | the coverage gate | see below |
 | Rust (rustup) with `llvm-tools-preview`, `cargo-llvm-cov`, `cargo-audit` | only for the desktop window (`desktop/`), its coverage and its dependency scan | `rustc --version`, `cargo llvm-cov --version`, `cargo audit --version` |
+| Playwright's Chromium (about 80 MB, from `e2e/package.json`) | only the browser tests, at the `test -> prod` gate | `cd e2e && npx playwright install chromium` |
 | gitleaks, ShellCheck, CodeQL CLI | the secret scan, and SAST for the shell and Python | `gitleaks version`, `shellcheck --version`, `codeql version` |
 
 ## Install
@@ -51,6 +52,50 @@ confirm the first start (right-click, Open). A Finder-started app has a minimal 
 `/usr/bin/python3` and finds the scripts at `~/.claude/scripts/board` (or `BOARD_SCRIPTS_DIR`, which a
 Finder-started app does not inherit from your shell, so link the clone there).
 
+**A signed, notarised build** (only needed to hand the `.app` to someone else; a locally built one opens
+without it). It needs an Apple Developer account, which this repository does not have set up: the build
+reads its credentials from the environment (Tauri's standard variables) and nothing goes into the
+repository or `tauri.conf.json`.
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: <name> (<TEAMID>)"   # `security find-identity -v -p codesigning`
+export APPLE_API_ISSUER=… APPLE_API_KEY=… APPLE_API_KEY_PATH=…                 # notarisation: an App Store Connect API key
+#   or APPLE_ID=… APPLE_PASSWORD=<app-specific password> APPLE_TEAM_ID=…
+cd desktop && cargo tauri build && spctl -a -vv "target/release/bundle/macos/Claude Monitor.app"
+```
+
+`spctl` should print `accepted` and `source=Notarized Developer ID`. Not done yet: the keychain on the
+maintainer's machine holds only a revoked certificate.
+
+## Where Claude Code runs it
+
+The board is fed by Claude Code's hooks, so it works wherever the hooks fire. Checked on 02/10/2026:
+
+| Surface | Status | Evidence |
+|---|---|---|
+| Desktop app | works | boards on this machine hold sessions whose transcript entrypoint is `claude-desktop` |
+| Terminal (`claude`) | hooks fire | a headless `claude -p` run in a temporary folder wrote `turn_start` and `turn_stop` to its board. An interactive terminal session was not driven by hand. |
+| VS Code extension | **not verified** | no VS Code session exists on this machine, so none could be observed. It should behave like the others (same hooks), but that is an assumption. |
+
+How a queued message reaches an idle session differs per surface: `docs/live-board.md` §2d.
+
+## Browser tests (e2e)
+
+Playwright drives a real Chromium against a real board server that `e2e/serve.py` starts on a seeded
+temporary project (its own registry, transcripts and skills folder, removed on exit): the user's boards are
+never touched. Dev-only; nothing here ships. Written and run at the `test -> prod` gate (global #33); the gate
+runs it through `E2E_WEB_CMD` in `scripts/merge-gate.conf`.
+
+```bash
+cd e2e && npm ci && npx playwright install chromium   # once
+npm test                                              # 13 tests, about 15 s; E2E_PORT / E2E_PYTHON in .env.example
+```
+
+The board's service worker passes every request through, and Playwright cannot intercept a request a service
+worker makes, so the two specs that fake a failed request run with the worker blocked (`test.use`). The
+suite changes the seeded board (removes a task, queues a message), each on rows of its own, so it can be
+repeated on one server (`--repeat-each`).
+
 ## Commit hooks
 
 This repository is public, so a commit is checked before it exists: the `CLAUDE.md` size budget, a
@@ -78,6 +123,7 @@ format of the map is described in `scripts/real-name-check.sh`. A deliberate exc
 ```bash
 python3 -m venv ~/.cache/claude-monitor/venv && ~/.cache/claude-monitor/venv/bin/pip install coverage
 bash scripts/merge-gate.sh dev
+python3 scripts/mutation_check.py scripts/board/board_store.py --tests test_board   # before a release: docs/release.md
 ```
 
 ## CI
@@ -98,6 +144,15 @@ This application holds **no secrets and no tokens**. The page is served on loopb
 controls accept same-origin JSON only. Runtime data (`.claude/board/events.jsonl`, `control.json`)
 is created `0600` and is git-ignored; it contains task titles, notes and session metadata, so treat
 it as private. Nothing to rotate. If a future change adds a credential, it goes here in the same pull request.
+
+Only if you build a signed `.app` (see "Desktop window"): these live in your shell or keychain, never in
+the repository, and CI does not use them.
+
+| Secret | What it is | Where to get it | Stored | Owner | Rotation |
+|---|---|---|---|---|---|
+| `APPLE_SIGNING_IDENTITY` | the name of a Developer ID Application certificate | Apple Developer account, Certificates | the macOS keychain (the name itself is not secret) | the maintainer | when the certificate expires or is revoked (yearly to five-yearly) |
+| `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_PATH` | App Store Connect API key used to notarise | App Store Connect, Users and Access, Keys | the `.p8` file outside the repository, `chmod 600` | the maintainer | revoke and reissue yearly, or on any leak |
+| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | the alternative to the API key (an app-specific password) | appleid.apple.com | your shell session only | the maintainer | revoke the app-specific password after the build |
 
 ## Backup
 
