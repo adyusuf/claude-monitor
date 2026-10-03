@@ -15,6 +15,7 @@ the EF Core migrations of phase 1 implement it and this file follows them.
 - **Search** is case- and accent-insensitive (global #13): one normaliser in the API fills the `*_search`
   columns, and searches compare normalised text.
 - **Paging** is by key (`last_event_at`, `id`), newest first; no list is unbounded.
+- **Foreign keys** on every reference, none cascading.
 - **Authorisation:** every team-owned row carries `workspace_id`, and every query filters by the caller's
   membership. Nothing is readable without it (global #6).
 
@@ -45,7 +46,7 @@ A workspace always has at least one owner; the API refuses the change that would
 | `machines` | `id`, `workspace_id`, `machine_key_hash`, `hostname`, `os` (`macos`, `windows`), `os_version`, `arch`, `first_seen_at`, `last_seen_at` | UNIQUE (`workspace_id`, `machine_key_hash`) |
 | `agents` | `id`, `machine_id`, `user_id`, `workspace_id`, `version`, `status` (`active`, `revoked`), `enrolled_at`, `last_heartbeat_at`, `revoked_at`, `revoked_by` | UNIQUE (`machine_id`, `user_id`) WHERE `status = 'active'`; (`workspace_id`) |
 | `agent_tokens` | `id`, `agent_id`, `kind` (`access`, `refresh`), `token_hash`, `created_at`, `expires_at`, `replaced_by`, `revoked_at`, `last_used_at` | UNIQUE `token_hash`; (`agent_id`) |
-| `device_authorizations` | `id`, `device_code_hash`, `user_code`, `requested_hostname`, `requested_os`, `requested_arch`, `agent_version`, `status` (`pending`, `approved`, `denied`, `expired`, `consumed`), `workspace_id`, `approved_by`, `created_at`, `expires_at`, `last_polled_at` | UNIQUE `device_code_hash`; UNIQUE `user_code` WHERE `status = 'pending'` |
+| `device_authorizations` | `id`, `device_code_hash`, `user_code`, `machine_key_hash`, `requested_hostname`, `requested_os`, `requested_arch`, `agent_version`, `status` (`pending`, `approved`, `denied`, `expired`, `consumed`), `workspace_id`, `approved_by`, `created_at`, `expires_at`, `last_polled_at` | UNIQUE `device_code_hash`; UNIQUE `user_code` WHERE `status = 'pending'` |
 
 `machine_key_hash` is a hash of a per-installation random id kept by the agent, not a hardware serial.
 A machine may run several agents, one per OS user. A refresh token is single-use: using it issues a new
@@ -68,8 +69,12 @@ pair and marks the old one `replaced_by`; a reused, already-replaced refresh tok
   updated in the same transaction as the batch that carries the events.
 - **Idempotency** sits in `agent_batches`, not in the event table: a unique key on a partitioned table must
   include the partition key, so it cannot catch a retried batch that lands in another month.
-- **Retention:** a daily job deletes `payload` content older than the workspace's `retention_days`; whole
-  monthly partitions older than the longest retention are dropped.
+- **Retention:** every few hours a job writes each workspace-day older than `retention_days` (UTC, by `received_at`)
+  to one zipped JSON array, records it in `event_archives`, and deletes those rows in the same transaction.
+
+| Table | Columns | Keys and indexes |
+|---|---|---|
+| `event_archives` | `id`, `workspace_id`, `day`, `path`, `event_count`, `bytes`, `sha256`, `created_at` | (`workspace_id`, `day`); several parts per day are allowed |
 - Project folder paths are **not** stored: they carry the OS user name.
 
 ## 5. Commands from the web
@@ -78,7 +83,10 @@ pair and marks the old one `replaced_by`; a reused, already-replaced refresh tok
 |---|---|---|
 | `session_commands` | `id`, `workspace_id`, `session_id`, `agent_id`, `kind` (`prompt`, `stop`), `body`, `created_by`, `created_at`, `expires_at`, `status` (`queued`, `delivered`, `applied`, `failed`, `expired`, `cancelled`), `delivered_at`, `applied_at`, `result` | (`agent_id`, `status`) WHERE `status IN ('queued', 'delivered')`; (`session_id`, `created_at` DESC) |
 
-The API accepts a command only from the session's owner (`agents.user_id` of the session's agent).
+| `permission_requests` | `id`, `workspace_id`, `session_id`, `agent_id`, `tool_name`, `tool_input` `jsonb`, `status` (`open`, `answered`, `expired`), `created_at`, `expires_at`, `decision` (`allow`, `deny`), `reason`, `answered_by`, `answered_at` | (`session_id`, `status`) |
+
+The API accepts a command or a permission answer only from the session's owner (`agents.user_id` of the
+session's agent).
 
 ## 6. Audit
 
@@ -97,7 +105,8 @@ users 1-n workspace_members n-1 workspaces 1-1 workspace_settings
 users 1-n user_logins, user_tokens, login_sessions
 workspaces 1-n machines 1-n agents n-1 users          agents 1-n agent_tokens, agent_batches
 workspaces 1-n projects 1-n harness_sessions n-1 agents
-harness_sessions 1-n session_events, session_tasks, subagent_runs, session_usage, session_commands
+harness_sessions 1-n session_events, session_tasks, subagent_runs, session_usage, session_commands, permission_requests
+workspaces 1-n event_archives
 ```
 
 ## Account deletion

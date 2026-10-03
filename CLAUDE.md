@@ -9,7 +9,7 @@ The maintainer's global rules apply; these are this repository's own.
 - **Stack** (approved 03/10/2026): .NET 10 for the API and the agent, PostgreSQL 18, React + Vite +
   TypeScript, Playwright for e2e. Any other dependency is asked first (#10).
 - **The agent never blocks a session.** Its hook and MCP entry points print to stderr and exit 0.
-- **The agent opens no network port:** a user-only Unix socket or named pipe; it talks to the API outbound.
+- **The agent opens no network port:** hooks and daemon share a SQLite file in the user-only home; it talks to the API outbound.
 - **Fail-closed, workspace-scoped** (#6): every API call checks membership; only a session's owner commands it.
 - **Captured content is sensitive:** never logged, masked for secrets by default, deleted after retention.
 - **Host names stay out of the repository;** they live in deployment configuration (#2, #3).

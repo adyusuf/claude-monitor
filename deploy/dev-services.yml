@@ -1,0 +1,18 @@
+# Local development only: PostgreSQL 18 and a mail catcher (Mailpit). Test and production run without Docker
+# (ADR-0002). The password is a local development value, not a secret; production's lives in the server's
+# environment (SETUP.md, secret inventory).
+name: claude-monitor-dev
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: monitor
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: monitor
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["monitor-pg:/var/lib/postgresql"]
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
+volumes:
+  monitor-pg: {}

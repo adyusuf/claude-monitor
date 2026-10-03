@@ -1,0 +1,37 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,ts,tsx,js,css,html,md}]
+indent_size = 2
+
+[*.cs]
+# Triage (global #19: suppressed only with a reason, never switched off silently):
+# CA1848/CA1873 ask for source-generated log delegates. Every log call here is on a cold path (an error, a
+# background job's summary); the delegates would add code without a measurable gain.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+# CA1725 (parameter names of overrides): EF's OnModelCreating parameter is renamed for readability only.
+dotnet_diagnostic.CA1725.severity = none
+
+# Generated code: EF Core migrations are generated, not hand-written (they are also outside the coverage denominator).
+[**/Data/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+
+# Tests: xUnit names, fixtures and throw-away clients follow test conventions, not library ones.
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA1062.severity = none
+dotnet_diagnostic.CA2234.severity = none
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1849.severity = none

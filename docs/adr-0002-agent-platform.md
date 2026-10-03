@@ -49,16 +49,20 @@ web app (same origin, /api) <--> central API          central API --SSE--> agent
 
 ### The agent
 
-- **One binary, three roles.** `agent hook` (called by a harness hook: reads the payload from stdin),
-  `agent mcp` (an MCP server on stdio, started by the harness) and `agent daemon` (the long-running part).
-  The first two are thin clients: they hand their input to the daemon and **start it, detached, if it is not
-  running**. One daemon per user per machine, guarded by a lock file.
-- **Never blocks a session.** The client roles fail open: on any error they print to stderr and exit 0.
-- **No network port.** The daemon listens on a Unix domain socket in a user-only directory (macOS) or a
-  named pipe whose ACL admits only the user (Windows). Other users on the machine cannot reach it.
-- **Durable outbox.** Every event goes into a local SQLite outbox first, then to the API in numbered
-  batches. A batch is retried until acknowledged; the API ignores a batch number it has already stored, so a
-  retry never duplicates data. Offline work is sent when the connection returns.
+- **One binary, three roles.** `cm-agent hook <Event>` (called by a harness hook: reads the payload from stdin),
+  `cm-agent mcp` (an MCP server on stdio, started by the harness) and `cm-agent daemon` (the long-running part).
+  The first two are short-lived: they work through the local database and **start the daemon, detached, if it is
+  not running**. One daemon per user per machine, guarded by an exclusive lock file.
+- **Never blocks a session.** The hook and MCP roles fail open: on any error they print to stderr and exit 0.
+  Hooks that only observe run asynchronously; only those that can carry an answer (PreToolUse, Stop,
+  UserPromptSubmit, PermissionRequest, SessionEnd) are synchronous.
+- **No network port.** The only channel between the hook processes and the daemon is a SQLite database in the
+  agent's home directory, which only the user can read (macOS: `~/Library/Application Support/ClaudeMonitor`,
+  Windows: `%LOCALAPPDATA%\ClaudeMonitor`). Hooks write events and permission requests and read commands; the
+  daemon uploads, relays and writes answers. Nothing listens, on macOS or Windows.
+- **Durable outbox.** Every event goes into that database first, then to the API in numbered batches. A batch is
+  retried with the same number and rows until acknowledged; the API ignores a batch number it has already
+  stored, so a retry never duplicates data. Events written while offline or while the daemon is down are sent later.
 - **Credentials** live in the OS store (macOS Keychain, Windows Credential Manager), never in a file.
 - **Updates and old agents.** Agents in the field are old clients: the protocol only grows (global #4). Each
   request carries the agent version; the API can answer "upgrade required" below a minimum version.
@@ -81,7 +85,9 @@ the central database hold users' code and anything their tools printed, **secret
   switchable per workspace (`workspace_settings.mask_secrets`);
 - an event larger than a configured size is truncated with a marker, never dropped silently;
 - content is never written to an application log (only ids and sizes);
-- every workspace has a **retention period** after which content is deleted (default 90 days).
+- every workspace has a **retention period** (default 90 days). Past it, events are written **one file per
+  workspace per day as a zipped JSON array** and then removed from the database; the archive's path, size, count
+  and SHA-256 are recorded (`event_archives`). Decided by the maintainer on 03/10/2026.
 
 ### Accounts and sign-in
 
@@ -112,15 +118,21 @@ where any of them can be revoked at once.
 The web queues a command (`session_commands`); the API pushes it to the owning agent over the agent's own
 outbound SSE connection (the agent has no inbound port). The agent delivers it to the session at the next hook
 that can carry it (for example the Stop hook, which can hand Claude a follow-up prompt). v1 kinds: **send a
-prompt** and **stop**. Answering a tool-permission prompt from the web is deliberately left out of v1: it would
-let a web session approve a command on someone's machine, and needs its own decision. Every command expires,
-is audited, and reports back delivered / applied / failed.
+prompt** and **stop**. Every command expires, is audited, and reports back delivered / applied / failed.
+
+**Permission prompts are answered from the web too** (maintainer, 03/10/2026). The PermissionRequest hook reports
+the tool call at once (`permission_requests`) and waits a configured time; the session's owner may allow or deny it
+on the web, and the answer reaches the hook over the agent's stream. No answer in time means the hook gives no
+decision, and Claude Code asks on the machine as usual. Only the session's owner may answer; every answer is
+audited.
 
 ### Environments
 
-Local development runs with Docker Compose (PostgreSQL and a mail catcher), the API and the web dev server.
-Test and production are hosted, each a single origin. Each serves `/api/version` with the deployed commit,
-which the `test -> prod` gate checks (#33). The hosting provider is open (below).
+Local development runs PostgreSQL and a mail catcher in Docker, the API and the web dev server. Test and
+production run on a server **without Docker** (maintainer, 03/10/2026): the API is a native service that also
+serves the built web app (one origin), behind a TLS reverse proxy; DNS is on Cloudflare; mail goes out through
+Gmail / Google Workspace SMTP. Each environment serves `/api/version` with the deployed commit, which the
+`test -> prod` gate checks (#33).
 
 ### Distribution
 
@@ -135,7 +147,7 @@ service). Automatic updates come after the first release.
 | Agent language | .NET (same language and contract as the API, both OSes, an official MCP SDK) | Rust: a second language for one team. Go: the same. Python: needs an interpreter on every machine |
 | Agent -> API transport | HTTPS batches, idempotent by batch number | WebSocket for data: harder to retry exactly once. gRPC: proxies and the web stack gain nothing |
 | API -> agent (commands) | SSE held open by the agent | an inbound port on the user's machine: never |
-| Local entry point | Unix socket / named pipe | TCP on loopback: reachable by every local user |
+| Hook <-> daemon | a SQLite database in the user-only home | TCP on loopback: reachable by every local user. A socket or pipe: more code per OS, and an event is lost while the daemon is down |
 | Identity | own accounts (ASP.NET Core Identity hasher) + GitHub/Google | a hosted identity vendor: a new paid dependency and data processor |
 | Live web | SSE | SignalR: a client library for a one-way stream. Polling: latency and load |
 | Start-up | with the harness (plugin / MCP) | an OS login item or service: the maintainer chose harness-driven start |
@@ -165,9 +177,7 @@ service). Automatic updates come after the first release.
 
 ## Open
 
-1. The hosting provider for test and production (before phase 4).
-2. The e-mail provider (SMTP) for verification and invitations (before phase 3 is deployed).
-3. The Windows signing route (certificate or a signing service).
-4. Privacy policy, data export and account deletion for users outside the maintainer's team: the service
+1. The server for test and production: its operating system and access (before phase 4).
+2. The Windows signing route (certificate or a signing service).
+3. Privacy policy, data export and account deletion for users outside the maintainer's team: the service
    stores other people's code, which brings data-protection duties (GDPR / KVKK).
-5. Answering permission prompts from the web (left out of v1, above).
