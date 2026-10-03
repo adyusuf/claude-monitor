@@ -1,47 +1,28 @@
 # Security
 
-The board is a single-user tool: a Python standard-library server on the loopback address, showing the user's own
-Claude Code sessions. It has **no authentication and no accounts**. The controls below keep it reachable only by
-that user's own machine and pages; they are reviewed against the OWASP Top 10 before each promotion to `prod`.
+The repository is being rebuilt ([ADR-0002](adr-0002-agent-platform.md)); no service runs from it yet. This file
+holds the design's security controls now, and the OWASP Top 10 mapping is written against the code from phase 1
+and reviewed before every promotion to `prod` (global #19).
 
-## Assumptions
+## What is at stake
 
-- One person uses the machine. `127.0.0.1` is shared by every OS account, so on a multi-user machine another
-  account can reach the board: do not run it there.
-- `BOARD_ALLOW_REMOTE=1` removes the loopback guard and the Host check on purpose. With it the board is open to
-  anyone who can reach the port.
-- The data on the page is the user's own (task titles, notes, session metadata). The page never shows a secret.
+The agent forwards everything a harness exposes: prompts, tool inputs and outputs, file contents. The central
+database therefore holds users' code and anything their tools printed. The web can also send a prompt to a
+session running on someone's machine. Those two facts drive the controls below.
 
-## OWASP Top 10 mapping (reviewed 01/10/2026 at `dev` `0ed1de9`)
+## Controls decided in ADR-0002
 
-| # | Risk | Status here, and the control |
-|---|---|---|
-| A01 | Broken access control | **No authentication, by design.** Reachable only through loopback: the server refuses to bind a non-loopback address (`board_server.main`), refuses any request whose `Host` is not a loopback name with its own port (DNS rebinding, `board_http_guard.py`), and refuses a cross-origin `POST`. Every control value is checked against an allowlist pattern (task id, role, skill, mode). IDOR does not apply: a project id is a hash and every registered project is the same user's. Other OS users on the machine are out of scope (see Assumptions). |
-| A02 | Cryptographic failures | No TLS (loopback `http`). No credential is read, stored or sent. Runtime files (`events.jsonl`, `control.json`, the registry) are created `0600`. |
-| A03 | Injection | No shell: no `shell=True`, `os.system`, `eval`, `exec` or `pickle` anywhere in `scripts/board`; subprocesses (`git`, `ps`, `lsof`) get argument lists. The page puts values into HTML only through one escaping helper (`esc`), with tests that markup in a task title stays inert; CSP allows scripts from `'self'` only. |
-| A04 | Insecure design | This document is the threat model: a local, single-user, unauthenticated tool, fail-closed on the bind address and the Host. No rate limiting (local). |
-| A05 | Security misconfiguration | Security headers on every response (CSP, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, CORP); `Server` names the app, not the Python version; no debug endpoint, no directory listing (static files come from a fixed allowlist, `../` returns 404); no default credentials. The CSP allows inline **styles** (one `<style>` block), not scripts. |
-| A06 | Vulnerable and outdated components | The server has no third-party runtime dependency: the Python standard library, and Node's built-in test runner for the page's tests. **The one exception is the optional desktop window (`desktop/`, Tauri):** its crates are locked in `desktop/Cargo.lock`, and the gate runs `cargo audit` on that file (`scripts/cargo-audit.sh`: a known vulnerability blocks, an unmaintained or unsound advisory is only reported; an unreachable advisory database is retried, then the step is NOT RUN and blocks) and CodeQL on the Rust; the window is a thin shell with no Tauri IPC permission, and navigates only to its own splash page or a loopback `http` address. CI runs gitleaks and CodeQL (Python, JavaScript) and ShellCheck on every push. |
-| A07 | Identification and authentication failures | Not applicable: no accounts, passwords or sessions. |
-| A08 | Software and data integrity failures | CI actions are pinned to a commit SHA and gitleaks is checksum-verified. The hooks run the code of the clone on the machine; its integrity is the user's checkout. `events.jsonl` is append-only; nothing is deserialised with an unsafe loader. |
-| A09 | Logging and monitoring failures | The server logs 4xx and 5xx responses to `server.log`; control changes are numbered in `control.json`. There is no audit log and no alerting, and none is needed for a local tool. |
-| A10 | Server-side request forgery | The server makes no outbound request. The one HTTP client call (`board_ensure.py`) asks the board's own loopback port for `/api/info`. |
-
-## Known advisory warnings (cargo audit, checked 02/10/2026)
-
-`cargo audit` reports two warnings on `desktop/Cargo.lock`. Neither is a vulnerability, neither blocks the gate.
-
-| Advisory | Crate | Why it stays |
-|---|---|---|
-| RUSTSEC-2024-0370 (unmaintained) | `proc-macro-error` | Pulled in by the GTK3 bindings Tauri uses on Linux only. |
-| RUSTSEC-2024-0429 (unsound) | `glib` | The same Linux-only GTK3 stack. |
-
-- **Not in the macOS build:** `cargo tree --target aarch64-apple-darwin -i glib` (and `-i proc-macro-error`) prints
-  nothing. The Linux build is what CI compiles and tests; no Linux bundle is shipped.
-- **Not fixable here:** `cargo update` leaves `Cargo.lock` unchanged (already the highest compatible versions); the
-  fix is Tauri / wry moving off GTK3, which is upstream.
-- **When to look again:** at every Tauri bump, and before anyone ships a Linux bundle. Re-run
-  `cd desktop && cargo audit`; if either warning is still there, this section stays true.
+| Area | Control |
+|---|---|
+| Access | Every API call is scoped to a workspace and checked in the API, fail-closed. Only a session's owner may command it. |
+| Accounts | Passwords hashed (ASP.NET Core Identity hasher); e-mail verification; GitHub/Google sign-in never silently joins an existing account. |
+| Web session | Opaque token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, stored hashed, revocable; an anti-forgery header on unsafe methods. |
+| Agent | Device authorisation (RFC 8628); short access tokens and single-use rotating refresh tokens, stored hashed by the API and in the OS credential store on the machine; reuse of a replaced refresh token revokes the agent. |
+| Local surface | The agent opens no network port: a user-only Unix socket or named pipe. Commands arrive over its own outbound connection. |
+| Captured content | Secret patterns masked by the agent by default; never written to logs; deleted after the workspace's retention period; size-capped per event. |
+| Commands | Expire, are audited, and report their outcome. Approving tool permissions from the web is out of v1. |
+| Audit | `audit_events` for sign-in, linking, invitations, roles, device approvals, revocations, settings and every command. |
+| Transport | HTTPS only; the API is served under the web's own host (global #17). |
 
 ## Reporting a problem
 

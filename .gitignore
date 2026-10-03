@@ -1,7 +1,6 @@
 __pycache__/
 *.pyc
 .coverage*
-!.coveragerc
 .claude/board/
 .claude/settings.local.json
 .codeql/
@@ -9,12 +8,8 @@ node_modules/
 .DS_Store
 # Local map of real project names for scripts/real-name-check.sh — never committed
 docs/project-nicknames.tsv
-# The desktop window: build output, and the icon drawn by desktop/make_icon.py
-desktop/target/
-desktop/icons/
-desktop/gen/
-
-# e2e (Playwright): installed browsers' reports and the npm tree stay local
-e2e/node_modules/
-e2e/test-results/
-e2e/playwright-report/
+# Local leftovers of the removed desktop window (archive/board-final), until phase 5
+desktop/
+# Playwright output
+test-results/
+playwright-report/
