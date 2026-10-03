@@ -1,11 +1,7 @@
 {
   "name": "claude-monitor-e2e",
   "private": true,
-  "description": "Browser tests for the live board. Dev-only: nothing here ships (CLAUDE.md, second exception).",
-  "scripts": {
-    "test": "playwright test"
-  },
-  "devDependencies": {
-    "@playwright/test": "1.55.1"
-  }
+  "description": "Browser tests of the web app against a running API (ADR-0002). Dev-only; run at the test -> prod gate (#33).",
+  "scripts": { "test": "playwright test" },
+  "devDependencies": { "@playwright/test": "1.55.1" }
 }

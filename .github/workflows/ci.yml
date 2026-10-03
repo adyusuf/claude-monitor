@@ -1,7 +1,7 @@
 # CI runs the SAME gate as a local run: scripts/gate-core.sh, with the thresholds in
 # scripts/merge-gate.conf — never a second set of rules in this file (rule #19).
-# The gate job is the fast gate: everything except e2e. The e2e job runs the browser tests (e2e/) on pushes to
-# test and prod only (global #33: e2e belongs to the test -> prod gate, not to dev). Locally: bash scripts/merge-gate.sh dev
+# .NET 10 for the API and the agent, Node 22 for the web app (ADR-0002). The e2e suite runs at the test -> prod gate.
+# Locally: bash scripts/merge-gate.sh dev
 name: CI
 
 on:
@@ -21,7 +21,7 @@ jobs:
   gate:
     name: Gate (dev)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       # Third-party actions are pinned to a full commit SHA (the tag is in the comment).
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -32,9 +32,19 @@ jobs:
         with:
           python-version: "3.9"
 
+      # The API and the agent (.NET 10). The API's tests start PostgreSQL 18 in Docker, which the runner has.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      # The web app: lint, typecheck, build, tests and coverage run through the same gate.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
+
+      # The gate's Node steps (lint, typecheck, build, tests) expect the web app's dependencies installed.
+      - name: Web dependencies
+        run: npm --prefix web ci
 
       - name: CodeQL CLI
         id: codeql
@@ -53,33 +63,12 @@ jobs:
           sudo tar -xzf gitleaks.tar.gz -C /usr/local/bin gitleaks
           rm gitleaks.tar.gz
 
-      - name: Python coverage venv (outside the repository, as scripts/coverage.sh expects)
-        run: |
-          python3 -m venv "$HOME/.cache/claude-monitor/venv"
-          "$HOME/.cache/claude-monitor/venv/bin/pip" install coverage==7.10.7
-
-      # The desktop window (desktop/) is a Rust codebase of its own; the coverage step measures it (#29).
-      # Versions are pinned here and in SETUP.md. Tauri on Linux needs the WebKitGTK development packages.
-      - name: Rust 1.99.0 and the libraries Tauri needs
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev librsvg2-dev
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init.sh
-          sh rustup-init.sh -y --profile minimal --default-toolchain 1.99.0 -c llvm-tools-preview
-          rm rustup-init.sh
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
-      - name: cargo-llvm-cov 0.9.1
-        run: ~/.cargo/bin/cargo install cargo-llvm-cov --version 0.9.1 --locked
-
-      - name: cargo-audit 0.22.2 (dependency CVE for desktop/Cargo.lock)
-        run: ~/.cargo/bin/cargo install cargo-audit --version 0.22.2 --locked
-
       - name: Tool versions
         run: |
           python3 --version
-          ~/.cargo/bin/rustc --version
+          dotnet --version
           node --version
+          docker version --format '{{.Server.Version}}'
           gitleaks version
           codeql version | head -1
           shellcheck --version | sed -n 2p
@@ -92,29 +81,3 @@ jobs:
       - name: Gate
         run: bash scripts/gate-core.sh dev
 
-  e2e:
-    name: Browser tests (Chromium, WebKit)
-    # Not on dev (global #33) and not on pull requests: the browsers are about 150 MB.
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name != 'dev')
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.9"
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "22"
-
-      - name: Install the suite and the browsers
-        working-directory: e2e
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium webkit
-
-      - name: Run the browser tests
-        working-directory: e2e
-        run: npx playwright test
