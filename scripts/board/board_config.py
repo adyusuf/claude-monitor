@@ -39,6 +39,10 @@ def _int_env(name: str, default: int) -> int:
 DECISION_WAIT_S = max(0, min(_int_env("BOARD_DECISION_WAIT", _DEFAULT_DECISION_WAIT_S),
                              _MAX_DECISION_WAIT_S))
 DECISION_POLL_S = 1.0
+# The plan reminder (board_nudge.py): after this many main-session tool calls with no `board.py add|set`
+# from that session, the PostToolUse hook says once that the board has no plan. 0 turns it off.
+NUDGE_AFTER = max(0, _int_env("BOARD_NUDGE_AFTER", 8))
+NUDGE_SESSIONS_KEPT = 50
 CHOICE_MAX = 64
 NOTE_MAX = 500
 CHANGES_KEPT = 50  # control.json keeps this many changes for sessions not told yet
