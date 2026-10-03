@@ -13,3 +13,10 @@ desktop/
 # Playwright output
 test-results/
 playwright-report/
+
+# .NET build output
+bin/
+obj/
+*.user
+TestResults/
+coverage-report/

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ClaudeMonitor.Api/ClaudeMonitor.Api.csproj" />
+    <Project Path="src/ClaudeMonitor.Contracts/ClaudeMonitor.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ClaudeMonitor.Api.Tests/ClaudeMonitor.Api.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,115 @@
+namespace ClaudeMonitor.Api.Config;
+
+/// <summary>
+/// The API's ONE configuration module (global #2): the only place that reads the environment or holds a URL,
+/// port, path, lifetime or price. Every other file takes an <see cref="ApiConfig"/>. Development fallbacks are
+/// defined here and only here, and only apply when the environment is Development or Testing.
+/// Every variable is listed in .env.example.
+/// </summary>
+public sealed record ApiConfig
+{
+    public required string DatabaseUrl { get; init; }
+    public required string PublicOrigin { get; init; }
+    public required SmtpSettings Smtp { get; init; }
+    public OAuthClient? GitHub { get; init; }
+    public OAuthClient? Google { get; init; }
+    public required string ArchiveDir { get; init; }
+    public string? WebRoot { get; init; }
+    public required string Commit { get; init; }
+    public required Version MinimumAgentVersion { get; init; }
+    public bool SecureCookies { get; init; } = true;
+    public bool BackgroundJobs { get; init; } = true;
+    public bool TrustProxy { get; init; }
+    public int AuthRequestsPerMinute { get; init; } = 20;
+
+    public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);
+    public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromHours(24);
+    public TimeSpan InvitationLifetime { get; init; } = TimeSpan.FromDays(7);
+    public TimeSpan DeviceCodeLifetime { get; init; } = TimeSpan.FromMinutes(15);
+    public int DevicePollSeconds { get; init; } = 5;
+    public TimeSpan AgentAccessLifetime { get; init; } = TimeSpan.FromMinutes(30);
+    public TimeSpan AgentRefreshLifetime { get; init; } = TimeSpan.FromDays(30);
+    public TimeSpan CommandLifetime { get; init; } = TimeSpan.FromMinutes(30);
+    public int PermissionWaitMaxSeconds { get; init; } = 600;
+    public int MaxBatchEvents { get; init; } = 500;
+    public long MaxBatchBytes { get; init; } = 8 * 1024 * 1024;
+    public int PageSizeMax { get; init; } = 100;
+
+    /// <summary>USD per million tokens: input, output, cache read, cache write (5-minute TTL, input x 1.25).
+    /// A model not listed is NOT priced: its cost stays null ("cannot be measured"), never a guess.</summary>
+    public IReadOnlyDictionary<string, ModelPrice> Prices { get; init; } = DefaultPrices;
+
+    public const string SessionCookie = "cm_session";
+    public const string CsrfHeader = "X-CSRF";
+    public const long BatchBodyLimit = 16 * 1024 * 1024;
+
+    public static readonly IReadOnlyDictionary<string, ModelPrice> DefaultPrices = new Dictionary<string, ModelPrice>
+    {
+        ["claude-opus-5-5"] = new(4m, 20m, 0.2m, 5m),
+        ["claude-sonnet-5-5"] = new(2m, 10m, 0.2m, 2.5m),
+        ["claude-haiku-4-5"] = new(1m, 5m, 0.1m, 1.25m),
+    };
+
+    public static ApiConfig From(IConfiguration env, bool development)
+    {
+        ArgumentNullException.ThrowIfNull(env);
+        string Required(string key, string devFallback) =>
+            env[key] is { Length: > 0 } v ? v
+            : development ? devFallback
+            : throw new InvalidOperationException($"{key} is not set (see .env.example)");
+
+        OAuthClient? Client(string prefix) =>
+            env[$"{prefix}_CLIENT_ID"] is { Length: > 0 } id && env[$"{prefix}_CLIENT_SECRET"] is { Length: > 0 } secret
+                ? new OAuthClient(id, secret)
+                : null;
+
+        return new ApiConfig
+        {
+            DatabaseUrl = Required("MONITOR_DB", "Host=localhost;Port=55432;Database=monitor;Username=monitor;Password=monitor"),
+            PublicOrigin = Required("MONITOR_PUBLIC_ORIGIN", "http://localhost:5173").TrimEnd('/'),
+            Smtp = new SmtpSettings(
+                Required("MONITOR_SMTP_HOST", "localhost"),
+                int.Parse(Required("MONITOR_SMTP_PORT", "1025"), System.Globalization.CultureInfo.InvariantCulture),
+                env["MONITOR_SMTP_USER"],
+                env["MONITOR_SMTP_PASSWORD"],
+                Required("MONITOR_SMTP_FROM", "monitor@localhost"),
+                (env["MONITOR_SMTP_TLS"] is { Length: > 0 } tls ? tls : development ? "false" : "true") == "true"),
+            GitHub = Client("MONITOR_GITHUB"),
+            Google = Client("MONITOR_GOOGLE"),
+            ArchiveDir = Required("MONITOR_ARCHIVE_DIR", Path.Combine(Path.GetTempPath(), "claude-monitor-archive")),
+            WebRoot = env["MONITOR_WEB_ROOT"],
+            Commit = env["MONITOR_COMMIT"] is { Length: > 0 } c ? c : "dev",
+            MinimumAgentVersion = Version.Parse(env["MONITOR_MIN_AGENT_VERSION"] is { Length: > 0 } m ? m : "0.1.0"),
+            SecureCookies = !development,
+            BackgroundJobs = env["MONITOR_BACKGROUND_JOBS"] != "off",
+            TrustProxy = env["MONITOR_TRUST_PROXY"] == "true",
+            AuthRequestsPerMinute = int.TryParse(env["MONITOR_AUTH_RATE_PER_MINUTE"], out var rate) && rate > 0 ? rate : 20,
+        };
+    }
+
+    /// <summary>The price for a model id: the longest configured prefix wins ("claude-haiku-4-5-20251001" -> "claude-haiku-4-5").</summary>
+    public ModelPrice? PriceFor(string model) =>
+        Prices.Where(p => model.StartsWith(p.Key, StringComparison.Ordinal))
+            .OrderByDescending(p => p.Key.Length)
+            .Select(p => (ModelPrice?)p.Value)
+            .FirstOrDefault();
+}
+
+public sealed record SmtpSettings(string Host, int Port, string? User, string? Password, string From, bool StartTls);
+
+public sealed record OAuthClient(string ClientId, string ClientSecret);
+
+/// <summary>The sign-in providers' public endpoints (fixed by the providers, not per deployment).</summary>
+public static class ProviderEndpoints
+{
+    public const string GitHubAuthorize = "https://github.com/login/oauth/authorize";
+    public const string GitHubToken = "https://github.com/login/oauth/access_token";
+    public const string GitHubUser = "https://api.github.com/user";
+    public const string GitHubEmails = "https://api.github.com/user/emails";
+    public const string GoogleAuthorize = "https://accounts.google.com/o/oauth2/v2/auth";
+    public const string GoogleToken = "https://oauth2.googleapis.com/token";
+    public const string GoogleUser = "https://openidconnect.googleapis.com/v1/userinfo";
+    public const string CallbackPrefix = "/api/auth/callback/";
+}
+
+public sealed record ModelPrice(decimal Input, decimal Output, decimal CacheRead, decimal CacheWrite);
