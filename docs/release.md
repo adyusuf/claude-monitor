@@ -14,6 +14,10 @@ rollback target has a name:
 git tag -a prod-DD-MM-YYYY -m "<one line: what shipped>" <sha> && git push origin prod-DD-MM-YYYY
 ```
 
+The `test` -> `prod` gate also runs the browser tests (`e2e/`, Playwright; `SETUP.md`): there is no deployed
+test environment for a local tool, so they start a real board server on a seeded temporary project. Nothing
+reaches `prod` without them green; only a maintainer-declared hotfix skips them, and the tag message says so.
+
 A second promotion on the same day appends `-2`. A hotfix says so in the tag message.
 
 ## Before a release: does the suite notice a fault?

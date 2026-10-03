@@ -13,3 +13,8 @@ docs/project-nicknames.tsv
 desktop/target/
 desktop/icons/
 desktop/gen/
+
+# e2e (Playwright): installed browsers' reports and the npm tree stay local
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
