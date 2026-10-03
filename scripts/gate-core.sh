@@ -21,11 +21,11 @@
 #               build, unit tests, coverage (the 80% threshold per codebase),
 #               secret scan, dependency CVE, SAST, backward-compatibility scan,
 #               the CLAUDE.md size and rule gates, and a CHECK for missing e2e
-#               specs (a WARNING in both directions — it never blocks; the gaps
-#               are written at the test -> prod gate, #33 step 2).
-#   prod      : the code must already be deployed to the TEST environment, the
-#               FULL e2e suite runs against it, and only a completely green run
-#               allows the promotion.
+#               specs (a WARNING — it never blocks). A test promotion also warns
+#               that e2e was NOT run: e2e is OPTIONAL (#33, 03/10/2026).
+#   prod      : the code must already be deployed to the TEST environment (the
+#               deploy is verified); e2e is NOT run — the gate warns, and
+#               GATE_RUN_E2E=1 runs the suite and then a red result blocks.
 #
 # ⚠️ A STEP THAT DID NOT RUN DID NOT PASS. A missing tool is reported as SKIPPED
 # and the result is INCOMPLETE, never green. The exit code is the gate: 0 only
@@ -248,8 +248,11 @@ if [ "$TARGET" != "prod" ]; then
   # SAYS it on every run, so the backlog stays visible rather than silent.
   # User decision.
   if [ "$missing" = 1 ] && [ "$TARGET" = "test" ]; then
-    warn "the missing spec(s) above are written at the test -> prod gate (#33 step 2); dev -> test is not blocked"
+    warn "the missing spec(s) above are a reminder only: e2e is optional (#33); dev -> test is not blocked"
   fi
+  fi
+  if [ "$TARGET" = "test" ]; then
+    warn "e2e was NOT run (optional since 03/10/2026) — nothing in this promotion was proven end to end"
   fi
 fi
 
