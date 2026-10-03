@@ -79,6 +79,18 @@ installed binary, so Claude Code starts the agent with its sessions; nothing is 
 the `claude` CLI on `PATH` it prints the two `claude plugin` commands to run. The agent's tokens are in the macOS
 Keychain / Windows Credential Manager (service `claude-monitor-agent`); its log is `agent.log` in the agent home.
 
+## Browser tests (e2e)
+
+Playwright (`e2e/`, Chromium and WebKit) drives the real web app and API. Written and run at the `test -> prod`
+gate (global #33). With `E2E_BASE_URL` set it runs against the test environment (its mail must reach a Mailpit at
+`E2E_MAILPIT_URL`); without it, `e2e/serve-local.sh` starts its own PostgreSQL and Mailpit (`e2e/services.yml`,
+throw-away), builds the web app and runs the API on `E2E_PORT`.
+
+```bash
+cd e2e && npm ci && npx playwright install chromium webkit   # once
+npx playwright test
+```
+
 ## Environment variables
 
 `.env.example` lists every variable with its default and what it is for. The API reads them only in

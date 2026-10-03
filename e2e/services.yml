@@ -1,0 +1,13 @@
+# The browser tests' own throw-away services (never the development database): PostgreSQL 18 and Mailpit, on
+# ports apart from deploy/dev-services.yml. The data lives in tmpfs and is gone when the containers stop.
+name: claude-monitor-e2e
+services:
+  postgres:
+    image: postgres:18
+    environment: { POSTGRES_DB: monitor_e2e, POSTGRES_USER: monitor, POSTGRES_PASSWORD: monitor }
+    ports: ["127.0.0.1:55433:5432"]
+    tmpfs: ["/var/lib/postgresql"]
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "monitor", "-d", "monitor_e2e"], interval: 1s, retries: 30 }
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["127.0.0.1:1125:1025", "127.0.0.1:8125:8025"]
