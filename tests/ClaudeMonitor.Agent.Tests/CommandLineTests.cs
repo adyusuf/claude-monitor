@@ -73,7 +73,7 @@ public sealed class CommandLineTests : IDisposable
         });
         var output = new StringWriter();
         string? opened = null;
-        var login = new Login(home.Config, output, new FastClock(clock), url => (opened = url) is not null);
+        var login = new Login(home.Config, output, new FastClock(clock), url => (opened = url) is not null, "macos");
         Assert.Equal(0, await login.RunAsync("https://monitor.invalid/", fake, CancellationToken.None));
         Assert.Contains("BCDF-GHJK", output.ToString(), StringComparison.Ordinal);
         Assert.Equal("https://monitor.invalid/device?code=BCDF-GHJK", opened);
@@ -97,7 +97,7 @@ public sealed class CommandLineTests : IDisposable
             .On("POST /api/device/code", HttpStatusCode.OK, new DeviceCodeResponse("dev", "BCDF-GHJK", "https://m.invalid/device", 0, 600))
             .On("POST /api/device/token", HttpStatusCode.BadRequest, $$"""{"error":"{{error}}"}""");
         var output = new StringWriter();
-        Assert.Equal(1, await new Login(home.Config, output, new FastClock(clock), _ => true).RunAsync("https://m.invalid", fake, CancellationToken.None));
+        Assert.Equal(1, await new Login(home.Config, output, new FastClock(clock), _ => true, "windows").RunAsync("https://m.invalid", fake, CancellationToken.None));
         Assert.Contains(said, output.ToString(), StringComparison.Ordinal);
     }
 
@@ -105,8 +105,10 @@ public sealed class CommandLineTests : IDisposable
     public async Task Login_needs_an_https_server_or_localhost()
     {
         var output = new StringWriter();
-        Assert.Equal(2, await new Login(home.Config, output, clock, _ => true).RunAsync("http://monitor.invalid", null, CancellationToken.None));
-        Assert.Equal(2, await new Login(home.Config, output, clock, _ => true).RunAsync(null, null, CancellationToken.None));
+        Assert.Equal(2, await new Login(home.Config, output, clock, _ => true, "macos").RunAsync("http://monitor.invalid", null, CancellationToken.None));
+        Assert.Equal(2, await new Login(home.Config, output, clock, _ => true, "macos").RunAsync(null, null, CancellationToken.None));
+        Assert.Equal(2, await new Login(home.Config, output, clock, _ => true, "unsupported").RunAsync("https://m.invalid", null, CancellationToken.None));
+        Assert.Contains("macOS and Windows", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

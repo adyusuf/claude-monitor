@@ -10,11 +10,14 @@ namespace ClaudeMonitor.Agent.Auth;
 /// "cm-agent login --server &lt;url&gt;": connects this machine with the device flow (RFC 8628). The person approves the
 /// shown code on the web while signed in; the agent never sees a password.
 /// </summary>
-public sealed class Login(AgentConfig config, TextWriter output, TimeProvider clock, Func<string, bool>? openBrowser = null)
+public sealed class Login(AgentConfig config, TextWriter output, TimeProvider clock, Func<string, bool>? openBrowser = null,
+    string? os = null)
 {
+    private readonly string os = os ?? AgentConfig.Os;
+
     public async Task<int> RunAsync(string? serverArg, HttpMessageHandler? handler, CancellationToken ct)
     {
-        if (AgentConfig.Os == "unsupported")
+        if (os == "unsupported")
         {
             await output.WriteLineAsync("cm-agent runs on macOS and Windows.");
             return 2;
@@ -30,7 +33,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
 
         using var http = ApiClient.CreateHttp(server, handler);
         using var api = new ApiClient(http, Credentials.For(config));
-        var code = await api.DeviceCodeAsync(new DeviceCodeRequest(identity.MachineKey, Environment.MachineName, AgentConfig.Os,
+        var code = await api.DeviceCodeAsync(new DeviceCodeRequest(identity.MachineKey, Environment.MachineName, os,
             RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(), AgentConfig.Version), ct);
         await output.WriteLineAsync($"Open {code.VerificationUri} and enter the code {code.UserCode}");
         (openBrowser ?? OpenBrowser)($"{code.VerificationUri}?code={code.UserCode}");
