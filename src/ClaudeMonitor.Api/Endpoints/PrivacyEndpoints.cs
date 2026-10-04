@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Endpoints;
 
-public sealed record DeleteAccountRequest(string? Password, string? Confirm);
+public sealed record DeleteAccountRequest(string? Password, string? Confirm, string? Code = null);
 
 /// <summary>
 /// A user's own data (docs/data-model.md, "Account deletion"; GDPR/KVKK): everything about them as one JSON download,
@@ -121,6 +121,12 @@ public static class PrivacyEndpoints
             return Http.Invalid("password", "invalid_credentials");
         }
 
+        if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, http.RequestServices.GetRequiredService<ApiConfig>(), user, req.Code,
+                clock.GetUtcNow(), ct))
+        {
+            return Http.Invalid("code", "invalid_code");
+        }
+
         var memberships = await db.WorkspaceMembers.Where(m => m.UserId == userId && m.RemovedAt == null).ToListAsync(ct);
         var soleOwned = new List<Guid>();
         var solo = new List<Guid>();
@@ -168,6 +174,7 @@ public static class PrivacyEndpoints
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
         await db.UserTokens.Where(t => t.UserId == userId && t.UsedAt == null).ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
         await db.UserLogins.Where(l => l.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.UserRecoveryCodes.Where(r => r.UserId == userId).ExecuteDeleteAsync(ct);
         if (email is not null)
         {
             await db.WorkspaceInvitations.Where(i => i.EmailNormalized == email && i.AcceptedAt == null && i.RevokedAt == null)
@@ -182,6 +189,8 @@ public static class PrivacyEndpoints
         user.DisplayName = DeletedName;
         user.DisplayNameSearch = "";
         user.PasswordHash = null;
+        user.TotpSecret = null;
+        user.TotpEnabledAt = null;
         user.Status = UserStatuses.Deleted;
         user.UpdatedAt = now;
         Audit.Add(db, http, clock, AuditActions.AccountDeleted, userId: userId,

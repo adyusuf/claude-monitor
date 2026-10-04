@@ -96,6 +96,14 @@ public static class AuthEndpoints
 
         user.FailedSignIns = 0;
         user.LockedUntil = null;
+        if (user.TotpEnabledAt is not null)
+        {
+            var token = MfaEndpoints.Pending(db, config, user, now);
+            await db.SaveChangesAsync(http.RequestAborted);
+            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "mfa_required",
+                extensions: new Dictionary<string, object?> { ["mfaToken"] = token });
+        }
+
         await Http.IssueLoginAsync(http, db, config, clock, user);
         return Results.NoContent();
     }

@@ -11,6 +11,7 @@ export interface Me {
   hasPassword: boolean;
   providers: string[];
   workspaces: MeWorkspace[];
+  mfaEnabled?: boolean;
 }
 
 export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number }

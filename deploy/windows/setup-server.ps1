@@ -84,6 +84,7 @@ if (-not (Test-Path $envFile)) {
     "MONITOR_ARCHIVE_DIR=$(Join-Path $home_ 'archive')",
     "MONITOR_TRUST_PROXY=true",
     "MONITOR_BACKUP_KEY=$(New-Secret 32)",
+    "MONITOR_MFA_KEY=$(New-Secret 32)",
     "MONITOR_BACKUP_OFFSITE="
   ) | Set-Content -Path $envFile -Encoding UTF8
   Write-Host "   wrote $envFile - fill in the SMTP password and the OAuth client secrets"

@@ -82,6 +82,7 @@ public static class Startup
         ExternalAuthEndpoints.Map(api);
         MeEndpoints.Map(api);
         PrivacyEndpoints.Map(api);
+        MfaEndpoints.Map(api);
         WorkspaceEndpoints.Map(api);
         InvitationEndpoints.Map(api);
         DeviceEndpoints.Map(api);

@@ -21,6 +21,7 @@ public static class TokenPurposes
 {
     public const string VerifyEmail = "verify_email";
     public const string ResetPassword = "reset_password";
+    public const string MfaPending = "mfa_pending";
 }
 
 public static class Roles
@@ -56,6 +57,20 @@ public sealed class User
     public DateTimeOffset UpdatedAt { get; set; }
     public int FailedSignIns { get; set; }
     public DateTimeOffset? LockedUntil { get; set; }
+
+    /// <summary>The TOTP secret, sealed (SecretBox); set while being set up, kept once enabled.</summary>
+    public string? TotpSecret { get; set; }
+    public DateTimeOffset? TotpEnabledAt { get; set; }
+    public long? TotpLastStep { get; set; }
+}
+
+public sealed class UserRecoveryCode
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid UserId { get; set; }
+    public string CodeHash { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UsedAt { get; set; }
 }
 
 public sealed class UserLogin
