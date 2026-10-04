@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.InteropServices;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
@@ -31,19 +32,46 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
             return 2;
         }
 
-        using var http = ApiClient.CreateHttp(server, handler);
+        using var http = ApiClient.CreateHttp(server, handler, config.LoginRequestTimeout);
         using var api = new ApiClient(http, Credentials.For(config));
-        var code = await api.DeviceCodeAsync(new DeviceCodeRequest(identity.MachineKey, Environment.MachineName, os,
-            RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(), AgentConfig.Version), ct);
+        DeviceCodeResponse code;
+        try
+        {
+            code = await api.DeviceCodeAsync(new DeviceCodeRequest(identity.MachineKey, Environment.MachineName, os,
+                RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(), AgentConfig.Version), ct);
+        }
+        catch (Exception e) when (Transient(e, ct))
+        {
+            await output.WriteLineAsync($"The server did not answer ({Describe(e)}). Check the address and the connection, then run cm-agent login again.");
+            return 1;
+        }
+
         await output.WriteLineAsync($"Open {code.VerificationUri} and enter the code {code.UserCode}");
         (openBrowser ?? OpenBrowser)($"{code.VerificationUri}?code={code.UserCode}");
 
         var interval = TimeSpan.FromSeconds(code.IntervalSeconds);
         var deadline = clock.GetUtcNow().AddSeconds(code.ExpiresInSeconds);
+        Exception? failure = null;
         while (clock.GetUtcNow() < deadline)
         {
             await Task.Delay(interval, clock, ct);
-            var (tokens, error) = await api.DeviceTokenAsync(code.DeviceCode, ct);
+            (TokenResponse? Tokens, string? Error) answer;
+            try
+            {
+                answer = await api.DeviceTokenAsync(code.DeviceCode, ct);
+            }
+            catch (Exception e) when (Transient(e, ct))
+            {
+                // RFC 8628 §3.5: a connection failure is no answer; keep polling until the code expires, backing off.
+                failure = e;
+                interval = Backoff(interval);
+                await output.WriteLineAsync($"The server did not answer ({Describe(e)}); trying again in {interval.TotalSeconds:0} s.");
+                continue;
+            }
+
+            var unanswered = failure is not null;
+            failure = null;
+            var (tokens, error) = answer;
             if (tokens is not null)
             {
                 api.SaveTokens(tokens);
@@ -63,14 +91,33 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                     await output.WriteLineAsync("The request was denied on the web.");
                     return 1;
                 default:
-                    await output.WriteLineAsync("The code expired. Run cm-agent login again.");
+                    // After a lost answer the code may have been used for tokens that never arrived; it cannot be reused.
+                    await output.WriteLineAsync(unanswered
+                        ? "The code expired, or it was used for an answer that did not arrive. Run cm-agent login again."
+                        : "The code expired. Run cm-agent login again.");
                     return 1;
             }
         }
 
-        await output.WriteLineAsync("The code expired. Run cm-agent login again.");
+        await output.WriteLineAsync(failure is null
+            ? "The code expired. Run cm-agent login again."
+            : $"The code expired while the server did not answer ({Describe(failure)}). Check the connection, then run cm-agent login again.");
         return 1;
     }
+
+    /// <summary>A failure that is no answer: the network, a request that took too long or a gateway error; never the
+    /// caller's own cancellation.</summary>
+    private static bool Transient(Exception e, CancellationToken ct) =>
+        !ct.IsCancellationRequested &&
+        e is HttpRequestException or IOException or OperationCanceledException or ApiException { Status: >= HttpStatusCode.InternalServerError };
+
+    private static string Describe(Exception e) =>
+        e is ApiException api ? $"it answered {(int)api.Status}" : $"{e.GetType().Name}: {e.Message.ReplaceLineEndings(" ")}";
+
+    private TimeSpan Backoff(TimeSpan interval) =>
+        interval >= config.LoginPollMax ? interval
+        : interval + config.LoginBackoffStep > config.LoginPollMax ? config.LoginPollMax
+        : interval + config.LoginBackoffStep;
 
     /// <summary>"cm-agent logout": forgets the tokens here; the web shows the machine until it is revoked there.</summary>
     public async Task<int> LogoutAsync()

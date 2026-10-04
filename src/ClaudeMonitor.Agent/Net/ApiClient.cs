@@ -20,15 +20,27 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials) : I
 
     public void Dispose() => refreshing.Dispose();
 
-    public static HttpClient CreateHttp(string server, HttpMessageHandler? handler = null)
+    /// <summary>The API's client. No timeout unless one is given: the daemon's stream stays open.</summary>
+    public static HttpClient CreateHttp(string server, HttpMessageHandler? handler = null, TimeSpan? timeout = null)
     {
-        var client = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
+        var client = handler is null ? new HttpClient(CreateHandler()) : new HttpClient(handler, disposeHandler: false);
         client.BaseAddress = new Uri(server.TrimEnd('/') + "/");
-        client.Timeout = Timeout.InfiniteTimeSpan; // the stream stays open; every other call passes its own deadline
+        client.Timeout = timeout ?? Timeout.InfiniteTimeSpan;
         client.DefaultRequestHeaders.Add(AgentHeaders.Version, AgentConfig.Version);
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"cm-agent/{AgentConfig.Version}");
         return client;
     }
+
+    /// <summary>
+    /// Pooled connections are retired, so a socket opened before a network change (new Wi-Fi, VPN up or down) is not
+    /// reused for ever: on macOS such a socket fails with EADDRNOTAVAIL, or a read on it waits until TCP gives up.
+    /// </summary>
+    public static SocketsHttpHandler CreateHandler() => new()
+    {
+        PooledConnectionLifetime = AgentConfig.ConnectionLifetime,
+        PooledConnectionIdleTimeout = AgentConfig.ConnectionIdle,
+        ConnectTimeout = AgentConfig.ConnectTimeout,
+    };
 
     public void SaveTokens(TokenResponse tokens)
     {
