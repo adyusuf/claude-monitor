@@ -48,8 +48,10 @@ public static class Startup
         services.Configure<ForwardedHeadersOptions>(o =>
         {
             o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            // Forwarded headers count only when they come from these networks (Cloudflare's, on the servers).
             o.KnownIPNetworks.Clear();
             o.KnownProxies.Clear();
+            foreach (var network in config.ProxyNetworks) o.KnownIPNetworks.Add(network);
         });
         return services;
     }
@@ -105,7 +107,7 @@ public static class Startup
         h.XFrameOptions = "DENY";
         h["Referrer-Policy"] = "same-origin";
         h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
-        h.ContentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+        h.ContentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self'; " +
                                   "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
         return next();
     }

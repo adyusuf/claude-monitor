@@ -132,7 +132,9 @@ public sealed class AuthTests(ApiFactory api)
         var response = await api.NewClient().Http.GetAsync("/api/version");
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single());
-        Assert.Contains("default-src 'self'", response.Headers.GetValues("Content-Security-Policy").Single(), StringComparison.Ordinal);
+        var csp = response.Headers.GetValues("Content-Security-Policy").Single();
+        Assert.Contains("default-src 'self'", csp, StringComparison.Ordinal);
+        Assert.DoesNotContain("unsafe-inline", csp, StringComparison.Ordinal);
         Assert.Equal("test-sha", (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("commit").GetString());
         Assert.Equal(HttpStatusCode.NotFound, (await api.NewClient().Http.GetAsync("/api/no-such-thing")).StatusCode);
     }

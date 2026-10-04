@@ -23,6 +23,9 @@ public sealed record ApiConfig
     public bool SecureCookies { get; init; } = true;
     public bool BackgroundJobs { get; init; } = true;
     public bool TrustProxy { get; init; }
+
+    /// <summary>The proxies whose X-Forwarded-* headers count (CIDR list); required when TrustProxy is on outside development.</summary>
+    public IReadOnlyList<System.Net.IPNetwork> ProxyNetworks { get; init; } = [];
     public int AuthRequestsPerMinute { get; init; } = 20;
     public int LockoutAfter { get; init; } = 5;
     public TimeSpan LockoutFor { get; init; } = TimeSpan.FromMinutes(15);
@@ -80,6 +83,14 @@ public sealed record ApiConfig
             throw new InvalidOperationException("MONITOR_PUBLIC_ORIGIN must be https outside development (see .env.example)");
         }
 
+        var trustProxy = env["MONITOR_TRUST_PROXY"] == "true";
+        var networks = (env["MONITOR_PROXY_NETWORKS"] ?? "").Split([',', ' ', ';', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(System.Net.IPNetwork.Parse).ToList();
+        if (trustProxy && networks.Count == 0 && !development)
+        {
+            throw new InvalidOperationException("MONITOR_TRUST_PROXY needs MONITOR_PROXY_NETWORKS: the proxies' address ranges (see .env.example)");
+        }
+
         return new ApiConfig
         {
             DatabaseUrl = Required("MONITOR_DB", "Host=localhost;Port=55432;Database=monitor;Username=monitor;Password=monitor"),
@@ -100,7 +111,8 @@ public sealed record ApiConfig
             MinimumAgentVersion = Version.Parse(env["MONITOR_MIN_AGENT_VERSION"] is { Length: > 0 } m ? m : "0.1.0"),
             SecureCookies = origin.StartsWith("https://", StringComparison.Ordinal),
             BackgroundJobs = env["MONITOR_BACKGROUND_JOBS"] != "off",
-            TrustProxy = env["MONITOR_TRUST_PROXY"] == "true",
+            TrustProxy = trustProxy,
+            ProxyNetworks = networks,
             AuthRequestsPerMinute = int.TryParse(env["MONITOR_AUTH_RATE_PER_MINUTE"], out var rate) && rate > 0 ? rate : 20,
         };
     }

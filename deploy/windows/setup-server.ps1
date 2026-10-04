@@ -66,6 +66,8 @@ $dbPassword = $null
 if (-not (Test-Path $envFile)) {
   $dbPassword = New-Secret
   $origin = "https://$HostName"
+  # Forwarded headers count only from Cloudflare: its published ranges, read once here (refresh with the runbook).
+  $cloudflare = ((Invoke-RestMethod "https://www.cloudflare.com/ips-v4") + "`n" + (Invoke-RestMethod "https://www.cloudflare.com/ips-v6")).Split("`n", [StringSplitOptions]::RemoveEmptyEntries) -join ","
   @(
     "# Claude Monitor $Environment - read by deploy.ps1 into the site's web.config. Never commit this file.",
     "ASPNETCORE_ENVIRONMENT=Production",
@@ -83,6 +85,7 @@ if (-not (Test-Path $envFile)) {
     "MONITOR_GOOGLE_CLIENT_SECRET=",
     "MONITOR_ARCHIVE_DIR=$(Join-Path $home_ 'archive')",
     "MONITOR_TRUST_PROXY=true",
+    "MONITOR_PROXY_NETWORKS=$cloudflare",
     "MONITOR_BACKUP_KEY=$(New-Secret 32)",
     "MONITOR_MFA_KEY=$(New-Secret 32)",
     "MONITOR_BACKUP_OFFSITE="

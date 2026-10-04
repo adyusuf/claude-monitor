@@ -16,7 +16,10 @@ IIS site, app pool, PostgreSQL database and folder under `C:\ClaudeMonitor\<env>
    - SSL/TLS, Origin Server: create an Origin Certificate for both host names (15 years), download certificate and key,
      and import them into `LocalMachine\My` on the server (as a .pfx: `certutil -mergepfx` or the Certificates MMC).
      Note its thumbprint.
-   - The server's firewall accepts 443 only from Cloudflare's address ranges (cloudflare.com/ips).
+   - The server's firewall accepts 443 only from Cloudflare's address ranges (cloudflare.com/ips). The same ranges
+     go into `MONITOR_PROXY_NETWORKS` (the set-up script writes them): forwarded client addresses are believed only from
+     there. Cloudflare changes the list rarely; when it does, update both and recycle the app pool.
+   - Turn on BitLocker for the drive that holds PostgreSQL's data, the archives and the backups (encryption at rest).
 3. **Per environment**, from an elevated PowerShell in `deploy\windows` of the release package or the repository:
 
    ```powershell

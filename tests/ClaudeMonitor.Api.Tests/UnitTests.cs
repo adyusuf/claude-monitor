@@ -104,6 +104,7 @@ public sealed class UnitTests
             ["MONITOR_GOOGLE_CLIENT_ID"] = "id",
             ["MONITOR_GOOGLE_CLIENT_SECRET"] = "secret",
             ["MONITOR_TRUST_PROXY"] = "true",
+            ["MONITOR_PROXY_NETWORKS"] = "173.245.48.0/20, 2400:cb00::/32",
             ["MONITOR_BACKGROUND_JOBS"] = "off",
             ["MONITOR_AUTH_RATE_PER_MINUTE"] = "5",
             ["MONITOR_MFA_KEY"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -112,6 +113,7 @@ public sealed class UnitTests
         Assert.True(prod.Smtp.StartTls);
         Assert.True(prod.SecureCookies);
         Assert.True(prod.TrustProxy);
+        Assert.Equal(["173.245.48.0/20", "2400:cb00::/32"], prod.ProxyNetworks.Select(n => n.ToString()));
         Assert.False(prod.BackgroundJobs);
         Assert.Equal(5, prod.AuthRequestsPerMinute);
         Assert.Equal("id", prod.Google!.ClientId);
@@ -129,6 +131,9 @@ public sealed class UnitTests
         Assert.Throws<InvalidOperationException>(() => ApiConfig.From(With("http://monitor.invalid"), development: false));
         Assert.False(ApiConfig.From(With("http://localhost:5190"), development: false).SecureCookies);
         Assert.Throws<InvalidOperationException>(() => ApiConfig.From(With("https://m.invalid", "c2hvcnQ"), development: false));
+        var trustingAnyone = new ConfigurationBuilder().AddInMemoryCollection(With("https://m.invalid").AsEnumerable()
+            .Append(new KeyValuePair<string, string?>("MONITOR_TRUST_PROXY", "true"))).Build();
+        Assert.Throws<InvalidOperationException>(() => ApiConfig.From(trustingAnyone, development: false));
     }
 
     [Theory]
