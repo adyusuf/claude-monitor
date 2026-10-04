@@ -132,7 +132,10 @@ public sealed class MfaTests(ApiFactory api)
         var client = api.NewClient();
         var token = await MfaTokenAsync(client, user.Email);
         for (var i = 0; i < 5; i++) await client.PostAsync("/api/auth/mfa", new { token, code = "000001" });
-        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password })).StatusCode);
+        // A locked account answers a password sign-in like any refusal (no 429 that would reveal the lock).
+        var login = await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password });
+        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
+        Assert.Equal("invalid_credentials", (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString());
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/auth/mfa", new { token, code = Now(secret) })).StatusCode);
     }
 

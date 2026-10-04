@@ -20,7 +20,7 @@ export const en = {
   },
   errors: {
     invalid_email: "That does not look like an e-mail address.", weak_password: "Use at least 10 characters.",
-    invalid_name: "Enter a name (up to 100 characters).", invalid_credentials: "The e-mail or the password is wrong.",
+    invalid_name: "Enter a name (up to 100 characters).", invalid_credentials: "The e-mail or the password is wrong. After too many attempts the account is locked for a while; resetting the password opens it at once.",
     email_not_verified: "Confirm your address first: open the link we mailed you.", invalid_token: "This link is invalid or has expired.",
     invitation_other_address: "This invitation was sent to another address. Sign in with that one.",
     provider_failed: "Signing in with the provider did not work. Try again.",

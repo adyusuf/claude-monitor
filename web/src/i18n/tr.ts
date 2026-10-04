@@ -22,7 +22,7 @@ export const tr: Dictionary = {
   },
   errors: {
     invalid_email: "Bu bir e-posta adresine benzemiyor.", weak_password: "En az 10 karakter kullanın.",
-    invalid_name: "Bir ad girin (en çok 100 karakter).", invalid_credentials: "E-posta ya da parola yanlış.",
+    invalid_name: "Bir ad girin (en çok 100 karakter).", invalid_credentials: "E-posta ya da parola yanlış. Çok fazla denemeden sonra hesap bir süre kilitlenir; parolayı sıfırlamak kilidi hemen açar.",
     email_not_verified: "Önce adresinizi doğrulayın: gönderdiğimiz bağlantıyı açın.", invalid_token: "Bu bağlantı geçersiz ya da süresi dolmuş.",
     invitation_other_address: "Bu davet başka bir adrese gönderildi. O adresle giriş yapın.",
     provider_failed: "Sağlayıcıyla giriş olmadı. Tekrar deneyin.",
