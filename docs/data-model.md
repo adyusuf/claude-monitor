@@ -121,5 +121,6 @@ workspaces 1-n event_archives
   ended, workspaces with no other member archived; the captured content of the user's sessions is deleted (events,
   tasks) or emptied (titles, subagent descriptions, command bodies, permission inputs). Ids, times, usage and audit
   rows stay, so other people's records still make sense. The address is free for a new sign-up.
-- **Not covered yet:** day files already archived past retention (`event_archives`) still hold the user's events
-  until they are deleted by hand; the legal side (privacy policy, retention of archives) is open in ADR-0002.
+- **Archives too:** the day files already written past retention are rewritten without the user's sessions' events
+  (a file left empty is deleted with its row), and their `event_archives` rows get the new count, size and SHA-256.
+  Copies already taken off the server by the backups age out with the backups' own retention.

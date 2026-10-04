@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ClaudeMonitor.Api.Background;
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
 using ClaudeMonitor.Api.Security;
@@ -142,7 +143,9 @@ public static class PrivacyEndpoints
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var email = user.EmailNormalized;
         var agentIds = await db.Agents.Where(a => a.UserId == userId).Select(a => a.Id).ToListAsync(ct);
-        var sessionIds = await db.HarnessSessions.Where(s => agentIds.Contains(s.AgentId)).Select(s => s.Id).ToListAsync(ct);
+        var sessions = await db.HarnessSessions.Where(s => agentIds.Contains(s.AgentId))
+            .Select(s => new { s.Id, s.WorkspaceId, s.StartedAt }).ToListAsync(ct);
+        var sessionIds = sessions.Select(s => s.Id).ToList();
 
         // Captured content of the user's sessions: gone. What others' records point at (ids, times, usage) stays.
         await db.SessionEvents.Where(e => sessionIds.Contains(e.SessionId)).ExecuteDeleteAsync(ct);
@@ -185,6 +188,13 @@ public static class PrivacyEndpoints
             detail: new { sessions = sessionIds.Count, agents = agentIds.Count, archivedWorkspaces = solo.Count });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        if (sessions.Count > 0)
+        {
+            // The archived day files hold the same content past retention: it leaves them too.
+            await ArchivePurge.RemoveSessionsAsync(db, sessionIds, sessions.Select(s => s.WorkspaceId).Distinct().ToList(),
+                DateOnly.FromDateTime(sessions.Min(s => s.StartedAt).UtcDateTime), ct);
+        }
+
         http.Response.Cookies.Delete(ApiConfig.SessionCookie);
         return Results.NoContent();
     }
