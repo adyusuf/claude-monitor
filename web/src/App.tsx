@@ -7,6 +7,7 @@ import { AcceptInvitationPage, AccountPage, DownloadPage } from "./pages/Account
 import { ForgotPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./pages/AuthPages";
 import { DevicePage, MachinesPage } from "./pages/MachinesPage";
 import { MembersPage } from "./pages/MembersPage";
+import { MfaPage } from "./pages/Mfa";
 import { SessionPage } from "./pages/SessionPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { NewWorkspacePage, WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage";
@@ -31,6 +32,7 @@ export function App() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot" element={<ForgotPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/mfa" element={<MfaPage />} />
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Home />} />
         <Route path="/settings" element={<AccountPage />} />

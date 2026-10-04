@@ -5,12 +5,15 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly fields: Record<string, string>;
+  /** The whole problem body, for the extra values some answers carry (the two-step sign-in token). */
+  readonly data: Record<string, unknown>;
 
-  constructor(status: number, code: string, fields: Record<string, string> = {}) {
+  constructor(status: number, code: string, fields: Record<string, string> = {}, data: Record<string, unknown> = {}) {
     super(code);
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.data = data;
   }
 }
 
@@ -35,7 +38,7 @@ export async function request<T>(method: Method, path: string, body?: unknown): 
 }
 
 async function toError(response: Response): Promise<ApiError> {
-  let data: { title?: string; errors?: Record<string, string[]> } = {};
+  let data: { title?: string; errors?: Record<string, string[]>; [key: string]: unknown } = {};
   try {
     data = await response.json();
   } catch {
@@ -44,7 +47,7 @@ async function toError(response: Response): Promise<ApiError> {
   const fields: Record<string, string> = {};
   for (const [field, codes] of Object.entries(data.errors ?? {})) fields[field] = codes[0] ?? "invalid";
   const code = Object.values(fields)[0] ?? data.title ?? statusCode(response.status);
-  return new ApiError(response.status, code, fields);
+  return new ApiError(response.status, code, fields, data);
 }
 
 function statusCode(status: number): string {

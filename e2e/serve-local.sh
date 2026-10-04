@@ -17,6 +17,7 @@ export MONITOR_ARCHIVE_DIR="$(mktemp -d)"
 export MONITOR_WEB_ROOT="$root/web/dist"
 export MONITOR_COMMIT="$(git -C "$root" rev-parse HEAD)"
 export MONITOR_AUTH_RATE_PER_MINUTE=1000
+export MONITOR_MFA_KEY="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')"
 dotnet build "$root/src/ClaudeMonitor.Api" -c Release --nologo -v q >/dev/null
 dotnet run --project "$root/src/ClaudeMonitor.Api" -c Release --no-build --no-launch-profile -- --migrate
 exec dotnet run --project "$root/src/ClaudeMonitor.Api" -c Release --no-build --no-launch-profile

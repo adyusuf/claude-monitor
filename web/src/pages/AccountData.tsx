@@ -14,6 +14,7 @@ export function AccountDataCards() {
   const { me } = useSession();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -24,7 +25,7 @@ export function AccountDataCards() {
     setBusy(true);
     setError(null);
     try {
-      await api.deleteAccount(me?.hasPassword ? password : undefined, confirm);
+      await api.deleteAccount(me?.hasPassword ? password : undefined, confirm, me?.mfaEnabled ? code : undefined);
       setDeleted(true);
     } catch (err) {
       setError(errorText(err));
@@ -55,6 +56,9 @@ export function AccountDataCards() {
           {me?.hasPassword ? (
             <Field label={t("auth.password")} type="password" autoComplete="current-password" value={password}
               onChange={(e) => setPassword(e.target.value)} />
+          ) : null}
+          {me?.mfaEnabled ? (
+            <Field label={t("auth.mfaCode")} value={code} autoComplete="one-time-code" onChange={(e) => setCode(e.target.value)} />
           ) : null}
           <Field label={t("account.deleteConfirm", { word: CONFIRM_WORD })} value={confirm} autoComplete="off"
             onChange={(e) => setConfirm(e.target.value)} />

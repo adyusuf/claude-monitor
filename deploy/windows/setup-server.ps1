@@ -12,7 +12,7 @@
     3. creates the PostgreSQL role and database for the environment with a random password (written only to monitor.env);
     4. creates the app pool (no managed code, always running: the API has background jobs) and the HTTPS site bound to
        the host name with SNI, plus a loopback HTTP binding the deploy uses to check /api/version;
-    5. registers the daily backup as a scheduled task.
+    5. registers the daily backup and the hourly health check (which mails MONITOR_ALERT_EMAIL) as scheduled tasks.
   Nothing secret is printed. Re-running is safe: what exists is left as it is.
 
 .EXAMPLE
@@ -36,7 +36,9 @@ $home_ = Join-Path $Root $Environment
 $envFile = Join-Path $home_ "monitor.env"
 
 function New-Secret([int] $bytes = 24) {
-  $b = [byte[]]::new($bytes); [Security.Cryptography.RandomNumberGenerator]::Fill($b)
+  # RandomNumberGenerator::Fill is .NET Core only; this script runs on Windows PowerShell 5.1 (.NET Framework).
+  $b = New-Object byte[] $bytes; $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $rng.GetBytes($b) } finally { $rng.Dispose() }
   return [Convert]::ToBase64String($b).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
@@ -66,6 +68,9 @@ $dbPassword = $null
 if (-not (Test-Path $envFile)) {
   $dbPassword = New-Secret
   $origin = "https://$HostName"
+  # Forwarded headers count only from Cloudflare: its published ranges, read once here (refresh with the runbook).
+  $cloudflare = (((Invoke-RestMethod "https://www.cloudflare.com/ips-v4") + "`n" + (Invoke-RestMethod "https://www.cloudflare.com/ips-v6")) -split "`n" |
+    ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ","
   @(
     "# Claude Monitor $Environment - read by deploy.ps1 into the site's web.config. Never commit this file.",
     "ASPNETCORE_ENVIRONMENT=Production",
@@ -83,8 +88,11 @@ if (-not (Test-Path $envFile)) {
     "MONITOR_GOOGLE_CLIENT_SECRET=",
     "MONITOR_ARCHIVE_DIR=$(Join-Path $home_ 'archive')",
     "MONITOR_TRUST_PROXY=true",
+    "MONITOR_PROXY_NETWORKS=$cloudflare",
     "MONITOR_BACKUP_KEY=$(New-Secret 32)",
-    "MONITOR_BACKUP_OFFSITE="
+    "MONITOR_MFA_KEY=$(New-Secret 32)",
+    "MONITOR_BACKUP_OFFSITE=",
+    "MONITOR_ALERT_EMAIL="
   ) | Set-Content -Path $envFile -Encoding UTF8
   Write-Host "   wrote $envFile - fill in the SMTP password and the OAuth client secrets"
 }
@@ -113,4 +121,11 @@ if (-not (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)) {
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\backup.ps1`" -Environment $Environment -Root `"$Root`" -PgBin `"$PgBin`""
   Register-ScheduledTask -TaskName $task -Action $action -Trigger (New-ScheduledTaskTrigger -Daily -At 03:30) -User "SYSTEM" -RunLevel Highest | Out-Null
 }
-Write-Host "Done. Next: fill in $envFile, then deploy a release with deploy.ps1."
+Write-Host "6. Hourly health check and alarm"
+$check = "ClaudeMonitor-health-$Environment"
+if (-not (Get-ScheduledTask -TaskName $check -ErrorAction SilentlyContinue)) {
+  $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\check-health.ps1`" -Environment $Environment -LoopbackPort $LoopbackPort -Root `"$Root`""
+  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 1)
+  Register-ScheduledTask -TaskName $check -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest | Out-Null
+}
+Write-Host "Done. Next: fill in $envFile (with MONITOR_ALERT_EMAIL), then deploy a release with deploy.ps1."

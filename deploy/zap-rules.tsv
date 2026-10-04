@@ -1,0 +1,12 @@
+# OWASP ZAP baseline rule levels for scripts/zap-baseline.sh (tab-separated: rule id, WARN|FAIL|IGNORE, reason).
+# Anything not listed is WARN. Raised to FAIL: the rules our own controls promise to satisfy, so a regression blocks.
+10020	FAIL	X-Frame-Options / frame-ancestors is set on every response (Startup.SecurityHeaders)
+10021	FAIL	X-Content-Type-Options: nosniff on every response
+10038	FAIL	a Content Security Policy is on every response
+10055	FAIL	the CSP allows no unsafe-inline / unsafe-eval (docs/security.md A05)
+10010	FAIL	the session cookie is HttpOnly
+10054	FAIL	the session cookie has SameSite
+10049	WARN	reported on the static files (hashed bundles may cache; index.html is no-cache); every /api response is no-store (tested)
+90004	FAIL	Cross-Origin-Embedder-Policy: require-corp on every response
+10027	IGNORE	"suspicious comments" are in the third-party code of the built bundle (React), not in anything served from data
+10109	IGNORE	informational: "this is a modern web application" (the scan's own note that a spider cannot see everything)

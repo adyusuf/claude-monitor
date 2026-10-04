@@ -23,6 +23,7 @@ test("a signed-out visitor is sent to sign in and back to the page asked for", a
   const address = await signUp(page, "next");
   const sessions = page.url();
   await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible(); // the sign-out has reached the API
   await page.goto(new URL(sessions).pathname);
   await expect(page).toHaveURL(/\/login\?next=/);
   await page.getByLabel("E-mail").fill(address);
