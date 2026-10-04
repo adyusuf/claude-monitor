@@ -71,20 +71,19 @@ public static class AuthEndpoints
         var normalized = SearchText.Email(req.Email ?? "");
         var user = await db.Users.FirstOrDefaultAsync(u => u.EmailNormalized == normalized, http.RequestAborted);
         var now = clock.GetUtcNow();
-        if (user?.LockedUntil > now)
+        // One verification on every path (unknown address, no password, locked) so timing tells nothing apart.
+        var passwordOk = Secrets.VerifyPasswordOrDummy(user, req.Password);
+        // Locked: even the right password waits and gets the same answer as a wrong one, so the lock can neither test
+        // passwords nor reveal that the address is registered. Attempts during the lock neither count nor extend it.
+        var locked = user?.LockedUntil > now;
+        if (locked || user is null || user.Status != UserStatuses.Active || !passwordOk)
         {
-            // Locked: even the right password waits, so the lock cannot be used to test passwords.
-            return Locked();
-        }
-
-        if (user is null || user.Status != UserStatuses.Active || req.Password is null || !Secrets.VerifyPassword(user, req.Password))
-        {
-            if (user is not null && RecordFailure(user, config, now))
+            if (user is not null && !locked && RecordFailure(user, config, now))
             {
                 Audit.Add(db, http, clock, AuditActions.AccountLocked, userId: user.Id);
             }
 
-            Audit.Add(db, http, clock, AuditActions.SignInFailed, userId: user?.Id);
+            Audit.Add(db, http, clock, AuditActions.SignInFailed, userId: user?.Id, detail: locked ? new { locked } : null);
             await db.SaveChangesAsync(http.RequestAborted);
             return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_credentials");
         }
@@ -167,6 +166,9 @@ public static class AuthEndpoints
         var user = await db.Users.FirstAsync(u => u.Id == token.UserId, http.RequestAborted);
         user.PasswordHash = Secrets.HashPassword(user, req.Password!);
         user.EmailVerifiedAt ??= now; // the link proves the mailbox
+        // ...and so it also opens a lock: whoever locked the account by guessing cannot keep its owner out.
+        user.FailedSignIns = 0;
+        user.LockedUntil = null;
         user.UpdatedAt = now;
         await db.LoginSessions.Where(s => s.UserId == user.Id && s.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), http.RequestAborted);

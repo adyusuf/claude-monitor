@@ -1,5 +1,8 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
+using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Daemon;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
 
@@ -47,10 +50,14 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
 
     private static string StopOutput() => new JsonObject { ["continue"] = false, ["stopReason"] = StopReason }.ToJsonString();
 
-    /// <summary>At the end of a turn: a stop ends it; a queued prompt continues it (waiting up to CM_STOP_WAIT).</summary>
+    /// <summary>
+    /// At the end of a turn: a stop ends it; a queued prompt continues it (waiting up to CM_STOP_WAIT, but only while
+    /// the web can be heard; otherwise one look at what already arrived).
+    /// </summary>
     private async Task<string?> StopAsync(string session, CancellationToken ct)
     {
-        var deadline = clock.GetUtcNow() + config.StopWait;
+        var wait = config.StopWait > TimeSpan.Zero && !CanHearTheWeb() ? TimeSpan.Zero : config.StopWait;
+        var deadline = clock.GetUtcNow() + wait;
         while (true)
         {
             var now = clock.GetUtcNow();
@@ -81,9 +88,13 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
         }.ToJsonString();
     }
 
-    /// <summary>Asks the web and waits for the owner's answer; no answer in time means no decision (Claude asks here).</summary>
+    /// <summary>
+    /// Asks the web and waits for the owner's answer; no answer in time means no decision (Claude asks here). When the
+    /// web cannot be heard, nothing is asked: a request sent later would be stale.
+    /// </summary>
     private async Task<string?> PermissionAsync(string session, JsonObject payload, CancellationToken ct)
     {
+        if (!CanHearTheWeb()) return null;
         var localId = Guid.NewGuid().ToString("N");
         var input = Masker.Mask(payload["tool_input"]?.DeepClone() ?? new JsonObject())!.ToJsonString();
         store.AddPermission(new PermissionAsk(localId, HarnessKinds.ClaudeCode, session, payload["tool_name"]?.GetValue<string>() ?? "unknown",
@@ -106,5 +117,23 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
 
         store.PermissionExpired(localId);
         return null;
+    }
+
+    /// <summary>
+    /// Whether an answer from the web can arrive: the agent is logged in (identity and a token) and the daemon's last
+    /// answered heartbeat is recent. Read only by the hooks that would wait: the credential store may start a process.
+    /// </summary>
+    private bool CanHearTheWeb()
+    {
+        if (!Identity.Load(config).Connected) return false;
+        var credentials = Credentials.For(config);
+        if (credentials.Read(Credentials.Refresh) is null && credentials.Read(Credentials.Access) is null) return false;
+        if (!DateTimeOffset.TryParse(store.Get(Relay.LastContactKey), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind,
+                out var contact))
+        {
+            return false;
+        }
+
+        return clock.GetUtcNow() - contact < config.HeartbeatEvery * 3; // a future contact (clock skew) counts as fresh
     }
 }

@@ -81,7 +81,9 @@ public static class ExternalAuthEndpoints
             {
                 var token = MfaEndpoints.Pending(db, config, user, now);
                 await db.SaveChangesAsync(http.RequestAborted);
-                return Back(config, "/mfa?token=" + Uri.EscapeDataString(token));
+                // In a cookie only the second step receives, not in the address (history, logs, Referer).
+                http.Response.Cookies.Append(ApiConfig.MfaCookie, token, MfaEndpoints.PendingCookie(config, now + config.MfaPendingLifetime));
+                return Back(config, "/mfa");
             }
 
             await Http.IssueLoginAsync(http, db, config, clock, user);

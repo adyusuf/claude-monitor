@@ -43,7 +43,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await relay.UploadAsync(ct);
                 await relay.ReportCommandsAsync(ct);
             }, api, revoked),
-            Loop("heartbeat", config.HeartbeatEvery, api.HeartbeatAsync, api, revoked),
+            Loop("heartbeat", config.HeartbeatEvery, relay.HeartbeatAsync, api, revoked),
             Loop("settings", config.SettingsEvery, relay.SettingsAsync, api, revoked),
             StreamAsync(api, relay, revoked));
         if (api.Disconnected)

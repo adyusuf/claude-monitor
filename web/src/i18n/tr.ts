@@ -22,7 +22,7 @@ export const tr: Dictionary = {
   },
   errors: {
     invalid_email: "Bu bir e-posta adresine benzemiyor.", weak_password: "En az 10 karakter kullanın.",
-    invalid_name: "Bir ad girin (en çok 100 karakter).", invalid_credentials: "E-posta ya da parola yanlış.",
+    invalid_name: "Bir ad girin (en çok 100 karakter).", invalid_credentials: "E-posta ya da parola yanlış. Çok fazla denemeden sonra hesap bir süre kilitlenir; parolayı sıfırlamak kilidi hemen açar.",
     email_not_verified: "Önce adresinizi doğrulayın: gönderdiğimiz bağlantıyı açın.", invalid_token: "Bu bağlantı geçersiz ya da süresi dolmuş.",
     invitation_other_address: "Bu davet başka bir adrese gönderildi. O adresle giriş yapın.",
     provider_failed: "Sağlayıcıyla giriş olmadı. Tekrar deneyin.",
@@ -37,6 +37,7 @@ export const tr: Dictionary = {
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
     account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
+    reauth_required: "Parolası olmayan bir hesabı silmek için yeniden oturum açın: çıkış yapın, GitHub ya da Google ile girin ve hesabı birkaç dakika içinde silin.",
     confirm_required: "Onay kelimesini tam olarak yazın.", sole_owner: "Paylaşılan bir çalışma alanının tek sahibisiniz: önce başka birini sahip yapın.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },

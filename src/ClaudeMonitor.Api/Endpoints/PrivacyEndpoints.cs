@@ -104,13 +104,23 @@ public static class PrivacyEndpoints
         await body.FlushAsync(ct);
     }
 
+    /// <summary>True when the current login session started within the re-authentication window. Fail-closed: a
+    /// session that cannot be found counts as old.</summary>
+    private static async Task<bool> RecentSignInAsync(HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
+    {
+        if (http.User.LoginSessionId() is not { } id) return false;
+        var createdAt = await db.LoginSessions.Where(s => s.Id == id).Select(s => (DateTimeOffset?)s.CreatedAt)
+            .FirstOrDefaultAsync(http.RequestAborted);
+        return createdAt is { } at && clock.GetUtcNow() - at <= config.ReauthWindow;
+    }
+
     private static void Write<T>(Utf8JsonWriter w, string name, T value)
     {
         w.WritePropertyName(name);
         JsonSerializer.Serialize(w, value, Json);
     }
 
-    private static async Task<IResult> Delete(DeleteAccountRequest req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Delete(DeleteAccountRequest req, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
     {
         var userId = http.User.UserId();
         var ct = http.RequestAborted;
@@ -121,10 +131,15 @@ public static class PrivacyEndpoints
             return Http.Invalid("password", "invalid_credentials");
         }
 
-        if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, http.RequestServices.GetRequiredService<ApiConfig>(), user, req.Code,
-                clock.GetUtcNow(), ct))
+        if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, config, user, req.Code, clock.GetUtcNow(), ct))
         {
             return Http.Invalid("code", "invalid_code");
+        }
+
+        // Neither a password nor a code to ask for (a GitHub/Google-only account): the proof is a fresh sign-in.
+        if (user.PasswordHash is null && user.TotpEnabledAt is null && !await RecentSignInAsync(http, db, config, clock))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "reauth_required");
         }
 
         var memberships = await db.WorkspaceMembers.Where(m => m.UserId == userId && m.RemovedAt == null).ToListAsync(ct);

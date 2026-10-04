@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRow } from "../api/types";
 import { Layout } from "../components/Layout";
+import { en } from "../i18n/en";
 import { ME, mockApi, renderAt } from "../test/helpers";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./AccountPages";
 import { DevicePage, MachinesPage } from "./MachinesPage";
@@ -49,7 +50,7 @@ describe("machines and devices", () => {
   });
 
   it("refuses a request and reports an unknown code", async () => {
-    mockApi({
+    const calls = mockApi({
       "GET /me": { body: ME },
       "GET /device/lookup/ZZZZ-ZZZZ": { status: 404 },
       "GET /device/lookup/BCDF-GHJK": { body: { userCode: "BCDF-GHJK", hostname: "desk", os: "macos", arch: "arm64", agentVersion: "0.3.0", createdAt: "", expiresAt: "" } },
@@ -64,6 +65,35 @@ describe("machines and devices", () => {
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(await screen.findByRole("button", { name: "This is not me" }));
     expect(await screen.findByText("The request was refused.")).toBeInTheDocument();
+    expect(calls.find((c) => c.path === "/device/deny")?.body).toEqual({ userCode: "BCDF-GHJK", workspaceId: "w1" });
+  });
+
+  it("sends the workspace the user picked when refusing", async () => {
+    const me = { ...ME, workspaces: [...ME.workspaces, { id: "w3", name: "Third", role: "member" as const }] };
+    const calls = mockApi({
+      "GET /me": { body: me },
+      "GET /device/lookup/BCDF-GHJK": { body: { userCode: "BCDF-GHJK", hostname: "desk", os: "macos", arch: "arm64", agentVersion: "0.3.0", createdAt: "", expiresAt: "" } },
+      "POST /device/deny": { status: 204 },
+    });
+    renderAt("/device?code=BCDF-GHJK", [{ path: "/device", element: <DevicePage /> }]);
+    await userEvent.selectOptions(await screen.findByLabelText("Report to workspace"), "w3");
+    await userEvent.click(screen.getByRole("button", { name: "This is not me" }));
+    expect(await screen.findByText("The request was refused.")).toBeInTheDocument();
+    expect(calls.find((c) => c.path === "/device/deny")?.body).toEqual({ userCode: "BCDF-GHJK", workspaceId: "w3" });
+  });
+
+  it("cannot refuse or approve when the user may contribute to no workspace", async () => {
+    const calls = mockApi({
+      "GET /me": { body: { ...ME, workspaces: [{ id: "w2", name: "Other", role: "viewer" }] } },
+      "GET /device/lookup/BCDF-GHJK": { body: { userCode: "BCDF-GHJK", hostname: "desk", os: "macos", arch: "arm64", agentVersion: "0.3.0", createdAt: "", expiresAt: "" } },
+      "POST /device/deny": { status: 204 },
+    });
+    renderAt("/device?code=BCDF-GHJK", [{ path: "/device", element: <DevicePage /> }]);
+    const deny = await screen.findByRole("button", { name: "This is not me" });
+    expect(deny).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Connect this machine" })).toBeDisabled();
+    await userEvent.click(deny);
+    expect(calls.some((c) => c.path === "/device/deny")).toBe(false);
   });
 });
 
@@ -208,5 +238,21 @@ describe("the user's own data", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
     expect(await screen.findByText(/only owner of a shared workspace/)).toBeInTheDocument();
     expect(calls.find((c) => c.path === "/me/delete")?.body).toEqual({ confirm: "DELETE" });
+  });
+
+  it("tells a provider-only account to sign in again when the API asks for a fresh sign-in", async () => {
+    const calls = mockApi({
+      "GET /me": { body: { ...ME, hasPassword: false, mfaEnabled: false } },
+      "POST /me/delete": { status: 403, body: { title: "reauth_required" } },
+    });
+    renderAt("/account", [{ path: "/account", element: <AccountPage /> }]);
+    await userEvent.type(await screen.findByLabelText("Type DELETE to confirm"), "DELETE");
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    expect(await screen.findByText(en.errors.reauth_required)).toBeInTheDocument();
+    expect(screen.queryByText("Your account is deleted.")).not.toBeInTheDocument();
+    const body = calls.find((c) => c.path === "/me/delete")?.body as object;
+    expect(body).toEqual({ confirm: "DELETE" });
+    expect(body).not.toHaveProperty("password");
+    expect(body).not.toHaveProperty("code");
   });
 });

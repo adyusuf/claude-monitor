@@ -137,7 +137,8 @@ public static class Startup
     {
         var request = http.Request;
         var unsafeMethod = !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method));
-        var cookieCall = request.Path.StartsWithSegments("/api") && request.Cookies.ContainsKey(ApiConfig.SessionCookie)
+        var cookieCall = request.Path.StartsWithSegments("/api")
+                         && (request.Cookies.ContainsKey(ApiConfig.SessionCookie) || request.Cookies.ContainsKey(ApiConfig.MfaCookie))
                          && !request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.Ordinal);
         if (unsafeMethod && cookieCall)
         {

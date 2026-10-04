@@ -41,6 +41,42 @@ public sealed class ManualClock(DateTimeOffset start) : TimeProvider
     public void Advance(TimeSpan by) => now += by;
 }
 
+/// <summary>
+/// A clock whose timers fire at once and move time forward by their due time, so the time a wait would have taken is
+/// measured exactly and costs nothing.
+/// </summary>
+public sealed class VirtualClock(DateTimeOffset start) : TimeProvider
+{
+    private readonly Lock gate = new();
+    private readonly DateTimeOffset origin = start;
+    private DateTimeOffset now = start;
+    private int timers;
+
+    public TimeSpan Elapsed => GetUtcNow() - origin;
+    public int Timers => Volatile.Read(ref timers);
+
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (gate) return now;
+    }
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        lock (gate) now += dueTime;
+        Interlocked.Increment(ref timers);
+        // Not inline: Task.Delay keeps the timer only after this returns, and its callback needs it.
+        ThreadPool.QueueUserWorkItem(_ => callback(state));
+        return new NoTimer();
+    }
+
+    private sealed class NoTimer : ITimer
+    {
+        public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+        public void Dispose() { }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+}
+
 /// <summary>Answers the agent's HTTP calls from a table of routes and records every request it saw.</summary>
 public sealed class FakeApi : HttpMessageHandler
 {

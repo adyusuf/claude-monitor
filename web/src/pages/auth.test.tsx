@@ -2,6 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { App } from "../App";
+import { en } from "../i18n/en";
 import { ME, mockApi, renderAt } from "../test/helpers";
 import { ForgotPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./AuthPages";
 
@@ -35,7 +36,9 @@ describe("sign in", () => {
     await userEvent.type(screen.getByLabelText("E-mail"), "x@gmail.com");
     await userEvent.type(screen.getByLabelText("Password"), "whatever-long");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByText("The e-mail or the password is wrong.")).toBeInTheDocument();
+    expect(await screen.findByText(en.errors.invalid_credentials)).toBeInTheDocument();
+    expect(screen.getByText(/locked for a while/)).toBeInTheDocument();
+    expect(screen.getByText(/resetting the password opens it at once/)).toBeInTheDocument();
   });
 });
 

@@ -48,9 +48,10 @@ public sealed class DeviceTests(ApiFactory api)
         var user = await api.NewClient().SignedUpAsync("deny");
         var agent = api.CreateClient();
         var denied = (await (await agent.PostAsJsonAsync("/api/device/code", Request(), TestUser.Json)).Content.ReadFromJsonAsync<DeviceCodeResponse>(TestUser.Json))!;
-        Assert.Equal(HttpStatusCode.NoContent, (await user.PostAsync("/api/device/deny", new { userCode = denied.UserCode })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await user.PostAsync("/api/device/deny", new { userCode = denied.UserCode, workspaceId = user.WorkspaceId })).StatusCode);
         Assert.Equal(DeviceTokenErrors.Denied, await ErrorOf(await agent.PostAsJsonAsync("/api/device/token", new DeviceTokenRequest(denied.DeviceCode), TestUser.Json)));
-        Assert.Equal(HttpStatusCode.BadRequest, (await user.PostAsync("/api/device/deny", new { userCode = denied.UserCode })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await user.PostAsync("/api/device/deny", new { userCode = denied.UserCode, workspaceId = user.WorkspaceId })).StatusCode);
 
         var late = (await (await agent.PostAsJsonAsync("/api/device/code", Request(), TestUser.Json)).Content.ReadFromJsonAsync<DeviceCodeResponse>(TestUser.Json))!;
         api.Clock.Advance(TimeSpan.FromMinutes(16));
@@ -73,6 +74,82 @@ public sealed class DeviceTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.BadRequest, (await user.PostAsync("/api/device/approve", new { userCode = code.UserCode })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
             (await user.PostAsync("/api/device/approve", new { userCode = "ZZZZ-ZZZZ", workspaceId = user.WorkspaceId })).StatusCode);
+    }
+
+    private async Task<DeviceCodeResponse> NewCodeAsync() =>
+        (await (await api.CreateClient().PostAsJsonAsync("/api/device/code", Request(), TestUser.Json))
+            .Content.ReadFromJsonAsync<DeviceCodeResponse>(TestUser.Json))!;
+
+    private static async Task AssertNotAMemberAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var errors = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.Equal("not_a_member", errors.GetProperty("workspaceId")[0].GetString());
+    }
+
+    [Fact]
+    public async Task Denying_needs_a_workspace_the_caller_is_a_member_of()
+    {
+        var user = await api.NewClient().SignedUpAsync("deny-none");
+        var code = await NewCodeAsync();
+        await AssertNotAMemberAsync(await user.PostAsync("/api/device/deny", new { userCode = code.UserCode }));
+        // A made-up workspace is no better than a missing one.
+        await AssertNotAMemberAsync(await user.PostAsync("/api/device/deny", new { userCode = code.UserCode, workspaceId = Guid.NewGuid() }));
+        Assert.Equal(HttpStatusCode.OK, (await user.Http.GetAsync("/api/device/lookup/" + code.UserCode)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_stranger_cannot_deny_and_the_rightful_user_can_still_approve()
+    {
+        var rightful = await api.NewClient().SignedUpAsync("deny-rightful");
+        var stranger = await api.NewClient().SignedUpAsync("deny-stranger");
+        var agent = api.CreateClient();
+        var code = await NewCodeAsync();
+        await AssertNotAMemberAsync(await stranger.PostAsync("/api/device/deny", new { userCode = code.UserCode, workspaceId = rightful.WorkspaceId }));
+
+        // Still pending: the poll says so, and the approval goes through.
+        Assert.Equal(DeviceTokenErrors.Pending, await ErrorOf(await agent.PostAsJsonAsync("/api/device/token", new DeviceTokenRequest(code.DeviceCode), TestUser.Json)));
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await rightful.PostAsync("/api/device/approve", new { userCode = code.UserCode, workspaceId = rightful.WorkspaceId })).StatusCode);
+        await using var db = api.Db();
+        Assert.False(db.AuditEvents.Any(a => a.ActorUserId == stranger.Id && a.Action == "agent.device_denied"));
+    }
+
+    [Fact]
+    public async Task A_viewer_cannot_deny_but_a_member_can_and_the_audit_row_names_the_workspace()
+    {
+        var owner = await api.NewClient().SignedUpAsync("deny-owner");
+        var viewer = await api.NewClient().SignedUpAsync("deny-viewer");
+        var member = await api.NewClient().SignedUpAsync("deny-member");
+        foreach (var (invited, role) in new[] { (viewer, "viewer"), (member, "member") })
+        {
+            (await owner.PostAsync($"/api/workspaces/{owner.WorkspaceId}/invitations", new { email = invited.Email, role })).EnsureSuccessStatusCode();
+            (await invited.PostAsync("/api/invitations/accept", new { token = api.Mail.TokenFor(invited.Email) })).EnsureSuccessStatusCode();
+        }
+
+        var code = await NewCodeAsync();
+        await AssertNotAMemberAsync(await viewer.PostAsync("/api/device/deny", new { userCode = code.UserCode, workspaceId = owner.WorkspaceId }));
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await member.PostAsync("/api/device/deny", new { userCode = code.UserCode, workspaceId = owner.WorkspaceId })).StatusCode);
+        Assert.Equal(DeviceTokenErrors.Denied,
+            await ErrorOf(await api.CreateClient().PostAsJsonAsync("/api/device/token", new DeviceTokenRequest(code.DeviceCode), TestUser.Json)));
+        await using var db = api.Db();
+        var audit = Assert.Single(db.AuditEvents.Where(a => a.Action == "agent.device_denied" && a.ActorUserId == member.Id));
+        Assert.Equal(owner.WorkspaceId, audit.WorkspaceId);
+        Assert.False(db.AuditEvents.Any(a => a.Action == "agent.device_denied" && a.ActorUserId == viewer.Id));
+    }
+
+    [Fact]
+    public async Task Denying_with_the_own_workspace_is_recorded_against_it()
+    {
+        var user = await api.NewClient().SignedUpAsync("deny-audit");
+        var code = await NewCodeAsync();
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await user.PostAsync("/api/device/deny", new { userCode = code.UserCode, workspaceId = user.WorkspaceId })).StatusCode);
+        await using var db = api.Db();
+        var audit = Assert.Single(db.AuditEvents.Where(a => a.Action == "agent.device_denied" && a.ActorUserId == user.Id));
+        Assert.Equal(user.WorkspaceId, audit.WorkspaceId);
+        Assert.Equal("device", audit.TargetType);
     }
 
     [Theory]

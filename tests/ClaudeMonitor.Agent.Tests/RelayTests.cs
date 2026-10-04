@@ -83,6 +83,23 @@ public sealed class RelayTests : IDisposable
     }
 
     [Fact]
+    public async Task Only_an_answered_heartbeat_is_recorded_as_contact()
+    {
+        fake.On("POST /api/agent/heartbeat", HttpStatusCode.BadGateway, "{}");
+        await Assert.ThrowsAsync<ApiException>(() => relay.HeartbeatAsync(CancellationToken.None));
+        Assert.Null(store.Get(Relay.LastContactKey));
+
+        fake.On("POST /api/agent/heartbeat", HttpStatusCode.Unauthorized, "{}");
+        fake.On("POST /api/agent/token/refresh", HttpStatusCode.Unauthorized, "{}");
+        await Assert.ThrowsAsync<ApiException>(() => relay.HeartbeatAsync(CancellationToken.None));
+        Assert.Null(store.Get(Relay.LastContactKey));
+
+        fake.On("POST /api/agent/heartbeat", HttpStatusCode.NoContent, "");
+        await relay.HeartbeatAsync(CancellationToken.None);
+        Assert.Equal(clock.GetUtcNow(), DateTimeOffset.Parse(store.Get(Relay.LastContactKey)!, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
     public async Task A_refused_refresh_disconnects_the_agent()
     {
         fake.On("POST /api/agent/heartbeat", HttpStatusCode.Unauthorized, "{}");
