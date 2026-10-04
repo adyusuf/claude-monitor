@@ -81,8 +81,8 @@ Keychain / Windows Credential Manager (service `claude-monitor-agent`); its log 
 
 ## Browser tests (e2e)
 
-Playwright (`e2e/`, Chromium and WebKit) drives the real web app and API. Written and run at the `test -> prod`
-gate (global #33). With `E2E_BASE_URL` set it runs against the test environment (its mail must reach a Mailpit at
+Playwright (`e2e/`, Chromium and WebKit) drives the real web app and API. It is optional (global #33): the
+`test -> prod` gate runs it only with `GATE_RUN_E2E=1`, or run it by hand. With `E2E_BASE_URL` set it runs against the test environment (its mail must reach a Mailpit at
 `E2E_MAILPIT_URL`); without it, `e2e/serve-local.sh` starts its own PostgreSQL and Mailpit (`e2e/services.yml`,
 throw-away), builds the web app and runs the API on `E2E_PORT`.
 
