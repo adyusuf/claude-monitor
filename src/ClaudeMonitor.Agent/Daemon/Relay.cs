@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
@@ -13,6 +14,16 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// </summary>
 public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock)
 {
+    /// <summary>When the API last answered a heartbeat (ISO-8601 UTC): the hooks wait for the web only if it is recent.</summary>
+    public const string LastContactKey = "relay.last_contact";
+
+    /// <summary>Tells the API this agent is alive; only an answered heartbeat counts as contact.</summary>
+    public async Task HeartbeatAsync(CancellationToken ct)
+    {
+        await api.HeartbeatAsync(ct);
+        store.Set(LastContactKey, clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture));
+    }
+
     /// <summary>Sends batches until the outbox is empty. Returns the number of events the API acknowledged.</summary>
     public async Task<int> UploadAsync(CancellationToken ct)
     {
@@ -62,7 +73,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     {
         var s = await api.SettingsAsync(ct);
         store.Set("settings.mask_secrets", s.MaskSecrets ? "true" : "false");
-        store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
     }
 
     /// <summary>Takes one stream message. Returns false when the agent was revoked and must stop.</summary>
