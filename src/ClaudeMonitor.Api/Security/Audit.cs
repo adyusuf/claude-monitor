@@ -10,6 +10,9 @@ public static class AuditActions
     public const string EmailVerified = "user.email_verified";
     public const string SignIn = "user.sign_in";
     public const string SignInFailed = "user.sign_in_failed";
+    public const string AccountLocked = "user.account_locked";
+    public const string MfaEnabled = "user.mfa_enabled";
+    public const string MfaDisabled = "user.mfa_disabled";
     public const string SignOut = "user.sign_out";
     public const string PasswordReset = "user.password_reset";
     public const string ProviderLinked = "user.provider_linked";

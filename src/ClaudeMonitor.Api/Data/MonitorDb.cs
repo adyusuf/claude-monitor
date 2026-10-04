@@ -9,6 +9,7 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<User> Users => Set<User>();
     public DbSet<UserLogin> UserLogins => Set<UserLogin>();
     public DbSet<UserToken> UserTokens => Set<UserToken>();
+    public DbSet<UserRecoveryCode> UserRecoveryCodes => Set<UserRecoveryCode>();
     public DbSet<LoginSession> LoginSessions => Set<LoginSession>();
     public DbSet<Workspace> Workspaces => Set<Workspace>();
     public DbSet<WorkspaceMember> WorkspaceMembers => Set<WorkspaceMember>();

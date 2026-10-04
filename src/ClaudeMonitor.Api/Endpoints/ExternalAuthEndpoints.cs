@@ -77,6 +77,13 @@ public static class ExternalAuthEndpoints
         {
             var user = await db.Users.FirstAsync(u => u.Id == existing.UserId, http.RequestAborted);
             if (user.Status != UserStatuses.Active) return Back(config, "/login?error=account_disabled");
+            if (user.TotpEnabledAt is not null)
+            {
+                var token = MfaEndpoints.Pending(db, config, user, now);
+                await db.SaveChangesAsync(http.RequestAborted);
+                return Back(config, "/mfa?token=" + Uri.EscapeDataString(token));
+            }
+
             await Http.IssueLoginAsync(http, db, config, clock, user);
             return Back(config, "/");
         }

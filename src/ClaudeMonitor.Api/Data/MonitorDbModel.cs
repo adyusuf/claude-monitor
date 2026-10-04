@@ -33,7 +33,12 @@ internal static class MonitorDbModel
         {
             e.HasIndex(x => x.TokenHash).IsUnique();
             e.ToTable(t => t.HasCheckConstraint("ck_user_tokens_purpose",
-                In("purpose", TokenPurposes.VerifyEmail, TokenPurposes.ResetPassword)));
+                In("purpose", TokenPurposes.VerifyEmail, TokenPurposes.ResetPassword, TokenPurposes.MfaPending)));
+        });
+        b.Entity<UserRecoveryCode>(e =>
+        {
+            e.HasIndex(x => x.CodeHash).IsUnique();
+            e.HasIndex(x => x.UserId);
         });
         b.Entity<LoginSession>(e =>
         {
@@ -161,6 +166,7 @@ internal static class MonitorDbModel
 
         Fk<UserLogin, User>(x => x.UserId);
         Fk<UserToken, User>(x => x.UserId);
+        Fk<UserRecoveryCode, User>(x => x.UserId);
         Fk<LoginSession, User>(x => x.UserId);
         Fk<Workspace, User>(x => x.CreatedBy);
         Fk<WorkspaceMember, Workspace>(x => x.WorkspaceId);
