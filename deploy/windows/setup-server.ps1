@@ -36,7 +36,9 @@ $home_ = Join-Path $Root $Environment
 $envFile = Join-Path $home_ "monitor.env"
 
 function New-Secret([int] $bytes = 24) {
-  $b = [byte[]]::new($bytes); [Security.Cryptography.RandomNumberGenerator]::Fill($b)
+  # RandomNumberGenerator::Fill is .NET Core only; this script runs on Windows PowerShell 5.1 (.NET Framework).
+  $b = New-Object byte[] $bytes; $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $rng.GetBytes($b) } finally { $rng.Dispose() }
   return [Convert]::ToBase64String($b).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
