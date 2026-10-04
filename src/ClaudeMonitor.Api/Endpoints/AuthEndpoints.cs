@@ -167,6 +167,9 @@ public static class AuthEndpoints
         var user = await db.Users.FirstAsync(u => u.Id == token.UserId, http.RequestAborted);
         user.PasswordHash = Secrets.HashPassword(user, req.Password!);
         user.EmailVerifiedAt ??= now; // the link proves the mailbox
+        // ...and so it also opens a lock: whoever locked the account by guessing cannot keep its owner out.
+        user.FailedSignIns = 0;
+        user.LockedUntil = null;
         user.UpdatedAt = now;
         await db.LoginSessions.Where(s => s.UserId == user.Id && s.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), http.RequestAborted);
