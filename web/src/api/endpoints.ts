@@ -21,7 +21,8 @@ export const api = {
   login: (email: string, password: string) => request<void>("POST", "/auth/login", { email, password }),
   logout: () => request<void>("POST", "/auth/logout"),
   deleteAccount: (password: string | undefined, confirm: string, code?: string) => request<void>("POST", "/me/delete", { password, confirm, code }),
-  mfaSignIn: (token: string, code: string) => request<void>("POST", "/auth/mfa", { token, code }),
+  /** Without a token the API takes the provider sign-in's pending token from its own cookie. */
+  mfaSignIn: (token: string | undefined, code: string) => request<void>("POST", "/auth/mfa", { token, code }),
   mfaSetup: () => request<{ secret: string; uri: string }>("POST", "/me/mfa/setup"),
   mfaEnable: (code: string) => request<{ recoveryCodes: string[] }>("POST", "/me/mfa/enable", { code }),
   mfaDisable: (code: string) => request<void>("POST", "/me/mfa/disable", { code }),

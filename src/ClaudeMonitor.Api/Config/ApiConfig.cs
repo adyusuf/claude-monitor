@@ -54,6 +54,10 @@ public sealed record ApiConfig
     public IReadOnlyDictionary<string, ModelPrice> Prices { get; init; } = DefaultPrices;
 
     public const string SessionCookie = "cm_session";
+
+    /// <summary>The provider sign-in's pending two-step token (never in the address), sent only to the second step.</summary>
+    public const string MfaCookie = "cm_mfa";
+    public const string MfaCookiePath = "/api/auth/mfa";
     public const string CsrfHeader = "X-CSRF";
     public const long BatchBodyLimit = 16 * 1024 * 1024;
 
