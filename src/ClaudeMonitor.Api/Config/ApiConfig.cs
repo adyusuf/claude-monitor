@@ -60,6 +60,8 @@ public sealed record ApiConfig
     public const string MfaCookiePath = "/api/auth/mfa";
     public const string CsrfHeader = "X-CSRF";
     public const long BatchBodyLimit = 16 * 1024 * 1024;
+    /// <summary>The configuration node SMTP may also be read from (e.g. a server-only appsettings.Production.json).</summary>
+    public const string SmtpSection = "Smtp";
 
     public static readonly IReadOnlyDictionary<string, ModelPrice> DefaultPrices = new Dictionary<string, ModelPrice>
     {
@@ -75,6 +77,15 @@ public sealed record ApiConfig
             env[key] is { Length: > 0 } v ? v
             : development ? devFallback
             : throw new InvalidOperationException($"{key} is not set (see .env.example)");
+
+        // SMTP: the MONITOR_SMTP_* key first (the environment file), else the same value from the "Smtp" node
+        // (Host, Port, User, Password, From, StartTls) — so a server-only appsettings.Production.json can hold it.
+        // An EMPTY key counts as unset and never hides the node (deploy.ps1 writes every monitor.env line, blank ones too).
+        string? SmtpValue(string key, string node) =>
+            env[key] is { Length: > 0 } v ? v : env[$"{SmtpSection}:{node}"] is { Length: > 0 } n ? n : null;
+        string SmtpRequired(string key, string node, string devFallback) =>
+            SmtpValue(key, node) ?? (development ? devFallback
+                : throw new InvalidOperationException($"{key} (or {SmtpSection}:{node}) is not set (see .env.example)"));
 
         OAuthClient? Client(string prefix) =>
             env[$"{prefix}_CLIENT_ID"] is { Length: > 0 } id && env[$"{prefix}_CLIENT_SECRET"] is { Length: > 0 } secret
@@ -103,12 +114,13 @@ public sealed record ApiConfig
             DatabaseUrl = Required("MONITOR_DB", "Host=localhost;Port=55432;Database=monitor;Username=monitor;Password=monitor"),
             PublicOrigin = origin,
             Smtp = new SmtpSettings(
-                Required("MONITOR_SMTP_HOST", "localhost"),
-                int.Parse(Required("MONITOR_SMTP_PORT", "1025"), System.Globalization.CultureInfo.InvariantCulture),
-                env["MONITOR_SMTP_USER"],
-                env["MONITOR_SMTP_PASSWORD"],
-                Required("MONITOR_SMTP_FROM", "monitor@localhost"),
-                (env["MONITOR_SMTP_TLS"] is { Length: > 0 } tls ? tls : development ? "false" : "true") == "true"),
+                SmtpRequired("MONITOR_SMTP_HOST", "Host", "localhost"),
+                int.Parse(SmtpRequired("MONITOR_SMTP_PORT", "Port", "1025"), System.Globalization.CultureInfo.InvariantCulture),
+                SmtpValue("MONITOR_SMTP_USER", "User"),
+                SmtpValue("MONITOR_SMTP_PASSWORD", "Password"),
+                SmtpRequired("MONITOR_SMTP_FROM", "From", "monitor@localhost"),
+                string.Equals(SmtpValue("MONITOR_SMTP_TLS", "StartTls") ?? (development ? "false" : "true"), "true",
+                    StringComparison.OrdinalIgnoreCase)),
             GitHub = Client("MONITOR_GITHUB"),
             Google = Client("MONITOR_GOOGLE"),
             ArchiveDir = Required("MONITOR_ARCHIVE_DIR", Path.Combine(Path.GetTempPath(), "claude-monitor-archive")),
