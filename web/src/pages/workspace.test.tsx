@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRow } from "../api/types";
 import { Layout } from "../components/Layout";
+import { en } from "../i18n/en";
 import { ME, mockApi, renderAt } from "../test/helpers";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./AccountPages";
 import { DevicePage, MachinesPage } from "./MachinesPage";
@@ -237,5 +238,21 @@ describe("the user's own data", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
     expect(await screen.findByText(/only owner of a shared workspace/)).toBeInTheDocument();
     expect(calls.find((c) => c.path === "/me/delete")?.body).toEqual({ confirm: "DELETE" });
+  });
+
+  it("tells a provider-only account to sign in again when the API asks for a fresh sign-in", async () => {
+    const calls = mockApi({
+      "GET /me": { body: { ...ME, hasPassword: false, mfaEnabled: false } },
+      "POST /me/delete": { status: 403, body: { title: "reauth_required" } },
+    });
+    renderAt("/account", [{ path: "/account", element: <AccountPage /> }]);
+    await userEvent.type(await screen.findByLabelText("Type DELETE to confirm"), "DELETE");
+    await userEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+    expect(await screen.findByText(en.errors.reauth_required)).toBeInTheDocument();
+    expect(screen.queryByText("Your account is deleted.")).not.toBeInTheDocument();
+    const body = calls.find((c) => c.path === "/me/delete")?.body as object;
+    expect(body).toEqual({ confirm: "DELETE" });
+    expect(body).not.toHaveProperty("password");
+    expect(body).not.toHaveProperty("code");
   });
 });

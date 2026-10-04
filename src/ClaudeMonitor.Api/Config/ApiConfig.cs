@@ -31,6 +31,9 @@ public sealed record ApiConfig
     public TimeSpan LockoutFor { get; init; } = TimeSpan.FromMinutes(15);
     public TimeSpan MfaPendingLifetime { get; init; } = TimeSpan.FromMinutes(5);
     public int RecoveryCodes { get; init; } = 10;
+
+    /// <summary>How fresh a sign-in must be to delete an account that has neither a password nor two-step sign-in.</summary>
+    public TimeSpan ReauthWindow { get; init; } = TimeSpan.FromMinutes(10);
     public const string MfaIssuer = "Claude Monitor";
 
     public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);

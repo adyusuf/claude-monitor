@@ -35,6 +35,7 @@ export const en = {
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
     request_failed: "The request failed.", network: "The server cannot be reached.",
     account_locked: "Too many wrong attempts on this account. Try again in 15 minutes.",
+    reauth_required: "To delete an account without a password, sign in again: sign out, sign in with GitHub or Google, and delete the account within a few minutes.",
     confirm_required: "Type the confirmation word exactly.", sole_owner: "You are the only owner of a shared workspace: make someone else owner first.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },

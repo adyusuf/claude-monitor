@@ -37,6 +37,7 @@ export const tr: Dictionary = {
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
     account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
+    reauth_required: "Parolası olmayan bir hesabı silmek için yeniden oturum açın: çıkış yapın, GitHub ya da Google ile girin ve hesabı birkaç dakika içinde silin.",
     confirm_required: "Onay kelimesini tam olarak yazın.", sole_owner: "Paylaşılan bir çalışma alanının tek sahibisiniz: önce başka birini sahip yapın.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
