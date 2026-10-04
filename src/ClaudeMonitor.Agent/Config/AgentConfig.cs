@@ -26,6 +26,18 @@ public sealed record AgentConfig
     public TimeSpan PollEvery { get; init; } = TimeSpan.FromMilliseconds(250);
     public TimeSpan DaemonStartWait { get; init; } = TimeSpan.FromSeconds(3);
     public TimeSpan RetryMax { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>How long one login request may take; the API answers at once, so a longer wait is a dead connection.</summary>
+    public TimeSpan LoginRequestTimeout { get; init; } = TimeSpan.FromSeconds(20);
+
+    /// <summary>Added to the login's polling interval after each failed poll (RFC 8628 §3.5), up to <see cref="LoginPollMax"/>.</summary>
+    public TimeSpan LoginBackoffStep { get; init; } = TimeSpan.FromSeconds(5);
+    public TimeSpan LoginPollMax { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>A pooled connection is retired after this long, so one opened before a network change is not reused for ever.</summary>
+    public static readonly TimeSpan ConnectionLifetime = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan ConnectionIdle = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
     public int BatchEvents { get; init; } = 200;
     public int BatchBytes { get; init; } = 4 * 1024 * 1024;
     public int EventMaxBytesDefault { get; init; } = 262_144;
