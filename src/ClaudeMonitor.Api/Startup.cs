@@ -70,7 +70,7 @@ public static class Startup
             // Before routing: once the SPA fallback below has matched a path, the static-file middleware stands
             // aside, and the built scripts would be answered with index.html.
             app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
-            app.UseStaticFiles(new StaticFileOptions { FileProvider = files });
+            app.UseStaticFiles(new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
         }
 
         app.UseRouting();
@@ -96,8 +96,15 @@ public static class Startup
         if (files is not null)
         {
             // The single-page app answers every non-API path; /api/* never falls through to it (global #17).
-            app.MapFallbackToFile("{*path:regex(^(?!api/).*$)}", "index.html", new StaticFileOptions { FileProvider = files });
+            app.MapFallbackToFile("{*path:regex(^(?!api/).*$)}", "index.html",
+                new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
         }
+    }
+
+    /// <summary>The page itself is always revalidated, so a new deploy loads at once; the hashed bundles may cache.</summary>
+    private static void NoCacheForPages(Microsoft.AspNetCore.StaticFiles.StaticFileResponseContext ctx)
+    {
+        if (ctx.File.Name.EndsWith(".html", StringComparison.Ordinal)) ctx.Context.Response.Headers.CacheControl = "no-cache";
     }
 
     private static Task SecurityHeaders(HttpContext http, Func<Task> next)
@@ -107,6 +114,15 @@ public static class Startup
         h.XFrameOptions = "DENY";
         h["Referrer-Policy"] = "same-origin";
         h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        h["Cross-Origin-Opener-Policy"] = "same-origin";
+        h["Cross-Origin-Embedder-Policy"] = "require-corp";
+        h["Cross-Origin-Resource-Policy"] = "same-origin";
+        if (http.Request.Path.StartsWithSegments("/api"))
+        {
+            // Account data, sessions and captured content: never kept by a browser or a proxy cache.
+            h.CacheControl = "no-store";
+        }
+
         h.ContentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self'; " +
                                   "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
         return next();

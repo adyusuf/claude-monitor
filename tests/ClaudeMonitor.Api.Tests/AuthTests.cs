@@ -135,6 +135,9 @@ public sealed class AuthTests(ApiFactory api)
         var csp = response.Headers.GetValues("Content-Security-Policy").Single();
         Assert.Contains("default-src 'self'", csp, StringComparison.Ordinal);
         Assert.DoesNotContain("unsafe-inline", csp, StringComparison.Ordinal);
+        Assert.Equal("require-corp", response.Headers.GetValues("Cross-Origin-Embedder-Policy").Single());
+        Assert.Equal("same-origin", response.Headers.GetValues("Cross-Origin-Opener-Policy").Single());
+        Assert.True(response.Headers.CacheControl!.NoStore);
         Assert.Equal("test-sha", (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("commit").GetString());
         Assert.Equal(HttpStatusCode.NotFound, (await api.NewClient().Http.GetAsync("/api/no-such-thing")).StatusCode);
     }
@@ -157,6 +160,7 @@ public sealed class AuthTests(ApiFactory api)
         var page = await http.GetAsync("/w/123/sessions");
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         Assert.Contains("<title>app</title>", await page.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.True(page.Headers.CacheControl!.NoCache);
         Assert.Equal("<!doctype html><title>app</title>", await http.GetStringAsync("/"));
         var api_ = await http.GetAsync("/api/nothing-here");
         Assert.Equal(HttpStatusCode.NotFound, api_.StatusCode);
