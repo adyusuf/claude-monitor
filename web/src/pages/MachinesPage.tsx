@@ -99,7 +99,7 @@ export function DevicePage() {
   const decide = async (approve: boolean) => {
     try {
       if (approve) await api.approveDevice(device!.userCode, workspace);
-      else await api.denyDevice(device!.userCode);
+      else await api.denyDevice(device!.userCode, workspace);
       setState(approve ? "approved" : "denied");
     } catch (e) {
       setError(e);
@@ -131,7 +131,7 @@ export function DevicePage() {
             </select>
           </label>
           <div className="row-actions">
-            <Button variant="ghost" onClick={() => void decide(false)}>{t("device.deny")}</Button>
+            <Button variant="ghost" disabled={!workspace} onClick={() => void decide(false)}>{t("device.deny")}</Button>
             <Button disabled={!workspace} onClick={() => void decide(true)}>{t("device.approve")}</Button>
           </div>
         </Card>

@@ -44,6 +44,20 @@ public static class MfaEndpoints
         return token;
     }
 
+    /// <summary>The pending-token cookie: HttpOnly, Strict, scoped to the second step's path, as long as the token lives.</summary>
+    public static CookieOptions PendingCookie(ApiConfig config, DateTimeOffset expires)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = config.SecureCookies,
+            SameSite = SameSiteMode.Strict,
+            Path = ApiConfig.MfaCookiePath,
+            Expires = expires,
+        };
+    }
+
     /// <summary>True when the code is the current TOTP (not replayed) or an unused recovery code, which is then spent.</summary>
     public static async Task<bool> CheckAsync(MonitorDb db, ApiConfig config, User user, string? code, DateTimeOffset now, CancellationToken ct)
     {
@@ -120,7 +134,9 @@ public static class MfaEndpoints
     private static async Task<IResult> SignIn(MfaSignInRequest req, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
     {
         var now = clock.GetUtcNow();
-        var hash = Secrets.Hash(req.Token ?? "");
+        // A password sign-in hands the token back in its answer; a provider sign-in left it in the cookie.
+        var token = string.IsNullOrEmpty(req.Token) ? http.Request.Cookies[ApiConfig.MfaCookie] : req.Token;
+        var hash = Secrets.Hash(token ?? "");
         var pending = await db.UserTokens.FirstOrDefaultAsync(
             t => t.TokenHash == hash && t.Purpose == TokenPurposes.MfaPending && t.UsedAt == null && t.ExpiresAt > now, http.RequestAborted);
         if (pending is null) return Http.Invalid("token", "invalid_token");
@@ -132,6 +148,7 @@ public static class MfaEndpoints
             if (AuthEndpoints.RecordFailure(user, config, now))
             {
                 pending.UsedAt = now; // a lock ends this attempt; signing in starts again
+                EndCookie(http, config);
                 Audit.Add(db, http, clock, AuditActions.AccountLocked, userId: user.Id);
             }
 
@@ -142,7 +159,16 @@ public static class MfaEndpoints
 
         pending.UsedAt = now;
         user.FailedSignIns = 0;
+        EndCookie(http, config);
         await Http.IssueLoginAsync(http, db, config, clock, user);
         return Results.NoContent();
+    }
+
+    private static void EndCookie(HttpContext http, ApiConfig config)
+    {
+        if (http.Request.Cookies.ContainsKey(ApiConfig.MfaCookie))
+        {
+            http.Response.Cookies.Delete(ApiConfig.MfaCookie, PendingCookie(config, DateTimeOffset.UnixEpoch));
+        }
     }
 }

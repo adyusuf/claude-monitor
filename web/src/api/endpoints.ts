@@ -21,7 +21,8 @@ export const api = {
   login: (email: string, password: string) => request<void>("POST", "/auth/login", { email, password }),
   logout: () => request<void>("POST", "/auth/logout"),
   deleteAccount: (password: string | undefined, confirm: string, code?: string) => request<void>("POST", "/me/delete", { password, confirm, code }),
-  mfaSignIn: (token: string, code: string) => request<void>("POST", "/auth/mfa", { token, code }),
+  /** Without a token the API takes the provider sign-in's pending token from its own cookie. */
+  mfaSignIn: (token: string | undefined, code: string) => request<void>("POST", "/auth/mfa", { token, code }),
   mfaSetup: () => request<{ secret: string; uri: string }>("POST", "/me/mfa/setup"),
   mfaEnable: (code: string) => request<{ recoveryCodes: string[] }>("POST", "/me/mfa/enable", { code }),
   mfaDisable: (code: string) => request<void>("POST", "/me/mfa/disable", { code }),
@@ -58,7 +59,7 @@ export const api = {
   moveAgent: (agentId: string, workspaceId: string) => request<void>("PATCH", `/agents/${agentId}`, { workspaceId }),
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),
   approveDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/approve", { userCode, workspaceId }),
-  denyDevice: (userCode: string) => request<void>("POST", "/device/deny", { userCode }),
+  denyDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/deny", { userCode, workspaceId }),
 };
 
 /** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */

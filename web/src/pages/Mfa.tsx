@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 import { api } from "../api/endpoints";
 import { safeNext, useSession } from "../auth/session";
 import { AuthFrame } from "../components/Layout";
@@ -7,7 +7,7 @@ import { Button, Card, CopyText, Field, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 
 /** The second step of a sign-in: a code for the pending token the first step left. */
-export function MfaStep({ token, next }: { token: string; next: string }) {
+export function MfaStep({ token, next }: { token?: string; next: string }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { refresh } = useSession();
@@ -41,11 +41,10 @@ export function MfaStep({ token, next }: { token: string; next: string }) {
   );
 }
 
-/** /mfa?token=: the second step after a GitHub or Google sign-in. */
+/** /mfa: the second step after a GitHub or Google sign-in. Its pending token is in an HttpOnly cookie, never the address. */
 export function MfaPage() {
   const { t } = useI18n();
-  const [params] = useSearchParams();
-  return <AuthFrame title={t("auth.mfaTitle")}><MfaStep token={params.get("token") ?? ""} next="/" /></AuthFrame>;
+  return <AuthFrame title={t("auth.mfaTitle")}><MfaStep next="/" /></AuthFrame>;
 }
 
 /** Account page: turn two-step sign-in on (key, first code, recovery codes) or off (a code). */

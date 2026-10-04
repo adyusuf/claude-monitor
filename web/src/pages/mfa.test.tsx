@@ -34,13 +34,15 @@ describe("two-step sign-in", () => {
     expect(calls.filter((c) => c.path === "/auth/mfa").at(-1)?.body).toEqual({ token: "pending-1", code: "123456" });
   });
 
-  it("takes the provider sign-in's token from the address", async () => {
+  it("posts only the code after a provider sign-in and ignores a token in the address", async () => {
     const calls = mockApi({ "GET /me": { status: 401 }, "POST /auth/mfa": { status: 204 } });
-    renderAt("/mfa?token=from-provider", [{ path: "/mfa", element: <MfaPage /> }, { path: "/", element: <div>home</div> }]);
+    renderAt("/mfa?token=leaked", [{ path: "/mfa", element: <MfaPage /> }, { path: "/", element: <div>home</div> }]);
     await userEvent.type(await screen.findByLabelText(/Code from your authenticator app/), "654321");
     await userEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(await screen.findByText("home")).toBeInTheDocument();
-    expect(calls.find((c) => c.path === "/auth/mfa")?.body).toEqual({ token: "from-provider", code: "654321" });
+    const body = calls.find((c) => c.path === "/auth/mfa")?.body as object;
+    expect(Object.keys(body)).toEqual(["code"]);
+    expect(body).toEqual({ code: "654321" });
   });
 });
 

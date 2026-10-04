@@ -172,4 +172,61 @@ public sealed class PrivacyTests(ApiFactory api)
         await using var check = api.Db();
         Assert.False(await check.EventArchives.AnyAsync(a => a.WorkspaceId == user.WorkspaceId));
     }
+
+    // The provider's answer is stood in by the test header; the cm_session cookie then stays in the client's jar.
+    private static async Task<string> ProviderSignInAsync(TestUser client, string subject, string? email = null)
+    {
+        email ??= Emails.New("provider-only");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/external/github/done?mode=signin");
+        request.Headers.Add(TestExternal.Header, $"{subject}|{email}|true|Provider Person");
+        Assert.Equal(HttpStatusCode.Redirect, (await client.Http.SendAsync(request)).StatusCode);
+        return email;
+    }
+
+    [Fact]
+    public async Task An_account_without_a_password_or_a_code_is_deleted_by_a_fresh_sign_in()
+    {
+        var client = api.NewClient();
+        await ProviderSignInAsync(client, "gh-" + Guid.NewGuid());
+        var me = await client.GetJsonAsync("/api/me");
+        Assert.False(me.GetProperty("hasPassword").GetBoolean());
+        Assert.False(me.GetProperty("mfaEnabled").GetBoolean());
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/me/delete", new { confirm = "DELETE" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.Http.GetAsync("/api/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_old_sign_in_cannot_delete_such_an_account_until_it_is_renewed()
+    {
+        var client = api.NewClient();
+        var subject = "gh-" + Guid.NewGuid();
+        var email = await ProviderSignInAsync(client, subject);
+        var id = (await client.GetJsonAsync("/api/me")).GetProperty("id").GetGuid();
+
+        api.Clock.Advance(TimeSpan.FromMinutes(11)); // past the re-authentication window, well inside the session's life
+        var refused = await client.PostAsync("/api/me/delete", new { confirm = "DELETE" });
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.Equal("reauth_required", (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await client.Http.GetAsync("/api/me")).StatusCode);
+        await using (var db = api.Db())
+        {
+            var row = await db.Users.AsNoTracking().SingleAsync(u => u.Id == id);
+            Assert.Equal(("active", email), (row.Status, row.Email));
+            Assert.False(await db.AuditEvents.AnyAsync(a => a.ActorUserId == id && a.Action == "user.account_deleted"));
+        }
+
+        // Signing in with the provider again renews the proof; the same client then deletes.
+        await ProviderSignInAsync(client, subject, email);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/me/delete", new { confirm = "DELETE" })).StatusCode);
+        await using var check = api.Db();
+        Assert.Equal("deleted", (await check.Users.AsNoTracking().SingleAsync(u => u.Id == id)).Status);
+    }
+
+    [Fact]
+    public async Task An_account_with_a_password_is_asked_for_it_not_for_a_fresh_sign_in()
+    {
+        var user = await api.NewClient().SignedUpAsync("delete-old-session");
+        api.Clock.Advance(TimeSpan.FromMinutes(11));
+        Assert.Equal(HttpStatusCode.NoContent, (await user.PostAsync("/api/me/delete", new { password = TestUser.Password, confirm = "DELETE" })).StatusCode);
+    }
 }
