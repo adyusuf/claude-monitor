@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ClaudeMonitor.Api.Background;
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
 using ClaudeMonitor.Api.Security;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Endpoints;
 
-public sealed record DeleteAccountRequest(string? Password, string? Confirm);
+public sealed record DeleteAccountRequest(string? Password, string? Confirm, string? Code = null);
 
 /// <summary>
 /// A user's own data (docs/data-model.md, "Account deletion"; GDPR/KVKK): everything about them as one JSON download,
@@ -120,6 +121,12 @@ public static class PrivacyEndpoints
             return Http.Invalid("password", "invalid_credentials");
         }
 
+        if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, http.RequestServices.GetRequiredService<ApiConfig>(), user, req.Code,
+                clock.GetUtcNow(), ct))
+        {
+            return Http.Invalid("code", "invalid_code");
+        }
+
         var memberships = await db.WorkspaceMembers.Where(m => m.UserId == userId && m.RemovedAt == null).ToListAsync(ct);
         var soleOwned = new List<Guid>();
         var solo = new List<Guid>();
@@ -142,7 +149,9 @@ public static class PrivacyEndpoints
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var email = user.EmailNormalized;
         var agentIds = await db.Agents.Where(a => a.UserId == userId).Select(a => a.Id).ToListAsync(ct);
-        var sessionIds = await db.HarnessSessions.Where(s => agentIds.Contains(s.AgentId)).Select(s => s.Id).ToListAsync(ct);
+        var sessions = await db.HarnessSessions.Where(s => agentIds.Contains(s.AgentId))
+            .Select(s => new { s.Id, s.WorkspaceId, s.StartedAt }).ToListAsync(ct);
+        var sessionIds = sessions.Select(s => s.Id).ToList();
 
         // Captured content of the user's sessions: gone. What others' records point at (ids, times, usage) stays.
         await db.SessionEvents.Where(e => sessionIds.Contains(e.SessionId)).ExecuteDeleteAsync(ct);
@@ -165,6 +174,7 @@ public static class PrivacyEndpoints
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
         await db.UserTokens.Where(t => t.UserId == userId && t.UsedAt == null).ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
         await db.UserLogins.Where(l => l.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.UserRecoveryCodes.Where(r => r.UserId == userId).ExecuteDeleteAsync(ct);
         if (email is not null)
         {
             await db.WorkspaceInvitations.Where(i => i.EmailNormalized == email && i.AcceptedAt == null && i.RevokedAt == null)
@@ -179,12 +189,21 @@ public static class PrivacyEndpoints
         user.DisplayName = DeletedName;
         user.DisplayNameSearch = "";
         user.PasswordHash = null;
+        user.TotpSecret = null;
+        user.TotpEnabledAt = null;
         user.Status = UserStatuses.Deleted;
         user.UpdatedAt = now;
         Audit.Add(db, http, clock, AuditActions.AccountDeleted, userId: userId,
             detail: new { sessions = sessionIds.Count, agents = agentIds.Count, archivedWorkspaces = solo.Count });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        if (sessions.Count > 0)
+        {
+            // The archived day files hold the same content past retention: it leaves them too.
+            await ArchivePurge.RemoveSessionsAsync(db, sessionIds, sessions.Select(s => s.WorkspaceId).Distinct().ToList(),
+                DateOnly.FromDateTime(sessions.Min(s => s.StartedAt).UtcDateTime), ct);
+        }
+
         http.Response.Cookies.Delete(ApiConfig.SessionCookie);
         return Results.NoContent();
     }

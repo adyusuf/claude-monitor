@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClaudeMonitor.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ClaudeMonitor.Api.Data.Migrations
 {
     [DbContext(typeof(MonitorDb))]
-    partial class MonitorDbModelSnapshot : ModelSnapshot
+    [Migration("20261004054649_AccountLockout")]
+    partial class AccountLockout
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1021,18 +1024,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.Property<DateTimeOffset?>("TotpEnabledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("totp_enabled_at");
-
-                    b.Property<long?>("TotpLastStep")
-                        .HasColumnType("bigint")
-                        .HasColumnName("totp_last_step");
-
-                    b.Property<string>("TotpSecret")
-                        .HasColumnType("text")
-                        .HasColumnName("totp_secret");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -1095,43 +1086,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.UserRecoveryCode", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("CodeHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("code_hash");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("UsedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("used_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_user_recovery_codes");
-
-                    b.HasIndex("CodeHash")
-                        .IsUnique()
-                        .HasDatabaseName("ix_user_recovery_codes_code_hash");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_user_recovery_codes_user_id");
-
-                    b.ToTable("user_recovery_codes");
-                });
-
             modelBuilder.Entity("ClaudeMonitor.Api.Data.UserToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1177,7 +1131,7 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("user_tokens", t =>
                         {
-                            t.HasCheckConstraint("ck_user_tokens_purpose", "purpose IN ('verify_email', 'reset_password', 'mfa_pending')");
+                            t.HasCheckConstraint("ck_user_tokens_purpose", "purpose IN ('verify_email', 'reset_password')");
                         });
                 });
 
@@ -1547,16 +1501,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_user_logins_users_user_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.UserRecoveryCode", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_user_recovery_codes_users_user_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.UserToken", b =>

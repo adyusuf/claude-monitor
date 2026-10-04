@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record MeWorkspace(Guid Id, string Name, string Role);
 public sealed record MeResponse(Guid Id, string? Email, string DisplayName, bool HasPassword, IReadOnlyList<string> Providers,
-    IReadOnlyList<MeWorkspace> Workspaces);
+    IReadOnlyList<MeWorkspace> Workspaces, bool MfaEnabled = false);
 public sealed record ProvidersResponse(IReadOnlyList<string> Available);
 
 /// <summary>The signed-in user, and which sign-in providers this deployment offers.</summary>
@@ -31,7 +31,8 @@ public static class MeEndpoints
                                 where m.UserId == userId && m.RemovedAt == null && w.Status == "active"
                                 orderby w.Name
                                 select new MeWorkspace(w.Id, w.Name, m.Role)).ToListAsync(http.RequestAborted);
-        return Results.Ok(new MeResponse(user.Id, user.Email, user.DisplayName, user.PasswordHash is not null, providers, workspaces));
+        return Results.Ok(new MeResponse(user.Id, user.Email, user.DisplayName, user.PasswordHash is not null, providers, workspaces,
+            user.TotpEnabledAt is not null));
     }
 
     private static async Task<IResult> Available(IAuthenticationSchemeProvider schemes)

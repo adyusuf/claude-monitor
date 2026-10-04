@@ -7,6 +7,7 @@ import { AuthFrame } from "../components/Layout";
 import { Button, Field, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
+import { MfaStep } from "./Mfa";
 
 const emailShape = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,6 +37,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(params.get("error") ? tx(`errors.${params.get("error")}`) : null);
   const [busy, setBusy] = useState(false);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -46,11 +48,16 @@ export function LoginPage() {
       await refresh();
       navigate(safeNext(params.get("next")), { replace: true });
     } catch (err) {
-      setError(errorText(err));
+      if (err instanceof ApiError && err.code === "mfa_required" && typeof err.data.mfaToken === "string") setMfaToken(err.data.mfaToken);
+      else setError(errorText(err));
     } finally {
       setBusy(false);
     }
   };
+
+  if (mfaToken) {
+    return <AuthFrame title={t("auth.mfaTitle")}><MfaStep token={mfaToken} next={params.get("next") ?? "/"} /></AuthFrame>;
+  }
 
   return (
     <AuthFrame title={t("auth.signIn")}>

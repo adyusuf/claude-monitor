@@ -17,10 +17,21 @@ public sealed record ApiConfig
     public string? WebRoot { get; init; }
     public required string Commit { get; init; }
     public required Version MinimumAgentVersion { get; init; }
+
+    /// <summary>32 bytes that seal the TOTP secrets at rest (MONITOR_MFA_KEY, base64url).</summary>
+    public required byte[] MfaKey { get; init; }
     public bool SecureCookies { get; init; } = true;
     public bool BackgroundJobs { get; init; } = true;
     public bool TrustProxy { get; init; }
+
+    /// <summary>The proxies whose X-Forwarded-* headers count (CIDR list); required when TrustProxy is on outside development.</summary>
+    public IReadOnlyList<System.Net.IPNetwork> ProxyNetworks { get; init; } = [];
     public int AuthRequestsPerMinute { get; init; } = 20;
+    public int LockoutAfter { get; init; } = 5;
+    public TimeSpan LockoutFor { get; init; } = TimeSpan.FromMinutes(15);
+    public TimeSpan MfaPendingLifetime { get; init; } = TimeSpan.FromMinutes(5);
+    public int RecoveryCodes { get; init; } = 10;
+    public const string MfaIssuer = "Claude Monitor";
 
     public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);
     public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromHours(24);
@@ -72,6 +83,14 @@ public sealed record ApiConfig
             throw new InvalidOperationException("MONITOR_PUBLIC_ORIGIN must be https outside development (see .env.example)");
         }
 
+        var trustProxy = env["MONITOR_TRUST_PROXY"] == "true";
+        var networks = (env["MONITOR_PROXY_NETWORKS"] ?? "").Split([',', ' ', ';', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(System.Net.IPNetwork.Parse).ToList();
+        if (trustProxy && networks.Count == 0 && !development)
+        {
+            throw new InvalidOperationException("MONITOR_TRUST_PROXY needs MONITOR_PROXY_NETWORKS: the proxies' address ranges (see .env.example)");
+        }
+
         return new ApiConfig
         {
             DatabaseUrl = Required("MONITOR_DB", "Host=localhost;Port=55432;Database=monitor;Username=monitor;Password=monitor"),
@@ -88,12 +107,21 @@ public sealed record ApiConfig
             ArchiveDir = Required("MONITOR_ARCHIVE_DIR", Path.Combine(Path.GetTempPath(), "claude-monitor-archive")),
             WebRoot = env["MONITOR_WEB_ROOT"],
             Commit = env["MONITOR_COMMIT"] is { Length: > 0 } c ? c : "dev",
+            MfaKey = Key32(Required("MONITOR_MFA_KEY", "ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyLWJ5dGU")),
             MinimumAgentVersion = Version.Parse(env["MONITOR_MIN_AGENT_VERSION"] is { Length: > 0 } m ? m : "0.1.0"),
             SecureCookies = origin.StartsWith("https://", StringComparison.Ordinal),
             BackgroundJobs = env["MONITOR_BACKGROUND_JOBS"] != "off",
-            TrustProxy = env["MONITOR_TRUST_PROXY"] == "true",
+            TrustProxy = trustProxy,
+            ProxyNetworks = networks,
             AuthRequestsPerMinute = int.TryParse(env["MONITOR_AUTH_RATE_PER_MINUTE"], out var rate) && rate > 0 ? rate : 20,
         };
+    }
+
+    private static byte[] Key32(string base64Url)
+    {
+        var text = base64Url.Replace('-', '+').Replace('_', '/');
+        var key = Convert.FromBase64String(text.PadRight(text.Length + ((4 - (text.Length % 4)) % 4), '='));
+        return key.Length == 32 ? key : throw new InvalidOperationException("MONITOR_MFA_KEY must be 32 bytes (base64url)");
     }
 
     /// <summary>The price for a model id: the longest configured prefix wins ("claude-haiku-4-5-20251001" -> "claude-haiku-4-5").</summary>

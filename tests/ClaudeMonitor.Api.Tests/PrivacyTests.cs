@@ -69,7 +69,7 @@ public sealed class PrivacyTests(ApiFactory api)
         Assert.Equal("sole_owner", body.GetProperty("title").GetString());
         Assert.Equal(owner.WorkspaceId, body.GetProperty("workspaces")[0].GetGuid());
 
-        // The member, owner of nothing shared, may leave the platform; the owner's workspace keeps going.
+        // The member, owner of nothing shared, may leave the platform; the owner workspace keeps going.
         Assert.Equal(HttpStatusCode.NoContent, (await member.PostAsync("/api/me/delete", new { password = TestUser.Password, confirm = "DELETE" })).StatusCode);
         var members = await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/members");
         Assert.Equal(1, members.GetArrayLength());
@@ -106,5 +106,70 @@ public sealed class PrivacyTests(ApiFactory api)
         // The address is free again: the person may sign up anew.
         Assert.Equal(HttpStatusCode.Accepted,
             (await api.NewClient().PostAsync("/api/auth/register", new { email = user.Email, password = TestUser.Password, displayName = "Again" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Deleting_also_takes_the_users_events_out_of_the_archived_day_files()
+    {
+        var owner = await api.NewClient().SignedUpAsync("archive-owner");
+        var leaver = await api.NewClient().SignedUpAsync("archive-leaver");
+        (await owner.PostAsync($"/api/workspaces/{owner.WorkspaceId}/invitations", new { email = leaver.Email })).EnsureSuccessStatusCode();
+        (await leaver.PostAsync("/api/invitations/accept", new { token = api.Mail.TokenFor(leaver.Email) })).EnsureSuccessStatusCode();
+        await owner.SendAsync(HttpMethod.Put, $"/api/workspaces/{owner.WorkspaceId}/settings", new { retentionDays = 1 });
+        var ownerAgent = await owner.ConnectAgentAsync();
+        var leaverAgent = await leaver.ConnectAgentAsync(owner.WorkspaceId);
+        await ownerAgent.SendAsync(TestAgent.Hook("owner-session", "UserPromptSubmit", new { prompt = "owner work" }, api.Clock.GetUtcNow()));
+        await leaverAgent.SendAsync(TestAgent.Hook("leaver-session", "UserPromptSubmit", new { prompt = "leaver secret" }, api.Clock.GetUtcNow()));
+        api.Clock.Advance(TimeSpan.FromDays(2));
+        await using (var db = api.Db())
+        {
+            await Background.Archiver.RunOnceAsync(db, api.ArchiveDir, api.Clock.GetUtcNow(), CancellationToken.None);
+        }
+
+        string ArchiveText()
+        {
+            using var db = api.Db();
+            var archive = db.EventArchives.AsNoTracking().Single(a => a.WorkspaceId == owner.WorkspaceId);
+            using var zip = System.IO.Compression.ZipFile.OpenRead(archive.Path);
+            using var reader = new StreamReader(zip.Entries.Single().Open());
+            return reader.ReadToEnd();
+        }
+
+        Assert.Contains("leaver secret", ArchiveText(), StringComparison.Ordinal);
+        var login = api.NewClient();
+        (await login.PostAsync("/api/auth/login", new { email = leaver.Email, password = TestUser.Password })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await login.PostAsync("/api/me/delete", new { password = TestUser.Password, confirm = "DELETE" })).StatusCode);
+
+        var text = ArchiveText();
+        Assert.DoesNotContain("leaver secret", text, StringComparison.Ordinal);
+        Assert.Contains("owner work", text, StringComparison.Ordinal);
+        await using var check = api.Db();
+        var row = await check.EventArchives.AsNoTracking().SingleAsync(a => a.WorkspaceId == owner.WorkspaceId);
+        Assert.Equal(1, row.EventCount);
+        await using var file = File.OpenRead(row.Path);
+        Assert.Equal(row.Sha256, Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(file)));
+    }
+
+    [Fact]
+    public async Task An_archive_left_empty_is_removed_with_its_row()
+    {
+        var user = await api.NewClient().SignedUpAsync("archive-solo");
+        await user.SendAsync(HttpMethod.Put, $"/api/workspaces/{user.WorkspaceId}/settings", new { retentionDays = 1 });
+        var agent = await user.ConnectAgentAsync();
+        await agent.SendAsync(TestAgent.Hook("solo-session", "Stop", new { }, api.Clock.GetUtcNow()));
+        api.Clock.Advance(TimeSpan.FromDays(2));
+        string path;
+        await using (var db = api.Db())
+        {
+            await Background.Archiver.RunOnceAsync(db, api.ArchiveDir, api.Clock.GetUtcNow(), CancellationToken.None);
+            path = db.EventArchives.AsNoTracking().Single(a => a.WorkspaceId == user.WorkspaceId).Path;
+        }
+
+        var login = api.NewClient();
+        (await login.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await login.PostAsync("/api/me/delete", new { password = TestUser.Password, confirm = "DELETE" })).StatusCode);
+        Assert.False(File.Exists(path));
+        await using var check = api.Db();
+        Assert.False(await check.EventArchives.AnyAsync(a => a.WorkspaceId == user.WorkspaceId));
     }
 }
