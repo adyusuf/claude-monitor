@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Gate library: the test -> prod steps (deployed SHA on test; e2e only on request, see below).
+# Gate library: the test -> prod steps (the test deploy check and e2e, BOTH only on request, see below).
 # Sourced by gate-core.sh - never run on its own. A TWIN (scripts/twins.txt). Code unchanged from
 # the former gate-core.sh lines 460-524.
 # shellcheck shell=bash
 
-gate_prod() {
+# Opt-in since 04/10/2026 (CLAUDE.md #33): the prod gate does not look at the test branch or the test
+# environment unless GATE_CHECK_TEST_DEPLOY=1 asks for it.
+gate_prod_check_test_deploy() {
 
-    say "is this code deployed to the TEST environment?"
+    say "is this code deployed to the TEST environment? (requested with GATE_CHECK_TEST_DEPLOY=1)"
     HEAD_SHA="$(git rev-parse HEAD)"
     if [ "$LIST_ONLY" = 1 ]; then
       if [ -n "${TEST_DEPLOY_SHA_CMD:-}" ]; then
@@ -52,6 +54,15 @@ gate_prod() {
       else
         bad "the test environment is running $deployed, not ${HEAD_SHA:0:7} — deploy to test first and wait for it"
       fi
+    fi
+}
+
+gate_prod() {
+    if [ "${GATE_CHECK_TEST_DEPLOY:-0}" = 1 ]; then
+      gate_prod_check_test_deploy
+    else
+      say "test branch / test environment — not checked"
+      warn "the test branch and the test environment were NOT checked (not required since 04/10/2026; GATE_CHECK_TEST_DEPLOY=1 checks the deployed SHA) — this promotion does not prove the code ran on test"
     fi
 
     # E2E is OPTIONAL (CLAUDE.md #33, 03/10/2026: not enough resources to run it). By default the gate

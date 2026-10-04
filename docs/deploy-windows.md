@@ -50,8 +50,9 @@ Copy the zip to the server and deploy, test first (Windows PowerShell 5.1 again,
 ```
 
 The script applies the migrations, switches the site, and checks `/api/version` reports the commit; if not, it
-switches back and fails. Then the `test -> prod` gate runs the e2e suite against the test environment
-(`E2E_BASE_URL=https://<test host>`), and only a green gate deploys the same zip to prod (`-Environment prod
+switches back and fails. The `test -> prod` gate does not require the test deploy (#33); to check it, run the gate
+with `GATE_CHECK_TEST_DEPLOY=1` (and `GATE_RUN_E2E=1` for the e2e suite) and `E2E_BASE_URL=https://<test host>`.
+Only a green gate deploys the same zip to prod (`-Environment prod
 -LoopbackPort 8080`).
 
 ## Backups and the restore drill

@@ -45,7 +45,7 @@ web app (same origin, /api) <--> central API          central API --SSE--> agent
 | Web | React + Vite + TypeScript | live updates over server-sent events |
 | Agent | .NET 10, one self-contained binary per OS/arch | macOS arm64/x64, Windows x64/arm64 |
 | Shared contract | a .NET class library used by both API and agent | the agent protocol is versioned additively |
-| e2e | Playwright (web) | at the `test -> prod` gate (#33) |
+| e2e | Playwright (web) | optional, at the `test -> prod` gate with `GATE_RUN_E2E=1` (#33) |
 
 ### The agent
 
@@ -132,8 +132,8 @@ Local development runs PostgreSQL and a mail catcher in Docker, the API and the 
 production run on a **Windows Server without Docker** (maintainer, 03/10/2026): each environment is an IIS site
 (ASP.NET Core module, in-process) whose API also serves the built web app (one origin), with its own PostgreSQL 18
 database; Cloudflare proxies both host names to the server with an Origin certificate; mail goes out through Gmail /
-Google Workspace SMTP. The runbook is `docs/deploy-windows.md`. Each environment serves `/api/version` with the deployed commit, which the
-`test -> prod` gate checks (#33).
+Google Workspace SMTP. The runbook is `docs/deploy-windows.md`. Each environment serves `/api/version` with the deployed commit; the
+`test -> prod` gate checks it only when asked (`GATE_CHECK_TEST_DEPLOY=1`, #33).
 
 ### Distribution
 

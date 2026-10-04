@@ -23,9 +23,11 @@
 #               the CLAUDE.md size and rule gates, and a CHECK for missing e2e
 #               specs (a WARNING — it never blocks). A test promotion also warns
 #               that e2e was NOT run: e2e is OPTIONAL (#33, 03/10/2026).
-#   prod      : the code must already be deployed to the TEST environment (the
-#               deploy is verified); e2e is NOT run — the gate warns, and
-#               GATE_RUN_E2E=1 runs the suite and then a red result blocks.
+#   prod      : the test branch and the TEST environment are NOT checked (04/10/2026,
+#               CLAUDE.md #33) and e2e is NOT run — the gate warns for both.
+#               GATE_CHECK_TEST_DEPLOY=1 verifies the deployed SHA (TEST_VERSION_URL /
+#               TEST_DEPLOY_SHA_CMD below); GATE_RUN_E2E=1 runs the suite. A red
+#               result of either then blocks.
 #
 # ⚠️ A STEP THAT DID NOT RUN DID NOT PASS. A missing tool is reported as SKIPPED
 # and the result is INCOMPLETE, never green. The exit code is the gate: 0 only
@@ -256,7 +258,7 @@ if [ "$TARGET" != "prod" ]; then
   fi
 fi
 
-# ── prod: deployed to test, then the full e2e suite ──────────────────────────
+# ── prod: the test deploy check and the full e2e suite, both only on request ──
 if [ "$TARGET" = "prod" ]; then gate_prod; fi
 
 # ── Result ───────────────────────────────────────────────────────────────────
