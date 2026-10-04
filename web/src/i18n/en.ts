@@ -20,7 +20,7 @@ export const en = {
   },
   errors: {
     invalid_email: "That does not look like an e-mail address.", weak_password: "Use at least 10 characters.",
-    invalid_name: "Enter a name (up to 100 characters).", invalid_credentials: "The e-mail or the password is wrong.",
+    invalid_name: "Enter a name (up to 100 characters).", invalid_credentials: "The e-mail or the password is wrong. After too many attempts the account is locked for a while; resetting the password opens it at once.",
     email_not_verified: "Confirm your address first: open the link we mailed you.", invalid_token: "This link is invalid or has expired.",
     invitation_other_address: "This invitation was sent to another address. Sign in with that one.",
     provider_failed: "Signing in with the provider did not work. Try again.",
@@ -35,6 +35,7 @@ export const en = {
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
     request_failed: "The request failed.", network: "The server cannot be reached.",
     account_locked: "Too many wrong attempts on this account. Try again in 15 minutes.",
+    reauth_required: "To delete an account without a password, sign in again: sign out, sign in with GitHub or Google, and delete the account within a few minutes.",
     confirm_required: "Type the confirmation word exactly.", sole_owner: "You are the only owner of a shared workspace: make someone else owner first.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },

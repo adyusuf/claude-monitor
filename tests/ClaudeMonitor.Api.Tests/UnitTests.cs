@@ -56,6 +56,47 @@ public sealed class UnitTests
         Assert.False(Secrets.VerifyPassword(user, "the passwore"));
     }
 
+    [Fact]
+    public void The_dummy_aware_check_answers_like_the_plain_one()
+    {
+        var user = new User();
+        Assert.False(Secrets.VerifyPasswordOrDummy(null, "anything")); // no such user
+        Assert.False(Secrets.VerifyPasswordOrDummy(user, "anything")); // a user without a password (provider-only)
+        user.PasswordHash = Secrets.HashPassword(user, "the password");
+        Assert.True(Secrets.VerifyPasswordOrDummy(user, "the password"));
+        Assert.False(Secrets.VerifyPasswordOrDummy(user, "the passwore"));
+        Assert.False(Secrets.VerifyPasswordOrDummy(user, null));
+        Assert.False(Secrets.VerifyPasswordOrDummy(null, null));
+    }
+
+    [Fact]
+    public void An_unknown_address_costs_about_as_much_as_a_wrong_password()
+    {
+        var user = new User();
+        user.PasswordHash = Secrets.HashPassword(user, "the password");
+        static TimeSpan Median(Func<bool> verify)
+        {
+            verify(); // warm up: the first call pays for JIT and for the dummy hash being made
+            var times = new List<TimeSpan>();
+            for (var i = 0; i < 5; i++)
+            {
+                var start = System.Diagnostics.Stopwatch.GetTimestamp();
+                Assert.False(verify());
+                times.Add(System.Diagnostics.Stopwatch.GetElapsedTime(start));
+            }
+
+            return times.Order().ElementAt(2);
+        }
+
+        var known = Median(() => Secrets.VerifyPasswordOrDummy(user, "not the password"));
+        var unknown = Median(() => Secrets.VerifyPasswordOrDummy(null, "not the password"));
+        var noPassword = Median(() => Secrets.VerifyPasswordOrDummy(new User(), "not the password"));
+        // Without the dummy verification an unknown address would return in microseconds; the real work factor is
+        // milliseconds. The margin is wide (a quarter) so a busy machine does not make this flaky.
+        Assert.True(unknown >= known * 0.25, $"unknown {unknown.TotalMilliseconds:F2} ms vs known {known.TotalMilliseconds:F2} ms");
+        Assert.True(noPassword >= known * 0.25, $"no password {noPassword.TotalMilliseconds:F2} ms vs known {known.TotalMilliseconds:F2} ms");
+    }
+
     [Theory]
     [InlineData("EmailNormalized", "email_normalized")]
     [InlineData("Id", "id")]

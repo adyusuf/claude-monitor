@@ -167,25 +167,106 @@ public sealed class AuthTests(ApiFactory api)
         Assert.DoesNotContain("<title>", await api_.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
+    private static async Task<(HttpStatusCode Status, string? Title)> Answer(HttpResponseMessage response) =>
+        (response.StatusCode, (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString());
+
+    private static async Task LockAsync(TestUser client, string email)
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized,
+                (await client.PostAsync("/api/auth/login", new { email, password = "wrong password " + i })).StatusCode);
+        }
+    }
+
     [Fact]
     public async Task Five_wrong_passwords_lock_the_account_for_a_while_even_against_the_right_one()
     {
         var user = await api.NewClient().SignedUpAsync("lockout");
         var client = api.NewClient();
-        for (var i = 0; i < 5; i++)
+        await LockAsync(client, user.Email);
+
+        // Locked: the right password is refused with the very answer a wrong one gets (no 429 that would reveal the lock).
+        var locked = await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password });
+        Assert.Equal((HttpStatusCode.Unauthorized, "invalid_credentials"), await Answer(locked));
+        DateTimeOffset? lockedUntil;
+        await using (var db = api.Db())
         {
-            Assert.Equal(HttpStatusCode.Unauthorized,
-                (await client.PostAsync("/api/auth/login", new { email = user.Email, password = "wrong password " + i })).StatusCode);
+            var row = db.Users.Single(u => u.Id == user.Id);
+            lockedUntil = row.LockedUntil;
+            Assert.NotNull(lockedUntil);
+            Assert.Equal(0, row.FailedSignIns); // the lock itself resets the count; a failure during it would make it 1
         }
 
-        var locked = await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password });
-        Assert.Equal(HttpStatusCode.TooManyRequests, locked.StatusCode);
-        Assert.Equal("account_locked", (await locked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString());
+        // Attempts during the lock neither count as failures nor push the end of the lock further away.
+        api.Clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal((HttpStatusCode.Unauthorized, "invalid_credentials"),
+            await Answer(await client.PostAsync("/api/auth/login", new { email = user.Email, password = "wrong during lock" })));
+        Assert.Equal((HttpStatusCode.Unauthorized, "invalid_credentials"),
+            await Answer(await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password })));
+        await using (var db = api.Db())
+        {
+            var row = db.Users.Single(u => u.Id == user.Id);
+            Assert.Equal(lockedUntil, row.LockedUntil);
+            Assert.Equal(0, row.FailedSignIns);
+            Assert.Equal(1, db.AuditEvents.Count(a => a.ActorUserId == user.Id && a.Action == "user.account_locked"));
+        }
+
         api.Clock.Advance(TimeSpan.FromMinutes(16));
         Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password })).StatusCode);
-        await using var db = api.Db();
-        Assert.True(db.AuditEvents.Any(a => a.ActorUserId == user.Id && a.Action == "user.account_locked"));
-        Assert.Equal(0, db.Users.Single(u => u.Id == user.Id).FailedSignIns);
+        await using var check = api.Db();
+        Assert.True(check.AuditEvents.Any(a => a.ActorUserId == user.Id && a.Action == "user.account_locked"));
+        Assert.Equal(0, check.Users.Single(u => u.Id == user.Id).FailedSignIns);
+        // The attempts during the lock are still on record, marked as such.
+        var failures = check.AuditEvents.Where(a => a.ActorUserId == user.Id && a.Action == "user.sign_in_failed").AsEnumerable().ToList();
+        Assert.Equal(8, failures.Count); // 5 that locked + 3 during the lock
+        Assert.Equal(3, failures.Count(a => a.Detail is { } d && d.RootElement.TryGetProperty("locked", out var flag) && flag.GetBoolean()));
+    }
+
+    [Fact]
+    public async Task A_locked_account_an_unknown_address_and_a_wrong_password_get_the_same_answer()
+    {
+        var client = api.NewClient();
+        var wrongOne = await api.NewClient().SignedUpAsync("same-wrong");
+        var lockedOne = await api.NewClient().SignedUpAsync("same-locked");
+        await LockAsync(client, lockedOne.Email);
+
+        var wrong = await Answer(await client.PostAsync("/api/auth/login", new { email = wrongOne.Email, password = "not the password!" }));
+        var locked = await Answer(await client.PostAsync("/api/auth/login", new { email = lockedOne.Email, password = TestUser.Password }));
+        var unknown = await Answer(await client.PostAsync("/api/auth/login", new { email = Emails.New("same-nobody"), password = TestUser.Password }));
+        Assert.Equal((HttpStatusCode.Unauthorized, "invalid_credentials"), wrong);
+        Assert.Equal(wrong, locked);
+        Assert.Equal(wrong, unknown);
+        // A missing password is the same refusal too, not a different error.
+        Assert.Equal(wrong, await Answer(await client.PostAsync("/api/auth/login", new { email = wrongOne.Email })));
+    }
+
+    [Fact]
+    public async Task A_password_reset_opens_a_lock_so_the_owner_signs_in_at_once()
+    {
+        var user = await api.NewClient().SignedUpAsync("lock-reset");
+        var client = api.NewClient();
+        await LockAsync(client, user.Email);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password })).StatusCode);
+        await using (var db = api.Db())
+        {
+            Assert.NotNull(db.Users.Single(u => u.Id == user.Id).LockedUntil);
+        }
+
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsync("/api/auth/password/forgot", new { email = user.Email })).StatusCode);
+        var token = api.Mail.TokenFor(user.Email);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.PostAsync("/api/auth/password/reset", new { token, password = "a fresh password after the lock" })).StatusCode);
+        await using (var db = api.Db())
+        {
+            var row = db.Users.Single(u => u.Id == user.Id);
+            Assert.Equal(0, row.FailedSignIns);
+            Assert.Null(row.LockedUntil);
+        }
+
+        // No clock advance: the lock did not simply run out.
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.PostAsync("/api/auth/login", new { email = user.Email, password = "a fresh password after the lock" })).StatusCode);
     }
 
     [Fact]

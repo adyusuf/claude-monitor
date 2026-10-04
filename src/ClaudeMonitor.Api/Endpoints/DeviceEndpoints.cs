@@ -17,7 +17,7 @@ public static class DeviceEndpoints
     {
         api.MapPost("/device/code", Code).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         api.MapPost("/device/token", Token);
-        var web = api.MapGroup("/device").RequireAuthorization(Schemes.Session);
+        var web = api.MapGroup("/device").RequireAuthorization(Schemes.Session).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         web.MapGet("/lookup/{userCode}", Lookup);
         web.MapPost("/approve", Approve);
         web.MapPost("/deny", Deny);
@@ -150,8 +150,7 @@ public static class DeviceEndpoints
     private static async Task<IResult> Approve(DeviceDecision req, HttpContext http, MonitorDb db, TimeProvider clock)
     {
         var userId = http.User.UserId();
-        if (req.WorkspaceId is not { } workspaceId ||
-            await Access.MemberAsync(db, userId, workspaceId, Roles.Member, http.RequestAborted) is null)
+        if (await DecidingWorkspaceAsync(db, userId, req, http.RequestAborted) is not { } workspaceId)
         {
             return Http.Invalid("workspaceId", "not_a_member");
         }
@@ -167,15 +166,33 @@ public static class DeviceEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// Denying takes the same authority as approving. A pending code belongs to no one until it is approved: holding
+    /// the user code is the credential (RFC 8628), so the decider must at least be a member of the workspace the
+    /// device was offered to. Guessing a code to deny someone else's enrolment is out of reach: about 34 bits, minutes
+    /// long, rate-limited per address; and a denied enrolment simply starts again (docs/security.md, A01).
+    /// </summary>
     private static async Task<IResult> Deny(DeviceDecision req, HttpContext http, MonitorDb db, TimeProvider clock)
     {
+        var userId = http.User.UserId();
+        if (await DecidingWorkspaceAsync(db, userId, req, http.RequestAborted) is not { } workspaceId)
+        {
+            return Http.Invalid("workspaceId", "not_a_member");
+        }
+
         var device = await PendingAsync(db, req.UserCode, clock, http.RequestAborted, track: true);
         if (device is null) return Http.Invalid("userCode", "invalid_code");
         device.Status = DeviceStatuses.Denied;
-        Audit.Add(db, http, clock, AuditActions.DeviceDenied, userId: http.User.UserId(), targetType: "device", targetId: device.Id);
+        Audit.Add(db, http, clock, AuditActions.DeviceDenied, workspaceId, userId, targetType: "device", targetId: device.Id);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
+
+    /// <summary>The decision's workspace when the caller is at least a member of it; otherwise null.</summary>
+    private static async Task<Guid?> DecidingWorkspaceAsync(MonitorDb db, Guid userId, DeviceDecision req, CancellationToken ct) =>
+        req.WorkspaceId is { } workspaceId && await Access.MemberAsync(db, userId, workspaceId, Roles.Member, ct) is not null
+            ? workspaceId
+            : null;
 
     private static async Task<DeviceAuthorization?> PendingAsync(MonitorDb db, string? userCode, TimeProvider clock,
         CancellationToken ct, bool track = false)
