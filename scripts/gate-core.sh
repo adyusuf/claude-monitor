@@ -21,11 +21,11 @@
 #               build, unit tests, coverage (the 80% threshold per codebase),
 #               secret scan, dependency CVE, SAST, backward-compatibility scan,
 #               the CLAUDE.md size and rule gates, and a CHECK for missing e2e
-#               specs (a WARNING in both directions — it never blocks; the gaps
-#               are written at the test -> prod gate, #33 step 2).
-#   prod      : the code must already be deployed to the TEST environment, the
-#               FULL e2e suite runs against it, and only a completely green run
-#               allows the promotion.
+#               specs (a WARNING — it never blocks). A test promotion also warns
+#               that e2e was NOT run: e2e is OPTIONAL (#33, 03/10/2026).
+#   prod      : the code must already be deployed to the TEST environment (the
+#               deploy is verified); e2e is NOT run — the gate warns, and
+#               GATE_RUN_E2E=1 runs the suite and then a red result blocks.
 #
 # ⚠️ A STEP THAT DID NOT RUN DID NOT PASS. A missing tool is reported as SKIPPED
 # and the result is INCOMPLETE, never green. The exit code is the gate: 0 only
@@ -44,7 +44,8 @@
 #                                                       # alternative source when there is no
 #                                                       # /version endpoint yet
 #   TEST_BASE_URL=https://test.example.com              # documentation + the e2e base URL
-#   E2E_WEB_CMD="npx playwright test"                   # default when e2e/ exists
+#   E2E_WEB_CMD="npx playwright test"                   # default when e2e/ (root, tests/e2e or <web tier>/e2e) exists;
+#                                                       # it runs from the directory that holds the suite
 #   E2E_MOBILE_CMD="bash scripts/mobile-e2e.sh"         # default when .maestro/ exists
 #   COVERAGE_CMD="node scripts/coverage-budget.cjs"     # must exit non-zero below the threshold
 #   COVERAGE_MIN=80
@@ -225,8 +226,8 @@ if [ "$TARGET" != "prod" ]; then
   if [ "$HAS_E2E_WEB" = 1 ] || [ "$HAS_E2E_MOBILE" = 1 ]; then
     base="$(git merge-base HEAD "origin/$TARGET" 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
     changed="$(git diff --name-only "$base"..HEAD 2>/dev/null)"
-    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
-    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
+    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|[^/]+/e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
+    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|[^/]+/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
     if [ -n "$behaviour" ] && [ -z "$specs_touched" ]; then
       missing=1
       warn "behaviour changed in $(printf '%s\n' "$behaviour" | wc -l | tr -d ' ') file(s) but no e2e spec was touched"
@@ -247,8 +248,11 @@ if [ "$TARGET" != "prod" ]; then
   # SAYS it on every run, so the backlog stays visible rather than silent.
   # User decision.
   if [ "$missing" = 1 ] && [ "$TARGET" = "test" ]; then
-    warn "the missing spec(s) above are written at the test -> prod gate (#33 step 2); dev -> test is not blocked"
+    warn "the missing spec(s) above are a reminder only: e2e is optional (#33); dev -> test is not blocked"
   fi
+  fi
+  if [ "$TARGET" = "test" ]; then
+    warn "e2e was NOT run (optional since 03/10/2026) — nothing in this promotion was proven end to end"
   fi
 fi
 

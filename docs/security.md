@@ -1,47 +1,49 @@
 # Security
 
-The board is a single-user tool: a Python standard-library server on the loopback address, showing the user's own
-Claude Code sessions. It has **no authentication and no accounts**. The controls below keep it reachable only by
-that user's own machine and pages; they are reviewed against the OWASP Top 10 before each promotion to `prod`.
+The design is [ADR-0002](adr-0002-agent-platform.md). The OWASP Top 10 mapping below is written against the code and
+reviewed before every promotion to `prod` (global #19); a row that names a gap is a known gap, not a pass.
 
-## Assumptions
+## What is at stake
 
-- One person uses the machine. `127.0.0.1` is shared by every OS account, so on a multi-user machine another
-  account can reach the board: do not run it there.
-- `BOARD_ALLOW_REMOTE=1` removes the loopback guard and the Host check on purpose. With it the board is open to
-  anyone who can reach the port.
-- The data on the page is the user's own (task titles, notes, session metadata). The page never shows a secret.
+The agent forwards everything a harness exposes: prompts, tool inputs and outputs, file contents. The central
+database therefore holds users' code and anything their tools printed. The web can also send a prompt, a stop or a
+permission answer to a session running on someone's machine. Those two facts drive the controls below.
 
-## OWASP Top 10 mapping (reviewed 01/10/2026 at `dev` `0ed1de9`)
+## Controls decided in ADR-0002
 
-| # | Risk | Status here, and the control |
+| Area | Control |
+|---|---|
+| Access | Every API call is scoped to a workspace and checked in the API, fail-closed. Only a session's owner may command it or answer its permission requests. |
+| Accounts | Passwords hashed (ASP.NET Core Identity hasher); e-mail verification; GitHub/Google sign-in never silently joins an existing account; export and deletion of one's own data. |
+| Web session | Opaque token in an `HttpOnly`, `SameSite=Lax` cookie (`Secure` on https, which is required outside development), stored hashed, revocable; an anti-forgery header on unsafe methods. |
+| Agent | Device authorisation (RFC 8628); short access tokens and single-use rotating refresh tokens, stored hashed by the API and in the OS credential store on the machine; reuse of a replaced refresh token revokes the agent. |
+| Local surface | The agent opens no network port: hooks and the daemon share a SQLite file in the user-only home directory. Commands arrive over the agent's own outbound connection. |
+| Captured content | Secret patterns masked by the agent by default; never written to logs; size-capped per event; archived and removed from the database after the workspace's retention period. |
+| Commands and permission answers | Owner only; expire; audited; report their outcome. |
+| Audit | `audit_events` for sign-in and its failures, linking, invitations, roles, device approvals, revocations, settings, commands, permission answers and account deletion. |
+| Transport | HTTPS only (Cloudflare to the server with an Origin certificate); the API is served under the web's own host (global #17). |
+
+## OWASP Top 10 (2021) mapping — reviewed 03/10/2026 at `dev`
+
+| # | Risk | Controls in the code | Known gaps |
+|---|---|---|---|
+| A01 | Broken access control | `Security/Access.cs`: membership checked per call, fail-closed (an unknown role ranks lowest); a workspace one cannot see answers 404. Owner-only commands and permission answers (`CommandEndpoints`), admin-only settings, audit and invitations, owners protected (`WorkspaceEndpoints`). Agents act only on their own sessions and commands (`AgentEndpoints`). CSRF: `X-CSRF` header and same-origin check on cookie calls (`Startup.Csrf`). Tests: `WorkspaceTests`, `CommandTests`, `DeviceTests`. | None known. |
+| A02 | Cryptographic failures | TLS end to end; cookies `Secure` on https; every token (login, mail, agent, device, invitation) is 256 random bits stored only as SHA-256 (`Security/Secrets.cs`); passwords with ASP.NET Core Identity's PBKDF2 hasher; backups AES-256-CBC + HMAC-SHA256 (`deploy/windows/BackupCrypto.psm1`, tested). | The database itself is not encrypted at rest beyond the server's disk encryption (the maintainer's server setting). |
+| A03 | Injection | All SQL through EF Core parameters; of the three raw statements, two are interpolated (parameterised) and one creates a partition whose name is built from dates only (`Background/Housekeeper.cs`); search terms escaped for `LIKE` (`Text/SearchText.ContainsPattern`); the web renders text through React (no `dangerouslySetInnerHTML`); CSP `script-src 'self'`. The agent masks payloads as JSON values, never by editing JSON text. | None known. |
+| A04 | Insecure design | Threat model above; commands and permission answers only by the machine's owner; the agent has no inbound port; device approval binds a machine to one workspace; refresh reuse revokes; export and deletion for the user. | No multi-factor sign-in. Permission answers from the web are powerful by design (owner only, expiring, audited). |
+| A05 | Security misconfiguration | Production refuses to start without its required settings or with a non-https origin (`ApiConfig.From`); security headers on every response (CSP, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`); no stack traces to clients (`UseExceptionHandler`); the SPA never answers `/api/*`; secrets only in the server's environment file readable by the site's app pool. | CSP allows inline styles (`style-src 'unsafe-inline'`). `MONITOR_TRUST_PROXY` trusts forwarded headers from any address: the server's firewall must admit only Cloudflare (runbook). OWASP ZAP baseline has not run yet (it needs the test environment). |
+| A06 | Vulnerable and outdated components | The gate fails on high/critical advisories: `dotnet list package --vulnerable`, `npm audit` for the web; CodeQL (C#, TypeScript, Python) and ShellCheck; CI actions pinned to commit SHAs; gitleaks on every commit and in the gate. | Windows agent binaries are not code-signed yet. |
+| A07 | Identification and authentication failures | Verified e-mail before sign-in; generic failure messages (no account enumeration on sign-up, sign-in or reset); password reset revokes all sessions; single-use, expiring mail tokens; rate limit on sign-in, sign-up, reset, provider sign-in, device codes, agent token refresh and account deletion (`RateLimitTests`); server-side session revocation on sign-out. | Rate limiting is per IP only (no per-account lockout); no MFA. |
+| A08 | Software and data integrity failures | macOS agent signed (Developer ID, hardened runtime) and notarised; release packages built from a clean commit and verified on the server by `/api/version` before traffic moves (`deploy.ps1` rolls back otherwise); additive-only migrations checked by `scripts/backcompat_scan.py`; idempotent agent batches. | Windows agent unsigned; no automatic update channel yet, so no update signing to review. |
+| A09 | Security logging and monitoring failures | `audit_events` for every security-relevant action, with a hashed IP; sign-in failures audited; captured content and tokens never logged; backups and restore drills write to the Windows event log (success and failure, so a backup that never ran is visible). | No alerting is wired yet: the runbook names the event ids to alert on; no central log collection. |
+| A10 | Server-side request forgery | The API calls out only to fixed endpoints: the OAuth providers (`ProviderEndpoints`) and the configured SMTP server. No user-supplied URL is ever fetched. | None known. |
+
+## Triaged findings
+
+| Tool | Finding | Why it stays |
 |---|---|---|
-| A01 | Broken access control | **No authentication, by design.** Reachable only through loopback: the server refuses to bind a non-loopback address (`board_server.main`), refuses any request whose `Host` is not a loopback name with its own port (DNS rebinding, `board_http_guard.py`), and refuses a cross-origin `POST`. Every control value is checked against an allowlist pattern (task id, role, skill, mode). IDOR does not apply: a project id is a hash and every registered project is the same user's. Other OS users on the machine are out of scope (see Assumptions). |
-| A02 | Cryptographic failures | No TLS (loopback `http`). No credential is read, stored or sent. Runtime files (`events.jsonl`, `control.json`, the registry) are created `0600`. |
-| A03 | Injection | No shell: no `shell=True`, `os.system`, `eval`, `exec` or `pickle` anywhere in `scripts/board`; subprocesses (`git`, `ps`, `lsof`) get argument lists. The page puts values into HTML only through one escaping helper (`esc`), with tests that markup in a task title stays inert; CSP allows scripts from `'self'` only. |
-| A04 | Insecure design | This document is the threat model: a local, single-user, unauthenticated tool, fail-closed on the bind address and the Host. No rate limiting (local). |
-| A05 | Security misconfiguration | Security headers on every response (CSP, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, CORP); `Server` names the app, not the Python version; no debug endpoint, no directory listing (static files come from a fixed allowlist, `../` returns 404); no default credentials. The CSP allows inline **styles** (one `<style>` block), not scripts. |
-| A06 | Vulnerable and outdated components | The server has no third-party runtime dependency: the Python standard library, and Node's built-in test runner for the page's tests. **The one exception is the optional desktop window (`desktop/`, Tauri):** its crates are locked in `desktop/Cargo.lock`, and the gate runs `cargo audit` on that file (`scripts/cargo-audit.sh`: a known vulnerability blocks, an unmaintained or unsound advisory is only reported; an unreachable advisory database is retried, then the step is NOT RUN and blocks) and CodeQL on the Rust; the window is a thin shell with no Tauri IPC permission, and navigates only to its own splash page or a loopback `http` address. CI runs gitleaks and CodeQL (Python, JavaScript) and ShellCheck on every push. |
-| A07 | Identification and authentication failures | Not applicable: no accounts, passwords or sessions. |
-| A08 | Software and data integrity failures | CI actions are pinned to a commit SHA and gitleaks is checksum-verified. The hooks run the code of the clone on the machine; its integrity is the user's checkout. `events.jsonl` is append-only; nothing is deserialised with an unsafe loader. |
-| A09 | Logging and monitoring failures | The server logs 4xx and 5xx responses to `server.log`; control changes are numbered in `control.json`. There is no audit log and no alerting, and none is needed for a local tool. |
-| A10 | Server-side request forgery | The server makes no outbound request. The one HTTP client call (`board_ensure.py`) asks the board's own loopback port for `/api/info`. |
-
-## Known advisory warnings (cargo audit, checked 02/10/2026)
-
-`cargo audit` reports two warnings on `desktop/Cargo.lock`. Neither is a vulnerability, neither blocks the gate.
-
-| Advisory | Crate | Why it stays |
-|---|---|---|
-| RUSTSEC-2024-0370 (unmaintained) | `proc-macro-error` | Pulled in by the GTK3 bindings Tauri uses on Linux only. |
-| RUSTSEC-2024-0429 (unsound) | `glib` | The same Linux-only GTK3 stack. |
-
-- **Not in the macOS build:** `cargo tree --target aarch64-apple-darwin -i glib` (and `-i proc-macro-error`) prints
-  nothing. The Linux build is what CI compiles and tests; no Linux bundle is shipped.
-- **Not fixable here:** `cargo update` leaves `Cargo.lock` unchanged (already the highest compatible versions); the
-  fix is Tauri / wry moving off GTK3, which is upstream.
-- **When to look again:** at every Tauri bump, and before anyone ships a Linux bundle. Re-run
-  `cd desktop && cargo audit`; if either warning is still there, this section stays true.
+| CodeQL `cs/sensitive-data-transmission` (4.3, below the blocking band) | `Mail/Mailer.cs`: the mail body carries a token | It is the verification, reset or invitation link: sending that token to the account's own mailbox is the design. The token is single-use, expires, and is stored only hashed. |
+| ESLint `react-hooks/set-state-in-effect` (switched off in `web/eslint.config.js`) | pages load from the API in an effect | State is set only after the response arrives (an async callback), React's documented fetch pattern; the rule cannot see the `await`. |
 
 ## Reporting a problem
 

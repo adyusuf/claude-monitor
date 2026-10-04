@@ -62,8 +62,15 @@ node_audit() {
     if [ -f "$d/pnpm-lock.yaml" ] || { [ "$d" != "." ] && [ -f "pnpm-lock.yaml" ]; }; then
       if have pnpm; then
         local out; out="$(mktemp)"
-        if pnpm --dir "$d" audit --audit-level=high >"$out" 2>&1; then ok "pnpm audit ($d)"; else bad "pnpm audit ($d): high or critical"; tail -10 "$out" | sed 's/^/      /'; fi
-        rm -f "$out"
+        if pnpm --dir "$d" audit --audit-level=high >"$out" 2>&1; then ok "pnpm audit ($d)"
+        elif [ -f "$ROOT/scripts/audit-triage.tsv" ] && [ -f "$ROOT/scripts/audit-triage.py" ] && have python3 \
+             && { pnpm --dir "$d" audit --audit-level=high --json >"$out.j" 2>/dev/null; true; } \
+             && python3 "$ROOT/scripts/audit-triage.py" "$ROOT/scripts/audit-triage.tsv" <"$out.j" >"$out.t" 2>&1; then
+          ok "pnpm audit ($d): every high advisory is triaged in scripts/audit-triage.tsv"; sed 's/^/      /' "$out.t"
+        else
+          bad "pnpm audit ($d): high or critical"; tail -10 "$out" | sed 's/^/      /'; [ -s "$out.t" ] && sed 's/^/      /' "$out.t"
+        fi
+        rm -f "$out.t" "$out.j" "$out"
       else skip "pnpm audit ($d): pnpm missing"; fi
     elif have npm; then
       local out; out="$(mktemp)"

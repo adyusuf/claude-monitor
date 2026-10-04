@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gate library: the test -> prod steps (deployed SHA on test, then the full e2e suite).
+# Gate library: the test -> prod steps (deployed SHA on test; e2e only on request, see below).
 # Sourced by gate-core.sh - never run on its own. A TWIN (scripts/twins.txt). Code unchanged from
 # the former gate-core.sh lines 460-524.
 # shellcheck shell=bash
@@ -54,12 +54,20 @@ gate_prod() {
       fi
     fi
 
-    say "full e2e suite against the test environment"
+    # E2E is OPTIONAL (CLAUDE.md #33, 03/10/2026: not enough resources to run it). By default the gate
+    # does NOT run it and says so; the report never reads that as a pass. GATE_RUN_E2E=1 runs the suite
+    # and a red result then blocks like any other step.
+    if [ "${GATE_RUN_E2E:-0}" != 1 ]; then
+      say "e2e (optional) — not run"
+      warn "e2e was NOT run (optional since 03/10/2026; GATE_RUN_E2E=1 runs it) — nothing in this promotion was proven end to end"
+      return 0
+    fi
+    say "full e2e suite against the test environment (requested with GATE_RUN_E2E=1)"
     ran=0
     if [ "$HAS_E2E_WEB" = 1 ]; then
       ran=1
       if [ -n "${E2E_WEB_CMD:-}" ]; then run "web e2e ($E2E_WEB_CMD)" bash -c "$E2E_WEB_CMD"
-      else run "web e2e (playwright)" npx playwright test; fi
+      else run "web e2e (playwright)" bash -c "cd \"$E2E_WEB_DIR\" && npx playwright test"; fi
     fi
     if [ "$HAS_E2E_MOBILE" = 1 ]; then
       ran=1
