@@ -17,7 +17,9 @@ IIS site, app pool, PostgreSQL database and folder under `C:\ClaudeMonitor\<env>
      and import them into `LocalMachine\My` on the server (as a .pfx: `certutil -mergepfx` or the Certificates MMC).
      Note its thumbprint.
    - The server's firewall accepts 443 only from Cloudflare's address ranges (cloudflare.com/ips).
-3. **Per environment**, from an elevated PowerShell in `deploy\windows` of the release package or the repository:
+3. **Per environment**, from an elevated **Windows PowerShell 5.1** (`powershell.exe`, not `pwsh`: PowerShell 7 loads
+   WebAdministration through its compatibility layer, without the `IIS:` drive the scripts use) in `deploy\windows` of
+   the release package or the repository:
 
    ```powershell
    .\setup-server.ps1 -Environment test -HostName <test host> -CertThumbprint <thumbprint> -LoopbackPort 8081 -SmtpUser <sender> -SmtpFrom <sender>
@@ -38,7 +40,7 @@ AGENT_SIGN_IDENTITY="<Developer ID Application identity>" AGENT_NOTARY_PROFILE=c
 bash scripts/build-release.sh                      # out/claude-monitor-<commit>.zip
 ```
 
-Copy the zip to the server and deploy, test first:
+Copy the zip to the server and deploy, test first (Windows PowerShell 5.1 again, elevated):
 
 ```powershell
 .\deploy.ps1 -Environment test -Package C:\Temp\claude-monitor-<commit>.zip -LoopbackPort 8081
