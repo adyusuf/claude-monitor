@@ -58,7 +58,7 @@ export const api = {
   moveAgent: (agentId: string, workspaceId: string) => request<void>("PATCH", `/agents/${agentId}`, { workspaceId }),
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),
   approveDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/approve", { userCode, workspaceId }),
-  denyDevice: (userCode: string) => request<void>("POST", "/device/deny", { userCode }),
+  denyDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/deny", { userCode, workspaceId }),
 };
 
 /** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */
