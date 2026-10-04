@@ -70,8 +70,20 @@ public static class AuthEndpoints
     {
         var normalized = SearchText.Email(req.Email ?? "");
         var user = await db.Users.FirstOrDefaultAsync(u => u.EmailNormalized == normalized, http.RequestAborted);
+        var now = clock.GetUtcNow();
+        if (user?.LockedUntil > now)
+        {
+            // Locked: even the right password waits, so the lock cannot be used to test passwords.
+            return Locked();
+        }
+
         if (user is null || user.Status != UserStatuses.Active || req.Password is null || !Secrets.VerifyPassword(user, req.Password))
         {
+            if (user is not null && RecordFailure(user, config, now))
+            {
+                Audit.Add(db, http, clock, AuditActions.AccountLocked, userId: user.Id);
+            }
+
             Audit.Add(db, http, clock, AuditActions.SignInFailed, userId: user?.Id);
             await db.SaveChangesAsync(http.RequestAborted);
             return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_credentials");
@@ -82,9 +94,26 @@ public static class AuthEndpoints
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "email_not_verified");
         }
 
+        user.FailedSignIns = 0;
+        user.LockedUntil = null;
         await Http.IssueLoginAsync(http, db, config, clock, user);
         return Results.NoContent();
     }
+
+    /// <summary>Counts a failed attempt; returns true when this one locked the account.</summary>
+    public static bool RecordFailure(User user, ApiConfig config, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(config);
+        user.FailedSignIns++;
+        if (user.FailedSignIns < config.LockoutAfter) return false;
+        user.FailedSignIns = 0;
+        user.LockedUntil = now + config.LockoutFor;
+        return true;
+    }
+
+    public static IResult Locked() =>
+        Results.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: "account_locked");
 
     private static async Task<IResult> Logout(HttpContext http, MonitorDb db, TimeProvider clock)
     {

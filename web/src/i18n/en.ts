@@ -33,6 +33,7 @@ export const en = {
     forbidden: "You are not allowed to do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
     request_failed: "The request failed.", network: "The server cannot be reached.",
+    account_locked: "Too many wrong attempts on this account. Try again in 15 minutes.",
     confirm_required: "Type the confirmation word exactly.", sole_owner: "You are the only owner of a shared workspace: make someone else owner first.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },

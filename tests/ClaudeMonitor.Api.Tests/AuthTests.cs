@@ -160,4 +160,37 @@ public sealed class AuthTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.NotFound, api_.StatusCode);
         Assert.DoesNotContain("<title>", await api_.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Five_wrong_passwords_lock_the_account_for_a_while_even_against_the_right_one()
+    {
+        var user = await api.NewClient().SignedUpAsync("lockout");
+        var client = api.NewClient();
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized,
+                (await client.PostAsync("/api/auth/login", new { email = user.Email, password = "wrong password " + i })).StatusCode);
+        }
+
+        var locked = await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password });
+        Assert.Equal(HttpStatusCode.TooManyRequests, locked.StatusCode);
+        Assert.Equal("account_locked", (await locked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString());
+        api.Clock.Advance(TimeSpan.FromMinutes(16));
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password })).StatusCode);
+        await using var db = api.Db();
+        Assert.True(db.AuditEvents.Any(a => a.ActorUserId == user.Id && a.Action == "user.account_locked"));
+        Assert.Equal(0, db.Users.Single(u => u.Id == user.Id).FailedSignIns);
+    }
+
+    [Fact]
+    public async Task A_good_sign_in_resets_the_failure_count()
+    {
+        var user = await api.NewClient().SignedUpAsync("lockout-reset");
+        var client = api.NewClient();
+        for (var i = 0; i < 4; i++) await client.PostAsync("/api/auth/login", new { email = user.Email, password = "nope nope " + i });
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/auth/login", new { email = user.Email, password = TestUser.Password })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync("/api/auth/login", new { email = user.Email, password = "nope again!" })).StatusCode);
+        await using var db = api.Db();
+        Assert.Equal(1, db.Users.Single(u => u.Id == user.Id).FailedSignIns);
+    }
 }

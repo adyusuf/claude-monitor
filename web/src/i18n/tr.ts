@@ -35,6 +35,7 @@ export const tr: Dictionary = {
     forbidden: "Bunu yapma izniniz yok.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
+    account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
     confirm_required: "Onay kelimesini tam olarak yazın.", sole_owner: "Paylaşılan bir çalışma alanının tek sahibisiniz: önce başka birini sahip yapın.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },

@@ -21,6 +21,8 @@ public sealed record ApiConfig
     public bool BackgroundJobs { get; init; } = true;
     public bool TrustProxy { get; init; }
     public int AuthRequestsPerMinute { get; init; } = 20;
+    public int LockoutAfter { get; init; } = 5;
+    public TimeSpan LockoutFor { get; init; } = TimeSpan.FromMinutes(15);
 
     public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);
     public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromHours(24);

@@ -54,6 +54,8 @@ public sealed class User
     public string Status { get; set; } = UserStatuses.Active;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public int FailedSignIns { get; set; }
+    public DateTimeOffset? LockedUntil { get; set; }
 }
 
 public sealed class UserLogin
