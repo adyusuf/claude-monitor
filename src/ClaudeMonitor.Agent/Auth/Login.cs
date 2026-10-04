@@ -69,6 +69,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                 continue;
             }
 
+            var unanswered = failure is not null;
             failure = null;
             var (tokens, error) = answer;
             if (tokens is not null)
@@ -90,7 +91,10 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                     await output.WriteLineAsync("The request was denied on the web.");
                     return 1;
                 default:
-                    await output.WriteLineAsync("The code expired. Run cm-agent login again.");
+                    // After a lost answer the code may have been used for tokens that never arrived; it cannot be reused.
+                    await output.WriteLineAsync(unanswered
+                        ? "The code expired, or it was used for an answer that did not arrive. Run cm-agent login again."
+                        : "The code expired. Run cm-agent login again.");
                     return 1;
             }
         }

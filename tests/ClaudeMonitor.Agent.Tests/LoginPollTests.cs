@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using ClaudeMonitor.Agent.Auth;
@@ -105,8 +106,33 @@ public sealed class LoginPollTests : IDisposable
             throw new OperationCanceledException(stop.Token);
         });
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Run(home.Config, api, new StringWriter(), stop.Token));
+        var output = new StringWriter();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Run(home.Config, api, output, stop.Token));
         Assert.Equal(1, api.Polls);
+        Assert.DoesNotContain("did not answer", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_cancelled_first_request_is_not_reported_as_an_unreachable_server()
+    {
+        using var stop = new CancellationTokenSource();
+        var api = new Scripted(null, (_, _) => Task.FromResult(Tokens()), onCode: stop.Cancel);
+        var output = new StringWriter();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Run(home.Config, api, output, stop.Token));
+        Assert.DoesNotContain("did not answer", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_expired_answer_after_a_lost_one_says_the_code_may_have_been_used()
+    {
+        var api = new Scripted(Code(), (poll, _) => poll == 1
+            ? throw new HttpRequestException("Operation timed out")
+            : Task.FromResult(Answer(HttpStatusCode.BadRequest, """{"error":"expired_token"}""")));
+        var output = new StringWriter();
+
+        Assert.Equal(1, await Run(home.Config, api, output));
+        Assert.Contains("or it was used for an answer that did not arrive", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -132,10 +158,16 @@ public sealed class LoginPollTests : IDisposable
         using var timed = ApiClient.CreateHttp("https://m.invalid", handler, TimeSpan.FromSeconds(7));
         using var open = ApiClient.CreateHttp("https://m.invalid", handler);
         Assert.Equal((TimeSpan.FromSeconds(7), Timeout.InfiniteTimeSpan), (timed.Timeout, open.Timeout));
+
+        // Without a handler of its own, the client (login and daemon alike) runs on the retiring one.
+        using var real = ApiClient.CreateHttp("https://m.invalid");
+        var inner = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(real);
+        Assert.Equal(AgentConfig.ConnectionLifetime, Assert.IsType<SocketsHttpHandler>(inner).PooledConnectionLifetime);
     }
 
     /// <summary>The device-code answer (null: the network fails), then each poll scripted by its number.</summary>
-    private sealed class Scripted(HttpResponseMessage? code, Func<int, CancellationToken, Task<HttpResponseMessage>> poll) : HttpMessageHandler
+    private sealed class Scripted(HttpResponseMessage? code, Func<int, CancellationToken, Task<HttpResponseMessage>> poll,
+        Action? onCode = null) : HttpMessageHandler
     {
         private int polls;
 
@@ -144,9 +176,16 @@ public sealed class LoginPollTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
             request.RequestUri!.AbsolutePath switch
             {
-                "/api/device/code" => code is null ? throw new HttpRequestException("No route to host") : Task.FromResult(code),
+                "/api/device/code" => Code(ct),
                 "/api/device/token" => poll(Interlocked.Increment(ref polls), ct),
                 _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)),
             };
+
+        private Task<HttpResponseMessage> Code(CancellationToken ct)
+        {
+            onCode?.Invoke();
+            ct.ThrowIfCancellationRequested();
+            return code is null ? throw new HttpRequestException("No route to host") : Task.FromResult(code);
+        }
     }
 }
