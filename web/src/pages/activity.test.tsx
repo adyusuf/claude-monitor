@@ -216,7 +216,7 @@ describe("the filter chips", () => {
   });
 
   it("remember the choice across a reload", async () => {
-    const first = show();
+    const first = await show();
     await userEvent.click(await screen.findByRole("button", { name: "Inputs" }));
     expect(localStorage.getItem(config.activityFilterKey)).toBe("inputs");
     first.view.unmount();
