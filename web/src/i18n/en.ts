@@ -61,6 +61,12 @@ export const en = {
     expiresIn: "expires in {time}",
     idleWarning: "This session is idle. A command is applied when something is typed in the session or when a turn ends.",
   },
+  chat: {
+    label: "Session conversation", view: "View", view_chat: "Conversation", view_raw: "Raw events", newBelow: "New messages",
+    thinking: "Thinking", tool_pending: "running", tool_done: "done", tool_error: "failed", options: "Options",
+    answer: "Answer", plan: "Plan", waitingAnswer: "Waiting for an answer", waitingApproval: "Waiting for approval",
+    showAll: "Show all", showLess: "Show less",
+  },
   commandStatus: { queued: "Queued", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
   commandHint: {
     queued: "waiting for the agent on the machine to pick it up",

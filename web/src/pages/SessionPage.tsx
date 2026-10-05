@@ -7,6 +7,7 @@ import { useErrorText, useI18n } from "../i18n";
 import { count, dateTime, usd } from "../lib/format";
 import { debounce, useLive } from "../lib/live";
 import { CommandsCard, PermissionsCard } from "./SessionControls";
+import { ChatCard } from "./ChatView";
 import { EventsCard } from "./SessionEvents";
 
 /** One session: what it is doing, what it cost, what waits for a person, and its activity. */
@@ -17,6 +18,7 @@ export function SessionPage() {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [version, setVersion] = useState(0);
+  const [view, setView] = useState<"chat" | "raw">("chat");
 
   const load = useCallback(async () => {
     try {
@@ -65,9 +67,14 @@ export function SessionPage() {
 
       <div className="grid">
         <div className="col">
+          <div className="seg" role="group" aria-label={t("chat.view")}>
+            {(["chat", "raw"] as const).map((v) => (
+              <button key={v} type="button" className={view === v ? "seg-on" : ""} aria-pressed={view === v} onClick={() => setView(v)}>{t(`chat.view_${v}`)}</button>
+            ))}
+          </div>
+          {view === "chat" ? <ChatCard sessionId={id} version={version} /> : <EventsCard sessionId={id} version={version} />}
           <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
           <CommandsCard sessionId={id} canCommand={detail.canCommand} ended={s.status === "ended"} lastEventAt={s.lastEventAt} version={version} onChange={reload} />
-          <EventsCard sessionId={id} version={version} />
         </div>
         <div className="col side">
           <Card title={t("session.tasks")}>

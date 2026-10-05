@@ -63,6 +63,12 @@ export const tr: Dictionary = {
     expiresIn: "{time} sonra sona erer",
     idleWarning: "Bu oturum boşta. Komut, oturumda bir şey yazıldığında ya da bir tur bittiğinde uygulanır.",
   },
+  chat: {
+    label: "Oturum konuşması", view: "Görünüm", view_chat: "Konuşma", view_raw: "Ham olaylar", newBelow: "Yeni mesajlar",
+    thinking: "Düşünüyor", tool_pending: "çalışıyor", tool_done: "bitti", tool_error: "hata", options: "Seçenekler",
+    answer: "Yanıt", plan: "Plan", waitingAnswer: "Yanıt bekleniyor", waitingApproval: "Onay bekleniyor",
+    showAll: "Tümünü göster", showLess: "Azalt",
+  },
   commandStatus: { queued: "Sırada", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal edildi" },
   commandHint: {
     queued: "makinedeki ajanın alması bekleniyor",

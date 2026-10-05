@@ -184,6 +184,47 @@ textarea.input { resize: vertical; }
 .event-time { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .event-kind { font-size: 12px; font-weight: 600; min-width: 128px; }
 .event-summary { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+/* ---- conversation (the session as Claude's screen shows it) ---- */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; align-self: flex-start; margin-bottom: 12px; }
+.seg button { background: var(--surface); border: none; padding: 6px 14px; font: 600 13px var(--font); color: var(--muted); cursor: pointer; }
+.seg button.seg-on { background: var(--accent-soft); color: var(--accent); }
+.chat-card { position: relative; }
+.chat-scroll { height: 68vh; min-height: 320px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 4px 2px; }
+.chat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.chat-row { min-width: 0; }
+.chat-user { align-self: flex-end; max-width: 85%; display: flex; justify-content: flex-end; }
+.chat-bubble { background: var(--accent-soft); border-radius: var(--radius); padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-bubble p { margin: 0; }
+.chat-time { display: block; margin-top: 2px; font: 11px var(--mono); color: var(--muted); }
+.chat-command-name { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.chat-assistant { overflow-wrap: anywhere; }
+.md p { margin: 0 0 8px; white-space: pre-wrap; }
+.md ul, .md ol { margin: 0 0 8px; padding-left: 22px; }
+.md-heading { margin-top: 6px; }
+.md-code, .chat-command, .chat-input, .chat-output pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; margin: 6px 0; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.md code:not(.md-code code) { background: var(--surface-2); border-radius: 4px; padding: 1px 5px; }
+.chat-thinking { color: var(--muted); font-size: 13px; }
+.chat-thinking p { white-space: pre-wrap; margin: 6px 0 0; }
+.chat-tool { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.chat-tool > summary { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; cursor: pointer; list-style: none; }
+.chat-tool > summary::-webkit-details-marker { display: none; }
+.chat-tool-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; align-self: center; }
+.chat-tool-pending .chat-tool-dot { background: var(--warn); animation: pulse 1.2s infinite; }
+.chat-tool-error .chat-tool-dot { background: var(--danger); }
+.chat-tool-summary { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-tool-state { font-size: 11.5px; color: var(--muted); }
+.chat-tool > pre, .chat-tool > .chat-output { margin: 0 10px 10px; }
+.chat-output-error pre { border-color: var(--danger); }
+.chat-question, .chat-plan { border: 1px solid var(--accent); border-radius: var(--radius); padding: 12px 14px; background: var(--surface); }
+.chat-q + .chat-q { margin-top: 14px; }
+.chat-q-text { margin: 6px 0; font-weight: 600; }
+.chat-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.chat-option { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 7px 12px; }
+.chat-option-chosen { border-color: var(--ok); background: var(--ok-soft); }
+.chat-option-label { font-weight: 600; }
+.chat-answer { margin: 6px 0 0; color: var(--ok); }
+.chat-shortened { color: var(--muted); }
+.chat-new { position: absolute; right: 28px; bottom: 28px; background: var(--accent); color: var(--accent-ink); border: none; border-radius: 999px; padding: 6px 14px; font: 600 13px var(--font); cursor: pointer; box-shadow: var(--shadow); }
 .device-code { font-family: var(--mono); font-size: 28px; letter-spacing: 0.15em; margin: 0 0 6px; }
 .downloads { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .audit li { display: flex; gap: 12px; }

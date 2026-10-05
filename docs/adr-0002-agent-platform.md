@@ -158,6 +158,24 @@ on the web, and the answer reaches the hook over the agent's stream. No answer i
 decision, and Claude Code asks on the machine as usual. Only the session's owner may answer; every answer is
 audited.
 
+### The session page shows the conversation (decided 05/10/2026)
+
+The activity of a session is read as Claude's own screen shows it, not as a list of hook events: what was asked, what
+Claude said, each tool call (a script's command, a file) with its output beside it, and the questions Claude put with
+their options and the one chosen. Oldest at the top, newest at the bottom; a new message pushes the rest up, and a page
+the reader scrolled up stays where it is (a "new messages" button says something came). The source is the `transcript`
+events the agent already captures (`GET /sessions/{id}/events?kind=transcript`), joined by `tool_use_id`; nothing new is
+captured or stored, and the API did not change. **Lazy loading:** only the newest page (40 lines) is read at first, and
+scrolling up reads the next older pages, so a session of several megabytes costs what is looked at; a live refresh reads
+the newest 20 and reads back only if more arrived. The raw event list stays one click away ("Raw events"). The page
+renders the text itself (a small Markdown subset built as React elements, never HTML), so captured text cannot inject
+markup and no Markdown library was added.
+
+The questions and plan approvals are shown with their options, read-only for now. Answering them from the web (a button
+that does the work in the session) rides the existing permission path: the `PermissionRequest` hook already waits for
+the owner's answer, and its allow decision may carry `updatedInput`. Whether Claude Code raises that hook for
+`AskUserQuestion` and `ExitPlanMode` has to be confirmed in a live session before the buttons are built on it.
+
 ### Environments
 
 Local development runs PostgreSQL and a mail catcher in Docker, the API and the web dev server. Test and
