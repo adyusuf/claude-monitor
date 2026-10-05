@@ -58,8 +58,22 @@ web app (same origin, /api) <--> central API          central API --SSE--> agent
   UserPromptSubmit, PermissionRequest, SessionEnd) are synchronous.
 - **No network port.** The only channel between the hook processes and the daemon is a SQLite database in the
   agent's home directory, which only the user can read (macOS: `~/Library/Application Support/ClaudeMonitor`,
-  Windows: `%LOCALAPPDATA%\ClaudeMonitor`). Hooks write events and permission requests and read commands; the
+  Windows: `%USERPROFILE%\.claude-monitor`, see "Home outside AppData" below). Hooks write events and permission requests and read commands; the
   daemon uploads, relays and writes answers. Nothing listens, on macOS or Windows.
+- **Home outside AppData (Windows, decided 05/10/2026).** The Claude desktop app is a packaged (MSIX) app, and every
+  process it starts (hooks, `cm-agent mcp`) sees reads and writes under `%LOCALAPPDATA%` redirected to a private copy
+  (`%LOCALAPPDATA%\Packages\<package>\LocalCache\Local\`). With the home at `%LOCALAPPDATA%\ClaudeMonitor`, a
+  `cm-agent login` in a normal terminal wrote `agent.json` to the real folder, while the processes of a Claude session
+  read the redirected, empty copy: "Not connected", no events, sessions missing on the server. `%USERPROFILE%` is not
+  redirected, so the Windows default moved to `%USERPROFILE%\.claude-monitor`; macOS and `CM_AGENT_HOME` are unchanged.
+  On every start, when `CM_AGENT_HOME` is not set, the new home has no `agent.json` and the old one has, the agent
+  **copies** `agent.json` (never deleting or overwriting; one line in `agent.log`; a failure is logged and the agent
+  goes on). Tokens are in the OS credential store, so no new login is needed. `agent.db` is not moved: it holds only
+  events not yet uploaded, and copying a SQLite file a running daemon may have open risks a torn copy, so those few
+  events are lost. A process inside the Claude app sees only the redirected old folder, so it migrates from that one;
+  the real old folder is migrated by the first process started from a normal terminal. Plugins installed earlier keep
+  running the binary in the old folder until `cm-agent install` is run again. `cm-agent status` prints `home:` so a
+  split like this is visible at once.
 - **Durable outbox.** Every event goes into that database first, then to the API in numbered batches. A batch is
   retried with the same number and rows until acknowledged; the API ignores a batch number it has already
   stored, so a retry never duplicates data. Events written while offline or while the daemon is down are sent later.

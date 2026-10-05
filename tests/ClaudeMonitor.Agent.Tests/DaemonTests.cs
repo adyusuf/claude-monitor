@@ -123,7 +123,10 @@ public sealed class DaemonTests
         Assert.Equal(TimeSpan.FromSeconds(590), config.PermissionWait);
         Assert.Equal(TimeSpan.FromSeconds(30), config.StopWait);
         var defaults = AgentConfig.FromEnvironment(_ => null);
-        Assert.EndsWith("ClaudeMonitor", defaults.Home, StringComparison.Ordinal);
+        Assert.Equal(AgentConfig.DefaultHome(), defaults.Home);
+        Assert.EndsWith(OperatingSystem.IsWindows() ? ".claude-monitor" : "ClaudeMonitor", defaults.Home, StringComparison.Ordinal);
+        Assert.Equal(AgentConfig.LegacyHome(), defaults.MigrateFrom);
+        Assert.Null(config.MigrateFrom);
         Assert.Equal(TimeSpan.Zero, defaults.StopWait);
         Assert.Equal(OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsWindows() ? "windows" : "unsupported", AgentConfig.Os);
     }

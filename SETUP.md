@@ -79,6 +79,18 @@ installed binary, so Claude Code starts the agent with its sessions; nothing is 
 the `claude` CLI on `PATH` it prints the two `claude plugin` commands to run. The agent's tokens are in the macOS
 Keychain / Windows Credential Manager (service `claude-monitor-agent`); its log is `agent.log` in the agent home.
 
+The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS and `%USERPROFILE%\.claude-monitor` on
+Windows (`CM_AGENT_HOME` overrides both); `cm-agent status` prints it as `home:`. It is deliberately **not** under
+`%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
+redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
+(ADR-0002, "Home outside AppData").
+
+**Upgrading a Windows machine** that used the old default (`%LOCALAPPDATA%\ClaudeMonitor`): the first start of the new
+`cm-agent` copies `agent.json` to the new home (no new login; `agent.db` is not moved, so events not yet uploaded are
+lost). The old plugin keeps running the old binary until you run `cm-agent install` again with the new one; do that
+from a normal terminal, then check that `cm-agent status` and `monitor_status` in a new Claude session show the same
+`home:`. The old folder is left in place and can be deleted afterwards.
+
 ## Browser tests (e2e)
 
 Playwright (`e2e/`, Chromium and WebKit) drives the real web app and API. It is optional (global #33): the
