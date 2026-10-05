@@ -70,6 +70,15 @@ export const tr: Dictionary = {
     expiredIdle: "Süresi doldu (oturum boştaydı)",
     expiredUnreached: "Süresi doldu (ajan hiç almadı)",
   },
+  activity: {
+    filterLabel: "Göster", all: "Tümü", inputs: "Girdiler", assistant: "Asistan", tools: "Araçlar",
+    monitorInput: "Claude Monitor (web)", humanInput: "İnsan (Claude Code)", assistantLabel: "Claude", stopRequest: "Durdurma isteği",
+    sentBy: "gönderen: {name}", typedBy: "yazan: {name}", someone: "bir üye",
+    waiting: "Bekliyor", pendingTitle: "Uygulanmayı bekliyor",
+    deliveredWith: "oturumda yazılan mesajla birlikte teslim edildi",
+    toolCalls: "Araç çağrısı: {n}", otherEvents: "Diğer olay: {n}", emptyFilter: "Bu filtreyle gösterilecek bir şey yok.",
+    status: { queued: "Bekliyor", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal" },
+  },
   machines: {
     title: "Makineler", empty: "Henüz bağlı makine yok.", connect: "Makine bağla", revoke: "Bağlantıyı kes",
     revokeConfirm: "Bu makinenin bağlantısı kesilsin mi? Ajanı raporlamayı bırakır.", revoked: "Bağlantı kesildi", lastSeen: "Son görülme",

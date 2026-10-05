@@ -68,6 +68,15 @@ export const en = {
     expiredIdle: "Expired (the session was idle)",
     expiredUnreached: "Expired (the agent never picked it up)",
   },
+  activity: {
+    filterLabel: "Show", all: "All", inputs: "Inputs", assistant: "Assistant", tools: "Tools",
+    monitorInput: "Claude Monitor (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
+    sentBy: "sent by {name}", typedBy: "typed by {name}", someone: "a member",
+    waiting: "Waiting", pendingTitle: "Waiting to be applied",
+    deliveredWith: "delivered together with the message typed in the session",
+    toolCalls: "Tool calls: {n}", otherEvents: "Other events: {n}", emptyFilter: "Nothing to show with this filter.",
+    status: { queued: "Waiting", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
+  },
   machines: {
     title: "Machines", empty: "No machine is connected yet.", connect: "Connect a machine", revoke: "Disconnect",
     revokeConfirm: "Disconnect this machine? Its agent stops reporting.", revoked: "Disconnected", lastSeen: "Last seen",

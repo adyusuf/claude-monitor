@@ -1,52 +1,43 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/endpoints";
-import type { EventRow } from "../api/types";
-import { Button, Card, Json } from "../components/ui";
+import type { CommandRow, EventRow } from "../api/types";
+import { Button, Card } from "../components/ui";
 import { config } from "../config";
 import { useI18n } from "../i18n";
-import { time } from "../lib/format";
+import { ActivityClass } from "../lib/activity";
+import { ACTIVITY_FILTERS, ActivityFilter, type ActivityFilterName, buildTimeline, filterItems, groupRows, isFilter, type TimelineItem } from "../lib/timeline";
+import { AssistantLine, GroupLine, InputLine, QuietLine, type Who } from "./ActivityItems";
 
-/** A one-line summary of an event, from the fields Claude Code's hooks carry. */
-export function summary(e: EventRow): string {
-  const p = e.payload;
-  const str = (k: string) => (typeof p[k] === "string" ? (p[k] as string) : "");
-  const tool = str("tool_name");
-  const input = p.tool_input as Record<string, unknown> | undefined;
-  const detail = input ? String(input.command ?? input.file_path ?? input.description ?? input.pattern ?? "") : "";
-  switch (e.kind) {
-    case "hook:UserPromptSubmit":
-      return str("prompt");
-    case "hook:PreToolUse":
-    case "hook:PostToolUse":
-    case "hook:PostToolUseFailure":
-    case "hook:PermissionRequest":
-      return [tool, detail].filter(Boolean).join(" · ");
-    case "hook:Notification":
-      return str("message");
-    case "hook:SubagentStart":
-    case "hook:SubagentStop":
-      return str("agent_type");
-    case "note":
-      return str("text");
-    case "transcript": {
-      const message = p.message as { content?: unknown } | undefined;
-      const content = Array.isArray(message?.content) ? message.content : [];
-      const text = content.find((c: { type?: string }) => c?.type === "text") as { text?: string } | undefined;
-      return text?.text ?? str("type");
-    }
-    default:
-      return "";
+function storedFilter(): ActivityFilterName {
+  try {
+    const saved = localStorage.getItem(config.activityFilterKey);
+    if (isFilter(saved)) return saved;
+  } catch {
+    // storage unavailable: show everything
+  }
+  return ActivityFilter.All;
+}
+
+function rememberFilter(filter: ActivityFilterName) {
+  try {
+    localStorage.setItem(config.activityFilterKey, filter);
+  } catch {
+    // storage unavailable: the choice lasts for this page only
   }
 }
 
-const label = (kind: string) => kind.replace(/^hook:/, "");
-
-/** The session's activity, newest first, an older page at a time. */
-export function EventsCard({ sessionId, version }: { sessionId: string; version: number }) {
+/**
+ * The session's activity, newest first, an older page at a time. What enters the session (a command sent from the web,
+ * a prompt typed in the harness) stands out; Claude's answers are plain; tool calls and background events are quiet.
+ */
+export function EventsCard({ sessionId, owner, version }: { sessionId: string; owner: Who; version: number }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<EventRow[]>([]);
+  const [commands, setCommands] = useState<CommandRow[]>([]);
   const [next, setNext] = useState<string | null>(null);
-  const [open, setOpen] = useState<number | null>(null);
+  const [filter, setFilter] = useState<ActivityFilterName>(storedFilter);
+  const [open, setOpen] = useState<string | null>(null);
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
 
   const load = useCallback(async () => {
     const page = await api.events(sessionId, { limit: config.eventPageSize });
@@ -56,7 +47,8 @@ export function EventsCard({ sessionId, version }: { sessionId: string; version:
 
   useEffect(() => {
     load().catch(() => setRows([]));
-  }, [load, version]);
+    api.commands(sessionId).then(setCommands).catch(() => setCommands([]));
+  }, [load, sessionId, version]);
 
   const older = async () => {
     const page = await api.events(sessionId, { before: next, limit: config.eventPageSize });
@@ -64,20 +56,57 @@ export function EventsCard({ sessionId, version }: { sessionId: string; version:
     setNext(page.next);
   };
 
+  const choose = (f: ActivityFilterName) => {
+    setFilter(f);
+    rememberFilter(f);
+  };
+  const toggle = (key: string) => setOpen((k) => (k === key ? null : key));
+  const toggleGroup = (key: string) => setOpenGroups((g) => {
+    const copy = new Set(g);
+    if (!copy.delete(key)) copy.add(key);
+    return copy;
+  });
+
+  const timeline = useMemo(() => buildTimeline(rows, commands, next !== null), [rows, commands, next]);
+  const visible = useMemo(() => filterItems(timeline.items, filter), [timeline, filter]);
+  const pinned = useMemo(() => filterItems(timeline.pinned, filter), [timeline, filter]);
+  const grouped = useMemo(() => groupRows(visible), [visible]);
+
+  const line = (item: TimelineItem) => {
+    const common = { item, open: open === item.key, onToggle: toggle };
+    switch (item.cls) {
+      case ActivityClass.MonitorInput:
+      case ActivityClass.HumanInput:
+        return <InputLine key={item.key} who={owner} {...common} />;
+      case ActivityClass.Assistant:
+        return <AssistantLine key={item.key} {...common} />;
+      default:
+        return <QuietLine key={item.key} {...common} />;
+    }
+  };
+
+  const empty = timeline.items.length === 0 && timeline.pinned.length === 0;
   return (
     <Card title={t("session.events")}>
-      {rows.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : (
-        <ol className="timeline">
-          {rows.map((e) => (
-            <li key={e.id} className={`event event-${label(e.kind).toLowerCase()}`}>
-              <button type="button" className="event-line" onClick={() => setOpen(open === e.id ? null : e.id)} aria-expanded={open === e.id}>
-                <span className="event-time">{time(e.occurredAt)}</span>
-                <span className="event-kind">{label(e.kind)}</span>
-                <span className="event-summary">{summary(e)}</span>
-                {e.truncated ? <span className="badge">{t("session.truncated")}</span> : null}
-              </button>
-              {open === e.id ? <Json value={e.payload} /> : null}
-            </li>
+      <div className="segmented" role="group" aria-label={t("activity.filterLabel")}>
+        {ACTIVITY_FILTERS.map((f) => (
+          <button key={f} type="button" className={`seg${filter === f ? " active" : ""}`} aria-pressed={filter === f} onClick={() => choose(f)}>
+            {t(`activity.${f}`)}
+          </button>
+        ))}
+      </div>
+      {pinned.length > 0 ? (
+        <>
+          <h3 className="sub">{t("activity.pendingTitle")}</h3>
+          <ol className="act-list">{pinned.map(line)}</ol>
+        </>
+      ) : null}
+      {empty ? <p className="muted">{t("session.noEvents")}</p> : grouped.length === 0 && pinned.length === 0 ? <p className="muted">{t("activity.emptyFilter")}</p> : (
+        <ol className="act-list">
+          {grouped.map((row) => row.kind === "item" ? line(row.item) : (
+            <GroupLine key={row.key} row={row} open={openGroups.has(row.key)} onToggle={toggleGroup}>
+              {row.items.map(line)}
+            </GroupLine>
           ))}
         </ol>
       )}

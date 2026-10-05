@@ -230,6 +230,7 @@ describe("filtering and grouping", () => {
     expect(rows.map((r) => r.kind)).toEqual(["item", "item", "item", "group"]);
     const group = rows[3]!;
     expect(group.kind === "group" && [group.items.length, group.tools, group.others]).toEqual([4, 2, 2]);
+    expect(group.kind === "group" && group.key).toBe(`g${items[items.length - 1]!.key}`);
     expect(groupRows([])).toEqual([]);
     const lone = groupRows(items.filter((i) => i.cls === ActivityClass.Assistant || i.key === items.find((x) => x.cls === ActivityClass.Tool)!.key));
     expect(lone.map((r) => r.kind)).toEqual(["item", "item"]);

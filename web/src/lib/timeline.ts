@@ -162,7 +162,7 @@ export type Row =
 
 const isQuiet = (i: TimelineItem) => i.cls === ActivityClass.Tool || i.cls === ActivityClass.Meta;
 
-/** Folds consecutive tool/meta lines into groups; a lone quiet line stays a line. */
+/** Folds consecutive tool/meta lines into groups; a lone quiet line stays a line. A group is keyed by its OLDEST line: new activity arrives on top and must not close an open group. */
 export function groupRows(items: TimelineItem[]): Row[] {
   const rows: Row[] = [];
   let run: TimelineItem[] = [];
@@ -170,7 +170,7 @@ export function groupRows(items: TimelineItem[]): Row[] {
     if (run.length === 1) rows.push({ kind: "item", item: run[0]! });
     else if (run.length > 1) {
       const tools = run.filter((i) => i.cls === ActivityClass.Tool).length;
-      rows.push({ kind: "group", key: `g${run[0]!.key}`, items: run, tools, others: run.length - tools });
+      rows.push({ kind: "group", key: `g${run[run.length - 1]!.key}`, items: run, tools, others: run.length - tools });
     }
     run = [];
   };
