@@ -83,7 +83,7 @@ public static class AgentEndpoints
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId));
     }
 
-    /// <summary>The agent's own stream: first every command still waiting for it, then new ones as they come.</summary>
+    /// <summary>The agent's own stream: a ready message, then every command still waiting for it, then new ones as they come.</summary>
     private static async Task<IResult> Stream(HttpContext http, MonitorDb db, Broker broker, TimeProvider clock)
     {
         var agentId = http.User.AgentId();
@@ -96,7 +96,10 @@ public static class AgentEndpoints
                              orderby c.CreatedAt
                              select new AgentCommandMessage(c.Id, c.SessionId, s.ExternalId, c.Kind, c.Body, c.ExpiresAt))
             .ToListAsync(http.RequestAborted);
-        return Sse.Stream(subscription, waiting.Select(c => new StreamMessage(AgentStreamEvents.Command, c)), http.RequestAborted);
+        // "ready" first: the response headers go out with the first message, and an idle stream would otherwise look unconnected for 20 s.
+        var first = new[] { new StreamMessage(AgentStreamEvents.Ready, new { }) }
+            .Concat(waiting.Select(c => new StreamMessage(AgentStreamEvents.Command, c)));
+        return Sse.Stream(subscription, first, http.RequestAborted);
     }
 
     private static async Task<IResult> CommandStatus(Guid id, CommandStatusUpdate req, HttpContext http, MonitorDb db,

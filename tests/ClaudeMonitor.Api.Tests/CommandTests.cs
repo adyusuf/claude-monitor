@@ -72,6 +72,14 @@ public sealed class CommandTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task An_idle_agent_stream_opens_at_once_with_a_ready_message()
+    {
+        var (_, _, agent, _, _) = await SetupAsync();
+        using var stream = await OpenAsync(agent.Http, "/api/agent/stream"); // returns only when the headers arrive: no wait for the first ping
+        await NextEventAsync(stream, AgentStreamEvents.Ready);
+    }
+
+    [Fact]
     public async Task Only_the_owner_commands_even_an_admin_cannot()
     {
         var (owner, admin, _, id, _) = await SetupAsync();
