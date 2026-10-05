@@ -54,6 +54,20 @@ public sealed partial class LocalStore
         return found;
     }
 
+    /// <summary>Commands still waiting for a hook to take them (not expired), and when the soonest of them expires.</summary>
+    public (int Count, DateTimeOffset? Soonest) WaitingCommands(DateTimeOffset now)
+    {
+        var waiting = new List<DateTimeOffset>();
+        using var cmd = Command("SELECT expires_at FROM commands WHERE state = 'queued'", null);
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            if (At(r.GetString(0)) is var expires && expires > now) waiting.Add(expires);
+        }
+
+        return (waiting.Count, waiting.Count == 0 ? null : waiting.Min());
+    }
+
     /// <summary>Taken commands whose outcome the daemon has not reported yet.</summary>
     public List<string> TakenCommands()
     {

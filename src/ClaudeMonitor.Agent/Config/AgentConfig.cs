@@ -26,6 +26,12 @@ public sealed record AgentConfig
 
     public TimeSpan PermissionWait { get; init; } = TimeSpan.FromSeconds(120);
     public TimeSpan StopWait { get; init; } = TimeSpan.Zero;
+
+    /// <summary>True when CM_STOP_WAIT was set: it then wins over the value `cm-agent install --stop-wait` saved.</summary>
+    public bool StopWaitFromEnvironment { get; init; }
+
+    /// <summary>The longest a hook may wait for the web (Claude Code's hook timeout is raised by the same amount).</summary>
+    public const int WaitMaxSeconds = 590;
     public TimeSpan FlushEvery { get; init; } = TimeSpan.FromSeconds(2);
     public TimeSpan HeartbeatEvery { get; init; } = TimeSpan.FromSeconds(60);
     public TimeSpan SettingsEvery { get; init; } = TimeSpan.FromMinutes(10);
@@ -90,8 +96,9 @@ public sealed record AgentConfig
             MigrateFrom = explicitHome ? null : legacyHome(),
             ServerOverride = read("CM_SERVER") is { Length: > 0 } s ? s.TrimEnd('/') : null,
             CredentialStore = read("CM_CREDENTIALS") == "file" ? "file" : "keychain",
-            PermissionWait = Seconds(read("CM_PERMISSION_WAIT"), TimeSpan.FromSeconds(120), 590),
-            StopWait = Seconds(read("CM_STOP_WAIT"), TimeSpan.Zero, 590),
+            PermissionWait = Seconds(read("CM_PERMISSION_WAIT"), TimeSpan.FromSeconds(120), WaitMaxSeconds),
+            StopWait = Seconds(read("CM_STOP_WAIT"), TimeSpan.Zero, WaitMaxSeconds),
+            StopWaitFromEnvironment = read("CM_STOP_WAIT") is { Length: > 0 },
         };
     }
 
