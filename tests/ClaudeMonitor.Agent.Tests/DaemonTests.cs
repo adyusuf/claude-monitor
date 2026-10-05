@@ -67,6 +67,30 @@ public sealed class DaemonTests
     }
 
     [Fact]
+    public async Task A_stream_connect_timeout_is_retried_and_does_not_end_the_stream()
+    {
+        using var home = new TempHome(c => c with { FlushEvery = TimeSpan.FromMilliseconds(20), RetryMax = TimeSpan.FromMilliseconds(100) });
+        var streams = 0;
+        var fake = new FakeApi()
+            .On("POST /api/agent/heartbeat", HttpStatusCode.NoContent, "")
+            .On("GET /api/agent/settings", HttpStatusCode.OK, new AgentSettings(true, 1000, Guid.NewGuid()))
+            .On("GET /api/agent/stream", _ => Interlocked.Increment(ref streams) == 1
+                ? throw new TaskCanceledException("connect timeout", new TimeoutException()) // what SocketsHttpHandler's ConnectTimeout throws
+                : (HttpStatusCode.OK, "event: revoked\ndata: {}\n\n"));
+        (Identity.Load(home.Config) with { Server = "https://m.invalid", AgentId = Guid.NewGuid(), WorkspaceId = Guid.NewGuid() }).Save(home.Config);
+        Credentials.For(home.Config).Write(Credentials.Access, "a");
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var host = new DaemonHost(home.Config, TimeProvider.System, new AgentLog(home.Config, TimeProvider.System), fake);
+        Assert.Equal(0, await host.RunAsync(timeout.Token).WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.False(timeout.IsCancellationRequested);
+        Assert.Equal(2, streams);
+        var log = await File.ReadAllTextAsync(home.Config.LogPath);
+        Assert.Contains("stream failed (1): TaskCanceledException", log, StringComparison.Ordinal);
+        Assert.Contains("revoked from the web", log, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_refused_token_disconnects_the_daemon_and_clears_the_identity()
     {
         using var home = new TempHome(c => c with { FlushEvery = TimeSpan.FromMilliseconds(20) });

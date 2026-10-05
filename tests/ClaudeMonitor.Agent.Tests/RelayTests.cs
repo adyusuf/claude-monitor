@@ -25,7 +25,7 @@ public sealed class RelayTests : IDisposable
         var creds = Credentials.For(home.Config);
         creds.Write(Credentials.Access, "access-1");
         creds.Write(Credentials.Refresh, "refresh-1");
-        api = new ApiClient(http, creds);
+        api = new ApiClient(http, creds, home.Config.ApiCallTimeout);
         relay = new Relay(home.Config with { BatchEvents = 2 }, store, api, clock);
     }
 
