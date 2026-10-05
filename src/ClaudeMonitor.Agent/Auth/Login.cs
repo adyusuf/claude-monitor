@@ -33,7 +33,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         }
 
         using var http = ApiClient.CreateHttp(server, handler, config.LoginRequestTimeout);
-        using var api = new ApiClient(http, Credentials.For(config));
+        using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout);
         DeviceCodeResponse code;
         try
         {

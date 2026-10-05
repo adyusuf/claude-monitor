@@ -30,7 +30,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
 
         using var store = new LocalStore(config.DatabasePath);
         using var http = ApiClient.CreateHttp(identity.Server!, handler);
-        using var api = new ApiClient(http, Credentials.For(config));
+        using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout);
         var relay = new Relay(config, store, api, clock);
         var tailer = new TranscriptTailer(config, store, clock);
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
