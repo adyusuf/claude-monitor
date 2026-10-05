@@ -33,7 +33,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         }
 
         using var http = ApiClient.CreateHttp(server, handler, config.LoginRequestTimeout);
-        using var api = new ApiClient(http, Credentials.For(config));
+        using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout);
         DeviceCodeResponse code;
         try
         {
@@ -43,6 +43,11 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         catch (Exception e) when (Transient(e, ct))
         {
             await output.WriteLineAsync($"The server did not answer ({Describe(e)}). Check the address and the connection, then run cm-agent login again.");
+            return 1;
+        }
+        catch (ApiException e) when (e.Status < HttpStatusCode.InternalServerError)
+        {
+            await output.WriteLineAsync(Refused(e, server));
             return 1;
         }
 
@@ -67,6 +72,11 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                 interval = Backoff(interval);
                 await output.WriteLineAsync($"The server did not answer ({Describe(e)}); trying again in {interval.TotalSeconds:0} s.");
                 continue;
+            }
+            catch (ApiException e) when (e.Status < HttpStatusCode.InternalServerError)
+            {
+                await output.WriteLineAsync(Refused(e, server));
+                return 1;
             }
 
             var unanswered = failure is not null;
@@ -113,6 +123,17 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
 
     private static string Describe(Exception e) =>
         e is ApiException api ? $"it answered {(int)api.Status}" : $"{e.GetType().Name}: {e.Message.ReplaceLineEndings(" ")}";
+
+    /// <summary>An answer that polling again cannot change. One line from the status alone: the body may be a proxy's
+    /// page and is never printed.</summary>
+    private static string Refused(ApiException e, string server) => e.Status switch
+    {
+        HttpStatusCode.UpgradeRequired =>
+            $"The server no longer accepts this cm-agent ({AgentConfig.Version}). Upgrade the agent, then run cm-agent login again.",
+        HttpStatusCode.TooManyRequests =>
+            "The server is limiting requests from this network. Wait a minute, then run cm-agent login again.",
+        _ => $"{server} answered {(int)e.Status}; it does not look like a Claude Monitor server. Check the address, then run cm-agent login again.",
+    };
 
     private TimeSpan Backoff(TimeSpan interval) =>
         interval >= config.LoginPollMax ? interval

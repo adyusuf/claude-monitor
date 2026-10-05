@@ -30,6 +30,12 @@ public sealed record AgentConfig
     /// <summary>How long one login request may take; the API answers at once, so a longer wait is a dead connection.</summary>
     public TimeSpan LoginRequestTimeout { get; init; } = TimeSpan.FromSeconds(20);
 
+    /// <summary>
+    /// How long one of the daemon's API calls may take (all but the stream, which stays open). Longer than the login's:
+    /// a full batch (<see cref="BatchBytes"/>) must still go up on a slow uplink, or it would be resent for ever.
+    /// </summary>
+    public TimeSpan ApiCallTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
     /// <summary>Added to the login's polling interval after each failed poll (RFC 8628 §3.5), up to <see cref="LoginPollMax"/>.</summary>
     public TimeSpan LoginBackoffStep { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan LoginPollMax { get; init; } = TimeSpan.FromSeconds(60);
@@ -38,6 +44,9 @@ public sealed record AgentConfig
     public static readonly TimeSpan ConnectionLifetime = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan ConnectionIdle = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>The head start of one address before the next is tried beside it (RFC 8305 §5 recommends 250 ms).</summary>
+    public static readonly TimeSpan ConnectStagger = TimeSpan.FromMilliseconds(250);
     public int BatchEvents { get; init; } = 200;
     public int BatchBytes { get; init; } = 4 * 1024 * 1024;
     public int EventMaxBytesDefault { get; init; } = 262_144;

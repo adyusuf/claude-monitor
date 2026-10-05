@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,8 +10,11 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Net;
 
-/// <summary>The agent's calls to the API. A 401 is answered once with a token refresh and a retry.</summary>
-public sealed class ApiClient(HttpClient http, ICredentialStore credentials) : IDisposable
+/// <summary>
+/// The agent's calls to the API. A 401 is answered once with a token refresh and a retry. Every authenticated call
+/// except the stream gives up after <c>callTimeout</c>, refresh included, with a <see cref="TimeoutException"/>.
+/// </summary>
+public sealed class ApiClient(HttpClient http, ICredentialStore credentials, TimeSpan callTimeout) : IDisposable
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim refreshing = new(1, 1);
@@ -20,7 +24,10 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials) : I
 
     public void Dispose() => refreshing.Dispose();
 
-    /// <summary>The API's client. No timeout unless one is given: the daemon's stream stays open.</summary>
+    /// <summary>
+    /// The API's client. No timeout unless one is given: the daemon's stream stays open, and its other calls are bounded
+    /// by the per-call deadline instead.
+    /// </summary>
     public static HttpClient CreateHttp(string server, HttpMessageHandler? handler = null, TimeSpan? timeout = null)
     {
         var client = handler is null ? new HttpClient(CreateHandler()) : new HttpClient(handler, disposeHandler: false);
@@ -40,6 +47,7 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials) : I
         PooledConnectionLifetime = AgentConfig.ConnectionLifetime,
         PooledConnectionIdleTimeout = AgentConfig.ConnectionIdle,
         ConnectTimeout = AgentConfig.ConnectTimeout,
+        ConnectCallback = HappyEyeballs.ConnectAsync,
     };
 
     public void SaveTokens(TokenResponse tokens)
@@ -75,31 +83,31 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials) : I
 
     // ---- authenticated calls -----------------------------------------------------------------------------------
 
-    public async Task<BatchAck> SendBatchAsync(EventBatch batch, CancellationToken ct) =>
-        await ReadAsync<BatchAck>(await SendAsync(() => Json_(HttpMethod.Post, "api/agent/batches", batch), ct), ct);
+    public Task<BatchAck> SendBatchAsync(EventBatch batch, CancellationToken ct) => WithinDeadlineAsync(async t =>
+        await ReadAsync<BatchAck>(await SendAsync(() => Json_(HttpMethod.Post, "api/agent/batches", batch), t), t), ct);
 
-    public async Task HeartbeatAsync(CancellationToken ct)
+    public Task HeartbeatAsync(CancellationToken ct) => WithinDeadlineAsync(async t =>
     {
-        using var response = await SendAsync(() => new HttpRequestMessage(HttpMethod.Post, "api/agent/heartbeat"), ct);
-        await EnsureAsync(response, ct);
-    }
+        using var response = await SendAsync(() => new HttpRequestMessage(HttpMethod.Post, "api/agent/heartbeat"), t);
+        await EnsureAsync(response, t);
+    }, ct);
 
-    public async Task<AgentSettings> SettingsAsync(CancellationToken ct) =>
-        await ReadAsync<AgentSettings>(await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, "api/agent/settings"), ct), ct);
+    public Task<AgentSettings> SettingsAsync(CancellationToken ct) => WithinDeadlineAsync(async t =>
+        await ReadAsync<AgentSettings>(await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, "api/agent/settings"), t), t), ct);
 
-    public async Task CommandStatusAsync(string id, string status, string? result, CancellationToken ct)
+    public Task CommandStatusAsync(string id, string status, string? result, CancellationToken ct) => WithinDeadlineAsync(async t =>
     {
-        using var response = await SendAsync(() => Json_(HttpMethod.Post, $"api/agent/commands/{id}/status", new CommandStatusUpdate(status, result)), ct);
+        using var response = await SendAsync(() => Json_(HttpMethod.Post, $"api/agent/commands/{id}/status", new CommandStatusUpdate(status, result)), t);
         if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.NotFound) return; // already settled or gone
-        await EnsureAsync(response, ct);
-    }
+        await EnsureAsync(response, t);
+    }, ct);
 
-    public async Task<PermissionRequestCreated?> CreatePermissionAsync(PermissionRequestCreate request, CancellationToken ct)
+    public Task<PermissionRequestCreated?> CreatePermissionAsync(PermissionRequestCreate request, CancellationToken ct) => WithinDeadlineAsync(async t =>
     {
-        using var response = await SendAsync(() => Json_(HttpMethod.Post, "api/agent/permission-requests", request), ct);
+        using var response = await SendAsync(() => Json_(HttpMethod.Post, "api/agent/permission-requests", request), t);
         if (response.StatusCode == HttpStatusCode.NotFound) return null; // the session has not reached the API yet
-        return await ReadAsync<PermissionRequestCreated>(response, ct);
-    }
+        return await ReadAsync<PermissionRequestCreated>(response, t);
+    }, ct);
 
     /// <summary>The agent's stream: (event name, data) pairs until the server or the token closes it.</summary>
     public async IAsyncEnumerable<(string Event, JsonElement Data)> StreamAsync([EnumeratorCancellation] CancellationToken ct)
@@ -122,6 +130,32 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials) : I
     }
 
     // ---- plumbing ----------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Runs one call under its own deadline. A request on a dead pooled connection would otherwise wait for the OS to give
+    /// up on TCP. The deadline surfaces as a <see cref="TimeoutException"/>, never as a cancellation: the daemon's loops
+    /// read a cancellation as shutdown and a timeout as a failure to retry. The caller's own cancellation stays one.
+    /// </summary>
+    private async Task<T> WithinDeadlineAsync<T>(Func<CancellationToken, Task<T>> call, CancellationToken ct)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(callTimeout);
+        try
+        {
+            return await call(deadline.Token);
+        }
+        catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
+        {
+            throw new TimeoutException(string.Create(CultureInfo.InvariantCulture, $"the API did not answer within {callTimeout.TotalSeconds:0.#} s"), e);
+        }
+    }
+
+    private async Task WithinDeadlineAsync(Func<CancellationToken, Task> call, CancellationToken ct) =>
+        await WithinDeadlineAsync(async t =>
+        {
+            await call(t);
+            return true;
+        }, ct);
 
     private static HttpRequestMessage Json_<T>(HttpMethod method, string url, T body) =>
         new(method, url) { Content = JsonContent.Create(body, options: Json) };

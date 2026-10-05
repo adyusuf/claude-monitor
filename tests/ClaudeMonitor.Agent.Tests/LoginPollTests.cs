@@ -146,6 +146,44 @@ public sealed class LoginPollTests : IDisposable
         Assert.Equal(0, api.Polls);
     }
 
+    private const string Body = """{"title":"body-that-must-not-be-printed"}""";
+
+    [Theory]
+    [InlineData(HttpStatusCode.UpgradeRequired, "Upgrade the agent, then run cm-agent login again.")]
+    [InlineData(HttpStatusCode.TooManyRequests, "Wait a minute, then run cm-agent login again.")]
+    [InlineData(HttpStatusCode.NotFound, "https://m.invalid answered 404; it does not look like a Claude Monitor server.")]
+    [InlineData(HttpStatusCode.Forbidden, "https://m.invalid answered 403; it does not look like a Claude Monitor server.")]
+    public async Task A_refused_device_code_request_says_why_in_one_line_and_exits(HttpStatusCode status, string expected)
+    {
+        var api = new Scripted(Answer(status, Body), (_, _) => Task.FromResult(Tokens()));
+        var output = new StringWriter();
+
+        Assert.Equal(1, await Run(home.Config, api, output));
+        var said = output.ToString();
+        Assert.Contains(expected, said, StringComparison.Ordinal);
+        Assert.Single(said.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        Assert.DoesNotContain("body-that-must-not-be-printed", said, StringComparison.Ordinal);
+        Assert.Equal(0, api.Polls);
+        Assert.False(Identity.Load(home.Config).Connected);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden, "https://m.invalid answered 403; it does not look like a Claude Monitor server.")]
+    [InlineData(HttpStatusCode.NotFound, "https://m.invalid answered 404; it does not look like a Claude Monitor server.")]
+    [InlineData(HttpStatusCode.TooManyRequests, "Wait a minute, then run cm-agent login again.")]
+    public async Task A_refused_poll_says_why_and_stops_polling(HttpStatusCode status, string expected)
+    {
+        var api = new Scripted(Code(), (_, _) => Task.FromResult(Answer(status, Body)));
+        var output = new StringWriter();
+
+        Assert.Equal(1, await Run(home.Config, api, output));
+        var said = output.ToString();
+        Assert.Contains(expected, said.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)[^1], StringComparison.Ordinal);
+        Assert.DoesNotContain("body-that-must-not-be-printed", said, StringComparison.Ordinal);
+        Assert.Equal(1, api.Polls);
+        Assert.False(Identity.Load(home.Config).Connected);
+    }
+
     [Fact]
     public void Pooled_connections_are_retired_and_connects_time_out()
     {
