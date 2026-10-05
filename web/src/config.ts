@@ -13,6 +13,8 @@ export const config = {
   liveDebounceMs: 400,
   /** A session whose last event is older than this is "idle": a command waits until a turn ends or someone types in it. */
   idleSessionMinutes: 5,
+  /** An applied command with no answer yet is "waiting for a reply" for this long, then "no reply recorded". */
+  replyWaitMinutes: 30,
   /** How often the pages that show a countdown or an age redraw. */
   clockTickMs: 15_000,
   languageKey: "cm.language",

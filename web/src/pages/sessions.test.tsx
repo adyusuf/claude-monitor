@@ -154,7 +154,8 @@ describe("one session", () => {
     expect(within(rowOf("three")).getByText("Expired (the session was idle)")).toBeInTheDocument();
     expect(within(rowOf("four")).getByText("Expired (the agent never picked it up)")).toBeInTheDocument();
     expect(within(rowOf("four")).queryByText(/expires in/)).not.toBeInTheDocument();
-    expect(rowOf("five")).not.toHaveTextContent(/expires in|waiting/);
+    expect(rowOf("five")).not.toHaveTextContent(/expires in/);
+    expect(within(rowOf("five")).getByText("Waiting for Claude's reply")).toBeInTheDocument(); // applied is not answered
   });
 
   describe("the idle warning above the prompt box", () => {

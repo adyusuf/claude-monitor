@@ -68,6 +68,15 @@ export const en = {
     expiredIdle: "Expired (the session was idle)",
     expiredUnreached: "Expired (the agent never picked it up)",
   },
+  commandReply: {
+    waiting: "Waiting for Claude's reply",
+    answered: "Claude replied",
+    unrecorded: "No reply recorded",
+    more: "See the whole reply",
+    less: "Show less",
+    loading: "Loading…",
+    gone: "The reply is no longer available.",
+  },
   machines: {
     title: "Machines", empty: "No machine is connected yet.", connect: "Connect a machine", revoke: "Disconnect",
     revokeConfirm: "Disconnect this machine? Its agent stops reporting.", revoked: "Disconnected", lastSeen: "Last seen",

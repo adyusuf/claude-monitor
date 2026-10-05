@@ -9,7 +9,8 @@ namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record CommandRequest(string? Kind, string? Body);
 public sealed record CommandRow(Guid Id, string Kind, string? Body, string Status, Guid CreatedBy, DateTimeOffset CreatedAt,
-    DateTimeOffset ExpiresAt, DateTimeOffset? DeliveredAt, DateTimeOffset? AppliedAt, string? Result);
+    DateTimeOffset ExpiresAt, DateTimeOffset? DeliveredAt, DateTimeOffset? AppliedAt, string? Result,
+    long? ReplyEventId = null, string? ReplyText = null, bool ReplyMore = false);
 public sealed record PermissionRow(Guid Id, string ToolName, System.Text.Json.JsonDocument ToolInput, string Status,
     DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, string? Decision, string? Reason, DateTimeOffset? AnsweredAt);
 public sealed record AnswerRequest(string? Decision, string? Reason);
@@ -33,13 +34,14 @@ public static class CommandEndpoints
         g.MapPost("/permission-requests/{id:guid}/answer", Answer);
     }
 
-    private static async Task<IResult> ListCommands(Guid id, HttpContext http, MonitorDb db)
+    private static async Task<IResult> ListCommands(Guid id, HttpContext http, MonitorDb db, ApiConfig config)
     {
         if (await Access.SessionAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
         var rows = await db.SessionCommands.AsNoTracking().Where(c => c.SessionId == id).OrderByDescending(c => c.CreatedAt).Take(50)
             .Select(c => new CommandRow(c.Id, c.Kind, c.Body, c.Status, c.CreatedBy, c.CreatedAt, c.ExpiresAt, c.DeliveredAt, c.AppliedAt, c.Result))
             .ToListAsync(http.RequestAborted);
-        return Results.Ok(rows);
+        var replies = await CommandReplies.FindAsync(db, id, rows, config, http.RequestAborted);
+        return Results.Ok(rows.Select(c => replies.TryGetValue(c.Id, out var r) ? c with { ReplyEventId = r.EventId, ReplyText = r.Text, ReplyMore = r.More } : c));
     }
 
     private static async Task<IResult> Create(Guid id, CommandRequest req, HttpContext http, MonitorDb db, ApiConfig config,

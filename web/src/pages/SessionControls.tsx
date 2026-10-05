@@ -116,7 +116,7 @@ export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, versio
       <h3 className="sub">{t("session.history")}</h3>
       {rows.length === 0 ? <p className="muted">{t("session.noCommands")}</p> : (
         <ul className="plain commands">
-          {rows.map((c) => <CommandItem key={c.id} command={c} now={now} canCancel={canCommand} onCancel={(id) => void cancel(id)} />)}
+          {rows.map((c) => <CommandItem key={c.id} command={c} sessionId={sessionId} ended={ended} now={now} canCancel={canCommand} onCancel={(id) => void cancel(id)} />)}
         </ul>
       )}
     </Card>

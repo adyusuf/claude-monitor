@@ -70,6 +70,15 @@ export const tr: Dictionary = {
     expiredIdle: "Süresi doldu (oturum boştaydı)",
     expiredUnreached: "Süresi doldu (ajan hiç almadı)",
   },
+  commandReply: {
+    waiting: "Claude'un cevabı bekleniyor",
+    answered: "Claude cevapladı",
+    unrecorded: "Kayıtlı cevap yok",
+    more: "Cevabın tamamını gör",
+    less: "Daha az göster",
+    loading: "Yükleniyor…",
+    gone: "Cevap artık mevcut değil.",
+  },
   machines: {
     title: "Makineler", empty: "Henüz bağlı makine yok.", connect: "Makine bağla", revoke: "Bağlantıyı kes",
     revokeConfirm: "Bu makinenin bağlantısı kesilsin mi? Ajanı raporlamayı bırakır.", revoked: "Bağlantı kesildi", lastSeen: "Son görülme",
