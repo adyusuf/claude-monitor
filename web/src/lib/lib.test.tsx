@@ -5,8 +5,9 @@ import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
 import { translate } from "../i18n";
 import { FakeEventSource, mockApi } from "../test/helpers";
-import { age, bytes, count, date, dateTime, time, usd } from "./format";
+import { age, bytes, count, date, dateTime, remaining, time, usd } from "./format";
 import { debounce, useLive } from "./live";
+import { useNow } from "./useNow";
 
 describe("format", () => {
   it("writes dates as dd/mm/yyyy in local time", () => {
@@ -27,6 +28,21 @@ describe("format", () => {
     expect(age(new Date(now - 3 * 3_600_000).toISOString(), now, units)).toBe("3h");
     expect(age(new Date(now - 2 * 86_400_000).toISOString(), now, units)).toBe("2d");
     expect(age(new Date(now - 20 * 86_400_000).toISOString(), now, units)).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+  });
+
+  it("counts the time left, and says nothing once it is gone or when it is not a date", () => {
+    const now = Date.UTC(2026, 9, 3, 12);
+    const units = en.time;
+    const at = (ms: number) => new Date(now + ms).toISOString();
+    expect(remaining(at(20_000), now, units)).toBe("1m");
+    expect(remaining(at(24 * 60_000 - 1), now, units)).toBe("24m");
+    expect(remaining(at(60 * 60_000), now, units)).toBe("1h 00m");
+    expect(remaining(at(95 * 60_000), now, units)).toBe("1h 35m");
+    expect(remaining(at(0), now, units)).toBeNull();
+    expect(remaining(at(-5000), now, units)).toBeNull();
+    expect(remaining("", now, units)).toBeNull();
+    expect(remaining(null, now, units)).toBeNull();
+    expect(remaining("not a date", now, units)).toBeNull();
   });
 
   it("shows money, counts and sizes", () => {
@@ -119,5 +135,24 @@ describe("live", () => {
     expect(FakeEventSource.last!.closed).toBe(true);
     vi.unstubAllGlobals();
     vi.useRealTimers();
+  });
+});
+
+describe("useNow", () => {
+  it("redraws on every tick and stops when the page goes away", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(Date.UTC(2026, 9, 3, 12)));
+      const { result, unmount } = renderHook(() => useNow(1000));
+      const first = result.current;
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(result.current - first).toBe(3000);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -66,9 +66,15 @@ public sealed record PermissionRequestCreated(Guid Id, DateTimeOffset ExpiresAt)
 public sealed record AgentCommandMessage(Guid Id, Guid SessionId, string SessionExternalId, string Kind, string? Body,
     DateTimeOffset ExpiresAt);
 
-public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, string Decision, string? Reason);
+/// <summary>
+/// The owner's answer to a permission request. For the harness's question tool, <c>Answers</c> maps each question's text to
+/// the option (or typed text) chosen; the agent hands them to the harness as the tool's answered input.
+/// </summary>
+public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, string Decision, string? Reason,
+    IReadOnlyDictionary<string, string>? Answers = null);
 
-public sealed record CommandStatusUpdate(string Status, string? Result);
+/// <summary>The agent's report on a command. At is when the hook handed it to the session (an older agent sends none).</summary>
+public sealed record CommandStatusUpdate(string Status, string? Result, DateTimeOffset? At = null);
 
 /// <summary>What the agent must know of its workspace's settings before it captures anything.</summary>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId);
@@ -79,4 +85,7 @@ public static class AgentStreamEvents
     public const string PermissionAnswer = "permission_answer";
     public const string Revoked = "revoked";
     public const string Ping = "ping";
+
+    /// <summary>The first message of every connection: it makes the server send its headers at once, so the agent knows it is connected.</summary>
+    public const string Ready = "ready";
 }

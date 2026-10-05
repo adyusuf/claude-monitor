@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
+using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
 
@@ -33,6 +34,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
             var ack = await api.SendBatchAsync(new EventBatch(batch.Seq, batch.Rows.Select(r => r.Event).ToList()), ct);
             store.Acknowledge(batch.Seq);
             sent += ack.Duplicate ? 0 : batch.Rows.Count;
+            UploadOutcome(null);
         }
 
         return sent;
@@ -62,10 +64,10 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     /// <summary>A command a hook took has been applied to its session: the web hears so.</summary>
     public async Task ReportCommandsAsync(CancellationToken ct)
     {
-        foreach (var id in store.TakenCommands())
+        foreach (var taken in store.TakenCommands())
         {
-            await api.CommandStatusAsync(id, CommandStatuses.Applied, null, ct);
-            store.MarkCommandReported(id);
+            await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At);
+            store.MarkCommandReported(taken.Id);
         }
     }
 
@@ -76,6 +78,31 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
     }
 
+    /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
+    public void StreamState(string state, int failures, string? error)
+    {
+        store.Set(PushStatus.StreamStateKey, state);
+        store.Set(PushStatus.StreamStateAtKey, Now());
+        store.Set(PushStatus.StreamFailuresKey, failures.ToString(CultureInfo.InvariantCulture));
+        store.Set(PushStatus.StreamErrorKey, error ?? "");
+    }
+
+    /// <summary>Records the outcome of an upload pass: its time, or the failure's type name.</summary>
+    public void UploadOutcome(string? error)
+    {
+        if (error is null)
+        {
+            store.Set(PushStatus.UploadAtKey, Now());
+            store.Set(PushStatus.UploadErrorKey, "");
+            return;
+        }
+
+        store.Set(PushStatus.UploadErrorKey, error);
+        store.Set(PushStatus.UploadErrorAtKey, Now());
+    }
+
+    private string Now() => clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
+
     /// <summary>Takes one stream message. Returns false when the agent was revoked and must stop.</summary>
     public async Task<bool> OnStreamAsync(string name, JsonElement data, CancellationToken ct)
     {
@@ -83,12 +110,14 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         {
             case AgentStreamEvents.Command:
                 var c = data.Deserialize<AgentCommandMessage>(ApiClient.Json)!;
+                store.Set(PushStatus.StreamCommandKey, c.Id.ToString());
+                store.Set(PushStatus.StreamCommandAtKey, Now());
                 store.SaveCommand(new LocalCommand(c.Id.ToString(), c.SessionExternalId, c.Kind, c.Body, c.ExpiresAt));
                 await api.CommandStatusAsync(c.Id.ToString(), CommandStatuses.Delivered, null, ct);
                 return true;
             case AgentStreamEvents.PermissionAnswer:
                 var a = data.Deserialize<PermissionAnswerMessage>(ApiClient.Json)!;
-                store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason);
+                store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason, a.Answers is null ? null : JsonSerializer.Serialize(a.Answers));
                 return true;
             case AgentStreamEvents.Revoked:
                 return false;

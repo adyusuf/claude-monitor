@@ -100,13 +100,22 @@ public static class SessionEndpoints
         return Results.Ok(new SessionDetail(row, canCommand, tasks, subagents, usage));
     }
 
+    private const int MaxKinds = 8;
+
     private static async Task<IResult> Events(Guid id, long? before, int? limit, string? kind, HttpContext http, MonitorDb db, ApiConfig config)
     {
         if (await Access.SessionAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
         var take = Http.Limit(limit, config);
         var query = db.SessionEvents.AsNoTracking().Where(e => e.SessionId == id);
         if (before is { } b) query = query.Where(e => e.Id < b);
-        if (kind is { Length: > 0 }) query = query.Where(e => e.Kind == kind);
+        if (kind is { Length: > 0 })
+        {
+            // One kind, or several separated by commas (the conversation view asks for the transcript and a few hooks at once).
+            var kinds = kind.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct().Take(MaxKinds).ToArray();
+            if (kinds.Length == 1) query = query.Where(e => e.Kind == kinds[0]);
+            else if (kinds.Length > 1) query = query.Where(e => kinds.Contains(e.Kind));
+        }
+
         var rows = await query.OrderByDescending(e => e.Id).Take(take + 1)
             .Select(e => new EventRow(e.Id, e.Kind, e.OccurredAt, e.Truncated, e.Payload)).ToListAsync(http.RequestAborted);
         var next = rows.Count > take ? rows[take - 1].Id.ToString(System.Globalization.CultureInfo.InvariantCulture) : null;

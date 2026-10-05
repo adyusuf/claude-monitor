@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Capture;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
 using ModelContextProtocol.Server;
@@ -19,14 +20,16 @@ public sealed class MonitorTools(AgentConfig config, TimeProvider clock)
     public const int NoteMax = 2000;
 
     [McpServerTool(Name = "monitor_status", ReadOnly = true)]
-    [Description("Whether this machine reports to Claude Monitor, which server, and how many events wait to be sent.")]
+    [Description("Whether this machine reports to Claude Monitor, which server, how many events wait to be sent and since when, whether the stream from the web is connected, the last message id, and whether web messages are pushed into this session.")]
     public string Status()
     {
         var identity = Identity.Load(config);
         using var store = new LocalStore(config.DatabasePath);
-        return identity.Connected
-            ? $"Connected to {identity.Server} (workspace {identity.WorkspaceId}). Events waiting to be sent: {store.OutboxCount()}."
-            : "Not connected. The user can run: cm-agent login --server <address>";
+        if (!identity.Connected) return "Not connected. The user can run: cm-agent login --server <address>";
+        var session = new PushPump(config, store, clock, ParentProcess.Id(), Environment.GetEnvironmentVariable("CLAUDE_CODE_SESSION_ID")).Session();
+        // The first sentence is what callers have always read; the lines after it are the new account of the path (ADR-0003).
+        return $"Connected to {identity.Server} (workspace {identity.WorkspaceId}). Events waiting to be sent: {store.OutboxCount()}. " +
+               string.Join(' ', PushStatus.Describe(config, store, clock.GetUtcNow(), session, PushStatus.DaemonRunning(config)));
     }
 
     [McpServerTool(Name = "monitor_note")]

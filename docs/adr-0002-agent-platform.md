@@ -58,8 +58,22 @@ web app (same origin, /api) <--> central API          central API --SSE--> agent
   UserPromptSubmit, PermissionRequest, SessionEnd) are synchronous.
 - **No network port.** The only channel between the hook processes and the daemon is a SQLite database in the
   agent's home directory, which only the user can read (macOS: `~/Library/Application Support/ClaudeMonitor`,
-  Windows: `%LOCALAPPDATA%\ClaudeMonitor`). Hooks write events and permission requests and read commands; the
+  Windows: `%USERPROFILE%\.claude-monitor`, see "Home outside AppData" below). Hooks write events and permission requests and read commands; the
   daemon uploads, relays and writes answers. Nothing listens, on macOS or Windows.
+- **Home outside AppData (Windows, decided 05/10/2026).** The Claude desktop app is a packaged (MSIX) app, and every
+  process it starts (hooks, `cm-agent mcp`) sees reads and writes under `%LOCALAPPDATA%` redirected to a private copy
+  (`%LOCALAPPDATA%\Packages\<package>\LocalCache\Local\`). With the home at `%LOCALAPPDATA%\ClaudeMonitor`, a
+  `cm-agent login` in a normal terminal wrote `agent.json` to the real folder, while the processes of a Claude session
+  read the redirected, empty copy: "Not connected", no events, sessions missing on the server. `%USERPROFILE%` is not
+  redirected, so the Windows default moved to `%USERPROFILE%\.claude-monitor`; macOS and `CM_AGENT_HOME` are unchanged.
+  On every start, when `CM_AGENT_HOME` is not set, the new home has no `agent.json` and the old one has, the agent
+  **copies** `agent.json` (never deleting or overwriting; one line in `agent.log`; a failure is logged and the agent
+  goes on). Tokens are in the OS credential store, so no new login is needed. `agent.db` is not moved: it holds only
+  events not yet uploaded, and copying a SQLite file a running daemon may have open risks a torn copy, so those few
+  events are lost. A process inside the Claude app sees only the redirected old folder, so it migrates from that one;
+  the real old folder is migrated by the first process started from a normal terminal. Plugins installed earlier keep
+  running the binary in the old folder until `cm-agent install` is run again. `cm-agent status` prints `home:` so a
+  split like this is visible at once.
 - **Durable outbox.** Every event goes into that database first, then to the API in numbered batches. A batch is
   retried with the same number and rows until acknowledged; the API ignores a batch number it has already
   stored, so a retry never duplicates data. Events written while offline or while the daemon is down are sent later.
@@ -120,11 +134,88 @@ outbound SSE connection (the agent has no inbound port). The agent delivers it t
 that can carry it (for example the Stop hook, which can hand Claude a follow-up prompt). v1 kinds: **send a
 prompt** and **stop**. Every command expires, is audited, and reports back delivered / applied / failed.
 
+**What "delivered" means, and the idle session (decided 05/10/2026).** The status ladder is queued (the API has it) →
+delivered (the agent's daemon took it into its local queue) → applied (a hook handed it to the session). A command
+enters a session only at a hook: `UserPromptSubmit` (someone typed in the session) or `Stop` (a turn ended). A session
+that is idle, with its turn finished and nobody typing, has no hook to run, so a prompt sent to it stays "delivered"
+until it expires (30 minutes). That is a property of the harness, not a fault, and the web says so instead of letting
+"delivered" read as "done": each waiting command shows what it waits for and the time left, an expired one says whether
+the session was idle or the agent never took it, and a session whose last event is older than
+`config.idleSessionMinutes` (web) warns above the prompt box. `cm-agent status` shows the local queue
+(`commands waiting: N (oldest expires HH:mm)`) and the stop wait in force.
+
+**The Stop hook's wait stays 0 by default (product decision).** `cm-agent install --stop-wait <seconds>` (0-590) makes
+a finished turn listen to the web for that long and start a new turn from a prompt that arrives; the value is saved in
+`agent.json` (the hooks are rewritten, so Claude Code's hook timeout becomes the wait + 15 s) and `CM_STOP_WAIT`, when
+set, wins. The default is not raised because a session that keeps waiting after its turn looks busy to the person at
+the terminal (the turn has not finished) and stretches the turn Claude Code measures. Whoever wants idle sessions
+reachable opts in per machine.
+
+**The Activity list separates what enters the session (decided 05/10/2026).** The session page merges the session's
+events with its commands (`session_commands`, the authoritative record of what was sent from the web) into one list
+(`web/src/lib/timeline.ts`) and gives each line a class (`web/src/lib/activity.ts`): **monitor input** (a web
+command: labelled card, sender, status chip), **human input** (a typed prompt, `hook:UserPromptSubmit`: labelled
+card in a second colour and icon), **assistant** (plain, thin stripe), **tool** and **meta** (quiet single lines,
+folded into closed groups). Rules that keep it honest: a transcript `user` line that is a tool result, or that the harness wrote (it opens with a tag such as
+`<task-notification>`, `<command-name>`, `<system-reminder>`; about a third of real `user` lines), is never a human
+input; a transcript `user` line with text repeats the prompt hook of its turn and is dropped when that hook is
+loaded (it shows only when none is, for a harness without the hook); a transcript line that repeats an applied web
+command's own text within `config.commandEchoSeconds` of its moment is dropped (matching is by the command's text,
+never by how Claude Code words the wrapper); a waiting command (queued, delivered) is pinned on top as "Waiting";
+a command applied within `config.commandPairSeconds` of a typed prompt sits directly above it ("delivered together
+with the message typed in the session"); while older pages of events are unloaded, a command older than the oldest
+loaded event is held back and appears when "Older activity" reaches its moment. The filter chips (All, Inputs,
+Assistant, Tools) are kept in the browser (`config.activityFilterKey`). No API change: only existing fields are read.
+Screenshots at 375 px, light and dark: `docs/images/activity-375-light.png`, `docs/images/activity-375-dark.png`.
+
+**Pushing into an idle session (decided 05/10/2026, opt-in):** [ADR-0003](adr-0003-push-into-idle-session.md) adds a Claude Code channel so a prompt
+starts a turn in an idle session; the daemon's stream, the status ladder and the two MCP tools are unchanged.
+
 **Permission prompts are answered from the web too** (maintainer, 03/10/2026). The PermissionRequest hook reports
 the tool call at once (`permission_requests`) and waits a configured time; the session's owner may allow or deny it
 on the web, and the answer reaches the hook over the agent's stream. No answer in time means the hook gives no
 decision, and Claude Code asks on the machine as usual. Only the session's owner may answer; every answer is
 audited.
+
+### The session page shows the conversation (decided 05/10/2026)
+
+The activity of a session is read as Claude's own screen shows it, not as a list of hook events: what was asked, what
+Claude said, each tool call (a script's command, a file) with its output beside it, and the questions Claude put with
+their options and the one chosen. Oldest at the top, newest at the bottom; a new message pushes the rest up, and a page
+the reader scrolled up stays where it is (a "new messages" button says something came). The source is the `transcript`
+events the agent already captures, plus the `Notification` and `SubagentStart/Stop` hooks (one line each, so the page
+sees when Claude waits for the user), joined by `tool_use_id`; nothing new is captured or stored. The API's one change is
+additive: `GET /sessions/{id}/events?kind=` also takes a comma-separated list (at most 8 kinds); a single kind behaves as
+before. A line the agent cut for size still names its call when the preview reaches the call's id, so that call shows
+"output too large"; a call with no result shows "running" only while nothing but other calls, notes came after it, and
+"no output" otherwise. A message sent from the web while the user typed one reaches Claude as hook context and is shown
+as the user's message (recognised by its fixed header; the transcript's exact shape for it is not yet confirmed on a live
+session). Permission requests waiting for the owner sit at the bottom of the conversation. **Lazy loading:** only the newest page (40 lines) is read at first, and
+scrolling up reads the next older pages, so a session of several megabytes costs what is looked at; a live refresh reads
+the newest 20 and reads back only if more arrived. The raw event list stays one click away ("Raw events"). The page
+renders the text itself (a small Markdown subset built as React elements, never HTML), so captured text cannot inject
+markup and no Markdown library was added.
+
+**Answering Claude's questions and plans from the web (decided 05/10/2026).** A question Claude puts to the user
+(`AskUserQuestion`) or a plan waiting for approval (`ExitPlanMode`) is a permission prompt, so it rides the existing
+permission path: the `PermissionRequest` hook reports it and waits; the owner answers on the web, where the options are
+buttons (one click for a single single-choice question; several questions or multi-choice are collected and sent
+together, with optional typed text); the answer reaches the hook over the agent's stream and the hook returns an
+`allow` whose `updatedInput` is the question tool's own input plus `answers` (question text -> the option chosen), which
+is how the harness takes an answer without asking on the machine. A plan is approved (`allow`) or sent back (`deny`
+with the note as the reason). The protocol grew only additively: `answers` on the answer request and on
+`PermissionAnswerMessage`, an `answers` column in the agent's local database (added in place when missing). The API
+accepts `answers` only for `AskUserQuestion`, only with an allow, only for questions the request carries, each at most
+500 characters; the agent builds `updatedInput` from the input the hook received, never from anything the web sent, so
+the web can choose among options but cannot change a call. **Fail-safe:** the buttons exist only while an open
+permission request for that tool exists. If Claude Code does not raise `PermissionRequest` for these tools, nothing is
+reported, no buttons appear, and the question stays readable in the conversation and answerable on the machine.
+**Not confirmed on a live interactive session (decided 05/10/2026):** whether Claude Code raises the hook for these tools
+and takes `updatedInput.answers`. A non-interactive run (`claude -p`) does not offer `AskUserQuestion` at all, so the
+check needs an interactive session. Confirmed on a live run the same day: a prompt sent from the web at the end of a
+turn (the `Stop` hook's reason) is kept in the transcript as a meta user line "Stop hook feedback: ..." and one sent
+while the user typed (`additionalContext`) as a `hook_additional_context` attachment; the conversation shows both as the
+user's message.
 
 ### Environments
 
@@ -140,6 +231,20 @@ Google Workspace SMTP. The runbook is `docs/deploy-windows.md`. Each environment
 The web offers the installers: a notarised `.pkg` for macOS (Developer ID Installer certificate in addition
 to the existing Developer ID Application one) and a signed MSI for Windows (a code-signing certificate or
 service). Automatic updates come after the first release.
+
+### Published build
+
+The agent ships as a self-contained single file, ReadyToRun, **not compressed** (`EnableCompressionInSingleFile=false`,
+one R2R image per assembly). Compression is off because of a runtime fault, found 05/10/2026 on macOS (Darwin 27, .NET
+10.0.6, osx-arm64): a compressed single-file bundle crashed the daemon within seconds with
+`System.AccessViolationException` raised at varying places in System.Net.Http. It reproduced 3 of 3 times on the unchanged
+base commit, and a ten-line program that only loops `HttpClient.GetAsync` failed 6 of 6 when published compressed and 0
+of 6 uncompressed, so it is neither the agent's `setsid` P/Invoke nor its connect callback (both switched off: still
+crashed). The compressed bundle crashed with or without ReadyToRun; `DOTNET_ReadyToRun=0` only hid it by making the
+framework JIT everything. Uncompressed it also starts faster (`cm-agent status`, 10 runs: 79 ms against 171 ms) and
+the zip a user downloads is the same size (29 MB against 36 MB); the cost is the binary on disk (81 MB against 42 MB).
+`scripts/agent_smoke.py` publishes the host build and checks the daemon stays up for 10 s against a fake API; the
+merge gate runs it. Re-test compression when the runtime is updated, with that script, before turning it back on.
 
 ## Options considered
 

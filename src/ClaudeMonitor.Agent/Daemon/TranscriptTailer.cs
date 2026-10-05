@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using ClaudeMonitor.Agent.Capture;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
 
@@ -16,10 +17,14 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
 {
     public static readonly TimeSpan ActiveWindow = TimeSpan.FromDays(1);
 
+    /// <summary>Ids of prompts pushed into a session and not yet seen in a transcript: the first line that holds one confirms it (ADR-0003).</summary>
+    private List<string> pending = [];
+
     /// <summary>Reads what was appended since last time. Returns the number of lines taken.</summary>
     public int RunOnce()
     {
         var taken = 0;
+        pending = store.UnconfirmedPushes().Select(p => p.Id).ToList();
         foreach (var t in store.Transcripts(clock.GetUtcNow() - ActiveWindow))
         {
             taken += Follow(t);
@@ -71,6 +76,12 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
 
         if (entry is not JsonObject obj) return false;
         var now = clock.GetUtcNow();
+        // The wrapper's own text, not the bare id: `monitor_status` also prints ids, and that must not confirm a push.
+        foreach (var pushed in pending.Where(p => line.Contains($"{ChannelEnvelopes.Open} id={p}", StringComparison.Ordinal)).ToList())
+        {
+            if (store.ConfirmPush(pushed, now)) pending.Remove(pushed);
+        }
+
         recorder.Record(EventKinds.Transcript, t.Session, obj, project, now);
         if (obj["type"]?.GetValue<string>() == "assistant" && obj["message"] is JsonObject message
             && message["usage"] is JsonObject usage && message["model"]?.GetValue<string>() is { } model
