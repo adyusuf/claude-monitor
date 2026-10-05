@@ -1,15 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/endpoints";
 import type { CommandRow, PermissionRow } from "../api/types";
 import { Button, Card, Json, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
-import { dateTime, time } from "../lib/format";
+import { time } from "../lib/format";
+import { useNow } from "../lib/useNow";
+import { CommandItem, isIdle } from "./CommandHistory";
+import { PlanPrompt, PLAN_TOOL, QUESTION_TOOL, QuestionPrompt } from "./PermissionPrompts";
 
 interface Props { sessionId: string; version: number; onChange: () => void }
 
+/** The permissions' frame: a card of its own, or a section inside the conversation. */
+function PermissionsFrame({ inline, children }: { inline: boolean; children: ReactNode }) {
+  const { t } = useI18n();
+  return inline
+    ? <div className="chat-permissions"><h3 className="sub">{t("session.permissions")}</h3>{children}</div>
+    : <Card title={t("session.permissions")} className="card-attention">{children}</Card>;
+}
+
 /** Tool calls waiting for permission: the session's owner allows or denies them from here. */
-export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Props & { canAnswer: boolean }) {
+export function PermissionsCard({ sessionId, canAnswer, version, onChange, inline }: Props & { canAnswer: boolean; inline?: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [rows, setRows] = useState<PermissionRow[]>([]);
@@ -22,9 +33,9 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Pro
   }, [load, version]);
 
   if (rows.length === 0) return null;
-  const answer = async (id: string, decision: "allow" | "deny") => {
+  const answer = async (id: string, decision: "allow" | "deny", answers?: Record<string, string>) => {
     try {
-      await api.answer(id, decision, reasons[id]?.trim() || undefined);
+      await api.answer(id, decision, reasons[id]?.trim() || undefined, answers);
       setRows((r) => r.filter((p) => p.id !== id));
       onChange();
     } catch (e) {
@@ -33,7 +44,7 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Pro
   };
 
   return (
-    <Card title={t("session.permissions")} className="card-attention">
+    <PermissionsFrame inline={inline === true}>
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
       {rows.map((p) => (
         <div key={p.id} className="permission">
@@ -41,24 +52,26 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Pro
             <strong>{p.toolName}</strong>
             <span className="muted small">{t("session.expires")}: {time(p.expiresAt)}</span>
           </div>
-          <Json value={p.toolInput} />
+          {p.toolName === PLAN_TOOL ? <PlanPrompt input={p.toolInput} /> : p.toolName === QUESTION_TOOL ? null : <Json value={p.toolInput} />}
+          {canAnswer && p.toolName === QUESTION_TOOL ? <QuestionPrompt input={p.toolInput} onAnswer={(answers) => void answer(p.id, "allow", answers)} /> : null}
           {canAnswer ? (
             <div className="permission-actions">
               <input className="input" placeholder={t("session.reason")} maxLength={config.reasonMax} value={reasons[p.id] ?? ""}
                 onChange={(e) => setReasons({ ...reasons, [p.id]: e.target.value })} />
-              <Button onClick={() => void answer(p.id, "allow")}>{t("session.allow")}</Button>
-              <Button variant="danger" onClick={() => void answer(p.id, "deny")}>{t("session.deny")}</Button>
+              {p.toolName === QUESTION_TOOL ? null : <Button onClick={() => void answer(p.id, "allow")}>{p.toolName === PLAN_TOOL ? t("chat.approvePlan") : t("session.allow")}</Button>}
+              <Button variant="danger" onClick={() => void answer(p.id, "deny")}>{p.toolName === PLAN_TOOL ? t("chat.rejectPlan") : t("session.deny")}</Button>
             </div>
           ) : <p className="muted small">{t("session.onlyOwner")}</p>}
         </div>
       ))}
-    </Card>
+    </PermissionsFrame>
   );
 }
 
 /** Send a prompt or a stop to the session, and what was sent before. */
-export function CommandsCard({ sessionId, canCommand, ended, version, onChange }: Props & { canCommand: boolean; ended: boolean }) {
+export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, version, onChange }: Props & { canCommand: boolean; ended: boolean; lastEventAt: string }) {
   const { t } = useI18n();
+  const now = useNow(config.clockTickMs);
   const errorText = useErrorText();
   const [rows, setRows] = useState<CommandRow[]>([]);
   const [text, setText] = useState("");
@@ -103,6 +116,7 @@ export function CommandsCard({ sessionId, canCommand, ended, version, onChange }
         <div className="compose">
           <textarea className="input" rows={3} maxLength={config.promptMax} placeholder={t("session.promptPlaceholder")}
             value={text} onChange={(e) => setText(e.target.value)} />
+          {isIdle(lastEventAt, now) ? <Notice kind="info">{t("session.idleWarning")}</Notice> : null}
           <div className="compose-actions">
             <Button variant="danger" busy={busy} onClick={() => void send("stop")}>{t("session.stop")}</Button>
             <Button busy={busy} onClick={() => void send("prompt")}>{t("session.send")}</Button>
@@ -112,14 +126,7 @@ export function CommandsCard({ sessionId, canCommand, ended, version, onChange }
       <h3 className="sub">{t("session.history")}</h3>
       {rows.length === 0 ? <p className="muted">{t("session.noCommands")}</p> : (
         <ul className="plain commands">
-          {rows.map((c) => (
-            <li key={c.id}>
-              <span className={`badge status-${c.status}`}>{t(`commandStatus.${c.status}` as never)}</span>
-              <span>{c.kind === "stop" ? t("session.stop") : c.body}</span>
-              <span className="muted small">{dateTime(c.createdAt)}</span>
-              {canCommand && c.status === "queued" ? <button type="button" className="link" onClick={() => void cancel(c.id)}>{t("session.cancel")}</button> : null}
-            </li>
-          ))}
+          {rows.map((c) => <CommandItem key={c.id} command={c} sessionId={sessionId} ended={ended} now={now} canCancel={canCommand} onCancel={(id) => void cancel(id)} />)}
         </ul>
       )}
     </Card>

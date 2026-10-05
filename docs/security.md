@@ -20,6 +20,7 @@ permission answer to a session running on someone's machine. Those two facts dri
 | Local surface | The agent opens no network port: hooks and the daemon share a SQLite file in the user-only home directory. Commands arrive over the agent's own outbound connection. |
 | Captured content | Secret patterns masked by the agent by default; never written to logs; size-capped per event; archived and removed from the database after the workspace's retention period. |
 | Commands and permission answers | Owner only; expire; audited; report their outcome. |
+| Push into a session | Opt-in ([ADR-0003](adr-0003-push-into-idle-session.md)). The text is untrusted: wrapped, labelled `origin="web"`, capped, wrapper-closing sequences defused, and the session is instructed to treat it as data and ask the user before side-effecting requests (an instruction to the model, not a sandbox). Exactly once by message id; a push is `applied` only when it shows in the transcript, never on a silent drop. No new credential. |
 | Audit | `audit_events` for sign-in and its failures, linking, invitations, roles, device approvals, revocations, settings, commands, permission answers and account deletion. |
 | Transport | HTTPS only (Cloudflare to the server with an Origin certificate); the API is served under the web's own host (global #17). |
 

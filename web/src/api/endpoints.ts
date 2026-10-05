@@ -51,8 +51,9 @@ export const api = {
   sendCommand: (id: string, kind: "prompt" | "stop", body?: string) => request<{ id: string }>("POST", `/sessions/${id}/commands`, { kind, body }),
   cancelCommand: (commandId: string) => request<void>("POST", `/commands/${commandId}/cancel`),
   permissions: (id: string, status?: string) => request<PermissionRow[]>("GET", `/sessions/${id}/permission-requests${q({ status })}`),
-  answer: (permissionId: string, decision: "allow" | "deny", reason?: string) =>
-    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason }),
+  /** `answers` (question text -> the option chosen) is only for the question tool's request, with an allow. */
+  answer: (permissionId: string, decision: "allow" | "deny", reason?: string, answers?: Record<string, string>) =>
+    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason, answers }),
 
   agents: (id: string) => request<AgentRow[]>("GET", `/workspaces/${id}/agents`),
   revokeAgent: (agentId: string) => request<void>("POST", `/agents/${agentId}/revoke`),

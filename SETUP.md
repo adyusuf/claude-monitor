@@ -79,6 +79,45 @@ installed binary, so Claude Code starts the agent with its sessions; nothing is 
 the `claude` CLI on `PATH` it prints the two `claude plugin` commands to run. The agent's tokens are in the macOS
 Keychain / Windows Credential Manager (service `claude-monitor-agent`); its log is `agent.log` in the agent home.
 
+A prompt sent from the web enters a session only when something is typed in it or a turn ends; an idle session takes
+it at neither, so it stays "delivered" until it expires. `cm-agent install --stop-wait 120` makes a finished turn wait
+up to 120 s (0-590, default 0) for a prompt from the web and start a new turn from it; the value is saved in
+`agent.json` and the hooks are rewritten (hook timeout = wait + 15 s), so re-run `install` after changing it.
+`cm-agent status` prints `commands waiting: N (oldest expires HH:mm)` and `stop wait: N s`. Reasons for the default of 0:
+ADR-0002, "Commands from the web".
+
+### Pushing web messages into an idle session (opt-in)
+
+Off by default. `cm-agent install --push on` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
+Claude Code **channel**: a prompt sent from the web starts a turn in an idle session within about a second, wrapped as
+`<<<claude-monitor-message …>>>` and labelled as coming from the web (untrusted: the session is told to treat it as data and
+to ask you before any request with side effects). A channel is a Claude Code research preview and a custom one is not on its
+allowlist, so Claude Code must be started with the flag `install` prints:
+
+```bash
+claude --dangerously-load-development-channels plugin:monitor-agent@monitor-agent-local   # accept the "local development" prompt
+```
+
+Without the flag (or where an organisation has channels off) nothing is lost: a pushed message that does not show up in the
+session transcript within 120 s goes back to the hooks and arrives at the next prompt, as before. `--push off` (or
+`CM_PUSH=off`) removes it. `CM_PUSH_SCOPE=machine` pushes every prompt of the machine instead of only this session's (single-session
+machines only). **No new token or secret:** the daemon uses the credential `cm-agent login` stored in the OS credential store; the MCP process
+never touches the network. Revoke it from the web's Machines page; rotation is `cm-agent logout` + `cm-agent login`. `monitor_status` and `cm-agent
+status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
+or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
+
+The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS and `%USERPROFILE%\.claude-monitor` on
+Windows (`CM_AGENT_HOME` overrides both); `cm-agent status` prints it as `home:`. It is deliberately **not** under
+`%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
+redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
+(ADR-0002, "Home outside AppData").
+
+**Upgrading a Windows machine** that used the old default (`%LOCALAPPDATA%\ClaudeMonitor`): the first start of the new
+`cm-agent` copies `agent.json` to the new home (no new login; `agent.db` is not moved, so events not yet uploaded are
+lost). The old plugin keeps running the old binary until you run `cm-agent install` again with the new one; do that
+from a normal terminal, then check that `cm-agent status` and `monitor_status` in a new Claude session show the same
+`home:`. The old folder is left in place and can be deleted afterwards.
+
 ## Browser tests (e2e)
 
 Playwright (`e2e/`, Chromium and WebKit) drives the real web app and API. It is optional (global #33): the

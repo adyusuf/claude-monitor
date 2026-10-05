@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-public sealed class HookRunnerTests : IDisposable
+public sealed partial class HookRunnerTests : IDisposable
 {
     private static readonly DateTimeOffset Start = new(2026, 10, 3, 12, 0, 0, TimeSpan.Zero);
     private readonly TempHome home = new();
@@ -106,7 +106,7 @@ public sealed class HookRunnerTests : IDisposable
         var output = JsonNode.Parse((await Run("PreToolUse", new { session_id = "s1", tool_name = "Bash" }))!)!;
         Assert.False(output["continue"]!.GetValue<bool>());
         Assert.Null(await Run("PreToolUse", new { session_id = "s1", tool_name = "Bash" }));
-        Assert.Equal(["c1"], store.TakenCommands());
+        Assert.Equal(["c1"], store.TakenCommands().Select(t => t.Id));
     }
 
     [Fact]

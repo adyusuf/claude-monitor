@@ -34,6 +34,7 @@ public sealed class CommandLineTests : IDisposable
         var (code, status) = await Cli_("status");
         Assert.Equal(1, code);
         Assert.Contains("not connected", status, StringComparison.Ordinal);
+        Assert.StartsWith($"home: {home.Config.Home}{Environment.NewLine}", status, StringComparison.Ordinal);
         Assert.Contains("daemon: not running", status, StringComparison.Ordinal);
         Assert.Equal("--x", Cli.Option(["a", "--server", "--x"], "--server"));
         Assert.Null(Cli.Option(["--server"], "--server"));

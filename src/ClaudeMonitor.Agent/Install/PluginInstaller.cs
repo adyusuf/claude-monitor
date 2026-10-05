@@ -28,6 +28,11 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         ("SessionEnd", false, 5),
     ];
 
+    public const string McpServerName = "claude-monitor";
+
+    /// <summary>How Claude Code must be started for the push to arrive: a channel is research-preview and not on the allowlist (ADR-0003).</summary>
+    public static readonly string ChannelFlag = $"--dangerously-load-development-channels plugin:{AgentConfig.PluginName}@{AgentConfig.MarketplaceName}";
+
     public string BinaryPath => Path.Combine(config.Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
 
     public int Install(string sourceBinary)
@@ -52,6 +57,12 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         }
 
         output.WriteLine($"Installed. Claude Code starts the agent with its sessions. Binary: {BinaryPath}");
+        output.WriteLine(config.StopWait > TimeSpan.Zero
+            ? $"A finished turn waits up to {(int)config.StopWait.TotalSeconds} s for a prompt from the web."
+            : "A finished turn does not wait for the web (cm-agent install --stop-wait <seconds> changes that).");
+        output.WriteLine(config.PushEnabled
+            ? $"Push is ON. Start Claude Code with:  claude {ChannelFlag}  (a channel is a research preview; the agent cannot enable it for you)."
+            : "Web messages reach a session at its next prompt (cm-agent install --push on delivers them into an idle session).");
         return 0;
     }
 
@@ -81,13 +92,16 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
                 ["description"] = "Reports this machine's sessions to Claude Monitor and carries its commands back.",
             }),
         });
-        Write(Path.Combine(plugin, ".claude-plugin", "plugin.json"), new JsonObject
+        var manifest = new JsonObject
         {
             ["name"] = AgentConfig.PluginName,
             ["version"] = AgentConfig.Version,
             ["description"] = "Claude Monitor agent: hooks and an MCP server that run the installed cm-agent.",
             ["author"] = new JsonObject { ["name"] = "Claude Monitor" },
-        });
+        };
+        // Push on: the MCP server is also a channel (ADR-0003). Without the entry (the default) the plugin is what it was.
+        if (config.PushEnabled) manifest["channels"] = new JsonArray(new JsonObject { ["server"] = McpServerName, ["displayName"] = "Claude Monitor" });
+        Write(Path.Combine(plugin, ".claude-plugin", "plugin.json"), manifest);
         var hooks = new JsonObject();
         foreach (var (name, isAsync, timeout) in Hooks)
         {
@@ -109,7 +123,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         {
             ["mcpServers"] = new JsonObject
             {
-                ["claude-monitor"] = new JsonObject { ["command"] = BinaryPath, ["args"] = new JsonArray("mcp") },
+                [McpServerName] = new JsonObject { ["command"] = BinaryPath, ["args"] = new JsonArray("mcp") },
             },
         });
     }

@@ -72,6 +72,14 @@ public sealed class CommandTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task An_idle_agent_stream_opens_at_once_with_a_ready_message()
+    {
+        var (_, _, agent, _, _) = await SetupAsync();
+        using var stream = await OpenAsync(agent.Http, "/api/agent/stream"); // returns only when the headers arrive: no wait for the first ping
+        await NextEventAsync(stream, AgentStreamEvents.Ready);
+    }
+
+    [Fact]
     public async Task Only_the_owner_commands_even_an_admin_cannot()
     {
         var (owner, admin, _, id, _) = await SetupAsync();
@@ -134,6 +142,36 @@ public sealed class CommandTests(ApiFactory api)
         Assert.Equal("answered", polled.GetProperty("status").GetString());
         Assert.Equal(HttpStatusCode.NotFound, (await agent.Http.GetAsync($"/api/agent/permission-requests/{Guid.NewGuid()}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await owner.PostAsync($"/api/permission-requests/{Guid.NewGuid()}/answer", new { decision = "allow" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_question_is_answered_with_a_chosen_option_and_nothing_else_is_accepted()
+    {
+        var (owner, admin, agent, _, external) = await SetupAsync();
+        async Task<Guid> Ask(string tool, object input) => (await (await agent.Http.PostAsJsonAsync("/api/agent/permission-requests",
+            new PermissionRequestCreate(HarnessKinds.ClaudeCode, external, tool, JsonSerializer.SerializeToElement(input), 120), TestUser.Json))
+            .Content.ReadFromJsonAsync<PermissionRequestCreated>(TestUser.Json))!.Id;
+        var options = new[] { new { label = "Left", description = "" }, new { label = "Right", description = "" } };
+        var question = await Ask("AskUserQuestion", new { questions = new[] { new { question = "Which way?", header = "Way", multiSelect = false, options } } });
+        var bash = await Ask("Bash", new { command = "ls" });
+        var malformed = await Ask("AskUserQuestion", new { questions = "none" });
+        using var stream = await OpenAsync(agent.Http, "/api/agent/stream");
+        Task<HttpStatusCode> Answer(Guid id, object body, TestUser? as_ = null) => (as_ ?? owner).PostAsync($"/api/permission-requests/{id}/answer", body).ContinueWith(t => t.Result.StatusCode);
+        var chosen = new Dictionary<string, string> { ["Which way?"] = "Right" };
+
+        Assert.Equal(HttpStatusCode.Forbidden, await Answer(question, new { decision = "allow", answers = chosen }, admin));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(bash, new { decision = "allow", answers = chosen })); // only the question tool takes answers
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(malformed, new { decision = "allow", answers = chosen }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "deny", answers = chosen })); // a refusal chooses nothing
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string>() }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string> { ["Another?"] = "x" } }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string> { ["Which way?"] = " " } }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string> { ["Which way?"] = new string('x', 501) } }));
+        Assert.Equal(HttpStatusCode.NoContent, await Answer(question, new { decision = "allow", answers = chosen }));
+        var message = await NextEventAsync(stream, AgentStreamEvents.PermissionAnswer);
+        Assert.Equal("allow", message.GetProperty("decision").GetString());
+        Assert.Equal("Right", message.GetProperty("answers").GetProperty("Which way?").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, await Answer(question, new { decision = "allow", answers = chosen }));
     }
 
     [Fact]
