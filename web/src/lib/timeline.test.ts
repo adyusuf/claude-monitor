@@ -41,6 +41,11 @@ describe("classifying events", () => {
       [userLine("typed text"), ActivityClass.HumanInput],
       [userLine([{ type: "text", text: "typed in blocks" }]), ActivityClass.HumanInput],
       [userLine("injected", 0, { isMeta: true }), ActivityClass.Meta],
+      [userLine("<task-notification>\n<task-id>b1</task-id> done</task-notification>"), ActivityClass.Meta],
+      [userLine("<command-name>/clear</command-name>"), ActivityClass.Meta],
+      [userLine([{ type: "text", text: "<system-reminder>be brief</system-reminder>" }]), ActivityClass.Meta],
+      [userLine("<pasted_content id=\"1\">log text</pasted_content> what is wrong?"), ActivityClass.HumanInput],
+      [userLine("a < b and <b>bold</b> are fine to type"), ActivityClass.HumanInput],
       [transcript({ type: "attachment", attachment: {} }), ActivityClass.Meta],
       [transcript({ type: "summary" }), ActivityClass.Meta],
     ];
@@ -95,6 +100,17 @@ describe("one timeline for events and web commands", () => {
 
   it("keeps a typed transcript line that has no prompt hook (a harness without the hook)", () => {
     expect(classes([userLine("typed without a hook")])).toEqual([ActivityClass.HumanInput]);
+  });
+
+  it("never makes a line the harness wrote (a task notice, a command echo) a human input", () => {
+    const notice = userLine("<task-notification>done</task-notification>", 5);
+    expect(classes([notice])).toEqual([ActivityClass.Meta]);
+    expect(transcriptUserText(notice)).toBe("");
+  });
+
+  it("drops the transcript twin of a prompt hook even when the prompt begins with a tag", () => {
+    const text = "<div>why does this break?</div>";
+    expect(classes([ev("hook:UserPromptSubmit", { prompt: text }, 1), userLine(text, 2)])).toEqual([ActivityClass.HumanInput]);
   });
 
   it("never makes a tool result a human input", () => {

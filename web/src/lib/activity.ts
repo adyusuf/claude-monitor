@@ -45,13 +45,27 @@ const str = (p: Record<string, unknown>, key: string) => (typeof p[key] === "str
 const toolDetail = (input: Record<string, unknown> | undefined) =>
   input ? String(input.command ?? input.file_path ?? input.description ?? input.pattern ?? "") : "";
 
-/** The text a person typed, from a transcript "user" line; "" when the line is a tool result, a meta line or has no text. */
-export function transcriptUserText(e: EventRow): string {
+/**
+ * Text the harness itself writes as a "user" line (background task notices, slash-command echoes, reminders, shell
+ * output): it opens with a lower-case tag such as <task-notification>. A person did not type it. The one tag that does
+ * wrap typed text is the desktop app's pasted content.
+ */
+const SYSTEM_TEXT = /^\s*<(?!pasted_content\b)[a-z][a-z0-9_-]*[\s>]/;
+export const isSystemText = (text: string) => SYSTEM_TEXT.test(text);
+
+/** The text of a transcript "user" line, whoever wrote it; "" for a tool result, a meta line or a line without text. */
+export function userLineText(e: EventRow): string {
   const p = e.payload;
   if (e.kind !== EventKind.Transcript || str(p, "type") !== TranscriptType.User || p.isMeta === true) return "";
   const parts = blocks(p);
   if (parts.some((b) => b.type === ContentType.ToolResult)) return "";
   return parts.filter((b) => b.type === ContentType.Text).map((b) => b.text ?? "").join("\n").trim();
+}
+
+/** The text a PERSON typed, from a transcript "user" line; "" when the line is a tool result, a meta line or written by the harness. */
+export function transcriptUserText(e: EventRow): string {
+  const text = userLineText(e);
+  return isSystemText(text) ? "" : text;
 }
 
 /** Which class an event belongs to. A transcript user line with text is a HUMAN input candidate: the timeline decides whether it only repeats a hook. */

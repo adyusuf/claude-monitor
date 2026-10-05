@@ -1,6 +1,6 @@
 import type { CommandRow, EventRow } from "../api/types";
 import { config } from "../config";
-import { ActivityClass, type ActivityClassName, classifyEvent, CommandKind, CommandStatus, EventKind, summary, TranscriptType, transcriptUserText } from "./activity";
+import { ActivityClass, type ActivityClassName, classifyEvent, CommandKind, CommandStatus, EventKind, summary, TranscriptType, userLineText } from "./activity";
 
 /** One line of the Activity list: a session event, or a command sent from the web. */
 export interface TimelineItem {
@@ -103,13 +103,10 @@ export function buildTimeline(events: EventRow[], commands: CommandRow[], hasOld
     oldest = Math.min(oldest, at);
     if (echoesCommand(e, at, applied)) continue;
     const cls = classifyEvent(e);
-    if (cls === ActivityClass.HumanInput && e.kind === EventKind.Transcript) {
-      const text = transcriptUserText(e);
-      const left = prompts.get(text) ?? 0;
-      if (left > 0) {
-        prompts.set(text, left - 1);
-        continue;
-      }
+    const typed = userLineText(e);
+    if (typed && (prompts.get(typed) ?? 0) > 0) {
+      prompts.set(typed, prompts.get(typed)! - 1);
+      continue;
     }
     items.push({ key: `e${e.id}`, cls, at, tie: e.id, text: summary(e), event: e, pending: false, withHuman: false });
   }
