@@ -75,11 +75,11 @@ public sealed partial class LocalStore
         return list;
     }
 
-    /// <summary>The prompt reached the session (its id is in the transcript): it counts as applied, and the web is told.</summary>
+    /// <summary>The prompt reached the session (its id is in the transcript): it counts as applied (at the moment it was seen), and the web is told.</summary>
     public bool ConfirmPush(string id, DateTimeOffset now)
     {
         using var tx = db.BeginTransaction(deferred: false);
-        var done = Exec("UPDATE commands SET state = 'taken' WHERE id = $i AND state = 'pushed'", tx, ("$i", id)) == 1;
+        var done = Exec("UPDATE commands SET state = 'taken', taken_at = $t WHERE id = $i AND state = 'pushed'", tx, ("$i", id), ("$t", Iso(now))) == 1;
         if (done) Exec("UPDATE pushes SET confirmed_at = $t WHERE command_id = $i", tx, ("$t", Iso(now)), ("$i", id));
         tx.Commit();
         return done;

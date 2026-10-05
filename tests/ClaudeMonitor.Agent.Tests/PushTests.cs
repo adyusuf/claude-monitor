@@ -99,7 +99,7 @@ public sealed class PushTests : IDisposable
         Assert.Equal(2, store.TakePromptsForPush("s-1", CommandKinds.Prompt, clock.GetUtcNow()).Count);
         Assert.True(store.ConfirmPush("c-1", clock.GetUtcNow()));
         Assert.False(store.ConfirmPush("c-1", clock.GetUtcNow())); // once
-        Assert.Equal(["c-1"], store.TakenCommands()); // now it is reported as applied
+        Assert.Equal([new TakenCommand("c-1", clock.GetUtcNow())], store.TakenCommands()); // now it is reported as applied, at the moment it was seen
         Assert.Equal(1, store.PushedTotal());
         store.PushFailed("c-2");
         Assert.Equal("c-2", store.TakeCommand("s-1", CommandKinds.Prompt, clock.GetUtcNow())!.Id);

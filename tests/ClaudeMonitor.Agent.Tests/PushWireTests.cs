@@ -157,7 +157,7 @@ public sealed class PushWireTests : IDisposable
         ]);
         store.TrackTranscript(new TranscriptCursor("s-1", HarnessKinds.ClaudeCode, transcript, 0, null, null, null), Start);
         new TranscriptTailer(home.Config, store, new ManualClock(Start)).RunOnce();
-        Assert.Equal(["c-2"], store.TakenCommands());
+        Assert.Equal(["c-2"], store.TakenCommands().Select(t => t.Id));
         Assert.Equal("c-1", Assert.Single(store.UnconfirmedPushes()).Id);
     }
 
