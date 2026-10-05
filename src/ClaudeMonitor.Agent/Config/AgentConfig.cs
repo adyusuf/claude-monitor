@@ -11,6 +11,13 @@ public sealed record AgentConfig
     /// <summary>The user-only directory holding the local database, the lock and the agent's identity file.</summary>
     public required string Home { get; init; }
 
+    /// <summary>
+    /// The folder an older agent used as its default home, set only when <see cref="Home"/> is the default and an older
+    /// default exists (Windows: %LOCALAPPDATA%\ClaudeMonitor). <see cref="HomeMigration"/> copies the identity file from it.
+    /// Null when CM_AGENT_HOME is set: an explicit home is never migrated.
+    /// </summary>
+    public string? MigrateFrom { get; init; }
+
     /// <summary>The API's origin when none is saved yet (set by "cm-agent login --server").</summary>
     public string? ServerOverride { get; init; }
 
@@ -69,16 +76,18 @@ public sealed record AgentConfig
     /// <summary>The OS code the API knows ("macos" / "windows"); anything else is refused at login.</summary>
     public static string Os => OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "unsupported";
 
-    public static AgentConfig FromEnvironment(Func<string, string?>? read = null)
+    public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null)
     {
         read ??= Environment.GetEnvironmentVariable;
+        legacyHome ??= LegacyHome;
         static TimeSpan Seconds(string? value, TimeSpan fallback, int max) =>
             int.TryParse(value, out var s) && s >= 0 ? TimeSpan.FromSeconds(Math.Min(s, max)) : fallback;
 
-        var home = read("CM_AGENT_HOME") is { Length: > 0 } h ? h : DefaultHome();
+        var explicitHome = read("CM_AGENT_HOME") is { Length: > 0 };
         return new AgentConfig
         {
-            Home = home,
+            Home = explicitHome ? read("CM_AGENT_HOME")! : DefaultHome(),
+            MigrateFrom = explicitHome ? null : legacyHome(),
             ServerOverride = read("CM_SERVER") is { Length: > 0 } s ? s.TrimEnd('/') : null,
             CredentialStore = read("CM_CREDENTIALS") == "file" ? "file" : "keychain",
             PermissionWait = Seconds(read("CM_PERMISSION_WAIT"), TimeSpan.FromSeconds(120), 590),
@@ -86,12 +95,21 @@ public sealed record AgentConfig
         };
     }
 
-    /// <summary>macOS: ~/Library/Application Support/ClaudeMonitor; Windows: %LOCALAPPDATA%\ClaudeMonitor.</summary>
-    public static string DefaultHome() =>
-        OperatingSystem.IsWindows()
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClaudeMonitor")
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support",
-                "ClaudeMonitor");
+    /// <summary>
+    /// macOS: ~/Library/Application Support/ClaudeMonitor; Windows: %USERPROFILE%\.claude-monitor. Not under AppData: the
+    /// Claude desktop app is a packaged (MSIX) app, and every process it starts sees %LOCALAPPDATA% redirected to a private
+    /// copy, so a login made in a normal terminal was invisible to its hooks and MCP server.
+    /// </summary>
+    public static string DefaultHome() => HomeFor(OperatingSystem.IsWindows(), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+
+    /// <summary>The older Windows default (%LOCALAPPDATA%\ClaudeMonitor), kept only to migrate from and to find old installs; null on macOS.</summary>
+    public static string? LegacyHome() =>
+        OperatingSystem.IsWindows() ? LegacyHomeFor(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)) : null;
+
+    public static string HomeFor(bool windows, string userProfile) =>
+        windows ? Path.Combine(userProfile, ".claude-monitor") : Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor");
+
+    public static string LegacyHomeFor(string localAppData) => Path.Combine(localAppData, "ClaudeMonitor");
 
     /// <summary>Creates the home directory readable by the user only.</summary>
     public void EnsureHome()

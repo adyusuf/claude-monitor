@@ -27,6 +27,7 @@ public static class Cli
     {
         ArgumentNullException.ThrowIfNull(args);
         var log = new AgentLog(config, clock);
+        HomeMigration.Run(config, log);
         switch (args.FirstOrDefault())
         {
             case "hook" when args.Length > 1:
@@ -103,6 +104,7 @@ public static class Cli
         var identity = Identity.Load(config);
         using var store = new LocalStore(config.DatabasePath);
         using var probe = DaemonHost.TryLock(config.LockPath);
+        await stdout.WriteLineAsync($"home: {config.Home}");
         await stdout.WriteLineAsync(identity.Connected ? $"connected: {identity.Server}" : "not connected (cm-agent login --server <url>)");
         await stdout.WriteLineAsync($"daemon: {(probe is null ? "running" : "not running")}");
         await stdout.WriteLineAsync($"events waiting: {store.OutboxCount()}");
