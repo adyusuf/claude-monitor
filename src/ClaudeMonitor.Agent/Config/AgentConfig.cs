@@ -38,6 +38,9 @@ public sealed record AgentConfig
     public static readonly TimeSpan ConnectionLifetime = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan ConnectionIdle = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>The head start of one address before the next is tried beside it (RFC 8305 §5 recommends 250 ms).</summary>
+    public static readonly TimeSpan ConnectStagger = TimeSpan.FromMilliseconds(250);
     public int BatchEvents { get; init; } = 200;
     public int BatchBytes { get; init; } = 4 * 1024 * 1024;
     public int EventMaxBytesDefault { get; init; } = 262_144;

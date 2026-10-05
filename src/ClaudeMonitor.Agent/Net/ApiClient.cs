@@ -40,6 +40,7 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials) : I
         PooledConnectionLifetime = AgentConfig.ConnectionLifetime,
         PooledConnectionIdleTimeout = AgentConfig.ConnectionIdle,
         ConnectTimeout = AgentConfig.ConnectTimeout,
+        ConnectCallback = HappyEyeballs.ConnectAsync,
     };
 
     public void SaveTokens(TokenResponse tokens)
