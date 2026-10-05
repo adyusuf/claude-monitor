@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/endpoints";
 import type { CommandRow, PermissionRow } from "../api/types";
 import { Button, Card, Json, Notice } from "../components/ui";
@@ -10,8 +10,16 @@ import { CommandItem, isIdle } from "./CommandHistory";
 
 interface Props { sessionId: string; version: number; onChange: () => void }
 
+/** The permissions' frame: a card of its own, or a section inside the conversation. */
+function PermissionsFrame({ inline, children }: { inline: boolean; children: ReactNode }) {
+  const { t } = useI18n();
+  return inline
+    ? <div className="chat-permissions"><h3 className="sub">{t("session.permissions")}</h3>{children}</div>
+    : <Card title={t("session.permissions")} className="card-attention">{children}</Card>;
+}
+
 /** Tool calls waiting for permission: the session's owner allows or denies them from here. */
-export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Props & { canAnswer: boolean }) {
+export function PermissionsCard({ sessionId, canAnswer, version, onChange, inline }: Props & { canAnswer: boolean; inline?: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [rows, setRows] = useState<PermissionRow[]>([]);
@@ -35,7 +43,7 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Pro
   };
 
   return (
-    <Card title={t("session.permissions")} className="card-attention">
+    <PermissionsFrame inline={inline === true}>
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
       {rows.map((p) => (
         <div key={p.id} className="permission">
@@ -54,7 +62,7 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Pro
           ) : <p className="muted small">{t("session.onlyOwner")}</p>}
         </div>
       ))}
-    </Card>
+    </PermissionsFrame>
   );
 }
 

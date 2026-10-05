@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { api } from "../api/endpoints";
 import type { EventRow } from "../api/types";
 import { Button, Card, Spinner } from "../components/ui";
@@ -6,8 +7,6 @@ import { config } from "../config";
 import { useI18n } from "../i18n";
 import { buildChat } from "../lib/transcript";
 import { ChatLine } from "./ChatItems";
-
-const KIND = "transcript";
 
 /** Events newest first, merged by id; older ones the page holds stay. */
 const merge = (held: EventRow[], fresh: EventRow[]): EventRow[] => {
@@ -21,7 +20,7 @@ const merge = (held: EventRow[], fresh: EventRow[]): EventRow[] => {
  * rest up. Only the newest page is read at first; scrolling up reads the older ones, so a long session costs what is
  * looked at. A page scrolled up stays where it is when something new arrives.
  */
-export function ChatCard({ sessionId, version }: { sessionId: string; version: number }) {
+export function ChatCard({ sessionId, version, footer }: { sessionId: string; version: number; footer?: ReactNode }) {
   const { t } = useI18n();
   const [held, setHeld] = useState<EventRow[]>([]); // newest first
   const [next, setNext] = useState<string | null>(null);
@@ -37,11 +36,11 @@ export function ChatCard({ sessionId, version }: { sessionId: string; version: n
   const refresh = useCallback(async (initial: boolean) => {
     const known = initial ? null : newest.current;
     const size = initial ? config.chatPageSize : config.chatRefreshSize;
-    let page = await api.events(sessionId, { kind: KIND, limit: size });
+    let page = await api.events(sessionId, { kind: config.chatKinds, limit: size });
     let fetched = page.items;
     // More arrived than one page holds: read back until it meets what the page already has.
     for (let i = 0; known !== null && page.next && fetched.length > 0 && fetched[fetched.length - 1]!.id > known && i < config.chatCatchUpPages; i++) {
-      page = await api.events(sessionId, { kind: KIND, before: page.next, limit: size });
+      page = await api.events(sessionId, { kind: config.chatKinds, before: page.next, limit: size });
       fetched = [...fetched, ...page.items];
     }
     const gap = known !== null && page.next !== null && fetched.length > 0 && fetched[fetched.length - 1]!.id > known;
@@ -57,6 +56,9 @@ export function ChatCard({ sessionId, version }: { sessionId: string; version: n
   useEffect(() => {
     newest.current = null;
     atBottom.current = true;
+    setHeld([]);
+    setNext(null);
+    setUnseen(false);
     setLoaded(false);
     refresh(true).catch(() => setLoaded(true));
   }, [refresh]);
@@ -72,7 +74,7 @@ export function ChatCard({ sessionId, version }: { sessionId: string; version: n
     if (!next || loadingOlder) return;
     setLoadingOlder(true);
     try {
-      const page = await api.events(sessionId, { kind: KIND, before: next, limit: config.chatPageSize });
+      const page = await api.events(sessionId, { kind: config.chatKinds, before: next, limit: config.chatPageSize });
       anchor.current = box.current?.scrollHeight ?? null;
       setHeld((h) => merge(h, page.items));
       setNext(page.next);
@@ -126,6 +128,7 @@ export function ChatCard({ sessionId, version }: { sessionId: string; version: n
           {items.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : <ol className="chat">{items.map((item) => <ChatLine key={item.key} item={item} />)}</ol>}
         </div>
       )}
+      {footer}
       {unseen ? <button type="button" className="chat-new" onClick={toEnd}>{t("chat.newBelow")} ↓</button> : null}
     </Card>
   );

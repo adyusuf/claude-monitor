@@ -65,6 +65,8 @@ export const en = {
     label: "Session conversation", view: "View", view_chat: "Conversation", view_raw: "Raw events", newBelow: "New messages",
     thinking: "Thinking", tool_pending: "running", tool_done: "done", tool_error: "failed", options: "Options",
     answer: "Answer", plan: "Plan", waitingAnswer: "Waiting for an answer", waitingApproval: "Waiting for approval",
+    tool_unknown: "no output", outputTooBig: "The output was too large to keep; the command did return.",
+    note_notification: "Claude is waiting for you:", note_subagent_start: "Subagent started:", note_subagent_stop: "Subagent finished:",
     showAll: "Show all", showLess: "Show less",
   },
   commandStatus: { queued: "Queued", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },

@@ -6,6 +6,8 @@ export const config = {
   pageSize: 25,
   eventPageSize: 50,
   /** The chat reads the newest transcript lines first, then this many more each time the reader scrolls up. */
+  /** What the conversation reads: the transcript, and the hooks that say Claude wants the user or a subagent came and went. */
+  chatKinds: "transcript,hook:Notification,hook:SubagentStart,hook:SubagentStop",
   chatPageSize: 40,
   /** A live refresh reads this many of the newest lines; if more arrived it reads back until it meets what it has. */
   chatRefreshSize: 20,

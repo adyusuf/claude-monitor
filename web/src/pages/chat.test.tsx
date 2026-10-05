@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventRow } from "../api/types";
@@ -6,7 +6,6 @@ import { Markdown } from "../lib/markdown";
 import { buildChat, toolSummary } from "../lib/transcript";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { SessionPage } from "./SessionPage";
-import { render } from "@testing-library/react";
 
 const at = "2026-10-05T10:00:00Z";
 const ev = (id: number, payload: Record<string, unknown>): EventRow => ({ id, kind: "transcript", occurredAt: at, truncated: false, payload });
@@ -70,6 +69,58 @@ describe("buildChat", () => {
     expect(toolSummary("TodoWrite", { todos: [1, 2] })).toBe("2");
     expect(toolSummary("Custom", { prompt: "p" })).toBe("p");
     expect(toolSummary("Custom", {})).toBe("");
+  });
+});
+
+describe("buildChat on large, hook and web-sent lines", () => {
+  const cut = (id: number, preview: string): EventRow => ({ ...ev(id, { truncated: true, bytes: 99999, preview }), truncated: true });
+
+  it("settles a call whose output was cut for size, by the call id the preview still names", () => {
+    const items = buildChat([
+      call(1, "t1", "Bash", { command: "big" }),
+      cut(2, '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"xxxx'),
+      said(3, "after"),
+    ]);
+    expect(items.map((i) => i.kind)).toEqual(["tool", "assistant"]);
+    expect(items[0]).toMatchObject({ result: { shortened: true, isError: false } });
+  });
+
+  it("calls a call settled once anything was said after it, and running only while it is the last thing", () => {
+    const items = buildChat([
+      call(1, "lost", "Bash", { command: "a" }),
+      cut(2, '{"type":"user","message":{"content":[{"type":"tool_result","content":"no id in the preview'),
+      call(3, "late", "Bash", { command: "b" }),
+      call(4, "late2", "Read", { file_path: "/x" }),
+    ]);
+    expect(items.map((i) => i.kind)).toEqual(["tool", "shortened", "tool", "tool"]);
+    expect(items.filter((i) => i.kind === "tool").map((i) => i.kind === "tool" && i.settled)).toEqual([true, false, false]);
+  });
+
+  it("shows a notification and the subagents coming and going as notes, and a web message as the user's", () => {
+    const hook = (id: number, kind: string, payload: Record<string, unknown>): EventRow => ({ id, kind, occurredAt: at, truncated: false, payload });
+    const items = buildChat([
+      hook(1, "hook:Notification", { message: "Claude needs your permission to use Bash" }),
+      hook(2, "hook:SubagentStart", { agent_type: "analyst" }),
+      hook(3, "hook:SubagentStop", { agent_type: "analyst" }),
+      ev(4, { type: "attachment", attachment: { type: "hook_additional_context", content: ["Messages sent to this session from Claude Monitor (the web):\n- run the tests\n- and lint"] } }),
+      ev(5, { type: "attachment", attachment: { type: "hook_additional_context", content: "something else" } }),
+      ev(6, { type: "attachment", attachment: { type: "date" } }),
+      ev(7, { type: "attachment", attachment: { type: "hook_additional_context", content: ["Messages sent to this session from Claude Monitor (the web):"] } }),
+    ]);
+    expect(items).toMatchObject([
+      { kind: "note", tone: "notification", text: "Claude needs your permission to use Bash" },
+      { kind: "note", tone: "subagent_start", text: "analyst" },
+      { kind: "note", tone: "subagent_stop", text: "analyst" },
+      { kind: "user", text: "run the tests\nand lint" },
+    ]);
+  });
+});
+
+describe("a call that waits for the user", () => {
+  it("stays running while only a notification or a subagent's start came after it", () => {
+    const note = (id: number, kind: string): EventRow => ({ id, kind, occurredAt: at, truncated: false, payload: { message: "m", agent_type: "a" } });
+    const items = buildChat([call(1, "t", "Bash", { command: "x" }), note(2, "hook:Notification"), note(3, "hook:SubagentStart")]);
+    expect(items[0]).toMatchObject({ kind: "tool", settled: false });
   });
 });
 
@@ -165,5 +216,111 @@ describe("the conversation on the session page", () => {
     expect(await screen.findByText("No activity recorded.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Conversation" }));
     expect(await screen.findByLabelText("Session conversation")).toBeInTheDocument();
+  });
+});
+
+describe("the conversation: long output, plans, notes, catching up and scrolling", () => {
+  beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (HTMLElement.prototype as { clientHeight?: number }).clientHeight;
+    delete (HTMLElement.prototype as { scrollHeight?: number }).scrollHeight;
+  });
+  const base = (events: (c: { path: string }) => unknown, extra: Record<string, unknown> = {}) => mockApi({
+    "GET /me": { body: ME },
+    "GET /sessions/s1": { body: detail },
+    "GET /sessions/s1/commands": { body: [] },
+    "GET /sessions/s1/permission-requests": { body: [] },
+    "GET /sessions/s1/events": (c: { path: string }) => ({ body: events(c) }),
+    ...extra,
+  } as never);
+
+  it("cuts a long output until asked, and shows a plan, a thought, a note, a running call and an unanswered one", async () => {
+    const long = "line\n".repeat(2000);
+    base(() => ({ items: [
+      call(9, "run", "Bash", { command: "sleep 99" }),
+      ev(8, { type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "p1", name: "ExitPlanMode", input: { plan: "# The plan\n- do it" } }] } }),
+      { id: 7, kind: "hook:Notification", occurredAt: at, truncated: false, payload: { message: "Claude is waiting for your input" } },
+      ev(6, { type: "assistant", message: { role: "assistant", content: [{ type: "thinking", thinking: "let me think" }] } }),
+      back(5, "big", long),
+      call(4, "big", "Bash", { command: "yes" }),
+      call(3, "gone", "Bash", { command: "old" }),
+      said(2, "wrap up"),
+    ], next: null }));
+    renderAt("/w/w1/sessions/s1", route);
+    expect(await screen.findByText("let me think")).toBeInTheDocument();
+    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByText("no output")).toBeInTheDocument();
+    expect(screen.getByText("Claude is waiting for you:", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("Waiting for approval")).toBeInTheDocument();
+    expect(screen.getByText("do it")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("yes"));
+    const pre = () => document.querySelector(".chat-output pre")!.textContent!.length;
+    expect(pre()).toBeLessThan(4100);
+    await userEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(pre()).toBe(long.length);
+    await userEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(pre()).toBeLessThan(4100);
+  });
+
+  it("reads back until it meets what it has when more arrived than a page, and starts over when it cannot meet it", async () => {
+    let mode: "first" | "meets" | "never" = "first";
+    base((c) => {
+      if (mode === "first") return { items: [said(10, "first reply"), said(9, "earlier")], next: "9" };
+      const before = /before=(\d+)/.exec(c.path)?.[1];
+      if (mode === "meets") {
+        if (!before) return { items: [said(15, "reply 15"), said(14, "reply 14")], next: "14" };
+        return { items: [said(13, "reply 13"), said(10, "first reply")], next: "10" };
+      }
+      const top = before ? Number(before) : 1001;
+      return { items: [said(top - 1, `far ${top - 1}`), said(top - 2, `far ${top - 2}`)], next: String(top - 2) };
+    });
+    renderAt("/w/w1/sessions/s1", route);
+    expect(await screen.findByText("first reply")).toBeInTheDocument();
+
+    mode = "meets";
+    act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
+    expect(await screen.findByText("reply 15")).toBeInTheDocument();
+    expect(screen.getByText("reply 13")).toBeInTheDocument();
+    expect(screen.getAllByText("first reply")).toHaveLength(1);
+    expect(screen.getByText("earlier")).toBeInTheDocument();
+    expect([...document.querySelectorAll(".chat-row")].map((r) => r.textContent)).toEqual(["earlier", "first reply", "reply 13", "reply 14", "reply 15"]);
+
+    mode = "never";
+    act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
+    expect(await screen.findByText("far 1000")).toBeInTheDocument();
+    expect(screen.queryByText("earlier")).toBeNull();
+    expect(screen.queryByText("reply 15")).toBeNull();
+  });
+
+  it("reads older pages by itself while the list does not fill the box, and when scrolled to the top", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 500 });
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 100 });
+    const calls = base((c) => {
+      const before = /before=(\d+)/.exec(c.path)?.[1];
+      if (!before) return { items: [said(5, "reply 5")], next: "5" };
+      return before === "5" ? { items: [said(4, "reply 4")], next: "4" } : { items: [said(3, "reply 3")], next: null };
+    });
+    renderAt("/w/w1/sessions/s1", route);
+    expect(await screen.findByText("reply 3")).toBeInTheDocument();
+    expect(calls.filter((c) => c.path.startsWith("/sessions/s1/events"))).toHaveLength(3);
+  });
+
+  it("reads the next older page when the reader scrolls to the top", async () => {
+    base((c) => (c.path.includes("before=") ? { items: [said(4, "reply 4")], next: null } : { items: [said(5, "reply 5")], next: "5" }));
+    renderAt("/w/w1/sessions/s1", route);
+    const box = await screen.findByLabelText("Session conversation");
+    fireEvent.scroll(box);
+    expect(await screen.findByText("reply 4")).toBeInTheDocument();
+  });
+
+  it("shows what waits for permission inside the conversation, where it can be answered", async () => {
+    base(() => ({ items: [said(1, "hello")], next: null }), {
+      "GET /sessions/s1/permission-requests": { body: [{ id: "p1", toolName: "Bash", toolInput: { command: "git push" }, status: "open", createdAt: "", expiresAt: at, decision: null, reason: null, answeredAt: null }] },
+    });
+    renderAt("/w/w1/sessions/s1", route);
+    const waiting = await screen.findByText("Waiting for permission");
+    expect(waiting.closest(".chat-card")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Allow" })).toBeInTheDocument();
   });
 });

@@ -224,6 +224,11 @@ textarea.input { resize: vertical; }
 .chat-option-label { font-weight: 600; }
 .chat-answer { margin: 6px 0 0; color: var(--ok); }
 .chat-shortened { color: var(--muted); }
+.chat-note { font-size: 12.5px; color: var(--muted); }
+.chat-note time { font-family: var(--mono); font-size: 11px; }
+.chat-note-notification { color: var(--warn); }
+.chat-permissions { border-top: 1px solid var(--warn); margin-top: 10px; padding-top: 4px; }
+.chat-note-tone { font-weight: 600; }
 .chat-new { position: absolute; right: 28px; bottom: 28px; background: var(--accent); color: var(--accent-ink); border: none; border-radius: 999px; padding: 6px 14px; font: 600 13px var(--font); cursor: pointer; box-shadow: var(--shadow); }
 .device-code { font-family: var(--mono); font-size: 28px; letter-spacing: 0.15em; margin: 0 0 6px; }
 .downloads { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }

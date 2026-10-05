@@ -164,8 +164,14 @@ The activity of a session is read as Claude's own screen shows it, not as a list
 Claude said, each tool call (a script's command, a file) with its output beside it, and the questions Claude put with
 their options and the one chosen. Oldest at the top, newest at the bottom; a new message pushes the rest up, and a page
 the reader scrolled up stays where it is (a "new messages" button says something came). The source is the `transcript`
-events the agent already captures (`GET /sessions/{id}/events?kind=transcript`), joined by `tool_use_id`; nothing new is
-captured or stored, and the API did not change. **Lazy loading:** only the newest page (40 lines) is read at first, and
+events the agent already captures, plus the `Notification` and `SubagentStart/Stop` hooks (one line each, so the page
+sees when Claude waits for the user), joined by `tool_use_id`; nothing new is captured or stored. The API's one change is
+additive: `GET /sessions/{id}/events?kind=` also takes a comma-separated list (at most 8 kinds); a single kind behaves as
+before. A line the agent cut for size still names its call when the preview reaches the call's id, so that call shows
+"output too large"; a call with no result shows "running" only while nothing but other calls, notes came after it, and
+"no output" otherwise. A message sent from the web while the user typed one reaches Claude as hook context and is shown
+as the user's message (recognised by its fixed header; the transcript's exact shape for it is not yet confirmed on a live
+session). Permission requests waiting for the owner sit at the bottom of the conversation. **Lazy loading:** only the newest page (40 lines) is read at first, and
 scrolling up reads the next older pages, so a session of several megabytes costs what is looked at; a live refresh reads
 the newest 20 and reads back only if more arrived. The raw event list stays one click away ("Raw events"). The page
 renders the text itself (a small Markdown subset built as React elements, never HTML), so captured text cannot inject

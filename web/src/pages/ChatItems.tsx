@@ -20,7 +20,7 @@ function Output({ result }: { result: ToolResult }) {
 
 function ToolCall({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
   const { t } = useI18n();
-  const state = item.result === null ? "pending" : item.result.isError ? "error" : "done";
+  const state = item.result === null ? (item.settled ? "unknown" : "pending") : item.result.isError ? "error" : "done";
   return (
     <details className={`chat-tool chat-tool-${state}`}>
       <summary>
@@ -33,6 +33,7 @@ function ToolCall({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
         ? <pre className="chat-command">$ {item.input.command}</pre>
         : <pre className="chat-input">{JSON.stringify(item.input, null, 2)}</pre>}
       {item.result?.text ? <Output result={item.result} /> : null}
+      {item.result?.shortened ? <p className="muted small chat-note">{t("chat.outputTooBig")}</p> : null}
     </details>
   );
 }
@@ -108,6 +109,12 @@ export function ChatLine({ item }: { item: ChatItem }) {
       return <li className="chat-row" data-kind="plan"><PlanCard item={item} /></li>;
     case "shortened":
       return <li className="chat-row chat-shortened" data-kind="shortened"><span className="badge">{t("session.truncated")}</span> <code>{item.text.slice(0, 200)}</code></li>;
+    case "note":
+      return (
+        <li className={`chat-row chat-note chat-note-${item.tone}`} data-kind="note">
+          <time dateTime={item.at}>{time(item.at)}</time> <span className="chat-note-tone">{t(`chat.note_${item.tone}`)}</span> {item.text}
+        </li>
+      );
     default:
       return null;
   }

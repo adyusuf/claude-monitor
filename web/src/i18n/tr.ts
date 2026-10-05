@@ -67,6 +67,8 @@ export const tr: Dictionary = {
     label: "Oturum konuşması", view: "Görünüm", view_chat: "Konuşma", view_raw: "Ham olaylar", newBelow: "Yeni mesajlar",
     thinking: "Düşünüyor", tool_pending: "çalışıyor", tool_done: "bitti", tool_error: "hata", options: "Seçenekler",
     answer: "Yanıt", plan: "Plan", waitingAnswer: "Yanıt bekleniyor", waitingApproval: "Onay bekleniyor",
+    tool_unknown: "çıktı yok", outputTooBig: "Çıktı saklanamayacak kadar büyüktü; komut sonuç döndürdü.",
+    note_notification: "Claude sizi bekliyor:", note_subagent_start: "Alt ajan başladı:", note_subagent_stop: "Alt ajan bitti:",
     showAll: "Tümünü göster", showLess: "Azalt",
   },
   commandStatus: { queued: "Sırada", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal edildi" },

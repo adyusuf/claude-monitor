@@ -72,8 +72,12 @@ export function SessionPage() {
               <button key={v} type="button" className={view === v ? "seg-on" : ""} aria-pressed={view === v} onClick={() => setView(v)}>{t(`chat.view_${v}`)}</button>
             ))}
           </div>
-          {view === "chat" ? <ChatCard sessionId={id} version={version} /> : <EventsCard sessionId={id} version={version} />}
-          <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
+          {view === "chat"
+            ? <ChatCard sessionId={id} version={version} footer={<PermissionsCard inline sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />} />
+            : <>
+              <EventsCard sessionId={id} version={version} />
+              <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
+            </>}
           <CommandsCard sessionId={id} canCommand={detail.canCommand} ended={s.status === "ended"} lastEventAt={s.lastEventAt} version={version} onChange={reload} />
         </div>
         <div className="col side">
