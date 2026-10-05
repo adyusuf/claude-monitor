@@ -88,6 +88,20 @@ pair and marks the old one `replaced_by`; a reused, already-replaced refresh tok
 The API accepts a command or a permission answer only from the session's owner (`agents.user_id` of the
 session's agent).
 
+**Claude's answer to a command is a view, not a status.** `applied` means the hook handed the text to the session; it
+does not say Claude has answered. `GET /sessions/{id}/commands` adds three fields to each row, computed from
+`session_events` and never stored: `replyEventId` (the event), `replyText` (its first 300 characters) and `replyMore`
+(the message goes on). A command's reply is the first `transcript` event of the same session that is an assistant
+message with a non-blank text block and was written after the command's `applied_at`. "Written" is the transcript
+line's own `timestamp`, else the event's `occurred_at` (the agent stamps an event with the moment it READ the line,
+which can be later). Only an `applied` `prompt` has one; two commands applied together share the first reply written
+after them; an event shortened to a marker (`truncated`) carries no message and is skipped. The web shows
+Applied -> "waiting for Claude's reply" -> "Claude replied" from these fields; `session_commands.status` keeps its
+six values. `applied_at` is the moment the hook handed the command to the session: the agent sends it as `at` with its
+`applied` report (the report itself can come seconds later) and the API believes it unless it is older than the command
+(give or take `ClockSkewMax`, 2 minutes), never later than the report; an older agent sends none and `applied_at` is the
+report's time. The search reads at most `ReplyScanMax` events (500) from the oldest applied command in the page.
+
 ## 6. Audit
 
 | Table | Columns | Keys and indexes |

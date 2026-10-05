@@ -1,3 +1,4 @@
+using System.Globalization;
 using ClaudeMonitor.Contracts;
 using Microsoft.Data.Sqlite;
 
@@ -30,15 +31,33 @@ public sealed partial class LocalStore : IDisposable
                 truncated INTEGER NOT NULL, project_key TEXT, project_name TEXT, git_branch TEXT, batch INTEGER);
             CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS commands (id TEXT PRIMARY KEY, session TEXT NOT NULL, kind TEXT NOT NULL,
-                body TEXT, expires_at TEXT NOT NULL, state TEXT NOT NULL);
+                body TEXT, expires_at TEXT NOT NULL, state TEXT NOT NULL, taken_at TEXT);
             CREATE TABLE IF NOT EXISTS permissions (local_id TEXT PRIMARY KEY, harness TEXT NOT NULL, session TEXT NOT NULL,
                 tool_name TEXT NOT NULL, tool_input TEXT NOT NULL, wait_seconds INTEGER NOT NULL, created_at TEXT NOT NULL,
-                remote_id TEXT, decision TEXT, reason TEXT, state TEXT NOT NULL);
+                remote_id TEXT, decision TEXT, reason TEXT, state TEXT NOT NULL, answers TEXT);
             CREATE TABLE IF NOT EXISTS transcripts (session TEXT PRIMARY KEY, harness TEXT NOT NULL, path TEXT NOT NULL,
                 offset INTEGER NOT NULL, project_key TEXT, project_name TEXT, git_branch TEXT, updated_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS usage_seen (session TEXT NOT NULL, message_id TEXT NOT NULL,
                 PRIMARY KEY (session, message_id));
+            CREATE TABLE IF NOT EXISTS session_bindings (session TEXT PRIMARY KEY, parent_pid INTEGER NOT NULL, seen_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS pushes (command_id TEXT PRIMARY KEY, pushed_at TEXT NOT NULL, confirmed_at TEXT);
             """);
+        AddColumnIfMissing("commands", "taken_at", "TEXT"); // a database made before the hook's hand-over time was kept
+        AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
+    }
+
+    /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>
+    private void AddColumnIfMissing(string table, string column, string type)
+    {
+        if (Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'") ?? 0L, CultureInfo.InvariantCulture) > 0) return;
+        try
+        {
+            Exec($"ALTER TABLE {table} ADD COLUMN {column} {type}");
+        }
+        catch (SqliteException) when (Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'") ?? 0L, CultureInfo.InvariantCulture) > 0)
+        {
+            // the other process added it first
+        }
     }
 
     public void Dispose() => db.Dispose();
@@ -65,6 +84,12 @@ public sealed partial class LocalStore : IDisposable
     }
 
     public long OutboxCount() => (long)(Scalar("SELECT COUNT(*) FROM outbox") ?? 0L);
+
+    /// <summary>When the oldest event still waiting was captured; null when none waits.</summary>
+    public DateTimeOffset? OutboxOldest() =>
+        Scalar("SELECT occurred_at FROM outbox ORDER BY id LIMIT 1") is string at
+            ? DateTimeOffset.Parse(at, System.Globalization.CultureInfo.InvariantCulture)
+            : null;
 
     /// <summary>
     /// The next batch to send. A batch already numbered (sent before, not acknowledged) is resent as it was, with the

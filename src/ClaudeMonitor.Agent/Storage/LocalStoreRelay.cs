@@ -4,8 +4,11 @@ using Microsoft.Data.Sqlite;
 namespace ClaudeMonitor.Agent.Storage;
 
 public sealed record LocalCommand(string Id, string Session, string Kind, string? Body, DateTimeOffset ExpiresAt);
+
+/// <summary>A command a hook took, and when (null for one taken before the agent recorded the time).</summary>
+public sealed record TakenCommand(string Id, DateTimeOffset? At);
 public sealed record PermissionAsk(string LocalId, string Harness, string Session, string ToolName, string ToolInput, int WaitSeconds,
-    DateTimeOffset CreatedAt, string? RemoteId, string? Decision, string? Reason, string State);
+    DateTimeOffset CreatedAt, string? RemoteId, string? Decision, string? Reason, string State, string? Answers = null);
 public sealed record TranscriptCursor(string Session, string Harness, string Path, long Offset, string? ProjectKey, string? ProjectName,
     string? GitBranch);
 
@@ -33,10 +36,13 @@ public sealed partial class LocalStore
             ("$i", c.Id), ("$s", c.Session), ("$k", c.Kind), ("$b", c.Body), ("$e", Iso(c.ExpiresAt)));
     }
 
-    /// <summary>Takes (once) the oldest unexpired command of a kind for a session; a taken command is not taken again.</summary>
+    /// <summary>
+    /// Takes (once) the oldest unexpired command of a kind for a session; a taken command is not taken again. The state
+    /// change is checked, so a hook and the push pump racing for one command cannot both get it.
+    /// </summary>
     public LocalCommand? TakeCommand(string session, string kind, DateTimeOffset now)
     {
-        using var tx = db.BeginTransaction();
+        using var tx = db.BeginTransaction(deferred: false);
         LocalCommand? found = null;
         using (var cmd = Command("SELECT id, body, expires_at FROM commands WHERE session = $s AND kind = $k AND state = 'queued' ORDER BY rowid",
                    tx, ("$s", session), ("$k", kind)))
@@ -49,7 +55,12 @@ public sealed partial class LocalStore
             }
         }
 
-        if (found is not null) Exec("UPDATE commands SET state = 'taken' WHERE id = $i", tx, ("$i", found.Id));
+        if (found is not null
+            && Exec("UPDATE commands SET state = 'taken', taken_at = $t WHERE id = $i AND state = 'queued'", tx, ("$i", found.Id), ("$t", Iso(now))) != 1)
+        {
+            found = null;
+        }
+
         tx.Commit();
         return found;
     }
@@ -69,13 +80,13 @@ public sealed partial class LocalStore
     }
 
     /// <summary>Taken commands whose outcome the daemon has not reported yet.</summary>
-    public List<string> TakenCommands()
+    public List<TakenCommand> TakenCommands()
     {
-        var ids = new List<string>();
-        using var cmd = Command("SELECT id FROM commands WHERE state = 'taken'", null);
+        var taken = new List<TakenCommand>();
+        using var cmd = Command("SELECT id, taken_at FROM commands WHERE state = 'taken'", null);
         using var r = cmd.ExecuteReader();
-        while (r.Read()) ids.Add(r.GetString(0));
-        return ids;
+        while (r.Read()) taken.Add(new TakenCommand(r.GetString(0), Str(r, 1) is { } at ? At(at) : null));
+        return taken;
     }
 
     public void MarkCommandReported(string id) => Exec("UPDATE commands SET state = 'reported' WHERE id = $i", ("$i", id));
@@ -99,9 +110,10 @@ public sealed partial class LocalStore
     public void PermissionSent(string localId, string remoteId) =>
         Exec("UPDATE permissions SET remote_id = $r, state = 'sent' WHERE local_id = $l AND state = 'new'", ("$r", remoteId), ("$l", localId));
 
-    public void PermissionAnswered(string remoteId, string decision, string? reason) =>
-        Exec("UPDATE permissions SET decision = $d, reason = $why, state = 'answered' WHERE remote_id = $r AND state = 'sent'",
-            ("$d", decision), ("$why", reason), ("$r", remoteId));
+    /// <summary>Records the owner's answer; <paramref name="answers"/> is the question tool's chosen options as a JSON object.</summary>
+    public void PermissionAnswered(string remoteId, string decision, string? reason, string? answers = null) =>
+        Exec("UPDATE permissions SET decision = $d, reason = $why, answers = $a, state = 'answered' WHERE remote_id = $r AND state = 'sent'",
+            ("$d", decision), ("$why", reason), ("$a", answers), ("$r", remoteId));
 
     public void PermissionExpired(string localId) =>
         Exec("UPDATE permissions SET state = 'expired' WHERE local_id = $l AND state IN ('new', 'sent')", ("$l", localId));
@@ -110,14 +122,14 @@ public sealed partial class LocalStore
     {
         var list = new List<PermissionAsk>();
         using var cmd = Command($"""
-            SELECT local_id, harness, session, tool_name, tool_input, wait_seconds, created_at, remote_id, decision, reason, state
+            SELECT local_id, harness, session, tool_name, tool_input, wait_seconds, created_at, remote_id, decision, reason, state, answers
             FROM permissions WHERE {where} ORDER BY created_at
             """, null, args);
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
             list.Add(new PermissionAsk(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetInt32(5),
-                At(r.GetString(6)), Str(r, 7), Str(r, 8), Str(r, 9), r.GetString(10)));
+                At(r.GetString(6)), Str(r, 7), Str(r, 8), Str(r, 9), r.GetString(10), Str(r, 11)));
         }
 
         return list;

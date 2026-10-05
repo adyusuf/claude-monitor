@@ -45,6 +45,12 @@ public static class CommandStatuses
     public static readonly IReadOnlySet<string> FromAgent = new HashSet<string> { Delivered, Applied, Failed };
 }
 
+/// <summary>The harness tools whose permission prompt is a question for the person, answered with a choice.</summary>
+public static class QuestionTools
+{
+    public const string AskUserQuestion = "AskUserQuestion";
+}
+
 public static class PermissionDecisions
 {
     public const string Allow = "allow";

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventRow, SessionDetail, SessionRow } from "../api/types";
 import { config } from "../config";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
-import { summary } from "./SessionEvents";
+import { summary } from "../lib/activity";
 import { SessionPage } from "./SessionPage";
 import { SessionsPage } from "./SessionsPage";
 
@@ -89,12 +89,15 @@ describe("one session", () => {
     expect(await screen.findByText("Write the parser")).toBeInTheDocument();
     expect(screen.getByText("analyst")).toBeInTheDocument();
     expect(screen.getByText("12k")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Raw events" }));
     expect(await screen.findByText("Fix the login please")).toBeInTheDocument();
     expect(screen.getByText("Bash · npm test")).toBeInTheDocument();
     expect(screen.getByText("shortened")).toBeInTheDocument();
     await userEvent.click(screen.getByText("Bash · npm test"));
     expect(screen.getByText(/"command":"npm test"/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Older activity" }));
+    expect(screen.queryByText("a note")).not.toBeInTheDocument(); // the quiet lines fold into one closed group
+    await userEvent.click(await screen.findByRole("button", { name: /Tool calls: 1 · Other events: 1/ }));
     expect(await screen.findByText("a note")).toBeInTheDocument();
 
     const permission = (await screen.findByText("Waiting for permission")).closest("section")!;
@@ -115,7 +118,8 @@ describe("one session", () => {
       "POST /commands/c1/cancel": { status: 204 },
     });
     renderAt("/w/w1/sessions/s1", sessionsRoute);
-    expect(await screen.findByText("earlier")).toBeInTheDocument();
+    const history = (await screen.findByRole("heading", { name: "Send to this session" })).closest("section")!;
+    expect(await within(history).findByText("earlier")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(screen.getByText("Write the message to send.")).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/A message for Claude/), "Run the tests");
@@ -150,11 +154,32 @@ describe("one session", () => {
     renderAt("/w/w1/sessions/s1", sessionsRoute);
     expect(await screen.findByText("waiting for the agent on the machine to pick it up · expires in 24m")).toBeInTheDocument();
     expect(screen.getByText("reached the agent, waiting for the session's next step · expires in 1h 35m")).toBeInTheDocument();
-    const rowOf = (body: string) => screen.getByText(body).closest("li")!;
+    const history = screen.getByRole("heading", { name: "Send to this session" }).closest("section")!;
+    const rowOf = (body: string) => within(history).getByText(body).closest("li")!;
     expect(within(rowOf("three")).getByText("Expired (the session was idle)")).toBeInTheDocument();
     expect(within(rowOf("four")).getByText("Expired (the agent never picked it up)")).toBeInTheDocument();
     expect(within(rowOf("four")).queryByText(/expires in/)).not.toBeInTheDocument();
-    expect(rowOf("five")).not.toHaveTextContent(/expires in|waiting/);
+    expect(rowOf("five")).not.toHaveTextContent(/expires in/);
+    expect(within(rowOf("five")).getByText("Waiting for Claude's reply")).toBeInTheDocument(); // applied is not answered
+  });
+
+  it("shows Claude's answer under the command when the live stream says the session changed, without a reload", async () => {
+    let answered = false;
+    const applied = { id: "c1", kind: "prompt", body: "Run the tests", status: "applied", createdBy: "u1", createdAt: "", expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      deliveredAt: null, appliedAt: new Date().toISOString(), result: null };
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /sessions/s1": { body: detail() },
+      "GET /sessions/s1/permission-requests": { body: [] },
+      "GET /sessions/s1/events": { body: { items: [], next: null } },
+      "GET /sessions/s1/commands": () => ({ body: [answered ? { ...applied, replyEventId: 9, replyText: "All 12 tests pass.", replyMore: false } : applied] }),
+    });
+    renderAt("/w/w1/sessions/s1", sessionsRoute);
+    expect(await screen.findByText("Waiting for Claude's reply")).toBeInTheDocument();
+    answered = true;
+    act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
+    expect(await screen.findByText("All 12 tests pass.")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for Claude's reply")).not.toBeInTheDocument();
   });
 
   describe("the idle warning above the prompt box", () => {
@@ -194,7 +219,7 @@ describe("one session", () => {
     expect(await screen.findByText(/Only the person whose machine runs this session/)).toBeInTheDocument();
     expect(screen.getByText("No tasks.")).toBeInTheDocument();
     expect(screen.getByText("No subagents.")).toBeInTheDocument();
-    expect(screen.getByText("No activity recorded.")).toBeInTheDocument();
+    expect(await screen.findByText("No activity recorded.")).toBeInTheDocument();
   });
 
   it("shows a session that cannot be read", async () => {

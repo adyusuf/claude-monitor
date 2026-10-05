@@ -93,8 +93,8 @@ export class FakeAgent {
     return (await this.request.get(`/api/agent/permission-requests/${id}`, { headers: this.headers() })).json();
   }
 
-  async reportCommand(id: string, status: "delivered" | "applied") {
-    const response = await this.request.post(`/api/agent/commands/${id}/status`, { headers: this.headers(), data: { status } });
+  async reportCommand(id: string, status: "delivered" | "applied", at?: string) {
+    const response = await this.request.post(`/api/agent/commands/${id}/status`, { headers: this.headers(), data: { status, at } });
     expect(response.ok()).toBe(true);
   }
 }

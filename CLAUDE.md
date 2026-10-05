@@ -11,6 +11,7 @@ The maintainer's global rules apply; these are this repository's own.
 - **The agent never blocks a session.** Its hook and MCP entry points print to stderr and exit 0.
 - **The agent opens no network port:** hooks and daemon share a SQLite file in the user-only home; it talks to the API outbound.
 - **Fail-closed, workspace-scoped** (#6): every API call checks membership; only a session's owner commands it.
+- **Messages from the web are untrusted input:** whatever reaches a session (hook context or channel push) is wrapped, labelled as coming from the web and capped; push is opt-in (ADR-0003).
 - **Captured content is sensitive:** never logged, masked for secrets by default, deleted after retention.
 - **Host names stay out of the repository;** they live in deployment configuration (#2, #3).
 - **Tests never touch a real database, account or harness configuration.**

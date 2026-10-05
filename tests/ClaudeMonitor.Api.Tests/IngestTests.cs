@@ -187,6 +187,12 @@ public sealed class IngestTests(ApiFactory api)
         Assert.Equal(3, rest.GetProperty("items").GetArrayLength());
         var stops = await user.GetJsonAsync($"/api/sessions/{id}/events?kind=hook:Stop");
         Assert.Equal(3, stops.GetProperty("items").GetArrayLength());
+        var both = await user.GetJsonAsync($"/api/sessions/{id}/events?kind=hook:Stop,%20hook:PreToolUse,,hook:Stop");
+        Assert.Equal(5, both.GetProperty("items").GetArrayLength());
+        var several = await user.GetJsonAsync($"/api/sessions/{id}/events?kind=hook:PreToolUse,hook:Nothing");
+        Assert.Equal(2, several.GetProperty("items").GetArrayLength());
+        var empty = await user.GetJsonAsync($"/api/sessions/{id}/events?kind=,");
+        Assert.Equal(5, empty.GetProperty("items").GetArrayLength());
 
         var stranger = await api.NewClient().SignedUpAsync("events-stranger");
         Assert.Equal(HttpStatusCode.NotFound, (await stranger.Http.GetAsync($"/api/sessions/{id}")).StatusCode);

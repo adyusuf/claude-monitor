@@ -28,6 +28,12 @@ A second promotion on the same day appends `-2`. A hotfix says so in the tag mes
   agent"). `cm-agent status` now prints `home:`. A new agent version also needs a deploy to test, then prod
   (`docs/deploy-windows.md`).
 
+- **Commands from the web, honest status** (`fix/idle-session-commands`): the web now says what a waiting command waits
+  for, how long is left, and why an expired one lapsed, and warns above the prompt box when a session is idle (a prompt
+  is applied only when something is typed or a turn ends). The agent gains `cm-agent install --stop-wait <seconds>`
+  (0-590, default 0; re-run `install` to rewrite the hooks) and `cm-agent status` prints `commands waiting` and
+  `stop wait`. No API change. Web and agent both need the usual deploy to test, then prod.
+
 ## Rollback
 
 - **A change on `dev` or `test`:** a revert commit through the gate, like any other change. Nothing is ever

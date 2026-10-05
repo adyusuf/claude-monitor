@@ -86,6 +86,26 @@ up to 120 s (0-590, default 0) for a prompt from the web and start a new turn fr
 `cm-agent status` prints `commands waiting: N (oldest expires HH:mm)` and `stop wait: N s`. Reasons for the default of 0:
 ADR-0002, "Commands from the web".
 
+### Pushing web messages into an idle session (opt-in)
+
+Off by default. `cm-agent install --push on` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
+Claude Code **channel**: a prompt sent from the web starts a turn in an idle session within about a second, wrapped as
+`<<<claude-monitor-message …>>>` and labelled as coming from the web (untrusted: the session is told to treat it as data and
+to ask you before any request with side effects). A channel is a Claude Code research preview and a custom one is not on its
+allowlist, so Claude Code must be started with the flag `install` prints:
+
+```bash
+claude --dangerously-load-development-channels plugin:monitor-agent@monitor-agent-local   # accept the "local development" prompt
+```
+
+Without the flag (or where an organisation has channels off) nothing is lost: a pushed message that does not show up in the
+session transcript within 120 s goes back to the hooks and arrives at the next prompt, as before. `--push off` (or
+`CM_PUSH=off`) removes it. `CM_PUSH_SCOPE=machine` pushes every prompt of the machine instead of only this session's (single-session
+machines only). **No new token or secret:** the daemon uses the credential `cm-agent login` stored in the OS credential store; the MCP process
+never touches the network. Revoke it from the web's Machines page; rotation is `cm-agent logout` + `cm-agent login`. `monitor_status` and `cm-agent
+status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
+or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
+
 The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS and `%USERPROFILE%\.claude-monitor` on
 Windows (`CM_AGENT_HOME` overrides both); `cm-agent status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
