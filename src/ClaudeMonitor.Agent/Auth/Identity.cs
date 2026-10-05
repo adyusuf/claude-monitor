@@ -6,13 +6,31 @@ namespace ClaudeMonitor.Agent.Auth;
 
 /// <summary>
 /// The agent's identity file (agent.json in the user-only home): which server it talks to, its agent and workspace
-/// ids, and this installation's random machine key. No token is in it; tokens are in the OS credential store.
+/// ids, this installation's random machine key and the one setting `cm-agent install --stop-wait` saves. No token is in
+/// it; tokens are in the OS credential store.
 /// </summary>
-public sealed record Identity(string MachineKey, string? Server = null, Guid? AgentId = null, Guid? WorkspaceId = null)
+public sealed record Identity(string MachineKey, string? Server = null, Guid? AgentId = null, Guid? WorkspaceId = null,
+    int? StopWaitSeconds = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     public bool Connected => Server is not null && AgentId is not null;
+
+    /// <summary>The saved identity, or null when there is none or it is unreadable. Never creates or changes the file.</summary>
+    public static Identity? Peek(AgentConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        try
+        {
+            return File.Exists(config.IdentityPath)
+                ? JsonSerializer.Deserialize<Identity>(File.ReadAllText(config.IdentityPath), Json) is { MachineKey.Length: >= 16 } saved ? saved : null
+                : null;
+        }
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     public static Identity Load(AgentConfig config)
     {

@@ -33,6 +33,14 @@ export function age(iso: string, now: number, units: { now: string; m: string; h
   return days < 8 ? `${days}${units.d}` : date(iso);
 }
 
+/** "24m", "1h 05m": the time left until iso; null when it is not a future moment (or not a date at all). */
+export function remaining(iso: string | null | undefined, now: number, units: { m: string; h: string }): string | null {
+  const left = iso ? new Date(iso).getTime() - now : NaN;
+  if (!(left > 0)) return null;
+  const minutes = Math.max(1, Math.ceil(left / 60_000));
+  return minutes < 60 ? `${minutes}${units.m}` : `${Math.floor(minutes / 60)}${units.h} ${pad(minutes % 60)}${units.m}`;
+}
+
 /** "$1.23"; tiny amounts keep 4 decimals; null is "cannot be measured" (the caller's text). */
 export function usd(value: number | null | undefined, unmeasured: string): string {
   if (value === null || value === undefined) return unmeasured;

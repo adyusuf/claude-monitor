@@ -66,7 +66,7 @@ export function SessionPage() {
       <div className="grid">
         <div className="col">
           <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
-          <CommandsCard sessionId={id} canCommand={detail.canCommand} ended={s.status === "ended"} version={version} onChange={reload} />
+          <CommandsCard sessionId={id} canCommand={detail.canCommand} ended={s.status === "ended"} lastEventAt={s.lastEventAt} version={version} onChange={reload} />
           <EventsCard sessionId={id} version={version} />
         </div>
         <div className="col side">

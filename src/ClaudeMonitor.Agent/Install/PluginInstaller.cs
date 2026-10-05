@@ -52,6 +52,9 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         }
 
         output.WriteLine($"Installed. Claude Code starts the agent with its sessions. Binary: {BinaryPath}");
+        output.WriteLine(config.StopWait > TimeSpan.Zero
+            ? $"A finished turn waits up to {(int)config.StopWait.TotalSeconds} s for a prompt from the web."
+            : "A finished turn does not wait for the web (cm-agent install --stop-wait <seconds> changes that).");
         return 0;
     }
 

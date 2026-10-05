@@ -4,7 +4,9 @@ import type { CommandRow, PermissionRow } from "../api/types";
 import { Button, Card, Json, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
-import { dateTime, time } from "../lib/format";
+import { time } from "../lib/format";
+import { useNow } from "../lib/useNow";
+import { CommandItem, isIdle } from "./CommandHistory";
 
 interface Props { sessionId: string; version: number; onChange: () => void }
 
@@ -57,8 +59,9 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange }: Pro
 }
 
 /** Send a prompt or a stop to the session, and what was sent before. */
-export function CommandsCard({ sessionId, canCommand, ended, version, onChange }: Props & { canCommand: boolean; ended: boolean }) {
+export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, version, onChange }: Props & { canCommand: boolean; ended: boolean; lastEventAt: string }) {
   const { t } = useI18n();
+  const now = useNow(config.clockTickMs);
   const errorText = useErrorText();
   const [rows, setRows] = useState<CommandRow[]>([]);
   const [text, setText] = useState("");
@@ -103,6 +106,7 @@ export function CommandsCard({ sessionId, canCommand, ended, version, onChange }
         <div className="compose">
           <textarea className="input" rows={3} maxLength={config.promptMax} placeholder={t("session.promptPlaceholder")}
             value={text} onChange={(e) => setText(e.target.value)} />
+          {isIdle(lastEventAt, now) ? <Notice kind="info">{t("session.idleWarning")}</Notice> : null}
           <div className="compose-actions">
             <Button variant="danger" busy={busy} onClick={() => void send("stop")}>{t("session.stop")}</Button>
             <Button busy={busy} onClick={() => void send("prompt")}>{t("session.send")}</Button>
@@ -112,14 +116,7 @@ export function CommandsCard({ sessionId, canCommand, ended, version, onChange }
       <h3 className="sub">{t("session.history")}</h3>
       {rows.length === 0 ? <p className="muted">{t("session.noCommands")}</p> : (
         <ul className="plain commands">
-          {rows.map((c) => (
-            <li key={c.id}>
-              <span className={`badge status-${c.status}`}>{t(`commandStatus.${c.status}` as never)}</span>
-              <span>{c.kind === "stop" ? t("session.stop") : c.body}</span>
-              <span className="muted small">{dateTime(c.createdAt)}</span>
-              {canCommand && c.status === "queued" ? <button type="button" className="link" onClick={() => void cancel(c.id)}>{t("session.cancel")}</button> : null}
-            </li>
-          ))}
+          {rows.map((c) => <CommandItem key={c.id} command={c} now={now} canCancel={canCommand} onCancel={(id) => void cancel(id)} />)}
         </ul>
       )}
     </Card>
