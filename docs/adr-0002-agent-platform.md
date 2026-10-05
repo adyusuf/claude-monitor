@@ -158,6 +158,46 @@ on the web, and the answer reaches the hook over the agent's stream. No answer i
 decision, and Claude Code asks on the machine as usual. Only the session's owner may answer; every answer is
 audited.
 
+### The session page shows the conversation (decided 05/10/2026)
+
+The activity of a session is read as Claude's own screen shows it, not as a list of hook events: what was asked, what
+Claude said, each tool call (a script's command, a file) with its output beside it, and the questions Claude put with
+their options and the one chosen. Oldest at the top, newest at the bottom; a new message pushes the rest up, and a page
+the reader scrolled up stays where it is (a "new messages" button says something came). The source is the `transcript`
+events the agent already captures, plus the `Notification` and `SubagentStart/Stop` hooks (one line each, so the page
+sees when Claude waits for the user), joined by `tool_use_id`; nothing new is captured or stored. The API's one change is
+additive: `GET /sessions/{id}/events?kind=` also takes a comma-separated list (at most 8 kinds); a single kind behaves as
+before. A line the agent cut for size still names its call when the preview reaches the call's id, so that call shows
+"output too large"; a call with no result shows "running" only while nothing but other calls, notes came after it, and
+"no output" otherwise. A message sent from the web while the user typed one reaches Claude as hook context and is shown
+as the user's message (recognised by its fixed header; the transcript's exact shape for it is not yet confirmed on a live
+session). Permission requests waiting for the owner sit at the bottom of the conversation. **Lazy loading:** only the newest page (40 lines) is read at first, and
+scrolling up reads the next older pages, so a session of several megabytes costs what is looked at; a live refresh reads
+the newest 20 and reads back only if more arrived. The raw event list stays one click away ("Raw events"). The page
+renders the text itself (a small Markdown subset built as React elements, never HTML), so captured text cannot inject
+markup and no Markdown library was added.
+
+**Answering Claude's questions and plans from the web (decided 05/10/2026).** A question Claude puts to the user
+(`AskUserQuestion`) or a plan waiting for approval (`ExitPlanMode`) is a permission prompt, so it rides the existing
+permission path: the `PermissionRequest` hook reports it and waits; the owner answers on the web, where the options are
+buttons (one click for a single single-choice question; several questions or multi-choice are collected and sent
+together, with optional typed text); the answer reaches the hook over the agent's stream and the hook returns an
+`allow` whose `updatedInput` is the question tool's own input plus `answers` (question text -> the option chosen), which
+is how the harness takes an answer without asking on the machine. A plan is approved (`allow`) or sent back (`deny`
+with the note as the reason). The protocol grew only additively: `answers` on the answer request and on
+`PermissionAnswerMessage`, an `answers` column in the agent's local database (added in place when missing). The API
+accepts `answers` only for `AskUserQuestion`, only with an allow, only for questions the request carries, each at most
+500 characters; the agent builds `updatedInput` from the input the hook received, never from anything the web sent, so
+the web can choose among options but cannot change a call. **Fail-safe:** the buttons exist only while an open
+permission request for that tool exists. If Claude Code does not raise `PermissionRequest` for these tools, nothing is
+reported, no buttons appear, and the question stays readable in the conversation and answerable on the machine.
+**Not confirmed on a live interactive session (decided 05/10/2026):** whether Claude Code raises the hook for these tools
+and takes `updatedInput.answers`. A non-interactive run (`claude -p`) does not offer `AskUserQuestion` at all, so the
+check needs an interactive session. Confirmed on a live run the same day: a prompt sent from the web at the end of a
+turn (the `Stop` hook's reason) is kept in the transcript as a meta user line "Stop hook feedback: ..." and one sent
+while the user typed (`additionalContext`) as a `hook_additional_context` attachment; the conversation shows both as the
+user's message.
+
 ### Environments
 
 Local development runs PostgreSQL and a mail catcher in Docker, the API and the web dev server. Test and

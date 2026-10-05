@@ -89,6 +89,7 @@ describe("one session", () => {
     expect(await screen.findByText("Write the parser")).toBeInTheDocument();
     expect(screen.getByText("analyst")).toBeInTheDocument();
     expect(screen.getByText("12k")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Raw events" }));
     expect(await screen.findByText("Fix the login please")).toBeInTheDocument();
     expect(screen.getByText("Bash · npm test")).toBeInTheDocument();
     expect(screen.getByText("shortened")).toBeInTheDocument();
@@ -194,7 +195,7 @@ describe("one session", () => {
     expect(await screen.findByText(/Only the person whose machine runs this session/)).toBeInTheDocument();
     expect(screen.getByText("No tasks.")).toBeInTheDocument();
     expect(screen.getByText("No subagents.")).toBeInTheDocument();
-    expect(screen.getByText("No activity recorded.")).toBeInTheDocument();
+    expect(await screen.findByText("No activity recorded.")).toBeInTheDocument();
   });
 
   it("shows a session that cannot be read", async () => {

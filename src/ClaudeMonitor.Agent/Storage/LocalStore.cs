@@ -1,3 +1,4 @@
+using System.Globalization;
 using ClaudeMonitor.Contracts;
 using Microsoft.Data.Sqlite;
 
@@ -33,12 +34,27 @@ public sealed partial class LocalStore : IDisposable
                 body TEXT, expires_at TEXT NOT NULL, state TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS permissions (local_id TEXT PRIMARY KEY, harness TEXT NOT NULL, session TEXT NOT NULL,
                 tool_name TEXT NOT NULL, tool_input TEXT NOT NULL, wait_seconds INTEGER NOT NULL, created_at TEXT NOT NULL,
-                remote_id TEXT, decision TEXT, reason TEXT, state TEXT NOT NULL);
+                remote_id TEXT, decision TEXT, reason TEXT, state TEXT NOT NULL, answers TEXT);
             CREATE TABLE IF NOT EXISTS transcripts (session TEXT PRIMARY KEY, harness TEXT NOT NULL, path TEXT NOT NULL,
                 offset INTEGER NOT NULL, project_key TEXT, project_name TEXT, git_branch TEXT, updated_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS usage_seen (session TEXT NOT NULL, message_id TEXT NOT NULL,
                 PRIMARY KEY (session, message_id));
             """);
+        AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
+    }
+
+    /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>
+    private void AddColumnIfMissing(string table, string column, string type)
+    {
+        if (Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'") ?? 0L, CultureInfo.InvariantCulture) > 0) return;
+        try
+        {
+            Exec($"ALTER TABLE {table} ADD COLUMN {column} {type}");
+        }
+        catch (SqliteException) when (Convert.ToInt64(Scalar($"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'") ?? 0L, CultureInfo.InvariantCulture) > 0)
+        {
+            // the other process added it first
+        }
     }
 
     public void Dispose() => db.Dispose();

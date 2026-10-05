@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
 using ClaudeMonitor.Api.Security;
@@ -12,7 +13,7 @@ public sealed record CommandRow(Guid Id, string Kind, string? Body, string Statu
     DateTimeOffset ExpiresAt, DateTimeOffset? DeliveredAt, DateTimeOffset? AppliedAt, string? Result);
 public sealed record PermissionRow(Guid Id, string ToolName, System.Text.Json.JsonDocument ToolInput, string Status,
     DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, string? Decision, string? Reason, DateTimeOffset? AnsweredAt);
-public sealed record AnswerRequest(string? Decision, string? Reason);
+public sealed record AnswerRequest(string? Decision, string? Reason, Dictionary<string, string>? Answers = null);
 
 /// <summary>
 /// Commands to a session and answers to its permission requests. Anyone in the workspace may READ them; only the
@@ -22,6 +23,8 @@ public static class CommandEndpoints
 {
     public const int BodyMax = 10_000;
     public const int ReasonMax = 500;
+    public const int AnswerMax = 500;
+    public const int QuestionsMax = 4;
 
     public static void Map(RouteGroupBuilder api)
     {
@@ -119,6 +122,7 @@ public static class CommandEndpoints
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
         if (!PermissionDecisions.All.Contains(req.Decision ?? "")) return Http.Invalid("decision", "invalid_decision");
         if (req.Reason is { Length: > ReasonMax }) return Http.Invalid("reason", "too_long");
+        if (req.Answers is not null && !AnswersFit(request, req.Decision!, req.Answers)) return Http.Invalid("answers", "invalid_answers");
         var now = clock.GetUtcNow();
         if (request.Status != PermissionStatuses.Open || request.ExpiresAt <= now) return Results.Conflict();
 
@@ -131,8 +135,29 @@ public static class CommandEndpoints
             targetId: id, detail: new { request.Decision, request.ToolName });
         await db.SaveChangesAsync(http.RequestAborted);
         broker.Publish(Broker.Agent(request.AgentId), new StreamMessage(AgentStreamEvents.PermissionAnswer,
-            new PermissionAnswerMessage(id, found.Session.ExternalId, request.Decision!, request.Reason)));
+            new PermissionAnswerMessage(id, found.Session.ExternalId, request.Decision!, request.Reason, req.Answers)));
         broker.Publish(Broker.Workspace(request.WorkspaceId), new StreamMessage("permission", new { sessionId = request.SessionId, id, status = request.Status }));
         return Results.NoContent();
+    }
+
+    /// <summary>
+    /// Answers are chosen options, so they are accepted only for the question tool, only with an allow, only for the
+    /// questions the request really carries, and each as short text: the web can never put other input into a tool call.
+    /// </summary>
+    private static bool AnswersFit(PermissionRequest request, string decision, Dictionary<string, string> answers)
+    {
+        if (request.ToolName != QuestionTools.AskUserQuestion || decision != PermissionDecisions.Allow) return false;
+        if (answers.Count is 0 or > QuestionsMax) return false;
+        var asked = new HashSet<string>();
+        if (request.ToolInput.RootElement.ValueKind == JsonValueKind.Object && request.ToolInput.RootElement.TryGetProperty("questions", out var list)
+            && list.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var q in list.EnumerateArray())
+            {
+                if (q.ValueKind == JsonValueKind.Object && q.TryGetProperty("question", out var text) && text.ValueKind == JsonValueKind.String) asked.Add(text.GetString()!);
+            }
+        }
+
+        return answers.All(a => asked.Contains(a.Key) && !string.IsNullOrWhiteSpace(a.Value) && a.Value.Length <= AnswerMax);
     }
 }

@@ -137,6 +137,36 @@ public sealed class CommandTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_question_is_answered_with_a_chosen_option_and_nothing_else_is_accepted()
+    {
+        var (owner, admin, agent, _, external) = await SetupAsync();
+        async Task<Guid> Ask(string tool, object input) => (await (await agent.Http.PostAsJsonAsync("/api/agent/permission-requests",
+            new PermissionRequestCreate(HarnessKinds.ClaudeCode, external, tool, JsonSerializer.SerializeToElement(input), 120), TestUser.Json))
+            .Content.ReadFromJsonAsync<PermissionRequestCreated>(TestUser.Json))!.Id;
+        var options = new[] { new { label = "Left", description = "" }, new { label = "Right", description = "" } };
+        var question = await Ask("AskUserQuestion", new { questions = new[] { new { question = "Which way?", header = "Way", multiSelect = false, options } } });
+        var bash = await Ask("Bash", new { command = "ls" });
+        var malformed = await Ask("AskUserQuestion", new { questions = "none" });
+        using var stream = await OpenAsync(agent.Http, "/api/agent/stream");
+        Task<HttpStatusCode> Answer(Guid id, object body, TestUser? as_ = null) => (as_ ?? owner).PostAsync($"/api/permission-requests/{id}/answer", body).ContinueWith(t => t.Result.StatusCode);
+        var chosen = new Dictionary<string, string> { ["Which way?"] = "Right" };
+
+        Assert.Equal(HttpStatusCode.Forbidden, await Answer(question, new { decision = "allow", answers = chosen }, admin));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(bash, new { decision = "allow", answers = chosen })); // only the question tool takes answers
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(malformed, new { decision = "allow", answers = chosen }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "deny", answers = chosen })); // a refusal chooses nothing
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string>() }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string> { ["Another?"] = "x" } }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string> { ["Which way?"] = " " } }));
+        Assert.Equal(HttpStatusCode.BadRequest, await Answer(question, new { decision = "allow", answers = new Dictionary<string, string> { ["Which way?"] = new string('x', 501) } }));
+        Assert.Equal(HttpStatusCode.NoContent, await Answer(question, new { decision = "allow", answers = chosen }));
+        var message = await NextEventAsync(stream, AgentStreamEvents.PermissionAnswer);
+        Assert.Equal("allow", message.GetProperty("decision").GetString());
+        Assert.Equal("Right", message.GetProperty("answers").GetProperty("Which way?").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, await Answer(question, new { decision = "allow", answers = chosen }));
+    }
+
+    [Fact]
     public async Task A_permission_request_needs_a_known_session_and_expires()
     {
         var (owner, _, agent, id, external) = await SetupAsync();

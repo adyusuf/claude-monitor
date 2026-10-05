@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-public sealed class HookRunnerTests : IDisposable
+public sealed partial class HookRunnerTests : IDisposable
 {
     private static readonly DateTimeOffset Start = new(2026, 10, 3, 12, 0, 0, TimeSpan.Zero);
     private readonly TempHome home = new();
