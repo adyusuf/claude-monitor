@@ -79,6 +79,13 @@ installed binary, so Claude Code starts the agent with its sessions; nothing is 
 the `claude` CLI on `PATH` it prints the two `claude plugin` commands to run. The agent's tokens are in the macOS
 Keychain / Windows Credential Manager (service `claude-monitor-agent`); its log is `agent.log` in the agent home.
 
+A prompt sent from the web enters a session only when something is typed in it or a turn ends; an idle session takes
+it at neither, so it stays "delivered" until it expires. `cm-agent install --stop-wait 120` makes a finished turn wait
+up to 120 s (0-590, default 0) for a prompt from the web and start a new turn from it; the value is saved in
+`agent.json` and the hooks are rewritten (hook timeout = wait + 15 s), so re-run `install` after changing it.
+`cm-agent status` prints `commands waiting: N (oldest expires HH:mm)` and `stop wait: N s`. Reasons for the default of 0:
+ADR-0002, "Commands from the web".
+
 The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS and `%USERPROFILE%\.claude-monitor` on
 Windows (`CM_AGENT_HOME` overrides both); `cm-agent status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
