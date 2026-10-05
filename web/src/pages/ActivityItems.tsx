@@ -18,6 +18,9 @@ interface LineProps {
   onToggle: (key: string) => void;
 }
 
+/** Text presentation (U+FE0E), so the icons take the line's colour instead of drawing as emoji. */
+const ICON = { monitor: "\u2601\uFE0E", human: "\u2328\uFE0E" } as const;
+
 const moment = (item: TimelineItem) => (item.at ? time(new Date(item.at).toISOString()) : "");
 
 /** The payload of an event, shown under its line while the line is open. */
@@ -54,7 +57,7 @@ export function InputLine({ item, who, open, onToggle }: LineProps) {
   return (
     <li className={`act act-input act-${item.cls}${item.pending ? " act-pending" : ""}`}>
       <div className="act-head">
-        <span className="act-icon" aria-hidden>{monitor ? "☁" : "⌨"}</span>
+        <span className="act-icon" aria-hidden>{monitor ? ICON.monitor : ICON.human}</span>
         <span className="act-label">{label}</span>
         <span className="act-by">{by}</span>
         {command ? <span className={`badge status-${command.status}`}>{statuses[command.status] ?? command.status}</span> : null}

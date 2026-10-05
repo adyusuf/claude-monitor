@@ -64,12 +64,12 @@ describe("the activity list tells inputs from everything else", () => {
     expect(within(monitor).getByText("Claude Monitor (web)")).toBeInTheDocument();
     expect(within(monitor).getByText("sent by Örnek Kişi")).toBeInTheDocument();
     expect(within(monitor).getByText("Applied")).toBeInTheDocument();
-    expect(within(monitor).getByText("☁")).toBeInTheDocument();
+    expect(within(monitor).getByText("\u2601\uFE0E")).toBeInTheDocument();
 
     expect(human).toHaveClass("act-human_input");
     expect(within(human).getByText("Human (Claude Code)")).toBeInTheDocument();
     expect(within(human).getByText("typed by Örnek Kişi")).toBeInTheDocument();
-    expect(within(human).getByText("⌨")).toBeInTheDocument();
+    expect(within(human).getByText("\u2328\uFE0E")).toBeInTheDocument();
 
     expect(within(card).getByText("On it, looking at the form.").closest("li")).toHaveClass("act-assistant");
     expect(card.querySelectorAll(".act-input")).toHaveLength(2);
