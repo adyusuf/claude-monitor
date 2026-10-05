@@ -129,6 +129,16 @@ describe("one timeline for events and web commands", () => {
     expect(items.map((i) => i.key).sort()).toEqual([`e${kept.id}`, "cc1"].sort());
   });
 
+  it("drops the attachments Claude Code really writes for a hook's context (shapes seen in real transcripts)", () => {
+    const body = "run the tests";
+    const context = `Messages sent to this session from Claude Monitor (the web):\n- ${body}`;
+    const hookOutput = JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: context } });
+    const added = transcript({ type: "attachment", attachment: { type: "hook_additional_context", content: [context], hookName: "UserPromptSubmit", hookEvent: "UserPromptSubmit", toolUseID: "t" } }, 1);
+    const success = transcript({ type: "attachment", attachment: { type: "hook_success", content: "", stdout: hookOutput, stderr: "", exitCode: 0, command: "cm-agent hook", hookEvent: "UserPromptSubmit", hookName: "UserPromptSubmit", toolUseID: "t", durationMs: 12 } }, 2);
+    const { items } = buildTimeline([added, success], [cmd({ body })], false);
+    expect(items.map((i) => i.key)).toEqual(["cc1"]);
+  });
+
   it("keeps an attachment that does not repeat the command, or that is far from its moment", () => {
     const body = "run the tests";
     const other = transcript({ type: "attachment", attachment: { content: ["something else"] } }, 1);
