@@ -58,8 +58,16 @@ export const en = {
     history: "Sent from the web", cancel: "Cancel", noCommands: "Nothing sent yet.",
     permissions: "Waiting for permission", noPermissions: "Nothing waits for permission.", allow: "Allow", deny: "Deny",
     reason: "Reason (optional)", answered: "Answered", expired: "Expired", expires: "Expires",
+    expiresIn: "expires in {time}",
+    idleWarning: "This session is idle. A command is applied when something is typed in the session or when a turn ends.",
   },
   commandStatus: { queued: "Queued", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
+  commandHint: {
+    queued: "waiting for the agent on the machine to pick it up",
+    delivered: "reached the agent, waiting for the session's next step",
+    expiredIdle: "Expired (the session was idle)",
+    expiredUnreached: "Expired (the agent never picked it up)",
+  },
   machines: {
     title: "Machines", empty: "No machine is connected yet.", connect: "Connect a machine", revoke: "Disconnect",
     revokeConfirm: "Disconnect this machine? Its agent stops reporting.", revoked: "Disconnected", lastSeen: "Last seen",

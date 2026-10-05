@@ -173,6 +173,7 @@ textarea.input { resize: vertical; }
 .permission-actions .input { flex: 1; }
 .compose { display: flex; flex-direction: column; gap: 10px; }
 .commands li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.command-hint { flex-basis: 100%; }
 .timeline { list-style: none; margin: 0; padding: 0; }
 .event { border-left: 2px solid var(--border); padding-left: 14px; position: relative; }
 .event::before { content: ""; position: absolute; left: -5px; top: 13px; width: 8px; height: 8px; border-radius: 50%; background: var(--border); }

@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventRow, SessionDetail, SessionRow } from "../api/types";
+import { config } from "../config";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { summary } from "./SessionEvents";
 import { SessionPage } from "./SessionPage";
@@ -125,6 +126,60 @@ describe("one session", () => {
     await waitFor(() => expect(calls.some((c) => c.path === "/commands/c1/cancel")).toBe(true));
     const sent = calls.filter((c) => c.path === "/sessions/s1/commands" && c.method === "POST").map((c) => c.body);
     expect(sent).toEqual([{ kind: "prompt", body: "Run the tests" }, { kind: "stop" }]);
+  });
+
+  it("says what each waiting command is waiting for, how long is left, and why a lapsed one lapsed", async () => {
+    const at = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+    const command = (id: string, body: string, status: string, over: Record<string, unknown> = {}) =>
+      ({ id, kind: "prompt", body, status, createdBy: "u1", createdAt: "", expiresAt: at(-1), deliveredAt: null, appliedAt: null, result: null, ...over });
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /sessions/s1": { body: detail() },
+      "GET /sessions/s1/permission-requests": { body: [] },
+      "GET /sessions/s1/events": { body: { items: [], next: null } },
+      "GET /sessions/s1/commands": {
+        body: [
+          command("c1", "one", "queued", { expiresAt: at(23.5) }),
+          command("c2", "two", "delivered", { expiresAt: at(95), deliveredAt: at(-1) }),
+          command("c3", "three", "expired", { deliveredAt: at(-30) }),
+          command("c4", "four", "expired", { expiresAt: at(7) }),
+          command("c5", "five", "applied", { expiresAt: at(10) }),
+        ],
+      },
+    });
+    renderAt("/w/w1/sessions/s1", sessionsRoute);
+    expect(await screen.findByText("waiting for the agent on the machine to pick it up · expires in 24m")).toBeInTheDocument();
+    expect(screen.getByText("reached the agent, waiting for the session's next step · expires in 1h 35m")).toBeInTheDocument();
+    const rowOf = (body: string) => screen.getByText(body).closest("li")!;
+    expect(within(rowOf("three")).getByText("Expired (the session was idle)")).toBeInTheDocument();
+    expect(within(rowOf("four")).getByText("Expired (the agent never picked it up)")).toBeInTheDocument();
+    expect(within(rowOf("four")).queryByText(/expires in/)).not.toBeInTheDocument();
+    expect(rowOf("five")).not.toHaveTextContent(/expires in|waiting/);
+  });
+
+  describe("the idle warning above the prompt box", () => {
+    const idle = /This session is idle\. A command is applied when something is typed/;
+    const open = async (minutesAgo: number) => {
+      mockApi({
+        "GET /me": { body: ME },
+        "GET /sessions/s1": { body: detail({ session: row({ lastEventAt: new Date(Date.now() - minutesAgo * 60_000).toISOString() }) }) },
+        "GET /sessions/s1/permission-requests": { body: [] },
+        "GET /sessions/s1/events": { body: { items: [], next: null } },
+        "GET /sessions/s1/commands": { body: [] },
+      });
+      renderAt("/w/w1/sessions/s1", sessionsRoute);
+      await screen.findByPlaceholderText(/A message for Claude/);
+    };
+
+    it("shows once the last event is older than the idle limit", async () => {
+      await open(config.idleSessionMinutes + 1);
+      expect(screen.getByText(idle)).toBeInTheDocument();
+    });
+
+    it("stays away while the session is recent", async () => {
+      await open(config.idleSessionMinutes - 1);
+      expect(screen.queryByText(idle)).not.toBeInTheDocument();
+    });
   });
 
   it("tells a viewer that only the owner commands, and an ended session takes nothing", async () => {

@@ -60,8 +60,16 @@ export const tr: Dictionary = {
     history: "Webden gönderilenler", cancel: "İptal", noCommands: "Henüz bir şey gönderilmedi.",
     permissions: "İzin bekleyenler", noPermissions: "İzin bekleyen bir şey yok.", allow: "İzin ver", deny: "Reddet",
     reason: "Gerekçe (isteğe bağlı)", answered: "Yanıtlandı", expired: "Süresi doldu", expires: "Bitiş",
+    expiresIn: "{time} sonra sona erer",
+    idleWarning: "Bu oturum boşta. Komut, oturumda bir şey yazıldığında ya da bir tur bittiğinde uygulanır.",
   },
   commandStatus: { queued: "Sırada", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal edildi" },
+  commandHint: {
+    queued: "makinedeki ajanın alması bekleniyor",
+    delivered: "ajana ulaştı, oturumun bir sonraki adımını bekliyor",
+    expiredIdle: "Süresi doldu (oturum boştaydı)",
+    expiredUnreached: "Süresi doldu (ajan hiç almadı)",
+  },
   machines: {
     title: "Makineler", empty: "Henüz bağlı makine yok.", connect: "Makine bağla", revoke: "Bağlantıyı kes",
     revokeConfirm: "Bu makinenin bağlantısı kesilsin mi? Ajanı raporlamayı bırakır.", revoked: "Bağlantı kesildi", lastSeen: "Son görülme",
