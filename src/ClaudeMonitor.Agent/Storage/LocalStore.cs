@@ -31,7 +31,7 @@ public sealed partial class LocalStore : IDisposable
                 truncated INTEGER NOT NULL, project_key TEXT, project_name TEXT, git_branch TEXT, batch INTEGER);
             CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS commands (id TEXT PRIMARY KEY, session TEXT NOT NULL, kind TEXT NOT NULL,
-                body TEXT, expires_at TEXT NOT NULL, state TEXT NOT NULL);
+                body TEXT, expires_at TEXT NOT NULL, state TEXT NOT NULL, taken_at TEXT);
             CREATE TABLE IF NOT EXISTS permissions (local_id TEXT PRIMARY KEY, harness TEXT NOT NULL, session TEXT NOT NULL,
                 tool_name TEXT NOT NULL, tool_input TEXT NOT NULL, wait_seconds INTEGER NOT NULL, created_at TEXT NOT NULL,
                 remote_id TEXT, decision TEXT, reason TEXT, state TEXT NOT NULL, answers TEXT);
@@ -40,6 +40,7 @@ public sealed partial class LocalStore : IDisposable
             CREATE TABLE IF NOT EXISTS usage_seen (session TEXT NOT NULL, message_id TEXT NOT NULL,
                 PRIMARY KEY (session, message_id));
             """);
+        AddColumnIfMissing("commands", "taken_at", "TEXT"); // a database made before the hook's hand-over time was kept
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
     }
 

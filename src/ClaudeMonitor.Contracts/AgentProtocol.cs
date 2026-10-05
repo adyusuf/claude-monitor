@@ -73,7 +73,8 @@ public sealed record AgentCommandMessage(Guid Id, Guid SessionId, string Session
 public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, string Decision, string? Reason,
     IReadOnlyDictionary<string, string>? Answers = null);
 
-public sealed record CommandStatusUpdate(string Status, string? Result);
+/// <summary>The agent's report on a command. At is when the hook handed it to the session (an older agent sends none).</summary>
+public sealed record CommandStatusUpdate(string Status, string? Result, DateTimeOffset? At = null);
 
 /// <summary>What the agent must know of its workspace's settings before it captures anything.</summary>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId);

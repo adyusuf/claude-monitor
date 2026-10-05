@@ -62,10 +62,10 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     /// <summary>A command a hook took has been applied to its session: the web hears so.</summary>
     public async Task ReportCommandsAsync(CancellationToken ct)
     {
-        foreach (var id in store.TakenCommands())
+        foreach (var taken in store.TakenCommands())
         {
-            await api.CommandStatusAsync(id, CommandStatuses.Applied, null, ct);
-            store.MarkCommandReported(id);
+            await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At);
+            store.MarkCommandReported(taken.Id);
         }
     }
 
