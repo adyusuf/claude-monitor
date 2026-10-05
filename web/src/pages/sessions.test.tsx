@@ -158,6 +158,25 @@ describe("one session", () => {
     expect(within(rowOf("five")).getByText("Waiting for Claude's reply")).toBeInTheDocument(); // applied is not answered
   });
 
+  it("shows Claude's answer under the command when the live stream says the session changed, without a reload", async () => {
+    let answered = false;
+    const applied = { id: "c1", kind: "prompt", body: "Run the tests", status: "applied", createdBy: "u1", createdAt: "", expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      deliveredAt: null, appliedAt: new Date().toISOString(), result: null };
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /sessions/s1": { body: detail() },
+      "GET /sessions/s1/permission-requests": { body: [] },
+      "GET /sessions/s1/events": { body: { items: [], next: null } },
+      "GET /sessions/s1/commands": () => ({ body: [answered ? { ...applied, replyEventId: 9, replyText: "All 12 tests pass.", replyMore: false } : applied] }),
+    });
+    renderAt("/w/w1/sessions/s1", sessionsRoute);
+    expect(await screen.findByText("Waiting for Claude's reply")).toBeInTheDocument();
+    answered = true;
+    act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
+    expect(await screen.findByText("All 12 tests pass.")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for Claude's reply")).not.toBeInTheDocument();
+  });
+
   describe("the idle warning above the prompt box", () => {
     const idle = /This session is idle\. A command is applied when something is typed/;
     const open = async (minutesAgo: number) => {
