@@ -18,7 +18,12 @@
     <PublishSingleFile>true</PublishSingleFile>
     <PublishReadyToRun>true</PublishReadyToRun>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- NEVER true: a compressed bundle crashed the macOS daemon within seconds (AccessViolationException in
+         System.Net.Http) with or without ReadyToRun, and starts twice as slowly (docs/adr-0002-agent-platform.md,
+         "Published build"). scripts/agent_smoke.py runs the published daemon to keep it so. -->
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <!-- One image per assembly, not one composite of the whole framework: 81 MB instead of 108 MB, same startup. -->
+    <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
     <DebugType>none</DebugType>
   </PropertyGroup>
 
