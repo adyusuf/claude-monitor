@@ -58,11 +58,9 @@ export function CommandReply({ command: c, sessionId, ended, now }: { command: C
       {state === "answered" ? (
         <>
           <blockquote>{shown}</blockquote>
-          {c.replyMore ? (
-            <button type="button" className="link" disabled={busy} onClick={() => void toggle()}>
-              {busy ? t("commandReply.loading") : open ? t("commandReply.less") : t("commandReply.more")}
-            </button>
-          ) : null}
+          <button type="button" className="link" disabled={busy} onClick={() => void toggle()}>
+            {busy ? t("commandReply.loading") : open ? t("commandReply.less") : t("commandReply.more")}
+          </button>
         </>
       ) : null}
     </div>

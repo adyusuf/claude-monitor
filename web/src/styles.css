@@ -175,6 +175,8 @@ textarea.input { resize: vertical; }
 .commands li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .command-hint { flex-basis: 100%; }
 .command-reply { flex-basis: 100%; }
+.command-reply .reply-state { font-weight: 600; }
+.command-reply .link { display: block; margin-top: 6px; }
 .command-reply blockquote { margin: 4px 0 0; padding-left: 10px; border-left: 2px solid var(--border); white-space: pre-wrap; overflow-wrap: anywhere; }
 .timeline { list-style: none; margin: 0; padding: 0; }
 .event { border-left: 2px solid var(--border); padding-left: 14px; position: relative; }

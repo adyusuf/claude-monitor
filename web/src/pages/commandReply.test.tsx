@@ -58,7 +58,7 @@ describe("under a command", () => {
     expect(within(li).getByText("Applied")).toBeInTheDocument();
     expect(within(li).getByText("Claude replied")).toBeInTheDocument();
     expect(within(li).getByText("All 12 tests pass.")).toBeInTheDocument();
-    expect(within(li).queryByRole("button", { name: "See the whole reply" })).not.toBeInTheDocument(); // nothing more to see
+    expect(within(li).getByRole("button", { name: "See the whole reply" })).toBeInTheDocument(); // always offered
     expect(within(li).queryByText("Waiting for Claude's reply")).not.toBeInTheDocument();
   });
 
