@@ -104,7 +104,7 @@ session transcript within 120 s goes back to the hooks and arrives at the next p
 machines only). **No new token or secret:** the daemon uses the credential `cm-agent login` stored in the OS credential store; the MCP process
 never touches the network. Revoke it from the web's Machines page; rotation is `cm-agent logout` + `cm-agent login`. `monitor_status` and `cm-agent
 status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
-or failure. Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
+or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
 
 The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS and `%USERPROFILE%\.claude-monitor` on
 Windows (`CM_AGENT_HOME` overrides both); `cm-agent status` prints it as `home:`. It is deliberately **not** under
