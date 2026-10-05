@@ -16,7 +16,7 @@ public static class HappyEyeballs
     {
         var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, ct);
         var socket = await RaceAsync(Interleave(addresses), AgentConfig.ConnectStagger,
-            (address, token) => ConnectSocketAsync(address, context.DnsEndPoint.Port, token), ct);
+            (address, token) => ConnectSocketAsync(NewSocket(address), address, context.DnsEndPoint.Port, token), ct);
         return new NetworkStream(socket, ownsSocket: true);
     }
 
@@ -74,9 +74,12 @@ public static class HappyEyeballs
         }
     }
 
-    private static async Task<Socket> ConnectSocketAsync(IPAddress address, int port, CancellationToken ct)
+    private static Socket NewSocket(IPAddress address) =>
+        new(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+
+    /// <summary>The connected socket; one that fails to connect is closed, not left to the finalizer.</summary>
+    internal static async Task<Socket> ConnectSocketAsync(Socket socket, IPAddress address, int port, CancellationToken ct)
     {
-        var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
             await socket.ConnectAsync(address, port, ct);

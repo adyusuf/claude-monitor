@@ -65,8 +65,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await work(cts.Token);
                 failures = 0;
             }
-            catch (Exception e) when (e is not OperationCanceledException)
+            catch (Exception e) when (!cts.IsCancellationRequested)
             {
+                // Only the daemon's own token means stopping; a timeout (also an OperationCanceledException) is a failure.
                 failures++;
                 log.Write($"{name} failed ({failures}): {e.GetType().Name} {e.Message}");
             }
@@ -94,8 +95,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                     }
                 }
             }
-            catch (Exception e) when (e is not OperationCanceledException)
+            catch (Exception e) when (!cts.IsCancellationRequested)
             {
+                // A connect timeout is an OperationCanceledException too; it must not end the stream for good.
                 failures++;
                 log.Write($"stream failed ({failures}): {e.GetType().Name} {e.Message}");
             }
