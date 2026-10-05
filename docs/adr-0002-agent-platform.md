@@ -173,6 +173,20 @@ The web offers the installers: a notarised `.pkg` for macOS (Developer ID Instal
 to the existing Developer ID Application one) and a signed MSI for Windows (a code-signing certificate or
 service). Automatic updates come after the first release.
 
+### Published build
+
+The agent ships as a self-contained single file, ReadyToRun, **not compressed** (`EnableCompressionInSingleFile=false`,
+one R2R image per assembly). Compression is off because of a runtime fault, found 05/10/2026 on macOS (Darwin 27, .NET
+10.0.6, osx-arm64): a compressed single-file bundle crashed the daemon within seconds with
+`System.AccessViolationException` raised at varying places in System.Net.Http. It reproduced 3 of 3 times on the unchanged
+base commit, and a ten-line program that only loops `HttpClient.GetAsync` failed 6 of 6 when published compressed and 0
+of 6 uncompressed, so it is neither the agent's `setsid` P/Invoke nor its connect callback (both switched off: still
+crashed). The compressed bundle crashed with or without ReadyToRun; `DOTNET_ReadyToRun=0` only hid it by making the
+framework JIT everything. Uncompressed it also starts faster (`cm-agent status`, 10 runs: 79 ms against 171 ms) and
+the zip a user downloads is the same size (29 MB against 36 MB); the cost is the binary on disk (81 MB against 42 MB).
+`scripts/agent_smoke.py` publishes the host build and checks the daemon stays up for 10 s against a fake API; the
+merge gate runs it. Re-test compression when the runtime is updated, with that script, before turning it back on.
+
 ## Options considered
 
 | Question | Chosen | Rejected, and why |
