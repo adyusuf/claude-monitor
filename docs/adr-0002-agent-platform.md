@@ -151,7 +151,6 @@ set, wins. The default is not raised because a session that keeps waiting after 
 the terminal (the turn has not finished) and stretches the turn Claude Code measures. Whoever wants idle sessions
 reachable opts in per machine.
 
-
 **The Activity list separates what enters the session (decided 05/10/2026).** The session page merges the session's
 events with its commands (`session_commands`, the authoritative record of what was sent from the web) into one list
 (`web/src/lib/timeline.ts`) and gives each line a class (`web/src/lib/activity.ts`): **monitor input** (a web
