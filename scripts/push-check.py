@@ -70,7 +70,7 @@ def main():
     home = os.path.join(work, "home")
     env = dict(os.environ, CM_AGENT_HOME=home, CM_CREDENTIALS="file", DOTNET_SYSTEM_NET_DISABLEIPV6="1", CLAUDE_CODE_SESSION_ID=SESSION)
     shim = os.path.join(work, "shim"); os.makedirs(shim)  # a `claude` that does nothing: `install` must not register anything in the real Claude Code
-    open(os.path.join(shim, "claude"), "w").write("#!/bin/sh\nexit 0\n"); os.chmod(os.path.join(shim, "claude"), 0o755)
+    open(os.path.join(shim, "claude"), "w").write("#!/bin/sh\nexit 0\n"); os.chmod(os.path.join(shim, "claude"), 0o700)
     agent = lambda *args, **kw: subprocess.run([AGENT_BIN, *args], text=True, capture_output=True, env=env, timeout=60, **kw)
     mcp = None
     try:
