@@ -52,7 +52,7 @@ public sealed class ApiDeadlineTests : IDisposable
         using (api)
         {
             var watch = Stopwatch.StartNew();
-            var e = await Assert.ThrowsAsync<TimeoutException>(() => Call(api, call, CancellationToken.None));
+            var e = await Assert.ThrowsAsync<TimeoutException>(() => Call(api, call, CancellationToken.None)).WaitAsync(TimeSpan.FromSeconds(30));
             Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"took {watch.Elapsed}");
             Assert.IsAssignableFrom<OperationCanceledException>(e.InnerException);
             Assert.Equal("the API did not answer within 0.1 s", e.Message);
@@ -69,7 +69,7 @@ public sealed class ApiDeadlineTests : IDisposable
         using (api)
         {
             using var stop = new CancellationTokenSource(Deadline);
-            var e = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Call(api, call, stop.Token));
+            var e = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Call(api, call, stop.Token)).WaitAsync(TimeSpan.FromSeconds(30));
             Assert.IsNotType<TimeoutException>(e.InnerException);
         }
     }
@@ -84,7 +84,7 @@ public sealed class ApiDeadlineTests : IDisposable
         using (http)
         using (api)
         {
-            await Assert.ThrowsAsync<TimeoutException>(() => api.HeartbeatAsync(CancellationToken.None));
+            await Assert.ThrowsAsync<TimeoutException>(() => api.HeartbeatAsync(CancellationToken.None)).WaitAsync(TimeSpan.FromSeconds(30));
             Assert.Equal(2, handler.Calls); // the heartbeat, then the refresh that hung
             Assert.False(api.Disconnected);
         }
