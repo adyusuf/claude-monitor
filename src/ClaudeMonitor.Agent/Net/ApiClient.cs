@@ -19,6 +19,9 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials, Tim
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim refreshing = new(1, 1);
 
+    /// <summary>A stream that stays silent this long is dead (the API pings every 20 s): reading it fails with a <see cref="TimeoutException"/>.</summary>
+    public TimeSpan StreamIdleTimeout { get; init; } = Timeout.InfiniteTimeSpan;
+
     /// <summary>Set when the API refused the refresh token: the agent must be connected again.</summary>
     public bool Disconnected { get; private set; }
 
@@ -109,15 +112,19 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials, Tim
         return await ReadAsync<PermissionRequestCreated>(response, t);
     }, ct);
 
-    /// <summary>The agent's stream: (event name, data) pairs until the server or the token closes it.</summary>
-    public async IAsyncEnumerable<(string Event, JsonElement Data)> StreamAsync([EnumeratorCancellation] CancellationToken ct)
+    /// <summary>
+    /// The agent's stream: (event name, data) pairs until the server or the token closes it. <paramref name="onOpen"/> runs
+    /// once the API has accepted the connection (the first pings come only after 20 s).
+    /// </summary>
+    public async IAsyncEnumerable<(string Event, JsonElement Data)> StreamAsync([EnumeratorCancellation] CancellationToken ct, Action? onOpen = null)
     {
         using var response = await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, "api/agent/stream"), ct,
             HttpCompletionOption.ResponseHeadersRead);
         await EnsureAsync(response, ct);
+        onOpen?.Invoke();
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(ct));
         string? name = null;
-        while (await reader.ReadLineAsync(ct) is { } line)
+        while (await ReadLineWithinAsync(reader, ct) is { } line)
         {
             if (line.StartsWith("event:", StringComparison.Ordinal)) name = line[6..].Trim();
             else if (line.StartsWith("data:", StringComparison.Ordinal) && name is not null)
@@ -126,6 +133,20 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials, Tim
                 yield return (name, doc.RootElement.Clone());
                 name = null;
             }
+        }
+    }
+
+    private async Task<string?> ReadLineWithinAsync(StreamReader reader, CancellationToken ct)
+    {
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        idle.CancelAfter(StreamIdleTimeout);
+        try
+        {
+            return await reader.ReadLineAsync(idle.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new TimeoutException($"the stream was silent for {StreamIdleTimeout.TotalSeconds:0} s");
         }
     }
 

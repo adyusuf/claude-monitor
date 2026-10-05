@@ -38,6 +38,8 @@ public sealed partial class LocalStore : IDisposable
                 offset INTEGER NOT NULL, project_key TEXT, project_name TEXT, git_branch TEXT, updated_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS usage_seen (session TEXT NOT NULL, message_id TEXT NOT NULL,
                 PRIMARY KEY (session, message_id));
+            CREATE TABLE IF NOT EXISTS session_bindings (session TEXT PRIMARY KEY, parent_pid INTEGER NOT NULL, seen_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS pushes (command_id TEXT PRIMARY KEY, pushed_at TEXT NOT NULL, confirmed_at TEXT);
             """);
     }
 
@@ -65,6 +67,12 @@ public sealed partial class LocalStore : IDisposable
     }
 
     public long OutboxCount() => (long)(Scalar("SELECT COUNT(*) FROM outbox") ?? 0L);
+
+    /// <summary>When the oldest event still waiting was captured; null when none waits.</summary>
+    public DateTimeOffset? OutboxOldest() =>
+        Scalar("SELECT occurred_at FROM outbox ORDER BY id LIMIT 1") is string at
+            ? DateTimeOffset.Parse(at, System.Globalization.CultureInfo.InvariantCulture)
+            : null;
 
     /// <summary>
     /// The next batch to send. A batch already numbered (sent before, not acknowledged) is resent as it was, with the

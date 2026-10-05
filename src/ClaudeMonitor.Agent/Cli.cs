@@ -5,6 +5,9 @@ using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Daemon;
 using ClaudeMonitor.Agent.Install;
 using ClaudeMonitor.Agent.Mcp;
+using ClaudeMonitor.Agent.Push;
+using ModelContextProtocol.Protocol;
+using System.Text.Json.Nodes;
 using ClaudeMonitor.Agent.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -17,9 +20,10 @@ public static class Cli
 {
     public const string Usage = """
         cm-agent login --server <url>   connect this machine (shows a code to approve on the web)
-        cm-agent install [--stop-wait <seconds>]
+        cm-agent install [--stop-wait <seconds>] [--push on|off]
                                         register the Claude Code plugin (hooks + MCP) that starts the agent;
                                         --stop-wait: how long a finished turn waits for a prompt from the web (0-590, default 0)
+                                        --push: deliver web messages into an idle session as a Claude Code channel (default off)
         cm-agent status                 connection and queue
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
@@ -73,7 +77,7 @@ public static class Cli
         }
     }
 
-    /// <summary>"cm-agent install [--stop-wait N]": N is saved, so the hooks written now and every later run agree on it.</summary>
+    /// <summary>"cm-agent install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it.</summary>
     public static int Install(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr, string sourceBinary,
         Func<string, string[], int>? run = null)
     {
@@ -90,6 +94,18 @@ public static class Cli
             }
 
             config = SavedSettings.SaveStopWait(config, seconds);
+        }
+
+        if (Array.IndexOf(args, "--push") >= 0)
+        {
+            var value = Option(args, "--push");
+            if (value is not ("on" or "off"))
+            {
+                stderr.WriteLine($"--push takes on or off, not \"{value}\".");
+                return 2;
+            }
+
+            config = SavedSettings.SavePush(config, value == "on");
         }
 
         return new PluginInstaller(config, stdout, run).Install(sourceBinary);
@@ -139,6 +155,7 @@ public static class Cli
             ? $"commands waiting: {commands} (oldest expires {expires.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)})"
             : "commands waiting: 0");
         await stdout.WriteLineAsync($"stop wait: {(int)config.StopWait.TotalSeconds} s");
+        foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
         await stdout.WriteLineAsync($"version: {AgentConfig.Version}");
         return identity.Connected ? 0 : 1;
     }
@@ -158,7 +175,14 @@ public static class Cli
         builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddSingleton(config);
         builder.Services.AddSingleton(clock);
-        builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<MonitorTools>();
+        var mcp = builder.Services.AddMcpServer(o =>
+        {
+            if (!config.PushEnabled) return; // off: the server is exactly what it was before the push existed
+            o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
+            o.ServerInstructions = ChannelEnvelopes.Instructions;
+        });
+        mcp.WithStdioServerTransport().WithTools<MonitorTools>();
+        if (config.PushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }
 }

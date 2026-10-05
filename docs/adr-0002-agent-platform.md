@@ -152,6 +152,9 @@ the terminal (the turn has not finished) and stretches the turn Claude Code meas
 reachable opts in per machine.
 
 
+**Pushing into an idle session (decided 05/10/2026, opt-in):** [ADR-0003](adr-0003-push-into-idle-session.md) adds a Claude Code channel so a prompt
+starts a turn in an idle session; the daemon's stream, the status ladder and the two MCP tools are unchanged.
+
 **Permission prompts are answered from the web too** (maintainer, 03/10/2026). The PermissionRequest hook reports
 the tool call at once (`permission_requests`) and waits a configured time; the session's owner may allow or deny it
 on the web, and the answer reaches the hook over the agent's stream. No answer in time means the hook gives no

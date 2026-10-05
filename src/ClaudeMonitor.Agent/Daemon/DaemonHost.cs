@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
+using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
 
 namespace ClaudeMonitor.Agent.Daemon;
@@ -30,7 +31,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
 
         using var store = new LocalStore(config.DatabasePath);
         using var http = ApiClient.CreateHttp(identity.Server!, handler);
-        using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout);
+        using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout) { StreamIdleTimeout = config.StreamIdleTimeout };
         var relay = new Relay(config, store, api, clock);
         var tailer = new TranscriptTailer(config, store, clock);
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
@@ -42,7 +43,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await relay.PermissionsAsync(ct);
                 await relay.UploadAsync(ct);
                 await relay.ReportCommandsAsync(ct);
-            }, api, revoked),
+            }, api, revoked, error => relay.UploadOutcome(error)),
             Loop("heartbeat", config.HeartbeatEvery, relay.HeartbeatAsync, api, revoked),
             Loop("settings", config.SettingsEvery, relay.SettingsAsync, api, revoked),
             StreamAsync(api, relay, revoked));
@@ -55,7 +56,8 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         return 0;
     }
 
-    private async Task Loop(string name, TimeSpan every, Func<CancellationToken, Task> work, ApiClient api, CancellationTokenSource cts)
+    private async Task Loop(string name, TimeSpan every, Func<CancellationToken, Task> work, ApiClient api, CancellationTokenSource cts,
+        Action<string>? onFailure = null)
     {
         var failures = 0;
         while (!cts.IsCancellationRequested)
@@ -70,6 +72,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 // Only the daemon's own token means stopping; a timeout (also an OperationCanceledException) is a failure.
                 failures++;
                 log.Write($"{name} failed ({failures}): {e.GetType().Name} {e.Message}");
+                onFailure?.Invoke(e.GetType().Name);
             }
 
             if (api.Disconnected) await cts.CancelAsync();
@@ -84,7 +87,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         {
             try
             {
-                await foreach (var (name, data) in api.StreamAsync(cts.Token))
+                await foreach (var (name, data) in api.StreamAsync(cts.Token, () => relay.StreamState(PushStatus.Connected, 0, null)))
                 {
                     failures = 0;
                     if (!await relay.OnStreamAsync(name, data, cts.Token))
@@ -94,12 +97,15 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                         return;
                     }
                 }
+
+                relay.StreamState(PushStatus.Reconnecting, failures, "StreamClosed"); // the API ended it: reopen
             }
             catch (Exception e) when (!cts.IsCancellationRequested)
             {
                 // A connect timeout is an OperationCanceledException too; it must not end the stream for good.
                 failures++;
                 log.Write($"stream failed ({failures}): {e.GetType().Name} {e.Message}");
+                relay.StreamState(PushStatus.Reconnecting, failures, e.GetType().Name);
             }
 
             if (api.Disconnected) await cts.CancelAsync();
