@@ -152,6 +152,23 @@ the terminal (the turn has not finished) and stretches the turn Claude Code meas
 reachable opts in per machine.
 
 
+**The Activity list separates what enters the session (decided 05/10/2026).** The session page merges the session's
+events with its commands (`session_commands`, the authoritative record of what was sent from the web) into one list
+(`web/src/lib/timeline.ts`) and gives each line a class (`web/src/lib/activity.ts`): **monitor input** (a web
+command: labelled card, sender, status chip), **human input** (a typed prompt, `hook:UserPromptSubmit`: labelled
+card in a second colour and icon), **assistant** (plain, thin stripe), **tool** and **meta** (quiet single lines,
+folded into closed groups). Rules that keep it honest: a transcript `user` line that is a tool result, or that the harness wrote (it opens with a tag such as
+`<task-notification>`, `<command-name>`, `<system-reminder>`; about a third of real `user` lines), is never a human
+input; a transcript `user` line with text repeats the prompt hook of its turn and is dropped when that hook is
+loaded (it shows only when none is, for a harness without the hook); a transcript line that repeats an applied web
+command's own text within `config.commandEchoSeconds` of its moment is dropped (matching is by the command's text,
+never by how Claude Code words the wrapper); a waiting command (queued, delivered) is pinned on top as "Waiting";
+a command applied within `config.commandPairSeconds` of a typed prompt sits directly above it ("delivered together
+with the message typed in the session"); while older pages of events are unloaded, a command older than the oldest
+loaded event is held back and appears when "Older activity" reaches its moment. The filter chips (All, Inputs,
+Assistant, Tools) are kept in the browser (`config.activityFilterKey`). No API change: only existing fields are read.
+Screenshots at 375 px, light and dark: `docs/images/activity-375-light.png`, `docs/images/activity-375-dark.png`.
+
 **Permission prompts are answered from the web too** (maintainer, 03/10/2026). The PermissionRequest hook reports
 the tool call at once (`permission_requests`) and waits a configured time; the session's owner may allow or deny it
 on the web, and the answer reaches the hook over the agent's stream. No answer in time means the hook gives no
