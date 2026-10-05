@@ -36,10 +36,13 @@ public sealed partial class LocalStore
             ("$i", c.Id), ("$s", c.Session), ("$k", c.Kind), ("$b", c.Body), ("$e", Iso(c.ExpiresAt)));
     }
 
-    /// <summary>Takes (once) the oldest unexpired command of a kind for a session; a taken command is not taken again.</summary>
+    /// <summary>
+    /// Takes (once) the oldest unexpired command of a kind for a session; a taken command is not taken again. The state
+    /// change is checked, so a hook and the push pump racing for one command cannot both get it.
+    /// </summary>
     public LocalCommand? TakeCommand(string session, string kind, DateTimeOffset now)
     {
-        using var tx = db.BeginTransaction();
+        using var tx = db.BeginTransaction(deferred: false);
         LocalCommand? found = null;
         using (var cmd = Command("SELECT id, body, expires_at FROM commands WHERE session = $s AND kind = $k AND state = 'queued' ORDER BY rowid",
                    tx, ("$s", session), ("$k", kind)))
@@ -52,7 +55,12 @@ public sealed partial class LocalStore
             }
         }
 
-        if (found is not null) Exec("UPDATE commands SET state = 'taken', taken_at = $t WHERE id = $i", tx, ("$i", found.Id), ("$t", Iso(now)));
+        if (found is not null
+            && Exec("UPDATE commands SET state = 'taken', taken_at = $t WHERE id = $i AND state = 'queued'", tx, ("$i", found.Id), ("$t", Iso(now))) != 1)
+        {
+            found = null;
+        }
+
         tx.Commit();
         return found;
     }

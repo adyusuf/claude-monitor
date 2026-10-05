@@ -169,6 +169,9 @@ loaded event is held back and appears when "Older activity" reaches its moment. 
 Assistant, Tools) are kept in the browser (`config.activityFilterKey`). No API change: only existing fields are read.
 Screenshots at 375 px, light and dark: `docs/images/activity-375-light.png`, `docs/images/activity-375-dark.png`.
 
+**Pushing into an idle session (decided 05/10/2026, opt-in):** [ADR-0003](adr-0003-push-into-idle-session.md) adds a Claude Code channel so a prompt
+starts a turn in an idle session; the daemon's stream, the status ladder and the two MCP tools are unchanged.
+
 **Permission prompts are answered from the web too** (maintainer, 03/10/2026). The PermissionRequest hook reports
 the tool call at once (`permission_requests`) and waits a configured time; the session's owner may allow or deny it
 on the web, and the answer reaches the hook over the agent's stream. No answer in time means the hook gives no

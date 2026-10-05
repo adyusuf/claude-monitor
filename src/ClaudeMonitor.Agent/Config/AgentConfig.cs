@@ -2,6 +2,12 @@ using System.Reflection;
 
 namespace ClaudeMonitor.Agent.Config;
 
+public static class PushScopes
+{
+    public const string Session = "session";
+    public const string Machine = "machine";
+}
+
 /// <summary>
 /// The agent's ONE configuration module (global #2): the only place that reads the environment or holds a path,
 /// URL, interval or limit. Every other file takes an <see cref="AgentConfig"/>. Every variable is in .env.example.
@@ -32,6 +38,30 @@ public sealed record AgentConfig
 
     /// <summary>The longest a hook may wait for the web (Claude Code's hook timeout is raised by the same amount).</summary>
     public const int WaitMaxSeconds = 590;
+    /// <summary>
+    /// Push into an idle session (ADR-0003): "claude/channel" notifications from `cm-agent mcp`. Off by default; `cm-agent install
+    /// --push on` saves it, and CM_PUSH (on/off), when set, wins.
+    /// </summary>
+    public bool PushEnabled { get; init; }
+
+    /// <summary>True when CM_PUSH was set: it then wins over the value `cm-agent install --push` saved.</summary>
+    public bool PushFromEnvironment { get; init; }
+
+    /// <summary>"session" (default): only prompts addressed to this session. "machine": any prompt of this machine (see ADR-0003).</summary>
+    public string PushScope { get; init; } = PushScopes.Session;
+
+    /// <summary>How often the MCP process looks in the local database for a prompt to push (a file read, no model, no network).</summary>
+    public TimeSpan PushPollEvery { get; init; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>A pushed prompt that never shows up in the transcript within this long goes back to the hooks (the channel was not enabled).</summary>
+    public TimeSpan PushConfirmWait { get; init; } = TimeSpan.FromSeconds(120);
+
+    /// <summary>The longest message body pushed whole; a longer one is cut with a marker.</summary>
+    public int PushContentMax { get; init; } = 8000;
+
+    /// <summary>The API pings the stream every 20 s; a stream silent for this long is dead (a half-open connection) and is reopened.</summary>
+    public TimeSpan StreamIdleTimeout { get; init; } = TimeSpan.FromSeconds(75);
+
     public TimeSpan FlushEvery { get; init; } = TimeSpan.FromSeconds(2);
     public TimeSpan HeartbeatEvery { get; init; } = TimeSpan.FromSeconds(60);
     public TimeSpan SettingsEvery { get; init; } = TimeSpan.FromMinutes(10);
@@ -99,6 +129,9 @@ public sealed record AgentConfig
             PermissionWait = Seconds(read("CM_PERMISSION_WAIT"), TimeSpan.FromSeconds(120), WaitMaxSeconds),
             StopWait = Seconds(read("CM_STOP_WAIT"), TimeSpan.Zero, WaitMaxSeconds),
             StopWaitFromEnvironment = read("CM_STOP_WAIT") is { Length: > 0 },
+            PushEnabled = read("CM_PUSH") == "on",
+            PushFromEnvironment = read("CM_PUSH") is { Length: > 0 },
+            PushScope = read("CM_PUSH_SCOPE") == PushScopes.Machine ? PushScopes.Machine : PushScopes.Session,
         };
     }
 

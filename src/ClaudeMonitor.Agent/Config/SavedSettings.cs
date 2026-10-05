@@ -3,9 +3,10 @@ using ClaudeMonitor.Agent.Auth;
 namespace ClaudeMonitor.Agent.Config;
 
 /// <summary>
-/// The one setting a person can change after the fact without editing the environment of every hook process:
-/// how long the Stop hook waits for a prompt from the web (`cm-agent install --stop-wait`). It is kept in agent.json
-/// beside the identity. CM_STOP_WAIT, when set, wins (tests and one-off overrides); the default stays 0.
+/// The settings a person can change after the fact without editing the environment of every hook process: how long the
+/// Stop hook waits for a prompt from the web (`cm-agent install --stop-wait`) and whether prompts are pushed into an idle
+/// session (`--push`). They are kept in agent.json beside the identity. CM_STOP_WAIT and CM_PUSH, when set, win (tests and
+/// one-off overrides); the defaults stay 0 and off.
 /// </summary>
 public static class SavedSettings
 {
@@ -13,9 +14,21 @@ public static class SavedSettings
     public static AgentConfig Apply(AgentConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return config.StopWaitFromEnvironment || Identity.Peek(config)?.StopWaitSeconds is not { } seconds
-            ? config
-            : config with { StopWait = TimeSpan.FromSeconds(Math.Clamp(seconds, 0, AgentConfig.WaitMaxSeconds)) };
+        var saved = Identity.Peek(config);
+        if (!config.StopWaitFromEnvironment && saved?.StopWaitSeconds is { } seconds)
+        {
+            config = config with { StopWait = TimeSpan.FromSeconds(Math.Clamp(seconds, 0, AgentConfig.WaitMaxSeconds)) };
+        }
+
+        return !config.PushFromEnvironment && saved?.Push is { } push ? config with { PushEnabled = push } : config;
+    }
+
+    /// <summary>Saves whether prompts from the web are pushed into an idle session (ADR-0003) and returns the configuration that uses it.</summary>
+    public static AgentConfig SavePush(AgentConfig config, bool on)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        (Identity.Load(config) with { Push = on }).Save(config);
+        return config with { PushEnabled = on };
     }
 
     /// <summary>Saves the stop wait (0 to <see cref="AgentConfig.WaitMaxSeconds"/>) and returns the configuration that uses it.</summary>

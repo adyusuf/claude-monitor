@@ -29,6 +29,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
         var now = clock.GetUtcNow();
         var project = ProjectInfo.Resolve(payload["cwd"]?.GetValue<string>());
         Record(hookEvent, session, payload, project, now);
+        if (Push.ParentProcess.Id() is > 0 and var claude) store.BindSession(session, claude, now); // which Claude Code process runs it (ADR-0003)
         if (payload["transcript_path"]?.GetValue<string>() is { Length: > 0 } transcript)
         {
             store.TrackTranscript(new TranscriptCursor(session, HarnessKinds.ClaudeCode, transcript, 0, project?.Key, project?.Name,

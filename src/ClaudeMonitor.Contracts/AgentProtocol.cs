@@ -85,4 +85,7 @@ public static class AgentStreamEvents
     public const string PermissionAnswer = "permission_answer";
     public const string Revoked = "revoked";
     public const string Ping = "ping";
+
+    /// <summary>The first message of every connection: it makes the server send its headers at once, so the agent knows it is connected.</summary>
+    public const string Ready = "ready";
 }
