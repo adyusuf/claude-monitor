@@ -14,6 +14,13 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "the working tree has uncommitted changes: a release is built from a commit" >&2
   exit 2
 fi
+# A server-only settings file may hold the SMTP password (ApiConfig.SmtpSection). It is git-ignored, so the check
+# above does not see it, and `dotnet publish` would copy it into a package that is meant to hold no secret.
+local_settings="$(find src -name 'appsettings.Production*.json' -not -path '*/bin/*' -not -path '*/obj/*' 2>/dev/null)"
+if [ -n "$local_settings" ]; then
+  echo "refusing: $local_settings would ship in the package — server-only settings live on the server" >&2
+  exit 2
+fi
 commit="$(git rev-parse HEAD)"
 out="$root/out"
 stage="$(mktemp -d)"

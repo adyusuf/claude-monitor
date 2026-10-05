@@ -34,6 +34,11 @@ IIS site, app pool, PostgreSQL database and folder under `C:\ClaudeMonitor\<env>
    `.../google`), and `MONITOR_BACKUP_OFFSITE` (a folder on another machine). Copy `MONITOR_BACKUP_KEY` into the
    password manager: without it no backup can be restored.
 
+   SMTP can also be given as an `"Smtp"` node (`Host`, `Port`, `User`, `Password`, `From`, `StartTls`) in
+   `releases\<commit>\api\appsettings.Production.json` on the server. A non-empty `MONITOR_SMTP_*` value in
+   `monitor.env` wins over it, an empty one does not hide it. The file is not in the package, so a new release folder
+   starts without it: copy it into each release, or keep the values in `monitor.env`, which every deploy carries over.
+
 ## Every release
 
 On the Mac, from a clean checkout of the commit to ship:
