@@ -66,7 +66,12 @@ public sealed record PermissionRequestCreated(Guid Id, DateTimeOffset ExpiresAt)
 public sealed record AgentCommandMessage(Guid Id, Guid SessionId, string SessionExternalId, string Kind, string? Body,
     DateTimeOffset ExpiresAt);
 
-public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, string Decision, string? Reason);
+/// <summary>
+/// The owner's answer to a permission request. For the harness's question tool, <c>Answers</c> maps each question's text to
+/// the option (or typed text) chosen; the agent hands them to the harness as the tool's answered input.
+/// </summary>
+public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, string Decision, string? Reason,
+    IReadOnlyDictionary<string, string>? Answers = null);
 
 public sealed record CommandStatusUpdate(string Status, string? Result);
 

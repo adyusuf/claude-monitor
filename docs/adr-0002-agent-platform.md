@@ -177,10 +177,26 @@ the newest 20 and reads back only if more arrived. The raw event list stays one 
 renders the text itself (a small Markdown subset built as React elements, never HTML), so captured text cannot inject
 markup and no Markdown library was added.
 
-The questions and plan approvals are shown with their options, read-only for now. Answering them from the web (a button
-that does the work in the session) rides the existing permission path: the `PermissionRequest` hook already waits for
-the owner's answer, and its allow decision may carry `updatedInput`. Whether Claude Code raises that hook for
-`AskUserQuestion` and `ExitPlanMode` has to be confirmed in a live session before the buttons are built on it.
+**Answering Claude's questions and plans from the web (decided 05/10/2026).** A question Claude puts to the user
+(`AskUserQuestion`) or a plan waiting for approval (`ExitPlanMode`) is a permission prompt, so it rides the existing
+permission path: the `PermissionRequest` hook reports it and waits; the owner answers on the web, where the options are
+buttons (one click for a single single-choice question; several questions or multi-choice are collected and sent
+together, with optional typed text); the answer reaches the hook over the agent's stream and the hook returns an
+`allow` whose `updatedInput` is the question tool's own input plus `answers` (question text -> the option chosen), which
+is how the harness takes an answer without asking on the machine. A plan is approved (`allow`) or sent back (`deny`
+with the note as the reason). The protocol grew only additively: `answers` on the answer request and on
+`PermissionAnswerMessage`, an `answers` column in the agent's local database (added in place when missing). The API
+accepts `answers` only for `AskUserQuestion`, only with an allow, only for questions the request carries, each at most
+500 characters; the agent builds `updatedInput` from the input the hook received, never from anything the web sent, so
+the web can choose among options but cannot change a call. **Fail-safe:** the buttons exist only while an open
+permission request for that tool exists. If Claude Code does not raise `PermissionRequest` for these tools, nothing is
+reported, no buttons appear, and the question stays readable in the conversation and answerable on the machine.
+**Not confirmed on a live interactive session (decided 05/10/2026):** whether Claude Code raises the hook for these tools
+and takes `updatedInput.answers`. A non-interactive run (`claude -p`) does not offer `AskUserQuestion` at all, so the
+check needs an interactive session. Confirmed on a live run the same day: a prompt sent from the web at the end of a
+turn (the `Stop` hook's reason) is kept in the transcript as a meta user line "Stop hook feedback: ..." and one sent
+while the user typed (`additionalContext`) as a `hook_additional_context` attachment; the conversation shows both as the
+user's message.
 
 ### Environments
 

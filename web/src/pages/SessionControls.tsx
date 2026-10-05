@@ -7,6 +7,7 @@ import { useErrorText, useI18n } from "../i18n";
 import { time } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import { CommandItem, isIdle } from "./CommandHistory";
+import { PlanPrompt, PLAN_TOOL, QUESTION_TOOL, QuestionPrompt } from "./PermissionPrompts";
 
 interface Props { sessionId: string; version: number; onChange: () => void }
 
@@ -32,9 +33,9 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
   }, [load, version]);
 
   if (rows.length === 0) return null;
-  const answer = async (id: string, decision: "allow" | "deny") => {
+  const answer = async (id: string, decision: "allow" | "deny", answers?: Record<string, string>) => {
     try {
-      await api.answer(id, decision, reasons[id]?.trim() || undefined);
+      await api.answer(id, decision, reasons[id]?.trim() || undefined, answers);
       setRows((r) => r.filter((p) => p.id !== id));
       onChange();
     } catch (e) {
@@ -51,13 +52,14 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
             <strong>{p.toolName}</strong>
             <span className="muted small">{t("session.expires")}: {time(p.expiresAt)}</span>
           </div>
-          <Json value={p.toolInput} />
+          {p.toolName === PLAN_TOOL ? <PlanPrompt input={p.toolInput} /> : p.toolName === QUESTION_TOOL ? null : <Json value={p.toolInput} />}
+          {canAnswer && p.toolName === QUESTION_TOOL ? <QuestionPrompt input={p.toolInput} onAnswer={(answers) => void answer(p.id, "allow", answers)} /> : null}
           {canAnswer ? (
             <div className="permission-actions">
               <input className="input" placeholder={t("session.reason")} maxLength={config.reasonMax} value={reasons[p.id] ?? ""}
                 onChange={(e) => setReasons({ ...reasons, [p.id]: e.target.value })} />
-              <Button onClick={() => void answer(p.id, "allow")}>{t("session.allow")}</Button>
-              <Button variant="danger" onClick={() => void answer(p.id, "deny")}>{t("session.deny")}</Button>
+              {p.toolName === QUESTION_TOOL ? null : <Button onClick={() => void answer(p.id, "allow")}>{p.toolName === PLAN_TOOL ? t("chat.approvePlan") : t("session.allow")}</Button>}
+              <Button variant="danger" onClick={() => void answer(p.id, "deny")}>{p.toolName === PLAN_TOOL ? t("chat.rejectPlan") : t("session.deny")}</Button>
             </div>
           ) : <p className="muted small">{t("session.onlyOwner")}</p>}
         </div>

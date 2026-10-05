@@ -5,7 +5,7 @@ namespace ClaudeMonitor.Agent.Storage;
 
 public sealed record LocalCommand(string Id, string Session, string Kind, string? Body, DateTimeOffset ExpiresAt);
 public sealed record PermissionAsk(string LocalId, string Harness, string Session, string ToolName, string ToolInput, int WaitSeconds,
-    DateTimeOffset CreatedAt, string? RemoteId, string? Decision, string? Reason, string State);
+    DateTimeOffset CreatedAt, string? RemoteId, string? Decision, string? Reason, string State, string? Answers = null);
 public sealed record TranscriptCursor(string Session, string Harness, string Path, long Offset, string? ProjectKey, string? ProjectName,
     string? GitBranch);
 
@@ -99,9 +99,10 @@ public sealed partial class LocalStore
     public void PermissionSent(string localId, string remoteId) =>
         Exec("UPDATE permissions SET remote_id = $r, state = 'sent' WHERE local_id = $l AND state = 'new'", ("$r", remoteId), ("$l", localId));
 
-    public void PermissionAnswered(string remoteId, string decision, string? reason) =>
-        Exec("UPDATE permissions SET decision = $d, reason = $why, state = 'answered' WHERE remote_id = $r AND state = 'sent'",
-            ("$d", decision), ("$why", reason), ("$r", remoteId));
+    /// <summary>Records the owner's answer; <paramref name="answers"/> is the question tool's chosen options as a JSON object.</summary>
+    public void PermissionAnswered(string remoteId, string decision, string? reason, string? answers = null) =>
+        Exec("UPDATE permissions SET decision = $d, reason = $why, answers = $a, state = 'answered' WHERE remote_id = $r AND state = 'sent'",
+            ("$d", decision), ("$why", reason), ("$a", answers), ("$r", remoteId));
 
     public void PermissionExpired(string localId) =>
         Exec("UPDATE permissions SET state = 'expired' WHERE local_id = $l AND state IN ('new', 'sent')", ("$l", localId));
@@ -110,14 +111,14 @@ public sealed partial class LocalStore
     {
         var list = new List<PermissionAsk>();
         using var cmd = Command($"""
-            SELECT local_id, harness, session, tool_name, tool_input, wait_seconds, created_at, remote_id, decision, reason, state
+            SELECT local_id, harness, session, tool_name, tool_input, wait_seconds, created_at, remote_id, decision, reason, state, answers
             FROM permissions WHERE {where} ORDER BY created_at
             """, null, args);
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
             list.Add(new PermissionAsk(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetInt32(5),
-                At(r.GetString(6)), Str(r, 7), Str(r, 8), Str(r, 9), r.GetString(10)));
+                At(r.GetString(6)), Str(r, 7), Str(r, 8), Str(r, 9), r.GetString(10), Str(r, 11)));
         }
 
         return list;

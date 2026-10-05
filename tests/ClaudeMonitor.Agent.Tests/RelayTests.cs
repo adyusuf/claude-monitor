@@ -152,6 +152,13 @@ public sealed class RelayTests : IDisposable
         var answer = new PermissionAnswerMessage(remote, "s1", PermissionDecisions.Allow, null);
         Assert.True(await relay.OnStreamAsync(AgentStreamEvents.PermissionAnswer, JsonSerializer.SerializeToElement(answer, ApiClient.Json), CancellationToken.None));
         Assert.Equal(PermissionDecisions.Allow, store.Permission("l1")!.Decision);
+        Assert.Null(store.Permission("l1")!.Answers);
+        store.AddPermission(new PermissionAsk("l9", HarnessKinds.ClaudeCode, "s1", "AskUserQuestion", "{}", 60, clock.GetUtcNow(), null, null, null, "new"));
+        var asked = Guid.NewGuid();
+        store.PermissionSent("l9", asked.ToString());
+        var chosen = new PermissionAnswerMessage(asked, "s1", PermissionDecisions.Allow, null, new Dictionary<string, string> { ["Which way?"] = "Right" });
+        Assert.True(await relay.OnStreamAsync(AgentStreamEvents.PermissionAnswer, JsonSerializer.SerializeToElement(chosen, ApiClient.Json), CancellationToken.None));
+        Assert.Equal("{\"Which way?\":\"Right\"}", store.Permission("l9")!.Answers);
         Assert.True(await relay.OnStreamAsync(AgentStreamEvents.Ping, JsonSerializer.SerializeToElement(new { }), CancellationToken.None));
         Assert.False(await relay.OnStreamAsync(AgentStreamEvents.Revoked, JsonSerializer.SerializeToElement(new { }), CancellationToken.None));
 

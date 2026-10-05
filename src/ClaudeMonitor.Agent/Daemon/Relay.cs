@@ -88,7 +88,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.PermissionAnswer:
                 var a = data.Deserialize<PermissionAnswerMessage>(ApiClient.Json)!;
-                store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason);
+                store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason, a.Answers is null ? null : JsonSerializer.Serialize(a.Answers));
                 return true;
             case AgentStreamEvents.Revoked:
                 return false;

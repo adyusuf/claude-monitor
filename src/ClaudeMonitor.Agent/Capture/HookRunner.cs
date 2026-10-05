@@ -106,6 +106,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             {
                 var result = new JsonObject { ["behavior"] = decision == PermissionDecisions.Allow ? "allow" : "deny" };
                 if (decision != PermissionDecisions.Allow && answered.Reason is { } why) result["message"] = why;
+                if (decision == PermissionDecisions.Allow && AnsweredInput(payload, answered.Answers) is { } updated) result["updatedInput"] = updated;
                 return new JsonObject
                 {
                     ["hookSpecificOutput"] = new JsonObject { ["hookEventName"] = "PermissionRequest", ["decision"] = result },
@@ -117,6 +118,19 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
 
         store.PermissionExpired(localId);
         return null;
+    }
+
+    /// <summary>
+    /// The question tool's input with the owner's answers added, which is how the harness takes an answer without asking
+    /// on the machine. Built from the tool's own input as the hook received it (never from anything the web sent), so
+    /// the web can choose among the options but cannot change the call.
+    /// </summary>
+    private static JsonObject? AnsweredInput(JsonObject payload, string? answers)
+    {
+        if (payload["tool_name"]?.GetValue<string>() != QuestionTools.AskUserQuestion || answers is null) return null;
+        if (payload["tool_input"]?.DeepClone() is not JsonObject input || JsonNode.Parse(answers) is not JsonObject chosen) return null;
+        input["answers"] = chosen;
+        return input;
     }
 
     /// <summary>

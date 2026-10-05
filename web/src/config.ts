@@ -21,6 +21,8 @@ export const config = {
   nameMax: 100,
   promptMax: 10_000,
   reasonMax: 500,
+  /** The longest typed answer to a question (the API takes the same). */
+  answerMax: 500,
   liveReconnectMs: 3_000,
   liveDebounceMs: 400,
   /** A session whose last event is older than this is "idle": a command waits until a turn ends or someone types in it. */

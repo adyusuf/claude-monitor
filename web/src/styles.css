@@ -258,3 +258,8 @@ textarea.input { resize: vertical; }
   .session-row { flex-direction: column; }
   .session-side { flex-direction: row; justify-content: space-between; align-items: center; }
 }
+.prompt-question, .prompt-plan { margin: 8px 0; }
+.prompt-options { display: grid; gap: 6px; margin: 6px 0; }
+.prompt-option { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font: inherit; cursor: pointer; }
+.prompt-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+.prompt-option-on { border-color: var(--accent); background: var(--accent-soft); }

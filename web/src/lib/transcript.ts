@@ -59,7 +59,7 @@ export function toolSummary(name: string, input: Obj): string {
   }
 }
 
-function questionsOf(input: Obj): Question[] {
+export function questionsOf(input: Obj): Question[] {
   const list = Array.isArray(input.questions) ? input.questions : [];
   return list.filter(isObj).map((q) => ({
     question: str(q.question),
@@ -100,6 +100,15 @@ function fromWeb(p: Obj): string | null {
   const at = text.indexOf(WEB_HEADER);
   if (at < 0) return null;
   return text.slice(at + WEB_HEADER.length).split("\n").map((l) => l.replace(/^\s*-\s?/, "")).join("\n").trim() || null;
+}
+
+const STOP_FEEDBACK = "Stop hook feedback:";
+
+/** A prompt sent from the web at the end of a turn reaches Claude as a Stop hook's reason, which the transcript keeps as a meta user line. */
+function fromStop(p: Obj): string | null {
+  if (p.type !== "user" || p.isMeta !== true || !isObj(p.message) || typeof p.message.content !== "string") return null;
+  const text = p.message.content.trim();
+  return text.startsWith(STOP_FEEDBACK) ? text.slice(STOP_FEEDBACK.length).trim() || null : null;
 }
 
 /** What a user line says. A slash command arrives wrapped in tags; the command's own output and reminders are not speech. */
@@ -150,7 +159,7 @@ export function buildChat(events: EventRow[]): ChatItem[] {
       continue;
     }
 
-    const web = fromWeb(p);
+    const web = fromWeb(p) ?? fromStop(p);
     if (web) {
       items.push({ kind: "user", key: `${e.id}`, at, text: web, command: null });
       continue;
