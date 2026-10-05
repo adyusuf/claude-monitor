@@ -126,4 +126,43 @@ public sealed class HappyEyeballsTests
         Assert.Equal("ok", await http.GetStringAsync(new Uri($"http://localhost:{port}/")).WaitAsync(TimeSpan.FromSeconds(10)));
         await serve.WaitAsync(TimeSpan.FromSeconds(10));
     }
+
+    [Fact]
+    public async Task A_socket_that_fails_to_connect_is_closed()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop(); // nothing listens there now: the connect is refused
+
+        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await Assert.ThrowsAsync<SocketException>(() =>
+            HappyEyeballs.ConnectSocketAsync(socket, IPAddress.Loopback, port, CancellationToken.None)).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(socket.SafeHandle.IsClosed);
+    }
+
+    [Fact]
+    public async Task Disposing_the_client_closes_its_connection()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var closedByClient = Task.Run(async () =>
+        {
+            using var client = await listener.AcceptTcpClientAsync();
+            var stream = client.GetStream();
+            var buffer = new byte[4096];
+            _ = await stream.ReadAsync(buffer);
+            await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")); // keep-alive
+            return await stream.ReadAsync(buffer); // 0 once the client closes the socket
+        });
+
+        var handler = ApiClient.CreateHandler();
+        using (var http = new HttpClient(handler))
+        {
+            Assert.Equal("ok", await http.GetStringAsync(new Uri($"http://127.0.0.1:{port}/")).WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+
+        Assert.Equal(0, await closedByClient.WaitAsync(TimeSpan.FromSeconds(10)));
+    }
 }
