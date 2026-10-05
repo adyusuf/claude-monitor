@@ -49,6 +49,9 @@ public sealed record ApiConfig
     public long MaxBatchBytes { get; init; } = 8 * 1024 * 1024;
     public int PageSizeMax { get; init; } = 100;
 
+    /// <summary>How far an agent's clock may differ from the API's before a time it reports is not believed.</summary>
+    public TimeSpan ClockSkewMax { get; init; } = TimeSpan.FromMinutes(2);
+
     /// <summary>How much of Claude's answer a command carries, and how many recorded messages are searched for it.</summary>
     public int ReplyPreviewChars { get; init; } = 300;
     public int ReplyScanMax { get; init; } = 500;

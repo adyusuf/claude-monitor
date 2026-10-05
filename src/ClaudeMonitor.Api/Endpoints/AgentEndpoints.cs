@@ -100,7 +100,7 @@ public static class AgentEndpoints
     }
 
     private static async Task<IResult> CommandStatus(Guid id, CommandStatusUpdate req, HttpContext http, MonitorDb db,
-        TimeProvider clock, Broker broker)
+        TimeProvider clock, Broker broker, ApiConfig config)
     {
         if (!CommandStatuses.FromAgent.Contains(req.Status ?? "")) return Http.Invalid("status", "invalid_status");
         var agentId = http.User.AgentId();
@@ -115,12 +115,19 @@ public static class AgentEndpoints
         command.Status = req.Status!;
         command.Result = req.Result is { Length: > 500 } r ? r[..500] : req.Result;
         if (req.Status == CommandStatuses.Delivered) command.DeliveredAt = now;
-        else command.AppliedAt = now;
+        else command.AppliedAt = AppliedMoment(req.At, command.CreatedAt, now, config.ClockSkewMax);
         await db.SaveChangesAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(command.WorkspaceId),
             new StreamMessage("command", new { sessionId = command.SessionId, id, status = command.Status }));
         return Results.NoContent();
     }
+
+    /// <summary>
+    /// When the hook handed the command to the session, as the agent saw it (the report itself can come seconds later).
+    /// Believed unless it is older than the command itself (give or take the allowed clock skew); never later than now.
+    /// </summary>
+    internal static DateTimeOffset AppliedMoment(DateTimeOffset? reported, DateTimeOffset created, DateTimeOffset now, TimeSpan skew) =>
+        reported is { } at && at >= created - skew ? (at < now ? at : now) : now;
 
     private static async Task<IResult> CreatePermission(PermissionRequestCreate req, HttpContext http, MonitorDb db,
         ApiConfig config, TimeProvider clock, Broker broker)

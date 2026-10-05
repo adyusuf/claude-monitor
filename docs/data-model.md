@@ -97,7 +97,10 @@ line's own `timestamp`, else the event's `occurred_at` (the agent stamps an even
 which can be later). Only an `applied` `prompt` has one; two commands applied together share the first reply written
 after them; an event shortened to a marker (`truncated`) carries no message and is skipped. The web shows
 Applied -> "waiting for Claude's reply" -> "Claude replied" from these fields; `session_commands.status` keeps its
-six values. The search reads at most `ReplyScanMax` events (500) from the oldest applied command in the page.
+six values. `applied_at` is the moment the hook handed the command to the session: the agent sends it as `at` with its
+`applied` report (the report itself can come seconds later) and the API believes it unless it is older than the command
+(give or take `ClockSkewMax`, 2 minutes), never later than the report; an older agent sends none and `applied_at` is the
+report's time. The search reads at most `ReplyScanMax` events (500) from the oldest applied command in the page.
 
 ## 6. Audit
 

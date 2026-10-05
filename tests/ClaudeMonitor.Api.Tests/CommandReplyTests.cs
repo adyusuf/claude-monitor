@@ -23,13 +23,15 @@ public sealed class CommandReplyTests(ApiFactory api)
     }
 
     /// <summary>Sends a prompt and reports it applied at the API's current time; returns the command's id.</summary>
-    private static async Task<Guid> AppliedAsync(Setup s, string body)
+    private static async Task<Guid> AppliedAsync(Setup s, string body, DateTimeOffset? at = null)
     {
         var created = await s.Owner.PostAsync($"/api/sessions/{s.SessionId}/commands", new { kind = "prompt", body });
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        Assert.Equal(HttpStatusCode.NoContent, (await s.Agent.Http.PostAsJsonAsync($"/api/agent/commands/{id}/status", new CommandStatusUpdate("applied", null), TestUser.Json)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await s.Agent.Http.PostAsJsonAsync($"/api/agent/commands/{id}/status", new CommandStatusUpdate("applied", null, at), TestUser.Json)).StatusCode);
         return id;
     }
+
+    private static async Task<DateTimeOffset> AppliedAtAsync(Setup s, Guid id) => (await CommandAsync(s, id)).GetProperty("appliedAt").GetDateTimeOffset();
 
     private static CapturedEvent Line(string external, object message, DateTimeOffset readAt, DateTimeOffset? writtenAt = null, string type = "assistant") =>
         TestAgent.Of(external, EventKinds.Transcript, new { type, timestamp = (writtenAt ?? readAt).UtcDateTime.ToString("O"), message }, readAt);
@@ -176,5 +178,31 @@ public sealed class CommandReplyTests(ApiFactory api)
         var whole = await CommandAsync(s, exact);
         Assert.False(whole.GetProperty("replyMore").GetBoolean());
         Assert.Equal(fits, whole.GetProperty("replyText").GetString());
+    }
+
+    [Fact]
+    public async Task The_time_the_agent_reports_is_the_applied_time_only_when_it_is_believable()
+    {
+        var s = await NewSessionAsync();
+        api.Clock.Advance(TimeSpan.FromSeconds(10));
+        var now = api.Clock.GetUtcNow();
+        Assert.Equal(now.AddSeconds(-7), await AppliedAtAsync(s, await AppliedAsync(s, "reported", now.AddSeconds(-7))));
+        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "older agent")));
+        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "a clock a little ahead", now.AddSeconds(1)))); // never in the future
+        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "a clock far ahead", now.AddHours(1))));
+        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "before it existed", now.AddHours(-1))));
+    }
+
+    [Fact]
+    public async Task A_quick_reply_belongs_to_the_command_when_the_agent_says_when_it_was_applied()
+    {
+        var s = await NewSessionAsync();
+        var t0 = api.Clock.GetUtcNow();
+        api.Clock.Advance(TimeSpan.FromSeconds(10)); // the daemon reports on its next round, the answer is already written
+        var knowing = await AppliedAsync(s, "reported time", t0.AddSeconds(1));
+        var guessing = await AppliedAsync(s, "older agent"); // the API's own time: 10 seconds in
+        await SendAsync(s, Line(s.External, Text("a quick answer"), readAt: t0.AddSeconds(9), writtenAt: t0.AddSeconds(4)));
+        Assert.Equal("a quick answer", (await CommandAsync(s, knowing)).GetProperty("replyText").GetString());
+        AssertNoReply(await CommandAsync(s, guessing));
     }
 }

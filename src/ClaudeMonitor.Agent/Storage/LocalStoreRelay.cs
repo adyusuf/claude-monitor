@@ -4,6 +4,9 @@ using Microsoft.Data.Sqlite;
 namespace ClaudeMonitor.Agent.Storage;
 
 public sealed record LocalCommand(string Id, string Session, string Kind, string? Body, DateTimeOffset ExpiresAt);
+
+/// <summary>A command a hook took, and when (null for one taken before the agent recorded the time).</summary>
+public sealed record TakenCommand(string Id, DateTimeOffset? At);
 public sealed record PermissionAsk(string LocalId, string Harness, string Session, string ToolName, string ToolInput, int WaitSeconds,
     DateTimeOffset CreatedAt, string? RemoteId, string? Decision, string? Reason, string State);
 public sealed record TranscriptCursor(string Session, string Harness, string Path, long Offset, string? ProjectKey, string? ProjectName,
@@ -49,19 +52,19 @@ public sealed partial class LocalStore
             }
         }
 
-        if (found is not null) Exec("UPDATE commands SET state = 'taken' WHERE id = $i", tx, ("$i", found.Id));
+        if (found is not null) Exec("UPDATE commands SET state = 'taken', taken_at = $t WHERE id = $i", tx, ("$i", found.Id), ("$t", Iso(now)));
         tx.Commit();
         return found;
     }
 
     /// <summary>Taken commands whose outcome the daemon has not reported yet.</summary>
-    public List<string> TakenCommands()
+    public List<TakenCommand> TakenCommands()
     {
-        var ids = new List<string>();
-        using var cmd = Command("SELECT id FROM commands WHERE state = 'taken'", null);
+        var taken = new List<TakenCommand>();
+        using var cmd = Command("SELECT id, taken_at FROM commands WHERE state = 'taken'", null);
         using var r = cmd.ExecuteReader();
-        while (r.Read()) ids.Add(r.GetString(0));
-        return ids;
+        while (r.Read()) taken.Add(new TakenCommand(r.GetString(0), Str(r, 1) is { } at ? At(at) : null));
+        return taken;
     }
 
     public void MarkCommandReported(string id) => Exec("UPDATE commands SET state = 'reported' WHERE id = $i", ("$i", id));

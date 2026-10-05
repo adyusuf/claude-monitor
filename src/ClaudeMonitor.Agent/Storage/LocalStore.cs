@@ -30,7 +30,7 @@ public sealed partial class LocalStore : IDisposable
                 truncated INTEGER NOT NULL, project_key TEXT, project_name TEXT, git_branch TEXT, batch INTEGER);
             CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS commands (id TEXT PRIMARY KEY, session TEXT NOT NULL, kind TEXT NOT NULL,
-                body TEXT, expires_at TEXT NOT NULL, state TEXT NOT NULL);
+                body TEXT, expires_at TEXT NOT NULL, state TEXT NOT NULL, taken_at TEXT);
             CREATE TABLE IF NOT EXISTS permissions (local_id TEXT PRIMARY KEY, harness TEXT NOT NULL, session TEXT NOT NULL,
                 tool_name TEXT NOT NULL, tool_input TEXT NOT NULL, wait_seconds INTEGER NOT NULL, created_at TEXT NOT NULL,
                 remote_id TEXT, decision TEXT, reason TEXT, state TEXT NOT NULL);
@@ -39,6 +39,11 @@ public sealed partial class LocalStore : IDisposable
             CREATE TABLE IF NOT EXISTS usage_seen (session TEXT NOT NULL, message_id TEXT NOT NULL,
                 PRIMARY KEY (session, message_id));
             """);
+        // A database an older agent made has no taken_at: add it (a column is only ever added).
+        if (Scalar("SELECT COUNT(*) FROM pragma_table_info('commands') WHERE name = 'taken_at'") is 0L)
+        {
+            Exec("ALTER TABLE commands ADD COLUMN taken_at TEXT");
+        }
     }
 
     public void Dispose() => db.Dispose();
