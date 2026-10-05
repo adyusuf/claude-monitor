@@ -28,7 +28,8 @@ const command = (over: Partial<CommandRow> = {}): CommandRow => ({
 
 interface Setup { events?: EventRow[]; commands?: CommandRow[] | (() => CommandRow[]); next?: string | null; older?: EventRow[] }
 
-function open({ events = [], commands = [], next = null, older = [] }: Setup = {}) {
+// The page opens on the conversation; the Activity list is its "Raw events" view, which this opens.
+async function open({ events = [], commands = [], next = null, older = [] }: Setup = {}) {
   const calls = mockApi({
     "GET /me": { body: ME },
     "GET /sessions/s1": { body: detail },
@@ -37,6 +38,7 @@ function open({ events = [], commands = [], next = null, older = [] }: Setup = {
     "GET /sessions/s1/events": (c) => ({ body: c.path.includes("before=") ? { items: older, next: null } : { items: events, next } }),
   });
   const view = renderAt("/w/w1/sessions/s1", [{ path: "/w/:ws/sessions/:id", element: <SessionPage /> }]);
+  await userEvent.click(await screen.findByRole("button", { name: en.chat.view_raw }));
   return { calls, view };
 }
 
@@ -55,7 +57,7 @@ const mixed = [
 
 describe("the activity list tells inputs from everything else", () => {
   it("shows a web command and a typed prompt apart, each with a label, an icon and a status, in text and not by colour alone", async () => {
-    open({ events: mixed, commands: [command()] });
+    await open({ events: mixed, commands: [command()] });
     const card = await activityCard();
     const monitor = (await within(card).findByText("run the tests")).closest("li")!;
     const human = within(card).getByText("please fix the login").closest("li")!;
@@ -76,19 +78,19 @@ describe("the activity list tells inputs from everything else", () => {
   });
 
   it("calls a command from someone other than the owner by a neutral name", async () => {
-    open({ commands: [command({ createdBy: "someone-else" })] });
+    await open({ commands: [command({ createdBy: "someone-else" })] });
     expect(await screen.findByText("sent by a member")).toBeInTheDocument();
   });
 
   it("shows a stop request with its own icon and no text of its own", async () => {
-    open({ commands: [command({ kind: "stop", body: null })] });
+    await open({ commands: [command({ kind: "stop", body: null })] });
     const item = (await screen.findByText("Stop request")).closest("li")!;
     expect(item).toHaveClass("act-monitor_input");
     expect(within(item).getByText("■")).toBeInTheDocument();
   });
 
   it("folds tool calls and background events into one closed group that opens on press", async () => {
-    open({ events: mixed });
+    await open({ events: mixed });
     const card = await activityCard();
     const toggle = await within(card).findByRole("button", { name: /Tool calls: 2 · Other events: 1/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -99,13 +101,13 @@ describe("the activity list tells inputs from everything else", () => {
   });
 
   it("does not crash on an event kind it has never seen, and shows it as a quiet line", async () => {
-    open({ events: [ev("hook:SomethingNew", { x: 1 }, 50)] });
+    await open({ events: [ev("hook:SomethingNew", { x: 1 }, 50)] });
     const line = (await screen.findByText("SomethingNew")).closest("li")!;
     expect(line).toHaveClass("act-quiet");
   });
 
   it("opens an event's payload under its line", async () => {
-    open({ events: mixed });
+    await open({ events: mixed });
     await userEvent.click(await screen.findByText("please fix the login"));
     expect(screen.getByText(/"prompt":"please fix the login"/)).toBeInTheDocument();
   });
@@ -113,7 +115,7 @@ describe("the activity list tells inputs from everything else", () => {
 
 describe("what is not a human input", () => {
   it("never shows a tool result as a typed message, and a prompt only once", async () => {
-    open({
+    await open({
       events: [
         ev("hook:UserPromptSubmit", { prompt: "fix it" }, 100),
         ev("transcript", { type: "user", message: { role: "user", content: "fix it" } }, 101),
@@ -127,7 +129,7 @@ describe("what is not a human input", () => {
   });
 
   it("shows a web command once: the transcript echo of its text is dropped, and it sits next to the prompt it rode along with", async () => {
-    open({
+    await open({
       events: [
         ev("hook:UserPromptSubmit", { prompt: "please fix the login" }, 90, 20),
         ev("transcript", { type: "attachment", attachment: { content: ["anything wrapped around: run the tests"] } }, 91, 21),
@@ -148,7 +150,7 @@ describe("what is not a human input", () => {
 describe("a command that has not entered the session yet", () => {
   it("stays on top as waiting until it is applied, then takes its place in the timeline", async () => {
     let state: CommandRow[] = [command({ id: "w", body: "pending one", status: "queued", appliedAt: null, deliveredAt: null, createdAt: at(200) })];
-    open({ events: mixed, commands: () => state });
+    await open({ events: mixed, commands: () => state });
     const card = await activityCard();
     const waiting = (await within(card).findByText("pending one")).closest("li")!;
     expect(within(card).getByText("Waiting to be applied")).toBeInTheDocument();
@@ -169,7 +171,7 @@ describe("a command that has not entered the session yet", () => {
   });
 
   it("keeps a waiting command visible under the Inputs filter and away from the Assistant one", async () => {
-    open({ events: mixed, commands: [command({ body: "waiting body", status: "delivered", appliedAt: null })] });
+    await open({ events: mixed, commands: [command({ body: "waiting body", status: "delivered", appliedAt: null })] });
     const card = await activityCard();
     await within(card).findByText("waiting body");
     await userEvent.click(within(card).getByRole("button", { name: "Assistant" }));
@@ -183,7 +185,7 @@ describe("the filter chips", () => {
   const show = () => open({ events: mixed, commands: [command()] });
 
   it("show the right subset, and Inputs shows only the two input kinds", async () => {
-    show();
+    await show();
     const card = await activityCard();
     await within(card).findByText("run the tests");
     const chip = (name: string) => within(card).getByRole("button", { name });
@@ -207,7 +209,7 @@ describe("the filter chips", () => {
   });
 
   it("says so when the filter leaves nothing", async () => {
-    open({ events: [ev("usage", {}, 1)] });
+    await open({ events: [ev("usage", {}, 1)] });
     const card = await activityCard();
     await userEvent.click(await within(card).findByRole("button", { name: "Inputs" }));
     expect(within(card).getByText("Nothing to show with this filter.")).toBeInTheDocument();
@@ -219,14 +221,14 @@ describe("the filter chips", () => {
     expect(localStorage.getItem(config.activityFilterKey)).toBe("inputs");
     first.view.unmount();
 
-    show();
+    await show();
     await waitFor(() => expect(screen.getByRole("button", { name: "Inputs" })).toHaveAttribute("aria-pressed", "true"));
   });
 
   it("work without storage: the choice lasts for the page only", async () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
-    show();
+    await show();
     expect(await screen.findByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Assistant" }));
     expect(screen.getByRole("button", { name: "Assistant" })).toHaveAttribute("aria-pressed", "true");
@@ -234,7 +236,7 @@ describe("the filter chips", () => {
 
   it("ignore a stored value that is not a filter", async () => {
     localStorage.setItem(config.activityFilterKey, "nonsense");
-    show();
+    await show();
     expect(await screen.findByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
   });
 });
@@ -243,7 +245,7 @@ describe("pages of older activity", () => {
   it("holds a command that belongs to an unloaded page back, and shows it once that page is loaded", async () => {
     const events = [ev("hook:Notification", { message: "recent" }, 1000, 50)];
     const older = [ev("hook:UserPromptSubmit", { prompt: "an old prompt" }, 5, 10)];
-    open({ events, next: "50", older, commands: [command({ body: "old command", appliedAt: at(6), createdAt: at(4) })] });
+    await open({ events, next: "50", older, commands: [command({ body: "old command", appliedAt: at(6), createdAt: at(4) })] });
     const card = await activityCard();
     await within(card).findByText("recent");
     expect(within(card).queryByText("old command")).not.toBeInTheDocument();
