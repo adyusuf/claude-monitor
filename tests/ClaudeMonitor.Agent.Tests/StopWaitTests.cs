@@ -157,6 +157,32 @@ public sealed class StopWaitTests : IDisposable
     }
 
     [Fact]
+    public async Task A_prompt_that_arrives_while_the_finished_turn_waits_starts_the_next_turn()
+    {
+        new Identity("machine-key-of-the-test", "https://monitor.invalid", Guid.NewGuid(), Guid.NewGuid()).Save(home.Config);
+        var credentials = Credentials.For(home.Config);
+        credentials.Write(Credentials.Access, "access-1");
+        credentials.Write(Credentials.Refresh, "refresh-1");
+        var config = SavedSettings.Apply(SavedSettings.SaveStopWait(home.Config, 30));
+        using var hookStore = new LocalStore(home.Config.DatabasePath);
+        hookStore.Set(Relay.LastContactKey, DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+
+        // The hook is one process waiting; the daemon is another, writing the command into the same database later.
+        var hook = Task.Run(() => new HookRunner(config, hookStore, TimeProvider.System).RunAsync("Stop", """{"session_id":"s1"}""", CancellationToken.None));
+        await Task.Delay(300);
+        Assert.False(hook.IsCompleted, "the turn must still be waiting: nothing has arrived");
+
+        using (var daemonStore = new LocalStore(home.Config.DatabasePath))
+        {
+            daemonStore.SaveCommand(new LocalCommand("c1", "s1", CommandKinds.Prompt, "Arrived while waiting", DateTimeOffset.UtcNow.AddMinutes(30)));
+        }
+
+        var output = JsonNode.Parse((await hook.WaitAsync(TimeSpan.FromSeconds(10)))!)!;
+        Assert.Equal("block", output["decision"]!.GetValue<string>());
+        Assert.Equal("Arrived while waiting", output["reason"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task A_finished_turn_does_not_wait_when_the_web_cannot_be_heard()
     {
         var config = SavedSettings.SaveStopWait(home.Config, 20); // never logged in
