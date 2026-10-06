@@ -24,6 +24,26 @@ public static class MemberLockHold
         return await Task.WhenAll(running);
     }
 
+    /// <summary>
+    /// The same, over several workspaces: every active member row of each is locked by the test, so a request that locks
+    /// members in any of them blocks there until all requests are waiting.
+    /// </summary>
+    public static async Task<HttpResponseMessage[]> RunHoldingWorkspacesAsync(
+        ApiFactory api, Guid[] workspaceIds, params Func<Task<HttpResponseMessage>>[] actions)
+    {
+        ArgumentNullException.ThrowIfNull(api);
+        ArgumentNullException.ThrowIfNull(actions);
+        await using var holder = api.Db();
+        await using var hold = await holder.Database.BeginTransactionAsync();
+        await holder.Database.ExecuteSqlAsync(
+            $"SELECT 1 FROM workspace_members WHERE workspace_id = ANY({workspaceIds}) AND removed_at IS NULL ORDER BY workspace_id, user_id FOR UPDATE");
+        var running = actions.Select(a => Task.Run(a)).ToArray();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (await WaitingBackendsAsync(api) < actions.Length) await Task.Delay(20, timeout.Token);
+        await hold.CommitAsync();
+        return await Task.WhenAll(running);
+    }
+
     private static async Task<int> WaitingBackendsAsync(ApiFactory api)
     {
         await using var db = api.Db();
