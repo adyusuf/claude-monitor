@@ -3,6 +3,7 @@ using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Capture;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Daemon;
+using ClaudeMonitor.Agent.Exec;
 using ClaudeMonitor.Agent.Install;
 using ClaudeMonitor.Agent.Mcp;
 using ClaudeMonitor.Agent.Push;
@@ -24,6 +25,10 @@ public static class Cli
                                         register the Claude Code plugin (hooks + MCP) that starts the agent;
                                         --stop-wait: how long a finished turn waits for a prompt from the web (0-590, default 0)
                                         --push: deliver web messages into an idle session as a Claude Code channel (default off)
+        cm-agent install --exec off|argv|shell
+                                        whether approved remote runs may execute on this machine (default off)
+        cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
+        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0004)
         cm-agent status                 connection and queue
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
@@ -33,6 +38,9 @@ public static class Cli
         TimeProvider clock)
     {
         ArgumentNullException.ThrowIfNull(args);
+        // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0004).
+        if (args.FirstOrDefault() == "install" && ServiceCommands.IsService(args)) return ServiceCommands.Install(args, stdout, stderr);
+        if (args.FirstOrDefault() == "uninstall" && ServiceCommands.IsService(args)) return ServiceCommands.Uninstall(stdout);
         var log = new AgentLog(config, clock);
         HomeMigration.Run(config, log);
         config = SavedSettings.Apply(config);
@@ -45,15 +53,7 @@ public static class Cli
                 await McpAsync(config, clock);
                 return 0;
             case "daemon":
-                using (var stop = new CancellationTokenSource())
-                {
-                    Console.CancelKeyPress += (_, e) =>
-                    {
-                        e.Cancel = true;
-                        stop.Cancel();
-                    };
-                    return await new DaemonHost(config, clock, log).RunAsync(stop.Token);
-                }
+                return await DaemonRole.RunAsync(config, clock, log);
 
             case "login":
                 var server = Option(args, "--server");
@@ -62,6 +62,9 @@ public static class Cli
                 return code;
             case "logout":
                 return await new Login(config, stdout, clock).LogoutAsync();
+            case "install" when Array.IndexOf(args, ServiceCommands.ExecOption) >= 0:
+                var saved = ServiceCommands.SaveExecLevel(args, config, stdout, stderr);
+                return saved != 0 || args.Length == 3 ? saved : Install(args, config, stdout, stderr, Environment.ProcessPath!);
             case "install":
                 return Install(args, config, stdout, stderr, Environment.ProcessPath!);
             case "uninstall":
@@ -155,6 +158,7 @@ public static class Cli
             ? $"commands waiting: {commands} (oldest expires {expires.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)})"
             : "commands waiting: 0");
         await stdout.WriteLineAsync($"stop wait: {(int)config.StopWait.TotalSeconds} s");
+        await stdout.WriteLineAsync($"remote runs: {ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel))}{(config.ServiceMode ? " (service)" : "")}");
         foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
         await stdout.WriteLineAsync($"version: {AgentConfig.Version}");
         return identity.Connected ? 0 : 1;
@@ -181,7 +185,7 @@ public static class Cli
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
             o.ServerInstructions = ChannelEnvelopes.Instructions;
         });
-        mcp.WithStdioServerTransport().WithTools<MonitorTools>();
+        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<GrantTools>();
         if (config.PushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }
