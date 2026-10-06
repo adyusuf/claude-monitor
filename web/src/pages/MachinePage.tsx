@@ -18,7 +18,7 @@ import { useMachineData } from "./useMachineData";
 /** The live events that change what this page shows. */
 const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job"];
 
-/** One machine: its load, its alerts, the runs waiting for the owner, the run history, grants and jobs (ADR-0004). */
+/** One machine: its load, its alerts, the runs waiting for the owner, the run history, grants and jobs (ADR-0005). */
 export function MachinePage() {
   const { ws = "", agentId = "" } = useParams();
   const { t } = useI18n();

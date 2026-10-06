@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// Remote runs as agents call them (ADR-0004): a requester asks, reads and cancels its own runs; a target reports the
+/// Remote runs as agents call them (ADR-0005): a requester asks, reads and cancels its own runs; a target reports the
 /// status and output of runs sent to it. Every call is the agent's own, checked against the run's requester or target.
 /// </summary>
 public static class AgentRunEndpoints

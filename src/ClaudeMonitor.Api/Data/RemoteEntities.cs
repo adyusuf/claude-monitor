@@ -2,7 +2,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Api.Data;
 
-// Remote work: metrics, alerts, runs, grants and jobs (docs/data-model.md §3b, ADR-0004). Status strings are the
+// Remote work: metrics, alerts, runs, grants and jobs (docs/data-model.md §3b, ADR-0005). Status strings are the
 // closed sets of Contracts/RemoteCodes.cs.
 
 public sealed class MachineMetric

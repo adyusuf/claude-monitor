@@ -1,6 +1,6 @@
 namespace ClaudeMonitor.Contracts;
 
-// The agent protocol of remote work (ADR-0004). Like AgentProtocol.cs it only GROWS (global #4): fields are added at
+// The agent protocol of remote work (ADR-0005). Like AgentProtocol.cs it only GROWS (global #4): fields are added at
 // the end of a record with a default, never removed, renamed or retyped.
 
 /// <summary>What a target tells the API about itself after every start and every settings change.</summary>

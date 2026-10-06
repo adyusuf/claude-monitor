@@ -6,7 +6,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// The command-line side of remote work (ADR-0004): "install --service" / "uninstall --service" for a boot service, and
+/// The command-line side of remote work (ADR-0005): "install --service" / "uninstall --service" for a boot service, and
 /// "install --exec" for an interactive agent. They run before the user's home is touched, so an admin's run never
 /// leaves root-owned files in its own home.
 /// </summary>

@@ -20,7 +20,7 @@ public sealed class AgentLog(AgentConfig config, TimeProvider clock)
                 config.EnsureHome();
                 var info = new FileInfo(config.LogPath);
                 if (info.Exists && info.Length > MaxBytes) File.Move(config.LogPath, config.LogPath + ".1", overwrite: true);
-                File.AppendAllText(config.LogPath, $"{clock.GetUtcNow():O} [{Environment.ProcessId}] {line}{Environment.NewLine}");
+                File.AppendAllText(config.LogPath, $"{clock.GetUtcNow():O} [{Environment.ProcessId}] {line.ReplaceLineEndings(" ")}{Environment.NewLine}");
             }
         }
         catch (IOException)

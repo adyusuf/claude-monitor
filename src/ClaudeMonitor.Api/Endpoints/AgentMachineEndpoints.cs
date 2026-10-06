@@ -8,7 +8,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// An agent's machine reports, and the workspace's machines as a requester's MCP tools read them (ADR-0004). Reads
+/// An agent's machine reports, and the workspace's machines as a requester's MCP tools read them (ADR-0005). Reads
 /// need the agent's user to be at least a member; a viewer's agent reports but sees no other machine.
 /// </summary>
 public static class AgentMachineEndpoints

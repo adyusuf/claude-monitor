@@ -1,6 +1,6 @@
 namespace ClaudeMonitor.Contracts;
 
-// The closed sets of remote work (ADR-0004). The database holds the same strings behind a CHECK, listed there in
+// The closed sets of remote work (ADR-0005). The database holds the same strings behind a CHECK, listed there in
 // this order; code that switches on them always has a default branch.
 
 /// <summary>What a target lets remote runs do, set on the target machine only. Unknown means off (fail-closed).</summary>

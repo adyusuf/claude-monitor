@@ -6,7 +6,7 @@ using ClaudeMonitor.Agent.Config;
 
 namespace ClaudeMonitor.Agent.Auth;
 
-/// <summary>Where the agent keeps its tokens: the OS credential store (ADR-0002), or for a service and on Linux a protected file or DPAPI (ADR-0004).</summary>
+/// <summary>Where the agent keeps its tokens: the OS credential store (ADR-0002), or for a service and on Linux a protected file or DPAPI (ADR-0005).</summary>
 public interface ICredentialStore
 {
     string? Read(string account);
@@ -25,7 +25,7 @@ public static class Credentials
     {
         ArgumentNullException.ThrowIfNull(config);
         if (config.CredentialStore == "file") return new FileCredentialStore(config.Home);
-        // A service has no login keychain (ADR-0004): DPAPI of its own account on Windows, a protected file elsewhere. Linux has none at all.
+        // A service has no login keychain (ADR-0005): DPAPI of its own account on Windows, a protected file elsewhere. Linux has none at all.
         if (OperatingSystem.IsWindows()) return config.ServiceMode ? new DpapiCredentialStore(config.Home) : new WindowsCredentialManager();
         if (OperatingSystem.IsMacOS() && !config.ServiceMode) return new MacKeychain();
         if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux()) return new ProtectedFileStore(config.Home);

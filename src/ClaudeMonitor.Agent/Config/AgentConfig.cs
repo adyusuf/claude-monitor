@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Config;
@@ -63,6 +64,56 @@ public sealed record AgentConfig
     /// <summary>The API pings the stream every 20 s; a stream silent for this long is dead (a half-open connection) and is reopened.</summary>
     public TimeSpan StreamIdleTimeout { get; init; } = TimeSpan.FromSeconds(75);
 
+    /// <summary>
+    /// How far this machine lets the agent go about updating itself (ADR-0004): "off" (default: no update call at all),
+    /// "check" (look and report) or "on" (install too). `cm-agent config auto-update` saves it, CM_AUTO_UPDATE wins when set.
+    /// The workspace has its own cap; the lower of the two applies. An explicit `cm-agent update` is not an automatic action and ignores both.
+    /// </summary>
+    public string AutoUpdate { get; init; } = UpdateModes.Off;
+
+    /// <summary>True when CM_AUTO_UPDATE was set: it then wins over the value `cm-agent config` saved.</summary>
+    public bool AutoUpdateFromEnvironment { get; init; }
+
+    /// <summary>The channel this build belongs to ("test", "prod", or "dev" for an unsigned local build), set at build time.</summary>
+    public string UpdateChannel { get; init; } = BuildMetadata("UpdateChannel") is { Length: > 0 } channel ? channel : "dev";
+
+    /// <summary>The public key (base64 SubjectPublicKeyInfo, ECDSA P-256) every update must be signed with; empty in a build without one, which then refuses all updates.</summary>
+    public string UpdatePublicKey { get; init; } = BuildMetadata("UpdatePublicKey") ?? "";
+
+    /// <summary>The OS and CPU the update is asked for and signed for; the host's own, except where a test stands in for a supported one.</summary>
+    public string UpdateOs { get; init; } = Os;
+
+    public string UpdateArch { get; init; } = Arch;
+
+    /// <summary>How long a downloaded candidate (and macOS's codesign check of it) may take to answer.</summary>
+    public TimeSpan UpdateProbeTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The shortest time between two looks at the server for an update.</summary>
+    public TimeSpan UpdateCheckEvery { get; init; } = TimeSpan.FromHours(6);
+
+    /// <summary>How often the daemon's update chore wakes to see whether a look is due (and whether the setting changed).</summary>
+    public TimeSpan UpdatePollEvery { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>After a failed or rolled-back automatic update the daemon waits this long before it tries again.</summary>
+    public TimeSpan UpdateRetryAfter { get; init; } = TimeSpan.FromHours(1);
+
+    /// <summary>The new daemon has this long to be answered by the API (or to be shown unreachable) before the update is judged.</summary>
+    public TimeSpan UpdateHealthWait { get; init; } = TimeSpan.FromSeconds(90);
+
+    /// <summary>How long a running daemon gets to stop when an update (or a rollback) asks it to.</summary>
+    public TimeSpan UpdateStopWait { get; init; } = TimeSpan.FromSeconds(30);
+
+    public TimeSpan UpdateDownloadTimeout { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The largest download accepted; the published zips are far smaller (a guard against an endless body).</summary>
+    public long UpdateDownloadMax { get; init; } = 250L * 1024 * 1024;
+
+    /// <summary>The largest binary taken out of a download (a guard against a zip bomb).</summary>
+    public long UpdateBinaryMax { get; init; } = 400L * 1024 * 1024;
+
+    /// <summary>How often a running daemon looks for a stop request (the file <see cref="StopRequestPath"/>).</summary>
+    public TimeSpan StopPollEvery { get; init; } = TimeSpan.FromSeconds(1);
+
     public TimeSpan FlushEvery { get; init; } = TimeSpan.FromSeconds(2);
     public TimeSpan HeartbeatEvery { get; init; } = TimeSpan.FromSeconds(60);
     public TimeSpan SettingsEvery { get; init; } = TimeSpan.FromMinutes(10);
@@ -97,12 +148,12 @@ public sealed record AgentConfig
     public int TranscriptLineMax { get; init; } = 1024 * 1024;
 
     /// <summary>
-    /// True when the daemon runs as a boot service under its own account (ADR-0004); the service units set CM_SERVICE=1.
+    /// True when the daemon runs as a boot service under its own account (ADR-0005); the service units set CM_SERVICE=1.
     /// Its exec level is then read from <see cref="ExecConfigPath"/>, an admin-owned file, never from agent.json.
     /// </summary>
     public bool ServiceMode { get; init; }
 
-    /// <summary>The admin-owned exec policy of a service agent: level and optional ceiling (ADR-0004, "Four fail-closed keys").</summary>
+    /// <summary>The admin-owned exec policy of a service agent: level and optional ceiling (ADR-0005, "Four fail-closed keys").</summary>
     public string ExecConfigPath { get; init; } = DefaultExecConfigPath(Os);
 
     /// <summary>Remote runs executing at once on this target; one more is refused as busy.</summary>
@@ -142,6 +193,16 @@ public sealed record AgentConfig
     public string IdentityPath => Path.Combine(Home, "agent.json");
     public string PluginDir => Path.Combine(Home, "claude-plugin");
     public string LogPath => Path.Combine(Home, "agent.log");
+    public string BinaryPath => Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
+
+    /// <summary>What the last update check and install left behind (shown by `cm-agent status`).</summary>
+    public string UpdateStatePath => Path.Combine(Home, "update-state.json");
+    public string UpdateLockPath => Path.Combine(Home, "update.lock");
+    public string UpdateDir => Path.Combine(Home, "update");
+
+    /// <summary>Written by an update to ask the running daemon to stop; the daemon deletes it and exits.</summary>
+    public string PidPath => Path.Combine(Home, "daemon.pid");
+    public string StopRequestPath => Path.Combine(Home, "daemon.stop");
 
     public const string CredentialService = "claude-monitor-agent";
     public const string PluginName = "monitor-agent";
@@ -150,6 +211,12 @@ public sealed record AgentConfig
     public static string Version =>
         typeof(AgentConfig).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             .Split('+')[0] ?? "0.0.0";
+
+    /// <summary>The CPU code the API knows ("arm64" / "x64").</summary>
+    public static string Arch => RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant();
+
+    private static string? BuildMetadata(string key) =>
+        typeof(AgentConfig).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == key)?.Value;
 
     /// <summary>The OS code the API knows (<see cref="OsKinds"/>); anything else is refused at login.</summary>
     public static string Os =>
@@ -179,6 +246,9 @@ public sealed record AgentConfig
             StopWaitFromEnvironment = read("CM_STOP_WAIT") is { Length: > 0 },
             PushEnabled = read("CM_PUSH") == "on",
             PushFromEnvironment = read("CM_PUSH") is { Length: > 0 },
+            AutoUpdate = UpdateModes.Normalize(read("CM_AUTO_UPDATE")),
+            UpdateHealthWait = Seconds(read("CM_UPDATE_HEALTH_WAIT"), TimeSpan.FromSeconds(90), 600),
+            AutoUpdateFromEnvironment = read("CM_AUTO_UPDATE") is { Length: > 0 },
             PushScope = read("CM_PUSH_SCOPE") == PushScopes.Machine ? PushScopes.Machine : PushScopes.Session,
             ServiceMode = read("CM_SERVICE") == "1",
         };

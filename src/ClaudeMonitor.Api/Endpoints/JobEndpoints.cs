@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// Jobs on the web (ADR-0004). Any member reads the jobs of an agent; only the target's owner approves (a recent
+/// Jobs on the web (ADR-0005). Any member reads the jobs of an agent; only the target's owner approves (a recent
 /// sign-in or a code), denies or retires.
 /// </summary>
 public static class JobEndpoints

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>The target owner's answer to a waiting run (ADR-0004, "The owner's approval"), and what the streams hear.</summary>
+/// <summary>The target owner's answer to a waiting run (ADR-0005, "The owner's approval"), and what the streams hear.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RunApprovalTests(ApiFactory api)
 {

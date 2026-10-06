@@ -12,7 +12,7 @@ public sealed record RemoteSettingsRequest(bool? RemoteRunsEnabled, int? AlertCp
     int? AlertSustainSeconds);
 
 /// <summary>
-/// The workspace's remote-work switch and alert thresholds (ADR-0004). Any member reads; an admin changes. Turning the
+/// The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; an admin changes. Turning the
 /// switch off cancels every open run of the workspace at once. Agents pick the new values up with their settings.
 /// </summary>
 public static class RemoteSettingsEndpoints

@@ -17,7 +17,7 @@ export function UntrustedReason({ text }: { text: string | null }) {
   );
 }
 
-/** Everything the owner must see before allowing a run (ADR-0004, "The owner's approval"). */
+/** Everything the owner must see before allowing a run (ADR-0005, "The owner's approval"). */
 export function RunFacts({ run, ws }: { run: WebRunView; ws: string }) {
   const { t } = useI18n();
   return (

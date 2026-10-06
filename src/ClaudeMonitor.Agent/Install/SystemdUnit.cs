@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// The systemd unit of the Linux service (ADR-0004). Paths are written unquoted, so a path that would need quoting or
+/// The systemd unit of the Linux service (ADR-0005). Paths are written unquoted, so a path that would need quoting or
 /// carries a systemd specifier is refused rather than escaped. ProtectHome=yes hides /home from the service: a grant
 /// that points into /home is refused by the agent anyway, and the service never reads a user's files.
 /// </summary>

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>Asking for a remote run (ADR-0004): the four keys, the shape of a request, idempotence and the caps.</summary>
+/// <summary>Asking for a remote run (ADR-0005): the four keys, the shape of a request, idempotence and the caps.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RunTests(ApiFactory api)
 {

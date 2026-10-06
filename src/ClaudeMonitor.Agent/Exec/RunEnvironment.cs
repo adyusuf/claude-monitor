@@ -1,7 +1,7 @@
 namespace ClaudeMonitor.Agent.Exec;
 
 /// <summary>
-/// The environment of a remote run, built from empty (ADR-0004): a fixed PATH, the service home and a UTF-8 locale. Nothing
+/// The environment of a remote run, built from empty (ADR-0005): a fixed PATH, the service home and a UTF-8 locale. Nothing
 /// comes from the agent's own environment or from the requester.
 /// </summary>
 public static class RunEnvironment

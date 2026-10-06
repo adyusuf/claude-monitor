@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Remote;
 
 /// <summary>
-/// What an agent reports about its machine (ADR-0004): its profile (exec level, service mode), metric samples and the
+/// What an agent reports about its machine (ADR-0005): its profile (exec level, service mode), metric samples and the
 /// alerts it opened or resolved. Samples are idempotent per (agent, time) and a time outside the allowed clock skew is
 /// dropped. Text from the machine (mounts, OS version) is cut and stripped of control characters.
 /// </summary>

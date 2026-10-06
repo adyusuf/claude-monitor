@@ -10,8 +10,8 @@ namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record NameRequest(string? Name);
 public sealed record WorkspaceResponse(Guid Id, string Name, string Role, SettingsResponse Settings);
-public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes);
-public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes);
+public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes, string AgentUpdate = UpdateModes.Off);
+public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes, string? AgentUpdate = null);
 public sealed record MemberResponse(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset JoinedAt);
 public sealed record RoleRequest(string? Role);
 
@@ -49,7 +49,7 @@ public static class WorkspaceEndpoints
         if (member is null) return Http.NotFound();
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes)));
+        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate)));
     }
 
     private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, MonitorDb db)
@@ -69,16 +69,18 @@ public static class WorkspaceEndpoints
         if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         if (req.RetentionDays is < 1 or > 3650) return Http.Invalid("retentionDays", "out_of_range");
         if (req.EventMaxBytes is < EventMaxBytesMin or > EventMaxBytesMax) return Http.Invalid("eventMaxBytes", "out_of_range");
+        if (req.AgentUpdate is not null && !UpdateModes.IsValid(req.AgentUpdate)) return Http.Invalid("agentUpdate", "invalid_mode");
 
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        var before = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes);
+        var before = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate);
         s.MaskSecrets = req.MaskSecrets ?? s.MaskSecrets;
         s.RetentionDays = req.RetentionDays ?? s.RetentionDays;
         s.EventMaxBytes = req.EventMaxBytes ?? s.EventMaxBytes;
+        s.AgentUpdate = req.AgentUpdate ?? s.AgentUpdate;
         s.UpdatedAt = clock.GetUtcNow();
         s.UpdatedBy = userId;
         Audit.Add(db, http, clock, AuditActions.SettingsChanged, id, userId,
-            detail: new { before, after = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes) });
+            detail: new { before, after = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate) });
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }

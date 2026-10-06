@@ -17,7 +17,7 @@ public sealed record WebGrantRequest(IReadOnlyList<string> Template, string Cwd,
     Guid? GranteeUserId = null, string? Code = null);
 
 /// <summary>
-/// Grants as they are asked for and decided (ADR-0004). Only the target agent's owner approves, denies or creates one,
+/// Grants as they are asked for and decided (ADR-0005). Only the target agent's owner approves, denies or creates one,
 /// the owner and the grantee revoke; approving and creating need a recent sign-in or a code. Every transition is a
 /// compare-and-set on the status, the audit row is saved with it, and the stream hears of it after the commit.
 /// </summary>

@@ -12,7 +12,7 @@ using ModelContextProtocol.Server;
 namespace ClaudeMonitor.Agent.Mcp;
 
 /// <summary>
-/// Runs on another machine of the workspace (ADR-0004). A run executes only when the workspace allows remote runs, the
+/// Runs on another machine of the workspace (ADR-0005). A run executes only when the workspace allows remote runs, the
 /// target machine allows it locally, and its owner approved it on the web or a grant covers it. The tools never wait for
 /// an approval: they return the run's id and its status, and monitor_run_result reads it later.
 /// </summary>

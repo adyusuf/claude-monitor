@@ -36,7 +36,7 @@ Every zip holds the one single-file `cm-agent` (`cm-agent.exe` on Windows), publ
 Linux host. The Windows and Linux builds are only smoke-tested on a host of their own OS.
 
 **Linux and Windows binaries are unsigned, so the SHA-256 in `SHA256SUMS` is what proves what an admin installs**
-(ADR-0004: the agent never updates itself and the API never pushes an upgrade; a service is upgraded by an admin).
+(ADR-0005: a service agent is upgraded by an admin; its binary is admin-owned, so the self-update of ADR-0004 cannot replace it).
 Before a service upgrade the admin downloads the zip **and** `SHA256SUMS` over HTTPS from the same address and checks
 the digest on the machine, not from a copy made elsewhere; see [`remote-work-setup.md`](remote-work-setup.md),
 "Upgrading". A mismatch means: do not install, report it.
@@ -51,7 +51,7 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
 
 ## Agent releases: notes
 
-- **Linux agent and service mode** (`feature/remote-work`, ADR-0004): `cm-agent-linux-x64.zip` and
+- **Linux agent and service mode** (`feature/remote-work`, ADR-0005): `cm-agent-linux-x64.zip` and
   `cm-agent-linux-arm64.zip` join the downloads (and the web's "Get the agent" page); `cm-agent install --service`
   registers a boot service on Linux, macOS and Windows Server. Old agents keep working but never report an exec level,
   so they are never a target of remote work. The API needs the usual deploy to test, then prod, **before** the agents:

@@ -3,7 +3,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Api.Tests;
 
 /// <summary>
-/// What a grant template may be (ADR-0004, "Grants: full templates"): Validate refuses everything a template may never
+/// What a grant template may be (ADR-0005, "Grants: full templates"): Validate refuses everything a template may never
 /// say. Pure; the target's OS is a parameter, so every OS is tested from any machine.
 /// </summary>
 public sealed class GrantMatcherTests

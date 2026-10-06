@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// Grants on the web (ADR-0004). A member reads the grants of an agent: its owner all of them, anyone else only their
+/// Grants on the web (ADR-0005). A member reads the grants of an agent: its owner all of them, anyone else only their
 /// own as grantee. Only the target's owner creates, approves or denies (approving and creating need a recent sign-in
 /// or a code); the owner and the grantee revoke.
 /// </summary>

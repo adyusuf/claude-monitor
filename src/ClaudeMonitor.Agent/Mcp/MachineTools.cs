@@ -10,7 +10,7 @@ using ModelContextProtocol.Server;
 namespace ClaudeMonitor.Agent.Mcp;
 
 /// <summary>
-/// The workspace's machines as the model sees them (ADR-0004): who is there, how loaded they are, and which alerts are
+/// The workspace's machines as the model sees them (ADR-0005): who is there, how loaded they are, and which alerts are
 /// open. Read-only; the agent never acts on an alert, the model decides what to ask for.
 /// </summary>
 [McpServerToolType]

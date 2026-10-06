@@ -8,7 +8,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// The requester's side of remote work (ADR-0004): the MCP tools write a request into the local database, this sends it
+/// The requester's side of remote work (ADR-0005): the MCP tools write a request into the local database, this sends it
 /// and writes the answer back; runs it created are followed (on run_update at once, otherwise every
 /// <see cref="AgentConfig.RemotePollEvery"/>) until they finish, with their output. The MCP process never calls the API.
 /// </summary>

@@ -28,7 +28,11 @@ function MachineRow({ ws, agent: a, view: v, canRevoke, onRevoke }: {
       <td>{v ? percent(memoryPct(v.latest)) : ""}</td>
       <td>{v ? percent(maxDiskPct(v.latest)) : ""}</td>
       <td>{v ? <span className={v.openAlerts > 0 ? "badge status-failed" : "muted"}>{v.openAlerts}</span> : ""}</td>
-      <td>{a.version}</td>
+      <td>
+        {a.version}
+        {a.status === "active" && a.updateAvailable
+          ? <> <span className="badge warn" title={t("machines.updateHint")}>{t("machines.updateAvailable", { version: a.latestVersion ?? "" })}</span></> : null}
+      </td>
       <td>{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
       <td className="right">
         {canRevoke ? <Button variant="ghost" onClick={() => onRevoke(a.id)}>{t("machines.revoke")}</Button> : null}

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>How a grant is asked for, decided and given (ADR-0004): a request is only a request until the owner re-authenticates.</summary>
+/// <summary>How a grant is asked for, decided and given (ADR-0005): a request is only a request until the owner re-authenticates.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class GrantApprovalTests(ApiFactory api)
 {

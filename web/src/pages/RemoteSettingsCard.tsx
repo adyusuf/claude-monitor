@@ -12,7 +12,7 @@ const SUSTAIN_MAX = 86_400;
 
 const inRange = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
 
-/** The workspace's remote-work switch and alert thresholds (ADR-0004). Any member reads; only an admin changes them. */
+/** The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; only an admin changes them. */
 export function RemoteSettingsCard({ ws, canEdit }: { ws: string; canEdit: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();

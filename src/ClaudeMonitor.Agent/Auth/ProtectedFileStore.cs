@@ -4,7 +4,7 @@ using System.Text;
 namespace ClaudeMonitor.Agent.Auth;
 
 /// <summary>
-/// Credentials of Linux and of macOS/Linux service accounts (ADR-0004): one 0600 file per account in the home, written
+/// Credentials of Linux and of macOS/Linux service accounts (ADR-0005): one 0600 file per account in the home, written
 /// through a temp file and an atomic rename. A read refuses (null) a file that is a link, is open to group or other, or is
 /// not owned by this account; it never throws.
 /// </summary>

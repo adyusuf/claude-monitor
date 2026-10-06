@@ -24,7 +24,7 @@ public static class ExecErrors
 }
 
 /// <summary>
-/// The target's full check just before exec (ADR-0004, "Grants: full templates, checked twice"): the exec level, the
+/// The target's full check just before exec (ADR-0005, "Grants: full templates, checked twice"): the exec level, the
 /// grant template again, then the real paths of the program, the working directory and every path value.
 /// </summary>
 public static class ExecGuard

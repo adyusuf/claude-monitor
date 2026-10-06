@@ -6,7 +6,7 @@ namespace ClaudeMonitor.Agent.Exec;
 public sealed record RunExit(int Code, int? Signal);
 
 /// <summary>
-/// A started run whose WHOLE process tree can be killed (ADR-0004, "The executor on the target"). Stdout and Stderr are the
+/// A started run whose WHOLE process tree can be killed (ADR-0005, "The executor on the target"). Stdout and Stderr are the
 /// read ends of the child's pipes; its stdin is the null device and nothing else is inherited.
 /// </summary>
 public interface IRunProcess : IAsyncDisposable

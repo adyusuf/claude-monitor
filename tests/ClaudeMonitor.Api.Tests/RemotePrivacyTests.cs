@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>Remote runs, grants, jobs, alerts and metrics are personal data: exported with the account, emptied on deletion (ADR-0004).</summary>
+/// <summary>Remote runs, grants, jobs, alerts and metrics are personal data: exported with the account, emptied on deletion (ADR-0005).</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RemotePrivacyTests(ApiFactory api)
 {

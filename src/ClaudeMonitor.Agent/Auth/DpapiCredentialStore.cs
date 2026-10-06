@@ -6,7 +6,7 @@ using ClaudeMonitor.Agent.Config;
 namespace ClaudeMonitor.Agent.Auth;
 
 /// <summary>
-/// Credentials of the Windows service (ADR-0004): DPAPI in the service account's CurrentUser scope, one
+/// Credentials of the Windows service (ADR-0005): DPAPI in the service account's CurrentUser scope, one
 /// <c>cred-&lt;account&gt;.bin</c> file each, written through a temp file and an atomic rename. Never LocalMachine scope,
 /// which any account on the machine could decrypt. A read returns null on any failure.
 /// </summary>

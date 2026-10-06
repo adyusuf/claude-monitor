@@ -1936,6 +1936,13 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("workspace_id");
 
+                    b.Property<string>("AgentUpdate")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("off")
+                        .HasColumnName("agent_update");
+
                     b.Property<int>("AlertCpuPct")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -1991,6 +1998,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("workspace_settings", t =>
                         {
+                            t.HasCheckConstraint("ck_workspace_settings_agent_update", "agent_update IN ('off', 'check', 'on')");
+
                             t.HasCheckConstraint("ck_workspace_settings_alerts", "alert_cpu_pct BETWEEN 1 AND 100 AND alert_memory_pct BETWEEN 1 AND 100 AND alert_disk_pct BETWEEN 1 AND 100 AND alert_sustain_seconds BETWEEN 60 AND 86400");
 
                             t.HasCheckConstraint("ck_workspace_settings_retention", "retention_days BETWEEN 1 AND 3650");

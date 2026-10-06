@@ -4,7 +4,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Metrics;
 
 /// <summary>
-/// Reads this machine's CPU, memory and disks with the OS's own counters (ADR-0004, "Resources and alerts").
+/// Reads this machine's CPU, memory and disks with the OS's own counters (ADR-0005, "Resources and alerts").
 /// Sample returns null when the numbers are unavailable and never throws.
 /// </summary>
 public interface IMetricsSource

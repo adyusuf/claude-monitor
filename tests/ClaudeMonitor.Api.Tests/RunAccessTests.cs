@@ -6,7 +6,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>Who may read a run and its output, who sees its command on the web, and who may cancel it (ADR-0004).</summary>
+/// <summary>Who may read a run and its output, who sees its command on the web, and who may cancel it (ADR-0005).</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RunAccessTests(ApiFactory api)
 {

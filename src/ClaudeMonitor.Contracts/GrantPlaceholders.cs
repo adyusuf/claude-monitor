@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace ClaudeMonitor.Contracts;
 
-// The placeholders of a grant template and the rules a value must satisfy to fill one (ADR-0004).
+// The placeholders of a grant template and the rules a value must satisfy to fill one (ADR-0005).
 
 internal enum PlaceholderKind
 {

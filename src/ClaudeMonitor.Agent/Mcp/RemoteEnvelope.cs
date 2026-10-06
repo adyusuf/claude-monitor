@@ -4,7 +4,7 @@ using ClaudeMonitor.Agent.Push;
 namespace ClaudeMonitor.Agent.Mcp;
 
 /// <summary>
-/// Everything that comes back from another machine is untrusted data (ADR-0004): run output, host names, mounts. It is
+/// Everything that comes back from another machine is untrusted data (ADR-0005): run output, host names, mounts. It is
 /// handed to the model inside this wrapper, with anything that could close it defused as in ADR-0003, and capped.
 /// </summary>
 public static class RemoteEnvelope

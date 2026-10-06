@@ -8,7 +8,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Exec;
 
 /// <summary>
-/// Where the exec policy comes from (ADR-0004, "Four fail-closed keys"). An interactive agent takes the level the user
+/// Where the exec policy comes from (ADR-0005, "Four fail-closed keys"). An interactive agent takes the level the user
 /// saved; a service agent reads an admin-owned file its own account cannot write. Anything doubtful is
 /// <see cref="ExecPolicy.Off"/>.
 /// </summary>
@@ -142,7 +142,7 @@ public static class ExecPolicyLoader
     {
         if ((File.GetUnixFileMode(path) & UnixFiles.GroupOrOtherWrite) != 0) return false;
         if ((File.GetUnixFileMode(directory) & UnixFiles.GroupOrOtherWrite) != 0) return false;
-        // Owned by root (uid 0), never by the service account: ADR-0004 keeps the exec level out of its reach.
+        // Owned by root (uid 0), never by the service account: ADR-0005 keeps the exec level out of its reach.
         return UnixFiles.Euid() is { } euid && euid != RootUid
             && UnixFiles.OwnerUid(path) == RootUid
             && UnixFiles.OwnerUid(directory) == RootUid;

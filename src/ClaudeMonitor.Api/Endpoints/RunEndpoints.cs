@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// Remote runs on the web (ADR-0004). Any member reads who ran what where and when; the command and its output only
+/// Remote runs on the web (ADR-0005). Any member reads who ran what where and when; the command and its output only
 /// the requester and the target's owner; only the owner approves or denies; requester or owner cancels.
 /// </summary>
 public static class RunEndpoints

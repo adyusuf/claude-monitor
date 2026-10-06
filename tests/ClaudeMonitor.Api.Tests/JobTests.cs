@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>Named commands the target's owner approved once (ADR-0004): proposing, approving, running and retiring them.</summary>
+/// <summary>Named commands the target's owner approved once (ADR-0005): proposing, approving, running and retiring them.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class JobTests(ApiFactory api)
 {

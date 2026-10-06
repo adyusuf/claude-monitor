@@ -12,7 +12,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// The daemon's machine reports (ADR-0004): its profile (exec level, service mode) and a metric sample every
+/// The daemon's machine reports (ADR-0005): its profile (exec level, service mode) and a metric sample every
 /// <see cref="AgentConfig.MetricsEvery"/>, with the alerts the evaluator opens or resolves. It only reports; it never acts on
 /// an alert. Samples and alerts the API did not take are kept (bounded) and sent with the next pass. An API that does not
 /// know these calls (404) switches the reports off until the daemon restarts.

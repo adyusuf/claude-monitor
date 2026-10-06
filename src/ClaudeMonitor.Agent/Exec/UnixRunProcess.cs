@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Exec;
 /// <summary>
 /// Linux and macOS: the run starts through posix_spawn in a process group of its own, so that kill(-pgid) reaches every
 /// descendant that did not leave the group. A double-forked child that calls setsid() does leave it: on Linux the systemd
-/// unit's KillMode=control-group still ends it; on macOS it is a residual risk (ADR-0004). The group id is the lead's pid;
+/// unit's KillMode=control-group still ends it; on macOS it is a residual risk (ADR-0005). The group id is the lead's pid;
 /// a signal sent after the lead was reaped could in theory reach a recycled id, so the agent only does that to clean up
 /// right after a run, within seconds.
 /// </summary>

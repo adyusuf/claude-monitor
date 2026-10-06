@@ -10,6 +10,7 @@ using ClaudeMonitor.Agent.Push;
 using ModelContextProtocol.Protocol;
 using System.Text.Json.Nodes;
 using ClaudeMonitor.Agent.Storage;
+using ClaudeMonitor.Agent.Update;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -28,8 +29,11 @@ public static class Cli
         cm-agent install --exec off|argv|shell
                                         whether approved remote runs may execute on this machine (default off)
         cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
-        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0004)
+        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005)
         cm-agent status                 connection and queue
+        cm-agent update [--check]       install the newest signed agent build from the server (--check: only look)
+        cm-agent config [auto-update off|check|on]
+                                        whether the agent looks for / installs updates by itself (default off)
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
         """;
@@ -38,7 +42,7 @@ public static class Cli
         TimeProvider clock)
     {
         ArgumentNullException.ThrowIfNull(args);
-        // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0004).
+        // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0005).
         if (args.FirstOrDefault() == "install" && ServiceCommands.IsService(args)) return ServiceCommands.Install(args, stdout, stderr);
         if (args.FirstOrDefault() == "uninstall" && ServiceCommands.IsService(args)) return ServiceCommands.Uninstall(stdout);
         var log = new AgentLog(config, clock);
@@ -69,6 +73,10 @@ public static class Cli
                 return Install(args, config, stdout, stderr, Environment.ProcessPath!);
             case "uninstall":
                 return new PluginInstaller(config, stdout).Uninstall();
+            case "update":
+                return await UpdateCommand.UpdateAsync(args, config, stdout, stderr, clock);
+            case "config":
+                return await UpdateCommand.ConfigAsync(args, config, stdout, stderr);
             case "status":
                 return await StatusAsync(config, stdout, clock);
             case "version":
@@ -160,6 +168,7 @@ public static class Cli
         await stdout.WriteLineAsync($"stop wait: {(int)config.StopWait.TotalSeconds} s");
         await stdout.WriteLineAsync($"remote runs: {ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel))}{(config.ServiceMode ? " (service)" : "")}");
         foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
+        foreach (var line in UpdateCommand.Describe(config, store)) await stdout.WriteLineAsync(line);
         await stdout.WriteLineAsync($"version: {AgentConfig.Version}");
         return identity.Connected ? 0 : 1;
     }

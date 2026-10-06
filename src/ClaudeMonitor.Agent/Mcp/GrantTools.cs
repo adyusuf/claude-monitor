@@ -11,7 +11,7 @@ using ModelContextProtocol.Server;
 namespace ClaudeMonitor.Agent.Mcp;
 
 /// <summary>
-/// Standing permissions (grants) and named jobs on other machines (ADR-0004). Asking for either only creates a request;
+/// Standing permissions (grants) and named jobs on other machines (ADR-0005). Asking for either only creates a request;
 /// it does nothing until the machine's owner approves it on the web. A shell command is never grantable.
 /// </summary>
 [McpServerToolType]

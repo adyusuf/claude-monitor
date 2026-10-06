@@ -1,6 +1,7 @@
-# ADR-0004: Remote work on other machines of a workspace
+# ADR-0005: Remote work on other machines of a workspace
 
-**Status:** Accepted (06/10/2026). Amends [ADR-0002](adr-0002-agent-platform.md) on boot start, operating systems,
+**Status:** Accepted (06/10/2026). Written in parallel with ADR-0004 (agent self-update) and numbered after it. Amends
+[ADR-0002](adr-0002-agent-platform.md) on boot start, operating systems,
 credential storage and who may command an agent. Data model: [`data-model.md`](data-model.md) §3b.
 **Decider:** the maintainer; the security and data reviews of 06/10/2026 shaped the controls.
 
@@ -178,8 +179,9 @@ shell targets; that is recorded under "Open" below.
   admin reads it and approves it on the web. The same path serves Linux and macOS (no `sudo -u` needed).
 - The exec policy file must be owned by root (uid 0) on Unix and must not be writable by the service process on
   Windows; anything else reads as `off`.
-- Upgrades are done by an admin; the agent never updates itself and the API never pushes one. The API refuses an
-  agent below a minimum version as a target.
+- A service agent is upgraded by an admin. Its binary lives in an admin-owned folder the service account cannot write,
+  so the opt-in self-update of [ADR-0004](adr-0004-agent-self-update.md) (which replaces the binary in the agent's own
+  home) cannot replace it. The API refuses an agent below a minimum version as a target.
 
 ### Backward compatibility
 

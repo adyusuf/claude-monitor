@@ -6,7 +6,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// Grants as a requester's agent calls them (ADR-0004): it asks for one (only a request until the target's owner
+/// Grants as a requester's agent calls them (ADR-0005): it asks for one (only a request until the target's owner
 /// approves it) and reads the grants its user holds. The agent's user must be at least a member of its workspace.
 /// </summary>
 public static class AgentGrantEndpoints

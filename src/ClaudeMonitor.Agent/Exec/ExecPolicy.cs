@@ -3,7 +3,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Exec;
 
 /// <summary>
-/// What this target lets remote runs do (ADR-0004, "Four fail-closed keys"): the exec level and an optional local
+/// What this target lets remote runs do (ADR-0005, "Four fail-closed keys"): the exec level and an optional local
 /// ceiling. Empty ceiling lists mean "no extra limit"; the level alone still applies. Unknown or unreadable means
 /// <see cref="Off"/>.
 /// </summary>

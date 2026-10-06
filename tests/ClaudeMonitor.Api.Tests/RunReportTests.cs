@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>What the target reports about a run it was sent: the status ladder and the output (ADR-0004).</summary>
+/// <summary>What the target reports about a run it was sent: the status ladder and the output (ADR-0005).</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RunReportTests(ApiFactory api)
 {

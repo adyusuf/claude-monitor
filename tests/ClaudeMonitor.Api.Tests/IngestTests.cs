@@ -209,6 +209,6 @@ public sealed class IngestTests(ApiFactory api)
         var row = (await user.GetJsonAsync($"/api/workspaces/{user.WorkspaceId}/agents"))[0];
         Assert.Equal("0.3.0", row.GetProperty("version").GetString());
         var settings = await agent.Http.GetFromJsonAsync<AgentSettings>("/api/agent/settings", TestUser.Json);
-        Assert.Equal(new AgentSettings(true, 262_144, user.WorkspaceId, false, new AlertThresholds(90, 90, 90, 300)), settings);
+        Assert.Equal(new AgentSettings(true, 262_144, user.WorkspaceId, UpdateModes.Off, false, new AlertThresholds(90, 90, 90, 300)), settings);
     }
 }

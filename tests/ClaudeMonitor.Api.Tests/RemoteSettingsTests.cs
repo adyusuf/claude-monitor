@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>The workspace's remote switch and alert thresholds, and the chores that keep remote data tidy (ADR-0004).</summary>
+/// <summary>The workspace's remote switch and alert thresholds, and the chores that keep remote data tidy (ADR-0005).</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RemoteSettingsTests(ApiFactory api)
 {

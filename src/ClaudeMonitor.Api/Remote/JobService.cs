@@ -14,7 +14,7 @@ namespace ClaudeMonitor.Api.Remote;
 public sealed record JobApproval(string? Code);
 
 /// <summary>
-/// Jobs as they are proposed and decided (ADR-0004). A requester's agent proposes; only the target agent's owner
+/// Jobs as they are proposed and decided (ADR-0005). A requester's agent proposes; only the target agent's owner
 /// approves (after a recent sign-in or a code), denies or retires. A job's command is frozen: changing it means
 /// retiring and proposing again. Running one is an ordinary run request with its JobId. Every transition is a
 /// compare-and-set, and the stream hears of it after the commit.

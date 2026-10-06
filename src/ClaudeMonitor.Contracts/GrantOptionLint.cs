@@ -1,6 +1,6 @@
 namespace ClaudeMonitor.Contracts;
 
-// The lint a grant that a Claude session asks for goes through (ADR-0004): no literal option that runs another program.
+// The lint a grant that a Claude session asks for goes through (ADR-0005): no literal option that runs another program.
 
 internal static class GrantOptionLint
 {

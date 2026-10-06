@@ -3,7 +3,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Api.Tests;
 
 /// <summary>
-/// The lexical match of one call against a template (ADR-0004; the security review's P/F list). Pure: it never touches
+/// The lexical match of one call against a template (ADR-0005; the security review's P/F list). Pure: it never touches
 /// the file system, the target repeats it with real paths before exec.
 /// </summary>
 public sealed class GrantMatchTests

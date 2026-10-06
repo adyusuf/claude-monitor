@@ -201,7 +201,7 @@ public sealed class MachineMonitorTests : IDisposable
     [Fact]
     public void Remember_keeps_the_workspace_switch_and_the_thresholds_the_settings_pass_learned()
     {
-        MachineMonitor.Remember(fx.Store, new AgentSettings(true, 1000, Guid.NewGuid(), true, new AlertThresholds(80, 81, 82, 83)));
+        MachineMonitor.Remember(fx.Store, new AgentSettings(true, 1000, Guid.NewGuid(), UpdateModes.Off, true, new AlertThresholds(80, 81, 82, 83)));
         Assert.Equal(("true", "80,81,82,83"), (fx.Store.Get(MachineMonitor.RemoteRunsKey), fx.Store.Get(MachineMonitor.ThresholdsKey)));
 
         MachineMonitor.Remember(fx.Store, new AgentSettings(true, 1000, Guid.NewGuid()));

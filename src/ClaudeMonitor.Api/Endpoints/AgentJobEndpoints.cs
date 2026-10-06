@@ -6,7 +6,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// Jobs as a requester's agent calls them (ADR-0004): it proposes one (only a proposal until the target's owner
+/// Jobs as a requester's agent calls them (ADR-0005): it proposes one (only a proposal until the target's owner
 /// approves it) and lists the workspace's active and proposed ones. Running one is POST /agent/runs with its JobId.
 /// </summary>
 public static class AgentJobEndpoints

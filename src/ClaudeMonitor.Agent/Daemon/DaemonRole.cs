@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// "cm-agent daemon": started by a hook or the MCP server, or by the OS as a boot service (ADR-0004). It stops on Ctrl+C,
+/// "cm-agent daemon": started by a hook or the MCP server, or by the OS as a boot service (ADR-0005). It stops on Ctrl+C,
 /// SIGTERM (systemd, launchd) or the Windows service manager's stop. A service that is not connected logs in by itself:
 /// the device code goes to its log and to login-code.txt in its home, for an admin to read and approve on the web.
 /// </summary>

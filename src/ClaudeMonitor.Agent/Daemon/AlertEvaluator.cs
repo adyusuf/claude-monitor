@@ -3,7 +3,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// Turns samples into alert reports (ADR-0004, "Resources and alerts"): per kind and subject, a value at or above the
+/// Turns samples into alert reports (ADR-0005, "Resources and alerts"): per kind and subject, a value at or above the
 /// threshold for the whole sustain time opens one alert, and it resolves once the value is below the threshold minus
 /// <see cref="HysteresisPct"/>. Pure: time comes from the samples, nothing is read or written, and the agent never acts on an alert.
 /// </summary>

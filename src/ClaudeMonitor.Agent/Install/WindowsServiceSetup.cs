@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// The sc.exe, icacls and reg arguments of the Windows service (ADR-0004), as argument lists for a process start, never a
+/// The sc.exe, icacls and reg arguments of the Windows service (ADR-0005), as argument lists for a process start, never a
 /// command line. The account is a virtual one: it needs no password and exists once the service does, so the ACLs come after sc create.
 /// </summary>
 public static class WindowsServiceSetup

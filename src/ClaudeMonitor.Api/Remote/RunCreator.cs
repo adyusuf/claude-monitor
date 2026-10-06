@@ -15,7 +15,7 @@ public sealed record RunCreateResult(RunCreated? Run, int Status, string? Error)
 }
 
 /// <summary>
-/// A requester's agent asks for a run (ADR-0004). Fail-closed at every step: the workspace switch, the requester's
+/// A requester's agent asks for a run (ADR-0005). Fail-closed at every step: the workspace switch, the requester's
 /// membership, the target's exec level and its owner's membership, the pending cap and the rate limit. A grant of the
 /// requester (or an active job) approves it at once; anything else waits for the target's owner.
 /// </summary>

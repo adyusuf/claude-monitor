@@ -1,4 +1,4 @@
-// Makes text safe to judge by eye (ADR-0004, "The owner's approval"): a command someone is asked to allow must show
+// Makes text safe to judge by eye (ADR-0005, "The owner's approval"): a command someone is asked to allow must show
 // every character it has. Anything that is not plain printable ASCII is marked; what has no glyph (controls, format
 // characters such as the right-to-left override, separators, combining marks, private and unassigned code points) is
 // shown ONLY as its \u escape, so nothing can hide.

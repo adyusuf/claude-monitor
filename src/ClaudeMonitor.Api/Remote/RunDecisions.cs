@@ -13,7 +13,7 @@ public sealed record RunApproval(string? Hash, string? Code);
 public sealed record RunDenial(string? Reason);
 
 /// <summary>
-/// The owner's answer and the cancels (ADR-0004). Every transition is a compare-and-set on the run's status, so an
+/// The owner's answer and the cancels (ADR-0005). Every transition is a compare-and-set on the run's status, so an
 /// approval racing the Housekeeper's expiry, or two clicks, change it once; the loser gets 409.
 /// </summary>
 public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider clock, Broker broker)

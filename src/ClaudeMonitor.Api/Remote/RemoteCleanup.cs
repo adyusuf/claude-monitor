@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Remote;
 
 /// <summary>
-/// When an agent leaves a workspace (revoked, moved) or a member is removed, its remote work ends with it (ADR-0004):
+/// When an agent leaves a workspace (revoked, moved) or a member is removed, its remote work ends with it (ADR-0005):
 /// grants revoked, jobs retired, open alerts resolved, open runs cancelled. Runs are cancelled and published at once;
 /// the rest is part of the caller's unit of work only where it says so.
 /// </summary>

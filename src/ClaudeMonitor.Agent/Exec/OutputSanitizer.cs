@@ -5,7 +5,7 @@ using ClaudeMonitor.Agent.Capture;
 namespace ClaudeMonitor.Agent.Exec;
 
 /// <summary>
-/// One output stream of a run, from raw bytes to masked, printable text (ADR-0004, "Output"): UTF-8 decoded with
+/// One output stream of a run, from raw bytes to masked, printable text (ADR-0005, "Output"): UTF-8 decoded with
 /// replacement, NUL and invalid bytes shown as U+FFFD, C0 controls (except line feed and tab), C1 controls and ANSI
 /// escape sequences removed, then masked line by line. A line is held until its newline, so a secret is never cut in two
 /// by a read; a private-key block is held from BEGIN to END and masked whole. Not thread-safe: one reader owns it.

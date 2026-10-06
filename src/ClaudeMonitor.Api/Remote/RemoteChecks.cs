@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Remote;
 
 /// <summary>
-/// The checks grants and jobs share (ADR-0004): the re-authentication an owner's approval needs, the template check
+/// The checks grants and jobs share (ADR-0005): the re-authentication an owner's approval needs, the template check
 /// answered as a 400 with the matcher's code, and the compare-and-set cancel of the runs a revoked grant or retired job
 /// had approved.
 /// </summary>

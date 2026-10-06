@@ -13,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace ClaudeMonitor.Api.Tests.Infrastructure;
 
 /// <summary>
-/// A workspace set up for remote work (ADR-0004): Admin owns the workspace and asks for work from Requester;
+/// A workspace set up for remote work (ADR-0005): Admin owns the workspace and asks for work from Requester;
 /// Owner is a member who runs Target; Other is a member with no part in the run. The switch is on and Target is at
 /// the exec level the test asked for.
 /// </summary>

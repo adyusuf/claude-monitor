@@ -100,6 +100,30 @@ public sealed class RelayTests : IDisposable
     }
 
     [Fact]
+    public async Task An_answered_heartbeat_clears_the_failure_the_last_one_left_and_a_failed_one_is_recorded_by_type()
+    {
+        relay.HeartbeatFailed("HttpRequestException");
+        Assert.Equal("HttpRequestException", store.Get(Relay.HeartbeatErrorKey));
+
+        fake.On("POST /api/agent/heartbeat", HttpStatusCode.NoContent, "");
+        await relay.HeartbeatAsync(CancellationToken.None);
+
+        Assert.Equal("", store.Get(Relay.HeartbeatErrorKey));
+        Assert.NotNull(store.Get(Relay.LastContactKey));
+    }
+
+    [Fact]
+    public async Task A_failing_heartbeat_leaves_the_recorded_failure_for_the_caller_to_set()
+    {
+        fake.On("POST /api/agent/heartbeat", HttpStatusCode.BadGateway, "{}");
+        relay.HeartbeatFailed("TimeoutException");
+
+        await Assert.ThrowsAsync<ApiException>(() => relay.HeartbeatAsync(CancellationToken.None));
+
+        Assert.Equal("TimeoutException", store.Get(Relay.HeartbeatErrorKey)); // not wiped by a failure, only by an answer
+    }
+
+    [Fact]
     public async Task A_refused_refresh_disconnects_the_agent()
     {
         fake.On("POST /api/agent/heartbeat", HttpStatusCode.Unauthorized, "{}");

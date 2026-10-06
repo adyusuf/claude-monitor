@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>When an agent leaves a workspace or a member is removed, the remote work around it ends with it (ADR-0004).</summary>
+/// <summary>When an agent leaves a workspace or a member is removed, the remote work around it ends with it (ADR-0005).</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RemoteCascadeTests(ApiFactory api)
 {

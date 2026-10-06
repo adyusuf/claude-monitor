@@ -36,7 +36,7 @@ export const config = {
   /** A transcript line that repeats a web command's text is its echo when it is this close to the command's moment (seconds). */
   commandEchoSeconds: 120,
   activityFilterKey: "cm.activityFilter",
-  /** Remote work (ADR-0004): a machine's metrics window and refresh, run history pages, the output page, the countdown tick. */
+  /** Remote work (ADR-0005): a machine's metrics window and refresh, run history pages, the output page, the countdown tick. */
   metricsMinutes: 60,
   metricsRefreshMs: 60_000,
   runPageSize: 50,
@@ -44,7 +44,7 @@ export const config = {
   pendingPollMs: 30_000,
   outputPageSize: 50,
   countdownTickMs: 1_000,
-  /** The Allow button of a shell or interpreter run waits this long after the card appears (ADR-0004, "The owner's approval"). */
+  /** The Allow button of a shell or interpreter run waits this long after the card appears (ADR-0005, "The owner's approval"). */
   runAllowDelayMs: 3_000,
   grantDaysDefault: 7,
   grantDaysMax: 90,

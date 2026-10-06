@@ -15,7 +15,7 @@ public sealed record ExecRun(string RunId, string State, string? FinalStatus, in
 
 public sealed record StoredChunk(string RunId, int Seq, string Stream, string Body, bool Gap);
 
-/// <summary>Remote work (ADR-0004) in the local database: requests for the API, runs followed, runs executed and their output.</summary>
+/// <summary>Remote work (ADR-0005) in the local database: requests for the API, runs followed, runs executed and their output.</summary>
 public sealed partial class LocalStore
 {
     public static class RequestStates

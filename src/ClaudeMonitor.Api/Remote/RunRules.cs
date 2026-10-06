@@ -4,7 +4,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Api.Remote;
 
 /// <summary>
-/// The shape checks of a run request (ADR-0004), before anything is looked up. They return an error code (an i18n key
+/// The shape checks of a run request (ADR-0005), before anything is looked up. They return an error code (an i18n key
 /// the web and the MCP tools show) or null. The target's own checks before exec are stricter; these keep junk out of
 /// the database and out of the owner's approval card.
 /// </summary>

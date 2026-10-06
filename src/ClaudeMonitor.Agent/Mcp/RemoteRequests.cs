@@ -13,7 +13,7 @@ public sealed record RemoteAnswer(JsonElement? Json, string? Error)
 }
 
 /// <summary>
-/// How an MCP tool talks to the API without calling it (ADR-0004): it writes a request for the daemon into the local
+/// How an MCP tool talks to the API without calling it (ADR-0005): it writes a request for the daemon into the local
 /// database and waits a little for the answer. The daemon is the only API caller (refresh tokens are single-use).
 /// </summary>
 public sealed class RemoteRequests(AgentConfig config, TimeProvider clock)

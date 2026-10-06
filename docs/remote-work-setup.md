@@ -2,7 +2,7 @@
 
 How to let Claude, talking to the agent on its own machine, have work done on **another machine of the same
 workspace**: read a live server's logs, run the tests on a test machine, follow each machine's CPU, memory and disk.
-The design and every control are in [ADR-0004](adr-0004-remote-work.md); the per-OS paths and the policy file are in
+The design and every control are in [ADR-0005](adr-0005-remote-work.md); the per-OS paths and the policy file are in
 [SETUP.md](../SETUP.md), "Service agent". Nothing here runs by itself: a run happens only when all four keys are on
 (workspace switch, local exec level, an approval or grant by the machine's owner, membership).
 
@@ -167,7 +167,7 @@ always, whatever the workspace's masking setting. A run is limited to two at a t
 
 ## 7. Upgrading a service agent (admin)
 
-The agent never updates itself and the API never pushes an upgrade.
+A service agent does not update itself: its binary is admin-owned, so the opt-in self-update ([ADR-0004](adr-0004-agent-self-update.md)) cannot replace it. An admin upgrades it:
 
 1. Download the new zip **and** `SHA256SUMS` from the same address and verify the SHA-256 on the target
    ([release.md](release.md)). A mismatch: stop, do not install, report it.
@@ -188,7 +188,7 @@ The agent never updates itself and the API never pushes an upgrade.
 - **A bad upgrade:** install the previous version's zip the same way (step 7); migrations only add, so an older agent
   runs on a newer API.
 
-## Residual risks (ADR-0004, "Consequences" and "Open")
+## Residual risks (ADR-0005, "Consequences" and "Open")
 
 Read these before turning `shell` or a wide ceiling on:
 

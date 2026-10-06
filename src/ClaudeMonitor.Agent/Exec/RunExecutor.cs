@@ -29,7 +29,7 @@ public sealed record RunResult(string Status, int? ExitCode, string? Error, bool
 }
 
 /// <summary>
-/// Runs approved runs on this target (ADR-0004, "The executor on the target"): refuses as root, too late, busy or not allowed,
+/// Runs approved runs on this target (ADR-0005, "The executor on the target"): refuses as root, too late, busy or not allowed,
 /// starts the run in a tree that can be killed whole, streams its masked output, enforces the timeout on a monotonic timer
 /// and reports exactly one final status. It logs the run id, grant id, exit code, sizes, duration, kill reason and argv[0] only.
 /// A callback that throws ends the run's reporting: the process is cleaned up and the exception reaches the caller.
@@ -127,7 +127,7 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         var env = RunEnvironment.Build(config.Home);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
         if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe);
-        // A grant fixes the working directory; a run that names none under a grant works there (ADR-0004, B4).
+        // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).
         return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0);
     }
 

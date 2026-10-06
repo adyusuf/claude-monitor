@@ -6,7 +6,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Exec;
 
 /// <summary>
-/// Collects what a run prints (ADR-0004, "Output"). Two reader tasks feed it raw bytes through <see cref="Add"/> (or
+/// Collects what a run prints (ADR-0005, "Output"). Two reader tasks feed it raw bytes through <see cref="Add"/> (or
 /// <see cref="PumpAsync"/>), each stream through its own <see cref="OutputSanitizer"/>. What survives is kept as the first
 /// <c>RunHeadBytes</c>, then only a ring of the last <c>RunTailBytes</c>. Output leaves as <see cref="RunOutputChunk"/>s of
 /// at most <c>RunChunkBytes</c> UTF-8 bytes, numbered from 0, through <see cref="Chunks"/>: head chunks as they fill (or on

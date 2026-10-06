@@ -10,14 +10,14 @@ namespace ClaudeMonitor.Agent.Tests;
 /// Stands in for the daemon next to an MCP tool: it takes the requests the tool wrote into the local database and answers
 /// them from a table, exactly as the real relay does after calling the API. Requests it has no answer for stay new.
 /// </summary>
-public sealed class FakeDaemon : IDisposable
+public sealed class RemoteFakeDaemon : IDisposable
 {
     private readonly TempHome home;
     private readonly CancellationTokenSource stop = new();
     private readonly Task loop;
     private readonly Dictionary<string, Func<RemoteRequest, (string State, string? Result, string? Error)>> answers = new();
 
-    public FakeDaemon(TempHome home)
+    public RemoteFakeDaemon(TempHome home)
     {
         this.home = home;
         loop = Task.Run(Loop);
@@ -27,19 +27,19 @@ public sealed class FakeDaemon : IDisposable
 
     public IEnumerable<RemoteRequest> OfKind(string kind) => Seen.Where(r => r.Kind == kind);
 
-    public FakeDaemon Answer(string kind, object? result)
+    public RemoteFakeDaemon Answer(string kind, object? result)
     {
         answers[kind] = _ => (LocalStore.RequestStates.Done, result is null ? null : result as string ?? JsonSerializer.Serialize(result, ApiClient.Json), null);
         return this;
     }
 
-    public FakeDaemon Fail(string kind, string error)
+    public RemoteFakeDaemon Fail(string kind, string error)
     {
         answers[kind] = _ => (LocalStore.RequestStates.Failed, null, error);
         return this;
     }
 
-    public FakeDaemon Machines(params MachineView[] machines) => Answer("machines", machines);
+    public RemoteFakeDaemon Machines(params MachineView[] machines) => Answer("machines", machines);
 
     private async Task Loop()
     {

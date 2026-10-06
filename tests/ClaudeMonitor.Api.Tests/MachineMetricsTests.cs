@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>What an agent reports about its machine (ADR-0004): profile, metric samples and alerts, and how they are read back.</summary>
+/// <summary>What an agent reports about its machine (ADR-0005): profile, metric samples and alerts, and how they are read back.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class MachineMetricsTests(ApiFactory api)
 {

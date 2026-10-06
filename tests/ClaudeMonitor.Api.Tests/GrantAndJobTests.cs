@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>What a grant does once it is active: it approves matching runs at once, and only those (ADR-0004).</summary>
+/// <summary>What a grant does once it is active: it approves matching runs at once, and only those (ADR-0005).</summary>
 [Collection(ApiGroup.Name)]
 public sealed class GrantAndJobTests(ApiFactory api)
 {

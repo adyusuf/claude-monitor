@@ -13,7 +13,7 @@ export interface CodeGate {
 }
 
 /**
- * An owner's action that may need a two-step code (ADR-0004): a shell approval answers 403 "mfa_required", a grant or job
+ * An owner's action that may need a two-step code (ADR-0005): a shell approval answers 403 "mfa_required", a grant or job
  * approval 403 "reauth_required" (the sign-in is not recent). The code field appears on that answer; a wrong code is
  * reported as such. Any other failure is shown as it is.
  */

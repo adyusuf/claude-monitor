@@ -49,7 +49,7 @@ public sealed class Agent
     public DateTimeOffset? RevokedAt { get; set; }
     public Guid? RevokedBy { get; set; }
 
-    /// <summary>What the agent last reported it lets remote runs do (ADR-0004); an agent that never reported is "off".</summary>
+    /// <summary>What the agent last reported it lets remote runs do (ADR-0005); an agent that never reported is "off".</summary>
     public string ExecLevel { get; set; } = ClaudeMonitor.Contracts.ExecLevels.Off;
     public bool ServiceMode { get; set; }
     public DateTimeOffset? ProfileAt { get; set; }

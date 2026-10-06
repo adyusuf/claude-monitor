@@ -4,7 +4,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// Where a boot service lives on one OS (ADR-0004, "Service mode"): an admin-owned binary folder, a home only the service
+/// Where a boot service lives on one OS (ADR-0005, "Service mode"): an admin-owned binary folder, a home only the service
 /// account can use, and the admin-owned exec policy file. The binary is never the copy in a user's home.
 /// </summary>
 public sealed record ServiceLayout(string Os, string BinaryDir, string Binary, string Home, string Account, string ExecConfigPath)
@@ -31,7 +31,7 @@ public sealed record ServiceLayout(string Os, string BinaryDir, string Binary, s
     /// <summary>The API's origin the service logs in to by itself (https only); null leaves CM_SERVER unset.</summary>
     public string? Server { get; init; }
 
-    /// <summary>Where a service that is not connected yet writes its device code for an admin to read (ADR-0004).</summary>
+    /// <summary>Where a service that is not connected yet writes its device code for an admin to read (ADR-0005).</summary>
     public string LoginCodePath => Os == OsKinds.Windows ? $@"{Home}\{LoginCodeFile}" : $"{Home}/{LoginCodeFile}";
 
     public const string LoginCodeFile = "login-code.txt";

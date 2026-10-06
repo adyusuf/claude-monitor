@@ -3,7 +3,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// "cm-agent install --service" and "uninstall --service" (ADR-0004): registers the daemon as a boot service under a
+/// "cm-agent install --service" and "uninstall --service" (ADR-0005): registers the daemon as a boot service under a
 /// dedicated account, from an admin-owned copy of the binary. Stops at the first failure, says what failed and undoes
 /// what this run created. Every external tool goes through <c>run</c>, which returns its exit code.
 /// </summary>

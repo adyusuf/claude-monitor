@@ -1,6 +1,6 @@
 namespace ClaudeMonitor.Contracts;
 
-// The lexical rules behind GrantMatcher (ADR-0004, "Grants: full templates, checked twice"). Pure: no file system and no
+// The lexical rules behind GrantMatcher (ADR-0005, "Grants: full templates, checked twice"). Pure: no file system and no
 // OperatingSystem.Is*; the target's OS is always a parameter.
 
 internal static class GrantTemplateRules

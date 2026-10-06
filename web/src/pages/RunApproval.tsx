@@ -10,7 +10,7 @@ import { RunFacts } from "./RunFacts";
 import { useCodeGate } from "./useCodeGate";
 
 /**
- * The owner's approval of one run (ADR-0004): the whole command, where it runs, who asked and why, and a countdown.
+ * The owner's approval of one run (ADR-0005): the whole command, where it runs, who asked and why, and a countdown.
  * A shell run or an interpreter gets a red notice and an Allow button that waits a few seconds after the card appears.
  * There is no "allow all". Allow sends the run's hash; the API refuses it if the run changed. A shell run asks for a
  * two-step code when the owner has one.

@@ -4,7 +4,7 @@ using System.Xml;
 
 namespace ClaudeMonitor.Agent.Install;
 
-/// <summary>The LaunchDaemon of the macOS service (ADR-0004) and the dscl calls that create its hidden role account.</summary>
+/// <summary>The LaunchDaemon of the macOS service (ADR-0005) and the dscl calls that create its hidden role account.</summary>
 public static class LaunchdDaemon
 {
     public const string Label = "com.claudemonitor.agent";

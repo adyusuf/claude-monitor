@@ -107,6 +107,8 @@ export const tr: Dictionary = {
     title: "Makineler", empty: "Henüz bağlı makine yok.", connect: "Makine bağla", revoke: "Bağlantıyı kes",
     revokeConfirm: "Bu makinenin bağlantısı kesilsin mi? Ajanı raporlamayı bırakır.", revoked: "Bağlantı kesildi", lastSeen: "Son görülme",
     version: "Ajan", user: "Kullanıcı", moveTo: "Çalışma alanına taşı", enrolled: "Bağlandı",
+    updateAvailable: "Güncelleme var: {version}",
+    updateHint: "Makinede \"cm-agent update\" çalıştırın ya da kendini güncellemesine izin verin (çalışma alanı izin veriyorsa: cm-agent config auto-update on).",
   },
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
@@ -125,6 +127,11 @@ export const tr: Dictionary = {
     retention: "Olayların saklanacağı süre (gün)", retentionHint: "Daha eski olaylar gün gün zip'li JSON olarak arşivlenip silinir.",
     eventMax: "En büyük olay (bayt)", audit: "Denetim kaydı", noAudit: "Kayıt yok.", createTitle: "Yeni çalışma alanı",
     create: "Oluştur",
+    agentUpdate: "Ajan güncellemeleri",
+    agentUpdateOff: "Kapalı: ajanlar kendiliğinden güncelleme aramaz",
+    agentUpdateCheck: "Yalnızca bak: ajanlar güncelleme olduğunu öğrenir",
+    agentUpdateOn: "İzinli: ajanlar imzalı güncellemeleri kendiliğinden kurabilir",
+    agentUpdateHint: "Bir ajanın kendi başına yapabileceği en fazla şey. Her makinede de açılmalıdır (cm-agent config auto-update); ikisinden düşük olan geçerlidir. Güncellemeler imzalıdır ve ajan tarafından doğrulanır.",
   },
   account: {
     title: "Hesap", providers: "Giriş yöntemleri", linked: "Bağlı", link: "{provider} bağla", password: "Parola",

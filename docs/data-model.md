@@ -36,7 +36,7 @@ the EF Core migrations of phase 1 implement it and this file follows them.
 | `workspaces` | `id`, `name`, `name_search`, `created_by`, `created_at`, `status` (`active`, `archived`) | |
 | `workspace_members` | `workspace_id`, `user_id`, `role` (`owner`, `admin`, `member`, `viewer`), `joined_at`, `removed_at` | PK (`workspace_id`, `user_id`); (`user_id`) |
 | `workspace_invitations` | `id`, `workspace_id`, `email_normalized`, `role`, `token_hash`, `invited_by`, `created_at`, `expires_at`, `accepted_at`, `revoked_at` | UNIQUE `token_hash`; (`workspace_id`) |
-| `workspace_settings` | `workspace_id`, `mask_secrets` (default true), `retention_days` (default 90), `event_max_bytes`, `updated_at`, `updated_by` | PK `workspace_id` |
+| `workspace_settings` | `workspace_id`, `mask_secrets` (default true), `retention_days` (default 90), `event_max_bytes`, `agent_update` (`off` default, `check`, `on`; CHECK `ck_workspace_settings_agent_update`; the most an agent may do about updating itself, ADR-0004), `updated_at`, `updated_by` | PK `workspace_id` |
 
 A workspace always has at least one owner; the API refuses the change that would leave it without one.
 
@@ -45,7 +45,7 @@ A workspace always has at least one owner; the API refuses the change that would
 | Table | Columns | Keys and indexes |
 |---|---|---|
 | `machines` | `id`, `workspace_id`, `machine_key_hash`, `hostname`, `os` (`macos`, `windows`, `linux`), `os_version`, `arch`, `first_seen_at`, `last_seen_at` | UNIQUE (`workspace_id`, `machine_key_hash`) |
-| `agents` | `id`, `machine_id`, `user_id`, `workspace_id`, `version`, `status` (`active`, `revoked`), `enrolled_at`, `last_heartbeat_at`, `revoked_at`, `revoked_by`; from ADR-0004 `exec_level` (`off`, `argv`, `shell`; default `off`), `service_mode` (default false), `profile_at` | UNIQUE (`machine_id`, `user_id`) WHERE `status = 'active'`; (`workspace_id`) |
+| `agents` | `id`, `machine_id`, `user_id`, `workspace_id`, `version`, `status` (`active`, `revoked`), `enrolled_at`, `last_heartbeat_at`, `revoked_at`, `revoked_by`; from ADR-0005 `exec_level` (`off`, `argv`, `shell`; default `off`), `service_mode` (default false), `profile_at` | UNIQUE (`machine_id`, `user_id`) WHERE `status = 'active'`; (`workspace_id`) |
 | `agent_tokens` | `id`, `agent_id`, `kind` (`access`, `refresh`), `token_hash`, `created_at`, `expires_at`, `replaced_by`, `revoked_at`, `last_used_at` | UNIQUE `token_hash`; (`agent_id`) |
 | `device_authorizations` | `id`, `device_code_hash`, `user_code`, `machine_key_hash`, `requested_hostname`, `requested_os`, `requested_arch`, `agent_version`, `status` (`pending`, `approved`, `denied`, `expired`, `consumed`), `workspace_id`, `approved_by`, `created_at`, `expires_at`, `last_polled_at` | UNIQUE `device_code_hash`; UNIQUE `user_code` WHERE `status = 'pending'` |
 
@@ -53,7 +53,7 @@ A workspace always has at least one owner; the API refuses the change that would
 A machine may run several agents, one per OS user. A refresh token is single-use: using it issues a new
 pair and marks the old one `replaced_by`; a reused, already-replaced refresh token revokes the agent's tokens.
 
-## 3b. Remote work ([ADR-0004](adr-0004-remote-work.md))
+## 3b. Remote work ([ADR-0005](adr-0005-remote-work.md))
 
 | Table | Columns | Keys and indexes |
 |---|---|---|

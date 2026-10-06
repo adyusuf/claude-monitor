@@ -2,7 +2,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>A grant a Claude session asks for may not carry an option that runs another program (ADR-0004).</summary>
+/// <summary>A grant a Claude session asks for may not carry an option that runs another program (ADR-0005).</summary>
 public sealed class GrantOptionLintTests
 {
     private static GrantTemplate Template(params string[] argv) => new(argv, "/var/log/app", 60);

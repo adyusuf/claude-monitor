@@ -22,7 +22,7 @@ public static class GrantErrors
 public sealed record GrantPathUse(string Value, string Root);
 
 /// <summary>
-/// The one grant matcher (ADR-0004, "Grants: full templates, checked twice"). Pure: it never touches the file system
+/// The one grant matcher (ADR-0005, "Grants: full templates, checked twice"). Pure: it never touches the file system
 /// and takes the target's OS as a parameter. The API uses it to auto-approve; the target runs the same check and then
 /// resolves real paths (ExecGuard). Anything it does not understand is refused.
 /// </summary>

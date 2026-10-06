@@ -8,7 +8,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// The target's side of remote work (ADR-0004). A run arriving on the stream is written to exec_runs before anything
+/// The target's side of remote work (ADR-0005). A run arriving on the stream is written to exec_runs before anything
 /// starts (a replay of a known run is never started again), executed by <see cref="RunExecutor"/>, and its output and
 /// outcome go through the local database to the API, output first. A run that was alive when the daemon stopped is
 /// reported failed, never restarted. The executor's callbacks come from other threads, so the store is used under a lock.

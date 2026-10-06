@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Endpoints;
 
 /// <summary>
-/// The remote-work part of a user's own data (ADR-0004; docs/data-model.md §3b). Export: runs they asked for or own as
+/// The remote-work part of a user's own data (ADR-0005; docs/data-model.md §3b). Export: runs they asked for or own as
 /// target, with their output, their grants and jobs, and the alerts and metrics of their machines. Deletion: open
 /// runs are cancelled, then commands, templates, working directories and output of those runs and the user's grants
 /// and jobs are emptied (the rows stay, other people's records point at them), and their machines' metrics and alerts go.

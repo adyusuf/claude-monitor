@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Tests;
 
 public sealed class RemoteToolsTests : IDisposable
 {
-    private readonly TempHome home = FakeDaemon.QuickHome();
+    private readonly TempHome home = RemoteFakeDaemon.QuickHome();
 
     public void Dispose() => home.Dispose();
 
@@ -31,7 +31,7 @@ public sealed class RemoteToolsTests : IDisposable
     [Fact]
     public async Task The_answer_the_daemon_writes_is_what_the_tool_gets()
     {
-        using var daemon = new FakeDaemon(home).Answer("machines", """[{"hostname":"h1"}]""");
+        using var daemon = new RemoteFakeDaemon(home).Answer("machines", """[{"hostname":"h1"}]""");
         var requests = new RemoteRequests(home.Config, TimeProvider.System);
 
         var answer = await requests.AskAsync("machines", HttpMethod.Get, "api/agent/machines", null, TimeSpan.FromSeconds(30));
@@ -45,7 +45,7 @@ public sealed class RemoteToolsTests : IDisposable
     [Fact]
     public async Task A_failed_request_gives_its_error_code_and_a_done_request_with_no_body_is_ok_and_empty()
     {
-        using var daemon = new FakeDaemon(home).Fail("run", "target_busy").Answer("cancel", null);
+        using var daemon = new RemoteFakeDaemon(home).Fail("run", "target_busy").Answer("cancel", null);
         var requests = new RemoteRequests(home.Config, TimeProvider.System);
 
         var failed = await requests.AskAsync("run", HttpMethod.Post, "api/agent/runs", new { }, TimeSpan.FromSeconds(30));
@@ -130,9 +130,9 @@ public sealed class RemoteToolsTests : IDisposable
     [Fact]
     public async Task A_host_name_with_two_agents_is_refused_with_both_candidates_listed_by_id()
     {
-        var service = FakeDaemon.Machine("web01", user: "svc", service: true, exec: ExecLevels.Argv);
-        var user = FakeDaemon.Machine("web01", user: "ada", service: false, exec: ExecLevels.Off);
-        using var daemon = new FakeDaemon(home).Machines(service, user, FakeDaemon.Machine("db01"));
+        var service = RemoteFakeDaemon.Machine("web01", user: "svc", service: true, exec: ExecLevels.Argv);
+        var user = RemoteFakeDaemon.Machine("web01", user: "ada", service: false, exec: ExecLevels.Off);
+        using var daemon = new RemoteFakeDaemon(home).Machines(service, user, RemoteFakeDaemon.Machine("db01"));
 
         var target = await Targets.ResolveAsync(new RemoteRequests(home.Config, TimeProvider.System), "web01");
 
@@ -146,7 +146,7 @@ public sealed class RemoteToolsTests : IDisposable
     [Fact]
     public async Task An_unknown_name_and_an_unknown_id_both_say_not_found_and_a_blank_one_asks_for_a_name()
     {
-        using var daemon = new FakeDaemon(home).Machines(FakeDaemon.Machine("web01"));
+        using var daemon = new RemoteFakeDaemon(home).Machines(RemoteFakeDaemon.Machine("web01"));
         var requests = new RemoteRequests(home.Config, TimeProvider.System);
 
         Assert.StartsWith("Not found: no machine 'nowhere'", (await Targets.ResolveAsync(requests, "nowhere")).Error, StringComparison.Ordinal);
@@ -159,10 +159,10 @@ public sealed class RemoteToolsTests : IDisposable
     [Fact]
     public async Task An_agent_id_resolves_even_among_agents_of_one_host_and_a_host_name_ignores_letter_case()
     {
-        var a = FakeDaemon.Machine("Web01", os: OsKinds.MacOs);
-        var b = FakeDaemon.Machine("Web01");
-        var lone = FakeDaemon.Machine("Db01");
-        using var daemon = new FakeDaemon(home).Machines(a, b, lone);
+        var a = RemoteFakeDaemon.Machine("Web01", os: OsKinds.MacOs);
+        var b = RemoteFakeDaemon.Machine("Web01");
+        var lone = RemoteFakeDaemon.Machine("Db01");
+        using var daemon = new RemoteFakeDaemon(home).Machines(a, b, lone);
         var requests = new RemoteRequests(home.Config, TimeProvider.System);
 
         var byId = await Targets.ResolveAsync(requests, b.AgentId.ToString().ToUpperInvariant());
@@ -175,7 +175,7 @@ public sealed class RemoteToolsTests : IDisposable
     [Fact]
     public async Task A_failed_machine_list_is_explained_instead_of_guessing()
     {
-        using (var daemon = new FakeDaemon(home).Fail("machines", RemoteErrors.Disabled))
+        using (var daemon = new RemoteFakeDaemon(home).Fail("machines", RemoteErrors.Disabled))
         {
             var target = await Targets.ResolveAsync(new RemoteRequests(home.Config, TimeProvider.System), "web01");
             Assert.Null(target.AgentId);

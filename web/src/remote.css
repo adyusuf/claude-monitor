@@ -1,4 +1,4 @@
-/* Remote work (ADR-0004): machines, metrics, runs, the owner's approval, grants and jobs. Uses the tokens of styles.css. */
+/* Remote work (ADR-0005): machines, metrics, runs, the owner's approval, grants and jobs. Uses the tokens of styles.css. */
 .table-scroll { overflow-x: auto; }
 .nav-badge { margin-left: auto; }
 .notice-warn { background: var(--warn-soft); color: var(--warn); }

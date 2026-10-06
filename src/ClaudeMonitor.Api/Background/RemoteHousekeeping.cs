@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Background;
 
 /// <summary>
-/// The periodic chores of remote work (ADR-0004): runs that waited too long expire (and the streams hear it), a run whose
+/// The periodic chores of remote work (ADR-0005): runs that waited too long expire (and the streams hear it), a run whose
 /// target went quiet fails, grants expire, offline alerts open and close, and old metrics, alerts and runs are deleted in
 /// batches. Every status change is a compare-and-set, so it never overrides an answer that arrived first.
 /// </summary>

@@ -76,9 +76,9 @@ public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, 
 /// <summary>The agent's report on a command. At is when the hook handed it to the session (an older agent sends none).</summary>
 public sealed record CommandStatusUpdate(string Status, string? Result, DateTimeOffset? At = null);
 
-/// <summary>What the agent must know of its workspace's settings before it captures anything.</summary>
-public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, bool RemoteRuns = false,
-    AlertThresholds? Alerts = null);
+/// <summary>What the agent must know of its workspace's settings before it captures anything. AgentUpdate is the most the workspace lets an agent do about updating itself.</summary>
+public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, string AgentUpdate = UpdateModes.Off,
+    bool RemoteRuns = false, AlertThresholds? Alerts = null);
 
 public static class AgentStreamEvents
 {
@@ -90,7 +90,7 @@ public static class AgentStreamEvents
     /// <summary>The first message of every connection: it makes the server send its headers at once, so the agent knows it is connected.</summary>
     public const string Ready = "ready";
 
-    /// <summary>An approved remote run for this agent to execute (ADR-0004).</summary>
+    /// <summary>An approved remote run for this agent to execute (ADR-0005).</summary>
     public const string Run = "run";
     public const string RunCancel = "run_cancel";
 

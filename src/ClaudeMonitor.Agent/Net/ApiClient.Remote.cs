@@ -4,7 +4,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Net;
 
-// Remote work (ADR-0004): the calls of a target (profile, metrics, alerts, its runs' status and output) and a requester's
+// Remote work (ADR-0005): the calls of a target (profile, metrics, alerts, its runs' status and output) and a requester's
 // calls, which the daemon relays for the MCP tools as raw JSON.
 public sealed partial class ApiClient
 {

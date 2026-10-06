@@ -30,6 +30,20 @@ describe("machines and devices", () => {
     await waitFor(() => expect(calls.some((c) => c.path === "/agents/a1/revoke")).toBe(true));
   });
 
+  it("marks a machine whose agent can be updated, and only an active one", async () => {
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1/agents": { body: [
+        agent({ updateAvailable: true, latestVersion: "0.3.1" }),
+        agent({ id: "a2", hostname: "desk", updateAvailable: false, latestVersion: "0.3.0" }),
+        agent({ id: "a3", hostname: "old", status: "revoked", updateAvailable: true, latestVersion: "0.3.1" }),
+        agent({ id: "a4", hostname: "legacy" }), // an API that predates the field
+      ] },
+    });
+    renderAt("/w/w1/machines", [{ path: "/w/:ws/machines", element: <MachinesPage /> }]);
+    expect(await screen.findAllByText("Update available: 0.3.1")).toHaveLength(1);
+  });
+
   it("shows an empty workspace and a failed load", async () => {
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/agents": { body: [] } });
     renderAt("/w/w1/machines", [{ path: "/w/:ws/machines", element: <MachinesPage /> }]);
@@ -157,8 +171,34 @@ describe("workspace settings and account", () => {
     await userEvent.type(screen.getByLabelText("Keep events for (days)"), "30");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
-    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ maskSecrets: false, retentionDays: 30, eventMaxBytes: 262144 });
+    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ maskSecrets: false, retentionDays: 30, eventMaxBytes: 262144, agentUpdate: "off" });
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ name: "Renamed" });
+  });
+
+  it("lets an admin choose how far agents may update themselves, off by default", async () => {
+    const calls = mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1": { body: { id: "w1", name: "Team", role: "owner", settings: { maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "check" } } },
+      "GET /workspaces/w1/audit": { body: { items: [], next: null } },
+      "PUT /workspaces/w1/settings": { status: 204 },
+    });
+    renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    const select = await screen.findByLabelText("Agent updates");
+    expect(select).toHaveValue("check");
+    await userEvent.selectOptions(select, "on");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "PUT")?.body).toMatchObject({ agentUpdate: "on" });
+  });
+
+  it("shows agent updates as off when the API predates the setting", async () => {
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1": { body: { id: "w1", name: "Team", role: "owner", settings: { maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144 } } },
+      "GET /workspaces/w1/audit": { body: { items: [], next: null } },
+    });
+    renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    expect(await screen.findByLabelText("Agent updates")).toHaveValue("off");
   });
 
   it("creates a workspace", async () => {

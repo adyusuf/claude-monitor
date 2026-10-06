@@ -15,6 +15,11 @@ public sealed record ApiConfig
     public OAuthClient? Google { get; init; }
     public required string ArchiveDir { get; init; }
     public string? WebRoot { get; init; }
+
+    /// <summary>The folder inside the web root that holds the agent builds, SHA256SUMS and the signed manifest.json.</summary>
+    public const string DownloadsFolder = ClaudeMonitor.Contracts.UpdatePaths.DownloadsFolder;
+
+    public string? DownloadsDir => WebRoot is { Length: > 0 } root ? Path.Combine(Path.GetFullPath(root), DownloadsFolder) : null;
     public required string Commit { get; init; }
     public required Version MinimumAgentVersion { get; init; }
 
@@ -49,7 +54,7 @@ public sealed record ApiConfig
     public long MaxBatchBytes { get; init; } = 8 * 1024 * 1024;
     public int PageSizeMax { get; init; } = 100;
 
-    /// <summary>Remote work (ADR-0004): how long a run waits for its owner, and how many may wait per target.</summary>
+    /// <summary>Remote work (ADR-0005): how long a run waits for its owner, and how many may wait per target.</summary>
     public TimeSpan RunPendingLifetime { get; init; } = TimeSpan.FromMinutes(15);
     public int RunPendingMaxPerTarget { get; init; } = 10;
 

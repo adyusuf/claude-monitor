@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Tests;
 
 public sealed class RemoteRunToolsTests : IDisposable
 {
-    private readonly TempHome home = FakeDaemon.QuickHome();
+    private readonly TempHome home = RemoteFakeDaemon.QuickHome();
     private readonly RemoteTools tools;
 
     public RemoteRunToolsTests() => tools = new RemoteTools(home.Config, TimeProvider.System);
@@ -34,7 +34,7 @@ public sealed class RemoteRunToolsTests : IDisposable
     [Fact]
     public async Task A_call_with_both_argv_and_shell_or_with_neither_is_refused_before_anything_is_asked()
     {
-        using var daemon = new FakeDaemon(home).Machines(FakeDaemon.Machine("web01"));
+        using var daemon = new RemoteFakeDaemon(home).Machines(RemoteFakeDaemon.Machine("web01"));
         Assert.Equal("Give either argv or shell, not both.", await tools.Run("web01", "why", argv: ["/bin/true"], shell: "true"));
         Assert.Equal("Give either argv or shell, not both.", await tools.Run("web01", "why"));
         Assert.Equal("Give either argv or shell, not both.", await tools.Run("web01", "why", argv: [], shell: ""));
@@ -44,9 +44,9 @@ public sealed class RemoteRunToolsTests : IDisposable
     [Fact]
     public async Task An_argv_run_asks_the_api_with_the_clamped_timeout_and_reports_the_wait_for_approval()
     {
-        var machine = FakeDaemon.Machine("web01");
+        var machine = RemoteFakeDaemon.Machine("web01");
         var created = new RunCreated(Guid.NewGuid(), RunStatuses.PendingApproval, null, DateTimeOffset.UtcNow.AddMinutes(15));
-        using var daemon = new FakeDaemon(home).Machines(machine).Answer(ClaudeMonitor.Agent.Daemon.RemoteRelay.RunKind, created);
+        using var daemon = new RemoteFakeDaemon(home).Machines(machine).Answer(ClaudeMonitor.Agent.Daemon.RemoteRelay.RunKind, created);
 
         var text = await tools.Run("WEB01", "read the log", argv: ["/usr/bin/tail", "-n", "5", "/var/log/app.log"], cwd: "/srv/app", timeoutSeconds: 99999, sessionId: "s-1");
 
@@ -64,7 +64,7 @@ public sealed class RemoteRunToolsTests : IDisposable
     [Fact]
     public async Task A_shell_run_is_sent_as_shell_mode_with_the_text_and_no_argv_and_a_too_small_timeout_becomes_one_second()
     {
-        using var daemon = new FakeDaemon(home).Machines(FakeDaemon.Machine("web01"))
+        using var daemon = new RemoteFakeDaemon(home).Machines(RemoteFakeDaemon.Machine("web01"))
             .Answer("run", new RunCreated(Guid.NewGuid(), RunStatuses.PendingApproval, null, DateTimeOffset.UtcNow));
         await tools.Run("web01", "why", shell: "df -h", timeoutSeconds: -4);
 
@@ -78,20 +78,20 @@ public sealed class RemoteRunToolsTests : IDisposable
     {
         var grant = Guid.NewGuid();
         var created = new RunCreated(Guid.NewGuid(), RunStatuses.Approved, grant, DateTimeOffset.UtcNow.AddMinutes(15));
-        using (var daemon = new FakeDaemon(home).Machines(FakeDaemon.Machine("web01")).Answer("run", created))
+        using (var daemon = new RemoteFakeDaemon(home).Machines(RemoteFakeDaemon.Machine("web01")).Answer("run", created))
         {
             var text = await tools.Run("web01", "why", argv: ["/bin/true"]);
             Assert.Contains($"Run {created.Id} on web01: approved (covered by grant {grant}).", text, StringComparison.Ordinal);
         }
 
-        using var refusing = new FakeDaemon(home).Machines(FakeDaemon.Machine("web01")).Fail("run", RemoteErrors.TargetCannotRun);
+        using var refusing = new RemoteFakeDaemon(home).Machines(RemoteFakeDaemon.Machine("web01")).Fail("run", RemoteErrors.TargetCannotRun);
         Assert.Equal("Refused: target_cannot_run.", await tools.Run("web01", "why", argv: ["/bin/true"]));
     }
 
     [Fact]
     public async Task A_machine_that_cannot_be_resolved_is_answered_with_the_resolution_error_and_no_run_is_asked()
     {
-        using var daemon = new FakeDaemon(home).Machines(FakeDaemon.Machine("web01"));
+        using var daemon = new RemoteFakeDaemon(home).Machines(RemoteFakeDaemon.Machine("web01"));
         Assert.StartsWith("Not found", await tools.Run("nowhere", "why", argv: ["/bin/true"]), StringComparison.Ordinal);
         Assert.Empty(daemon.OfKind("run"));
     }
@@ -206,7 +206,7 @@ public sealed class RemoteRunToolsTests : IDisposable
     public async Task Cancelling_asks_the_api_for_the_followed_run_and_an_unknown_run_is_refused_locally()
     {
         var id = Follow(RunStatuses.Running, false, "web01");
-        using var daemon = new FakeDaemon(home).Answer("cancel", null);
+        using var daemon = new RemoteFakeDaemon(home).Answer("cancel", null);
 
         Assert.Equal($"Run {id} cancelled.", await tools.Cancel(id));
         Assert.Equal($"api/agent/runs/{id}/cancel", Assert.Single(daemon.OfKind("cancel")).Url);
@@ -218,7 +218,7 @@ public sealed class RemoteRunToolsTests : IDisposable
     public async Task A_cancel_the_api_refuses_shows_its_code()
     {
         var id = Follow(RunStatuses.Running, false, "web01");
-        using var daemon = new FakeDaemon(home).Fail("cancel", RemoteErrors.NotPending);
+        using var daemon = new RemoteFakeDaemon(home).Fail("cancel", RemoteErrors.NotPending);
         Assert.Equal("Refused: not_pending.", await tools.Cancel(id));
     }
 }
