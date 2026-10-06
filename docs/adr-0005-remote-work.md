@@ -93,6 +93,23 @@ A run executes only when **all** hold; each one defaults to "no".
   executable pinned and owned by root or Administrators, its folders not writable by the service account). A grant a
   Claude session asks for is linted by the API for options that execute (`-exec`, `--to-command`, `-o ProxyCommand`
   and similar) and refused if it has one.
+- **Windows trust of the executable** (06/10/2026): the `.exe` and every folder above it up to the drive root must be
+  **owned by an admin principal** (Administrators `S-1-5-32-544`, SYSTEM `S-1-5-18`, TrustedInstaller
+  `S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464`) and carry **no ALLOW rule that applies to the path
+  and grants a write-like right to any other SID**: WriteData/CreateFiles, AppendData/CreateDirectories,
+  WriteAttributes, WriteExtendedAttributes, Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership
+  (Write, Modify and FullControl are made of these), and the unmapped GENERIC_ALL/GENERIC_WRITE. Deny rules neither
+  fail nor excuse anything. An **inherit-only** rule does not apply to the path it sits on (only to children, which
+  have their own ACL read), so Program Files' CREATOR OWNER rule and a drive root's inherit-only Authenticated Users
+  rule pass; CREATOR OWNER in a rule that does apply is refused because it is not an admin principal. For folders
+  **above the executable's own folder** CreateFiles and CreateDirectories are not counted: the default drive root
+  lets every signed-in user create folders, which cannot replace the entry leading to the program, and counting it
+  would refuse every program on a default install; the executable and its own folder (a planted DLL or manifest
+  beside it) use the full list. Anything unreadable is untrusted, and so is a Windows target on a host that cannot
+  read ACLs. The decision is a pure function on SID/mask snapshots (`WindowsAclVerdict`, tested on any OS); only
+  `WindowsAclReader` touches the Windows API and **it has not run on a real Windows host**. Not covered: a change
+  between this check and the exec (the same gap as on Unix), and ACE order (the decision ignores it on purpose:
+  any applicable write allow to a non-admin refuses, whatever denies exist).
 - A grant is scoped to a **grantee user** (optionally one requester agent), expires within 90 days, can be revoked at
   once, and counts its uses. A grant asked for by Claude is only a request until the owner approves it, after
   re-authenticating within 10 minutes.
@@ -210,9 +227,9 @@ exists, so a rollback of that slice is code-only.
   account, a multi-instance API broker.
 - **Target-side checks not in v1** (security review items left open while building): refusing a grant root whose
   folder chain is writable by a non-admin (it would refuse ordinary app-owned log folders), a pinned hash of the
-  executable, an ACL ownership check of the executable on Windows (Unix checks owner and modes), and resource limits
+  executable, and resource limits
   (rlimits) for runs on macOS. A process that leaves its process group with `setsid` survives a kill on macOS; on
   Linux the service's cgroup ends it.
-- **Unverified platforms:** the Linux and Windows paths of the executor, the metrics and the service installer compile
-  and follow the platform contracts but have only run on macOS; they are verified on a Linux and a Windows Server
+- **Unverified platforms:** the Linux and Windows paths of the executor (on Windows including the ACL reader of the executable
+  check), the metrics and the service installer compile and follow the platform contracts but have only run on macOS; they are verified on a Linux and a Windows Server
   machine before a target there is trusted.
