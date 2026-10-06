@@ -1,3 +1,4 @@
+using ClaudeMonitor.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Data;
@@ -46,7 +47,7 @@ internal static class MonitorDbModel
             e.HasIndex(x => x.UserId);
         });
         b.Entity<Workspace>(e =>
-            e.ToTable(t => t.HasCheckConstraint("ck_workspaces_status", In("status", "active", "archived"))));
+            e.ToTable(t => t.HasCheckConstraint("ck_workspaces_status", In("status", WorkspaceStatuses.Active, "archived"))));
         b.Entity<WorkspaceMember>(e =>
         {
             e.HasKey(x => new { x.WorkspaceId, x.UserId });
@@ -67,7 +68,7 @@ internal static class MonitorDbModel
         b.Entity<Machine>(e =>
         {
             e.HasIndex(x => new { x.WorkspaceId, x.MachineKeyHash }).IsUnique();
-            e.ToTable(t => t.HasCheckConstraint("ck_machines_os", In("os", "macos", "windows")));
+            e.ToTable(t => t.HasCheckConstraint("ck_machines_os", In("os", OsKinds.MacOs, OsKinds.Windows, OsKinds.Linux)));
         });
         b.Entity<Agent>(e =>
         {

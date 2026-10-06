@@ -1,4 +1,5 @@
 using System.Reflection;
+using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Config;
 
@@ -109,8 +110,14 @@ public sealed record AgentConfig
         typeof(AgentConfig).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             .Split('+')[0] ?? "0.0.0";
 
-    /// <summary>The OS code the API knows ("macos" / "windows"); anything else is refused at login.</summary>
-    public static string Os => OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "unsupported";
+    /// <summary>The OS code the API knows (<see cref="OsKinds"/>); anything else is refused at login.</summary>
+    public static string Os =>
+        OperatingSystem.IsWindows() ? OsKinds.Windows
+        : OperatingSystem.IsMacOS() ? OsKinds.MacOs
+        : OperatingSystem.IsLinux() ? OsKinds.Linux
+        : Unsupported;
+
+    public const string Unsupported = "unsupported";
 
     public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null)
     {
@@ -140,14 +147,17 @@ public sealed record AgentConfig
     /// Claude desktop app is a packaged (MSIX) app, and every process it starts sees %LOCALAPPDATA% redirected to a private
     /// copy, so a login made in a normal terminal was invisible to its hooks and MCP server.
     /// </summary>
-    public static string DefaultHome() => HomeFor(OperatingSystem.IsWindows(), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    public static string DefaultHome() => HomeFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     /// <summary>The older Windows default (%LOCALAPPDATA%\ClaudeMonitor), kept only to migrate from and to find old installs; null on macOS.</summary>
     public static string? LegacyHome() =>
         OperatingSystem.IsWindows() ? LegacyHomeFor(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)) : null;
 
-    public static string HomeFor(bool windows, string userProfile) =>
-        windows ? Path.Combine(userProfile, ".claude-monitor") : Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor");
+    public static string HomeFor(bool windows, string userProfile) => HomeFor(windows ? OsKinds.Windows : OsKinds.MacOs, userProfile);
+
+    /// <summary>macOS keeps the Library folder; Windows and Linux use a dot folder in the user's profile.</summary>
+    public static string HomeFor(string os, string userProfile) =>
+        os == OsKinds.MacOs ? Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor") : Path.Combine(userProfile, ".claude-monitor");
 
     public static string LegacyHomeFor(string localAppData) => Path.Combine(localAppData, "ClaudeMonitor");
 
