@@ -58,18 +58,21 @@ internal static class ExecPaths
             string? target;
             try
             {
-                target = new FileInfo(next).LinkTarget;
-            }
-            catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
-            {
-                if (!allowMissing)
+                // LinkTarget is null both for a plain entry and for one that does not exist: existence is checked first.
+                var entry = new FileInfo(next);
+                if (!entry.Exists && !Directory.Exists(next) && entry.LinkTarget is null)
                 {
-                    return null;
+                    if (!allowMissing)
+                    {
+                        return null;
+                    }
+
+                    missing = true;
+                    current = next;
+                    continue;
                 }
 
-                missing = true;
-                current = next;
-                continue;
+                target = entry.LinkTarget;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

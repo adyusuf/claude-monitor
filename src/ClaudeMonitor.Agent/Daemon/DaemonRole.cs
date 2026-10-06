@@ -79,9 +79,9 @@ public static class DaemonRole
         {
             code = await new Login(config, both, clock, _ => false).RunAsync(config.ServerOverride, null, stop);
         }
-        catch (OperationCanceledException)
+        catch (Exception e) when (e is OperationCanceledException || stop.IsCancellationRequested)
         {
-            return NotConnected;
+            return NotConnected; // stopped while logging in: whatever the login was doing, the service ends
         }
 
         log.Write(code == 0 ? "service logged in" : "service login did not complete");
