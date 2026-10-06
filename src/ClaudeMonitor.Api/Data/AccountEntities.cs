@@ -24,6 +24,11 @@ public static class TokenPurposes
     public const string MfaPending = "mfa_pending";
 }
 
+public static class WorkspaceStatuses
+{
+    public const string Active = "active";
+}
+
 public static class Roles
 {
     public const string Owner = "owner";
@@ -113,7 +118,7 @@ public sealed class Workspace
     public string NameSearch { get; set; } = "";
     public Guid CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public string Status { get; set; } = "active";
+    public string Status { get; set; } = WorkspaceStatuses.Active;
 }
 
 public sealed class WorkspaceMember

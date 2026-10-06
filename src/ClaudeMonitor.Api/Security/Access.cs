@@ -15,7 +15,7 @@ public static class Access
     {
         var member = await db.WorkspaceMembers.AsNoTracking()
             .Where(m => m.WorkspaceId == workspaceId && m.UserId == userId && m.RemovedAt == null)
-            .Join(db.Workspaces.Where(w => w.Status == "active"), m => m.WorkspaceId, w => w.Id, (m, _) => m)
+            .Join(db.Workspaces.Where(w => w.Status == WorkspaceStatuses.Active), m => m.WorkspaceId, w => w.Id, (m, _) => m)
             .FirstOrDefaultAsync(ct);
         return member is not null && Roles.Rank(member.Role) >= Roles.Rank(minRole) && Roles.Rank(minRole) > 0
             ? member
