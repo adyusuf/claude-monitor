@@ -89,12 +89,18 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
         var workspace = Identity.Peek(config)?.WorkspaceId;
         var s = await api.SettingsAsync(ct);
-        store.Set("settings.mask_secrets", s.MaskSecrets ? "true" : "false");
-        store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
-        store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate));
-        MachineMonitor.Remember(store, s);
-        store.Set(ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false");
-        if (workspace is { } w) WorkspaceSettings.Tag(store, w);
+        // One transaction for the values AND their tag: two passes (this loop's and the stream's re-read) on separate connections
+        // cannot leave one pass's values under the other's tag.
+        List<(string Key, string Value)> entries =
+        [
+            ("settings.mask_secrets", s.MaskSecrets ? "true" : "false"),
+            ("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
+            (UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate)),
+            .. MachineMonitor.Entries(s),
+            (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
+        ];
+        if (workspace is { } w) entries.Add(WorkspaceSettings.TagEntry(w));
+        store.SetMany(entries);
         lastSettingsAt = clock.GetUtcNow();
     }
 
@@ -104,14 +110,26 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     public static readonly TimeSpan SettingsReuse = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// How far a run's decision time (the server's clock) may be from the agent's clock for a cached settings read to still count as
+    /// taken after it: the read is trusted only when it is at least this much later. A server clock ahead of the agent's just costs
+    /// an extra read (it fails toward reading); one behind it by more than this could leave a read taken just before the decision
+    /// looking later, which is why the margin is there. A few seconds is far beyond what synchronised hosts differ by.
+    /// </summary>
+    public static readonly TimeSpan DecisionSkew = TimeSpan.FromSeconds(2);
+
+    /// <summary>
     /// The workspace's remote-runs switch for this run. Unread, another workspace's or off is no; but a switch an admin has
     /// just turned on is only learned at the next settings pass (SettingsEvery), so before refusing, the settings are read
-    /// again once. A failed read is not swallowed: the stream reconnects and the server replays the approved run.
+    /// again once. A read under <see cref="SettingsReuse"/> old is reused only if it was taken after the run was decided: the
+    /// server checks the switch when it approves, so a run approved after the read may have a switch the read does not show.
+    /// A failed read is not swallowed: the stream reconnects and the server replays the approved run.
     /// </summary>
-    private async Task<bool> RemoteRunsOnAsync(CancellationToken ct)
+    private async Task<bool> RemoteRunsOnAsync(RunMessage run, CancellationToken ct)
     {
         if (WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true") return true;
-        if (clock.GetUtcNow() - lastSettingsAt >= SettingsReuse) await SettingsAsync(ct);
+        var now = clock.GetUtcNow();
+        var decidedAfterRead = run.DecidedAt is { } decided && lastSettingsAt < decided + DecisionSkew;
+        if (now - lastSettingsAt >= SettingsReuse || decidedAfterRead) await SettingsAsync(ct);
         return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
     }
 
@@ -158,7 +176,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.Run:
                 var run = data.Deserialize<RunMessage>(ApiClient.Json)!;
-                if (Runs is null || !await RemoteRunsOnAsync(ct))
+                if (Runs is null || !await RemoteRunsOnAsync(run, ct))
                 {
                     if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
                     {

@@ -47,9 +47,12 @@ public sealed record RunOutputPage(IReadOnlyList<RunOutputChunk> Chunks, int Nex
 /// <summary>A grant as the target re-checks it: a fixed-length argv template, its literal working directory and longest timeout.</summary>
 public sealed record GrantTemplate(IReadOnlyList<string> Argv, string Cwd, int MaxTimeoutSeconds);
 
-/// <summary>An approved run sent to its target. NotAfter: the target never starts it later than this.</summary>
+/// <summary>
+/// An approved run sent to its target. NotAfter: the target never starts it later than this. DecidedAt: when the server approved it
+/// (server clock; null from an older API), so a target that refuses a run for an off switch knows whether its last settings read is older.
+/// </summary>
 public sealed record RunMessage(Guid Id, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand, string? Cwd,
-    int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant);
+    int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null);
 
 public sealed record RunCancelMessage(Guid Id);
 

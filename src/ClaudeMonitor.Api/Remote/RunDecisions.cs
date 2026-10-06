@@ -60,6 +60,7 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
             detail: new { hash = req.Hash, mode = run.Mode });
         await db.SaveChangesAsync(ct);
         run.Status = RunStatuses.Approved;
+        run.DecidedAt = now;
         run.ExpiresAt = startBy;
         RunNotices.Changed(broker, run);
         await RunNotices.DeliverAsync(broker, db, run, ct);

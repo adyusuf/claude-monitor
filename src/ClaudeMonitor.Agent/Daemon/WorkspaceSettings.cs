@@ -24,8 +24,12 @@ public static class WorkspaceSettings
     public static void Tag(LocalStore store, Guid workspaceId)
     {
         ArgumentNullException.ThrowIfNull(store);
-        store.Set(WorkspaceKey, workspaceId.ToString("D"));
+        var (key, value) = TagEntry(workspaceId);
+        store.Set(key, value);
     }
+
+    /// <summary>The tag as a key/value pair, for a write that must carry it together with the values it vouches for.</summary>
+    public static (string Key, string Value) TagEntry(Guid workspaceId) => (WorkspaceKey, workspaceId.ToString("D"));
 
     /// <summary>The stored value of a workspace switch, or null when it is unread or belongs to another workspace.</summary>
     public static string? Get(AgentConfig config, LocalStore store, string key)
