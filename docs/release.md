@@ -24,11 +24,14 @@ A second promotion on the same day appends `-2`. A hotfix says so in the tag mes
 `bash scripts/build-agent.sh [out-dir]` (default `out/downloads`) writes one zip per platform plus `SHA256SUMS`, the
 manifest the deploy copies to the web root's `/downloads`:
 
-| File | Platform | Signed |
-|---|---|---|
-| `cm-agent-macos-arm64.zip`, `cm-agent-macos-x64.zip` | macOS | Developer ID, hardened runtime, notarised (when `AGENT_SIGN_IDENTITY` / `AGENT_NOTARY_PROFILE` name them) |
-| `cm-agent-windows-x64.zip`, `cm-agent-windows-arm64.zip` | Windows | **no** |
-| `cm-agent-linux-x64.zip`, `cm-agent-linux-arm64.zip` | Linux (systemd) | **no** |
+| File | Platform | Code-signed | In the update `manifest.json` (ADR-0004) |
+|---|---|---|---|
+| `cm-agent-macos-arm64.zip`, `cm-agent-macos-x64.zip` | macOS | Developer ID, hardened runtime, notarised (when `AGENT_SIGN_IDENTITY` / `AGENT_NOTARY_PROFILE` name them) | yes |
+| `cm-agent-windows-x64.zip`, `cm-agent-windows-arm64.zip` | Windows | **no** | yes |
+| `cm-agent-linux-x64.zip`, `cm-agent-linux-arm64.zip` | Linux (systemd) | **no** | yes |
+
+With `AGENT_UPDATE_CHANNEL` set, `scripts/sign_manifest.py` signs an update entry for every one of these six zips, so
+an interactive agent on any of the three systems can update itself. A service agent cannot (below).
 
 Every zip holds the one single-file `cm-agent` (`cm-agent.exe` on Windows), published uncompressed: never switch
 `EnableCompressionInSingleFile` on (it crashes the daemon on macOS, see the csproj). The published-agent smoke test
@@ -50,6 +53,10 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
 ```
 
 ## Agent releases: notes
+
+- **Linux agents update themselves** (`fix/linux-self-update`, ADR-0004 amendment): `/api/agent/latest` accepts
+  `os=linux` and the Linux zips are signed into `manifest.json`. Deploy the API first: an older API answers a Linux
+  agent's check with 400 (`invalid_os`), which the agent records as `unreachable` and installs nothing.
 
 - **Linux agent and service mode** (`feature/remote-work`, ADR-0005): `cm-agent-linux-x64.zip` and
   `cm-agent-linux-arm64.zip` join the downloads (and the web's "Get the agent" page); `cm-agent install --service`

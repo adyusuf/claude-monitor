@@ -25,7 +25,7 @@ import tempfile
 
 FORMAT = 'cm-agent-update/1'
 CHANNELS = ('test', 'prod')
-ZIP = re.compile(r'^cm-agent-(macos|windows)-(arm64|x64)\.zip$')
+ZIP = re.compile(r'^cm-agent-(macos|windows|linux)-(arm64|x64)\.zip$')
 VERSION = re.compile(r'^\d+\.\d+\.\d+$')
 # The committed public halves (deploy/update-keys/<channel>.pub); tests point this at a temporary folder.
 KEYS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'deploy', 'update-keys')
