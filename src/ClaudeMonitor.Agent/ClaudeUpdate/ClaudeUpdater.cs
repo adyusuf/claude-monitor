@@ -24,12 +24,16 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
     [GeneratedRegex(@"\d+\.\d+\.\d+")]
     private static partial Regex VersionPattern();
 
+    /// <summary>Set when a result could not be saved: no attempt starts in this process before then, as the file cannot say so.</summary>
+    private DateTimeOffset? heldUntil;
+
     public async Task<ClaudeOutcome> RunAsync(CancellationToken ct)
     {
         ResolveInterruptedCountdown();
         if (!ClaudePolicy.Allowed(config, store)) return new(ClaudeCodes.Disabled, "not allowed by this machine and the workspace");
         var state = ClaudeUpdateState.Load(config);
         if (Later(state.NextAt) is { } wait) return new(ClaudeCodes.NotDue, $"next attempt after {wait:O}");
+        if (heldUntil is { } held && held > clock.GetUtcNow()) return new(ClaudeCodes.NotDue, $"next attempt after {held:O} (the last result could not be saved)");
         config.EnsureHome();
         using var guard = DaemonHost.TryLock(config.ClaudeUpdateLockPath);
         if (guard is null) return new(ClaudeCodes.Busy, "an attempt is already running");
@@ -44,14 +48,43 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         if (!Idle(out var why)) return Waiting(state, why);
         if (await CountdownAsync(install, ct) is { } stopped) return stopped;
 
-        var before = Version(install.Path!);
-        var (exit, _) = await Task.Run(() => runner.Run(install.Path!, ["update"], config.ClaudeUpdateTimeout), ct);
-        var after = Version(install.Path!);
-        if (exit != 0) return Record(ClaudeCodes.Failed, $"`claude update` exited with {exit}", before, after, next: config.UpdateRetryAfter);
+        var before = Version(install.Path!, ct);
+        if (ct.IsCancellationRequested) return Record(ClaudeCodes.Interrupted, "the agent stopped before `claude update` started", before, next: config.UpdateRetryAfter);
+        // The daemon's stop (its own, or one a self-update asks for) kills `claude update`: see ADR-0006 rule 7.
+        var run = await Task.Run(() => runner.Run(install.Path!, ["update"], config.ClaudeUpdateTimeout, ct), CancellationToken.None);
+        if (run.End == ProcessEnd.Cancelled)
+        {
+            return Record(ClaudeCodes.Interrupted, $"the agent stopped while `claude update` ran, so it was ended{Killed(run)}; if `claude` no longer starts, run `claude update` by hand",
+                before, next: config.UpdateRetryAfter);
+        }
+
+        var after = Version(install.Path!, ct);
+        if (Failure(run) is { } failure) return Failed(failure, before, after);
         var changed = after is not null && after != before;
         return Record(changed ? ClaudeCodes.Updated : ClaudeCodes.Unchanged,
             changed ? $"Claude Code {before ?? "?"} -> {after}; running sessions keep their version until they are restarted" : $"Claude Code is up to date ({after ?? "version unknown"})",
-            before, after, next: config.ClaudeUpdateEvery);
+            before, after, next: config.ClaudeUpdateEvery, failures: 0);
+    }
+
+    /// <summary>Why the run is a failure, or null when it exited 0. Only how it ended is told, never what it printed.</summary>
+    private string? Failure(ProcessResult run) => run.End switch
+    {
+        ProcessEnd.Exited when run.ExitCode == 0 => null,
+        ProcessEnd.Exited => $"`claude update` exited with {run.ExitCode}",
+        ProcessEnd.TimedOut => $"`claude update` did not end within {config.ClaudeUpdateTimeout.TotalMinutes:0} min and was ended{Killed(run)}",
+        ProcessEnd.NotStarted => $"`claude update` could not be started{(run.Error is { } e ? $" ({e})" : "")}",
+        _ => $"`claude update` ended in a way this agent does not know ({run.End})",
+    };
+
+    private static string Killed(ProcessResult run) => run.Error is { } e ? $" (ending it failed: {e})" : "";
+
+    /// <summary>A failure is retried after the retry delay; after several in a row only after the usual time, so a lasting fault is not tried every hour.</summary>
+    private ClaudeOutcome Failed(string why, string? before, string? after)
+    {
+        var failures = ClaudeUpdateState.Load(config).Failures + 1;
+        var backOff = failures >= config.ClaudeFailuresBeforeBackoff;
+        var detail = backOff ? $"{why}; {failures} failures in a row, so the next attempt waits {config.ClaudeUpdateEvery.TotalHours:0} h" : why;
+        return Record(ClaudeCodes.Failed, detail, before, after, next: backOff ? config.ClaudeUpdateEvery : config.UpdateRetryAfter, failures: failures);
     }
 
     /// <summary>A countdown is only true while an attempt holds the lock; found with none alive (the daemon was stopped) it is cleared, so `status` never promises an update that will not come.</summary>
@@ -60,7 +93,7 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         if (ClaudeUpdateState.Load(config).CountdownUntil is null) return;
         using var attempt = DaemonHost.TryLock(config.ClaudeUpdateLockPath);
         if (attempt is null) return;
-        ClaudeUpdateState.Change(config, s => s with { CountdownUntil = null, Result = "interrupted", Detail = "the countdown ended without an update (the agent was stopped)" });
+        ClaudeUpdateState.Change(config, s => s with { CountdownUntil = null, Result = ClaudeCodes.Interrupted, Detail = "the countdown ended without an update (the agent was stopped)" }, log);
     }
 
     /// <summary>Announces the update and waits; stops early when cancelled, switched off, or a session is no longer idle.</summary>
@@ -68,7 +101,12 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
     {
         TryDelete(config.ClaudeCancelPath);
         var until = clock.GetUtcNow() + config.ClaudeCountdown;
-        ClaudeUpdateState.Change(config, s => s with { CountdownUntil = until.ToString("O", CultureInfo.InvariantCulture), Result = "countdown", Detail = "Claude Code will be updated when the countdown ends" });
+        if (!ClaudeUpdateState.Change(config, s => s with { CountdownUntil = until.ToString("O", CultureInfo.InvariantCulture), Result = ClaudeCodes.Countdown, Detail = "Claude Code will be updated when the countdown ends" }, log))
+        {
+            // `cm-agent claude-update cancel` reads the countdown from the file: one it cannot see must not run
+            return Record(ClaudeCodes.NotSaved, "the countdown could not be saved, so it could not be cancelled: nothing was run", next: config.UpdateRetryAfter);
+        }
+
         var minutes = Math.Ceiling(config.ClaudeCountdown.TotalMinutes);
         var text = $"Claude Code will be updated in {minutes:0} min. Cancel with: cm-agent claude-update cancel";
         log.Write($"claude update: {text} ({install.Detail}, {install.Path})");
@@ -89,9 +127,11 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         }
     }
 
+    /// <summary>Every config folder a session was seen under lately (the daemon's own included) must be all-idle.</summary>
     private bool Idle(out string why)
     {
-        var (idle, reason) = ClaudeSessions.AllIdle(ClaudeSessions.Read(config, alive), clock.GetUtcNow(), config.ClaudeIdleFor);
+        var now = clock.GetUtcNow();
+        var (idle, reason) = ClaudeSessions.AllIdle(ClaudeSessions.ConfigDirs(config, store, now, config.ClaudeUpdateEvery), alive, now, config.ClaudeIdleFor);
         why = reason;
         return idle;
     }
@@ -101,14 +141,15 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
     {
         var detail = $"waiting: {why}";
         if (state.Result != ClaudeCodes.Waiting || state.Detail != detail) log.Write($"claude update {detail}");
-        ClaudeUpdateState.Change(config, s => s with { CheckedAt = Now(), Result = ClaudeCodes.Waiting, Detail = detail, CountdownUntil = null });
+        ClaudeUpdateState.Change(config, s => s with { CheckedAt = Now(), Result = ClaudeCodes.Waiting, Detail = detail, CountdownUntil = null }, log);
         return new(ClaudeCodes.Waiting, detail);
     }
 
-    private ClaudeOutcome Record(string code, string detail, string? before = null, string? after = null, TimeSpan? next = null)
+    /// <summary>Remembers the result; when it cannot be saved, no attempt starts in this process before the usual time (or a longer <paramref name="next"/>).</summary>
+    private ClaudeOutcome Record(string code, string detail, string? before = null, string? after = null, TimeSpan? next = null, int? failures = null)
     {
         var due = next is { } n && n > TimeSpan.Zero ? (clock.GetUtcNow() + n).ToString("O", CultureInfo.InvariantCulture) : null;
-        ClaudeUpdateState.Change(config, s => s with
+        var saved = ClaudeUpdateState.Change(config, s => s with
         {
             CheckedAt = Now(),
             Result = code,
@@ -117,15 +158,22 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
             VersionAfter = after ?? s.VersionAfter,
             NextAt = due,
             CountdownUntil = null,
-        });
+            Failures = failures ?? s.Failures,
+        }, log);
         log.Write($"claude update {code}: {detail}");
+        if (!saved)
+        {
+            heldUntil = clock.GetUtcNow() + (next is { } longer && longer > config.ClaudeUpdateEvery ? longer : config.ClaudeUpdateEvery);
+            log.Write($"claude update: the result could not be saved; no attempt starts before {heldUntil:O} while this agent runs");
+        }
+
         return new(code, detail);
     }
 
-    private string? Version(string claude)
+    private string? Version(string claude, CancellationToken ct)
     {
-        var (exit, output) = runner.Run(claude, ["--version"], VersionTimeout);
-        return exit == 0 && VersionPattern().Match(output) is { Success: true } m ? m.Value : null;
+        var run = runner.Run(claude, ["--version"], VersionTimeout, ct);
+        return run is { End: ProcessEnd.Exited, ExitCode: 0 } && VersionPattern().Match(run.Output) is { Success: true } m ? m.Value : null;
     }
 
     private DateTimeOffset? Later(string? iso) =>

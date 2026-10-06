@@ -28,22 +28,37 @@ parts (update, restart, resume). A spike on the maintainer's Mac (06/10/2026) me
    downloads, replaces or deletes a Claude binary, and it never ends, restarts or resumes a session. Running sessions keep
    the version they started with until their owner restarts them.
 2. **Two consents, default off.** The workspace setting `claudeUpdate` (admin, audited) **and** the machine's own
-   (`cm-agent config claude-update on|off`, `CM_CLAUDE_UPDATE` wins) must both be on. Unread or unknown is off.
+   (`cm-agent config claude-update on|off`, `CM_CLAUDE_UPDATE` wins) must both be on. Unread or unknown is off; `cm-agent login`
+   and `logout` forget the workspace's answer (the next workspace may forbid it) until the daemon's next settings pass.
 3. **Only installs that update themselves.** The `claude` found on the PATH is resolved to where it really lives and
    classified: an npm install (`node_modules/@anthropic-ai/claude-code`, or the Windows `claude.cmd` shim beside it) or a
    native installer install (`~/.local/share/claude`, `~/.claude/local`). The desktop app (`.app`, `WindowsApps`) and a
    package-manager install (`Caskroom`) are **never** touched; anything not positively recognised is left alone.
 4. **Only when every session is idle.** Every live session (a file whose pid is running) must have `status` exactly `idle` for at
    least `ClaudeIdleFor` (10 min). A missing folder, an unreadable or odd file, an unknown status or a missing time means "not
-   idle". No sessions at all counts as idle.
+   idle". No sessions at all counts as idle. A session may run under any `CLAUDE_CONFIG_DIR`: every hook records its session's
+   config folder (or the default) in the local database, and the folders checked are the daemon's own plus every one recorded
+   within `ClaudeUpdateEvery`. Each must be readable and all-idle; a recorded folder that is gone or unreadable counts as not idle.
 5. **A countdown, announced, cancellable.** Before `claude update` runs there is a countdown (`ClaudeCountdown`, 5 min). It is
    announced in agent.log, in `cm-agent status`, and as a desktop notification on macOS (no notifier was built or tested for
    Windows: there the log and `status` carry it). `cm-agent claude-update cancel` stops it and snoozes the attempt for a day.
    During the countdown consent and idleness are checked again every second; a session turning busy or the setting being
    switched off stands the attempt down.
 6. **Rare and logged.** One attempt per `ClaudeUpdateEvery` (24 h; a failed one is retried after the update retry delay, a
-   cancelled one after a day). The versions before and after (`claude --version`), the result and the reason go to agent.log,
-   `claude-update-state.json` and `cm-agent status`.
+   cancelled one after a day; after `ClaudeFailuresBeforeBackoff` (3) failures in a row only after `ClaudeUpdateEvery`, which
+   `cm-agent status` says). The versions before and after (`claude --version`), the result and the reason ("exited with N",
+   "did not end within …", "could not be started"; never the command's output) go to agent.log, `claude-update-state.json` and
+   `cm-agent status`. If that file cannot be written the agent fails closed: a countdown it cannot save (so `cancel` could not
+   see it) is abandoned before anything runs, and a result it cannot save holds further attempts in that daemon for
+   `ClaudeUpdateEvery`.
+7. **The daemon's stop ends `claude update`.** When the daemon stops (its own token, or the stop request of a self-update) while
+   `claude update` runs, the process tree is killed at once, the attempt is recorded as `interrupted` and is not tried again
+   before the update retry delay. The stop must fit the self-update's budget (`UpdateStopWait`, 30 s; a daemon that misses it
+   keeps the old version, and a rollback kills its whole process tree). Leaving `claude update` to finish detached was considered
+   and rejected: it would not be left alone (that rollback kill, a systemd service's `KillMode=control-group`), its output pipes
+   close with the daemon, and nobody would then bound or record it. The runner already killed the tree when
+   `ClaudeUpdateTimeout` ran out, so an install ended half-way was already a possible outcome; the log and `status` say to run
+   `claude update` by hand if `claude` no longer starts.
 
 ## Consequences
 
@@ -51,6 +66,10 @@ parts (update, restart, resume). A spike on the maintainer's Mac (06/10/2026) me
 - Because `claude update` has no dry run, an enabled machine gets the countdown notice once a day even when Claude Code is
   already current.
 - Not verified: the native-installer paths and the Windows shim (no such install on the maintainer's Mac), the Windows
-  session-file location and format, and what `claude update` does on an npm install when run without a terminal.
+  session-file location and format, what `claude update` does on an npm install when run without a terminal, and whether an
+  npm or native install killed half-way (rule 7) still starts.
+- A session is seen under a non-default `CLAUDE_CONFIG_DIR` only once one of its hooks has run, so only where this agent's
+  hooks are installed for that folder; a session under a folder without them stays invisible. A recorded folder that is later
+  deleted holds updates back until it has not been seen for `ClaudeUpdateEvery`.
 - Restart-and-resume was considered and rejected for now (see Context). If it is wanted later it needs CLI-only sessions, a
   terminal to open, and an explicit per-machine switch of its own.

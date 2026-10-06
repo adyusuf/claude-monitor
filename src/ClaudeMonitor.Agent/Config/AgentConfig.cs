@@ -119,6 +119,9 @@ public sealed partial record AgentConfig
 
     public TimeSpan ClaudeUpdateTimeout { get; init; } = TimeSpan.FromMinutes(10);
 
+    /// <summary>After this many failed attempts in a row the next waits <see cref="ClaudeUpdateEvery"/>, not <see cref="UpdateRetryAfter"/>.</summary>
+    public int ClaudeFailuresBeforeBackoff { get; init; } = 3;
+
     public TimeSpan ClaudeCountdownPoll { get; init; } = TimeSpan.FromSeconds(1);
 
     /// <summary>The shortest time between two looks at the server for an update.</summary>

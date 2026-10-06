@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Storage;
 
 namespace ClaudeMonitor.Agent.ClaudeUpdate;
 
@@ -12,15 +13,23 @@ public sealed record SessionsView(bool Readable, IReadOnlyList<ClaudeSession> Li
 /// Which Claude Code sessions run, and whether all are idle: Claude Code writes sessions/&lt;pid&gt;.json (pid, status, the time
 /// the status last changed in epoch milliseconds) for every running session, whichever way it was started. The format is
 /// Claude Code's own and undocumented, so every doubt reads as "not idle": a missing folder, an unreadable file, a status that is
-/// not exactly "idle", a missing time.
+/// not exactly "idle", a missing time. A session may run under any CLAUDE_CONFIG_DIR: its hooks record which (see
+/// <see cref="ConfigDirs"/>), and every such folder must be all-idle.
 /// </summary>
 public static class ClaudeSessions
 {
+    /// <summary>The sessions of the config folder the daemon itself was started with.</summary>
     public static SessionsView Read(AgentConfig config, Func<int, bool>? alive = null)
     {
         ArgumentNullException.ThrowIfNull(config);
+        return Read(config.ClaudeConfigDir, alive);
+    }
+
+    public static SessionsView Read(string configDir, Func<int, bool>? alive = null)
+    {
+        ArgumentNullException.ThrowIfNull(configDir);
         alive ??= ProcessExists;
-        var dir = Path.Combine(config.ClaudeConfigDir, "sessions");
+        var dir = Path.Combine(configDir, "sessions");
         if (!Directory.Exists(dir)) return new(false, [], "the sessions folder of Claude Code is not there, so no session can be seen");
         var live = new List<ClaudeSession>();
         try
@@ -55,6 +64,40 @@ public static class ClaudeSessions
         }
 
         return (true, view.Live.Count == 0 ? "no session is running" : $"{view.Live.Count} session(s), all idle");
+    }
+
+    /// <summary>
+    /// The config folders whose sessions count: the daemon's own, and every one a hook recorded within <paramref name="seenWithin"/>
+    /// (a session under another CLAUDE_CONFIG_DIR is otherwise invisible). Distinct, the daemon's own first.
+    /// </summary>
+    public static IReadOnlyList<string> ConfigDirs(AgentConfig config, LocalStore store, DateTimeOffset now, TimeSpan seenWithin)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(store);
+        var dirs = new List<string> { LocalStore.NormalizeDir(config.ClaudeConfigDir) };
+        foreach (var dir in store.ClaudeConfigDirsSince(now - seenWithin))
+        {
+            if (!dirs.Contains(dir, StringComparer.Ordinal)) dirs.Add(dir);
+        }
+
+        return dirs;
+    }
+
+    /// <summary>True only when every folder is readable and all-idle (as <see cref="AllIdle(SessionsView, DateTimeOffset, TimeSpan)"/>); the first that is not says why.</summary>
+    public static (bool Idle, string Why) AllIdle(IReadOnlyList<string> configDirs, Func<int, bool>? alive, DateTimeOffset now, TimeSpan idleFor)
+    {
+        ArgumentNullException.ThrowIfNull(configDirs);
+        if (configDirs.Count == 0) return (false, "no Claude config folder is known");
+        var live = 0;
+        foreach (var dir in configDirs)
+        {
+            var view = Read(dir, alive);
+            var (idle, why) = AllIdle(view, now, idleFor);
+            if (!idle) return (false, configDirs.Count > 1 ? $"{why} (one of {configDirs.Count} Claude config folders)" : why);
+            live += view.Live.Count;
+        }
+
+        return (true, live == 0 ? "no session is running" : $"{live} session(s), all idle");
     }
 
     private static ClaudeSession? ReadOne(string file)

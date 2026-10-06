@@ -58,5 +58,10 @@ public static class ClaudeUpdateCommand
                 : "?";
             yield return $"last Claude Code update: {result} ({state.Detail}) {at}";
         }
+
+        if (state.Failures >= config.ClaudeFailuresBeforeBackoff)
+        {
+            yield return $"Claude Code update failed {state.Failures} times in a row: it is tried only every {config.ClaudeUpdateEvery.TotalHours:0} h until it works";
+        }
     }
 }
