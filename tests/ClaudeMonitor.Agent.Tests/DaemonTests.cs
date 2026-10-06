@@ -124,7 +124,7 @@ public sealed class DaemonTests
         Assert.Equal(TimeSpan.FromSeconds(30), config.StopWait);
         var defaults = AgentConfig.FromEnvironment(_ => null);
         Assert.Equal(AgentConfig.DefaultHome(), defaults.Home);
-        Assert.EndsWith(OperatingSystem.IsWindows() ? ".claude-monitor" : "ClaudeMonitor", defaults.Home, StringComparison.Ordinal);
+        Assert.EndsWith(OperatingSystem.IsMacOS() ? "ClaudeMonitor" : ".claude-monitor", defaults.Home, StringComparison.Ordinal); // Windows and Linux: ~/.claude-monitor
         Assert.Equal(AgentConfig.LegacyHome(), defaults.MigrateFrom);
         Assert.Null(config.MigrateFrom);
         Assert.Equal(TimeSpan.Zero, defaults.StopWait);
