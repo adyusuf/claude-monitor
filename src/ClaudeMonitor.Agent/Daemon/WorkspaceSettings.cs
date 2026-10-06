@@ -39,4 +39,17 @@ public static class WorkspaceSettings
         var from = store.Get(WorkspaceKey);
         return from is not null && Identity.Peek(config)?.WorkspaceId?.ToString("D") == from ? store.Get(key) : null;
     }
+
+    /// <summary>
+    /// True when the stored tag names a workspace and agent.json now names a different one: the stored switches are another
+    /// workspace's and read as unread. False with no tag (never read) or with no workspace in agent.json (not logged in: a read
+    /// would tag nothing, so it cannot help).
+    /// </summary>
+    public static bool TagIsStale(AgentConfig config, LocalStore store)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(store);
+        var from = store.Get(WorkspaceKey);
+        return from is not null && Identity.Peek(config)?.WorkspaceId?.ToString("D") is { } current && current != from;
+    }
 }
