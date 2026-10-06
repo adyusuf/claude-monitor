@@ -89,12 +89,18 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
         var workspace = Identity.Peek(config)?.WorkspaceId;
         var s = await api.SettingsAsync(ct);
-        store.Set("settings.mask_secrets", s.MaskSecrets ? "true" : "false");
-        store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
-        store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate));
-        MachineMonitor.Remember(store, s);
-        store.Set(ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false");
-        if (workspace is { } w) WorkspaceSettings.Tag(store, w);
+        // One transaction for the values AND their tag: two passes (this loop's and the stream's re-read) on separate connections
+        // cannot leave one pass's values under the other's tag.
+        List<(string Key, string Value)> entries =
+        [
+            ("settings.mask_secrets", s.MaskSecrets ? "true" : "false"),
+            ("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
+            (UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate)),
+            .. MachineMonitor.Entries(s),
+            (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
+        ];
+        if (workspace is { } w) entries.Add(WorkspaceSettings.TagEntry(w));
+        store.SetMany(entries);
         lastSettingsAt = clock.GetUtcNow();
     }
 
