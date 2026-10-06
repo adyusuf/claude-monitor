@@ -53,6 +53,30 @@ public static class RemoteLocks
         }
     }
 
+    /// <summary>
+    /// The workspace's owners and these users (the member about to change, the one acting), one row per statement in user-id
+    /// order, active members only. Returns the ids actually held, so a caller can tell a user who has left. Held until the
+    /// caller's transaction ends. Callers lock several workspaces in workspace-id order, so (workspace, user id) is one total
+    /// order for every transaction that takes member rows and two of them cannot wait on each other.
+    /// </summary>
+    public static async Task<HashSet<Guid>> MembersAsync(MonitorDb db, Guid workspaceId, IEnumerable<Guid> userIds, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(userIds);
+        var owners = await db.WorkspaceMembers.AsNoTracking()
+            .Where(m => m.WorkspaceId == workspaceId && m.RemovedAt == null && m.Role == Roles.Owner)
+            .Select(m => m.UserId).ToListAsync(ct);
+        var held = new HashSet<Guid>();
+        foreach (var memberId in owners.Concat(userIds).Distinct().Order())
+        {
+            var rows = await db.WorkspaceMembers.Where(m => m.WorkspaceId == workspaceId && m.UserId == memberId && m.RemovedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+            if (rows == 1) held.Add(memberId);
+        }
+
+        return held;
+    }
+
     /// <summary>Active agents of these ids, by id.</summary>
     public static async Task AgentsAsync(MonitorDb db, IEnumerable<Guid> agentIds, CancellationToken ct)
     {
