@@ -8,8 +8,10 @@ namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record NameRequest(string? Name);
 public sealed record WorkspaceResponse(Guid Id, string Name, string Role, SettingsResponse Settings);
-public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes, string AgentUpdate = UpdateModes.Off);
-public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes, string? AgentUpdate = null);
+public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes, string AgentUpdate = UpdateModes.Off,
+    bool ClaudeUpdate = false);
+public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes, string? AgentUpdate = null,
+    bool? ClaudeUpdate = null);
 public sealed record MemberResponse(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset JoinedAt);
 public sealed record RoleRequest(string? Role);
 
@@ -47,7 +49,7 @@ public static class WorkspaceEndpoints
         if (member is null) return Http.NotFound();
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate)));
+        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate)));
     }
 
     private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, MonitorDb db)
@@ -70,15 +72,16 @@ public static class WorkspaceEndpoints
         if (req.AgentUpdate is not null && !UpdateModes.IsValid(req.AgentUpdate)) return Http.Invalid("agentUpdate", "invalid_mode");
 
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        var before = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate);
+        var before = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate);
         s.MaskSecrets = req.MaskSecrets ?? s.MaskSecrets;
         s.RetentionDays = req.RetentionDays ?? s.RetentionDays;
         s.EventMaxBytes = req.EventMaxBytes ?? s.EventMaxBytes;
         s.AgentUpdate = req.AgentUpdate ?? s.AgentUpdate;
+        s.ClaudeUpdate = req.ClaudeUpdate ?? s.ClaudeUpdate;
         s.UpdatedAt = clock.GetUtcNow();
         s.UpdatedBy = userId;
         Audit.Add(db, http, clock, AuditActions.SettingsChanged, id, userId,
-            detail: new { before, after = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate) });
+            detail: new { before, after = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate) });
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }

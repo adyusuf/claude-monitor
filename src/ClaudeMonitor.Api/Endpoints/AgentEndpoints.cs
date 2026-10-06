@@ -91,7 +91,7 @@ public static class AgentEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
-        return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate));
+        return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.ClaudeUpdate));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command still waiting for it, then new ones as they come.</summary>

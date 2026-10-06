@@ -148,6 +148,9 @@ public sealed class WorkspaceSettings
 
     /// <summary>The most an agent of this workspace may do about updating itself (<see cref="ClaudeMonitor.Contracts.UpdateModes"/>); off until an admin says otherwise.</summary>
     public string AgentUpdate { get; set; } = ClaudeMonitor.Contracts.UpdateModes.Off;
+
+    /// <summary>Whether agents of this workspace may update Claude Code itself on their machines (when idle, with a countdown; ADR-0005); off until an admin says otherwise.</summary>
+    public bool ClaudeUpdate { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
 }

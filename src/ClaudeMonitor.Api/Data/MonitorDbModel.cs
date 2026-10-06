@@ -64,6 +64,7 @@ internal static class MonitorDbModel
         {
             e.HasKey(x => x.WorkspaceId);
             e.Property(x => x.AgentUpdate).HasDefaultValue(UpdateModes.Off);
+            e.Property(x => x.ClaudeUpdate).HasDefaultValue(false);
             e.ToTable(t =>
             {
                 t.HasCheckConstraint("ck_workspace_settings_retention", "retention_days BETWEEN 1 AND 3650");
