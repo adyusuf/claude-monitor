@@ -29,10 +29,16 @@ public sealed class ManifestFile : IDisposable
 
     public static Dictionary<string, string?> Entry(string version, string os = "macos", string arch = "arm64", string file = MacZip,
         string sha = Sha, string channel = "test", string minSupported = "0.2.0", string signature = "AAAA") => new()
-    {
-        ["channel"] = channel, ["version"] = version, ["os"] = os, ["arch"] = arch, ["file"] = file, ["sha256"] = sha,
-        ["minSupported"] = minSupported, ["signature"] = signature,
-    };
+        {
+            ["channel"] = channel,
+            ["version"] = version,
+            ["os"] = os,
+            ["arch"] = arch,
+            ["file"] = file,
+            ["sha256"] = sha,
+            ["minSupported"] = minSupported,
+            ["signature"] = signature,
+        };
 
     public static string Json(params Dictionary<string, string?>[] entries) =>
         JsonSerializer.Serialize(new { format = UpdateManifest.Format, entries }, TestUser.Json);
