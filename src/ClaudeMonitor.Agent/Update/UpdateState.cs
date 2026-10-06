@@ -25,6 +25,8 @@ public static class UpdateCodes
     public const string Busy = "busy";
     public const string Unreachable = "unreachable";
     public const string Failed = "failed";
+    public const string RollbackStuck = "rollback-stuck";
+    public const string Interrupted = "interrupted";
 }
 
 /// <summary>
@@ -58,8 +60,23 @@ public sealed record UpdateState(string? CheckedAt = null, string? Result = null
     {
         ArgumentNullException.ThrowIfNull(config);
         config.EnsureHome();
-        var temp = config.UpdateStatePath + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(this, Json));
-        File.Move(temp, config.UpdateStatePath, overwrite: true);
+        // Best effort and never a crash: two writers (the daemon's check and the updater) may meet; a unique temp name keeps them apart.
+        var temp = config.UpdateStatePath + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, JsonSerializer.Serialize(this, Json));
+            File.Move(temp, config.UpdateStatePath, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            try
+            {
+                File.Delete(temp);
+            }
+            catch (Exception d) when (d is IOException or UnauthorizedAccessException)
+            {
+                // nothing more to do
+            }
+        }
     }
 }

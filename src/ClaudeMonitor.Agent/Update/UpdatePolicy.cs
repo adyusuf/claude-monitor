@@ -24,6 +24,9 @@ public static class UpdateHealth
 {
     public const string VersionKey = "daemon.version";
 
+    /// <summary>Failures of a heartbeat that say "the network", not "the API said no": nothing against the build that made them.</summary>
+    public static readonly IReadOnlySet<string> NetworkErrors = new HashSet<string> { "HttpRequestException", "TimeoutException", "SocketException", "IOException" };
+
     public static bool IsHealthy(LocalStore store, string version, DateTimeOffset since)
     {
         ArgumentNullException.ThrowIfNull(store);

@@ -28,7 +28,7 @@ public sealed record UpdateResult(string Code, string Message, string? From = nu
 /// version; and on macOS it carries a valid code signature. Then the binary is replaced (keeping the previous one), the daemon
 /// restarted, and if the new daemon is not answered by the API in time the previous binary is put back.
 /// </summary>
-public sealed class Updater(AgentConfig config, ApiClient api, HttpClient downloads, IProcessRunner runner, IDaemonControl daemon,
+public sealed partial class Updater(AgentConfig config, ApiClient api, HttpClient downloads, IProcessRunner runner, IDaemonControl daemon,
     AgentLog log, TimeProvider clock)
 {
     /// <summary>Asks the server for the newest build and decides whether this agent may take it. Changes nothing on disk but update-state.json.</summary>
@@ -49,13 +49,30 @@ public sealed class Updater(AgentConfig config, ApiClient api, HttpClient downlo
         return result;
     }
 
+    /// <summary>Text the server sent that has not been verified (it may hold a line break or a terminal escape): only plain characters, and short.</summary>
+    internal static string Printable(string? text) =>
+        new((text ?? "").Where(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_').Take(32).ToArray());
+
     private async Task<UpdateCheck> EvaluateAsync(CancellationToken ct)
     {
         if (config.UpdatePublicKey.Length == 0) return new(UpdateCodes.NoKey, "this build has no update key built in");
         if (config.UpdateOs == "unsupported") return new(UpdateCodes.Unsupported, "this operating system has no agent builds");
         var offer = await api.LatestAsync(config.UpdateOs, config.UpdateArch, ct);
-        if (offer is null) return new(UpdateCodes.UpToDate, "no update is published for this machine");
-        if (offer.Channel != config.UpdateChannel) return new(UpdateCodes.Channel, $"the offer is for channel \"{offer.Channel}\", this agent is \"{config.UpdateChannel}\"");
+        return offer is null ? new(UpdateCodes.UpToDate, "no update is published for this machine") : Judge(offer);
+    }
+
+    /// <summary>
+    /// Every test an offer must pass before anything is downloaded; <see cref="ApplyAsync"/> runs it again, so an offer that
+    /// did not come through <see cref="CheckAsync"/> can never be installed. Pure: no network, no disk.
+    /// </summary>
+    internal UpdateCheck Judge(UpdateOffer offer)
+    {
+        if (config.UpdatePublicKey.Length == 0) return new(UpdateCodes.NoKey, "this build has no update key built in");
+        if (offer.Channel != config.UpdateChannel)
+        {
+            return new(UpdateCodes.Channel, $"the offer is for channel \"{Printable(offer.Channel)}\", this agent is \"{config.UpdateChannel}\"");
+        }
+
         if (!UpdateRules.TryParse(offer.Version, out _) || !UpdateRules.TryParse(offer.MinSupported, out _)
             || offer.Sha256 is not { Length: 64 } hash || !hash.All(char.IsAsciiHexDigit) || string.IsNullOrEmpty(offer.Signature))
         {
@@ -89,6 +106,11 @@ public sealed class Updater(AgentConfig config, ApiClient api, HttpClient downlo
     {
         ArgumentNullException.ThrowIfNull(offer);
         config.EnsureHome();
+        if (Judge(offer) is { Offer: null } refused)
+        {
+            return Record(new(refused.Code, refused.Message)); // not a verified, newer offer: nothing is downloaded, whoever asked
+        }
+
         using var guard = DaemonHost.TryLock(config.UpdateLockPath);
         if (guard is null) return Record(new(UpdateCodes.Busy, "another update is running"));
         if (!File.Exists(config.BinaryPath)) return Record(new(UpdateCodes.NotInstalled, $"no installed binary at {config.BinaryPath} (run cm-agent install)"));
@@ -96,7 +118,7 @@ public sealed class Updater(AgentConfig config, ApiClient api, HttpClient downlo
         try
         {
             UpdateState.Change(config, s => s with { AttemptedAt = Now(), Phase = null });
-            if (await DownloadAndStageAsync(offer, staged, ct) is { } refused) return Record(refused);
+            if (await DownloadAndStageAsync(offer, staged, ct) is { } rejected) return Record(rejected);
             return await ReplaceAndWatchAsync(offer, staged, ct);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or HttpRequestException or TimeoutException or InvalidDataException)
@@ -108,157 +130,4 @@ public sealed class Updater(AgentConfig config, ApiClient api, HttpClient downlo
             Cleanup(staged);
         }
     }
-
-    /// <summary>Null when the verified binary is staged next to the installed one; otherwise why it was refused.</summary>
-    private async Task<UpdateResult?> DownloadAndStageAsync(UpdateOffer offer, string staged, CancellationToken ct)
-    {
-        if (!Uri.TryCreate(offer.Url, UriKind.Absolute, out var url) || downloads.BaseAddress is not { } server
-            || url.GetLeftPart(UriPartial.Authority) != server.GetLeftPart(UriPartial.Authority)
-            || !url.AbsolutePath.StartsWith("/downloads/", StringComparison.Ordinal))
-        {
-            return new(UpdateCodes.BadUrl, "the download address is not on this agent's own server");
-        }
-
-        Directory.CreateDirectory(config.UpdateDir);
-        var zip = Path.Combine(config.UpdateDir, "download.zip");
-        using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct))
-        {
-            timeout.CancelAfter(config.UpdateDownloadTimeout);
-            using var response = await downloads.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-            if (response.StatusCode != HttpStatusCode.OK) return new(UpdateCodes.Failed, $"the download answered {(int)response.StatusCode}");
-            if (response.RequestMessage?.RequestUri != url) return new(UpdateCodes.BadUrl, "the download was redirected");
-            if (response.Content.Headers.ContentLength > config.UpdateDownloadMax) return new(UpdateCodes.TooLarge, "the download is larger than allowed");
-            using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            long total = 0;
-            await using (var input = await response.Content.ReadAsStreamAsync(timeout.Token))
-            await using (var output = new FileStream(zip, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                var buffer = new byte[81920];
-                int read;
-                while ((read = await input.ReadAsync(buffer, timeout.Token)) > 0)
-                {
-                    total += read;
-                    if (total > config.UpdateDownloadMax) return new(UpdateCodes.TooLarge, "the download is larger than allowed");
-                    sha.AppendData(buffer, 0, read);
-                    await output.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
-                }
-            }
-
-            if (!string.Equals(Convert.ToHexStringLower(sha.GetHashAndReset()), offer.Sha256, StringComparison.OrdinalIgnoreCase))
-            {
-                return new(UpdateCodes.HashMismatch, "the download's SHA-256 is not the signed one");
-            }
-        }
-
-        if (ExtractBinary(zip, staged) is { } bad) return bad;
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(staged, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        if (OperatingSystem.IsMacOS() && runner.Run("codesign", ["--verify", "--strict", staged], TimeSpan.FromSeconds(30)).ExitCode != 0)
-        {
-            return new(UpdateCodes.BadBinary, "the binary carries no valid macOS code signature");
-        }
-
-        var (exit, output2) = runner.Run(staged, ["version"], TimeSpan.FromSeconds(30));
-        return exit == 0 && output2.Trim() == offer.Version
-            ? null
-            : new(UpdateCodes.BadBinary, "the downloaded binary does not run, or is not the version it was signed as");
-    }
-
-    /// <summary>Exactly one entry, with the binary's own name and a plain path; its size is capped while it is copied.</summary>
-    private UpdateResult? ExtractBinary(string zip, string target)
-    {
-        var name = Path.GetFileName(config.BinaryPath);
-        using var archive = ZipFile.OpenRead(zip);
-        if (archive.Entries.Count != 1 || archive.Entries[0].FullName != name)
-        {
-            return new(UpdateCodes.BadArchive, $"the archive must hold exactly one file, {name}");
-        }
-
-        var entry = archive.Entries[0];
-        if (entry.Length > config.UpdateBinaryMax) return new(UpdateCodes.TooLarge, "the binary in the archive is larger than allowed");
-        using var input = entry.Open();
-        using var output = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None);
-        var buffer = new byte[81920];
-        long copied = 0;
-        int read;
-        while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
-        {
-            copied += read;
-            if (copied > config.UpdateBinaryMax) return new(UpdateCodes.TooLarge, "the binary in the archive is larger than allowed");
-            output.Write(buffer, 0, read);
-        }
-
-        return null;
-    }
-
-    private async Task<UpdateResult> ReplaceAndWatchAsync(UpdateOffer offer, string staged, CancellationToken ct)
-    {
-        var from = AgentConfig.Version;
-        var style = BinarySwap.Native;
-        var wasRunning = daemon.IsRunning();
-        var connected = Auth.Identity.Load(config).Connected;
-        var swapped = clock.GetUtcNow();
-        BinarySwap.Install(config.BinaryPath, staged, style);
-        UpdateState.Change(config, s => s with { Phase = UpdateState.PendingHealth, From = from, To = offer.Version, Result = UpdateCodes.Available });
-        log.Write($"update: {from} -> {offer.Version} put in place, restarting the daemon");
-
-        if (!wasRunning && !connected) return Record(Installed(from, offer.Version, "replaced; no daemon to restart"));
-        if (wasRunning && !await daemon.StopAsync(config.UpdateStopWait, ct))
-        {
-            return Record(Installed(from, offer.Version, "replaced; the running daemon did not stop and keeps the old version until it restarts"));
-        }
-
-        daemon.Start(config.BinaryPath);
-        if (await WaitHealthyAsync(offer.Version, swapped, ct)) return Record(Installed(from, offer.Version, "the new daemon is healthy"));
-
-        log.Write($"update: {offer.Version} is not healthy after {config.UpdateHealthWait.TotalSeconds:0} s, rolling back to {from}");
-        await daemon.StopAsync(config.UpdateStopWait, ct);
-        BinarySwap.Restore(config.BinaryPath, style);
-        daemon.Start(config.BinaryPath);
-        UpdateState.Change(config, s => s with { Phase = null, BlockedVersion = offer.Version, To = offer.Version, From = from });
-        return Record(new(UpdateCodes.RolledBack, $"{offer.Version} did not become healthy within {config.UpdateHealthWait.TotalSeconds:0} s; back on {from}", from, offer.Version));
-    }
-
-    private async Task<bool> WaitHealthyAsync(string version, DateTimeOffset since, CancellationToken ct)
-    {
-        using var store = new LocalStore(config.DatabasePath);
-        var until = clock.GetUtcNow() + config.UpdateHealthWait;
-        while (true)
-        {
-            if (UpdateHealth.IsHealthy(store, version, since)) return true;
-            if (clock.GetUtcNow() >= until) return false;
-            await Task.Delay(TimeSpan.FromSeconds(1), clock, ct);
-        }
-    }
-
-    private static UpdateResult Installed(string from, string to, string note) => new(UpdateCodes.Installed, $"{from} -> {to}: {note}", from, to);
-
-    /// <summary>Writes the outcome to update-state.json and agent.log and passes it on.</summary>
-    private UpdateResult Record(UpdateResult result)
-    {
-        UpdateState.Change(config, s => s with
-        {
-            Result = result.Code,
-            Detail = result.Message,
-            Phase = null,
-            Available = result.Succeeded ? null : s.Available,
-            InstalledAt = result.Succeeded ? Now() : s.InstalledAt,
-        });
-        log.Write($"update {result.Code}: {result.Message}");
-        return result;
-    }
-
-    private void Cleanup(string staged)
-    {
-        try
-        {
-            File.Delete(staged);
-            if (Directory.Exists(config.UpdateDir)) Directory.Delete(config.UpdateDir, recursive: true);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // the next update starts with a clean folder anyway
-        }
-    }
-
-    private string Now() => clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
 }

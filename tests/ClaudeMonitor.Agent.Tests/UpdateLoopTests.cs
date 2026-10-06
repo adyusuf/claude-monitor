@@ -1,5 +1,6 @@
 using System.Net;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Daemon;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Agent.Update;
 using ClaudeMonitor.Contracts;
@@ -135,8 +136,11 @@ public sealed class UpdateLoopTests : IDisposable
         Machine(UpdateModes.On);
         Workspace(UpdateModes.On);
         UpdateState.Change(kit.Config, s => s with { Phase = UpdateState.PendingHealth });
+        using var updater = DaemonHost.TryLock(kit.Config.UpdateLockPath); // "in progress" is an updater holding update.lock
+        Assert.NotNull(updater);
         await loop.RunAsync(CancellationToken.None);
         Assert.Equal(0, installs);
+        Assert.Equal(UpdateState.PendingHealth, kit.State.Phase);
     }
 
     [Fact]

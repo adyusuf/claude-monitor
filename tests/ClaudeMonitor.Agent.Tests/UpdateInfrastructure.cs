@@ -13,139 +13,6 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>Records what the updater asked to run and answers from a script; nothing real is ever started.</summary>
-public sealed class FakeRunner : IProcessRunner
-{
-    public ConcurrentQueue<(string File, string[] Args)> Calls { get; } = new();
-
-    /// <summary>What `version` prints and its exit code (the downloaded binary's own report).</summary>
-    public string VersionOutput { get; set; } = "";
-
-    public int VersionExit { get; set; }
-    public int CodesignExit { get; set; }
-
-    public (int ExitCode, string Output) Run(string file, IReadOnlyList<string> args, TimeSpan timeout)
-    {
-        Calls.Enqueue((file, [.. args]));
-        if (file == "codesign") return (CodesignExit, "");
-        return args.Count == 1 && args[0] == "version" ? (VersionExit, VersionOutput) : (-1, "");
-    }
-}
-
-/// <summary>
-/// Stands in for the daemon: records Stop and Start in order and, like a daemon that came up healthy, can write the two
-/// health markers into the LocalStore. An unhealthy one writes nothing.
-/// </summary>
-public sealed class FakeDaemon(AgentConfig config, TimeProvider clock, bool healthy = true, string? version = null) : IDaemonControl
-{
-    private readonly ConcurrentQueue<string> calls = new();
-
-    public bool Running { get; set; } = true;
-    public bool StopResult { get; set; } = true;
-
-    /// <summary>The version a healthy daemon reports (the offered one).</summary>
-    public string? Version { get; set; } = version;
-
-    /// <summary>Runs inside Stop: lets a test make a daemon healthy only late.</summary>
-    public Action<FakeDaemon>? OnStop { get; set; }
-
-    public IReadOnlyList<string> Calls => [.. calls];
-    public int Starts => calls.Count(c => c.StartsWith("start", StringComparison.Ordinal));
-
-    public bool IsRunning() => Running;
-
-    public Task<bool> StopAsync(TimeSpan wait, CancellationToken ct)
-    {
-        calls.Enqueue("stop");
-        OnStop?.Invoke(this);
-        if (StopResult) Running = false;
-        return Task.FromResult(StopResult);
-    }
-
-    public bool Start(string binary)
-    {
-        calls.Enqueue("start:" + binary);
-        Running = true;
-        if (healthy) WriteHealthMarkers();
-        return true;
-    }
-
-    public void WriteHealthMarkers()
-    {
-        using var store = new LocalStore(config.DatabasePath);
-        store.Set(UpdateHealth.VersionKey, Version ?? AgentConfig.Version);
-        store.Set(Relay.LastContactKey, clock.GetUtcNow().ToString("O"));
-    }
-}
-
-/// <summary>
-/// The server as the updater sees it: /downloads/* answers with bytes (or a scripted failure, redirect or endless body), the
-/// rest goes to a <see cref="FakeApi"/>.
-/// </summary>
-public sealed class DownloadHost(FakeApi api) : HttpMessageHandler
-{
-    private readonly HttpMessageInvoker inner = new(api, disposeHandler: false);
-
-    public ConcurrentDictionary<string, byte[]> Files { get; } = new();
-    public ConcurrentQueue<string> Downloads { get; } = new();
-
-    /// <summary>The query string of every call that went to the API (FakeApi records only paths).</summary>
-    public ConcurrentQueue<string> Queries { get; } = new();
-    public HttpStatusCode? DownloadStatus { get; set; }
-
-    /// <summary>When set, the response claims to come from this address (what a followed redirect looks like).</summary>
-    public Uri? RedirectedTo { get; set; }
-
-    /// <summary>When true the body carries no length, so only counting the bytes can stop an oversized download.</summary>
-    public bool UnknownLength { get; set; }
-
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-    {
-        var path = request.RequestUri!.AbsolutePath;
-        if (!path.StartsWith("/downloads/", StringComparison.Ordinal))
-        {
-            Queries.Enqueue(request.RequestUri.Query);
-            return await inner.SendAsync(request, ct);
-        }
-
-        Downloads.Enqueue(path);
-        if (DownloadStatus is { } status) return new HttpResponseMessage(status);
-        if (!Files.TryGetValue(path, out var bytes)) return new HttpResponseMessage(HttpStatusCode.NotFound);
-        var response = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = UnknownLength ? new UnknownLengthContent(bytes) : new ByteArrayContent(bytes),
-        };
-        // A real handler (SocketsHttpHandler) sets the request that produced the response, which after a redirect is the last one.
-        response.RequestMessage = RedirectedTo is { } to ? new HttpRequestMessage(HttpMethod.Get, to) : request;
-        return response;
-    }
-
-    private sealed class UnknownLengthContent(byte[] bytes) : HttpContent
-    {
-        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => stream.WriteAsync(bytes, 0, bytes.Length);
-
-        protected override bool TryComputeLength(out long length)
-        {
-            length = 0;
-            return false;
-        }
-    }
-}
-
-/// <summary>Waits on a condition, never on a fixed sleep.</summary>
-public static class Until
-{
-    public static async Task True(Func<bool> condition, int seconds = 20)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(seconds));
-        while (!condition())
-        {
-            if (timeout.IsCancellationRequested) throw new TimeoutException("the condition did not become true");
-            await Task.Delay(10, CancellationToken.None);
-        }
-    }
-}
-
 /// <summary>
 /// One updating machine in a box: a throw-away home with the installed binary ("OLD"), a signing key whose public half is
 /// built into the agent, a server that publishes signed offers and zips, and fakes for the process runner and the daemon.
@@ -274,6 +141,24 @@ public sealed class UpdateKit : IDisposable
         Api.On("GET /api/agent/latest*", HttpStatusCode.OK, offer);
         if (zip is not null) Host.Files[new Uri(offer.Url).AbsolutePath] = zip;
         return offer;
+    }
+
+    /// <summary>Makes the server serve these bytes at the offer's address (without making it the latest offer).</summary>
+    public void Serve(UpdateOffer offer, byte[] zip) => Host.Files[new Uri(offer.Url).AbsolutePath] = zip;
+
+    /// <summary>Applies the offer and checks the refusal: the code, the recorded state, the disk untouched, the daemon left alone.</summary>
+    public async Task<UpdateResult> ApplyRefusedAsync(UpdateOffer offer, string code)
+    {
+        var result = await Updater.ApplyAsync(offer, CancellationToken.None);
+        Assert.Equal(code, result.Code);
+        Assert.False(result.Succeeded);
+        AssertUntouched();
+        Assert.Equal(code, State.Result);
+        Assert.Null(State.Phase);
+        Assert.Null(State.InstalledAt);
+        Assert.Empty(Daemon.Calls);
+        Assert.True(Daemon.Running, "nobody stopped the daemon");
+        return result;
     }
 
     /// <summary>The usual good case: a signed newer zip, published, the runner reporting its version.</summary>

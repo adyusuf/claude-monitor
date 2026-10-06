@@ -70,6 +70,45 @@ public sealed class UpdateContractTests
         Assert.Equal(["off", "check", "on"], UpdateModes.All);
     }
 
+    // ---- UpdateVersion ----
+
+    [Theory]
+    [InlineData("0.0.0", 0, 0, 0)]
+    [InlineData("1.2.3", 1, 2, 3)]
+    [InlineData("10.20.30", 10, 20, 30)]
+    [InlineData("999999999.0.1", 999999999, 0, 1)]
+    [InlineData("01.2.3", 1, 2, 3)]
+    public void UpdateVersion_accepts_exactly_three_numeric_parts(string text, int major, int minor, int build)
+    {
+        Assert.True(UpdateVersion.TryParse(text, out var version));
+        Assert.Equal(new Version(major, minor, build), version);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("1")]
+    [InlineData("1.2")]
+    [InlineData("1.2.3.4")]
+    [InlineData(" 1.2.3")]
+    [InlineData("1.2.3 ")]
+    [InlineData("1.2.3\n")]
+    [InlineData("1.2.3-beta")]
+    [InlineData("1.2.3+build")]
+    [InlineData("v1.2.3")]
+    [InlineData("1.2.x")]
+    [InlineData("1..3")]
+    [InlineData(".1.2")]
+    [InlineData("-1.2.3")]
+    [InlineData("+1.2.3")]
+    [InlineData("1.2.1234567890")]
+    [InlineData("\u0661.\u0662.\u0663")]
+    public void UpdateVersion_refuses_everything_else_and_never_throws(string? text)
+    {
+        Assert.False(UpdateVersion.TryParse(text, out var version));
+        Assert.Equal(new Version(0, 0, 0), version);
+    }
+
     // ---- Payload ----
 
     [Fact]

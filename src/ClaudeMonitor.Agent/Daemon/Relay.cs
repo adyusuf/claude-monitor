@@ -19,12 +19,18 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     /// <summary>When the API last answered a heartbeat (ISO-8601 UTC): the hooks wait for the web only if it is recent.</summary>
     public const string LastContactKey = "relay.last_contact";
 
+    /// <summary>The exception type name of the last failed heartbeat, empty after an answered one (an update judges a new daemon by it).</summary>
+    public const string HeartbeatErrorKey = "relay.heartbeat_error";
+
     /// <summary>Tells the API this agent is alive; only an answered heartbeat counts as contact.</summary>
     public async Task HeartbeatAsync(CancellationToken ct)
     {
         await api.HeartbeatAsync(ct);
         store.Set(LastContactKey, clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture));
+        store.Set(HeartbeatErrorKey, "");
     }
+
+    public void HeartbeatFailed(string errorType) => store.Set(HeartbeatErrorKey, errorType);
 
     /// <summary>Sends batches until the outbox is empty. Returns the number of events the API acknowledged.</summary>
     public async Task<int> UploadAsync(CancellationToken ct)

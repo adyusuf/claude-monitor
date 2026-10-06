@@ -13,6 +13,9 @@ public interface IDaemonControl
     Task<bool> StopAsync(TimeSpan wait, CancellationToken ct);
 
     bool Start(string binary);
+
+    /// <summary>Ends a daemon that ignores a stop request (a hung one); true when none holds the lock afterwards.</summary>
+    bool Kill();
 }
 
 /// <summary>
@@ -53,6 +56,30 @@ public sealed class DaemonControl(AgentConfig config, AgentLog log, TimeProvider
 
     public bool Start(string binary) => DaemonHost.EnsureRunning(config, log, binary);
 
+    /// <summary>
+    /// Only the process the daemon wrote into daemon.pid, only while the lock is held, and only when it is still a cm-agent
+    /// (a recycled process id must never take an unrelated program with it).
+    /// </summary>
+    public bool Kill()
+    {
+        if (!IsRunning()) return true;
+        try
+        {
+            using var process = Process.GetProcessById(int.Parse(File.ReadAllText(config.PidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture));
+            if (!process.ProcessName.StartsWith("cm-agent", StringComparison.Ordinal)) return false;
+            log.Write($"killing the daemon (pid {process.Id}): it did not stop when asked");
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(config.UpdateStopWait);
+        }
+        catch (Exception e) when (e is IOException or FormatException or ArgumentException or InvalidOperationException
+                                      or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        return !IsRunning();
+    }
+
     /// <summary>Starts "cm-agent update --auto" detached from this process (the daemon is about to be stopped by it).</summary>
     public static bool SpawnAutoUpdate(AgentConfig config, AgentLog log)
     {
@@ -66,8 +93,8 @@ public sealed class DaemonControl(AgentConfig config, AgentLog log, TimeProvider
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
-            info.ArgumentList.Add("update");
-            info.ArgumentList.Add("--auto");
+            info.ArgumentList.Add(UpdateCommand.Verb);
+            info.ArgumentList.Add(UpdateCommand.AutoFlag);
             using var child = Process.Start(info);
             return child is not null;
         }

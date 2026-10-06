@@ -80,12 +80,15 @@ public sealed record AgentConfig
     /// <summary>The public key (base64 SubjectPublicKeyInfo, ECDSA P-256) every update must be signed with; empty in a build without one, which then refuses all updates.</summary>
     public string UpdatePublicKey { get; init; } = BuildMetadata("UpdatePublicKey") ?? "";
 
-    /// <summary>The shortest time between two looks at the server for an update.</summary>
     /// <summary>The OS and CPU the update is asked for and signed for; the host's own, except where a test stands in for a supported one.</summary>
     public string UpdateOs { get; init; } = Os;
 
     public string UpdateArch { get; init; } = Arch;
 
+    /// <summary>How long a downloaded candidate (and macOS's codesign check of it) may take to answer.</summary>
+    public TimeSpan UpdateProbeTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The shortest time between two looks at the server for an update.</summary>
     public TimeSpan UpdateCheckEvery { get; init; } = TimeSpan.FromHours(6);
 
     /// <summary>How often the daemon's update chore wakes to see whether a look is due (and whether the setting changed).</summary>
@@ -94,7 +97,7 @@ public sealed record AgentConfig
     /// <summary>After a failed or rolled-back automatic update the daemon waits this long before it tries again.</summary>
     public TimeSpan UpdateRetryAfter { get; init; } = TimeSpan.FromHours(1);
 
-    /// <summary>The new daemon must answer a heartbeat within this long, or the update is rolled back.</summary>
+    /// <summary>The new daemon has this long to be answered by the API (or to be shown unreachable) before the update is judged.</summary>
     public TimeSpan UpdateHealthWait { get; init; } = TimeSpan.FromSeconds(90);
 
     /// <summary>How long a running daemon gets to stop when an update (or a rollback) asks it to.</summary>
@@ -157,6 +160,7 @@ public sealed record AgentConfig
     public string UpdateDir => Path.Combine(Home, "update");
 
     /// <summary>Written by an update to ask the running daemon to stop; the daemon deletes it and exits.</summary>
+    public string PidPath => Path.Combine(Home, "daemon.pid");
     public string StopRequestPath => Path.Combine(Home, "daemon.stop");
 
     public const string CredentialService = "claude-monitor-agent";

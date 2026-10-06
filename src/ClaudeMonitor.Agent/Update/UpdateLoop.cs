@@ -14,6 +14,7 @@ public sealed class UpdateLoop(AgentConfig config, LocalStore store, Updater upd
 {
     public async Task RunAsync(CancellationToken ct)
     {
+        ResolveInterruptedUpdate();
         var mode = UpdatePolicy.Effective(SavedSettings.Apply(config), store); // the saved setting is read afresh: this daemon may be old
         if (mode == UpdateModes.Off) return;
         if (!Due(UpdateState.Load(config))) return;
@@ -26,6 +27,26 @@ public sealed class UpdateLoop(AgentConfig config, LocalStore store, Updater upd
         {
             // already recorded by CheckAsync; the next round tries again at the normal interval, never in a tight retry loop
         }
+    }
+
+    /// <summary>
+    /// "pending-health" is only true while an updater holds update.lock. Found with no updater alive (it was killed, the machine
+    /// lost power), it would block every automatic update for ever: it is settled here, from what is known.
+    /// </summary>
+    internal void ResolveInterruptedUpdate()
+    {
+        var state = UpdateState.Load(config);
+        if (state.Phase != UpdateState.PendingHealth) return;
+        using var updater = Daemon.DaemonHost.TryLock(config.UpdateLockPath);
+        if (updater is null) return; // an update is in progress
+        var arrived = state.To == AgentConfig.Version;
+        UpdateState.Change(config, s => s with
+        {
+            Phase = null,
+            Result = arrived ? UpdateCodes.Installed : UpdateCodes.Interrupted,
+            Detail = arrived ? $"{s.From} -> {s.To}: the new daemon runs (the updater ended before it could say so)" : $"the update to {s.To} was interrupted; this daemon still runs {AgentConfig.Version}",
+            InstalledAt = arrived ? clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture) : s.InstalledAt,
+        });
     }
 
     private bool Due(UpdateState state) =>

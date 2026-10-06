@@ -30,6 +30,26 @@ public static class UpdateModes
 /// </summary>
 public sealed record UpdateOffer(string Version, string Url, string Sha256, string Signature, string MinSupported, string Channel);
 
+/// <summary>The one meaning of "a version" for updates: x.y.z, numbers only. The server and the agent both use it.</summary>
+public static class UpdateVersion
+{
+    public static bool TryParse(string? text, out Version version)
+    {
+        version = new Version(0, 0, 0);
+        var parts = (text ?? "").Split('.');
+        if (parts.Length != 3 || parts.Any(p => p.Length == 0 || p.Length > 9 || !p.All(char.IsAsciiDigit))) return false;
+        version = new Version(int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture),
+            int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture), int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture));
+        return true;
+    }
+}
+
+/// <summary>The folder (inside the web root, served at /downloads) that holds the agent builds, SHA256SUMS and manifest.json.</summary>
+public static class UpdatePaths
+{
+    public const string DownloadsFolder = "downloads";
+}
+
 /// <summary>The signed statement about one build, and its check.</summary>
 public static class UpdateManifest
 {

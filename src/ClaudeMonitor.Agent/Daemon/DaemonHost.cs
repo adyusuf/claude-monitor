@@ -48,7 +48,12 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
         updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
-        BinarySwap.CleanLeftovers(config.BinaryPath);
+        File.WriteAllText(config.PidPath, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        using (var updating = TryLock(config.UpdateLockPath))
+        {
+            if (updating is not null) BinarySwap.CleanLeftovers(config.BinaryPath); // an update in progress owns its staged file
+        }
+
         var updates = new UpdateLoop(config, updateStore, new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock),
             () => DaemonControl.SpawnAutoUpdate(config, log), clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
@@ -62,7 +67,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await relay.UploadAsync(ct);
                 await relay.ReportCommandsAsync(ct);
             }, api, revoked, error => relay.UploadOutcome(error)),
-            Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked),
+            Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
             Loop("settings", config.SettingsEvery, settings.SettingsAsync, api, revoked),
             StreamAsync(api, stream, revoked));
         if (api.Disconnected)
@@ -85,8 +90,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await work(cts.Token);
                 failures = 0;
             }
-            catch (Exception e) when (!cts.IsCancellationRequested)
+            catch (Exception e)
             {
+                if (cts.IsCancellationRequested) break; // stopping: whatever the request in flight ended with is not a failure
                 // Only the daemon's own token means stopping; a timeout (also an OperationCanceledException) is a failure.
                 failures++;
                 log.Write($"{name} failed ({failures}): {e.GetType().Name} {e.Message}");
@@ -163,8 +169,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
 
                 relay.StreamState(PushStatus.Reconnecting, failures, "StreamClosed"); // the API ended it: reopen
             }
-            catch (Exception e) when (!cts.IsCancellationRequested)
+            catch (Exception e)
             {
+                if (cts.IsCancellationRequested) return; // stopping, as above
                 // A connect timeout is an OperationCanceledException too; it must not end the stream for good.
                 failures++;
                 log.Write($"stream failed ({failures}): {e.GetType().Name} {e.Message}");

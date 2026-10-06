@@ -14,6 +14,11 @@ namespace ClaudeMonitor.Agent.Update;
 /// </summary>
 public static class UpdateCommand
 {
+    public const string Verb = "update";
+
+    /// <summary>What the daemon passes when it starts an install by itself.</summary>
+    public const string AutoFlag = "--auto";
+
     public static async Task<int> UpdateAsync(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr, TimeProvider clock,
         HttpMessageHandler? handler = null, IProcessRunner? runner = null, IDaemonControl? daemon = null)
     {
@@ -21,8 +26,8 @@ public static class UpdateCommand
         ArgumentNullException.ThrowIfNull(stdout);
         ArgumentNullException.ThrowIfNull(stderr);
         var checkOnly = args.Contains("--check");
-        var auto = args.Contains("--auto");
-        var unknown = args.Skip(1).FirstOrDefault(a => a is not ("--check" or "--auto"));
+        var auto = args.Contains(AutoFlag);
+        var unknown = args.Skip(1).FirstOrDefault(a => a != "--check" && a != AutoFlag);
         if (unknown is not null || (checkOnly && auto))
         {
             await stderr.WriteLineAsync("usage: cm-agent update [--check]");

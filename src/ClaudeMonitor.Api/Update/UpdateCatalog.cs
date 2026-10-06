@@ -23,7 +23,7 @@ public sealed class UpdateCatalog(ApiConfig config)
         foreach (var e in Load())
         {
             if (!string.Equals(e.Os, os, StringComparison.Ordinal) || !string.Equals(e.Arch, arch, StringComparison.Ordinal)) continue;
-            if (!Version.TryParse(e.Version, out var v) || (bestVersion is not null && v <= bestVersion)) continue;
+            if (!UpdateVersion.TryParse(e.Version, out var v) || (bestVersion is not null && v <= bestVersion)) continue;
             best = e;
             bestVersion = v;
         }
@@ -58,11 +58,12 @@ public sealed class UpdateCatalog(ApiConfig config)
         }
     }
 
-    /// <summary>Every field is present, the file name is a plain name (it becomes part of a URL) and the hash is hex.</summary>
+    /// <summary>Every field is present, the file name is a plain name (it becomes part of a URL), the hash is hex and the versions are the strict x.y.z the agent also requires (else a lax entry could hide a valid one).</summary>
     private static bool IsUsable(Entry e) =>
         new[] { e.Channel, e.Version, e.Os, e.Arch, e.File, e.Sha256, e.MinSupported, e.Signature }.All(v => !string.IsNullOrEmpty(v))
         && e.File!.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '-' or '_') && !e.File!.StartsWith('.')
-        && e.Sha256!.Length == 64 && e.Sha256.All(char.IsAsciiHexDigit);
+        && e.Sha256!.Length == 64 && e.Sha256.All(char.IsAsciiHexDigit)
+        && UpdateVersion.TryParse(e.Version, out _) && UpdateVersion.TryParse(e.MinSupported, out _);
 
     private sealed record Manifest(string? Format, List<Entry>? Entries);
     private sealed record Entry(string? Channel, string? Version, string? Os, string? Arch, string? File, string? Sha256, string? MinSupported,

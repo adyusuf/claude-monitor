@@ -30,6 +30,7 @@ public static class BinarySwap
         if (style == SwapStyle.Atomic)
         {
             File.Copy(current, previous, overwrite: true);
+            FlushToDisk(previous);
             File.Move(staged, current, overwrite: true);
             return;
         }
@@ -45,6 +46,13 @@ public static class BinarySwap
             File.Move(previous, current); // the old binary goes back; nothing was changed
             throw;
         }
+    }
+
+    /// <summary>Makes a file's bytes durable before a rename depends on it (a power loss must not leave a torn rollback copy).</summary>
+    private static void FlushToDisk(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+        stream.Flush(flushToDisk: true);
     }
 
     /// <summary>Puts the previous version back as the binary; the faulty one is set aside (<c>.bad</c>) so it can be deleted when it no longer runs.</summary>
