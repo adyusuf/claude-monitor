@@ -170,14 +170,11 @@ The agent never updates itself and the API never pushes an upgrade.
 
 1. Download the new zip **and** `SHA256SUMS` from the same address and verify the SHA-256 on the target
    ([release.md](release.md)). A mismatch: stop, do not install, report it.
-2. **Copy the exec policy file aside** (step 4). A reinstall writes the policy again from `--exec` and starts with
-   empty ceiling lists, so a ceiling you edited in is not kept.
-3. Unzip and run the same install command as in step 2 with the **same `--exec`** level. It stops the old service,
-   replaces the binary, rewrites the unit and starts the new one; the login in the service home stays, so no new code
-   is needed.
-4. Put your `allowedExecutables` and `allowedRoots` back into the file, keep its owner and mode, and restart the
-   service. Check the Machines page (the machine is seen again) and the service's status.
-5. Remove: `sudo cm-agent uninstall --service` (an elevated prompt on Windows) stops and deletes the service and
+2. Unzip and run the same install command as in step 2. It stops the old service, replaces the binary, rewrites the
+   unit and starts the new one. The exec policy keeps its `allowedExecutables` and `allowedRoots`, and its level unless
+   you pass `--exec`; the login in the service home stays, so no new code is needed.
+3. Check the Machines page (the machine is seen again) and `cm-agent status` on the target.
+4. Remove: `sudo cm-agent uninstall --service` (an elevated prompt on Windows) stops and deletes the service and
    **keeps** the home (the login), the exec policy and the binary. To retire a machine for good, also revoke its agent
    on the web (the Machines page) and delete the home.
 
