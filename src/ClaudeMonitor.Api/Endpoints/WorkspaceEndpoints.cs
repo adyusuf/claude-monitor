@@ -109,6 +109,11 @@ public static class WorkspaceEndpoints
             m => m.WorkspaceId == id && m.UserId == userId && m.RemovedAt == null, http.RequestAborted);
         if (target is null) return Http.NotFound();
 
+        // The owners and the target are locked, then read again: two owners demoting each other both saw the other as an owner.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockMembersAsync(db, id, userId, http.RequestAborted)) return Http.NotFound();
+        await db.Entry(target).ReloadAsync(http.RequestAborted);
+
         // Only an owner grants or takes away ownership; an admin cannot raise anyone above admin.
         var touchesOwner = req.Role == Roles.Owner || target.Role == Roles.Owner;
         if (touchesOwner && actor.Role != Roles.Owner) return Results.Forbid();
@@ -122,6 +127,7 @@ public static class WorkspaceEndpoints
         Audit.Add(db, http, clock, AuditActions.RoleChanged, id, actor.UserId, targetType: "user", targetId: userId,
             detail: new { before, after = req.Role });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
@@ -133,27 +139,24 @@ public static class WorkspaceEndpoints
         var target = await db.WorkspaceMembers.FirstOrDefaultAsync(
             m => m.WorkspaceId == id && m.UserId == userId && m.RemovedAt == null, http.RequestAborted);
         if (target is null) return Http.NotFound();
-        if (target.Role == Roles.Owner && self != userId && actor.Role != Roles.Owner) return Results.Forbid();
-        if (target.Role == Roles.Owner && await LastOwnerAsync(db, id, http.RequestAborted)) return Http.Invalid("userId", "last_owner");
 
         var now = clock.GetUtcNow();
         // The removal, its agents' revocation and the end of their remote work commit together.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        // The rows are locked first, in the order a run creation takes them (the member, then the agents), so the
+        // The rows are locked first, in the order a run creation takes them (the members, then the agents), so the
         // two cannot wait on each other for what they hold; the member's lock also queues behind a run about to commit.
-        if (await db.WorkspaceMembers.Where(m => m.WorkspaceId == id && m.UserId == userId && m.RemovedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), http.RequestAborted) != 1)
-        {
-            return Http.NotFound();
-        }
+        // The owners are locked with the target and read again, so two owners removing each other cannot both pass the last-owner check.
+        if (!await LockMembersAsync(db, id, userId, http.RequestAborted)) return Http.NotFound();
+        await db.Entry(target).ReloadAsync(http.RequestAborted);
+        if (target.Role == Roles.Owner && self != userId && actor.Role != Roles.Owner) return Results.Forbid();
+        if (target.Role == Roles.Owner && await LastOwnerAsync(db, id, http.RequestAborted)) return Http.Invalid("userId", "last_owner");
 
         target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
         await db.SaveChangesAsync(http.RequestAborted);
         var notices = new List<Action>();
-        foreach (var agentId in agents) await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted, notices);
-        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices);
+        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices, agents);
         await tx.CommitAsync(http.RequestAborted);
         notices.ForEach(n => n());
         foreach (var agentId in agents) broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
@@ -168,11 +171,7 @@ public static class WorkspaceEndpoints
         var active = await db.Agents
             .Where(a => a.WorkspaceId == workspaceId && a.UserId == userId && a.Status == AgentStatuses.Active)
             .Select(a => a.Id).ToListAsync(http.RequestAborted);
-        foreach (var agentId in active.Order())
-        {
-            await db.Agents.Where(a => a.Id == agentId && a.Status == AgentStatuses.Active)
-                .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevel, a => a.ExecLevel), http.RequestAborted);
-        }
+        await RemoteLocks.AgentsAsync(db, active, http.RequestAborted);
 
         var agents = await db.Agents
             .Where(a => a.WorkspaceId == workspaceId && a.UserId == userId && a.Status == AgentStatuses.Active)
@@ -188,6 +187,26 @@ public static class WorkspaceEndpoints
         }
 
         return agents.Select(a => a.Id).ToList();
+    }
+
+    /// <summary>
+    /// Locks the workspace's owners and the member about to change, one row per statement in user-id order (the order a run
+    /// creation takes members in); false when that member is no longer in the workspace. Held until the caller's transaction ends.
+    /// </summary>
+    private static async Task<bool> LockMembersAsync(MonitorDb db, Guid workspaceId, Guid userId, CancellationToken ct)
+    {
+        var owners = await db.WorkspaceMembers.AsNoTracking()
+            .Where(m => m.WorkspaceId == workspaceId && m.RemovedAt == null && m.Role == Roles.Owner)
+            .Select(m => m.UserId).ToListAsync(ct);
+        var targetHeld = false;
+        foreach (var memberId in owners.Append(userId).Distinct().Order())
+        {
+            var held = await db.WorkspaceMembers.Where(m => m.WorkspaceId == workspaceId && m.UserId == memberId && m.RemovedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+            if (memberId == userId) targetHeld = held == 1;
+        }
+
+        return targetHeld;
     }
 
     private static async Task<bool> LastOwnerAsync(MonitorDb db, Guid workspaceId, CancellationToken ct) =>

@@ -185,8 +185,8 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
         }
 
         // One member row per statement, in a fixed order: run creation and member removal (WorkspaceEndpoints.Remove) both
-        // take members (by user id) before agents (by id), so neither waits on the other for a row it holds. The cascades'
-        // multi-row updates of grants and jobs (RemoteCleanup) have no such order; that is not covered here.
+        // take members (by user id) before agents (by id), so neither waits on the other for a row it holds. The cascades
+        // (RemoteCleanup) go on in the same order, jobs, grants, then runs, each by id (RemoteLocks).
         foreach (var memberId in new[] { userId, ownerId }.Distinct().Order())
         {
             var member = await db.WorkspaceMembers

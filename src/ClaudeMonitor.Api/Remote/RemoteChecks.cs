@@ -53,7 +53,7 @@ public static class RemoteChecks
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(broker);
-        var runs = await db.RemoteRuns.AsNoTracking().Where(filter).Where(r => Open.Contains(r.Status)).ToListAsync(ct);
+        var runs = await db.RemoteRuns.AsNoTracking().Where(filter).Where(r => Open.Contains(r.Status)).OrderBy(r => r.Id).ToListAsync(ct);
         foreach (var run in runs)
         {
             var changed = await db.RemoteRuns.Where(r => r.Id == run.Id && r.Status == run.Status)

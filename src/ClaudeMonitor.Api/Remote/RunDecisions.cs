@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
 using ClaudeMonitor.Api.Endpoints;
@@ -114,16 +115,22 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
     /// Cancels every open run of a workspace, or of one agent as requester or target (member removed, agent moved, switch off).
     /// Inside a caller's transaction the stream notices go to <paramref name="after"/>, to be published once it commits.
     /// </summary>
-    public static async Task CancelOpenAsync(MonitorDb db, Broker broker, DateTimeOffset now, Guid? workspaceId, Guid? agentId,
-        Guid? userId, CancellationToken ct, List<Action>? after = null)
+    public static Task CancelOpenAsync(MonitorDb db, Broker broker, DateTimeOffset now, Guid? workspaceId, Guid? agentId,
+        Guid? userId, CancellationToken ct, List<Action>? after = null) =>
+        CancelOpenAsync(db, broker, now, r => (workspaceId == null || r.WorkspaceId == workspaceId)
+                                              && (agentId == null || r.TargetAgentId == agentId || r.RequesterAgentId == agentId)
+                                              && (userId == null || r.TargetUserId == userId || r.RequesterUserId == userId), ct, after);
+
+    /// <summary>
+    /// Cancels every open run the filter selects, one compare-and-set per run in id order (the order the cascades lock rows in,
+    /// <see cref="RemoteLocks"/>). Notices go to <paramref name="after"/> when the caller has a transaction to commit first.
+    /// </summary>
+    public static async Task CancelOpenAsync(MonitorDb db, Broker broker, DateTimeOffset now, Expression<Func<RemoteRun, bool>> filter,
+        CancellationToken ct, List<Action>? after = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(broker);
-        var runs = await db.RemoteRuns.AsNoTracking()
-            .Where(r => Cancellable.Contains(r.Status)
-                        && (workspaceId == null || r.WorkspaceId == workspaceId)
-                        && (agentId == null || r.TargetAgentId == agentId || r.RequesterAgentId == agentId)
-                        && (userId == null || r.TargetUserId == userId || r.RequesterUserId == userId))
+        var runs = await db.RemoteRuns.AsNoTracking().Where(r => Cancellable.Contains(r.Status)).Where(filter).OrderBy(r => r.Id)
             .ToListAsync(ct);
         foreach (var run in runs)
         {
