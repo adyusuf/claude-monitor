@@ -8,7 +8,8 @@ namespace ClaudeMonitor.Api.Remote;
 /// Row locks for transactions that touch sets of remote-work rows (a member removed, an agent revoked or moved, an account
 /// deleted). PostgreSQL gives a multi-row UPDATE no row order, so two of them over overlapping rows can wait on each other
 /// (40P01). The one global order, shared with <see cref="RunCreator"/>: settings, members (by workspace, then user id),
-/// agents (by id), jobs, grants, alerts, runs; within a table by id; one row per statement, using the no-op
+/// agents (by id), jobs, grants, alerts, runs; within a table by id; a run's output rows are changed only after the run's own
+/// row is locked (runs, then output); one row per statement, using the no-op
 /// <c>ExecuteUpdate</c> idiom inside the ambient transaction. Call the methods in that order, before the bulk update.
 /// </summary>
 public static class RemoteLocks
