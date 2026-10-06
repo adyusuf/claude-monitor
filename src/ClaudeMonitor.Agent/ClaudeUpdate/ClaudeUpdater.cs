@@ -60,6 +60,13 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
 
         var after = Version(install.Path!, ct);
         if (Failure(run) is { } failure) return Failed(failure, before, after);
+        if (after is null && ct.IsCancellationRequested)
+        {
+            // the update ran to its end but the version check was cut short: "up to date" would be a guess
+            return Record(ClaudeCodes.Interrupted, "`claude update` ended, but the agent stopped before it read the new version; the next attempt reads it",
+                before, next: config.UpdateRetryAfter);
+        }
+
         var changed = after is not null && after != before;
         return Record(changed ? ClaudeCodes.Updated : ClaudeCodes.Unchanged,
             changed ? $"Claude Code {before ?? "?"} -> {after}; running sessions keep their version until they are restarted" : $"Claude Code is up to date ({after ?? "version unknown"})",
