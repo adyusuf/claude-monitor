@@ -28,14 +28,14 @@ internal sealed unsafe partial class UnixRunProcess
     private void SendToTree(int signal)
     {
         Exception? failure = null;
+        Exception? pollFailure = null;
         try
         {
             _tracker?.Poll();
         }
         catch (Exception e)
         {
-            failure = e;
-            _log?.Invoke($"descendant poll before kill failed ({e.GetType().Name})"); // the message may hold a path: not logged
+            failure = pollFailure = e;
         }
 
         try
@@ -56,6 +56,8 @@ internal sealed unsafe partial class UnixRunProcess
             failure ??= e;
         }
 
+        // Logged last: a logger that throws must not keep the group from being signalled. The message may hold a path: only the type.
+        if (pollFailure is not null) _log?.Invoke($"descendant poll before kill failed ({pollFailure.GetType().Name})");
         if (failure is not null) ExceptionDispatchInfo.Throw(failure);
     }
 
