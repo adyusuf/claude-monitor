@@ -75,7 +75,9 @@ public sealed class UnixKillPollFailureTests
         tracker!.Poll();
         table!.Failure = new InvalidOperationException("table broke");
 
-        Assert.Throws<InvalidOperationException>(run.Kill); // the log's own failure replaces the report, after the signals
+        // The log's own failure replaces the report, after the signals: the message tells it from the table's failure.
+        var thrown = Assert.Throws<InvalidOperationException>(run.Kill);
+        Assert.Equal("the log is broken", thrown.Message);
 
         var exit = await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(Term, exit.Signal); // the group was signalled before the log was written
