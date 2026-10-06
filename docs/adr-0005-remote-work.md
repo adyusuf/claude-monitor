@@ -104,7 +104,11 @@ A run executes only when **all** hold; each one defaults to "no".
   (Write, Modify and FullControl are made of these), and the unmapped GENERIC_ALL/GENERIC_WRITE. Deny rules neither
   fail nor excuse anything. An **inherit-only** rule does not apply to the path it sits on (only to children, which
   have their own ACL read), so Program Files' CREATOR OWNER rule and a drive root's inherit-only Authenticated Users
-  rule pass; CREATOR OWNER in a rule that does apply is refused because it is not an admin principal. For folders
+  rule pass; CREATOR OWNER in a rule that does apply is refused because it is not an admin principal. The one
+  exception to the inherit-only exemption is the **executable's own folder**: its files (a DLL or manifest beside
+  the executable) are not in the chain, so an inherit-only rule that files inherit (ObjectInherit) counts there with
+  the full list, except CREATOR OWNER (it only becomes the creating account's rights); a container-inherit-only
+  rule there, and any inherit-only rule on the executable or above its folder, stay exempt. For folders
   **above the executable's own folder** CreateFiles and CreateDirectories are not counted: the default drive root
   lets every signed-in user create folders, which cannot replace the entry leading to the program, and counting it
   would refuse every program on a default install; the executable and its own folder (a planted DLL or manifest
