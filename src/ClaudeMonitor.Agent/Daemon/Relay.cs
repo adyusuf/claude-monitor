@@ -92,6 +92,18 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         WorkspaceSettings.Tag(store, s.WorkspaceId);
     }
 
+    /// <summary>
+    /// The workspace's remote-runs switch for this run. Unread, another workspace's or off is no; but a switch an admin has
+    /// just turned on is only learned at the next settings pass (SettingsEvery), so before refusing, the settings are read
+    /// again once. A failed read is not swallowed: the stream reconnects and the server replays the approved run.
+    /// </summary>
+    private async Task<bool> RemoteRunsOnAsync(CancellationToken ct)
+    {
+        if (WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true") return true;
+        await SettingsAsync(ct);
+        return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
+    }
+
     /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
     public void StreamState(string state, int failures, string? error)
     {
@@ -135,7 +147,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.Run:
                 var run = data.Deserialize<RunMessage>(ApiClient.Json)!;
-                if (Runs is null || WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) != "true") // unread or another workspace's: no
+                if (Runs is null || !await RemoteRunsOnAsync(ct))
                 {
                     if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
                     {

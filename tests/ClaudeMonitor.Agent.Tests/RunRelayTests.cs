@@ -37,6 +37,10 @@ public sealed class RunRelayTests : IDisposable
         fx.Dispose();
     }
 
+    /// <summary>What the API answers when the relay reads the workspace's settings again before refusing a run.</summary>
+    private void Settings(bool remoteRuns) =>
+        fx.Fake.On("GET /api/agent/settings", HttpStatusCode.OK, new AgentSettings(true, 1000, TestWorkspace.Id(fx.Home.Config), RemoteRuns: remoteRuns));
+
     private void Routes(Guid id, HttpStatusCode output = HttpStatusCode.NoContent)
     {
         fx.Fake.On($"POST /api/agent/runs/{id}/status", RemoteFixture.NoContent);
@@ -168,6 +172,7 @@ public sealed class RunRelayTests : IDisposable
             WorkspaceSettings.Tag(fx.Store, Guid.NewGuid());
         }
 
+        Settings(remoteRuns: false);
         var run = Shell($"echo should-not-run > {Path.Combine(fx.Home.Dir, "ran")}");
         Routes(run.Id);
 
@@ -178,10 +183,38 @@ public sealed class RunRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task A_switch_turned_on_since_the_last_settings_pass_is_read_again_and_the_run_executes()
+    {
+        if (!ExecFixture.Unix) return;
+        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "false"); // read before the admin turned it on
+        Settings(remoteRuns: true);
+        var run = Shell("echo late-switch");
+        Routes(run.Id);
+
+        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
+        Assert.True(await Finished(run.Id));
+        Assert.Equal(RunStatuses.Succeeded, fx.Store.ExecRunOf(run.Id.ToString())!.FinalStatus);
+        Assert.Equal(1, fx.Fake.Count("GET /api/agent/settings"));
+    }
+
+    [Fact]
+    public async Task A_settings_read_that_fails_leaves_the_run_unrecorded_so_the_replay_can_run_it()
+    {
+        if (!ExecFixture.Unix) return;
+        fx.Fake.On("GET /api/agent/settings", HttpStatusCode.BadGateway, "{}");
+        var run = Shell("echo later");
+
+        await Assert.ThrowsAnyAsync<Exception>(() => stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
+        Assert.Null(fx.Store.ExecRunOf(run.Id.ToString()));
+        Assert.Equal(0, Volatile.Read(ref guardCalls));
+    }
+
+    [Fact]
     public async Task With_remote_runs_switched_off_locally_a_run_is_failed_as_disabled_without_executing()
     {
         if (!ExecFixture.Unix) return;
         TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "false");
+        Settings(remoteRuns: false); // read again before refusing: still off
         var run = Shell($"echo should-not-run > {Path.Combine(fx.Home.Dir, "ran")}");
         Routes(run.Id);
 
