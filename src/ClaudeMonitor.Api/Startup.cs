@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Primitives;
 
 namespace ClaudeMonitor.Api;
 
@@ -71,6 +72,18 @@ public static class Startup
             // aside, and the built scripts would be answered with index.html.
             app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
             app.UseStaticFiles(new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
+            // The agent builds and their checksums. An extension-less file (SHA256SUMS) is an "unknown type" to the
+            // default mount, would fall through to the SPA and come back as index.html: the download could not be
+            // verified. Here every file is served as what it is, and a missing one is a 404, never the page.
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new SubFolderProvider(files, "downloads"),
+                RequestPath = DownloadsPath,
+                ServeUnknownFileTypes = true,
+                DefaultContentType = "application/octet-stream",
+                ContentTypeProvider = new DownloadContentTypes(),
+                OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+            });
         }
 
         app.UseRouting();
@@ -96,8 +109,36 @@ public static class Startup
         if (files is not null)
         {
             // The single-page app answers every non-API path; /api/* never falls through to it (global #17).
-            app.MapFallbackToFile("{*path:regex(^(?!api/).*$)}", "index.html",
+            app.MapFallbackToFile("{*path:regex(^(?!api/|downloads/).*$)}", "index.html",
                 new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
+        }
+    }
+
+    public const string DownloadsPath = "/downloads";
+
+    /// <summary>A folder of the web root that may appear after the start (the deploy copies the builds in).</summary>
+    private sealed class SubFolderProvider(IFileProvider root, string folder) : IFileProvider
+    {
+        public IFileInfo GetFileInfo(string subpath) => root.GetFileInfo(Combine(subpath));
+        public IDirectoryContents GetDirectoryContents(string subpath) => root.GetDirectoryContents(Combine(subpath));
+        public IChangeToken Watch(string filter) => root.Watch(Combine(filter));
+        private string Combine(string subpath) => folder + "/" + subpath.TrimStart('/');
+    }
+
+    /// <summary>The standard map, plus the checksum file the build writes without an extension.</summary>
+    private sealed class DownloadContentTypes : Microsoft.AspNetCore.StaticFiles.IContentTypeProvider
+    {
+        private readonly Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider standard = new();
+
+        public bool TryGetContentType(string subpath, out string contentType)
+        {
+            if (string.Equals(Path.GetFileName(subpath), "SHA256SUMS", StringComparison.Ordinal))
+            {
+                contentType = "text/plain; charset=utf-8";
+                return true;
+            }
+
+            return standard.TryGetContentType(subpath, out contentType!);
         }
     }
 
