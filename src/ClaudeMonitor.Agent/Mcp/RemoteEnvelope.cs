@@ -29,6 +29,26 @@ public static class RemoteEnvelope
             .Replace(Open, Open.Replace('<', '‹'), StringComparison.Ordinal)
             .Replace(Close, Close.Replace('<', '‹'), StringComparison.Ordinal);
 
+    public const int LabelMax = 64;
+    public const string UnknownCode = "see_web";
+
+    /// <summary>
+    /// A name another machine chose (host name, user name) for use OUTSIDE the wrapper: letters, digits and . _ - @ only,
+    /// at most 64 characters, so it cannot carry a sentence or an instruction. Anything else becomes "?".
+    /// </summary>
+    public static string Label(string? value)
+    {
+        var kept = new string((value ?? "").Select(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' or '@' ? c : '?').ToArray());
+        kept = kept.Length > LabelMax ? kept[..LabelMax] : kept;
+        return kept.Length == 0 ? "?" : kept;
+    }
+
+    /// <summary>An error reported by another machine or a person, OUTSIDE the wrapper: only an error code passes.</summary>
+    public static string Code(string? value) =>
+        value is { Length: > 0 and <= LabelMax } && value.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '_')
+            ? value
+            : UnknownCode;
+
     /// <summary>A value inside an attribute: no quotes, no angle brackets, no control characters, at most 200 characters.</summary>
     public static string Attr(string value)
     {

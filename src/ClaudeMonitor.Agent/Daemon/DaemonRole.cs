@@ -17,6 +17,7 @@ namespace ClaudeMonitor.Agent.Daemon;
 public static class DaemonRole
 {
     public const int NotConnected = 1;
+    public static readonly TimeSpan LoginRetry = TimeSpan.FromSeconds(30);
 
     public static async Task<int> RunAsync(AgentConfig config, TimeProvider clock, AgentLog log)
     {
@@ -46,24 +47,43 @@ public static class DaemonRole
             return NotConnected;
         }
 
-        if (config.ServiceMode && !Identity.Load(config).Connected && await ServiceLoginAsync(config, clock, log, stop) != 0) return NotConnected;
+        if (config.ServiceMode && !Identity.Load(config).Connected)
+        {
+            if (config.ServerOverride is null)
+            {
+                log.Write("service not connected and CM_SERVER is not set: install again with --server");
+                return NotConnected;
+            }
+
+            // A code nobody approved expires; the service asks for a new one instead of exiting, so no service manager
+            // restarts it in a loop and an admin always finds a current code.
+            while (await ServiceLoginAsync(config, clock, log, stop) != 0)
+            {
+                if (stop.IsCancellationRequested) return NotConnected;
+                await Task.Delay(LoginRetry, clock, stop).ContinueWith(_ => { }, TaskScheduler.Default);
+            }
+        }
+
         return await new DaemonHost(config, clock, log).RunAsync(stop);
     }
 
     /// <summary>The device flow for a service: the code is printed to stderr (the service log) and to login-code.txt.</summary>
     private static async Task<int> ServiceLoginAsync(AgentConfig config, TimeProvider clock, AgentLog log, CancellationToken stop)
     {
-        if (config.ServerOverride is null)
-        {
-            log.Write("service not connected and CM_SERVER is not set: install again with --server");
-            return NotConnected;
-        }
-
         config.EnsureHome();
         var path = Path.Combine(config.Home, ServiceLayout.LoginCodeFile);
         await using var file = new StreamWriter(path, append: false);
         await using var both = new TeeWriter(Console.Error, file);
-        var code = await new Login(config, both, clock, _ => false).RunAsync(config.ServerOverride, null, stop);
+        int code;
+        try
+        {
+            code = await new Login(config, both, clock, _ => false).RunAsync(config.ServerOverride, null, stop);
+        }
+        catch (OperationCanceledException)
+        {
+            return NotConnected;
+        }
+
         log.Write(code == 0 ? "service logged in" : "service login did not complete");
         return code;
     }

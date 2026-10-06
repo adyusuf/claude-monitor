@@ -43,7 +43,7 @@ public sealed class MachineTools(AgentConfig config, TimeProvider clock)
             $"api/agent/machines/{target.AgentId}/metrics?minutes={Math.Clamp(minutes, 1, 1440)}", null, RemoteRequests.ReadWait);
         if (!answer.Ok) return Failure(answer.Error!);
         var samples = answer.Json!.Value.Deserialize<List<MetricSample>>(ApiClient.Json) ?? [];
-        if (samples.Count == 0) return $"No samples from {target.Hostname} in the last {minutes} minutes.";
+        if (samples.Count == 0) return $"No samples from {RemoteEnvelope.Label(target.Hostname)} in the last {minutes} minutes.";
         var b = new StringBuilder();
         foreach (var s in samples) b.AppendLine(CultureInfo.InvariantCulture, $"{s.SampledAt:HH:mm} {Sample(s)}");
         return RemoteEnvelope.Wrap("metrics", target.AgentId.ToString()!, target.Hostname, b.ToString().TrimEnd());
@@ -83,7 +83,7 @@ public sealed class MachineTools(AgentConfig config, TimeProvider clock)
         RemoteAnswer.Pending => "The local agent has not answered yet (is the daemon running and connected? see monitor_status). Try again shortly.",
         Daemon.RemoteRelay.Unavailable => "This Claude Monitor server does not support remote work yet.",
         RemoteErrors.Disabled => "Remote runs are switched off for this workspace (an admin turns them on in the workspace settings).",
-        _ => $"Refused: {error}.",
+        _ => $"Refused: {RemoteEnvelope.Code(error)}.",
     };
 
     private static string Line(MachineView m) => string.Create(CultureInfo.InvariantCulture,

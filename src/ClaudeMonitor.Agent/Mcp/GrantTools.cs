@@ -37,7 +37,7 @@ public sealed class GrantTools(AgentConfig config, TimeProvider clock)
             new GrantRequest(target.AgentId!.Value, template!, cwd!, maxTimeoutSeconds, days, reason), RemoteRequests.ReadWait);
         if (!answer.Ok) return MachineTools.Failure(answer.Error!);
         var grant = answer.Json!.Value.Deserialize<GrantView>(ApiClient.Json)!;
-        return $"Grant {grant.Id} on {target.Hostname}: {grant.Status}. It does nothing until the owner approves it on the web.";
+        return $"Grant {grant.Id} on {RemoteEnvelope.Label(target.Hostname)}: {grant.Status}. It does nothing until the owner approves it on the web.";
     }
 
     [McpServerTool(Name = "monitor_grants", ReadOnly = true)]
@@ -96,7 +96,7 @@ public sealed class GrantTools(AgentConfig config, TimeProvider clock)
             new JobProposal(target.AgentId!.Value, name, argv ?? [], cwd, timeoutSeconds, reason), RemoteRequests.ReadWait);
         if (!answer.Ok) return MachineTools.Failure(answer.Error!);
         var job = answer.Json!.Value.Deserialize<JobView>(ApiClient.Json)!;
-        return $"Job {job.Id} \"{job.Name}\" on {target.Hostname}: {job.Status}. It runs only after the owner approves it on the web.";
+        return $"Job {job.Id} \"{job.Name}\" on {RemoteEnvelope.Label(target.Hostname)}: {job.Status}. It runs only after the owner approves it on the web.";
     }
 
     [McpServerTool(Name = "monitor_job_run", Destructive = true)]

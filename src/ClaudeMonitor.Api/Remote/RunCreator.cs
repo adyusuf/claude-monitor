@@ -74,6 +74,7 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
         };
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        if (await LockAsync(workspaceId, userId, target.a.Id, target.a.UserId, req.Mode, ct) is { } refused) return refused;
         var approvedBy = await ApproveByJobAsync(req, run, now, ct) ?? await ApproveByGrantAsync(run, target.Os, now, ct);
         if (approvedBy is null
             && await db.RemoteRuns.CountAsync(r => r.TargetAgentId == run.TargetAgentId && r.Status == RunStatuses.PendingApproval, ct)
@@ -129,6 +130,13 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
             return null;
         }
 
+        // Locks the job row: a retire that comes later waits, then its sweep finds this run and cancels it.
+        if (await db.MachineJobs.Where(j => j.Id == job.Id && j.Status == JobStatuses.Active)
+                .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, j => j.Status), ct) != 1)
+        {
+            return null;
+        }
+
         run.JobId = job.Id;
         Approve(run, job.OwnerUserId, now);
         return job.OwnerUserId;
@@ -160,6 +168,31 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Re-checks, under row locks held until commit, what the reads above saw: the workspace switch, the target agent
+    /// (active, here, its level) and both memberships. A switch-off, revoke, move or removal running at the same moment
+    /// waits for this run to commit, and its sweep then cancels it.
+    /// </summary>
+    private async Task<RunCreateResult?> LockAsync(Guid workspaceId, Guid userId, Guid targetId, Guid ownerId, string mode, CancellationToken ct)
+    {
+        var levels = mode == RunModes.Shell ? new[] { ExecLevels.Shell } : new[] { ExecLevels.Argv, ExecLevels.Shell };
+        if (await db.WorkspaceSettings.Where(s => s.WorkspaceId == workspaceId && s.RemoteRunsEnabled)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RemoteRunsEnabled, x => x.RemoteRunsEnabled), ct) != 1)
+        {
+            return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.Disabled);
+        }
+
+        var members = await db.WorkspaceMembers
+            .Where(m => m.WorkspaceId == workspaceId && (m.UserId == userId || m.UserId == ownerId) && m.RemovedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+        var agent = await db.Agents
+            .Where(a => a.Id == targetId && a.WorkspaceId == workspaceId && a.Status == AgentStatuses.Active && levels.Contains(a.ExecLevel))
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevel, a => a.ExecLevel), ct);
+        return members == (userId == ownerId ? 1 : 2) && agent == 1
+            ? null
+            : RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.TargetCannotRun);
     }
 
     private void Approve(RemoteRun run, Guid by, DateTimeOffset now)

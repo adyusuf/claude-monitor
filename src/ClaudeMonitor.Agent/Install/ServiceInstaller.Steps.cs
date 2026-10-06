@@ -81,6 +81,7 @@ public sealed partial class ServiceInstaller
         if (run(Sc(), WindowsServiceSetup.Query()) == 0)
         {
             run(Sc(), WindowsServiceSetup.Stop());
+            WaitStopped(); // sc stop returns at once; the binary stays locked and delete is deferred until the process ends
             Step("remove the old service", Sc(), WindowsServiceSetup.Delete());
         }
 
@@ -157,6 +158,21 @@ public sealed partial class ServiceInstaller
         if (!existed) undo.Add(("home created", () => Directory.Delete(l.Home, recursive: false)));
         if (os != OsKinds.Windows) Step("hand the home to the service account", Chown(), [$"{l.Account}:{l.Account}", l.Home]);
     }
+
+    /// <summary>Waits until "sc query" no longer reports the service as running or stopping (at most StopWait).</summary>
+    private void WaitStopped()
+    {
+        for (var i = 0; i < StopWaitSeconds; i++)
+        {
+            var state = (read ?? CaptureTool)(Sc(), WindowsServiceSetup.Query()) ?? "";
+            if (!state.Contains("RUNNING", StringComparison.Ordinal) && !state.Contains("STOP_PENDING", StringComparison.Ordinal)) return;
+            Thread.Sleep(TimeSpan.FromSeconds(1));
+        }
+
+        output.WriteLine($"The old service did not stop within {StopWaitSeconds} s; continuing.");
+    }
+
+    private const int StopWaitSeconds = 30;
 
     private void WritePolicy(ServiceLayout l, string execLevel)
     {

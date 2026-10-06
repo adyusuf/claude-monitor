@@ -28,9 +28,9 @@ public static class Targets
         return found.Count switch
         {
             1 => new Target(found[0].AgentId, found[0].Hostname, found[0].Os, null),
-            0 => new Target(null, "", "", $"Not found: no machine '{RemoteEnvelope.Attr(name)}' in this workspace (see monitor_machines)."),
-            _ => new Target(null, "", "", $"{RemoteErrors.Ambiguous}: '{RemoteEnvelope.Attr(name)}' has several agents; name one by id: "
-                + string.Join(", ", found.Select(m => $"{m.AgentId} (owner {RemoteEnvelope.Attr(m.UserName)}, service={(m.ServiceMode ? "yes" : "no")}, exec={m.ExecLevel})"))),
+            0 => new Target(null, "", "", $"Not found: no machine '{RemoteEnvelope.Label(name)}' in this workspace (see monitor_machines)."),
+            _ => new Target(null, "", "", $"{RemoteErrors.Ambiguous}: '{RemoteEnvelope.Label(name)}' has several agents; name one by id: "
+                + string.Join(", ", found.Select(m => $"{m.AgentId} (owner {RemoteEnvelope.Label(m.UserName)}, service={(m.ServiceMode ? "yes" : "no")}, exec={m.ExecLevel})"))),
         };
     }
 }

@@ -50,14 +50,17 @@ public static class MachineEndpoints
         if (agent.Status == AgentStatuses.Revoked) return Results.NoContent();
 
         var now = clock.GetUtcNow();
+        // The revoke and the end of its remote work (grants, jobs, alerts, open runs) commit together.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         agent.Status = AgentStatuses.Revoked;
         agent.RevokedAt = now;
         agent.RevokedBy = userId;
         await AgentTokens.RevokeAllAsync(db, agent.Id, now, http.RequestAborted);
         Audit.Add(db, http, clock, AuditActions.AgentRevoked, agent.WorkspaceId, userId, targetType: "agent", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
-        broker.Publish(Broker.Agent(id), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
+        broker.Publish(Broker.Agent(id), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         return Results.NoContent();
     }
 
@@ -98,8 +101,11 @@ public static class MachineEndpoints
         agent.MachineId = targetMachine.Id;
         agent.WorkspaceId = target;
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
+        // The move and the end of the agent's remote work in its old workspace commit together.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await db.SaveChangesAsync(http.RequestAborted);
-        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, clock.GetUtcNow(), http.RequestAborted);
+        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 

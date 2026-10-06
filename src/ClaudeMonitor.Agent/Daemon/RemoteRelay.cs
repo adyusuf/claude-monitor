@@ -17,6 +17,7 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
     public const string RunKind = "run";
     public const string Unavailable = "remote_unavailable";
     public const string Offline = "offline";
+    public const string BadAnswer = "bad_answer";
     public static readonly TimeSpan GiveUpAfter = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan ForgetAfter = TimeSpan.FromDays(1);
     private const int OutputPage = 50;
@@ -26,6 +27,7 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
         await SendRequestsAsync(ct);
         await FollowRunsAsync(ct);
         store.ForgetRequests(clock.GetUtcNow() - ForgetAfter);
+        store.ForgetRuns(clock.GetUtcNow() - config.RemoteLocalRetention);
     }
 
     public async Task SendRequestsAsync(CancellationToken ct)
@@ -47,6 +49,11 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
             catch (ApiException e)
             {
                 store.RequestAnswered(r.LocalId, LocalStore.RequestStates.Failed, null, ErrorCode(e), now);
+            }
+            catch (JsonException)
+            {
+                // an answer that is not JSON (a proxy's page) must not block the requests behind it
+                store.RequestAnswered(r.LocalId, LocalStore.RequestStates.Failed, null, BadAnswer, now);
             }
             catch (Exception e) when (e is HttpRequestException or TimeoutException && !ct.IsCancellationRequested)
             {

@@ -63,8 +63,19 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
         {
             foreach (var part in group.Chunk(ChunksPerCall))
             {
-                var sent = await api.RunOutputAsync(Guid.Parse(group.Key),
-                    part.Select(c => new RunOutputChunk(c.Seq, c.Stream, c.Body, c.Gap)).ToList(), ct);
+                bool sent;
+                try
+                {
+                    sent = await api.RunOutputAsync(Guid.Parse(group.Key),
+                        part.Select(c => new RunOutputChunk(c.Seq, c.Stream, c.Body, c.Gap)).ToList(), ct);
+                }
+                catch (ApiException e) when ((int)e.Status is >= 400 and < 500)
+                {
+                    // refused for good (not a retryable failure): drop it so it cannot block later output
+                    log.Write($"run {group.Key} output refused ({(int)e.Status}), dropped");
+                    sent = false;
+                }
+
                 lock (gate)
                 {
                     foreach (var c in part) store.ExecOutputSent(c.RunId, c.Seq); // sent, or the run is gone (404): either way done here
@@ -78,10 +89,20 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
         lock (gate) finished = store.UnreportedExecs().Where(r => !store.HasUnsentOutput(r.RunId)).ToList();
         foreach (var r in finished)
         {
-            await api.RunStatusAsync(Guid.Parse(r.RunId),
-                new RunStatusUpdate(r.FinalStatus ?? RunStatuses.Failed, r.ExitCode, r.Error, r.Truncated, r.ResolvedExe, clock.GetUtcNow()), ct);
+            try
+            {
+                await api.RunStatusAsync(Guid.Parse(r.RunId),
+                    new RunStatusUpdate(r.FinalStatus ?? RunStatuses.Failed, r.ExitCode, r.Error, r.Truncated, r.ResolvedExe, clock.GetUtcNow()), ct);
+            }
+            catch (ApiException e) when ((int)e.Status is >= 400 and < 500)
+            {
+                log.Write($"run {r.RunId} outcome refused ({(int)e.Status}), dropped");
+            }
+
             lock (gate) store.ExecReported(r.RunId);
         }
+
+        lock (gate) store.ForgetRuns(clock.GetUtcNow() - config.RemoteLocalRetention);
     }
 
     private async Task ExecuteAsync(RunMessage run, CancellationTokenSource cts)
@@ -133,6 +154,4 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
     }
 
     internal int Running => running.Count;
-
-    internal AgentConfig Config => config;
 }

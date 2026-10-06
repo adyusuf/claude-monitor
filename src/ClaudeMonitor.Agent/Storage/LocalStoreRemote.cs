@@ -78,6 +78,17 @@ public sealed partial class LocalStore
         return list;
     }
 
+    /// <summary>
+    /// Finished runs older than <paramref name="before"/> leave this machine's database: a followed run with its output, and
+    /// an executed run once reported. What another machine printed is not kept here longer than the API keeps it.
+    /// </summary>
+    public void ForgetRuns(DateTimeOffset before)
+    {
+        Exec("DELETE FROM run_output WHERE run_id IN (SELECT run_id FROM followed_runs WHERE done = 1 AND updated_at < $t)", ("$t", Iso(before)));
+        Exec("DELETE FROM followed_runs WHERE done = 1 AND updated_at < $t", ("$t", Iso(before)));
+        Exec("DELETE FROM exec_runs WHERE state = 'finished' AND reported = 1 AND started_at < $t", ("$t", Iso(before)));
+    }
+
     // ---- runs followed (requester side) ----------------------------------------------------------------------------
 
     public void FollowRun(string runId, string status, DateTimeOffset now) =>

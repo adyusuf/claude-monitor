@@ -20,6 +20,10 @@ internal static unsafe partial class UnixFileInfo
     private const int LinuxX64UidOffset = 28;
     private const int LinuxArm64LinkCountOffset = 20;
     private const int LinuxArm64UidOffset = 24;
+    private const int MacOsModeOffset = 4;
+    private const int LinuxX64ModeOffset = 24;
+    private const int LinuxArm64ModeOffset = 16;
+    private const int PermissionBits = 0x1FF;
 
     public static UnixFileStat? TryGet(string path)
     {
@@ -31,12 +35,15 @@ internal static unsafe partial class UnixFileInfo
         try
         {
             byte* buffer = stackalloc byte[BufferSize];
-            if (Stat(path, buffer) != 0)
+            // macOS x64 exports the 64-bit-inode layout under stat$INODE64; plain stat there is the legacy layout.
+            var mac64 = OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.X64;
+            if ((mac64 ? StatInode64(path, buffer) : Stat(path, buffer)) != 0)
             {
                 return null;
             }
 
-            return Read(buffer);
+            // A layout guard: the permission bits read from the buffer must be the ones .NET reports, else the offsets are wrong.
+            return ModeBits(buffer) is { } mode && mode == ((int)File.GetUnixFileMode(path) & PermissionBits) ? Read(buffer) : null;
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -65,6 +72,22 @@ internal static unsafe partial class UnixFileInfo
         return null;
     }
 
+    private static int? ModeBits(byte* buffer)
+    {
+        var arm64 = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+        if (OperatingSystem.IsMacOS()) return Unsafe.ReadUnaligned<ushort>(buffer + MacOsModeOffset) & PermissionBits;
+        if (OperatingSystem.IsLinux() && arm64) return (int)(Unsafe.ReadUnaligned<uint>(buffer + LinuxArm64ModeOffset) & PermissionBits);
+        if (OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.X64)
+        {
+            return (int)(Unsafe.ReadUnaligned<uint>(buffer + LinuxX64ModeOffset) & PermissionBits);
+        }
+
+        return null;
+    }
+
     [LibraryImport("libc", EntryPoint = "stat", StringMarshalling = StringMarshalling.Utf8)]
     private static partial int Stat(string path, byte* buffer);
+
+    [LibraryImport("libc", EntryPoint = "stat$INODE64", StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int StatInode64(string path, byte* buffer);
 }

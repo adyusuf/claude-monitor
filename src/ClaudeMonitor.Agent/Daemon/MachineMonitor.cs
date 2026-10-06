@@ -35,7 +35,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     {
         if (unsupported) return;
         var policy = Policy();
-        var level = ExecPolicyLoader.RunningAsRoot() ? ExecLevels.Off : policy.Level;
+        var level = ExecPolicyLoader.RunningAsRoot() ? ExecLevels.Off
+            : policy.Level == ExecLevels.Shell && policy.HasCeiling ? ExecLevels.Argv : policy.Level;
         await Guard(() => api.ProfileAsync(new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription,
             Environment.UserName, config.ExecMaxConcurrent), ct));
     }

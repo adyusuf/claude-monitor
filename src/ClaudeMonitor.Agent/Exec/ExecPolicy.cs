@@ -11,7 +11,10 @@ public sealed record ExecPolicy(string Level, IReadOnlyList<string> AllowedExecu
 {
     public static readonly ExecPolicy Off = new(ExecLevels.Off, [], []);
 
-    public bool Allows(string mode) => ExecLevels.Allows(Level, mode);
+    /// <summary>A ceiling (allowed executables or roots) limits what runs; free shell text could not be held to it, so a policy with one never allows shell.</summary>
+    public bool HasCeiling => AllowedExecutables.Count > 0 || AllowedRoots.Count > 0;
+
+    public bool Allows(string mode) => ExecLevels.Allows(Level, mode) && !(HasCeiling && mode == RunModes.Shell);
 }
 
 /// <summary>The target's verdict on one run just before it would start. ResolvedExe is the real path of argv[0].</summary>

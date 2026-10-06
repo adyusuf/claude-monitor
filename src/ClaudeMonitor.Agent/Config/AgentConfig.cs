@@ -125,6 +125,9 @@ public sealed record AgentConfig
 
     public TimeSpan MetricsEvery { get; init; } = TimeSpan.FromSeconds(60);
 
+    /// <summary>Finished runs (and the output read from them) are deleted from the local database after this long.</summary>
+    public TimeSpan RemoteLocalRetention { get; init; } = TimeSpan.FromDays(7);
+
     /// <summary>How often the daemon sends queued remote requests and polls open runs it asked for (fallback to run_update).</summary>
     public TimeSpan RemotePollEvery { get; init; } = TimeSpan.FromSeconds(5);
 

@@ -34,7 +34,10 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
         var settings = await db.WorkspaceSettings.AsNoTracking().FirstAsync(s => s.WorkspaceId == run.WorkspaceId, ct);
         var target = await db.Agents.AsNoTracking().FirstAsync(a => a.Id == run.TargetAgentId, ct);
         if (!settings.RemoteRunsEnabled) return Conflict(RemoteErrors.Disabled);
-        if (target.Status != AgentStatuses.Active || !ExecLevels.Allows(target.ExecLevel, run.Mode)) return Conflict(RemoteErrors.TargetCannotRun);
+        if (target.Status != AgentStatuses.Active || target.WorkspaceId != run.WorkspaceId || !ExecLevels.Allows(target.ExecLevel, run.Mode))
+        {
+            return Conflict(RemoteErrors.TargetCannotRun);
+        }
 
         var now = clock.GetUtcNow();
         if (run.Mode == RunModes.Shell)

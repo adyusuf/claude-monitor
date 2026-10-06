@@ -49,8 +49,8 @@ public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
         if (!answer.Ok) return MachineTools.Failure(answer.Error!);
         var run = answer.Json!.Value.Deserialize<RunCreated>(ApiClient.Json)!;
         return run.Status == RunStatuses.PendingApproval
-            ? $"Run {run.Id} on {target.Hostname} waits for its owner's approval on the web (until {run.ExpiresAt:O}). Call monitor_run_result with runId {run.Id} to follow it."
-            : $"Run {run.Id} on {target.Hostname}: {run.Status}{(run.GrantId is { } g ? $" (covered by grant {g})" : "")}. Call monitor_run_result with runId {run.Id}.";
+            ? $"Run {run.Id} on {RemoteEnvelope.Label(target.Hostname)} waits for its owner's approval on the web (until {run.ExpiresAt:O}). Call monitor_run_result with runId {run.Id} to follow it."
+            : $"Run {run.Id} on {RemoteEnvelope.Label(target.Hostname)}: {run.Status}{(run.GrantId is { } g ? $" (covered by grant {g})" : "")}. Call monitor_run_result with runId {run.Id}.";
     }
 
     [McpServerTool(Name = "monitor_run_result", ReadOnly = true)]
@@ -82,7 +82,7 @@ public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
         var head = view is null
             ? $"Run {id}: {run.Status}."
             : string.Create(CultureInfo.InvariantCulture,
-                $"Run {id} on {RemoteEnvelope.Attr(view.TargetHostname)}: {view.Status}{(view.ExitCode is { } x ? $", exit code {x}" : "")}{(view.Error is { } e ? $", error {RemoteEnvelope.Attr(e)}" : "")}{(view.OutputTruncated ? ", output truncated" : "")}.");
+                $"Run {id} on {RemoteEnvelope.Label(view.TargetHostname)}: {view.Status}{(view.ExitCode is { } x ? $", exit code {x}" : "")}{(view.Error is { } e ? $", error {RemoteEnvelope.Code(e)}" : "")}{(view.OutputTruncated ? ", output truncated" : "")}.");
         if (!run.Done) head += run.Status == RunStatuses.PendingApproval ? " Waiting for the owner's approval." : " Not finished yet.";
         using var s = new LocalStore(config.DatabasePath);
         var text = Text(s.RunOutput(id));

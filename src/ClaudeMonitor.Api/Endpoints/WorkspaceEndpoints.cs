@@ -132,17 +132,16 @@ public static class WorkspaceEndpoints
         if (target.Role == Roles.Owner && await LastOwnerAsync(db, id, http.RequestAborted)) return Http.Invalid("userId", "last_owner");
 
         var now = clock.GetUtcNow();
+        // The removal, its agents' revocation and the end of their remote work commit together.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
         await db.SaveChangesAsync(http.RequestAborted);
-        foreach (var agentId in agents)
-        {
-            broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
-            await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted);
-        }
-
+        foreach (var agentId in agents) await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted);
         await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
+        foreach (var agentId in agents) broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
 
         return Results.NoContent();
     }
