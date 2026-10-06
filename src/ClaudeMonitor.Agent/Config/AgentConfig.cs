@@ -88,6 +88,39 @@ public sealed record AgentConfig
     /// <summary>How long a downloaded candidate (and macOS's codesign check of it) may take to answer.</summary>
     public TimeSpan UpdateProbeTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// Whether this machine lets the agent update Claude Code itself (ADR-0006; off by default). `cm-agent config claude-update on|off`
+    /// saves it, CM_CLAUDE_UPDATE wins when set. The workspace must allow it too; both are needed.
+    /// </summary>
+    public bool ClaudeUpdateEnabled { get; init; }
+
+    /// <summary>True when CM_CLAUDE_UPDATE was set: it then wins over the value `cm-agent config` saved.</summary>
+    public bool ClaudeUpdateFromEnvironment { get; init; }
+
+    /// <summary>Where Claude Code keeps its per-session files (sessions/&lt;pid&gt;.json): CLAUDE_CONFIG_DIR, else ~/.claude.</summary>
+    public string ClaudeConfigDir { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
+
+    /// <summary>The `claude` to update when it must not be searched for (CM_CLAUDE_BINARY; tests); null = the first `claude` on <see cref="PathVariable"/>.</summary>
+    public string? ClaudeBinary { get; init; }
+
+    public string PathVariable { get; init; } = Environment.GetEnvironmentVariable("PATH") ?? "";
+
+    /// <summary>The shortest time between two attempts to update Claude Code (`claude update` has no dry run, so each attempt is a real one).</summary>
+    public TimeSpan ClaudeUpdateEvery { get; init; } = TimeSpan.FromHours(24);
+
+    /// <summary>Every live session must have been idle at least this long.</summary>
+    public TimeSpan ClaudeIdleFor { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The warning before `claude update` runs; `cm-agent claude-update cancel` stops it.</summary>
+    public TimeSpan ClaudeCountdown { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>A cancelled attempt is not made again for this long.</summary>
+    public TimeSpan ClaudeSnooze { get; init; } = TimeSpan.FromHours(24);
+
+    public TimeSpan ClaudeUpdateTimeout { get; init; } = TimeSpan.FromMinutes(10);
+
+    public TimeSpan ClaudeCountdownPoll { get; init; } = TimeSpan.FromSeconds(1);
+
     /// <summary>The shortest time between two looks at the server for an update.</summary>
     public TimeSpan UpdateCheckEvery { get; init; } = TimeSpan.FromHours(6);
 
@@ -202,6 +235,11 @@ public sealed record AgentConfig
 
     /// <summary>Written by an update to ask the running daemon to stop; the daemon deletes it and exits.</summary>
     public string PidPath => Path.Combine(Home, "daemon.pid");
+    public string ClaudeUpdateStatePath => Path.Combine(Home, "claude-update-state.json");
+    public string ClaudeUpdateLockPath => Path.Combine(Home, "claude-update.lock");
+
+    /// <summary>Written by `cm-agent claude-update cancel`; the countdown sees it and stands down.</summary>
+    public string ClaudeCancelPath => Path.Combine(Home, "claude-update.cancel");
     public string StopRequestPath => Path.Combine(Home, "daemon.stop");
 
     public const string CredentialService = "claude-monitor-agent";
@@ -246,6 +284,11 @@ public sealed record AgentConfig
             StopWaitFromEnvironment = read("CM_STOP_WAIT") is { Length: > 0 },
             PushEnabled = read("CM_PUSH") == "on",
             PushFromEnvironment = read("CM_PUSH") is { Length: > 0 },
+            ClaudeUpdateEnabled = read("CM_CLAUDE_UPDATE") == "on",
+            ClaudeUpdateFromEnvironment = read("CM_CLAUDE_UPDATE") is { Length: > 0 },
+            ClaudeConfigDir = read("CLAUDE_CONFIG_DIR") is { Length: > 0 } claudeDir ? claudeDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude"),
+            ClaudeBinary = read("CM_CLAUDE_BINARY") is { Length: > 0 } claudeBinary ? claudeBinary : null,
+            PathVariable = read("PATH") ?? "",
             AutoUpdate = UpdateModes.Normalize(read("CM_AUTO_UPDATE")),
             UpdateHealthWait = Seconds(read("CM_UPDATE_HEALTH_WAIT"), TimeSpan.FromSeconds(90), 600),
             AutoUpdateFromEnvironment = read("CM_AUTO_UPDATE") is { Length: > 0 },

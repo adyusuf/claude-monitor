@@ -166,12 +166,12 @@ describe("workspace settings and account", () => {
     expect(await screen.findByText("workspace.created")).toBeInTheDocument();
     await userEvent.clear(screen.getByLabelText("Name"));
     await userEvent.type(screen.getByLabelText("Name"), "Renamed");
-    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Mask secrets before upload/ }));
     await userEvent.clear(screen.getByLabelText("Keep events for (days)"));
     await userEvent.type(screen.getByLabelText("Keep events for (days)"), "30");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
-    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ maskSecrets: false, retentionDays: 30, eventMaxBytes: 262144, agentUpdate: "off" });
+    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ maskSecrets: false, retentionDays: 30, eventMaxBytes: 262144, agentUpdate: "off", claudeUpdate: false });
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ name: "Renamed" });
   });
 
@@ -189,6 +189,22 @@ describe("workspace settings and account", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(calls.find((c) => c.method === "PUT")?.body).toMatchObject({ agentUpdate: "on" });
+  });
+
+  it("lets an admin allow Claude Code updates, off by default", async () => {
+    const calls = mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1": { body: { id: "w1", name: "Team", role: "owner", settings: { maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off" } } },
+      "GET /workspaces/w1/audit": { body: { items: [], next: null } },
+      "PUT /workspaces/w1/settings": { status: 204 },
+    });
+    renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    const box = await screen.findByLabelText(/Allow agents to update Claude Code/);
+    expect(box).not.toBeChecked(); // an API that predates the field reads as off
+    await userEvent.click(box);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "PUT")?.body).toMatchObject({ claudeUpdate: true });
   });
 
   it("shows agent updates as off when the API predates the setting", async () => {

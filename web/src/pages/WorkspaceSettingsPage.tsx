@@ -16,15 +16,15 @@ export function WorkspaceSettingsPage() {
   const errorText = useErrorText();
   const { refresh } = useSession();
   const [info, setInfo] = useState<WorkspaceInfo | null>(null);
-  const [form, setForm] = useState<{ name: string; maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode }>(
-    { name: "", maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off" });
+  const [form, setForm] = useState<{ name: string; maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate: boolean }>(
+    { name: "", maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off", claudeUpdate: false });
   const [audit, setAudit] = useState<AuditRow[]>([]);
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
   useEffect(() => {
     api.workspace(ws).then((w) => {
       setInfo(w);
-      setForm({ name: w.name, ...w.settings, agentUpdate: w.settings.agentUpdate ?? "off" });
+      setForm({ name: w.name, ...w.settings, agentUpdate: w.settings.agentUpdate ?? "off", claudeUpdate: w.settings.claudeUpdate ?? false });
     }).catch((e) => setNotice({ kind: "error", text: errorText(e) }));
     api.audit(ws).then((p) => setAudit(p.items)).catch(() => setAudit([]));
     // errorText changes identity every render; the workspace id is what matters
@@ -34,7 +34,7 @@ export function WorkspaceSettingsPage() {
   const save = async () => {
     try {
       if (form.name !== info?.name) await api.renameWorkspace(ws, form.name);
-      await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes, agentUpdate: form.agentUpdate });
+      await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes, agentUpdate: form.agentUpdate, claudeUpdate: form.claudeUpdate });
       await refresh();
       setNotice({ kind: "success", text: t("workspace.saved") });
     } catch (e) {
@@ -68,6 +68,10 @@ export function WorkspaceSettingsPage() {
             </select>
             <span id="agent-update-note" className="field-hint">{t("workspace.agentUpdateHint")}</span>
           </div>
+          <label className="check">
+            <input type="checkbox" checked={form.claudeUpdate} onChange={(e) => setForm({ ...form, claudeUpdate: e.target.checked })} />
+            <span>{t("workspace.claudeUpdate")}<span className="field-hint">{t("workspace.claudeUpdateHint")}</span></span>
+          </label>
           <div><Button onClick={() => void save()}>{t("workspace.save")}</Button></div>
         </div>
       </Card>

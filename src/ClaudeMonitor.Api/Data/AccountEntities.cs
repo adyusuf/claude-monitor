@@ -158,6 +158,9 @@ public sealed class WorkspaceSettings
     public int AlertDiskPct { get; set; } = 90;
     public int AlertSustainSeconds { get; set; } = 300;
     public bool RemoteRunsEnabled { get; set; }
+
+    /// <summary>Whether agents of this workspace may update Claude Code itself on their machines (when idle, with a countdown; ADR-0006); off until an admin says otherwise.</summary>
+    public bool ClaudeUpdate { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
 }

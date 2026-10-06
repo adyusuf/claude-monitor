@@ -76,9 +76,9 @@ public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, 
 /// <summary>The agent's report on a command. At is when the hook handed it to the session (an older agent sends none).</summary>
 public sealed record CommandStatusUpdate(string Status, string? Result, DateTimeOffset? At = null);
 
-/// <summary>What the agent must know of its workspace's settings before it captures anything. AgentUpdate is the most the workspace lets an agent do about updating itself.</summary>
+/// <summary>What the agent must know of its workspace's settings before it captures anything. AgentUpdate is the most the workspace lets an agent do about updating itself; ClaudeUpdate whether it may update Claude Code on the machine (ADR-0006).</summary>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, string AgentUpdate = UpdateModes.Off,
-    bool RemoteRuns = false, AlertThresholds? Alerts = null);
+    bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false);
 
 public static class AgentStreamEvents
 {

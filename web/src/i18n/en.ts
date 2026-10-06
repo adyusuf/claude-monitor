@@ -129,6 +129,8 @@ export const en = {
     agentUpdateOff: "Off: agents never look for updates by themselves",
     agentUpdateCheck: "Look only: agents find out that an update exists",
     agentUpdateOn: "Allowed: agents may install signed updates by themselves",
+    claudeUpdate: "Allow agents to update Claude Code",
+    claudeUpdateHint: "Only when every Claude session on the machine is idle, after a countdown the person can cancel, and only with Claude Code's own update command. Each machine must also turn it on (cm-agent config claude-update on). Running sessions are never restarted.",
     agentUpdateHint: "The most an agent may do on its own. Each machine must also turn it on (cm-agent config auto-update); the lower of the two applies. Updates are signed and verified by the agent.",
   },
   account: {
