@@ -149,7 +149,9 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     /// just turned on is only learned at the next settings pass (SettingsEvery), so before refusing, the settings are read
     /// again once. A read under <see cref="SettingsReuse"/> old is reused only if it was taken after the run was decided: the
     /// server checks the switch when it approves, so a run approved after the read may have a switch the read does not show.
-    /// A failed read is not swallowed: the stream reconnects and the server replays the approved run.
+    /// A stored read tagged with a workspace other than the one agent.json now names (a login moved the machine) is not a recent
+    /// read of this workspace: it forces the read whatever its age, once per run. A failed read is not swallowed: the stream
+    /// reconnects and the server replays the approved run.
     /// </summary>
     private async Task<bool> RemoteRunsOnAsync(RunMessage run, CancellationToken ct)
     {
@@ -158,7 +160,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         var readBegan = LastSettingsAt;
         if (readBegan > now) readBegan = DateTimeOffset.MinValue; // a stamp from the future cannot be trusted: read again
         var decidedAfterRead = run.DecidedAt is { } decided && readBegan < decided + DecisionSkew;
-        if (now - readBegan >= SettingsReuse || decidedAfterRead) await SettingsAsync(ct);
+        if (now - readBegan >= SettingsReuse || decidedAfterRead || WorkspaceSettings.TagIsStale(config, store)) await SettingsAsync(ct);
         return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
     }
 
