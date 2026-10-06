@@ -9,6 +9,7 @@ using ClaudeMonitor.Agent.Push;
 using ModelContextProtocol.Protocol;
 using System.Text.Json.Nodes;
 using ClaudeMonitor.Agent.Storage;
+using ClaudeMonitor.Agent.Update;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,9 @@ public static class Cli
                                         --stop-wait: how long a finished turn waits for a prompt from the web (0-590, default 0)
                                         --push: deliver web messages into an idle session as a Claude Code channel (default off)
         cm-agent status                 connection and queue
+        cm-agent update [--check]       install the newest signed agent build from the server (--check: only look)
+        cm-agent config [auto-update off|check|on]
+                                        whether the agent looks for / installs updates by itself (default off)
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
         """;
@@ -66,6 +70,10 @@ public static class Cli
                 return Install(args, config, stdout, stderr, Environment.ProcessPath!);
             case "uninstall":
                 return new PluginInstaller(config, stdout).Uninstall();
+            case "update":
+                return await UpdateCommand.UpdateAsync(args, config, stdout, stderr, clock);
+            case "config":
+                return await UpdateCommand.ConfigAsync(args, config, stdout, stderr);
             case "status":
                 return await StatusAsync(config, stdout, clock);
             case "version":
@@ -156,6 +164,7 @@ public static class Cli
             : "commands waiting: 0");
         await stdout.WriteLineAsync($"stop wait: {(int)config.StopWait.TotalSeconds} s");
         foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
+        foreach (var line in UpdateCommand.Describe(config, store)) await stdout.WriteLineAsync(line);
         await stdout.WriteLineAsync($"version: {AgentConfig.Version}");
         return identity.Connected ? 0 : 1;
     }

@@ -4,6 +4,7 @@ using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
+using ClaudeMonitor.Agent.Update;
 using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Daemon;
@@ -76,6 +77,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         var s = await api.SettingsAsync(ct);
         store.Set("settings.mask_secrets", s.MaskSecrets ? "true" : "false");
         store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
+        store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate));
     }
 
     /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>

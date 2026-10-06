@@ -98,6 +98,20 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials, Tim
     public Task<AgentSettings> SettingsAsync(CancellationToken ct) => WithinDeadlineAsync(async t =>
         await ReadAsync<AgentSettings>(await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, "api/agent/settings"), t), t), ct);
 
+    /// <summary>The newest signed build the server hands out for this OS and CPU; null when none is published. The caller verifies it.</summary>
+    public Task<UpdateOffer?> LatestAsync(string os, string arch, CancellationToken ct) => WithinDeadlineAsync(async t =>
+    {
+        var url = $"api/agent/latest?os={Uri.EscapeDataString(os)}&arch={Uri.EscapeDataString(arch)}";
+        var response = await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, url), t);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            response.Dispose();
+            return null;
+        }
+
+        return await ReadAsync<UpdateOffer>(response, t);
+    }, ct);
+
     public Task CommandStatusAsync(string id, string status, string? result, CancellationToken ct, DateTimeOffset? at = null) => WithinDeadlineAsync(async t =>
     {
         using var response = await SendAsync(() => Json_(HttpMethod.Post, $"api/agent/commands/{id}/status", new CommandStatusUpdate(status, result, at)), t);
