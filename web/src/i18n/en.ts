@@ -100,6 +100,8 @@ export const en = {
     title: "Machines", empty: "No machine is connected yet.", connect: "Connect a machine", revoke: "Disconnect",
     revokeConfirm: "Disconnect this machine? Its agent stops reporting.", revoked: "Disconnected", lastSeen: "Last seen",
     version: "Agent", user: "User", moveTo: "Move to workspace", enrolled: "Connected",
+    updateAvailable: "Update available: {version}",
+    updateHint: "Run \"cm-agent update\" on the machine, or let it update itself (cm-agent config auto-update on, if the workspace allows it).",
   },
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
@@ -118,6 +120,11 @@ export const en = {
     retention: "Keep events for (days)", retentionHint: "Older events are archived day by day as zipped JSON and removed.",
     eventMax: "Largest event (bytes)", audit: "Audit log", noAudit: "No entries.", createTitle: "New workspace",
     create: "Create",
+    agentUpdate: "Agent updates",
+    agentUpdateOff: "Off: agents never look for updates by themselves",
+    agentUpdateCheck: "Look only: agents find out that an update exists",
+    agentUpdateOn: "Allowed: agents may install signed updates by themselves",
+    agentUpdateHint: "The most an agent may do on its own. Each machine must also turn it on (cm-agent config auto-update); the lower of the two applies. Updates are signed and verified by the agent.",
   },
   account: {
     title: "Account", providers: "Sign-in methods", linked: "Linked", link: "Link {provider}", password: "Password",

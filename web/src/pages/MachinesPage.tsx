@@ -50,7 +50,11 @@ export function MachinesPage() {
                 <tr key={a.id} className={a.status === "revoked" ? "dim" : ""}>
                   <td><strong>{a.hostname}</strong> <span className="muted small">{a.os} {a.arch}</span></td>
                   <td>{a.userName}</td>
-                  <td>{a.version}</td>
+                  <td>
+                    {a.version}
+                    {a.status === "active" && a.updateAvailable
+                      ? <> <span className="badge warn" title={t("machines.updateHint")}>{t("machines.updateAvailable", { version: a.latestVersion ?? "" })}</span></> : null}
+                  </td>
                   <td>{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
                   <td className="right">
                     {a.status === "active" && (a.userId === me?.id || role === "owner" || role === "admin")
