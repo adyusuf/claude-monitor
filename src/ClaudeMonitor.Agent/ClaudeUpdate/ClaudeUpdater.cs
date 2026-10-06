@@ -49,6 +49,9 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         if (await CountdownAsync(install, ct) is { } stopped) return stopped;
 
         var before = Version(install.Path!, ct);
+        // An earlier attempt whose version read was cut short remembered what was installed before its update: a different version now
+        // means that update did happen, and it is this attempt that tells it (otherwise it would read "up to date" for good).
+        var from = state.PendingFrom is { } pending && (before is null || before != pending) ? pending : before;
         if (ct.IsCancellationRequested) return Record(ClaudeCodes.Interrupted, "the agent stopped before `claude update` started", before, next: config.UpdateRetryAfter);
         // The daemon's stop (its own, or one a self-update asks for) kills `claude update`: see ADR-0006 rule 7.
         var run = await Task.Run(() => runner.Run(install.Path!, ["update"], config.ClaudeUpdateTimeout, ct), CancellationToken.None);
@@ -64,13 +67,13 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         {
             // the update ran to its end but the version check was cut short: "up to date" would be a guess
             return Record(ClaudeCodes.Interrupted, "`claude update` ended, but the agent stopped before it read the new version; the next attempt reads it",
-                before, next: config.UpdateRetryAfter);
+                before, next: config.UpdateRetryAfter, pendingFrom: from);
         }
 
-        var changed = after is not null && after != before;
+        var changed = after is not null && after != from;
         return Record(changed ? ClaudeCodes.Updated : ClaudeCodes.Unchanged,
-            changed ? $"Claude Code {before ?? "?"} -> {after}; running sessions keep their version until they are restarted" : $"Claude Code is up to date ({after ?? "version unknown"})",
-            before, after, next: config.ClaudeUpdateEvery, failures: 0);
+            changed ? $"Claude Code {from ?? "?"} -> {after}; running sessions keep their version until they are restarted" : $"Claude Code is up to date ({after ?? "version unknown"})",
+            from, after, next: config.ClaudeUpdateEvery, failures: 0);
     }
 
     /// <summary>Why the run is a failure, or null when it exited 0. Only how it ended is told, never what it printed.</summary>
@@ -152,8 +155,12 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         return new(ClaudeCodes.Waiting, detail);
     }
 
-    /// <summary>Remembers the result; when it cannot be saved, no attempt starts in this process before the usual time (or a longer <paramref name="next"/>).</summary>
-    private ClaudeOutcome Record(string code, string detail, string? before = null, string? after = null, TimeSpan? next = null, int? failures = null)
+    /// <summary>
+    /// Remembers the result; when it cannot be saved, no attempt starts in this process before the usual time (or a longer <paramref name="next"/>).
+    /// <paramref name="pendingFrom"/> is kept until an attempt reads a version (updated or up to date) and tells what changed since.
+    /// </summary>
+    private ClaudeOutcome Record(string code, string detail, string? before = null, string? after = null, TimeSpan? next = null, int? failures = null,
+        string? pendingFrom = null)
     {
         var due = next is { } n && n > TimeSpan.Zero ? (clock.GetUtcNow() + n).ToString("O", CultureInfo.InvariantCulture) : null;
         var saved = ClaudeUpdateState.Change(config, s => s with
@@ -166,6 +173,7 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
             NextAt = due,
             CountdownUntil = null,
             Failures = failures ?? s.Failures,
+            PendingFrom = code is ClaudeCodes.Updated or ClaudeCodes.Unchanged ? null : pendingFrom ?? s.PendingFrom,
         }, log);
         log.Write($"claude update {code}: {detail}");
         if (!saved)

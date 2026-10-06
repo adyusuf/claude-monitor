@@ -29,8 +29,10 @@ public static class ClaudeCodes
 
 /// <summary>What the Claude Code updater remembers (claude-update-state.json): the last attempt, its versions, when the next is due.</summary>
 /// <param name="Failures">Failed attempts in a row (`claude update` did not exit 0); an update or an up-to-date answer resets it.</param>
+/// <param name="PendingFrom">The version installed before a `claude update` that ended while its new version could not be read (the agent stopped);
+/// the next attempt that reads a different version reports the change from it, then clears it.</param>
 public sealed record ClaudeUpdateState(string? CheckedAt = null, string? Result = null, string? Detail = null, string? VersionBefore = null,
-    string? VersionAfter = null, string? NextAt = null, string? CountdownUntil = null, int Failures = 0)
+    string? VersionAfter = null, string? NextAt = null, string? CountdownUntil = null, int Failures = 0, string? PendingFrom = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 

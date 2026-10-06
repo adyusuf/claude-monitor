@@ -21,6 +21,9 @@ public sealed class ScriptedClaudeRunner : IProcessRunner
     /// <summary>Runs inside every `--version` call (a test can cancel the daemon's token there).</summary>
     public Action? OnVersion { get; set; }
 
+    /// <summary>What `--version` prints (a test can change it between attempts, as an update would).</summary>
+    public string Version { get; set; } = VersionText;
+
     public int Updates => Asked.Count(a => a == "update");
 
     public (int ExitCode, string Output) Run(string file, IReadOnlyList<string> args, TimeSpan timeout) =>
@@ -35,7 +38,7 @@ public sealed class ScriptedClaudeRunner : IProcessRunner
         if (line == "--version")
         {
             OnVersion?.Invoke();
-            return new(ProcessEnd.Exited, 0, VersionText);
+            return new(ProcessEnd.Exited, 0, Version);
         }
 
         return line == "update" ? OnUpdate(ct) : new(ProcessEnd.Exited, -1, "");
