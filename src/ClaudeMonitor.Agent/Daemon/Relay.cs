@@ -88,6 +88,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
         store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate));
         MachineMonitor.Remember(store, s);
+        store.Set(ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false");
     }
 
     /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>

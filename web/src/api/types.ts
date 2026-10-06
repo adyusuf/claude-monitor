@@ -15,7 +15,7 @@ export interface Me {
 }
 
 export type AgentUpdateMode = "off" | "check" | "on";
-export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode }
+export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate?: boolean }
 export interface WorkspaceInfo { id: string; name: string; role: Role; settings: Settings }
 export interface Member { userId: string; displayName: string; email: string | null; role: Role; joinedAt: string }
 export interface Invitation { id: string; email: string; role: Role; createdAt: string; expiresAt: string }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using ClaudeMonitor.Agent.Auth;
+using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Capture;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Daemon;
@@ -32,8 +33,10 @@ public static class Cli
         cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005)
         cm-agent status                 connection and queue
         cm-agent update [--check]       install the newest signed agent build from the server (--check: only look)
-        cm-agent config [auto-update off|check|on]
-                                        whether the agent looks for / installs updates by itself (default off)
+        cm-agent config [auto-update off|check|on] [claude-update on|off]
+                                        whether the agent looks for / installs agent updates by itself, and whether it may
+                                        update Claude Code when every session is idle (both default off; the workspace must allow too)
+        cm-agent claude-update cancel   stop a Claude Code update that is counting down
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
         """;
@@ -75,6 +78,8 @@ public static class Cli
                 return new PluginInstaller(config, stdout).Uninstall();
             case "update":
                 return await UpdateCommand.UpdateAsync(args, config, stdout, stderr, clock);
+            case ClaudeUpdateCommand.Verb:
+                return await ClaudeUpdateCommand.RunAsync(args, config, stdout, stderr, clock);
             case "config":
                 return await UpdateCommand.ConfigAsync(args, config, stdout, stderr);
             case "status":
@@ -169,6 +174,7 @@ public static class Cli
         await stdout.WriteLineAsync($"remote runs: {ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel))}{(config.ServiceMode ? " (service)" : "")}");
         foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
         foreach (var line in UpdateCommand.Describe(config, store)) await stdout.WriteLineAsync(line);
+        foreach (var line in ClaudeUpdateCommand.Describe(config, store, clock ?? TimeProvider.System)) await stdout.WriteLineAsync(line);
         await stdout.WriteLineAsync($"version: {AgentConfig.Version}");
         return identity.Connected ? 0 : 1;
     }

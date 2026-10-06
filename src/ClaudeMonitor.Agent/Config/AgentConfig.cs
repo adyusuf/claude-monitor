@@ -14,7 +14,7 @@ public static class PushScopes
 /// The agent's ONE configuration module (global #2): the only place that reads the environment or holds a path,
 /// URL, interval or limit. Every other file takes an <see cref="AgentConfig"/>. Every variable is in .env.example.
 /// </summary>
-public sealed record AgentConfig
+public sealed partial record AgentConfig
 {
     /// <summary>The user-only directory holding the local database, the lock and the agent's identity file.</summary>
     public required string Home { get; init; }
@@ -88,6 +88,42 @@ public sealed record AgentConfig
     /// <summary>How long a downloaded candidate (and macOS's codesign check of it) may take to answer.</summary>
     public TimeSpan UpdateProbeTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// Whether this machine lets the agent update Claude Code itself (ADR-0006; off by default). `cm-agent config claude-update on|off`
+    /// saves it, CM_CLAUDE_UPDATE wins when set. The workspace must allow it too; both are needed.
+    /// </summary>
+    public bool ClaudeUpdateEnabled { get; init; }
+
+    /// <summary>True when CM_CLAUDE_UPDATE was set: it then wins over the value `cm-agent config` saved.</summary>
+    public bool ClaudeUpdateFromEnvironment { get; init; }
+
+    /// <summary>Where Claude Code keeps its per-session files (sessions/&lt;pid&gt;.json): CLAUDE_CONFIG_DIR, else ~/.claude.</summary>
+    public string ClaudeConfigDir { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
+
+    /// <summary>The `claude` to update when it must not be searched for (CM_CLAUDE_BINARY; tests); null = the first `claude` on <see cref="PathVariable"/>.</summary>
+    public string? ClaudeBinary { get; init; }
+
+    public string PathVariable { get; init; } = Environment.GetEnvironmentVariable("PATH") ?? "";
+
+    /// <summary>The shortest time between two attempts to update Claude Code (`claude update` has no dry run, so each attempt is a real one).</summary>
+    public TimeSpan ClaudeUpdateEvery { get; init; } = TimeSpan.FromHours(24);
+
+    /// <summary>Every live session must have been idle at least this long.</summary>
+    public TimeSpan ClaudeIdleFor { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The warning before `claude update` runs; `cm-agent claude-update cancel` stops it.</summary>
+    public TimeSpan ClaudeCountdown { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>A cancelled attempt is not made again for this long.</summary>
+    public TimeSpan ClaudeSnooze { get; init; } = TimeSpan.FromHours(24);
+
+    public TimeSpan ClaudeUpdateTimeout { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>After this many failed attempts in a row the next waits <see cref="ClaudeUpdateEvery"/>, not <see cref="UpdateRetryAfter"/>.</summary>
+    public int ClaudeFailuresBeforeBackoff { get; init; } = 3;
+
+    public TimeSpan ClaudeCountdownPoll { get; init; } = TimeSpan.FromSeconds(1);
+
     /// <summary>The shortest time between two looks at the server for an update.</summary>
     public TimeSpan UpdateCheckEvery { get; init; } = TimeSpan.FromHours(6);
 
@@ -147,47 +183,6 @@ public sealed record AgentConfig
     public int EventMaxBytesDefault { get; init; } = 262_144;
     public int TranscriptLineMax { get; init; } = 1024 * 1024;
 
-    /// <summary>
-    /// True when the daemon runs as a boot service under its own account (ADR-0005); the service units set CM_SERVICE=1.
-    /// Its exec level is then read from <see cref="ExecConfigPath"/>, an admin-owned file, never from agent.json.
-    /// </summary>
-    public bool ServiceMode { get; init; }
-
-    /// <summary>The admin-owned exec policy of a service agent: level and optional ceiling (ADR-0005, "Four fail-closed keys").</summary>
-    public string ExecConfigPath { get; init; } = DefaultExecConfigPath(Os);
-
-    /// <summary>Remote runs executing at once on this target; one more is refused as busy.</summary>
-    public int ExecMaxConcurrent { get; init; } = 2;
-    public TimeSpan ExecTimeoutDefault { get; init; } = TimeSpan.FromSeconds(120);
-    public TimeSpan ExecTimeoutMax { get; init; } = TimeSpan.FromSeconds(3600);
-
-    /// <summary>After SIGTERM (or a Job Object close request) a run's processes get this long before they are killed.</summary>
-    public TimeSpan ExecKillGrace { get; init; } = TimeSpan.FromSeconds(5);
-
-    /// <summary>Output kept from the start of a run; past it only a tail of <see cref="RunTailBytes"/> is kept.</summary>
-    public int RunHeadBytes { get; init; } = 256 * 1024;
-    public int RunTailBytes { get; init; } = 256 * 1024;
-
-    /// <summary>A run that prints more than this in total is killed (output_limit).</summary>
-    public long RunReadCap { get; init; } = 64L * 1024 * 1024;
-
-    /// <summary>The most one output chunk carries to the API (the API refuses more than 64 KB).</summary>
-    public int RunChunkBytes { get; init; } = 32 * 1024;
-
-    public TimeSpan MetricsEvery { get; init; } = TimeSpan.FromSeconds(60);
-
-    /// <summary>Finished runs (and the output read from them) are deleted from the local database after this long.</summary>
-    public TimeSpan RemoteLocalRetention { get; init; } = TimeSpan.FromDays(7);
-
-    /// <summary>How often the daemon sends queued remote requests and polls open runs it asked for (fallback to run_update).</summary>
-    public TimeSpan RemotePollEvery { get; init; } = TimeSpan.FromSeconds(5);
-
-    /// <summary>How often the MCP process looks in the local database for an answer while a tool waits.</summary>
-    public TimeSpan RemoteWaitPoll { get; init; } = TimeSpan.FromMilliseconds(250);
-
-    /// <summary>The longest an MCP tool waits for a run before answering with its current status.</summary>
-    public const int RemoteWaitMaxSeconds = 50;
-
     public string DatabasePath => Path.Combine(Home, "agent.db");
     public string LockPath => Path.Combine(Home, "daemon.lock");
     public string IdentityPath => Path.Combine(Home, "agent.json");
@@ -202,6 +197,11 @@ public sealed record AgentConfig
 
     /// <summary>Written by an update to ask the running daemon to stop; the daemon deletes it and exits.</summary>
     public string PidPath => Path.Combine(Home, "daemon.pid");
+    public string ClaudeUpdateStatePath => Path.Combine(Home, "claude-update-state.json");
+    public string ClaudeUpdateLockPath => Path.Combine(Home, "claude-update.lock");
+
+    /// <summary>Written by `cm-agent claude-update cancel`; the countdown sees it and stands down.</summary>
+    public string ClaudeCancelPath => Path.Combine(Home, "claude-update.cancel");
     public string StopRequestPath => Path.Combine(Home, "daemon.stop");
 
     public const string CredentialService = "claude-monitor-agent";
@@ -246,6 +246,11 @@ public sealed record AgentConfig
             StopWaitFromEnvironment = read("CM_STOP_WAIT") is { Length: > 0 },
             PushEnabled = read("CM_PUSH") == "on",
             PushFromEnvironment = read("CM_PUSH") is { Length: > 0 },
+            ClaudeUpdateEnabled = read("CM_CLAUDE_UPDATE") == "on",
+            ClaudeUpdateFromEnvironment = read("CM_CLAUDE_UPDATE") is { Length: > 0 },
+            ClaudeConfigDir = read("CLAUDE_CONFIG_DIR") is { Length: > 0 } claudeDir ? claudeDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude"),
+            ClaudeBinary = read("CM_CLAUDE_BINARY") is { Length: > 0 } claudeBinary ? claudeBinary : null,
+            PathVariable = read("PATH") ?? "",
             AutoUpdate = UpdateModes.Normalize(read("CM_AUTO_UPDATE")),
             UpdateHealthWait = Seconds(read("CM_UPDATE_HEALTH_WAIT"), TimeSpan.FromSeconds(90), 600),
             AutoUpdateFromEnvironment = read("CM_AUTO_UPDATE") is { Length: > 0 },
@@ -272,14 +277,6 @@ public sealed record AgentConfig
         os == OsKinds.MacOs ? Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor") : Path.Combine(userProfile, ".claude-monitor");
 
     public static string LegacyHomeFor(string localAppData) => Path.Combine(localAppData, "ClaudeMonitor");
-
-    /// <summary>Linux /etc/cm-agent; macOS /Library/Application Support/ClaudeMonitor; Windows %ProgramFiles%\ClaudeMonitor — all admin-owned.</summary>
-    public static string DefaultExecConfigPath(string os) => os switch
-    {
-        OsKinds.Windows => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "ClaudeMonitor", "exec.json"),
-        OsKinds.MacOs => "/Library/Application Support/ClaudeMonitor/exec.json",
-        _ => "/etc/cm-agent/exec.json",
-    };
 
     /// <summary>Creates the home directory readable by the user only.</summary>
     public void EnsureHome()

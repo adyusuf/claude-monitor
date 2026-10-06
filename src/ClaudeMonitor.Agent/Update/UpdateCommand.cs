@@ -75,6 +75,13 @@ public static class UpdateCommand
             return 0;
         }
 
+        if (args.Length == 3 && args[1] == "claude-update" && args[2] is "on" or "off")
+        {
+            SavedSettings.SaveClaudeUpdate(config, args[2] == "on");
+            await stdout.WriteLineAsync($"claude-update: {args[2]} on this machine (the workspace must allow it too)");
+            return 0;
+        }
+
         if (args.Length == 3 && args[1] == "auto-update" && UpdateModes.IsValid(args[2]))
         {
             SavedSettings.SaveAutoUpdate(config, args[2]);
@@ -82,7 +89,7 @@ public static class UpdateCommand
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on]");
+        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off]");
         return 2;
     }
 

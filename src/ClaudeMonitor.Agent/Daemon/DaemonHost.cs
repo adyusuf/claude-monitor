@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using ClaudeMonitor.Agent.Auth;
+using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Exec;
 using ClaudeMonitor.Agent.Metrics;
@@ -68,8 +69,11 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
 
         var updates = new UpdateLoop(config, updateStore, new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock),
             () => DaemonControl.SpawnAutoUpdate(config, log), clock);
+        using var claudeStore = new LocalStore(config.DatabasePath);
+        var claudeUpdates = new ClaudeUpdater(config, claudeStore, new SystemProcessRunner(), new SystemNotifier(new SystemProcessRunner(), config.UpdateProbeTimeout), log, clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
         await Task.WhenAll(
+            Loop("claude-update", config.UpdatePollEvery, claudeUpdates.RunAsync, api, revoked),
             StopRequestAsync(revoked),
             Loop("update", config.UpdatePollEvery, updates.RunAsync, api, revoked),
             Loop("flush", config.FlushEvery, async ct =>
