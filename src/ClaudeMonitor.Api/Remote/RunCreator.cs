@@ -184,15 +184,20 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
             return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.Disabled);
         }
 
-        var members = await db.WorkspaceMembers
-            .Where(m => m.WorkspaceId == workspaceId && (m.UserId == userId || m.UserId == ownerId) && m.RemovedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+        // One member row per statement, in a fixed order: every path that locks several rows takes them in the order
+        // workspace switch, members (by user id), agent, so none of them can wait on the other for the rows it holds.
+        foreach (var memberId in new[] { userId, ownerId }.Distinct().Order())
+        {
+            var member = await db.WorkspaceMembers
+                .Where(m => m.WorkspaceId == workspaceId && m.UserId == memberId && m.RemovedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+            if (member != 1) return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.TargetCannotRun);
+        }
+
         var agent = await db.Agents
             .Where(a => a.Id == targetId && a.WorkspaceId == workspaceId && a.Status == AgentStatuses.Active && levels.Contains(a.ExecLevel))
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevel, a => a.ExecLevel), ct);
-        return members == (userId == ownerId ? 1 : 2) && agent == 1
-            ? null
-            : RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.TargetCannotRun);
+        return agent == 1 ? null : RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.TargetCannotRun);
     }
 
     private void Approve(RemoteRun run, Guid by, DateTimeOffset now)

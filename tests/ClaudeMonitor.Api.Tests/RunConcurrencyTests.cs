@@ -25,6 +25,7 @@ public sealed class RunConcurrencyTests(ApiFactory api)
     {
         SwitchOff,
         TargetRevoked,
+        TargetOwnerRemoved,
     }
 
     /// <summary>Starts every action at the same moment and returns what each did; nothing begins before all are ready.</summary>
@@ -44,6 +45,7 @@ public sealed class RunConcurrencyTests(ApiFactory api)
     {
         Disruption.SwitchOff => team.Admin.SendAsync(HttpMethod.Put, $"/api/workspaces/{team.WorkspaceId}/remote-settings", new { remoteRunsEnabled = false }),
         Disruption.TargetRevoked => team.Admin.PostAsync($"/api/agents/{team.TargetId}/revoke"),
+        Disruption.TargetOwnerRemoved => team.Admin.SendAsync(HttpMethod.Delete, $"/api/workspaces/{team.WorkspaceId}/members/{team.Owner.Id}"),
         _ => throw new ArgumentOutOfRangeException(nameof(how), how, null),
     };
 
@@ -87,6 +89,7 @@ public sealed class RunConcurrencyTests(ApiFactory api)
     [Theory]
     [InlineData(Disruption.SwitchOff)]
     [InlineData(Disruption.TargetRevoked)]
+    [InlineData(Disruption.TargetOwnerRemoved)]
     public async Task A_run_asked_for_while_remote_work_is_being_ended_never_outlives_it(Disruption how)
     {
         for (var round = 0; round < Rounds; round++)
