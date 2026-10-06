@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text;
 
 namespace ClaudeMonitor.Agent.Exec;
@@ -40,7 +41,7 @@ public static class ProcessTree
     /// (<see cref="DescendantTracker"/>, best effort).
     /// </summary>
     public static IRunProcess Start(string exe, IReadOnlyList<string> args, string cwd, IReadOnlyDictionary<string, string> env,
-        string? argv0 = null, RunLimits? limits = null, TimeSpan trackEvery = default)
+        string? argv0 = null, RunLimits? limits = null, TimeSpan trackEvery = default, Action<string>? log = null)
     {
         Validate(exe, args, cwd, env);
         if (OperatingSystem.IsWindows())
@@ -53,16 +54,16 @@ public static class ProcessTree
 
             var line = new StringBuilder(QuoteWindowsArg(argv0 ?? exe));
             foreach (var a in args) line.Append(' ').Append(QuoteWindowsArg(a));
-            return WindowsRunProcess.Start(exe, line.ToString(), cwd, env);
+            return WindowsRunProcess.Start(exe, line.ToString(), cwd, env, log);
         }
 
         if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
         {
             IReadOnlyList<string> argv = [argv0 ?? exe, .. args];
-            if (limits is null || !RunLimits.AppliesHere) return UnixRunProcess.Start(exe, argv, cwd, env, trackEvery);
+            if (limits is null || !RunLimits.AppliesHere) return UnixRunProcess.Start(exe, argv, cwd, env, trackEvery, log);
             UnixRunProcess.RequireExecutable(exe);
             var (launcher, wrapped) = RunLauncher.Wrap(exe, argv, limits);
-            return UnixRunProcess.Start(launcher, wrapped, cwd, env, trackEvery);
+            return UnixRunProcess.Start(launcher, wrapped, cwd, env, trackEvery, log);
         }
 
         throw new PlatformNotSupportedException("Remote runs are supported on Windows, macOS and Linux.");
@@ -73,16 +74,16 @@ public static class ProcessTree
     /// shell's path as the guard resolved it (default: /bin/sh, or cmd.exe in the system folder).
     /// </summary>
     public static IRunProcess StartShell(string text, string cwd, IReadOnlyDictionary<string, string> env, string? shell = null,
-        RunLimits? limits = null, TimeSpan trackEvery = default)
+        RunLimits? limits = null, TimeSpan trackEvery = default, Action<string>? log = null)
     {
         if (OperatingSystem.IsWindows())
         {
             Validate(text, [], cwd, env);
             var cmd = shell ?? Path.Combine(Environment.SystemDirectory, "cmd.exe");
-            return WindowsRunProcess.Start(cmd, $"\"{cmd}\" /d /s /c \"{text}\"", cwd, env);
+            return WindowsRunProcess.Start(cmd, $"\"{cmd}\" /d /s /c \"{text}\"", cwd, env, log);
         }
 
-        return Start(shell ?? UnixShell, ["-c", text], cwd, env, argv0: "sh", limits, trackEvery);
+        return Start(shell ?? UnixShell, ["-c", text], cwd, env, argv0: "sh", limits, trackEvery, log);
     }
 
     private const string UnixShell = "/bin/sh";
@@ -129,8 +130,11 @@ public static class ProcessTree
     }
 }
 
-/// <summary>What both platforms share: the wait thread, the exit task and a bounded, non-blocking disposal.</summary>
-internal abstract class RunProcessBase(Stream stdout, Stream stderr) : IRunProcess
+/// <summary>
+/// What both platforms share: the wait thread, the exit task and a bounded, non-blocking disposal. <c>log</c> takes one line
+/// for the agent's log (error type names only, never content); null where nobody listens.
+/// </summary>
+internal abstract class RunProcessBase(Stream stdout, Stream stderr, Action<string>? log = null) : IRunProcess
 {
     private static readonly TimeSpan CloseWait = TimeSpan.FromSeconds(5);
     private readonly TaskCompletionSource<RunExit> _exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -171,17 +175,37 @@ internal abstract class RunProcessBase(Stream stdout, Stream stderr) : IRunProce
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        KillNow();
-        await Task.WhenAny(_exited.Task, Task.Delay(CloseWait));
-        ReleaseNative();
-
-        // A read blocked on a pipe that an escaped process still holds does not end by itself, and closing the stream waits
-        // for it: close in the background and give up after a while. The thread is freed when that process dies.
-        var close = Task.Run(() =>
+        try
         {
-            Stdout.Dispose();
-            Stderr.Dispose();
-        });
-        if (await Task.WhenAny(close, Task.Delay(CloseWait)) == close) await close;
+            try
+            {
+                KillNow();
+            }
+            catch (Exception e) when (e is IOException or Win32Exception or InvalidOperationException)
+            {
+                log?.Invoke($"kill on dispose failed ({e.GetType().Name})"); // the message may hold a path: not logged
+            }
+
+            await Task.WhenAny(_exited.Task, Task.Delay(CloseWait));
+        }
+        finally
+        {
+            // Whatever happened above, the native handles, the tracker thread and the pipes are released.
+            try
+            {
+                ReleaseNative();
+            }
+            finally
+            {
+                // A read blocked on a pipe that an escaped process still holds does not end by itself, and closing the stream waits
+                // for it: close in the background and give up after a while. The thread is freed when that process dies.
+                var close = Task.Run(() =>
+                {
+                    Stdout.Dispose();
+                    Stderr.Dispose();
+                });
+                if (await Task.WhenAny(close, Task.Delay(CloseWait)) == close) await close;
+            }
+        }
     }
 }

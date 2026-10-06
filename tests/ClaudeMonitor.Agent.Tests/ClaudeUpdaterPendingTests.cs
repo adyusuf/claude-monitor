@@ -57,6 +57,26 @@ public sealed class ClaudeUpdaterPendingTests : IDisposable
     }
 
     [Fact]
+    public async Task The_remembered_version_survives_a_failed_attempt_in_between_and_the_next_one_still_reports_the_update()
+    {
+        await CutShortUpdateAsync();
+        runner.OnUpdate = _ => new(ProcessEnd.Exited, 1, "");
+
+        var failed = await updater.RunAsync(CancellationToken.None);
+
+        Assert.Equal(ClaudeCodes.Failed, failed.Code);
+        Assert.Equal(Old, kit.State.PendingFrom); // a failure tells nothing about what changed
+        runner.OnUpdate = _ => new(ProcessEnd.Exited, 0, "");
+        kit.Clock.Advance(kit.Config.UpdateRetryAfter + TimeSpan.FromMinutes(1));
+
+        var next = await updater.RunAsync(CancellationToken.None);
+
+        Assert.Equal(ClaudeCodes.Updated, next.Code);
+        Assert.Contains($"Claude Code {Old} -> {New}", next.Detail, StringComparison.Ordinal);
+        Assert.Null(kit.State.PendingFrom);
+    }
+
+    [Fact]
     public async Task Once_told_the_following_attempt_is_plainly_up_to_date()
     {
         await CutShortUpdateAsync();

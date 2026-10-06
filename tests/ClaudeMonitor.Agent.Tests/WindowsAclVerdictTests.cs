@@ -32,7 +32,8 @@ public sealed class WindowsAclVerdictTests
     private const string Ancestor = "ancestor";
     private const string Root = "root";
 
-    private static AclRule Allow(string sid, int rights, bool inheritOnly = false) => new(sid, rights, true, inheritOnly);
+    private static AclRule Allow(string sid, int rights, bool inheritOnly = false, bool objectInherit = false) =>
+        new(sid, rights, true, inheritOnly, objectInherit);
 
     private static AclRule Deny(string sid, int rights) => new(sid, rights, false, false);
 
@@ -172,6 +173,43 @@ public sealed class WindowsAclVerdictTests
         Assert.True(With(where, Admin(Allow(WindowsSids.CreatorOwner, FullControl, inheritOnly: true))).Trusted);
         // Not inherit-only: nothing here is an admin principal, so it is refused rather than reasoned about.
         Assert.False(With(where, Admin(Allow(WindowsSids.CreatorOwner, FullControl))).Trusted);
+    }
+
+    [Theory]
+    [InlineData(Modify)]
+    [InlineData(FullControl)]
+    [InlineData(WriteData)]
+    public void An_inherit_only_rule_that_files_inherit_on_the_executables_folder_reaches_the_files_beside_it(int rights)
+    {
+        // exe's own ACL is clean (inheritance protected), but a sibling DLL would inherit Users:Modify from the folder.
+        foreach (var sid in new[] { Users, AuthenticatedUsers, Everyone, ServiceAccount, NormalUser })
+        {
+            var v = Chain(folder: Admin(Allow(sid, rights, inheritOnly: true, objectInherit: true)));
+            Assert.Equal(new AclVerdict(false, AclReason.WriteGranted, 1), v);
+        }
+    }
+
+    [Fact]
+    public void An_inherit_only_rule_that_only_folders_inherit_on_the_executables_folder_stays_trusted()
+    {
+        // container-inherit only: it reaches sub-folders, not the files beside the executable.
+        Assert.True(Chain(folder: Admin(Allow(Users, Modify, inheritOnly: true, objectInherit: false))).Trusted);
+    }
+
+    [Fact]
+    public void An_object_inherit_creator_owner_rule_on_the_executables_folder_stays_trusted()
+    {
+        // Program Files' usual rule, as its children carry it: it only becomes the creating account's rights on a new file.
+        Assert.True(Chain(folder: Admin(Allow(WindowsSids.CreatorOwner, FullControl, inheritOnly: true, objectInherit: true))).Trusted);
+    }
+
+    [Theory]
+    [InlineData(Exe)]
+    [InlineData(Ancestor)]
+    [InlineData(Root)]
+    public void An_inherit_only_rule_that_files_inherit_stays_exempt_on_the_executable_and_above_the_executables_folder(string where)
+    {
+        Assert.True(With(where, Admin(Allow(Users, Modify, inheritOnly: true, objectInherit: true))).Trusted);
     }
 
     [Theory]

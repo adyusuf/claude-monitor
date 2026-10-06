@@ -7,12 +7,12 @@ namespace ClaudeMonitor.Agent.Exec;
 internal sealed unsafe partial class UnixRunProcess
 {
     // A run that cannot be tracked is not left running: the process just started is ended and reaped.
-    private static DescendantTracker? StartTracker(int pid, TimeSpan every)
+    private static DescendantTracker? StartTracker(int pid, TimeSpan every, Action<string>? log)
     {
         if (every <= TimeSpan.Zero || !OperatingSystem.IsMacOS()) return null;
         try
         {
-            return new DescendantTracker(pid, new LibProcTable(), SendToPid, every);
+            return new DescendantTracker(pid, new LibProcTable(), SendToPid, every, log);
         }
         catch (IOException)
         {

@@ -1,7 +1,10 @@
 namespace ClaudeMonitor.Agent.Exec;
 
-/// <summary>One access rule of a path, as read from its ACL: who, which rights, allow or deny, and whether it only applies to children.</summary>
-internal readonly record struct AclRule(string Sid, int Rights, bool Allow, bool InheritOnly);
+/// <summary>
+/// One access rule of a path, as read from its ACL: who, which rights, allow or deny, whether it only applies to children, and
+/// whether it is inherited by files (ObjectInherit), which is what makes an inherit-only rule reach the files beside an executable.
+/// </summary>
+internal readonly record struct AclRule(string Sid, int Rights, bool Allow, bool InheritOnly, bool ObjectInherit = false);
 
 /// <summary>The owner and the access rules of one path (a file or a folder), as SID strings.</summary>
 internal sealed record PathAcl(string OwnerSid, IReadOnlyList<AclRule> Rules);
@@ -98,7 +101,8 @@ internal static class WindowsAclVerdict
 
             // The executable and its own folder (a planted DLL or manifest next to it counts) use every right.
             var mask = i < 2 ? WriteLikeRights : AncestorWriteRights;
-            if (acl.Rules is null || acl.Rules.Any(rule => GrantsWrite(rule, mask)))
+            var ownFolder = i == 1;
+            if (acl.Rules is null || acl.Rules.Any(rule => GrantsWrite(rule, mask, ownFolder)))
             {
                 return new AclVerdict(false, AclReason.WriteGranted, i);
             }
@@ -112,7 +116,13 @@ internal static class WindowsAclVerdict
     /// it has its own snapshot: this is why the usual inheritable CREATOR OWNER rule (full control, inherit-only) of
     /// Program Files and a drive root's inherit-only Authenticated Users rule pass. The same SID in a rule that does
     /// apply to the path is not exempt: CREATOR OWNER is not an admin principal.
+    /// One exception: the executable's own folder. Its files (a DLL or manifest beside the executable) are not in the chain,
+    /// so an inherit-only rule that files inherit (ObjectInherit) applies to them and counts there, except CREATOR OWNER,
+    /// which only ever becomes the account that creates a file and so grants nothing to anyone else.
     /// </summary>
-    private static bool GrantsWrite(AclRule rule, int mask) =>
-        rule.Allow && !rule.InheritOnly && (rule.Rights & mask) != 0 && !WindowsSids.IsAdmin(rule.Sid);
+    private static bool GrantsWrite(AclRule rule, int mask, bool ownFolder)
+    {
+        var reachesSiblings = ownFolder && rule.ObjectInherit && !string.Equals(rule.Sid, WindowsSids.CreatorOwner, StringComparison.OrdinalIgnoreCase);
+        return rule.Allow && (!rule.InheritOnly || reachesSiblings) && (rule.Rights & mask) != 0 && !WindowsSids.IsAdmin(rule.Sid);
+    }
 }

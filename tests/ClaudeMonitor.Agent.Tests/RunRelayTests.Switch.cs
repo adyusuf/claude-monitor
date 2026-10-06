@@ -143,4 +143,31 @@ public sealed partial class RunRelayTests
         Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None)); // a replay changes nothing
         Assert.Equal(1, fx.Fake.Count($"POST /api/agent/runs/{run.Id}/status"));
     }
+
+    [Fact]
+    public async Task A_settings_read_whose_answer_arrived_after_the_decision_is_not_trusted_for_a_run_decided_while_it_was_in_flight()
+    {
+        if (!ExecFixture.Unix) return;
+        var started = fx.Clock.GetUtcNow();
+        var reads = 0;
+        // The request reaches the server at once (switch off); the answer is slow: the clock is 4 s on when it completes.
+        fx.Fake.On("GET /api/agent/settings", _ =>
+        {
+            var on = Interlocked.Increment(ref reads) > 1;
+            if (!on) fx.Clock.Advance(TimeSpan.FromSeconds(4));
+            return (HttpStatusCode.OK, JsonSerializer.Serialize(new AgentSettings(true, 1000, TestWorkspace.Id(fx.Home.Config), RemoteRuns: on), ApiClient.Json));
+        });
+        var timed = new Relay(fx.Home.Config, fx.Store, fx.Api, fx.Clock) { Runs = relay };
+        await timed.SettingsAsync(CancellationToken.None);
+        Assert.Equal(started.AddSeconds(4), fx.Clock.GetUtcNow());
+
+        // an admin turned the switch on and the server approved this run a second into that request, before the answer completed
+        var run = Shell("echo decided-in-flight", started.AddSeconds(1));
+        Routes(run.Id);
+        Assert.True(await timed.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
+
+        Assert.True(await Finished(run.Id));
+        Assert.Equal(RunStatuses.Succeeded, fx.Store.ExecRunOf(run.Id.ToString())!.FinalStatus);
+        Assert.Equal(2, fx.Fake.Count("GET /api/agent/settings"));
+    }
 }

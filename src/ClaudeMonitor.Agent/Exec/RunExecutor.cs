@@ -133,10 +133,13 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         var env = RunEnvironment.Build(config.Home);
         var limits = RunLimits.For(config, timeout);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
-        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe, limits, TrackEvery);
+        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe, limits, TrackEvery, Note(run));
         // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).
-        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0, limits, TrackEvery);
+        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0, limits, TrackEvery, Note(run));
     }
+
+    // What the process layer reports (an error type name, no content) goes to the agent's log under the run's id.
+    private Action<string> Note(RunMessage run) => line => log.Write($"run {run.Id}: {line}");
 
     private async Task<RunResult> SuperviseAsync(RunMessage run, IRunProcess process, string? exe, TimeSpan timeout, long began,
         Func<RunOutputChunk, Task> onChunk, Func<RunStatusUpdate, Task> onStatus, CancellationToken cancel)

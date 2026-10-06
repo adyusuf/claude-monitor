@@ -50,7 +50,8 @@ internal static class WindowsAclReader
                 r.IdentityReference.Value,
                 (int)r.FileSystemRights,
                 r.AccessControlType != AccessControlType.Deny, // anything that is not a deny counts as an allow
-                (r.PropagationFlags & PropagationFlags.InheritOnly) != 0));
+                (r.PropagationFlags & PropagationFlags.InheritOnly) != 0,
+                (r.InheritanceFlags & InheritanceFlags.ObjectInherit) != 0));
         }
 
         return new PathAcl(owner, rules);

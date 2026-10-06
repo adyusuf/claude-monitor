@@ -88,6 +88,9 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         // overtakes is then tagged with the old workspace and reads as off, while an agent moved to another workspace on the web
         // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
         var workspace = Identity.Peek(config)?.WorkspaceId;
+        // Stamped with the time the read BEGAN: the server answers with the switch as of some moment during the request, so a
+        // stamp taken when the answer arrives could look newer than a decision the answer does not reflect.
+        var began = clock.GetUtcNow();
         var s = await api.SettingsAsync(ct);
         // One transaction for the values AND their tag: two passes (this loop's and the stream's re-read) on separate connections
         // cannot leave one pass's values under the other's tag.
@@ -101,17 +104,31 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         ];
         if (workspace is { } w) entries.Add(WorkspaceSettings.TagEntry(w));
         store.SetMany(entries);
-        lastSettingsAt = clock.GetUtcNow();
+        StampSettingsRead(began);
     }
 
-    private DateTimeOffset lastSettingsAt = DateTimeOffset.MinValue;
+    // UTC ticks of the newest successful read's start. Two passes (this loop's and the stream's re-read) may overlap, so only a
+    // later start replaces it: the larger value wins.
+    private long lastSettingsTicks = DateTimeOffset.MinValue.UtcTicks;
 
-    /// <summary>A settings read this recent is reused when a run finds the switch off: a burst of runs costs one read.</summary>
+    private DateTimeOffset LastSettingsAt => new(Interlocked.Read(ref lastSettingsTicks), TimeSpan.Zero);
+
+    private void StampSettingsRead(DateTimeOffset began)
+    {
+        long seen;
+        do seen = Interlocked.Read(ref lastSettingsTicks);
+        while (began.UtcTicks > seen && Interlocked.CompareExchange(ref lastSettingsTicks, began.UtcTicks, seen) != seen);
+    }
+
+    /// <summary>
+    /// A settings read whose request began this recently is reused when a run finds the switch off: a burst of runs costs one read.
+    /// The age is measured from the time the read began, not from when its answer arrived.
+    /// </summary>
     public static readonly TimeSpan SettingsReuse = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// How far a run's decision time (the server's clock) may be from the agent's clock for a cached settings read to still count as
-    /// taken after it: the read is trusted only when it is at least this much later. A server clock ahead of the agent's just costs
+    /// begun after it: the read is trusted only when it began at least this much later. A server clock ahead of the agent's just costs
     /// an extra read (it fails toward reading); one behind it by more than this could leave a read taken just before the decision
     /// looking later, which is why the margin is there. A few seconds is far beyond what synchronised hosts differ by.
     /// </summary>
@@ -128,8 +145,9 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     {
         if (WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true") return true;
         var now = clock.GetUtcNow();
-        var decidedAfterRead = run.DecidedAt is { } decided && lastSettingsAt < decided + DecisionSkew;
-        if (now - lastSettingsAt >= SettingsReuse || decidedAfterRead) await SettingsAsync(ct);
+        var readBegan = LastSettingsAt;
+        var decidedAfterRead = run.DecidedAt is { } decided && readBegan < decided + DecisionSkew;
+        if (now - readBegan >= SettingsReuse || decidedAfterRead) await SettingsAsync(ct);
         return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
     }
 
