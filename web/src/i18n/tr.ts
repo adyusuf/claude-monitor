@@ -126,6 +126,8 @@ export const tr: Dictionary = {
     agentUpdateOff: "Kapalı: ajanlar kendiliğinden güncelleme aramaz",
     agentUpdateCheck: "Yalnızca bak: ajanlar güncelleme olduğunu öğrenir",
     agentUpdateOn: "İzinli: ajanlar imzalı güncellemeleri kendiliğinden kurabilir",
+    claudeUpdate: "Ajanların Claude Code'u güncellemesine izin ver",
+    claudeUpdateHint: "Yalnızca makinedeki her Claude oturumu boştayken, kişinin iptal edebileceği bir geri sayımdan sonra ve yalnızca Claude Code'un kendi güncelleme komutuyla. Her makinede ayrıca açılmalıdır (cm-agent config claude-update on). Çalışan oturumlar asla yeniden başlatılmaz.",
     agentUpdateHint: "Bir ajanın kendi başına yapabileceği en fazla şey. Her makinede de açılmalıdır (cm-agent config auto-update); ikisinden düşük olan geçerlidir. Güncellemeler imzalıdır ve ajan tarafından doğrulanır.",
   },
   account: {
