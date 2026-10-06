@@ -122,8 +122,11 @@ public static class PrivacyRemoteData
     }
 
     /// <summary>
-    /// First in the deletion's transaction: the user's member rows (by workspace) and active agents (by id), the order a run
-    /// creation and a member removal take them in, before any row of remote work is touched (<see cref="RemoteLocks"/>).
+    /// First in the deletion's transaction: for each workspace the user belongs to, in workspace-id order, its owners and the
+    /// user (<see cref="RemoteLocks.MembersAsync"/>, user-id order within the workspace), then the user's active agents (by id),
+    /// before any row of remote work is touched (<see cref="RemoteLocks"/>). Remove and ChangeRole lock one workspace's members
+    /// in that same user-id order and a run creation locks one workspace's too, so every transaction takes member rows in
+    /// the one order (workspace id, user id) and two of them cannot hold each other's rows.
     /// </summary>
     public static async Task LockAsync(MonitorDb db, Guid userId, CancellationToken ct)
     {
@@ -132,8 +135,7 @@ public static class PrivacyRemoteData
             .OrderBy(m => m.WorkspaceId).Select(m => m.WorkspaceId).ToListAsync(ct);
         foreach (var workspaceId in workspaces)
         {
-            await db.WorkspaceMembers.Where(m => m.WorkspaceId == workspaceId && m.UserId == userId && m.RemovedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+            await RemoteLocks.MembersAsync(db, workspaceId, [userId], ct);
         }
 
         await RemoteLocks.AgentsAsync(db, await db.Agents.AsNoTracking().Where(a => a.UserId == userId && a.Status == AgentStatuses.Active)

@@ -145,6 +145,12 @@ public static class PrivacyEndpoints
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "reauth_required");
         }
 
+        var now = clock.GetUtcNow();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await PrivacyRemoteData.LockAsync(db, userId, ct);
+
+        // Judged under the locks (each workspace's owners are held): two owners deleting at once, or an owner deleting while
+        // another is demoted or removed, cannot each see the other as the owner that stays.
         var memberships = await db.WorkspaceMembers.Where(m => m.UserId == userId && m.RemovedAt == null).ToListAsync(ct);
         var soleOwned = new List<Guid>();
         var solo = new List<Guid>();
@@ -159,13 +165,11 @@ public static class PrivacyEndpoints
 
         if (soleOwned.Count > 0)
         {
+            // The transaction ends without a commit: nothing was written.
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "sole_owner",
                 extensions: new Dictionary<string, object?> { ["workspaces"] = soleOwned });
         }
 
-        var now = clock.GetUtcNow();
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await PrivacyRemoteData.LockAsync(db, userId, ct);
         var email = user.EmailNormalized;
         var agentIds = await db.Agents.Where(a => a.UserId == userId).Select(a => a.Id).ToListAsync(ct);
         var sessions = await db.HarnessSessions.Where(s => agentIds.Contains(s.AgentId))

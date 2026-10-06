@@ -137,19 +137,6 @@ public sealed class OwnerRaceTests(ApiFactory api)
         }
     }
 
-    /// <summary>Every request has read its actor (the rows in <paramref name="held"/> are locked meanwhile) before any of them locks.</summary>
-    private async Task<HttpResponseMessage[]> HeldActorsAsync(Guid workspaceId, Guid[] held, params Func<Task<HttpResponseMessage>>[] actions)
-    {
-        await using var holder = api.Db();
-        await using var hold = await holder.Database.BeginTransactionAsync();
-        await holder.Database.ExecuteSqlAsync(
-            $"SELECT 1 FROM workspace_members WHERE workspace_id = {workspaceId} AND user_id = ANY({held}) FOR UPDATE");
-        var running = actions.Select(a => Task.Run(a)).ToArray();
-        await WaitUntilAsync(async () => await WaitingBackendsAsync() >= actions.Length);
-        await hold.CommitAsync();
-        return await Task.WhenAll(running);
-    }
-
     private async Task<WorkspaceMember> RowAsync(Guid workspaceId, TestUser user)
     {
         await using var db = api.Db();
@@ -170,7 +157,7 @@ public sealed class OwnerRaceTests(ApiFactory api)
             await RemoteKit.MemberAsync(api, a, "or-c", Roles.Owner);
             var workspaceId = a.WorkspaceId;
 
-            var answers = await HeldActorsAsync(workspaceId, [a.Id, b.Id],
+            var answers = await MemberLockHold.RunAsync(api, workspaceId, [a.Id, b.Id],
                 () => ChangeAsync(workspaceId, a, b, Roles.Viewer), () => RemoveAsync(workspaceId, b, a));
 
             var (aRow, bRow) = (await RowAsync(workspaceId, a), await RowAsync(workspaceId, b));
@@ -200,7 +187,7 @@ public sealed class OwnerRaceTests(ApiFactory api)
             var target = await RemoteKit.MemberAsync(api, a, "og-t", Roles.Admin);
             var workspaceId = a.WorkspaceId;
 
-            var answers = await HeldActorsAsync(workspaceId, [a.Id, b.Id],
+            var answers = await MemberLockHold.RunAsync(api, workspaceId, [a.Id, b.Id],
                 () => ChangeAsync(workspaceId, a, b, Roles.Viewer), () => ChangeAsync(workspaceId, b, target, Roles.Owner));
 
             Assert.Equal(HttpStatusCode.NoContent, answers[0].StatusCode);
@@ -235,7 +222,7 @@ public sealed class OwnerRaceTests(ApiFactory api)
             var member = await RemoteKit.MemberAsync(api, owner, "ar-m");
             var workspaceId = owner.WorkspaceId;
 
-            var answers = await HeldActorsAsync(workspaceId, [owner.Id, admin.Id],
+            var answers = await MemberLockHold.RunAsync(api, workspaceId, [owner.Id, admin.Id],
                 () => RemoveAsync(workspaceId, owner, admin), () => RemoveAsync(workspaceId, admin, member));
 
             Assert.Equal(HttpStatusCode.NoContent, answers[0].StatusCode);
