@@ -64,6 +64,54 @@ public sealed partial class RunRelayTests
     }
 
     [Fact]
+    public async Task A_burst_of_runs_all_decided_before_the_settings_read_costs_one_read()
+    {
+        if (!ExecFixture.Unix) return;
+        Settings(remoteRuns: false);
+        var decided = DateTimeOffset.UtcNow.AddMinutes(-1); // well before the read, whatever a few seconds of clock skew
+        foreach (var run in new[] { Shell("echo 1", decided), Shell("echo 2", decided), Shell("echo 3", decided) })
+        {
+            Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
+            Assert.Equal(RemoteErrors.Disabled, fx.Store.ExecRunOf(run.Id.ToString())!.Error);
+        }
+
+        Assert.Equal(1, fx.Fake.Count("GET /api/agent/settings"));
+    }
+
+    [Fact]
+    public async Task A_run_decided_after_the_last_settings_read_forces_a_new_read_and_executes_when_the_switch_is_now_on()
+    {
+        if (!ExecFixture.Unix) return;
+        Settings(remoteRuns: false);
+        var early = Shell("echo early", DateTimeOffset.UtcNow.AddMinutes(-1));
+        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(early), CancellationToken.None));
+        Assert.Equal(RemoteErrors.Disabled, fx.Store.ExecRunOf(early.Id.ToString())!.Error);
+        Assert.Equal(1, fx.Fake.Count("GET /api/agent/settings"));
+
+        // the admin turns the switch on; the server approves a run after the read the agent still holds (under 10 s old)
+        Settings(remoteRuns: true);
+        var late = Shell("echo decided-late", DateTimeOffset.UtcNow);
+        Routes(late.Id);
+        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(late), CancellationToken.None));
+
+        Assert.True(await Finished(late.Id));
+        Assert.Equal(RunStatuses.Succeeded, fx.Store.ExecRunOf(late.Id.ToString())!.FinalStatus);
+        Assert.Equal(2, fx.Fake.Count("GET /api/agent/settings"));
+    }
+
+    [Fact]
+    public async Task A_run_decided_after_the_read_is_still_refused_when_the_switch_reads_off_again()
+    {
+        if (!ExecFixture.Unix) return;
+        Settings(remoteRuns: false);
+        var run = Shell("echo no", DateTimeOffset.UtcNow.AddSeconds(1)); // a server clock a little ahead of this one
+        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
+        Assert.Equal(RemoteErrors.Disabled, fx.Store.ExecRunOf(run.Id.ToString())!.Error);
+        Assert.Equal(1, fx.Fake.Count("GET /api/agent/settings"));
+        Assert.Equal(0, Volatile.Read(ref guardCalls));
+    }
+
+    [Fact]
     public async Task A_settings_read_that_fails_leaves_the_run_unrecorded_so_the_replay_can_run_it()
     {
         if (!ExecFixture.Unix) return;

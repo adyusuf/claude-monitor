@@ -49,8 +49,8 @@ public sealed partial class RunRelayTests : IDisposable
 
     private static JsonElement Message(RunMessage run) => JsonSerializer.SerializeToElement(run, ApiClient.Json);
 
-    private static RunMessage Shell(string command) =>
-        new(Guid.NewGuid(), RunModes.Shell, null, command, null, 60, DateTimeOffset.UtcNow.AddMinutes(5), null, null);
+    private static RunMessage Shell(string command, DateTimeOffset? decidedAt = null) =>
+        new(Guid.NewGuid(), RunModes.Shell, null, command, null, 60, DateTimeOffset.UtcNow.AddMinutes(5), null, null, decidedAt);
 
     private Task<bool> Finished(Guid id) => ExecHarness.UntilAsync(() => fx.Store.ExecRunOf(id.ToString())?.State == LocalStore.ExecStates.Finished);
 

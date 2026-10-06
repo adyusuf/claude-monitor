@@ -211,9 +211,12 @@ public sealed class RunApprovalTests(ApiFactory api)
         using var stream = await RemoteKit.OpenAsync(team.Target.Http, "/api/agent/stream");
         await RemoteKit.NextEventAsync(stream, AgentStreamEvents.Ready);
         var (req, id) = await AskAsync(team);
+        api.Clock.Advance(TimeSpan.FromMinutes(3)); // asked earlier than approved: DecidedAt is the approval, not the creation
+        var approvedAt = api.Clock.GetUtcNow();
         Assert.Equal(HttpStatusCode.NoContent, (await RemoteKit.ApproveAsync(team.Owner, id, req)).StatusCode);
 
         var run = await RemoteKit.RunEventAsync(stream, AgentStreamEvents.Run, id);
+        Assert.InRange(run.GetProperty("decidedAt").GetDateTimeOffset() - approvedAt, -Ms, Ms);
         Assert.Equal("argv", run.GetProperty("mode").GetString());
         Assert.Equal(req.Argv, run.GetProperty("argv").EnumerateArray().Select(a => a.GetString()!).ToList());
         Assert.Equal("/tmp", run.GetProperty("cwd").GetString());
@@ -238,6 +241,7 @@ public sealed class RunApprovalTests(ApiFactory api)
         using var stream = await RemoteKit.OpenAsync(team.Target.Http, "/api/agent/stream");
         var first = await RemoteKit.NextEventAsync(stream, AgentStreamEvents.Run);
         Assert.Equal(waiting, first.GetProperty("id").GetGuid());
+        Assert.NotEqual(JsonValueKind.Null, first.GetProperty("decidedAt").ValueKind); // a replayed run carries its decision time too
     }
 
     [Fact]
