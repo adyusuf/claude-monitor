@@ -125,15 +125,17 @@ internal static class ExecPaths
 
     /// <summary>
     /// A program file the service account cannot have replaced: on Unix it and every folder above it is owned by
-    /// root and writable by neither group nor others. Windows relies on the install folder's ACL and the .exe rule;
-    /// the Administrators-owned check is v2. Where the owner cannot be read (see <see cref="UnixFileInfo"/>) only the
-    /// permission bits are checked.
+    /// root and writable by neither group nor others. On Windows it and every folder up to the drive root must be owned
+    /// by an administrator principal and grant no write-like right to anyone else (<see cref="WindowsAclVerdict"/>).
+    /// Where the Unix owner cannot be read (see <see cref="UnixFileInfo"/>) only the permission bits are checked.
+    /// <paramref name="windowsReader"/> replaces the ACL reader (tests); by default only a Windows host can read ACLs,
+    /// and a host that cannot answers "untrusted" for a Windows target.
     /// </summary>
-    public static bool IsTrustedExecutable(string realExe, string os)
+    public static bool IsTrustedExecutable(string realExe, string os, Func<string, IReadOnlyList<PathAcl>?>? windowsReader = null)
     {
         if (os == OsKinds.Windows || OperatingSystem.IsWindows())
         {
-            return true;
+            return WindowsAclVerdict.Evaluate((windowsReader ?? ReadWindowsAcls)(realExe)).Trusted;
         }
 
         try
@@ -160,6 +162,9 @@ internal static class ExecPaths
             return false;
         }
     }
+
+    private static IReadOnlyList<PathAcl>? ReadWindowsAcls(string realExe) =>
+        OperatingSystem.IsWindows() ? WindowsAclReader.ReadChain(realExe) : null;
 
     /// <summary>A file with more than one hard link can be reached from outside the root it seems to sit in.</summary>
     public static bool HasExtraLinks(string realPath, string os)
