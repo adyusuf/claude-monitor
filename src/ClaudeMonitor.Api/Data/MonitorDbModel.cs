@@ -1,3 +1,4 @@
+using ClaudeMonitor.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Data;
@@ -62,7 +63,12 @@ internal static class MonitorDbModel
         b.Entity<WorkspaceSettings>(e =>
         {
             e.HasKey(x => x.WorkspaceId);
-            e.ToTable(t => t.HasCheckConstraint("ck_workspace_settings_retention", "retention_days BETWEEN 1 AND 3650"));
+            e.Property(x => x.AgentUpdate).HasDefaultValue(UpdateModes.Off);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_workspace_settings_retention", "retention_days BETWEEN 1 AND 3650");
+                t.HasCheckConstraint("ck_workspace_settings_agent_update", In("agent_update", [.. UpdateModes.All]));
+            });
         });
         b.Entity<Machine>(e =>
         {

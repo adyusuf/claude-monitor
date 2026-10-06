@@ -7,6 +7,7 @@ using ClaudeMonitor.Api.Ingest;
 using ClaudeMonitor.Api.Mail;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Streaming;
+using ClaudeMonitor.Api.Update;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public static class Startup
         services.AddSingleton(config);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Broker>();
+        services.AddSingleton<UpdateCatalog>();
         services.AddDbContext<MonitorDb>(o => o.UseNpgsql(config.DatabaseUrl));
         services.AddSingleton<IMailer, SmtpMailer>();
         services.AddScoped<BatchIngestor>();
@@ -77,7 +79,7 @@ public static class Startup
             // verified. Here every file is served as what it is, and a missing one is a 404, never the page.
             app.UseStaticFiles(new StaticFileOptions
             {
-                FileProvider = new SubFolderProvider(files, "downloads"),
+                FileProvider = new SubFolderProvider(files, ApiConfig.DownloadsFolder),
                 RequestPath = DownloadsPath,
                 ServeUnknownFileTypes = true,
                 DefaultContentType = "application/octet-stream",
@@ -114,7 +116,7 @@ public static class Startup
         }
     }
 
-    public const string DownloadsPath = "/downloads";
+    public const string DownloadsPath = "/" + ApiConfig.DownloadsFolder;
 
     /// <summary>A folder of the web root that may appear after the start (the deploy copies the builds in).</summary>
     private sealed class SubFolderProvider(IFileProvider root, string folder) : IFileProvider

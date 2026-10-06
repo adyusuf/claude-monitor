@@ -15,6 +15,11 @@ public sealed record ApiConfig
     public OAuthClient? Google { get; init; }
     public required string ArchiveDir { get; init; }
     public string? WebRoot { get; init; }
+
+    /// <summary>The folder inside the web root that holds the agent builds, SHA256SUMS and the signed manifest.json.</summary>
+    public const string DownloadsFolder = "downloads";
+
+    public string? DownloadsDir => WebRoot is { Length: > 0 } root ? Path.Combine(Path.GetFullPath(root), DownloadsFolder) : null;
     public required string Commit { get; init; }
     public required Version MinimumAgentVersion { get; init; }
 

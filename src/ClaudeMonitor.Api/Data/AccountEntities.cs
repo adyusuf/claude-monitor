@@ -145,6 +145,9 @@ public sealed class WorkspaceSettings
     public bool MaskSecrets { get; set; } = true;
     public int RetentionDays { get; set; } = 90;
     public int EventMaxBytes { get; set; } = 262_144;
+
+    /// <summary>The most an agent of this workspace may do about updating itself (<see cref="ClaudeMonitor.Contracts.UpdateModes"/>); off until an admin says otherwise.</summary>
+    public string AgentUpdate { get; set; } = ClaudeMonitor.Contracts.UpdateModes.Off;
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
 }
