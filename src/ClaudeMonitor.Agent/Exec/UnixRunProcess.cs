@@ -41,18 +41,21 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
 
     private readonly int _pid;
     private readonly DescendantTracker? _tracker;
+    private readonly Action<string>? _log;
 
     private UnixRunProcess(Stream stdout, Stream stderr, int pid, DescendantTracker? tracker, Action<string>? log) : base(stdout, stderr, log)
     {
         _pid = pid;
         _tracker = tracker;
+        _log = log;
     }
 
     /// <summary>
     /// <paramref name="trackEvery"/> above zero turns the descendant tracker on, on macOS only (Linux has the cgroup).
+    /// <paramref name="trackerFor"/> (tests) replaces the tracker that would be started: it gets the new process's pid.
     /// </summary>
     public static UnixRunProcess Start(string exe, IReadOnlyList<string> argv, string cwd, IReadOnlyDictionary<string, string> env,
-        TimeSpan trackEvery = default, Action<string>? log = null)
+        TimeSpan trackEvery = default, Action<string>? log = null, Func<int, DescendantTracker?>? trackerFor = null)
     {
         // .NET creates both pipes close-on-exec, so no other child can inherit them; the spawn dup2s the write ends to 1 and 2.
         var stdout = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
@@ -62,7 +65,7 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
             var pid = Spawn(exe, argv, cwd, env, FdOf(stdout.ClientSafePipeHandle), FdOf(stderr.ClientSafePipeHandle));
             stdout.DisposeLocalCopyOfClientHandle(); // else the read end never sees the end of the output
             stderr.DisposeLocalCopyOfClientHandle();
-            var tracker = StartTracker(pid, trackEvery, log);
+            var tracker = trackerFor is null ? StartTracker(pid, trackEvery, log) : trackerFor(pid);
             var process = new UnixRunProcess(stdout, stderr, pid, tracker, log);
             process.BeginWait();
             return process;
