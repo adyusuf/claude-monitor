@@ -29,7 +29,9 @@ parts (update, restart, resume). A spike on the maintainer's Mac (06/10/2026) me
    the version they started with until their owner restarts them.
 2. **Two consents, default off.** The workspace setting `claudeUpdate` (admin, audited) **and** the machine's own
    (`cm-agent config claude-update on|off`, `CM_CLAUDE_UPDATE` wins) must both be on. Unread or unknown is off; `cm-agent login`
-   and `logout` forget the workspace's answer (the next workspace may forbid it) until the daemon's next settings pass.
+   and `logout` forget the workspace's answer (the next workspace may forbid it) until the daemon's next settings pass. An
+   answer is tagged with the workspace it came from and counts only for the workspace in `agent.json`, so a settings pass
+   still in flight during a login cannot carry the old workspace's consent over (the agent-update cap likewise).
 3. **Only installs that update themselves.** The `claude` found on the PATH is resolved to where it really lives and
    classified: an npm install (`node_modules/@anthropic-ai/claude-code`, or the Windows `claude.cmd` shim beside it) or a
    native installer install (`~/.local/share/claude`, `~/.claude/local`). The desktop app (`.app`, `WindowsApps`) and a
@@ -53,7 +55,8 @@ parts (update, restart, resume). A spike on the maintainer's Mac (06/10/2026) me
    `ClaudeUpdateEvery`.
 7. **The daemon's stop ends `claude update`.** When the daemon stops (its own token, or the stop request of a self-update) while
    `claude update` runs, the process tree is killed at once, the attempt is recorded as `interrupted` and is not tried again
-   before the update retry delay. The stop must fit the self-update's budget (`UpdateStopWait`, 30 s; a daemon that misses it
+   before the update retry delay. A stop that lands after `claude update` ended but before its version was read is also
+   `interrupted`, never "up to date". The stop must fit the self-update's budget (`UpdateStopWait`, 30 s; a daemon that misses it
    keeps the old version, and a rollback kills its whole process tree). Leaving `claude update` to finish detached was considered
    and rejected: it would not be left alone (that rollback kill, a systemd service's `KillMode=control-group`), its output pipes
    close with the daemon, and nobody would then bound or record it. The runner already killed the tree when
