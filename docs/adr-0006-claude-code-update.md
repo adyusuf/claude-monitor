@@ -30,8 +30,9 @@ parts (update, restart, resume). A spike on the maintainer's Mac (06/10/2026) me
 2. **Two consents, default off.** The workspace setting `claudeUpdate` (admin, audited) **and** the machine's own
    (`cm-agent config claude-update on|off`, `CM_CLAUDE_UPDATE` wins) must both be on. Unread or unknown is off; `cm-agent login`
    and `logout` forget the workspace's answer (the next workspace may forbid it) until the daemon's next settings pass. An
-   answer is tagged with the workspace it came from and counts only for the workspace in `agent.json`, so a settings pass
-   still in flight during a login cannot carry the old workspace's consent over (the agent-update cap likewise).
+   answer is tagged with the workspace `agent.json` named when the settings read began and counts only while `agent.json`
+   still names it, so a settings pass still in flight during a login cannot carry the old workspace's consent over (the
+   agent-update cap likewise); `cm-agent status` shows such an answer as `unread`.
 3. **Only installs that update themselves.** The `claude` found on the PATH is resolved to where it really lives and
    classified: an npm install (`node_modules/@anthropic-ai/claude-code`, or the Windows `claude.cmd` shim beside it) or a
    native installer install (`~/.local/share/claude`, `~/.claude/local`). The desktop app (`.app`, `WindowsApps`) and a

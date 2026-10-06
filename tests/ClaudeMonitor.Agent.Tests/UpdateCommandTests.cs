@@ -87,8 +87,8 @@ public sealed class UpdateCommandTests : IDisposable
     // ---- status ------------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData("off", null, "auto-update: off (this machine: off, workspace: off)")]
-    [InlineData("on", null, "auto-update: off (this machine: on, workspace: off)")]
+    [InlineData("off", null, "auto-update: off (this machine: off, workspace: unread)")]
+    [InlineData("on", null, "auto-update: off (this machine: on, workspace: unread)")]
     [InlineData("on", "on", "auto-update: on (this machine: on, workspace: on)")]
     [InlineData("on", "check", "auto-update: check (this machine: on, workspace: check)")]
     [InlineData("check", "on", "auto-update: check (this machine: check, workspace: on)")]

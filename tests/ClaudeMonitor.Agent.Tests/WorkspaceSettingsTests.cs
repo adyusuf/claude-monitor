@@ -50,14 +50,29 @@ public sealed class WorkspaceSettingsTests : IDisposable
     }
 
     [Fact]
-    public async Task An_answer_for_the_previous_workspace_that_lands_after_login_leaves_every_switch_off()
+    public async Task A_settings_pass_that_a_login_overtakes_leaves_every_switch_off_until_the_next_pass()
     {
-        await Answer(Guid.NewGuid()); // the old workspace's answer, written after login saved the new workspace
+        var next = Guid.NewGuid();
+        fx.Fake.On("GET /api/agent/settings", _ =>
+        {
+            // `cm-agent login` to another workspace lands while the old workspace's answer is on its way
+            (Identity.Load(fx.Home.Config) with { WorkspaceId = next }).Save(fx.Home.Config);
+            return (HttpStatusCode.OK, System.Text.Json.JsonSerializer.Serialize(
+                new AgentSettings(true, 1000, current, UpdateModes.On, RemoteRuns: true, ClaudeUpdate: true), Net.ApiClient.Json));
+        });
+        await relay.SettingsAsync(CancellationToken.None);
 
         Assert.Equal((false, UpdateModes.Off, (string?)null), Switches());
         Assert.Equal("true", fx.Store.Get(ClaudePolicy.WorkspaceKey)); // stored, but not trusted
 
-        await Answer(current); // the next pass, with the new tokens
+        await Answer(next); // the next pass, with the new tokens and agent.json
+        Assert.Equal((true, UpdateModes.On, "true"), Switches());
+    }
+
+    [Fact]
+    public async Task An_agent_moved_to_another_workspace_on_the_web_keeps_trusting_what_the_server_answers()
+    {
+        await Answer(Guid.NewGuid()); // same tokens, agent.json still names the workspace it logged in to
         Assert.Equal((true, UpdateModes.On, "true"), Switches());
     }
 
