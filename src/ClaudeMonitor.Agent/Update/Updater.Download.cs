@@ -54,7 +54,8 @@ public sealed partial class Updater
 
         if (ExtractBinary(zip, staged) is { } bad) return bad;
         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(staged, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        if (OperatingSystem.IsMacOS() && runner.Run("/usr/bin/codesign", ["--verify", "--strict", staged], config.UpdateProbeTimeout).ExitCode != 0)
+        // Decided by the OS the build was signed for (the host's own outside tests): codesign exists only on macOS.
+        if (config.UpdateOs == OsKinds.MacOs && runner.Run("/usr/bin/codesign", ["--verify", "--strict", staged], config.UpdateProbeTimeout).ExitCode != 0)
         {
             return new(UpdateCodes.BadBinary, "the binary carries no valid macOS code signature");
         }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Push;
@@ -83,12 +84,35 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
 
     public async Task SettingsAsync(CancellationToken ct)
     {
+        // The tag is the workspace agent.json names as the pass begins, not the one in the answer: a pass that `cm-agent login`
+        // overtakes is then tagged with the old workspace and reads as off, while an agent moved to another workspace on the web
+        // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
+        var workspace = Identity.Peek(config)?.WorkspaceId;
         var s = await api.SettingsAsync(ct);
         store.Set("settings.mask_secrets", s.MaskSecrets ? "true" : "false");
         store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
         store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate));
         MachineMonitor.Remember(store, s);
         store.Set(ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false");
+        if (workspace is { } w) WorkspaceSettings.Tag(store, w);
+        lastSettingsAt = clock.GetUtcNow();
+    }
+
+    private DateTimeOffset lastSettingsAt = DateTimeOffset.MinValue;
+
+    /// <summary>A settings read this recent is reused when a run finds the switch off: a burst of runs costs one read.</summary>
+    public static readonly TimeSpan SettingsReuse = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The workspace's remote-runs switch for this run. Unread, another workspace's or off is no; but a switch an admin has
+    /// just turned on is only learned at the next settings pass (SettingsEvery), so before refusing, the settings are read
+    /// again once. A failed read is not swallowed: the stream reconnects and the server replays the approved run.
+    /// </summary>
+    private async Task<bool> RemoteRunsOnAsync(CancellationToken ct)
+    {
+        if (WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true") return true;
+        if (clock.GetUtcNow() - lastSettingsAt >= SettingsReuse) await SettingsAsync(ct);
+        return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
     }
 
     /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
@@ -134,7 +158,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.Run:
                 var run = data.Deserialize<RunMessage>(ApiClient.Json)!;
-                if (Runs is null || store.Get(MachineMonitor.RemoteRunsKey) == "false")
+                if (Runs is null || !await RemoteRunsOnAsync(ct))
                 {
                     if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
                     {

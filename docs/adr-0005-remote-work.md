@@ -48,7 +48,11 @@ target daemon --executes, masks, caps--> API --> requester's daemon --> local SQ
 A run executes only when **all** hold; each one defaults to "no".
 
 1. **Workspace switch** `remote_runs_enabled`, set by an admin (default off). Checked at create, delivery and exec;
-   turning it off cancels pending runs.
+   turning it off cancels pending runs. The target's own copy counts only when it was read for the workspace in its
+   `agent.json` (the daemon tags the stored settings with the workspace `agent.json` named when the read began, so an agent
+   moved on the web keeps working and a read that a login overtakes does not count); unread or another workspace's is off,
+   and `cm-agent login`/`logout` forget it. Before refusing a run for an off or unread copy, the target reads the settings
+   once more (at most once per 10 s), so a switch an admin has just turned on is not missed until the next settings pass.
 2. **Local exec level on the target**, `cm-agent install --exec off|argv|shell` (default `off`; `shell` is a separate,
    stronger opt-in). In service mode it lives in an **admin-owned file the service account cannot write**, with an
    optional local ceiling (allowed executables and roots). The API can never raise it. Shell text cannot be held to a

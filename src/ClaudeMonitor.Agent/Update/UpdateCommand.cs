@@ -98,7 +98,8 @@ public static class UpdateCommand
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(store);
-        var workspace = UpdateModes.Normalize(store.Get(UpdatePolicy.WorkspaceKey));
+        var answer = Daemon.WorkspaceSettings.Get(config, store, UpdatePolicy.WorkspaceKey);
+        var workspace = answer is null ? Daemon.WorkspaceSettings.Unread : UpdateModes.Normalize(answer);
         yield return $"auto-update: {UpdatePolicy.Effective(config, store)} (this machine: {config.AutoUpdate}, workspace: {workspace})";
         var state = UpdateState.Load(config);
         if (state.Phase == UpdateState.PendingHealth) yield return $"update: {state.From} -> {state.To} is being checked";

@@ -2,6 +2,9 @@
 
 **Status:** Accepted (06/10/2026). Extends [ADR-0002](adr-0002-agent-platform.md); the agent's `/downloads` folder and
 minimum-version gate (426) are from there.
+**Amended (06/10/2026):** Linux builds (ADR-0005) update the same way: `/api/agent/latest` accepts `os=linux`, `scripts/sign_manifest.py`
+signs `cm-agent-linux-<arch>.zip`, and the swap is the macOS one (copy to `.prev`, rename over the running binary) without codesign. The
+platform steps follow the OS the build was signed for. A service agent (any OS) has no binary in its home to replace and gets `not-installed`.
 **Decider:** the maintainer asked for it; the trust model below was chosen so that a compromised server cannot
 push code to the machines.
 
@@ -75,7 +78,7 @@ agent. The manifest is not time-limited: any validly signed build that is newer 
 There is no OS service (the hooks start the daemon on demand), so the update does its own process control:
 
 - **Stage:** the verified binary is written beside the installed one as `<bin>.new`, so the final rename never crosses a volume.
-- **macOS:** the old binary is copied to `<bin>.prev`, then `<bin>.new` is renamed over the binary (atomic).
+- **macOS and Linux:** the old binary is copied to `<bin>.prev`, then `<bin>.new` (mode 0755) is renamed over the binary (atomic).
 - **Windows:** a running exe cannot be overwritten but can be renamed: the running exe is renamed to `<bin>.prev`, then `<bin>.new` is moved in. If an old `.prev` is locked and cannot be deleted it is renamed `<bin>.old<id>` and deleted at the next daemon start.
 - **Stopping the daemon:** an update writes a stop-request file (`daemon.stop`); the daemon sees it, exits, and "stopped" means its exclusive lock is free. The new daemon is started from the installed binary.
 - **Health:** the new daemon has `UpdateHealthWait` (90 s; counted from when it was started, so the old daemon's last heartbeat does not count) to be answered by the API. Healthy: it reports its version and the API answered it. **Rolled back:** it is gone, reports no version, or the API refused it; the previous binary is restored and the version is **blocked from automatic retry** (`update-state.json`, `BlockedVersion`). **Not judged:** it runs but its heartbeats failed only for want of a network (the exception type is kept in the local store): that says nothing against the build, so it stays, unconfirmed, and nothing is blocked. A new daemon that ignores the stop request on rollback is killed (the pid it wrote to `daemon.pid`, only while it holds the lock and is still a `cm-agent`); if even that fails the old binary is restored on disk anyway and the result is `rollback-stuck` (end the process by hand).
@@ -88,7 +91,7 @@ to update the first would be a second thing to sign, trust and keep alive.
 
 ### (e) API (additive, global #4)
 
-- `GET /api/agent/latest?os=<macos|windows>&arch=<arm64|x64>`, agent token. It is **deliberately outside the 426 minimum-version gate**, so an
+- `GET /api/agent/latest?os=<macos|windows|linux>&arch=<arm64|x64>`, agent token. It is **deliberately outside the 426 minimum-version gate**, so an
   agent below the minimum can still fetch its update. Answer: `{version, url, sha256, signature, minSupported, channel}`; `404 no_update` when nothing is published for that OS and CPU.
 - The `url` is built from the server's own public origin and `downloads/manifest.json`, written by `scripts/sign_manifest.py` at release. **Channel separation therefore follows the deploy:** a server offers whatever its web root holds.
 - The machine list rows gain `latestVersion` and `updateAvailable`.

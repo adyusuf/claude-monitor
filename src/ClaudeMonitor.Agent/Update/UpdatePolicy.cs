@@ -15,7 +15,7 @@ public static class UpdatePolicy
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(store);
-        return UpdateModes.Lower(config.AutoUpdate, store.Get(WorkspaceKey));
+        return UpdateModes.Lower(config.AutoUpdate, Daemon.WorkspaceSettings.Get(config, store, WorkspaceKey));
     }
 }
 

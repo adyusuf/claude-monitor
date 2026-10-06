@@ -42,8 +42,9 @@ public static class ClaudeUpdateCommand
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(clock);
         var machine = Config.SavedSettings.Apply(config).ClaudeUpdateEnabled;
-        var workspace = store.Get(ClaudePolicy.WorkspaceKey) == "true";
-        yield return $"claude-update: {(machine && workspace ? "on" : "off")} (this machine: {(machine ? "on" : "off")}, workspace: {(workspace ? "on" : "off")})";
+        var answer = Daemon.WorkspaceSettings.Get(config, store, ClaudePolicy.WorkspaceKey);
+        var workspace = answer == "true";
+        yield return $"claude-update: {(machine && workspace ? "on" : "off")} (this machine: {(machine ? "on" : "off")}, workspace: {(answer is null ? Daemon.WorkspaceSettings.Unread : workspace ? "on" : "off")})";
         if (!machine && !workspace) yield break;
         var state = ClaudeUpdateState.Load(config);
         if (DateTimeOffset.TryParse(state.CountdownUntil, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var until) && until > clock.GetUtcNow())

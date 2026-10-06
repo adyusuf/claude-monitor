@@ -184,13 +184,14 @@ public sealed class CommandReplyTests(ApiFactory api)
     public async Task The_time_the_agent_reports_is_the_applied_time_only_when_it_is_believable()
     {
         var s = await NewSessionAsync();
-        api.Clock.Advance(TimeSpan.FromSeconds(10));
+        api.Clock.Advance(TimeSpan.FromSeconds(10) + TimeSpan.FromTicks(7)); // below a microsecond, as a Linux clock reads
         var now = api.Clock.GetUtcNow();
-        Assert.Equal(now.AddSeconds(-7), await AppliedAtAsync(s, await AppliedAsync(s, "reported", now.AddSeconds(-7))));
-        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "older agent")));
-        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "a clock a little ahead", now.AddSeconds(1)))); // never in the future
-        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "a clock far ahead", now.AddHours(1))));
-        Assert.Equal(now, await AppliedAtAsync(s, await AppliedAsync(s, "before it existed", now.AddHours(-1))));
+        var stored = now.AddTicks(-(now.Ticks % TimeSpan.TicksPerMicrosecond)); // PostgreSQL keeps microseconds
+        Assert.Equal(stored.AddSeconds(-7), await AppliedAtAsync(s, await AppliedAsync(s, "reported", now.AddSeconds(-7))));
+        Assert.Equal(stored, await AppliedAtAsync(s, await AppliedAsync(s, "older agent")));
+        Assert.Equal(stored, await AppliedAtAsync(s, await AppliedAsync(s, "a clock a little ahead", now.AddSeconds(1)))); // never in the future
+        Assert.Equal(stored, await AppliedAtAsync(s, await AppliedAsync(s, "a clock far ahead", now.AddHours(1))));
+        Assert.Equal(stored, await AppliedAtAsync(s, await AppliedAsync(s, "before it existed", now.AddHours(-1))));
     }
 
     [Fact]

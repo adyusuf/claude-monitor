@@ -173,6 +173,25 @@ public sealed class ClaudeUpdaterStopTests : IDisposable
     }
 
     [Fact]
+    public async Task A_stop_after_claude_update_ended_but_before_the_version_was_read_is_interrupted_not_up_to_date()
+    {
+        using var stop = new CancellationTokenSource();
+        runner.OnUpdate = _ =>
+        {
+            stop.Cancel(); // the update finished; the stop lands before the version check
+            return new(ProcessEnd.Exited, 0, "");
+        };
+
+        var outcome = await updater.RunAsync(stop.Token);
+
+        Assert.Equal(ClaudeCodes.Interrupted, outcome.Code);
+        Assert.Contains("before it read the new version", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(["--version", "update", "--version"], Asked(runner));
+        Assert.Equal(0, kit.State.Failures);
+        kit.AssertNextAt(kit.Config.UpdateRetryAfter);
+    }
+
+    [Fact]
     public async Task A_failure_still_probes_the_version_after_it_so_the_state_shows_what_is_installed()
     {
         runner.OnUpdate = _ => new(ProcessEnd.Exited, 1, "");
