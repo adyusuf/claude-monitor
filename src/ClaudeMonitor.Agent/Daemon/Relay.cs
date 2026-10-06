@@ -103,21 +103,31 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
             (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
         ];
         if (workspace is { } w) entries.Add(WorkspaceSettings.TagEntry(w));
-        store.SetMany(entries);
-        StampSettingsRead(began);
+        StoreRead(began, entries);
     }
 
-    // UTC ticks of the newest successful read's start. Two passes (this loop's and the stream's re-read) may overlap, so only a
-    // later start replaces it: the larger value wins.
+    // UTC ticks of the newest successful read's start. Two passes (this loop's and the stream's re-read) may overlap, so the
+    // values and this stamp are written together, under one lock, and only by the pass that began later (see StoreRead).
     private long lastSettingsTicks = DateTimeOffset.MinValue.UtcTicks;
 
+    private readonly Lock settingsGate = new();
+
+    // Readable without the lock: the ticks are only ever replaced whole.
     private DateTimeOffset LastSettingsAt => new(Interlocked.Read(ref lastSettingsTicks), TimeSpan.Zero);
 
-    private void StampSettingsRead(DateTimeOffset began)
+    // The values and the stamp of one pass go in as one step. A pass that began earlier than the stamp already stored lost the
+    // race to a newer pass whose (fresher) values are in the store, so its older answer is dropped instead of overwriting them.
+    // A stamp after the current time cannot be right (the clock was stepped back since): it is not compared against, so the
+    // pass that now reads replaces it, even with an earlier time.
+    private void StoreRead(DateTimeOffset began, List<(string Key, string Value)> entries)
     {
-        long seen;
-        do seen = Interlocked.Read(ref lastSettingsTicks);
-        while (began.UtcTicks > seen && Interlocked.CompareExchange(ref lastSettingsTicks, began.UtcTicks, seen) != seen);
+        lock (settingsGate)
+        {
+            var stored = LastSettingsAt;
+            if (stored <= clock.GetUtcNow() && began < stored) return;
+            store.SetMany(entries);
+            Interlocked.Exchange(ref lastSettingsTicks, began.UtcTicks);
+        }
     }
 
     /// <summary>
@@ -146,6 +156,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         if (WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true") return true;
         var now = clock.GetUtcNow();
         var readBegan = LastSettingsAt;
+        if (readBegan > now) readBegan = DateTimeOffset.MinValue; // a stamp from the future cannot be trusted: read again
         var decidedAfterRead = run.DecidedAt is { } decided && readBegan < decided + DecisionSkew;
         if (now - readBegan >= SettingsReuse || decidedAfterRead) await SettingsAsync(ct);
         return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
