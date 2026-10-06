@@ -1,6 +1,6 @@
 # ADR-0002: An agent on every machine, a central API and a web app
 
-**Status:** Accepted (03/10/2026). Replaces the local live board; supersedes ADR-0001.
+**Status:** Accepted (03/10/2026). Replaces the local live board; supersedes ADR-0001. Amended by [ADR-0004](adr-0004-remote-work.md) (boot service, Linux, service credentials, remote runs).
 **Deciders:** the maintainer.
 **Data model:** [`data-model.md`](data-model.md).
 
