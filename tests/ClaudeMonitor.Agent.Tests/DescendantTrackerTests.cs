@@ -203,4 +203,30 @@ public sealed class DescendantTrackerTests
             Assert.Throws<IOException>(tracker.Poll);
         }
     }
+
+    [Fact]
+    public async Task A_background_poll_that_throws_something_other_than_an_IO_error_does_not_end_the_thread_and_logs_once_per_streak()
+    {
+        var table = new FakeTable();
+        table.Add(Lead, 1);
+        var lines = new List<string>();
+        using var tracker = new DescendantTracker(Lead, table, (_, _) => { }, TimeSpan.FromMilliseconds(10), line => { lock (lines) lines.Add(line); });
+        List<string> Logged() { lock (lines) return [.. lines]; }
+
+        table.Failure = new InvalidOperationException("table broke at /home/someone/secret-folder");
+        Assert.True(await ExecHarness.UntilAsync(() => tracker.PollFailures >= 5), "the failures were not counted");
+        var first = Assert.Single(Logged()); // five failures, one line
+        Assert.Contains(nameof(InvalidOperationException), first, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-folder", first, StringComparison.Ordinal);
+
+        table.Failure = null; // the thread is alive: the next poll records what is there
+        table.Add(101, Lead, group: 101);
+        Assert.True(await ExecHarness.UntilAsync(() => tracker.TrackedPids.Contains(101)), "the poll thread did not recover");
+
+        table.Failure = new InvalidOperationException("again"); // a new streak logs again
+        Assert.True(await ExecHarness.UntilAsync(() => Logged().Count == 2), "the second streak was not logged");
+        var failures = tracker.PollFailures;
+        Assert.True(await ExecHarness.UntilAsync(() => tracker.PollFailures >= failures + 3));
+        Assert.Equal(2, Logged().Count);
+    }
 }

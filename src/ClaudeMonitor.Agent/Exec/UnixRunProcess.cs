@@ -62,7 +62,7 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
             var pid = Spawn(exe, argv, cwd, env, FdOf(stdout.ClientSafePipeHandle), FdOf(stderr.ClientSafePipeHandle));
             stdout.DisposeLocalCopyOfClientHandle(); // else the read end never sees the end of the output
             stderr.DisposeLocalCopyOfClientHandle();
-            var tracker = StartTracker(pid, trackEvery);
+            var tracker = StartTracker(pid, trackEvery, log);
             var process = new UnixRunProcess(stdout, stderr, pid, tracker, log);
             process.BeginWait();
             return process;

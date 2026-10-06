@@ -36,14 +36,18 @@ internal sealed class DescendantTracker : IDisposable
     private readonly Dictionary<int, ProcessStamp> _tracked = [];
     private readonly ManualResetEventSlim _stop = new();
     private readonly Thread? _thread;
+    private readonly Action<string>? _log;
     private int _pollFailures;
 
     /// <summary>
     /// <paramref name="lead"/> is the run's lead pid and group id; <paramref name="signal"/> sends (pid, signal) and throws an
     /// IOException for any failure but "no such process". <paramref name="every"/> zero or less: no background polling.
+    /// <paramref name="log"/> takes one line (an error type name, no content) the first time a background poll fails after one
+    /// that worked.
     /// </summary>
-    public DescendantTracker(int lead, IProcessTable table, Action<int, int> signal, TimeSpan every)
+    public DescendantTracker(int lead, IProcessTable table, Action<int, int> signal, TimeSpan every, Action<string>? log = null)
     {
+        _log = log;
         _lead = lead;
         _table = table;
         _signal = signal;
@@ -123,17 +127,22 @@ internal sealed class DescendantTracker : IDisposable
 
     private bool IsSame(ProcessStamp recorded) => _table.Find(recorded.Pid) is { } now && now.StartMicros == recorded.StartMicros;
 
+    // Nothing may leave this thread: an exception here would end the daemon in the middle of a run.
     private void PollLoop(TimeSpan every)
     {
+        var failing = false;
         while (!_stop.Wait(every))
         {
             try
             {
                 Poll();
+                failing = false;
             }
-            catch (IOException)
+            catch (Exception e)
             {
                 Interlocked.Increment(ref _pollFailures); // counted; the kill-time Poll throws if the table is still unreadable
+                if (!failing) _log?.Invoke($"descendant poll failed ({e.GetType().Name})"); // once per streak
+                failing = true;
             }
         }
     }
