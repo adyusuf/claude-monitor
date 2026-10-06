@@ -139,7 +139,7 @@ public sealed class ClaudeCommandTests : IDisposable
     public async Task Status_by_default_shows_off_on_both_sides_and_no_further_claude_lines()
     {
         var lines = await StatusLines();
-        var at = Array.IndexOf(lines, "claude-update: off (this machine: off, workspace: off)");
+        var at = Array.IndexOf(lines, "claude-update: off (this machine: off, workspace: unread)");
         Assert.True(at >= 0, string.Join("|", lines));
         Assert.StartsWith("version: ", lines[at + 1], StringComparison.Ordinal); // nothing between it and the version
         Assert.DoesNotContain(lines, l => l.Contains("Claude Code", StringComparison.Ordinal));
@@ -153,7 +153,7 @@ public sealed class ClaudeCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, null, "claude-update: off (this machine: on, workspace: off)")]
+    [InlineData(true, null, "claude-update: off (this machine: on, workspace: unread)")]
     [InlineData(false, "true", "claude-update: off (this machine: off, workspace: on)")]
     [InlineData(true, "false", "claude-update: off (this machine: on, workspace: off)")]
     [InlineData(true, "true", "claude-update: on (this machine: on, workspace: on)")]

@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Tests;
 
 [UnsupportedOSPlatform("windows")]
-public sealed class RunRelayTests : IDisposable
+public sealed partial class RunRelayTests : IDisposable
 {
     private readonly RemoteFixture fx = new();
     private readonly List<string> stateInGuard = [];
@@ -158,76 +158,6 @@ public sealed class RunRelayTests : IDisposable
         await relay.ReportAsync(CancellationToken.None);
         Assert.Empty(fx.Store.UnsentExecOutput(10));
         Assert.True(fx.Store.ExecRunOf(run.Id.ToString())!.Reported);
-    }
-
-    [Theory]
-    [InlineData(false)] // never read
-    [InlineData(true)] // read, but for another workspace than the one in agent.json
-    public async Task A_remote_runs_switch_that_is_unread_or_another_workspaces_fails_the_run_as_disabled(bool otherWorkspace)
-    {
-        if (!ExecFixture.Unix) return;
-        if (otherWorkspace)
-        {
-            TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "true");
-            WorkspaceSettings.Tag(fx.Store, Guid.NewGuid());
-        }
-
-        Settings(remoteRuns: false);
-        var run = Shell($"echo should-not-run > {Path.Combine(fx.Home.Dir, "ran")}");
-        Routes(run.Id);
-
-        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
-        Assert.Equal(RemoteErrors.Disabled, fx.Store.ExecRunOf(run.Id.ToString())!.Error);
-        Assert.Equal(0, Volatile.Read(ref guardCalls));
-        Assert.False(File.Exists(Path.Combine(fx.Home.Dir, "ran")));
-    }
-
-    [Fact]
-    public async Task A_switch_turned_on_since_the_last_settings_pass_is_read_again_and_the_run_executes()
-    {
-        if (!ExecFixture.Unix) return;
-        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "false"); // read before the admin turned it on
-        Settings(remoteRuns: true);
-        var run = Shell("echo late-switch");
-        Routes(run.Id);
-
-        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
-        Assert.True(await Finished(run.Id));
-        Assert.Equal(RunStatuses.Succeeded, fx.Store.ExecRunOf(run.Id.ToString())!.FinalStatus);
-        Assert.Equal(1, fx.Fake.Count("GET /api/agent/settings"));
-    }
-
-    [Fact]
-    public async Task A_settings_read_that_fails_leaves_the_run_unrecorded_so_the_replay_can_run_it()
-    {
-        if (!ExecFixture.Unix) return;
-        fx.Fake.On("GET /api/agent/settings", HttpStatusCode.BadGateway, "{}");
-        var run = Shell("echo later");
-
-        await Assert.ThrowsAnyAsync<Exception>(() => stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
-        Assert.Null(fx.Store.ExecRunOf(run.Id.ToString()));
-        Assert.Equal(0, Volatile.Read(ref guardCalls));
-    }
-
-    [Fact]
-    public async Task With_remote_runs_switched_off_locally_a_run_is_failed_as_disabled_without_executing()
-    {
-        if (!ExecFixture.Unix) return;
-        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "false");
-        Settings(remoteRuns: false); // read again before refusing: still off
-        var run = Shell($"echo should-not-run > {Path.Combine(fx.Home.Dir, "ran")}");
-        Routes(run.Id);
-
-        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
-        var row = fx.Store.ExecRunOf(run.Id.ToString())!;
-        Assert.Equal((LocalStore.ExecStates.Finished, RunStatuses.Failed, RemoteErrors.Disabled), (row.State, row.FinalStatus, row.Error));
-        Assert.Equal(0, Volatile.Read(ref guardCalls));
-        Assert.False(File.Exists(Path.Combine(fx.Home.Dir, "ran")));
-
-        await relay.ReportAsync(CancellationToken.None);
-        Assert.Contains(fx.Fake.Seen, s => s.Path.EndsWith("/status", StringComparison.Ordinal) && s.Body.Contains(RemoteErrors.Disabled, StringComparison.Ordinal));
-        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None)); // a replay changes nothing
-        Assert.Equal(1, fx.Fake.Count($"POST /api/agent/runs/{run.Id}/status"));
     }
 
     [Fact]

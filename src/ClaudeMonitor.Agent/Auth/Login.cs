@@ -165,7 +165,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
     {
         config.EnsureHome();
         using var local = new LocalStore(config.DatabasePath);
-        foreach (var key in (string[])[ClaudePolicy.WorkspaceKey, Update.UpdatePolicy.WorkspaceKey, Daemon.MachineMonitor.RemoteRunsKey, Daemon.WorkspaceSettings.WorkspaceKey])
+        foreach (var key in Daemon.WorkspaceSettings.Switches)
         {
             local.Remove(key);
         }
