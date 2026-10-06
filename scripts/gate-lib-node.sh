@@ -1,13 +1,32 @@
 #!/usr/bin/env bash
 # Gate library: the Node steps (lint, typecheck, build, test, audit) and the opt-in parallel track.
-# Sourced by gate-core.sh - never run on its own. A TWIN (scripts/twins.txt). Code unchanged from
-# the former gate-core.sh lines 184-315.
+# Sourced by gate-core.sh - never run on its own. A TWIN (scripts/twins.txt): code as in the canonical
+# copy (the former gate-core.sh lines 184-315) plus node_install, which the canonical copy needs too.
 # shellcheck shell=bash
 
 # ── Node steps as functions ──────────────────────────────────────────────────
 # Serial mode calls each one where its section is; GATE_PARALLEL_NODE=1 runs them
 # all as one track beside the .NET steps (node_start / node_join below).
+# A fresh checkout or worktree has no node_modules, and lint / tsc / build / test then fail with
+# "eslint: command not found" - a false red, because the gate never installed what it runs (the install
+# used to hide in the coverage step, which runs AFTER these). Install once, before the first Node step,
+# with the same idiom coverage.sh uses: only when node_modules is missing. FAIL-CLOSED: a failed install
+# is a failed step carrying the npm log, never a skip and never a pass.
+NODE_DEPS_DONE=0
+node_install() {
+  [ "$NODE_DEPS_DONE" = 0 ] || return 0
+  NODE_DEPS_DONE=1
+  for d in "$WEB_DIR" "$MOBILE_DIR"; do
+    [ -n "$d" ] && [ -f "$d/package.json" ] && [ ! -d "$d/node_modules" ] || continue
+    if [ -f "$d/pnpm-lock.yaml" ] || { [ "$d" != "." ] && [ -f "pnpm-lock.yaml" ]; }; then
+      if have pnpm || [ "$LIST_ONLY" = 1 ]; then run "install dependencies ($d)" pnpm --dir "$d" install --frozen-lockfile
+      else bad "install dependencies ($d): pnpm is missing"; fi
+    elif have npm || [ "$LIST_ONLY" = 1 ]; then run "install dependencies ($d)" npm --prefix "$d" ci
+    else bad "install dependencies ($d): npm is missing"; fi
+  done
+}
 node_lint() {
+  node_install
   for d in "$WEB_DIR" "$MOBILE_DIR"; do
     [ -n "$d" ] || continue
     if [ -f "$d/node_modules/.bin/eslint" ] || grep -q '"lint"' "$d/package.json" 2>/dev/null; then
@@ -16,6 +35,7 @@ node_lint() {
   done
 }
 node_typecheck() {
+  node_install
   for d in "$WEB_DIR" "$MOBILE_DIR"; do
     [ -n "$d" ] || continue
     # A solution-style root tsconfig ("files": [] + "references", the Vite
@@ -28,6 +48,7 @@ node_typecheck() {
   done
 }
 node_build() {
+  node_install
   for d in "$WEB_DIR" "$MOBILE_DIR"; do
     [ -n "$d" ] || continue
     if grep -q '"build"' "$d/package.json" 2>/dev/null; then run "build ($d)" npm --prefix "$d" run build
@@ -35,6 +56,7 @@ node_build() {
   done
 }
 node_test() {
+  node_install
   for d in "$WEB_DIR" "$MOBILE_DIR"; do
     [ -n "$d" ] || continue
     if grep -q '"test"' "$d/package.json" 2>/dev/null; then
@@ -53,6 +75,7 @@ node_test() {
   done
 }
 node_audit() {
+  node_install
   for d in "$WEB_DIR" "$MOBILE_DIR"; do
     [ -n "$d" ] || continue
     # A pnpm workspace has pnpm-lock.yaml and NO package-lock.json, so `npm audit` fails with
