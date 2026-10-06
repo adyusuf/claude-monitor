@@ -15,6 +15,9 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// </summary>
 public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock)
 {
+    /// <summary>Executes runs sent to this agent (ADR-0004); null where the relay only uploads.</summary>
+    public RunRelay? Runs { get; init; }
+
     /// <summary>When the API last answered a heartbeat (ISO-8601 UTC): the hooks wait for the web only if it is recent.</summary>
     public const string LastContactKey = "relay.last_contact";
 
@@ -76,6 +79,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         var s = await api.SettingsAsync(ct);
         store.Set("settings.mask_secrets", s.MaskSecrets ? "true" : "false");
         store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
+        MachineMonitor.Remember(store, s);
     }
 
     /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
@@ -118,6 +122,26 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
             case AgentStreamEvents.PermissionAnswer:
                 var a = data.Deserialize<PermissionAnswerMessage>(ApiClient.Json)!;
                 store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason, a.Answers is null ? null : JsonSerializer.Serialize(a.Answers));
+                return true;
+            case AgentStreamEvents.Run:
+                var run = data.Deserialize<RunMessage>(ApiClient.Json)!;
+                if (Runs is null || store.Get(MachineMonitor.RemoteRunsKey) == "false")
+                {
+                    if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
+                    {
+                        store.ExecEnd(run.Id.ToString(), RunStatuses.Failed, null, RemoteErrors.Disabled, false, null);
+                    }
+
+                    return true;
+                }
+
+                Runs.Accept(run, ct);
+                return true;
+            case AgentStreamEvents.RunCancel:
+                Runs?.Cancel(data.Deserialize<RunCancelMessage>(ApiClient.Json)!.Id);
+                return true;
+            case AgentStreamEvents.RunUpdate:
+                store.RunChanged(data.Deserialize<RunUpdateMessage>(ApiClient.Json)!.Id.ToString());
                 return true;
             case AgentStreamEvents.Revoked:
                 return false;

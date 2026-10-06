@@ -44,6 +44,7 @@ public sealed partial class LocalStore : IDisposable
             """);
         AddColumnIfMissing("commands", "taken_at", "TEXT"); // a database made before the hook's hand-over time was kept
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
+        CreateRemoteTables();
     }
 
     /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>
