@@ -35,9 +35,10 @@ public static class ProcessTree
     /// <summary>
     /// Starts exe with args (argv mode). The environment is exactly <paramref name="env"/>, never inherited. argv0 is what
     /// the child sees as its own name (default: exe). Throws when the OS refuses to start it; the message carries no argument.
+    /// <paramref name="limits"/> are applied on macOS through <see cref="RunLauncher"/> (and nowhere else, see <see cref="RunLimits"/>).
     /// </summary>
     public static IRunProcess Start(string exe, IReadOnlyList<string> args, string cwd, IReadOnlyDictionary<string, string> env,
-        string? argv0 = null)
+        string? argv0 = null, RunLimits? limits = null)
     {
         Validate(exe, args, cwd, env);
         if (OperatingSystem.IsWindows())
@@ -55,7 +56,11 @@ public static class ProcessTree
 
         if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
         {
-            return UnixRunProcess.Start(exe, [argv0 ?? exe, .. args], cwd, env);
+            IReadOnlyList<string> argv = [argv0 ?? exe, .. args];
+            if (limits is null || !RunLimits.AppliesHere) return UnixRunProcess.Start(exe, argv, cwd, env);
+            UnixRunProcess.RequireExecutable(exe);
+            var (launcher, wrapped) = RunLauncher.Wrap(exe, argv, limits);
+            return UnixRunProcess.Start(launcher, wrapped, cwd, env);
         }
 
         throw new PlatformNotSupportedException("Remote runs are supported on Windows, macOS and Linux.");
@@ -65,7 +70,8 @@ public static class ProcessTree
     /// Starts a shell run: /bin/sh -c text on Unix, cmd.exe /d /s /c "text" on Windows. <paramref name="shell"/> is the
     /// shell's path as the guard resolved it (default: /bin/sh, or cmd.exe in the system folder).
     /// </summary>
-    public static IRunProcess StartShell(string text, string cwd, IReadOnlyDictionary<string, string> env, string? shell = null)
+    public static IRunProcess StartShell(string text, string cwd, IReadOnlyDictionary<string, string> env, string? shell = null,
+        RunLimits? limits = null)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -74,7 +80,7 @@ public static class ProcessTree
             return WindowsRunProcess.Start(cmd, $"\"{cmd}\" /d /s /c \"{text}\"", cwd, env);
         }
 
-        return Start(shell ?? UnixShell, ["-c", text], cwd, env, argv0: "sh");
+        return Start(shell ?? UnixShell, ["-c", text], cwd, env, argv0: "sh", limits);
     }
 
     private const string UnixShell = "/bin/sh";

@@ -106,7 +106,7 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         IRunProcess process;
         try
         {
-            process = Start(run, decision, argv0);
+            process = Start(run, decision, argv0, timeout);
         }
         catch (Exception e) when (e is Win32Exception or IOException or ArgumentException or InvalidOperationException
             or UnauthorizedAccessException or PlatformNotSupportedException)
@@ -122,13 +122,14 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         }
     }
 
-    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0)
+    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0, TimeSpan timeout)
     {
         var env = RunEnvironment.Build(config.Home);
+        var limits = RunLimits.For(config, timeout);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
-        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe);
+        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe, limits);
         // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).
-        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0);
+        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0, limits);
     }
 
     private async Task<RunResult> SuperviseAsync(RunMessage run, IRunProcess process, string? exe, TimeSpan timeout, long began,

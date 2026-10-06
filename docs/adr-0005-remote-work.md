@@ -119,6 +119,21 @@ a job runs only when asked (a schedule would be an autonomous action and needs i
   (SIGTERM, then SIGKILL after 5 s; the systemd unit uses `KillMode=control-group`); Windows puts it in a Job Object
   with kill-on-close, a process limit and a memory limit, created suspended and resumed after assignment. A process
   that escapes on macOS is a documented residual risk.
+- **Resource limits on macOS.** `posix_spawn` has no rlimit attribute there, and `setrlimit` on the daemon is unsafe (the
+  CPU limit is cumulative and would signal the daemon), so a run starts through a trusted launcher: `/bin/sh` sets the
+  limits with `ulimit` (hard, so the run cannot raise them) and then **execs the target in the same process**. The pid,
+  the process group and the kill logic are unchanged; the target comes in as `"$0"`, its argv[0] as `"$1"` and its
+  arguments as `"$@"`, never as script text, so argv mode still never goes through shell parsing (shell mode runs
+  `/bin/sh -c <text>` as the target, as before). The limits are: CPU seconds = (timeout + kill grace) × the cores a run
+  may use (`ExecCpuCores`, default the processor count), which a multi-threaded run inside its timeout never meets but a
+  process that escaped the kill cannot exceed for ever (SIGXCPU); the largest file it may write (`ExecFileSizeMax`,
+  default 1 GiB, SIGXFSZ); open descriptors (`ExecOpenFilesMax`, default 1024, at most 10240); core files off. The
+  values are bounded in `RunLimits.For`. A limit the system refuses fails the run with exit 126; it never runs unlimited.
+  Known differences from a direct start: the launcher shell exports `SHLVL=0` to the target, a program that is missing
+  or not executable is still refused as `spawn_failed` (checked before the launcher starts), and `ulimit -f` counts
+  1024-byte blocks in macOS bash (a test writes past the limit to catch a change). **Linux does not use the launcher**:
+  the service unit is the place for `Limit*` settings and the cgroup, and `/bin/sh` there is often dash, which cannot
+  keep argv[0] through `exec`.
 - **Output** is read as a stream: the first 256 KB and a tail ring are kept, a run that prints more than 64 MB is
   killed (`output_limit`), and at most 1 MB per run is stored. Secrets are masked on whole lines (a pattern may span
   chunks), **always**, whatever the workspace's masking setting; control characters and ANSI sequences are stripped;
@@ -210,8 +225,7 @@ exists, so a rollback of that slice is code-only.
   account, a multi-instance API broker.
 - **Target-side checks not in v1** (security review items left open while building): refusing a grant root whose
   folder chain is writable by a non-admin (it would refuse ordinary app-owned log folders), a pinned hash of the
-  executable, an ACL ownership check of the executable on Windows (Unix checks owner and modes), and resource limits
-  (rlimits) for runs on macOS. A process that leaves its process group with `setsid` survives a kill on macOS; on
+  executable, an ACL ownership check of the executable on Windows (Unix checks owner and modes). A process that leaves its process group with `setsid` survives a kill on macOS; on
   Linux the service's cgroup ends it.
 - **Unverified platforms:** the Linux and Windows paths of the executor, the metrics and the service installer compile
   and follow the platform contracts but have only run on macOS; they are verified on a Linux and a Windows Server

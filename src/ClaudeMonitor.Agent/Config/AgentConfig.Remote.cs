@@ -23,6 +23,14 @@ public sealed partial record AgentConfig
     /// <summary>After SIGTERM (or a Job Object close request) a run's processes get this long before they are killed.</summary>
     public TimeSpan ExecKillGrace { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// Limits of a run on macOS (<see cref="RunLimits"/>): the cores its CPU budget allows (budget = timeout + grace, times
+    /// this), the largest file it may write and its open descriptors. Bounded where they are used.
+    /// </summary>
+    public int ExecCpuCores { get; init; } = Environment.ProcessorCount;
+    public long ExecFileSizeMax { get; init; } = 1024L * 1024 * 1024;
+    public int ExecOpenFilesMax { get; init; } = 1024;
+
     /// <summary>Output kept from the start of a run; past it only a tail of <see cref="RunTailBytes"/> is kept.</summary>
     public int RunHeadBytes { get; init; } = 256 * 1024;
     public int RunTailBytes { get; init; } = 256 * 1024;

@@ -23,6 +23,8 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
     private const int Sigkill = 9;
     private const int Eintr = 4;
     private const int Esrch = 3;
+    private const int Eacces = 13;
+    private const int XOk = 1;
     private const int FirstFreeFd = 3;
     private const int StatusExitShift = 8;
     private const int StatusByteMask = 0xff;
@@ -61,6 +63,16 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
             stderr.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Fails like posix_spawn would when exe is missing or not executable. A run that starts through the launcher
+    /// (<see cref="RunLauncher"/>) would otherwise only show an exit code of 126 or 127 from the shell.
+    /// </summary>
+    public static void RequireExecutable(string exe)
+    {
+        if (Directory.Exists(exe)) throw new Win32Exception(Eacces, "Could not start the run (exec).");
+        if (access(exe, XOk) != 0) throw new Win32Exception(Marshal.GetLastPInvokeError(), "Could not start the run (exec).");
     }
 
     public override void Kill() => SendToGroup(Sigterm);
@@ -209,6 +221,9 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
 
     [LibraryImport(LibC)]
     private static partial int sigfillset(nint set);
+
+    [LibraryImport(LibC, StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+    private static partial int access(string path, int mode);
 
     [LibraryImport(LibC, SetLastError = true)]
     private static partial int kill(int pid, int signal);
