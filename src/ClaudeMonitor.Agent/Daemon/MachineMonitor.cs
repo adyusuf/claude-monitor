@@ -61,13 +61,21 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     public static void Remember(LocalStore store, AgentSettings settings)
     {
         ArgumentNullException.ThrowIfNull(store);
+        store.SetMany(Entries(settings));
+    }
+
+    /// <summary>What <see cref="Remember"/> keeps, as key/value pairs: a settings pass writes them in one transaction with its other keys.</summary>
+    public static List<(string Key, string Value)> Entries(AgentSettings settings)
+    {
         ArgumentNullException.ThrowIfNull(settings);
-        store.Set(RemoteRunsKey, settings.RemoteRuns ? "true" : "false");
+        List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false")];
         if (settings.Alerts is { } a)
         {
-            store.Set(ThresholdsKey, string.Join(',', new[] { a.CpuPct, a.MemoryPct, a.DiskPct, a.SustainSeconds }
-                .Select(v => v.ToString(CultureInfo.InvariantCulture))));
+            entries.Add((ThresholdsKey, string.Join(',', new[] { a.CpuPct, a.MemoryPct, a.DiskPct, a.SustainSeconds }
+                .Select(v => v.ToString(CultureInfo.InvariantCulture)))));
         }
+
+        return entries;
     }
 
     private AlertThresholds? Thresholds()

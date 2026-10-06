@@ -184,15 +184,21 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
             return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.Disabled);
         }
 
-        var members = await db.WorkspaceMembers
-            .Where(m => m.WorkspaceId == workspaceId && (m.UserId == userId || m.UserId == ownerId) && m.RemovedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+        // One member row per statement, in a fixed order: run creation and member removal (WorkspaceEndpoints.Remove) both
+        // take members (by user id) before agents (by id), so neither waits on the other for a row it holds. The cascades
+        // (RemoteCleanup) go on in the same order, jobs, grants, then runs, each by id (RemoteLocks).
+        foreach (var memberId in new[] { userId, ownerId }.Distinct().Order())
+        {
+            var member = await db.WorkspaceMembers
+                .Where(m => m.WorkspaceId == workspaceId && m.UserId == memberId && m.RemovedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), ct);
+            if (member != 1) return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.TargetCannotRun);
+        }
+
         var agent = await db.Agents
             .Where(a => a.Id == targetId && a.WorkspaceId == workspaceId && a.Status == AgentStatuses.Active && levels.Contains(a.ExecLevel))
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevel, a => a.ExecLevel), ct);
-        return members == (userId == ownerId ? 1 : 2) && agent == 1
-            ? null
-            : RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.TargetCannotRun);
+        return agent == 1 ? null : RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.TargetCannotRun);
     }
 
     private void Approve(RemoteRun run, Guid by, DateTimeOffset now)

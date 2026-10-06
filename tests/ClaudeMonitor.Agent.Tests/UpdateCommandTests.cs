@@ -32,7 +32,7 @@ public sealed class UpdateCommandTests : IDisposable
     private void Workspace(string mode)
     {
         using var store = new LocalStore(kit.Config.DatabasePath);
-        store.Set(UpdatePolicy.WorkspaceKey, mode);
+        TestWorkspace.Set(kit.Config, store, UpdatePolicy.WorkspaceKey, mode);
     }
 
     private static string Stamp => Now.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
@@ -87,8 +87,8 @@ public sealed class UpdateCommandTests : IDisposable
     // ---- status ------------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData("off", null, "auto-update: off (this machine: off, workspace: off)")]
-    [InlineData("on", null, "auto-update: off (this machine: on, workspace: off)")]
+    [InlineData("off", null, "auto-update: off (this machine: off, workspace: unread)")]
+    [InlineData("on", null, "auto-update: off (this machine: on, workspace: unread)")]
     [InlineData("on", "on", "auto-update: on (this machine: on, workspace: on)")]
     [InlineData("on", "check", "auto-update: check (this machine: on, workspace: check)")]
     [InlineData("check", "on", "auto-update: check (this machine: check, workspace: on)")]

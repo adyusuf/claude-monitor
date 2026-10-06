@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Tests;
 
 [UnsupportedOSPlatform("windows")]
-public sealed class RunRelayTests : IDisposable
+public sealed partial class RunRelayTests : IDisposable
 {
     private readonly RemoteFixture fx = new();
     private readonly List<string> stateInGuard = [];
@@ -37,6 +37,10 @@ public sealed class RunRelayTests : IDisposable
         fx.Dispose();
     }
 
+    /// <summary>What the API answers when the relay reads the workspace's settings again before refusing a run.</summary>
+    private void Settings(bool remoteRuns) =>
+        fx.Fake.On("GET /api/agent/settings", HttpStatusCode.OK, new AgentSettings(true, 1000, TestWorkspace.Id(fx.Home.Config), RemoteRuns: remoteRuns));
+
     private void Routes(Guid id, HttpStatusCode output = HttpStatusCode.NoContent)
     {
         fx.Fake.On($"POST /api/agent/runs/{id}/status", RemoteFixture.NoContent);
@@ -45,8 +49,8 @@ public sealed class RunRelayTests : IDisposable
 
     private static JsonElement Message(RunMessage run) => JsonSerializer.SerializeToElement(run, ApiClient.Json);
 
-    private static RunMessage Shell(string command) =>
-        new(Guid.NewGuid(), RunModes.Shell, null, command, null, 60, DateTimeOffset.UtcNow.AddMinutes(5), null, null);
+    private static RunMessage Shell(string command, DateTimeOffset? decidedAt = null) =>
+        new(Guid.NewGuid(), RunModes.Shell, null, command, null, 60, DateTimeOffset.UtcNow.AddMinutes(5), null, null, decidedAt);
 
     private Task<bool> Finished(Guid id) => ExecHarness.UntilAsync(() => fx.Store.ExecRunOf(id.ToString())?.State == LocalStore.ExecStates.Finished);
 
@@ -54,6 +58,7 @@ public sealed class RunRelayTests : IDisposable
     public async Task A_run_from_the_stream_is_recorded_before_it_starts_and_a_replay_never_starts_it_twice()
     {
         if (!ExecFixture.Unix) return;
+        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "true");
         var run = Shell("echo once");
         Routes(run.Id);
         Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
@@ -156,26 +161,6 @@ public sealed class RunRelayTests : IDisposable
     }
 
     [Fact]
-    public async Task With_remote_runs_switched_off_locally_a_run_is_failed_as_disabled_without_executing()
-    {
-        if (!ExecFixture.Unix) return;
-        fx.Store.Set(MachineMonitor.RemoteRunsKey, "false");
-        var run = Shell($"echo should-not-run > {Path.Combine(fx.Home.Dir, "ran")}");
-        Routes(run.Id);
-
-        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
-        var row = fx.Store.ExecRunOf(run.Id.ToString())!;
-        Assert.Equal((LocalStore.ExecStates.Finished, RunStatuses.Failed, RemoteErrors.Disabled), (row.State, row.FinalStatus, row.Error));
-        Assert.Equal(0, Volatile.Read(ref guardCalls));
-        Assert.False(File.Exists(Path.Combine(fx.Home.Dir, "ran")));
-
-        await relay.ReportAsync(CancellationToken.None);
-        Assert.Contains(fx.Fake.Seen, s => s.Path.EndsWith("/status", StringComparison.Ordinal) && s.Body.Contains(RemoteErrors.Disabled, StringComparison.Ordinal));
-        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None)); // a replay changes nothing
-        Assert.Equal(1, fx.Fake.Count($"POST /api/agent/runs/{run.Id}/status"));
-    }
-
-    [Fact]
     public async Task A_relay_without_a_run_relay_also_fails_a_run_as_disabled_instead_of_dropping_it()
     {
         if (!ExecFixture.Unix) return;
@@ -189,7 +174,7 @@ public sealed class RunRelayTests : IDisposable
     public async Task A_run_cancel_message_stops_a_running_run()
     {
         if (!ExecFixture.Unix) return;
-        fx.Store.Set(MachineMonitor.RemoteRunsKey, "true");
+        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "true");
         var run = Shell("sleep 300");
         Routes(run.Id);
         await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None);

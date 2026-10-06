@@ -101,6 +101,9 @@ public static class RemoteHousekeeping
         if (old.Count > 0)
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
+            // The runs are locked before their output is deleted: account deletion takes a run's row, then its output, and
+            // output first here would meet it from the other side (40P01); the global order is runs, then output.
+            await RemoteLocks.RunsAsync(db, r => old.Contains(r.Id), ct);
             await db.RemoteRunOutput.Where(o => old.Contains(o.RunId)).ExecuteDeleteAsync(ct);
             await db.RemoteRuns.Where(r => old.Contains(r.Id)).ExecuteDeleteAsync(ct);
             await tx.CommitAsync(ct);

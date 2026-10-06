@@ -18,16 +18,17 @@ public sealed class ClaudeDaemonLoopTests
             SettingsEvery = TimeSpan.FromMilliseconds(20),
             UpdatePollEvery = TimeSpan.FromMilliseconds(50),
         }, installed: false);
+        var workspaceId = Guid.NewGuid(); // the server answers with the workspace the agent is in
         FakeApi fake = null!;
         fake = new FakeApi()
             .On("POST /api/agent/heartbeat", HttpStatusCode.NoContent, "")
-            .On("GET /api/agent/settings", HttpStatusCode.OK, new AgentSettings(true, 1000, Guid.NewGuid(), ClaudeUpdate: workspace))
+            .On("GET /api/agent/settings", HttpStatusCode.OK, new AgentSettings(true, 1000, workspaceId, ClaudeUpdate: workspace))
             .On("GET /api/agent/stream", _ =>
             {
                 SpinWait.SpinUntil(() => enough(kit, fake), TimeSpan.FromSeconds(20)); // a condition, not a sleep
                 return (HttpStatusCode.OK, "event: revoked\ndata: {}\n\n");
             });
-        (Identity.Load(kit.Config) with { Server = "https://m.invalid", AgentId = Guid.NewGuid(), WorkspaceId = Guid.NewGuid() }).Save(kit.Config);
+        (Identity.Load(kit.Config) with { Server = "https://m.invalid", AgentId = Guid.NewGuid(), WorkspaceId = workspaceId }).Save(kit.Config);
         Credentials.For(kit.Config).Write(Credentials.Access, "a");
         SavedSettings.SaveClaudeUpdate(kit.Config, machine);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
