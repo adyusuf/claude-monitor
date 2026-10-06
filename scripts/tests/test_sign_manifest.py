@@ -52,6 +52,11 @@ class SigningTests(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
+        keys = tempfile.TemporaryDirectory()  # never the committed deploy/update-keys: a test must not overwrite or delete them
+        self.addCleanup(keys.cleanup)
+        patcher = mock.patch.object(sm, 'KEYS', keys.name)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.key = new_key()
         self.public = sm.public_key(self.key)
         for name, body in (('cm-agent-macos-arm64.zip', b'one'), ('cm-agent-windows-x64.zip', b'two'), ('SHA256SUMS', b'x'), ('notes.txt', b'y')):
@@ -111,10 +116,9 @@ class SigningTests(unittest.TestCase):
                 self.manifest()
 
     def test_a_key_that_is_not_the_shipped_one_is_refused(self):
-        shipped = os.path.join(os.path.dirname(SCRIPT), '..', 'deploy', 'update-keys', 'test.pub')
+        shipped = os.path.join(sm.KEYS, 'test.pub')
         with open(shipped, 'w', encoding='utf-8') as f:
             f.write(sm.public_key(new_key()))
-        self.addCleanup(os.remove, shipped)
         err = io.StringIO()
         with mock.patch.dict(os.environ, {'TEST_KEY': self.key}), contextlib.redirect_stderr(err):
             code = sm.main(['sign', '--channel', 'test', '--downloads', self.dir.name, '--version', '0.3.1', '--min-supported', '0.2.0', '--key-env', 'TEST_KEY'])
@@ -123,10 +127,9 @@ class SigningTests(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.dir.name, 'manifest.json')))
 
     def test_the_shipped_key_itself_is_accepted(self):
-        shipped = os.path.join(os.path.dirname(SCRIPT), '..', 'deploy', 'update-keys', 'test.pub')
+        shipped = os.path.join(sm.KEYS, 'test.pub')
         with open(shipped, 'w', encoding='utf-8') as f:
             f.write(self.public + '\n')
-        self.addCleanup(os.remove, shipped)
         with mock.patch.dict(os.environ, {'TEST_KEY': self.key}), contextlib.redirect_stdout(io.StringIO()):
             code = sm.main(['sign', '--channel', 'test', '--downloads', self.dir.name, '--version', '0.3.1', '--min-supported', '0.2.0', '--key-env', 'TEST_KEY'])
         self.assertEqual(code, 0)
