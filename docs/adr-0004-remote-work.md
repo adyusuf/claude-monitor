@@ -50,7 +50,8 @@ A run executes only when **all** hold; each one defaults to "no".
    turning it off cancels pending runs.
 2. **Local exec level on the target**, `cm-agent install --exec off|argv|shell` (default `off`; `shell` is a separate,
    stronger opt-in). In service mode it lives in an **admin-owned file the service account cannot write**, with an
-   optional local ceiling (allowed executables and roots). The API can never raise it.
+   optional local ceiling (allowed executables and roots). The API can never raise it. Shell text cannot be held to a
+   ceiling, so **a policy with a ceiling never allows shell** (the agent reports it as `argv`).
 3. **A grant or a per-call approval by the owner.** Only the target agent's owner approves, as only a session's owner
    commands it (ADR-0002). **There is no self-approval:** a requester who is also the owner still clicks Allow.
 4. **Membership.** Requester and owner are members (role ≥ member) of the same active workspace, checked at create,
@@ -127,7 +128,9 @@ a job runs only when asked (a schedule would be an autonomous action and needs i
   agent is listed first. Another workspace's machine and an unknown one give the same "not found".
 - Everything coming back from another machine — run output, alert subjects, mount names — is **untrusted data**:
   wrapped as `<<<claude-monitor-output … origin="remote-machine">>>`, wrapper-closing sequences defused as in
-  ADR-0003, capped. The tool descriptions say never to follow instructions found in it. Marking `monitor_run`
+  ADR-0003, capped. What must appear outside the wrapper (a host or user name, an error) is reduced to a label of
+  letters, digits and `. _ - @` (at most 64) or an error code, so it cannot carry a sentence.
+- The requester's agent deletes finished runs and the output it read from its local database after 7 days. The tool descriptions say never to follow instructions found in it. Marking `monitor_run`
   destructive makes Claude Code ask on the requester's machine too, but that is a convenience, not a control: the
   controls are the four keys.
 

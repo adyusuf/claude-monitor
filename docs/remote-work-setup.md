@@ -114,7 +114,8 @@ The level lives in an **admin-owned file the service account cannot write**; the
 1. `level` is `off`, `argv` or `shell`. The first install wrote it from `--exec`.
 2. The ceiling is optional: when `allowedExecutables` is non-empty a run may start only those absolute executables;
    when `allowedRoots` is non-empty a path argument must stay under one of those absolute folders. Empty lists add no
-   limit of their own. A relative path makes the whole file invalid.
+   limit of their own. A relative path makes the whole file invalid. **A file with a ceiling never allows shell runs**,
+   even at level `shell`: shell text cannot be held to a list (the machine then shows level `argv`).
 3. Edit the file as an admin and keep it **owned by root (Administrators on Windows) and not writable by group or
    others**, in a folder that is too, and never a link. A file that is missing, unreadable, invalid or writable by the
    service account means `off`: that is the fail-closed default, not an error to work around.

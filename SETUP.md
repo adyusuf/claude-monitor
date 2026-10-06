@@ -155,7 +155,8 @@ unreadable, invalid or writable file grants nothing. `cm-agent install --service
 
 `level` is `off`, `argv` or `shell`. `allowedExecutables` and `allowedRoots` are the optional local **ceiling**: a
 list of absolute executables a run may start and of absolute folders a path argument must stay under (Windows paths
-likewise, e.g. `C:\Program Files\Git\cmd\git.exe`). An empty or missing list adds no restriction of its own; the
+likewise, e.g. `C:\Program Files\Git\cmd\git.exe`). A file with a ceiling never allows shell runs (shell text cannot be
+held to it). An empty or missing list adds no restriction of its own; the
 web grants and the agent's own checks (never a shell or interpreter in a grant, no `/etc`, `/home`, the agent's home)
 apply either way. A relative path makes the whole file invalid, hence `off`. The API can never raise this level.
 
