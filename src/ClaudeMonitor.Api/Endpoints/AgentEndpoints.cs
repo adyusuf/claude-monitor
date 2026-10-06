@@ -2,8 +2,10 @@ using System.Text.Json;
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
 using ClaudeMonitor.Api.Ingest;
+using ClaudeMonitor.Api.Remote;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Streaming;
+using ClaudeMonitor.Api.Update;
 using ClaudeMonitor.Contracts;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +17,8 @@ public static class AgentEndpoints
     public static void Map(RouteGroupBuilder api)
     {
         api.MapPost("/agent/token/refresh", Refresh).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+        // Outside the version gate on purpose: an agent below the minimum version must still be able to fetch its update.
+        api.MapGet("/agent/latest", Latest).RequireAuthorization(Schemes.Agent);
         var g = api.MapGroup("/agent").RequireAuthorization(Schemes.Agent).AddEndpointFilter(VersionGate);
         g.MapPost("/batches", Batch).WithMetadata(new RequestSizeLimitAttributeShim());
         g.MapPost("/heartbeat", Heartbeat);
@@ -26,13 +30,21 @@ public static class AgentEndpoints
     }
 
     /// <summary>Old agents in the field: below the configured minimum version the API answers 426.</summary>
-    private static async ValueTask<object?> VersionGate(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
+    internal static async ValueTask<object?> VersionGate(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
     {
         var config = ctx.HttpContext.RequestServices.GetRequiredService<ApiConfig>();
         var header = ctx.HttpContext.Request.Headers[AgentHeaders.Version].ToString();
         return !Version.TryParse(header, out var v) || v < config.MinimumAgentVersion
             ? DeviceEndpoints.UpgradeRequired()
             : await next(ctx);
+    }
+
+    /// <summary>The newest signed build for the caller's OS and CPU; the agent checks the signature, the hash and the version itself.</summary>
+    private static IResult Latest(string? os, string? arch, UpdateCatalog catalog)
+    {
+        if (os is not ("macos" or "windows")) return Http.Invalid("os", "invalid_os");
+        if (arch is not ("arm64" or "x64")) return Http.Invalid("arch", "invalid_arch");
+        return catalog.Latest(os, arch) is { } offer ? Results.Ok(offer) : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "no_update");
     }
 
     private static async Task<IResult> Refresh(RefreshRequest req, HttpContext http, MonitorDb db, ApiConfig config,
@@ -80,10 +92,11 @@ public static class AgentEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
-        return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId));
+        return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
+            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate));
     }
 
-    /// <summary>The agent's own stream: a ready message, then every command still waiting for it, then new ones as they come.</summary>
+    /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
     private static async Task<IResult> Stream(HttpContext http, MonitorDb db, Broker broker, TimeProvider clock)
     {
         var agentId = http.User.AgentId();
@@ -97,8 +110,10 @@ public static class AgentEndpoints
                              select new AgentCommandMessage(c.Id, c.SessionId, s.ExternalId, c.Kind, c.Body, c.ExpiresAt))
             .ToListAsync(http.RequestAborted);
         // "ready" first: the response headers go out with the first message, and an idle stream would otherwise look unconnected for 20 s.
+        var runs = await RunNotices.WaitingForAsync(db, agentId, now, http.RequestAborted);
         var first = new[] { new StreamMessage(AgentStreamEvents.Ready, new { }) }
-            .Concat(waiting.Select(c => new StreamMessage(AgentStreamEvents.Command, c)));
+            .Concat(waiting.Select(c => new StreamMessage(AgentStreamEvents.Command, c)))
+            .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)));
         return Sse.Stream(subscription, first, http.RequestAborted);
     }
 

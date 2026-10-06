@@ -101,7 +101,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 def host_rid():
     arch = {'arm64': 'arm64', 'aarch64': 'arm64', 'x86_64': 'x64', 'amd64': 'x64'}.get(platform.machine().lower())
-    system = {'Darwin': 'osx', 'Windows': 'win'}.get(platform.system())
+    system = {'Darwin': 'osx', 'Windows': 'win', 'Linux': 'linux'}.get(platform.system())
     return f'{system}-{arch}' if system and arch else None
 
 
@@ -166,7 +166,7 @@ def main(argv=None):
         if binary is None:
             rid = host_rid()
             if rid is None:
-                print('agent smoke: NOT RUN — the agent ships for macOS and Windows only')
+                print('agent smoke: NOT RUN — the agent ships for macOS, Windows and Linux only')
                 return 3
             if shutil.which('dotnet') is None:
                 print('agent smoke: NOT RUN — dotnet is not installed')

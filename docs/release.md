@@ -19,7 +19,43 @@ A second promotion on the same day appends `-2`. A hotfix says so in the tag mes
 `prod`. The phases of ADR-0002 therefore reach `dev` (and `test`), but **not `prod`, until the cut-over
 (phase 5)**, when the agent replaces the old hooks. The old board's last release is the tag `archive/board-final`.
 
+## Agent artifacts and verification
+
+`bash scripts/build-agent.sh [out-dir]` (default `out/downloads`) writes one zip per platform plus `SHA256SUMS`, the
+manifest the deploy copies to the web root's `/downloads`:
+
+| File | Platform | Signed |
+|---|---|---|
+| `cm-agent-macos-arm64.zip`, `cm-agent-macos-x64.zip` | macOS | Developer ID, hardened runtime, notarised (when `AGENT_SIGN_IDENTITY` / `AGENT_NOTARY_PROFILE` name them) |
+| `cm-agent-windows-x64.zip`, `cm-agent-windows-arm64.zip` | Windows | **no** |
+| `cm-agent-linux-x64.zip`, `cm-agent-linux-arm64.zip` | Linux (systemd) | **no** |
+
+Every zip holds the one single-file `cm-agent` (`cm-agent.exe` on Windows), published uncompressed: never switch
+`EnableCompressionInSingleFile` on (it crashes the daemon on macOS, see the csproj). The published-agent smoke test
+(`scripts/agent_smoke.py`) runs the binary of the host it runs on: the macOS build on a Mac, the Linux build on a
+Linux host. The Windows and Linux builds are only smoke-tested on a host of their own OS.
+
+**Linux and Windows binaries are unsigned, so the SHA-256 in `SHA256SUMS` is what proves what an admin installs**
+(ADR-0005: a service agent is upgraded by an admin; its binary is admin-owned, so the self-update of ADR-0004 cannot replace it).
+Before a service upgrade the admin downloads the zip **and** `SHA256SUMS` over HTTPS from the same address and checks
+the digest on the machine, not from a copy made elsewhere; see [`remote-work-setup.md`](remote-work-setup.md),
+"Upgrading". A mismatch means: do not install, report it.
+
+```bash
+sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 256 -c SHA256SUMS)
+```
+
+```powershell
+(Get-FileHash .\cm-agent-windows-x64.zip -Algorithm SHA256).Hash   # compare with the line in SHA256SUMS
+```
+
 ## Agent releases: notes
+
+- **Linux agent and service mode** (`feature/remote-work`, ADR-0005): `cm-agent-linux-x64.zip` and
+  `cm-agent-linux-arm64.zip` join the downloads (and the web's "Get the agent" page); `cm-agent install --service`
+  registers a boot service on Linux, macOS and Windows Server. Old agents keep working but never report an exec level,
+  so they are never a target of remote work. The API needs the usual deploy to test, then prod, **before** the agents:
+  a new agent on an old API gets 404 and switches the feature off.
 
 - **Windows agent home moved** (`fix/agent-home-outside-appdata`): the default is now `%USERPROFILE%\.claude-monitor`,
   not `%LOCALAPPDATA%\ClaudeMonitor` (the Claude desktop app's MSIX packaging redirects AppData, ADR-0002). On first

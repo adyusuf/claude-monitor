@@ -128,7 +128,7 @@ public sealed class DaemonTests
         Assert.Equal(AgentConfig.LegacyHome(), defaults.MigrateFrom);
         Assert.Null(config.MigrateFrom);
         Assert.Equal(TimeSpan.Zero, defaults.StopWait);
-        Assert.Equal(OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsWindows() ? "windows" : "unsupported", AgentConfig.Os);
+        Assert.Equal(OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsLinux() ? "linux" : "unsupported", AgentConfig.Os);
     }
 
     [Fact]

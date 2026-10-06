@@ -53,6 +53,12 @@ public sealed class VirtualClock(DateTimeOffset start) : TimeProvider
     private int timers;
 
     public TimeSpan Elapsed => GetUtcNow() - origin;
+
+    public void Advance(TimeSpan by)
+    {
+        lock (gate) now += by;
+    }
+
     public int Timers => Volatile.Read(ref timers);
 
     public override DateTimeOffset GetUtcNow()

@@ -1,10 +1,14 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using ClaudeMonitor.Agent.Auth;
+using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Exec;
+using ClaudeMonitor.Agent.Metrics;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
+using ClaudeMonitor.Agent.Update;
 
 namespace ClaudeMonitor.Agent.Daemon;
 
@@ -20,6 +24,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         config.EnsureHome();
         using var lockFile = TryLock(config.LockPath);
         if (lockFile is null) return 0; // another daemon already runs
+        var started = clock.GetUtcNow();
         if (!OperatingSystem.IsWindows()) _ = SetSid(); // leave the hook's process group: its end must not end us
 
         var identity = Identity.Load(config);
@@ -29,7 +34,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             return 1;
         }
 
-        // One connection per loop: a SQLite connection is not safe to share between threads, and the four loops run at once.
+        // One connection per loop: a SQLite connection is not safe to share between threads, and the loops run at once.
         // They meet in the database file itself (WAL, busy timeout).
         using var flushStore = new LocalStore(config.DatabasePath);
         using var beatStore = new LocalStore(config.DatabasePath);
@@ -40,11 +45,37 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var relay = new Relay(config, flushStore, api, clock);
         var beat = new Relay(config, beatStore, api, clock);
         var settings = new Relay(config, settingsStore, api, clock);
-        var stream = new Relay(config, streamStore, api, clock);
+        Relay stream;
         var tailer = new TranscriptTailer(config, flushStore, clock);
+        using var updateStore = new LocalStore(config.DatabasePath);
+        using var remoteStore = new LocalStore(config.DatabasePath);
+        using var execStore = new LocalStore(config.DatabasePath);
+        using var metricsStore = new LocalStore(config.DatabasePath);
+        var remote = new RemoteRelay(config, remoteStore, api, clock);
+        var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os));
+        var executor = new RunExecutor(config, clock, log, run => ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
+            ExecPolicyLoader.RunningAsRoot);
+        using var runs = new RunRelay(config, execStore, api, clock, executor, log);
+        runs.Recover();
+        stream = new Relay(config, streamStore, api, clock) { Runs = runs };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        DropStaleStopRequest(started);
+        updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
+        File.WriteAllText(config.PidPath, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        using (var updating = TryLock(config.UpdateLockPath))
+        {
+            if (updating is not null) BinarySwap.CleanLeftovers(config.BinaryPath); // an update in progress owns its staged file
+        }
+
+        var updates = new UpdateLoop(config, updateStore, new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock),
+            () => DaemonControl.SpawnAutoUpdate(config, log), clock);
+        using var claudeStore = new LocalStore(config.DatabasePath);
+        var claudeUpdates = new ClaudeUpdater(config, claudeStore, new SystemProcessRunner(), new SystemNotifier(new SystemProcessRunner(), config.UpdateProbeTimeout), log, clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
         await Task.WhenAll(
+            Loop("claude-update", config.UpdatePollEvery, claudeUpdates.RunAsync, api, revoked),
+            StopRequestAsync(revoked),
+            Loop("update", config.UpdatePollEvery, updates.RunAsync, api, revoked),
             Loop("flush", config.FlushEvery, async ct =>
             {
                 tailer.RunOnce();
@@ -52,8 +83,15 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await relay.UploadAsync(ct);
                 await relay.ReportCommandsAsync(ct);
             }, api, revoked, error => relay.UploadOutcome(error)),
-            Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked),
-            Loop("settings", config.SettingsEvery, settings.SettingsAsync, api, revoked),
+            Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
+            Loop("settings", config.SettingsEvery, async ct =>
+            {
+                await settings.SettingsAsync(ct);
+                await monitor.ProfileAsync(ct);
+            }, api, revoked),
+            Loop("remote", config.RemotePollEvery, remote.RunOnceAsync, api, revoked),
+            Loop("runs", config.FlushEvery, runs.ReportAsync, api, revoked),
+            Loop("metrics", config.MetricsEvery, monitor.SampleAsync, api, revoked),
             StreamAsync(api, stream, revoked));
         if (api.Disconnected)
         {
@@ -75,8 +113,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await work(cts.Token);
                 failures = 0;
             }
-            catch (Exception e) when (!cts.IsCancellationRequested)
+            catch (Exception e)
             {
+                if (cts.IsCancellationRequested) break; // stopping: whatever the request in flight ended with is not a failure
                 // Only the daemon's own token means stopping; a timeout (also an OperationCanceledException) is a failure.
                 failures++;
                 log.Write($"{name} failed ({failures}): {e.GetType().Name} {e.Message}");
@@ -85,6 +124,51 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
 
             if (api.Disconnected) await cts.CancelAsync();
             await Wait(Backoff(every, failures), cts.Token);
+        }
+    }
+
+    /// <summary>Ends the daemon when an update (or a rollback) asks for it by writing the stop-request file.</summary>
+    private async Task StopRequestAsync(CancellationTokenSource cts)
+    {
+        while (!cts.IsCancellationRequested)
+        {
+            if (File.Exists(config.StopRequestPath))
+            {
+                TryDelete(config.StopRequestPath);
+                log.Write("stop requested (an update)");
+                await cts.CancelAsync();
+                return;
+            }
+
+            await Wait(config.StopPollEvery, cts.Token);
+        }
+    }
+
+    /// <summary>A request written before this daemon took its lock was meant for an earlier one; one written after is ours and stays.</summary>
+    private void DropStaleStopRequest(DateTimeOffset started)
+    {
+        try
+        {
+            if (!File.Exists(config.StopRequestPath)) return;
+            var at = DateTimeOffset.TryParse(File.ReadAllText(config.StopRequestPath), System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var written) ? written : (DateTimeOffset?)null;
+            if (at is null || at < started) File.Delete(config.StopRequestPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // best effort
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // best effort
         }
     }
 
@@ -108,8 +192,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
 
                 relay.StreamState(PushStatus.Reconnecting, failures, "StreamClosed"); // the API ended it: reopen
             }
-            catch (Exception e) when (!cts.IsCancellationRequested)
+            catch (Exception e)
             {
+                if (cts.IsCancellationRequested) return; // stopping, as above
                 // A connect timeout is an OperationCanceledException too; it must not end the stream for good.
                 failures++;
                 log.Write($"stream failed ({failures}): {e.GetType().Name} {e.Message}");
@@ -150,8 +235,8 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         }
     }
 
-    /// <summary>Starts the daemon detached when no daemon holds the lock. Never throws: a hook must not fail.</summary>
-    public static bool EnsureRunning(AgentConfig config, AgentLog log)
+    /// <summary>Starts the daemon (from <paramref name="binary"/>, else from this process's own binary) detached when no daemon holds the lock. Never throws: a hook must not fail.</summary>
+    public static bool EnsureRunning(AgentConfig config, AgentLog log, string? binary = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(log);
@@ -163,7 +248,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 if (probe is null) return true;
             }
 
-            var exe = Environment.ProcessPath ?? throw new InvalidOperationException("no process path");
+            var exe = binary ?? Environment.ProcessPath ?? throw new InvalidOperationException("no process path");
             var info = new ProcessStartInfo(exe)
             {
                 UseShellExecute = false,

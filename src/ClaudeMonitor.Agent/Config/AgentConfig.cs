@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
+using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Config;
 
@@ -12,7 +14,7 @@ public static class PushScopes
 /// The agent's ONE configuration module (global #2): the only place that reads the environment or holds a path,
 /// URL, interval or limit. Every other file takes an <see cref="AgentConfig"/>. Every variable is in .env.example.
 /// </summary>
-public sealed record AgentConfig
+public sealed partial record AgentConfig
 {
     /// <summary>The user-only directory holding the local database, the lock and the agent's identity file.</summary>
     public required string Home { get; init; }
@@ -62,6 +64,92 @@ public sealed record AgentConfig
     /// <summary>The API pings the stream every 20 s; a stream silent for this long is dead (a half-open connection) and is reopened.</summary>
     public TimeSpan StreamIdleTimeout { get; init; } = TimeSpan.FromSeconds(75);
 
+    /// <summary>
+    /// How far this machine lets the agent go about updating itself (ADR-0004): "off" (default: no update call at all),
+    /// "check" (look and report) or "on" (install too). `cm-agent config auto-update` saves it, CM_AUTO_UPDATE wins when set.
+    /// The workspace has its own cap; the lower of the two applies. An explicit `cm-agent update` is not an automatic action and ignores both.
+    /// </summary>
+    public string AutoUpdate { get; init; } = UpdateModes.Off;
+
+    /// <summary>True when CM_AUTO_UPDATE was set: it then wins over the value `cm-agent config` saved.</summary>
+    public bool AutoUpdateFromEnvironment { get; init; }
+
+    /// <summary>The channel this build belongs to ("test", "prod", or "dev" for an unsigned local build), set at build time.</summary>
+    public string UpdateChannel { get; init; } = BuildMetadata("UpdateChannel") is { Length: > 0 } channel ? channel : "dev";
+
+    /// <summary>The public key (base64 SubjectPublicKeyInfo, ECDSA P-256) every update must be signed with; empty in a build without one, which then refuses all updates.</summary>
+    public string UpdatePublicKey { get; init; } = BuildMetadata("UpdatePublicKey") ?? "";
+
+    /// <summary>The OS and CPU the update is asked for and signed for; the host's own, except where a test stands in for a supported one.</summary>
+    public string UpdateOs { get; init; } = Os;
+
+    public string UpdateArch { get; init; } = Arch;
+
+    /// <summary>How long a downloaded candidate (and macOS's codesign check of it) may take to answer.</summary>
+    public TimeSpan UpdateProbeTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Whether this machine lets the agent update Claude Code itself (ADR-0006; off by default). `cm-agent config claude-update on|off`
+    /// saves it, CM_CLAUDE_UPDATE wins when set. The workspace must allow it too; both are needed.
+    /// </summary>
+    public bool ClaudeUpdateEnabled { get; init; }
+
+    /// <summary>True when CM_CLAUDE_UPDATE was set: it then wins over the value `cm-agent config` saved.</summary>
+    public bool ClaudeUpdateFromEnvironment { get; init; }
+
+    /// <summary>Where Claude Code keeps its per-session files (sessions/&lt;pid&gt;.json): CLAUDE_CONFIG_DIR, else ~/.claude.</summary>
+    public string ClaudeConfigDir { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
+
+    /// <summary>The `claude` to update when it must not be searched for (CM_CLAUDE_BINARY; tests); null = the first `claude` on <see cref="PathVariable"/>.</summary>
+    public string? ClaudeBinary { get; init; }
+
+    public string PathVariable { get; init; } = Environment.GetEnvironmentVariable("PATH") ?? "";
+
+    /// <summary>The shortest time between two attempts to update Claude Code (`claude update` has no dry run, so each attempt is a real one).</summary>
+    public TimeSpan ClaudeUpdateEvery { get; init; } = TimeSpan.FromHours(24);
+
+    /// <summary>Every live session must have been idle at least this long.</summary>
+    public TimeSpan ClaudeIdleFor { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The warning before `claude update` runs; `cm-agent claude-update cancel` stops it.</summary>
+    public TimeSpan ClaudeCountdown { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>A cancelled attempt is not made again for this long.</summary>
+    public TimeSpan ClaudeSnooze { get; init; } = TimeSpan.FromHours(24);
+
+    public TimeSpan ClaudeUpdateTimeout { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>After this many failed attempts in a row the next waits <see cref="ClaudeUpdateEvery"/>, not <see cref="UpdateRetryAfter"/>.</summary>
+    public int ClaudeFailuresBeforeBackoff { get; init; } = 3;
+
+    public TimeSpan ClaudeCountdownPoll { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>The shortest time between two looks at the server for an update.</summary>
+    public TimeSpan UpdateCheckEvery { get; init; } = TimeSpan.FromHours(6);
+
+    /// <summary>How often the daemon's update chore wakes to see whether a look is due (and whether the setting changed).</summary>
+    public TimeSpan UpdatePollEvery { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>After a failed or rolled-back automatic update the daemon waits this long before it tries again.</summary>
+    public TimeSpan UpdateRetryAfter { get; init; } = TimeSpan.FromHours(1);
+
+    /// <summary>The new daemon has this long to be answered by the API (or to be shown unreachable) before the update is judged.</summary>
+    public TimeSpan UpdateHealthWait { get; init; } = TimeSpan.FromSeconds(90);
+
+    /// <summary>How long a running daemon gets to stop when an update (or a rollback) asks it to.</summary>
+    public TimeSpan UpdateStopWait { get; init; } = TimeSpan.FromSeconds(30);
+
+    public TimeSpan UpdateDownloadTimeout { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The largest download accepted; the published zips are far smaller (a guard against an endless body).</summary>
+    public long UpdateDownloadMax { get; init; } = 250L * 1024 * 1024;
+
+    /// <summary>The largest binary taken out of a download (a guard against a zip bomb).</summary>
+    public long UpdateBinaryMax { get; init; } = 400L * 1024 * 1024;
+
+    /// <summary>How often a running daemon looks for a stop request (the file <see cref="StopRequestPath"/>).</summary>
+    public TimeSpan StopPollEvery { get; init; } = TimeSpan.FromSeconds(1);
+
     public TimeSpan FlushEvery { get; init; } = TimeSpan.FromSeconds(2);
     public TimeSpan HeartbeatEvery { get; init; } = TimeSpan.FromSeconds(60);
     public TimeSpan SettingsEvery { get; init; } = TimeSpan.FromMinutes(10);
@@ -100,6 +188,21 @@ public sealed record AgentConfig
     public string IdentityPath => Path.Combine(Home, "agent.json");
     public string PluginDir => Path.Combine(Home, "claude-plugin");
     public string LogPath => Path.Combine(Home, "agent.log");
+    public string BinaryPath => Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
+
+    /// <summary>What the last update check and install left behind (shown by `cm-agent status`).</summary>
+    public string UpdateStatePath => Path.Combine(Home, "update-state.json");
+    public string UpdateLockPath => Path.Combine(Home, "update.lock");
+    public string UpdateDir => Path.Combine(Home, "update");
+
+    /// <summary>Written by an update to ask the running daemon to stop; the daemon deletes it and exits.</summary>
+    public string PidPath => Path.Combine(Home, "daemon.pid");
+    public string ClaudeUpdateStatePath => Path.Combine(Home, "claude-update-state.json");
+    public string ClaudeUpdateLockPath => Path.Combine(Home, "claude-update.lock");
+
+    /// <summary>Written by `cm-agent claude-update cancel`; the countdown sees it and stands down.</summary>
+    public string ClaudeCancelPath => Path.Combine(Home, "claude-update.cancel");
+    public string StopRequestPath => Path.Combine(Home, "daemon.stop");
 
     public const string CredentialService = "claude-monitor-agent";
     public const string PluginName = "monitor-agent";
@@ -109,8 +212,20 @@ public sealed record AgentConfig
         typeof(AgentConfig).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             .Split('+')[0] ?? "0.0.0";
 
-    /// <summary>The OS code the API knows ("macos" / "windows"); anything else is refused at login.</summary>
-    public static string Os => OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "unsupported";
+    /// <summary>The CPU code the API knows ("arm64" / "x64").</summary>
+    public static string Arch => RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant();
+
+    private static string? BuildMetadata(string key) =>
+        typeof(AgentConfig).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == key)?.Value;
+
+    /// <summary>The OS code the API knows (<see cref="OsKinds"/>); anything else is refused at login.</summary>
+    public static string Os =>
+        OperatingSystem.IsWindows() ? OsKinds.Windows
+        : OperatingSystem.IsMacOS() ? OsKinds.MacOs
+        : OperatingSystem.IsLinux() ? OsKinds.Linux
+        : Unsupported;
+
+    public const string Unsupported = "unsupported";
 
     public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null)
     {
@@ -131,7 +246,16 @@ public sealed record AgentConfig
             StopWaitFromEnvironment = read("CM_STOP_WAIT") is { Length: > 0 },
             PushEnabled = read("CM_PUSH") == "on",
             PushFromEnvironment = read("CM_PUSH") is { Length: > 0 },
+            ClaudeUpdateEnabled = read("CM_CLAUDE_UPDATE") == "on",
+            ClaudeUpdateFromEnvironment = read("CM_CLAUDE_UPDATE") is { Length: > 0 },
+            ClaudeConfigDir = read("CLAUDE_CONFIG_DIR") is { Length: > 0 } claudeDir ? claudeDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude"),
+            ClaudeBinary = read("CM_CLAUDE_BINARY") is { Length: > 0 } claudeBinary ? claudeBinary : null,
+            PathVariable = read("PATH") ?? "",
+            AutoUpdate = UpdateModes.Normalize(read("CM_AUTO_UPDATE")),
+            UpdateHealthWait = Seconds(read("CM_UPDATE_HEALTH_WAIT"), TimeSpan.FromSeconds(90), 600),
+            AutoUpdateFromEnvironment = read("CM_AUTO_UPDATE") is { Length: > 0 },
             PushScope = read("CM_PUSH_SCOPE") == PushScopes.Machine ? PushScopes.Machine : PushScopes.Session,
+            ServiceMode = read("CM_SERVICE") == "1",
         };
     }
 
@@ -140,14 +264,17 @@ public sealed record AgentConfig
     /// Claude desktop app is a packaged (MSIX) app, and every process it starts sees %LOCALAPPDATA% redirected to a private
     /// copy, so a login made in a normal terminal was invisible to its hooks and MCP server.
     /// </summary>
-    public static string DefaultHome() => HomeFor(OperatingSystem.IsWindows(), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    public static string DefaultHome() => HomeFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     /// <summary>The older Windows default (%LOCALAPPDATA%\ClaudeMonitor), kept only to migrate from and to find old installs; null on macOS.</summary>
     public static string? LegacyHome() =>
         OperatingSystem.IsWindows() ? LegacyHomeFor(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)) : null;
 
-    public static string HomeFor(bool windows, string userProfile) =>
-        windows ? Path.Combine(userProfile, ".claude-monitor") : Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor");
+    public static string HomeFor(bool windows, string userProfile) => HomeFor(windows ? OsKinds.Windows : OsKinds.MacOs, userProfile);
+
+    /// <summary>macOS keeps the Library folder; Windows and Linux use a dot folder in the user's profile.</summary>
+    public static string HomeFor(string os, string userProfile) =>
+        os == OsKinds.MacOs ? Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor") : Path.Combine(userProfile, ".claude-monitor");
 
     public static string LegacyHomeFor(string localAppData) => Path.Combine(localAppData, "ClaudeMonitor");
 

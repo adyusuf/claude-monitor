@@ -59,3 +59,21 @@ export function bytes(n: number): string {
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** "4:07": the time left until iso as minutes and seconds; null when it is not a future moment. */
+export function countdown(iso: string | null | undefined, now: number): string | null {
+  const left = iso ? new Date(iso).getTime() - now : NaN;
+  if (!(left > 0)) return null;
+  const seconds = Math.ceil(left / 1000);
+  return `${Math.floor(seconds / 60)}:${pad(seconds % 60)}`;
+}
+
+/** "42%": a share between 0 and 100, rounded; an empty or unmeasured value is "–". */
+export function percent(value: number | null | undefined): string {
+  return value === null || value === undefined || !Number.isFinite(value) ? "–" : `${Math.round(value)}%`;
+}
+
+/** The share of total that used is, 0-100; 0 when total is not positive. */
+export function share(used: number, total: number): number {
+  return total > 0 ? (used / total) * 100 : 0;
+}

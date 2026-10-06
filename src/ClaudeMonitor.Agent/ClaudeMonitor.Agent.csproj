@@ -12,6 +12,17 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- Self-update (ADR-0004): the channel this build belongs to and the PUBLIC key its updates must be signed with
+       (base64 SubjectPublicKeyInfo, deploy/update-keys/<channel>.pub), passed by scripts/build-agent.sh. A build
+       without a key cannot update itself. -->
+  <PropertyGroup>
+    <UpdateChannel Condition="'$(UpdateChannel)' == ''">dev</UpdateChannel>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="UpdateChannel" Value="$(UpdateChannel)" />
+    <AssemblyMetadata Include="UpdatePublicKey" Value="$(UpdatePublicKey)" />
+  </ItemGroup>
+
   <!-- Release publishing: dotnet publish -c Release -r <osx-arm64|osx-x64|win-x64|win-arm64> -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <SelfContained>true</SelfContained>
@@ -30,6 +41,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.10" />
     <PackageReference Include="ModelContextProtocol" Version="2.1.0" />
   </ItemGroup>
 

@@ -1,11 +1,45 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { api } from "../api/endpoints";
-import type { AgentRow, DeviceLookup } from "../api/types";
+import { ApiError } from "../api/client";
+import type { AgentRow, DeviceLookup, MachineView } from "../api/types";
 import { useSession } from "../auth/session";
 import { Button, Card, Empty, Field, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
-import { dateTime } from "../lib/format";
+import { dateTime, percent } from "../lib/format";
+import { debounce, useLive } from "../lib/live";
+import { ExecBadge, maxDiskPct, memoryPct, OnlineDot, ServiceBadge } from "./MachineBits";
+
+/** One machine: the agent's facts, and (when the API reports remote work) its exec level, load and open alerts. */
+function MachineRow({ ws, agent: a, view: v, canRevoke, onRevoke }: {
+  ws: string; agent: AgentRow; view: MachineView | undefined; canRevoke: boolean; onRevoke: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <tr className={a.status === "revoked" ? "dim" : ""}>
+      <td>
+        {v ? <OnlineDot online={v.online} /> : null}{" "}
+        {v ? <Link to={`/w/${ws}/machines/${a.id}`}><strong>{a.hostname}</strong></Link> : <strong>{a.hostname}</strong>}{" "}
+        <span className="muted small">{a.os} {a.arch}</span>
+      </td>
+      <td>{a.userName}</td>
+      <td>{v ? <><ExecBadge level={v.execLevel} /> <ServiceBadge serviceMode={v.serviceMode} /></> : null}</td>
+      <td>{v ? percent(v.latest?.cpuPct) : ""}</td>
+      <td>{v ? percent(memoryPct(v.latest)) : ""}</td>
+      <td>{v ? percent(maxDiskPct(v.latest)) : ""}</td>
+      <td>{v ? <span className={v.openAlerts > 0 ? "badge status-failed" : "muted"}>{v.openAlerts}</span> : ""}</td>
+      <td>
+        {a.version}
+        {a.status === "active" && a.updateAvailable
+          ? <> <span className="badge warn" title={t("machines.updateHint")}>{t("machines.updateAvailable", { version: a.latestVersion ?? "" })}</span></> : null}
+      </td>
+      <td>{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
+      <td className="right">
+        {canRevoke ? <Button variant="ghost" onClick={() => onRevoke(a.id)}>{t("machines.revoke")}</Button> : null}
+      </td>
+    </tr>
+  );
+}
 
 /** The workspace's connected machines; a user disconnects their own, an admin anyone's. */
 export function MachinesPage() {
@@ -14,13 +48,33 @@ export function MachinesPage() {
   const errorText = useErrorText();
   const { me } = useSession();
   const [rows, setRows] = useState<AgentRow[] | null>(null);
+  const [views, setViews] = useState<Map<string, MachineView>>(new Map());
   const [error, setError] = useState<unknown>(null);
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
 
-  const load = useCallback(() => api.agents(ws).then(setRows).catch(setError), [ws]);
+  // An API without remote work answers 404 to the machines list: the page then shows the plain list, as before.
+  const load = useCallback(async () => {
+    try {
+      const [agents, machines] = await Promise.all([
+        api.agents(ws),
+        api.machines(ws).catch((e: unknown) => {
+          if (e instanceof ApiError && e.status === 404) return [];
+          throw e;
+        }),
+      ]);
+      setRows(agents);
+      setViews(new Map(machines.map((m) => [m.agentId, m])));
+    } catch (e) {
+      setError(e);
+    }
+  }, [ws]);
   useEffect(() => {
     void load();
   }, [load]);
+  const reload = useMemo(() => debounce(() => void load()), [load]);
+  useLive(ws, (m) => {
+    if (m.event === "alert" || m.event === "run" || m.event === "session") reload();
+  });
 
   const revoke = async (id: string) => {
     if (!window.confirm(t("machines.revokeConfirm"))) return;
@@ -41,25 +95,24 @@ export function MachinesPage() {
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
       {rows === null ? <Spinner /> : rows.length === 0 ? <Empty title={t("machines.empty")} hint={t("sessions.emptyHint")} /> : (
         <Card>
-          <table className="table">
-            <thead>
-              <tr><th>{t("sessions.host")}</th><th>{t("machines.user")}</th><th>{t("machines.version")}</th><th>{t("machines.lastSeen")}</th><th /></tr>
-            </thead>
-            <tbody>
-              {rows.map((a) => (
-                <tr key={a.id} className={a.status === "revoked" ? "dim" : ""}>
-                  <td><strong>{a.hostname}</strong> <span className="muted small">{a.os} {a.arch}</span></td>
-                  <td>{a.userName}</td>
-                  <td>{a.version}</td>
-                  <td>{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
-                  <td className="right">
-                    {a.status === "active" && (a.userId === me?.id || role === "owner" || role === "admin")
-                      ? <Button variant="ghost" onClick={() => void revoke(a.id)}>{t("machines.revoke")}</Button> : null}
-                  </td>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t("sessions.host")}</th><th>{t("machines.user")}</th><th>{t("remote.remote")}</th><th>{t("remote.cpu")}</th>
+                  <th>{t("remote.memory")}</th><th>{t("remote.disk")}</th><th>{t("remote.alerts")}</th><th>{t("machines.version")}</th>
+                  <th>{t("machines.lastSeen")}</th><th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((a) => (
+                  <MachineRow key={a.id} ws={ws} agent={a} view={views.get(a.id)}
+                    canRevoke={a.status === "active" && (a.userId === me?.id || role === "owner" || role === "admin")}
+                    onRevoke={(id) => void revoke(id)} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
     </div>
