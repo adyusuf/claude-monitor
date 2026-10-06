@@ -58,7 +58,8 @@ A run executes only when **all** hold; each one defaults to "no".
    agent allows 2 s of clock difference and otherwise reads again; an older API sends none and keeps the 10 s rule).
    The read is stamped with the time it **began**. A stamp later than the agent's clock (the clock was stepped back) is
    untrusted and counts as no read, and when two passes overlap the one that began earlier does not overwrite the values of
-   the later one: the values and the stamp are written together under one lock.
+   the later one: the values and the stamp are written together under one lock. A stored tag that is not the workspace
+   `agent.json` names now (a login moved the machine) also forces a read, whatever the stamp's age, once per run.
 2. **Local exec level on the target**, `cm-agent install --exec off|argv|shell` (default `off`; `shell` is a separate,
    stronger opt-in). In service mode it lives in an **admin-owned file the service account cannot write**, with an
    optional local ceiling (allowed executables and roots). The API can never raise it. Shell text cannot be held to a
