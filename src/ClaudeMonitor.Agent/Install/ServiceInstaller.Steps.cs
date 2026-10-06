@@ -162,7 +162,9 @@ public sealed partial class ServiceInstaller
     {
         EnsureAdminDir(Path.GetDirectoryName(l.ExecConfigPath)!);
         var existed = File.Exists(l.ExecConfigPath);
-        ExecPolicyLoader.Save(l.ExecConfigPath, new ExecPolicy(execLevel, [], []));
+        // A reinstall (an upgrade) keeps the ceiling an admin wrote by hand.
+        var before = ExecPolicyLoader.ReadExisting(l.ExecConfigPath);
+        ExecPolicyLoader.Save(l.ExecConfigPath, new ExecPolicy(execLevel, before?.AllowedExecutables ?? [], before?.AllowedRoots ?? []));
         if (!existed) undo.Add(("exec policy written", () => File.Delete(l.ExecConfigPath)));
     }
 

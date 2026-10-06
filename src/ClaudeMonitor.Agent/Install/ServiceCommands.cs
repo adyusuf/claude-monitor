@@ -34,8 +34,10 @@ public static class ServiceCommands
             return 2;
         }
 
-        if (level == ExecLevels.Shell) stdout.WriteLine("Warning: exec level shell lets approved runs execute any shell text on this machine.");
         var layout = ServiceLayout.For(AgentConfig.Os) with { Server = server };
+        // Without --exec a reinstall keeps the level an admin chose before; a first install starts off.
+        if (Array.IndexOf(args, ExecOption) < 0) level = ExecPolicyLoader.ReadExisting(layout.ExecConfigPath)?.Level ?? ExecLevels.Off;
+        if (level == ExecLevels.Shell) stdout.WriteLine("Warning: exec level shell lets approved runs execute any shell text on this machine.");
         return new ServiceInstaller(stdout, run ?? ServiceInstaller.RunTool, AgentConfig.Os, isAdmin ?? ExecPolicyLoader.RunningAsRoot(), layout)
             .Install(Environment.ProcessPath!, level, Array.IndexOf(args, AllowRootFlag) >= 0);
     }

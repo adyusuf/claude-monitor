@@ -53,6 +53,28 @@ public static class ExecPolicyLoader
         }
     }
 
+    /// <summary>
+    /// The policy an admin wrote before, for a reinstall (an upgrade) to keep its ceiling, and its level when --exec is not
+    /// given. No ownership check: the installer itself runs as the admin. Null when there is none or it is invalid.
+    /// </summary>
+    public static ExecPolicy? ReadExisting(string path)
+    {
+        try
+        {
+            if (!File.Exists(path) || IsLink(path)) return null;
+            var file = JsonSerializer.Deserialize<ExecFile>(File.ReadAllText(path), Json);
+            if (file?.Level is not { } level || !ExecLevels.All.Contains(level)) return null;
+            var executables = file.AllowedExecutables ?? [];
+            var roots = file.AllowedRoots ?? [];
+            return AllAbsolute(executables) && AllAbsolute(roots) ? new ExecPolicy(level, executables, roots) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // an unreadable old policy is simply not kept
+            return null;
+        }
+    }
+
     /// <summary>Written by an admin (`cm-agent install --service --exec`): temp file and atomic rename, readable by all, never by a link.</summary>
     public static void Save(string path, ExecPolicy policy)
     {
