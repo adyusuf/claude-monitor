@@ -1,9 +1,11 @@
+using ClaudeMonitor.Contracts;
+
 namespace ClaudeMonitor.Agent.Update;
 
 /// <summary>How a running binary is put aside. Windows will not overwrite a running exe but will rename it; elsewhere a rename over it is atomic.</summary>
 public enum SwapStyle
 {
-    /// <summary>The previous version is copied to the side, then the new file is renamed over the binary in one step (macOS).</summary>
+    /// <summary>The previous version is copied to the side, then the new file is renamed over the binary in one step (macOS, Linux).</summary>
     Atomic,
 
     /// <summary>The binary is renamed aside (allowed while it runs), then the new file is renamed into its place (Windows).</summary>
@@ -18,6 +20,14 @@ public enum SwapStyle
 public static class BinarySwap
 {
     public static SwapStyle Native => OperatingSystem.IsWindows() ? SwapStyle.RenameAside : SwapStyle.Atomic;
+
+    /// <summary>The style for the OS an update was signed for (<see cref="OsKinds"/>): Windows renames aside; macOS and Linux rename over the running binary.</summary>
+    public static SwapStyle For(string os) => os switch
+    {
+        OsKinds.Windows => SwapStyle.RenameAside,
+        OsKinds.MacOs or OsKinds.Linux => SwapStyle.Atomic,
+        _ => Native,
+    };
 
     public static string Previous(string current) => current + ".prev";
 

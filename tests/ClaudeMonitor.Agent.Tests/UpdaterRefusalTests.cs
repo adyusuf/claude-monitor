@@ -179,7 +179,7 @@ public sealed class UpdaterRefusalTests : IDisposable
     [Fact]
     public async Task On_macos_a_binary_without_a_valid_code_signature_is_refused_without_being_run()
     {
-        if (!OperatingSystem.IsMacOS()) return;
+        Assert.Equal(OsKinds.MacOs, kit.Config.UpdateOs); // decided by the signed-for OS, so this runs on every host
         kit.InstallOld();
         var offer = kit.PublishGood();
         kit.Runner.CodesignExit = 1;

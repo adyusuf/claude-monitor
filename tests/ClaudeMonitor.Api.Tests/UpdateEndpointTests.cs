@@ -75,7 +75,7 @@ public sealed class UpdateEndpointTests : IDisposable
     {
         var agent = await AgentAsync();
         Publish(ManifestFile.Entry("0.3.1"));
-        foreach (var query in new[] { "os=windows&arch=x64", "os=windows&arch=arm64", "os=macos&arch=x64" })
+        foreach (var query in new[] { "os=windows&arch=x64", "os=windows&arch=arm64", "os=macos&arch=x64", "os=linux&arch=arm64" })
         {
             var response = await Latest(agent, query);
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -90,6 +90,20 @@ public sealed class UpdateEndpointTests : IDisposable
         Publish(ManifestFile.Entry("0.3.1"), ManifestFile.Entry("9.0.0", os: "windows", arch: "x64", file: "cm-agent-windows-x64.zip"));
         Assert.Equal("0.3.1", (await (await Latest(agent)).Content.ReadFromJsonAsync<UpdateOffer>(TestUser.Json))!.Version);
         Assert.Equal("9.0.0", (await (await Latest(agent, "os=windows&arch=x64")).Content.ReadFromJsonAsync<UpdateOffer>(TestUser.Json))!.Version);
+    }
+
+    [Theory]
+    [InlineData("x64")]
+    [InlineData("arm64")]
+    public async Task Latest_offers_a_linux_build_to_a_linux_agent_and_nothing_of_another_os(string arch)
+    {
+        var agent = await AgentAsync();
+        var zip = $"cm-agent-linux-{arch}.zip";
+        Publish(ManifestFile.Entry("0.3.1"), ManifestFile.Entry("0.4.0", os: OsKinds.Linux, arch: arch, file: zip));
+        var offer = await (await Latest(agent, $"os={OsKinds.Linux}&arch={arch}")).Content.ReadFromJsonAsync<UpdateOffer>(TestUser.Json);
+        Assert.Equal("0.4.0", offer!.Version);
+        Assert.Equal(ApiFactory.Origin + "/downloads/" + zip, offer.Url);
+        Assert.Equal("0.3.1", (await (await Latest(agent)).Content.ReadFromJsonAsync<UpdateOffer>(TestUser.Json))!.Version); // macOS keeps its own
     }
 
     [Fact]
@@ -187,7 +201,9 @@ public sealed class UpdateEndpointTests : IDisposable
     }
 
     [Theory]
-    [InlineData("os=linux&arch=arm64")]
+    [InlineData("os=freebsd&arch=arm64")]
+    [InlineData("os=unsupported&arch=x64")]
+    [InlineData("os=LINUX&arch=x64")]
     [InlineData("os=macos&arch=mips")]
     [InlineData("os=MACOS&arch=arm64")]
     [InlineData("arch=arm64")]
@@ -204,7 +220,7 @@ public sealed class UpdateEndpointTests : IDisposable
     public async Task Latest_names_the_field_that_is_wrong()
     {
         var agent = await AgentAsync();
-        var os = await (await Latest(agent, "os=linux&arch=arm64")).Content.ReadFromJsonAsync<JsonElement>();
+        var os = await (await Latest(agent, "os=freebsd&arch=arm64")).Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(os.GetProperty("errors").TryGetProperty("os", out _));
         var arch = await (await Latest(agent, "os=macos&arch=mips")).Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(arch.GetProperty("errors").TryGetProperty("arch", out _));

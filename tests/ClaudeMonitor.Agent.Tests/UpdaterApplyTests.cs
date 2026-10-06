@@ -58,7 +58,7 @@ public sealed class UpdaterApplyTests : IDisposable
         await kit.Updater.ApplyAsync(offer, CancellationToken.None);
         var calls = kit.Runner.Calls.ToArray();
         Assert.Contains(calls, c => c.File == kit.Staged && c.Args.SequenceEqual(["version"]));
-        if (OperatingSystem.IsMacOS())
+        if (kit.Config.UpdateOs == OsKinds.MacOs) // the OS the build was signed for, not the host: the same on every machine
         {
             Assert.Equal(FakeRunner.Codesign, calls[0].File);
             Assert.Equal(["--verify", "--strict", kit.Staged], calls[0].Args);

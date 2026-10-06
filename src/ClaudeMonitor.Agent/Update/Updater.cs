@@ -56,7 +56,7 @@ public sealed partial class Updater(AgentConfig config, ApiClient api, HttpClien
     private async Task<UpdateCheck> EvaluateAsync(CancellationToken ct)
     {
         if (config.UpdatePublicKey.Length == 0) return new(UpdateCodes.NoKey, "this build has no update key built in");
-        if (config.UpdateOs == "unsupported") return new(UpdateCodes.Unsupported, "this operating system has no agent builds");
+        if (config.UpdateOs == AgentConfig.Unsupported) return new(UpdateCodes.Unsupported, "this operating system has no agent builds");
         var offer = await api.LatestAsync(config.UpdateOs, config.UpdateArch, ct);
         return offer is null ? new(UpdateCodes.UpToDate, "no update is published for this machine") : Judge(offer);
     }
