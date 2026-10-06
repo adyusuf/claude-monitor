@@ -7,8 +7,8 @@ namespace ClaudeMonitor.Agent.Exec;
 
 /// <summary>
 /// Linux and macOS: the run starts through posix_spawn in a process group of its own, so that kill(-pgid) reaches every
-/// descendant that did not leave the group. A double-forked child that calls setsid() does leave it: on Linux the systemd
-/// unit's KillMode=control-group still ends it; on macOS it is a residual risk (ADR-0005). The group id is the lead's pid;
+/// descendant that did not leave the group. A child that calls setsid() does leave it: on Linux the systemd unit's
+/// KillMode=control-group still ends it; on macOS the <see cref="DescendantTracker"/> signals it too, best effort (ADR-0005). The group id is the lead's pid;
 /// a signal sent after the lead was reaped could in theory reach a recycled id, so the agent only does that to clean up
 /// right after a run, within seconds.
 /// </summary>
@@ -40,10 +40,19 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
     private static readonly nint AddCloseFrom = ResolveAddCloseFrom();
 
     private readonly int _pid;
+    private readonly DescendantTracker? _tracker;
 
-    private UnixRunProcess(Stream stdout, Stream stderr, int pid) : base(stdout, stderr) => _pid = pid;
+    private UnixRunProcess(Stream stdout, Stream stderr, int pid, DescendantTracker? tracker) : base(stdout, stderr)
+    {
+        _pid = pid;
+        _tracker = tracker;
+    }
 
-    public static UnixRunProcess Start(string exe, IReadOnlyList<string> argv, string cwd, IReadOnlyDictionary<string, string> env)
+    /// <summary>
+    /// <paramref name="trackEvery"/> above zero turns the descendant tracker on, on macOS only (Linux has the cgroup).
+    /// </summary>
+    public static UnixRunProcess Start(string exe, IReadOnlyList<string> argv, string cwd, IReadOnlyDictionary<string, string> env,
+        TimeSpan trackEvery = default)
     {
         // .NET creates both pipes close-on-exec, so no other child can inherit them; the spawn dup2s the write ends to 1 and 2.
         var stdout = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
@@ -53,7 +62,8 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
             var pid = Spawn(exe, argv, cwd, env, FdOf(stdout.ClientSafePipeHandle), FdOf(stderr.ClientSafePipeHandle));
             stdout.DisposeLocalCopyOfClientHandle(); // else the read end never sees the end of the output
             stderr.DisposeLocalCopyOfClientHandle();
-            var process = new UnixRunProcess(stdout, stderr, pid);
+            var tracker = StartTracker(pid, trackEvery);
+            var process = new UnixRunProcess(stdout, stderr, pid, tracker);
             process.BeginWait();
             return process;
         }
@@ -75,9 +85,11 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
         if (access(exe, XOk) != 0) throw new Win32Exception(Marshal.GetLastPInvokeError(), "Could not start the run (exec).");
     }
 
-    public override void Kill() => SendToGroup(Sigterm);
+    public override void Kill() => SendToTree(Sigterm);
 
-    public override void KillNow() => SendToGroup(Sigkill);
+    public override void KillNow() => SendToTree(Sigkill);
+
+    protected override void ReleaseNative() => _tracker?.Dispose();
 
     protected override RunExit WaitForExit()
     {
@@ -93,13 +105,6 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
     {
         var signal = status & StatusSignalMask;
         return signal == 0 ? new RunExit((status >> StatusExitShift) & StatusByteMask, null) : new RunExit(128 + signal, signal);
-    }
-
-    private void SendToGroup(int signal)
-    {
-        if (kill(-_pid, signal) == 0) return;
-        var errno = Marshal.GetLastPInvokeError();
-        if (errno != Esrch) throw new IOException($"kill failed (errno {errno})"); // ESRCH: the group is already gone
     }
 
     private static int FdOf(SafePipeHandle handle)

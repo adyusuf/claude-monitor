@@ -31,6 +31,12 @@ public sealed partial record AgentConfig
     public long ExecFileSizeMax { get; init; } = 1024L * 1024 * 1024;
     public int ExecOpenFilesMax { get; init; } = 1024;
 
+    /// <summary>
+    /// macOS only: how often the descendants of a run are recorded so that a kill also reaches those that left the process
+    /// group (<see cref="DescendantTracker"/>). Zero turns it off; otherwise between 50 ms and 5 s.
+    /// </summary>
+    public TimeSpan ExecTrackEvery { get; init; } = TimeSpan.FromMilliseconds(250);
+
     /// <summary>Output kept from the start of a run; past it only a tail of <see cref="RunTailBytes"/> is kept.</summary>
     public int RunHeadBytes { get; init; } = 256 * 1024;
     public int RunTailBytes { get; init; } = 256 * 1024;

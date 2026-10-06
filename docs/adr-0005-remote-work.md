@@ -117,8 +117,16 @@ a job runs only when asked (a schedule would be an autonomous action and needs i
   120 s, at most 3600 s, measured on a monotonic clock; a run also carries a `not_after` the target enforces.
 - **The whole process tree dies** on timeout or cancel: Linux and macOS start the run in its own process group
   (SIGTERM, then SIGKILL after 5 s; the systemd unit uses `KillMode=control-group`); Windows puts it in a Job Object
-  with kill-on-close, a process limit and a memory limit, created suspended and resumed after assignment. A process
-  that escapes on macOS is a documented residual risk.
+  with kill-on-close, a process limit and a memory limit, created suspended and resumed after assignment.
+- **A process that leaves the process group (`setsid`)** is ended by the service's cgroup on Linux. macOS has no cgroup, so
+  there a **descendant tracker** polls every 250 ms (`ExecTrackEvery`, 50 ms to 5 s, zero turns it off) while the run
+  lives, through libproc: it records every descendant of the lead by following parent pids (from the lead and from what
+  it already recorded), each as pid **and** start time. A kill polls once more first, signals the process group, then
+  every recorded descendant that is still the same process (same start time, so a recycled pid is never signalled) and
+  has left the group, with the same signal (SIGTERM, later SIGKILL); the poller stops when the run is disposed. **This is
+  best effort:** a process that double-forks and re-parents to launchd between two polls (or whose parent dies before
+  it is seen) is never recorded and can still escape, as can one created after the last poll. The recorded set is
+  capped at 4096. Linux does not start the tracker.
 - **Resource limits on macOS.** `posix_spawn` has no rlimit attribute there, and `setrlimit` on the daemon is unsafe (the
   CPU limit is cumulative and would signal the daemon), so a run starts through a trusted launcher: `/bin/sh` sets the
   limits with `ulimit` (hard, so the run cannot raise them) and then **execs the target in the same process**. The pid,
@@ -225,8 +233,7 @@ exists, so a rollback of that slice is code-only.
   account, a multi-instance API broker.
 - **Target-side checks not in v1** (security review items left open while building): refusing a grant root whose
   folder chain is writable by a non-admin (it would refuse ordinary app-owned log folders), a pinned hash of the
-  executable, an ACL ownership check of the executable on Windows (Unix checks owner and modes). A process that leaves its process group with `setsid` survives a kill on macOS; on
-  Linux the service's cgroup ends it.
+  executable, and an ACL ownership check of the executable on Windows (Unix checks owner and modes).
 - **Unverified platforms:** the Linux and Windows paths of the executor, the metrics and the service installer compile
   and follow the platform contracts but have only run on macOS; they are verified on a Linux and a Windows Server
   machine before a target there is trusted.

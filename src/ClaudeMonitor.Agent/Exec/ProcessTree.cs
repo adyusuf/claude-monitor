@@ -36,9 +36,11 @@ public static class ProcessTree
     /// Starts exe with args (argv mode). The environment is exactly <paramref name="env"/>, never inherited. argv0 is what
     /// the child sees as its own name (default: exe). Throws when the OS refuses to start it; the message carries no argument.
     /// <paramref name="limits"/> are applied on macOS through <see cref="RunLauncher"/> (and nowhere else, see <see cref="RunLimits"/>).
+    /// <paramref name="trackEvery"/> above zero makes a kill reach descendants that left the process group, on macOS only
+    /// (<see cref="DescendantTracker"/>, best effort).
     /// </summary>
     public static IRunProcess Start(string exe, IReadOnlyList<string> args, string cwd, IReadOnlyDictionary<string, string> env,
-        string? argv0 = null, RunLimits? limits = null)
+        string? argv0 = null, RunLimits? limits = null, TimeSpan trackEvery = default)
     {
         Validate(exe, args, cwd, env);
         if (OperatingSystem.IsWindows())
@@ -57,10 +59,10 @@ public static class ProcessTree
         if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
         {
             IReadOnlyList<string> argv = [argv0 ?? exe, .. args];
-            if (limits is null || !RunLimits.AppliesHere) return UnixRunProcess.Start(exe, argv, cwd, env);
+            if (limits is null || !RunLimits.AppliesHere) return UnixRunProcess.Start(exe, argv, cwd, env, trackEvery);
             UnixRunProcess.RequireExecutable(exe);
             var (launcher, wrapped) = RunLauncher.Wrap(exe, argv, limits);
-            return UnixRunProcess.Start(launcher, wrapped, cwd, env);
+            return UnixRunProcess.Start(launcher, wrapped, cwd, env, trackEvery);
         }
 
         throw new PlatformNotSupportedException("Remote runs are supported on Windows, macOS and Linux.");
@@ -71,7 +73,7 @@ public static class ProcessTree
     /// shell's path as the guard resolved it (default: /bin/sh, or cmd.exe in the system folder).
     /// </summary>
     public static IRunProcess StartShell(string text, string cwd, IReadOnlyDictionary<string, string> env, string? shell = null,
-        RunLimits? limits = null)
+        RunLimits? limits = null, TimeSpan trackEvery = default)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -80,7 +82,7 @@ public static class ProcessTree
             return WindowsRunProcess.Start(cmd, $"\"{cmd}\" /d /s /c \"{text}\"", cwd, env);
         }
 
-        return Start(shell ?? UnixShell, ["-c", text], cwd, env, argv0: "sh", limits);
+        return Start(shell ?? UnixShell, ["-c", text], cwd, env, argv0: "sh", limits, trackEvery);
     }
 
     private const string UnixShell = "/bin/sh";
