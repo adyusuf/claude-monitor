@@ -1,13 +1,15 @@
 using ClaudeMonitor.Api.Data;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Streaming;
+using ClaudeMonitor.Api.Update;
 using ClaudeMonitor.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record AgentRow(Guid Id, Guid MachineId, string Hostname, string Os, string Arch, string Version, string Status,
-    Guid UserId, string UserName, DateTimeOffset EnrolledAt, DateTimeOffset? LastHeartbeatAt, DateTimeOffset? RevokedAt);
+    Guid UserId, string UserName, DateTimeOffset EnrolledAt, DateTimeOffset? LastHeartbeatAt, DateTimeOffset? RevokedAt, string? LatestVersion = null,
+    bool UpdateAvailable = false);
 public sealed record MoveRequest(Guid? WorkspaceId);
 public sealed record AuditRow(long Id, string Action, Guid? ActorUserId, Guid? ActorAgentId, string? TargetType, string? TargetId,
     DateTimeOffset At, System.Text.Json.JsonDocument? Detail);
@@ -24,7 +26,7 @@ public static class MachineEndpoints
         g.MapGet("/workspaces/{id:guid}/audit", AuditLog);
     }
 
-    private static async Task<IResult> List(Guid id, HttpContext http, MonitorDb db)
+    private static async Task<IResult> List(Guid id, HttpContext http, MonitorDb db, UpdateCatalog catalog)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
         var rows = await (from a in db.Agents.AsNoTracking()
@@ -34,7 +36,15 @@ public static class MachineEndpoints
                           orderby a.Status, m.Hostname, a.EnrolledAt descending
                           select new AgentRow(a.Id, m.Id, m.Hostname, m.Os, m.Arch, a.Version, a.Status, u.Id, u.DisplayName,
                               a.EnrolledAt, a.LastHeartbeatAt, a.RevokedAt)).Take(500).ToListAsync(http.RequestAborted);
-        return Results.Ok(rows);
+        return Results.Ok(rows.Select(r => WithUpdate(r, catalog)));
+    }
+
+    /// <summary>Whether the newest build this server hands out is newer than the one the agent runs (decided here, never in the browser).</summary>
+    private static AgentRow WithUpdate(AgentRow row, UpdateCatalog catalog)
+    {
+        if (row.Status != AgentStatuses.Active || catalog.Latest(row.Os, row.Arch) is not { } offer) return row;
+        var newer = Version.TryParse(offer.Version, out var latest) && Version.TryParse(row.Version, out var current) && latest > current;
+        return row with { LatestVersion = offer.Version, UpdateAvailable = newer };
     }
 
     /// <summary>The agent's own user, or an admin of its workspace, may disconnect it.</summary>

@@ -118,6 +118,40 @@ lost). The old plugin keeps running the old binary until you run `cm-agent insta
 from a normal terminal, then check that `cm-agent status` and `monitor_status` in a new Claude session show the same
 `home:`. The old folder is left in place and can be deleted afterwards.
 
+## Updating the agent
+
+Design, trust model and limits: [ADR-0004](docs/adr-0004-agent-self-update.md). **Off by default**: an agent never asks the server for an update
+unless a person runs the command below or turns the setting on.
+
+```bash
+cm-agent update --check                  # look only: prints "update available: <version>" or why none is taken
+cm-agent update                          # install the newest signed build of this agent's channel
+cm-agent config auto-update off|check|on # what the daemon may do by itself (default off); no argument prints the setting
+```
+
+- `cm-agent update` and `--check` are your own decision and ignore both settings below. The agent must be logged in (the build comes from its own
+  server) and installed (`cm-agent install`); the installed binary in the agent home is what is replaced. Exit code 0 = installed or up to date, 1 = refused or failed, 2 = usage.
+- **Machine setting:** `cm-agent config auto-update off|check|on` (saved in `agent.json`) or `CM_AUTO_UPDATE` (wins when set). `check` looks every 6 h and reports; `on` also installs.
+- **Workspace setting** `agentUpdate` (`off` default, `check`, `on`): the cap an owner or admin sets in the workspace settings on the web. **The lower of the two applies.**
+  While the effective mode is `off` the daemon makes no update call at all.
+- `cm-agent status` shows `auto-update: <effective> (this machine: <m>, workspace: <w>)`, `update available: <version>`, `update: <from> -> <to> is being checked` while a new
+  daemon is on probation, and `last update check: <code> (<reason>) <dd/mm/yyyy HH:mm>`. After a refused update the code says why (for example `bad-signature`, `channel`,
+  `downgrade`, `hash-mismatch`, `no-key`); after a rolled-back one `status` also prints `update <version> was rolled back and is not retried by itself`. The same lines are in `agent.log`.
+- **Replacement:** the new binary is staged as `cm-agent.new`, the old one is kept as `cm-agent.prev` (one version back), the daemon is stopped through a `daemon.stop`
+  file and started again from the new binary. If it does not report its version and get an answer from the API within 90 s, the previous binary is put back automatically.
+- **MCP processes** (one per Claude Code session) keep running the old version until their session ends; they are not killed. Hooks use the new binary at once.
+- **The standards repository's `install.py`** may run `cm-agent update` instead of rebuilding when an agent is already installed (it only needs the exit code); that is a
+  choice of that script, nothing here depends on it.
+
+### Releasing an agent build (maintainer, macOS)
+
+1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `cm-agent-update-<channel>`) and is never written to a file; the public half is printed:
+   `python3 scripts/sign_manifest.py keygen --channel test` and `... --channel prod`. Save the printed line as `deploy/update-keys/<channel>.pub` and commit it (it is public by design).
+2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
+   The channel's public key is built into the agent; `out/downloads` gets the four zips, `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
+3. Deploy copies `downloads/` as before (`docs/deploy-windows.md`). **The server offers whatever its web root holds**, so deploy test builds to test and prod builds to prod.
+4. Agents already installed at that channel take it when a person runs `cm-agent update` or when `auto-update` allows it.
+
 ## Browser tests (e2e)
 
 Playwright (`e2e/`, Chromium and WebKit) drives the real web app and API. It is optional (global #33): the
@@ -157,13 +191,16 @@ secrets.
 | the PostgreSQL `postgres` password | the database superuser (set-up and restore drills only) | chosen at the PostgreSQL install | the maintainer's password manager only | the maintainer | yearly |
 | `MONITOR_GOOGLE_CLIENT_SECRET` | the Google OAuth client's secret; redirect `https://<host>/api/auth/callback/google` | Google Cloud Console, APIs and Services, Credentials (one client per environment) | server environment file | the maintainer | add a new secret, deploy, disable the old one |
 
-Already present on the maintainer's machine, for the macOS installer of phase 4 (they live in the macOS
+Already present on the maintainer's machine, for the macOS installer of phase 4, and the two update-signing keys
+of ADR-0004, created by `keygen` at the first release of each channel (they live in the macOS
 keychain, never in the repository, the shell environment or CI):
 
 | Secret | What it is | Where to get it | Stored | Owner | Rotation |
 |---|---|---|---|---|---|
 | the `claude-monitor-notary` keychain profile | the stored App Store Connect API credentials `notarytool` uses | created by `xcrun notarytool store-credentials` | the macOS keychain | the maintainer | revoke the API key in App Store Connect and store a new profile |
 | the Developer ID Application certificate | signs the agent binary | Apple Developer account, Certificates | the macOS keychain (its name is not secret) | the maintainer | when it expires or is revoked |
+| `cm-agent-update-test` signing key | the ECDSA P-256 private key that signs `test` agent builds for self-update (ADR-0004) | `python3 scripts/sign_manifest.py keygen --channel test`, once | the maintainer's macOS keychain, service `cm-agent-update-test` (never a file, the repository, CI or a server); the public half is `deploy/update-keys/test.pub` | the maintainer | new key + a new build installed by hand on every `test` agent: installed agents trust only the key built into them. `keygen` never overwrites an existing key |
+| `cm-agent-update-prod` signing key | the same, for `prod` agent builds | `python3 scripts/sign_manifest.py keygen --channel prod`, once | the maintainer's macOS keychain, service `cm-agent-update-prod`; public half `deploy/update-keys/prod.pub` | the maintainer | as above; **lost or leaked, installed prod agents cannot be updated and must be reinstalled by hand** |
 
 ## Backup
 

@@ -1329,6 +1329,13 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("workspace_id");
 
+                    b.Property<string>("AgentUpdate")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("off")
+                        .HasColumnName("agent_update");
+
                     b.Property<int>("EventMaxBytes")
                         .HasColumnType("integer")
                         .HasColumnName("event_max_bytes");
@@ -1354,6 +1361,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("workspace_settings", t =>
                         {
+                            t.HasCheckConstraint("ck_workspace_settings_agent_update", "agent_update IN ('off', 'check', 'on')");
+
                             t.HasCheckConstraint("ck_workspace_settings_retention", "retention_days BETWEEN 1 AND 3650");
                         });
                 });

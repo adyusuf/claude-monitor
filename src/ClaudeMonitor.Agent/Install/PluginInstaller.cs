@@ -33,7 +33,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
     /// <summary>How Claude Code must be started for the push to arrive: a channel is research-preview and not on the allowlist (ADR-0003).</summary>
     public static readonly string ChannelFlag = $"--dangerously-load-development-channels plugin:{AgentConfig.PluginName}@{AgentConfig.MarketplaceName}";
 
-    public string BinaryPath => Path.Combine(config.Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
+    public string BinaryPath => config.BinaryPath;
 
     public int Install(string sourceBinary)
     {

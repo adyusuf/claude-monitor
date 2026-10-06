@@ -14,7 +14,8 @@ export interface Me {
   mfaEnabled?: boolean;
 }
 
-export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number }
+export type AgentUpdateMode = "off" | "check" | "on";
+export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode }
 export interface WorkspaceInfo { id: string; name: string; role: Role; settings: Settings }
 export interface Member { userId: string; displayName: string; email: string | null; role: Role; joinedAt: string }
 export interface Invitation { id: string; email: string; role: Role; createdAt: string; expiresAt: string }
@@ -95,6 +96,9 @@ export interface AgentRow {
   enrolledAt: string;
   lastHeartbeatAt: string | null;
   revokedAt: string | null;
+  /** The newest build this server hands out for the machine's OS and CPU, and whether it is newer than the running one (decided by the API). */
+  latestVersion?: string | null;
+  updateAvailable?: boolean
 }
 export interface DeviceLookup { userCode: string; hostname: string; os: string; arch: string; agentVersion: string; createdAt: string; expiresAt: string }
 export interface AuditRow { id: number; action: string; actorUserId: string | null; actorAgentId: string | null; targetType: string | null; targetId: string | null; at: string; detail: unknown }

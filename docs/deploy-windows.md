@@ -48,6 +48,9 @@ AGENT_SIGN_IDENTITY="<Developer ID Application identity>" AGENT_NOTARY_PROFILE=c
 bash scripts/build-release.sh                      # out/claude-monitor-<commit>.zip
 ```
 
+For agents that update themselves (ADR-0004, SETUP.md "Updating the agent"), add `AGENT_UPDATE_CHANNEL=test` or `prod` to the first command: it signs
+`manifest.json` into `out/downloads`, which the package carries. The server offers whatever its `downloads/` holds, so a `test` package goes to test and a `prod` package to prod.
+
 Copy the zip to the server and deploy, test first (Windows PowerShell 5.1 again, elevated):
 
 ```powershell
