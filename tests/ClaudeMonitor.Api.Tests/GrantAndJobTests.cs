@@ -36,6 +36,8 @@ public sealed class GrantAndJobTests(ApiFactory api)
 
         var message = await RemoteKit.RunEventAsync(targetStream, AgentStreamEvents.Run, created.Id);
         Assert.Equal(grant.Id, message.GetProperty("grantId").GetGuid());
+        // A grant approves at creation: the decision time the agent compares its settings read with is that moment.
+        Assert.InRange(message.GetProperty("decidedAt").GetDateTimeOffset() - row.DecidedAt!.Value, -TimeSpan.FromMilliseconds(5), TimeSpan.FromMilliseconds(5));
         var template = message.GetProperty("grant");
         Assert.Equal(grant.Template, template.GetProperty("argv").EnumerateArray().Select(a => a.GetString()!).ToList());
         Assert.Equal("/var/log/app", template.GetProperty("cwd").GetString());

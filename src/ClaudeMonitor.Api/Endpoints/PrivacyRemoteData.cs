@@ -121,19 +121,42 @@ public static class PrivacyRemoteData
         w.WriteEndArray();
     }
 
-    /// <summary>Inside the deletion's transaction, before the user row changes: cancel, then empty.</summary>
+    /// <summary>
+    /// First in the deletion's transaction: for each workspace the user belongs to, in workspace-id order, its owners and the
+    /// user (<see cref="RemoteLocks.MembersAsync"/>, user-id order within the workspace), then the user's active agents (by id),
+    /// before any row of remote work is touched (<see cref="RemoteLocks"/>). Remove and ChangeRole lock one workspace's members
+    /// in that same user-id order and a run creation locks one workspace's too, so every transaction takes member rows in
+    /// the one order (workspace id, user id) and two of them cannot hold each other's rows.
+    /// </summary>
+    public static async Task LockAsync(MonitorDb db, Guid userId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        var workspaces = await db.WorkspaceMembers.AsNoTracking().Where(m => m.UserId == userId && m.RemovedAt == null)
+            .OrderBy(m => m.WorkspaceId).Select(m => m.WorkspaceId).ToListAsync(ct);
+        foreach (var workspaceId in workspaces)
+        {
+            await RemoteLocks.MembersAsync(db, workspaceId, [userId], ct);
+        }
+
+        await RemoteLocks.AgentsAsync(db, await db.Agents.AsNoTracking().Where(a => a.UserId == userId && a.Status == AgentStatuses.Active)
+            .Select(a => a.Id).ToListAsync(ct), ct);
+    }
+
+    /// <summary>Inside the deletion's transaction, before the user row changes: cancel, then empty. Jobs, grants, then runs, as the cascades lock them.</summary>
     public static async Task DeleteAsync(MonitorDb db, Broker broker, Guid userId, List<Guid> agentIds, DateTimeOffset now,
         CancellationToken ct, List<Action>? after = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(agentIds);
-        await RunDecisions.CancelOpenAsync(db, broker, now, null, null, userId, ct, after);
-        var runIds = db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId).Select(r => r.Id);
-        await db.RemoteRunOutput.Where(o => runIds.Contains(o.RunId)).ExecuteDeleteAsync(ct);
-        await db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Argv, (List<string>?)null).SetProperty(r => r.ShellCommand, (string?)null)
-                .SetProperty(r => r.Cwd, (string?)null).SetProperty(r => r.Reason, (string?)null)
-                .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null), ct);
+        await RemoteLocks.JobsAsync(db, j => j.OwnerUserId == userId || j.ProposedByUserId == userId, ct);
+        await RemoteLocks.GrantsAsync(db, g => g.OwnerUserId == userId || g.GranteeUserId == userId, ct);
+        await RemoteLocks.AlertsAsync(db, a => agentIds.Contains(a.AgentId), ct);
+        await db.MachineJobs.Where(j => (j.OwnerUserId == userId || j.ProposedByUserId == userId)
+                                        && (j.Status == JobStatuses.Active || j.Status == JobStatuses.Proposed))
+            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Retired).SetProperty(j => j.RetiredAt, now), ct);
+        await db.MachineJobs.Where(j => j.OwnerUserId == userId || j.ProposedByUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Argv, (List<string>?)null).SetProperty(j => j.Cwd, (string?)null)
+                .SetProperty(j => j.Reason, (string?)null), ct);
         await db.MachineGrants.Where(g => (g.OwnerUserId == userId || g.GranteeUserId == userId)
                                           && (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested))
             .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Revoked).SetProperty(g => g.RevokedAt, now)
@@ -141,12 +164,14 @@ public static class PrivacyRemoteData
         await db.MachineGrants.Where(g => g.OwnerUserId == userId || g.GranteeUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(g => g.Template, (List<string>?)null).SetProperty(g => g.Cwd, (string?)null)
                 .SetProperty(g => g.Reason, (string?)null), ct);
-        await db.MachineJobs.Where(j => (j.OwnerUserId == userId || j.ProposedByUserId == userId)
-                                        && (j.Status == JobStatuses.Active || j.Status == JobStatuses.Proposed))
-            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Retired).SetProperty(j => j.RetiredAt, now), ct);
-        await db.MachineJobs.Where(j => j.OwnerUserId == userId || j.ProposedByUserId == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Argv, (List<string>?)null).SetProperty(j => j.Cwd, (string?)null)
-                .SetProperty(j => j.Reason, (string?)null), ct);
+        await RemoteLocks.RunsAsync(db, r => r.RequesterUserId == userId || r.TargetUserId == userId, ct);
+        await RunDecisions.CancelOpenAsync(db, broker, now, null, null, userId, ct, after);
+        var runIds = db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId).Select(r => r.Id);
+        await db.RemoteRunOutput.Where(o => runIds.Contains(o.RunId)).ExecuteDeleteAsync(ct);
+        await db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Argv, (List<string>?)null).SetProperty(r => r.ShellCommand, (string?)null)
+                .SetProperty(r => r.Cwd, (string?)null).SetProperty(r => r.Reason, (string?)null)
+                .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null), ct);
         await db.MachineMetrics.Where(m => agentIds.Contains(m.AgentId)).ExecuteDeleteAsync(ct);
         await db.MachineAlerts.Where(a => agentIds.Contains(a.AgentId)).ExecuteDeleteAsync(ct);
     }

@@ -73,6 +73,22 @@ public sealed partial class LocalStore : IDisposable
         Exec("INSERT INTO kv (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             ("$k", key), ("$v", value));
 
+    /// <summary>
+    /// Sets several keys in ONE transaction: another connection (a hook, a second relay) sees all of them or none, never a mix,
+    /// and a failure part-way leaves every key as it was. The values of one settings pass belong together with their workspace tag.
+    /// </summary>
+    public void SetMany(IReadOnlyList<(string Key, string Value)> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        using var tx = db.BeginTransaction();
+        foreach (var (key, value) in entries)
+        {
+            Exec("INSERT INTO kv (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value", tx, ("$k", key), ("$v", value));
+        }
+
+        tx.Commit();
+    }
+
     /// <summary>Forgets a key: it then reads as never set.</summary>
     public void Remove(string key) => Exec("DELETE FROM kv WHERE key = $k", ("$k", key));
 
