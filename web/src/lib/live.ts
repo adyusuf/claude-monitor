@@ -4,7 +4,7 @@ import { config } from "../config";
 
 export interface LiveMessage { event: string; sessionId?: string; id?: string; status?: string }
 
-const EVENTS = ["session", "command", "permission"] as const;
+const EVENTS = ["session", "command", "permission", "run", "alert", "grant", "job"] as const;
 
 /**
  * The workspace's live stream (server-sent events). Calls onMessage for every change; the page re-reads what it

@@ -7,6 +7,7 @@ import { Button, Card, Field, Notice, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { RemoteSettingsCard } from "./RemoteSettingsCard";
 
 /** Name, capture settings and the audit log (admins). */
 export function WorkspaceSettingsPage() {
@@ -59,6 +60,7 @@ export function WorkspaceSettingsPage() {
           <div><Button onClick={() => void save()}>{t("workspace.save")}</Button></div>
         </div>
       </Card>
+      <RemoteSettingsCard ws={ws} canEdit={info.role === "owner" || info.role === "admin"} />
       <Card title={t("workspace.audit")}>
         {audit.length === 0 ? <p className="muted">{t("workspace.noAudit")}</p> : (
           <ul className="plain audit">

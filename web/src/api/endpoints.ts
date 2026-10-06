@@ -1,7 +1,8 @@
 import { request } from "./client";
 import type {
-  AgentRow, AuditRow, CommandRow, DeviceLookup, EventRow, Invitation, Me, Member, Page, PermissionRow, Role,
-  SessionDetail, SessionRow, Settings, WorkspaceInfo,
+  AgentRow, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineView, Me, Member, MetricSample,
+  Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView,
+  WorkspaceInfo,
 } from "./types";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
@@ -58,6 +59,28 @@ export const api = {
   agents: (id: string) => request<AgentRow[]>("GET", `/workspaces/${id}/agents`),
   revokeAgent: (agentId: string) => request<void>("POST", `/agents/${agentId}/revoke`),
   moveAgent: (agentId: string, workspaceId: string) => request<void>("PATCH", `/agents/${agentId}`, { workspaceId }),
+  machines: (id: string) => request<MachineView[]>("GET", `/workspaces/${id}/machines`),
+  metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
+  alerts: (id: string, agent: string, includeResolved: boolean) =>
+    request<AlertView[]>("GET", `/workspaces/${id}/alerts${q({ agent, resolved: includeResolved ? "true" : "false" })}`),
+  runs: (id: string, opts: { agent?: string; before?: string | null; limit?: number }) =>
+    request<WebRunView[]>("GET", `/workspaces/${id}/runs${q(opts)}`),
+  run: (runId: string) => request<WebRunView>("GET", `/runs/${runId}`),
+  runOutput: (runId: string, after: number, limit: number) => request<RunOutputPage>("GET", `/runs/${runId}/output${q({ after, limit })}`),
+  approveRun: (runId: string, hash: string, code?: string) => request<void>("POST", `/runs/${runId}/approve`, { hash, code }),
+  denyRun: (runId: string, reason?: string) => request<void>("POST", `/runs/${runId}/deny`, { reason }),
+  cancelRun: (runId: string) => request<void>("POST", `/runs/${runId}/cancel`),
+  grants: (agentId: string) => request<WebGrantView[]>("GET", `/agents/${agentId}/grants`),
+  createGrant: (agentId: string, input: GrantInput) => request<WebGrantView>("POST", `/agents/${agentId}/grants`, input),
+  approveGrant: (grantId: string, code?: string) => request<void>("POST", `/grants/${grantId}/approve`, { code }),
+  denyGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/deny`),
+  revokeGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/revoke`),
+  jobs: (agentId: string) => request<WebJobView[]>("GET", `/agents/${agentId}/jobs`),
+  approveJob: (jobId: string, code?: string) => request<void>("POST", `/jobs/${jobId}/approve`, { code }),
+  denyJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/deny`),
+  retireJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/retire`),
+  remoteSettings: (id: string) => request<RemoteSettings>("GET", `/workspaces/${id}/remote-settings`),
+  saveRemoteSettings: (id: string, settings: RemoteSettings) => request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, settings),
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),
   approveDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/approve", { userCode, workspaceId }),
   denyDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/deny", { userCode, workspaceId }),
