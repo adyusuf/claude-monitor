@@ -107,6 +107,23 @@ public sealed class ClaudeWorkspaceForgetTests : IDisposable
         Assert.Null(Workspace());
     }
 
+    [Fact]
+    public async Task A_successful_login_also_forgets_the_agent_update_cap_the_remote_runs_switch_and_their_workspace()
+    {
+        SetWorkspace("true");
+        Local(s =>
+        {
+            s.Set(Update.UpdatePolicy.WorkspaceKey, "on");
+            s.Set(Daemon.MachineMonitor.RemoteRunsKey, "true");
+        });
+        var tokens = new TokenResponse("a", "r", clock.GetUtcNow(), clock.GetUtcNow(), Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(0, await NewLogin(new StringWriter()).RunAsync("https://monitor.invalid", Api(HttpStatusCode.OK, tokens), CancellationToken.None));
+
+        Local(s => Assert.All(new[] { Update.UpdatePolicy.WorkspaceKey, Daemon.MachineMonitor.RemoteRunsKey, Daemon.WorkspaceSettings.WorkspaceKey },
+            key => Assert.Null(s.Get(key))));
+    }
+
     [Theory]
     [InlineData("access_denied")]
     [InlineData("expired_token")]
@@ -118,5 +135,5 @@ public sealed class ClaudeWorkspaceForgetTests : IDisposable
         Assert.Equal("true", Workspace());
     }
 
-    private void SetWorkspace(string value) => Local(s => s.Set(ClaudePolicy.WorkspaceKey, value));
+    private void SetWorkspace(string value) => Local(s => TestWorkspace.Set(home.Config, s, ClaudePolicy.WorkspaceKey, value));
 }

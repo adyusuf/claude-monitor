@@ -89,6 +89,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate));
         MachineMonitor.Remember(store, s);
         store.Set(ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false");
+        WorkspaceSettings.Tag(store, s.WorkspaceId);
     }
 
     /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
@@ -134,7 +135,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.Run:
                 var run = data.Deserialize<RunMessage>(ApiClient.Json)!;
-                if (Runs is null || store.Get(MachineMonitor.RemoteRunsKey) == "false")
+                if (Runs is null || WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) != "true") // unread or another workspace's: no
                 {
                     if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
                     {

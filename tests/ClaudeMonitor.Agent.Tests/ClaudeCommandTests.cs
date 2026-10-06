@@ -25,7 +25,7 @@ public sealed class ClaudeCommandTests : IDisposable
     private void Workspace(string value)
     {
         using var store = new LocalStore(home.Config.DatabasePath);
-        store.Set(ClaudePolicy.WorkspaceKey, value);
+        TestWorkspace.Set(home.Config, store, ClaudePolicy.WorkspaceKey, value);
     }
 
     private void State(ClaudeUpdateState state) => ClaudeUpdateState.Change(home.Config, _ => state);

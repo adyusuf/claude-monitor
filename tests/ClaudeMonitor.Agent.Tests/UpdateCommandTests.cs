@@ -32,7 +32,7 @@ public sealed class UpdateCommandTests : IDisposable
     private void Workspace(string mode)
     {
         using var store = new LocalStore(kit.Config.DatabasePath);
-        store.Set(UpdatePolicy.WorkspaceKey, mode);
+        TestWorkspace.Set(kit.Config, store, UpdatePolicy.WorkspaceKey, mode);
     }
 
     private static string Stamp => Now.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
