@@ -1,4 +1,5 @@
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Remote;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Streaming;
 using ClaudeMonitor.Api.Text;
@@ -138,7 +139,10 @@ public static class WorkspaceEndpoints
         foreach (var agentId in agents)
         {
             broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
+            await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted);
         }
+
+        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted);
 
         return Results.NoContent();
     }

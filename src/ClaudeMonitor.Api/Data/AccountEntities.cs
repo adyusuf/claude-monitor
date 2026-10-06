@@ -150,6 +150,11 @@ public sealed class WorkspaceSettings
     public bool MaskSecrets { get; set; } = true;
     public int RetentionDays { get; set; } = 90;
     public int EventMaxBytes { get; set; } = 262_144;
+    public int AlertCpuPct { get; set; } = 90;
+    public int AlertMemoryPct { get; set; } = 90;
+    public int AlertDiskPct { get; set; } = 90;
+    public int AlertSustainSeconds { get; set; } = 300;
+    public bool RemoteRunsEnabled { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
 }

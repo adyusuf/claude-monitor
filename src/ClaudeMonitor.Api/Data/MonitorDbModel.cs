@@ -6,12 +6,13 @@ namespace ClaudeMonitor.Api.Data;
 /// <summary>Keys, indexes and CHECK constraints (docs/data-model.md). Names are mapped to snake_case afterwards.</summary>
 internal static class MonitorDbModel
 {
-    private static string In(string column, params string[] values) =>
+    internal static string In(string column, params string[] values) =>
         $"{column} IN ({string.Join(", ", values.Select(v => $"'{v}'"))})";
 
     public static void Configure(ModelBuilder b)
     {
         ForeignKeys(b);
+        MonitorDbModelRemote.Configure(b);
         b.Entity<HarnessKind>().HasData(new HarnessKind
         {
             Code = "claude_code",

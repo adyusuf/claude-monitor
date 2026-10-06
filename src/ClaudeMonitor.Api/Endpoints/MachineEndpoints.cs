@@ -1,4 +1,5 @@
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Remote;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Streaming;
 using ClaudeMonitor.Contracts;
@@ -56,12 +57,13 @@ public static class MachineEndpoints
         Audit.Add(db, http, clock, AuditActions.AgentRevoked, agent.WorkspaceId, userId, targetType: "agent", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
         broker.Publish(Broker.Agent(id), new StreamMessage(AgentStreamEvents.Revoked, new { }));
+        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted);
         return Results.NoContent();
     }
 
     /// <summary>Only the agent's own user moves it, and only into a workspace where they may contribute.
     /// Sessions already captured stay where they were recorded.</summary>
-    private static async Task<IResult> Move(Guid id, MoveRequest req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Move(Guid id, MoveRequest req, HttpContext http, MonitorDb db, TimeProvider clock, Broker broker)
     {
         var userId = http.User.UserId();
         var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId && a.Status == AgentStatuses.Active,
@@ -97,6 +99,7 @@ public static class MachineEndpoints
         agent.WorkspaceId = target;
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
         await db.SaveChangesAsync(http.RequestAborted);
+        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, clock.GetUtcNow(), http.RequestAborted);
         return Results.NoContent();
     }
 
