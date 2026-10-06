@@ -23,17 +23,19 @@ internal sealed unsafe partial class UnixRunProcess
     }
 
     // The descendants are recorded first (while their parents live), then the group is signalled, then those that left it.
-    // Each step runs whatever the others did; the first failure is thrown at the end.
+    // Each step runs whatever the others did; the first failure is thrown at the end. The poll may fail with any exception: the
+    // run is killed all the same, so none may leave before the group is signalled.
     private void SendToTree(int signal)
     {
-        IOException? failure = null;
+        Exception? failure = null;
         try
         {
             _tracker?.Poll();
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             failure = e;
+            _log?.Invoke($"descendant poll before kill failed ({e.GetType().Name})"); // the message may hold a path: not logged
         }
 
         try
