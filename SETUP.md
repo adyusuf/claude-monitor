@@ -68,7 +68,7 @@ checksum-verified. To change a version, change it there and in the Prerequisites
 
 ```bash
 dotnet run --project src/ClaudeMonitor.Agent -- version                # from source
-dotnet publish src/ClaudeMonitor.Agent -c Release -r osx-arm64 -o out/osx-arm64   # one self-contained binary (also osx-x64, win-x64, win-arm64)
+dotnet publish src/ClaudeMonitor.Agent -c Release -r osx-arm64 -o out/osx-arm64   # one self-contained binary (also osx-x64, win-x64, win-arm64, linux-x64, linux-arm64)
 out/osx-arm64/cm-agent login --server http://localhost:5080            # shows a code; approve it on the web (/device)
 out/osx-arm64/cm-agent install                                         # copies itself to the agent home and registers the Claude Code plugin
 out/osx-arm64/cm-agent status
@@ -77,7 +77,8 @@ out/osx-arm64/cm-agent status
 `install` registers a local plugin marketplace (`monitor-agent-local`) whose hooks and MCP server run the
 installed binary, so Claude Code starts the agent with its sessions; nothing is registered with the OS. Without
 the `claude` CLI on `PATH` it prints the two `claude plugin` commands to run. The agent's tokens are in the macOS
-Keychain / Windows Credential Manager (service `claude-monitor-agent`); its log is `agent.log` in the agent home.
+Keychain / Windows Credential Manager (service `claude-monitor-agent`); on Linux, which has no credential store, in
+user-only (0600) `cred-*` files in the agent home. Its log is `agent.log` in the agent home.
 
 A prompt sent from the web enters a session only when something is typed in it or a turn ends; an idle session takes
 it at neither, so it stays "delivered" until it expires. `cm-agent install --stop-wait 120` makes a finished turn wait
@@ -106,8 +107,8 @@ never touches the network. Revoke it from the web's Machines page; rotation is `
 status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
 or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
 
-The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS and `%USERPROFILE%\.claude-monitor` on
-Windows (`CM_AGENT_HOME` overrides both); `cm-agent status` prints it as `home:`. It is deliberately **not** under
+The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS, `%USERPROFILE%\.claude-monitor` on
+Windows and `~/.claude-monitor` on Linux (`CM_AGENT_HOME` overrides all three); `cm-agent status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
 redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
 (ADR-0002, "Home outside AppData").
@@ -117,6 +118,46 @@ redirected to a private copy, so a login made in a normal terminal would be invi
 lost). The old plugin keeps running the old binary until you run `cm-agent install` again with the new one; do that
 from a normal terminal, then check that `cm-agent status` and `monitor_status` in a new Claude session show the same
 `home:`. The old folder is left in place and can be deleted afterwards.
+
+## Service agent (boot service, remote work)
+
+`cm-agent install --service` registers the daemon to start at boot with no Claude session, so other machines of a
+workspace can be reached (ADR-0004). It is opt-in and needs root / an elevated prompt; the interactive agent above is
+unchanged. The step-by-step runbook is [docs/remote-work-setup.md](docs/remote-work-setup.md). What the install lays
+down, per OS:
+
+| | Linux (systemd) | macOS (LaunchDaemon) | Windows Server (service) |
+|---|---|---|---|
+| Service account | `cm-agent` (system, no login shell) | `_cmagent` (hidden role account) | `NT SERVICE\cm-agent` (virtual) |
+| Binary (admin-owned) | `/usr/local/lib/cm-agent/cm-agent` | `/Library/Application Support/ClaudeMonitor/bin/cm-agent` | `%ProgramFiles%\ClaudeMonitor\cm-agent.exe` |
+| Service home (account only) | `/var/lib/cm-agent` | `/Library/Application Support/ClaudeMonitor/home` | `%ProgramData%\ClaudeMonitor\service` |
+| Exec policy file (admin-owned) | `/etc/cm-agent/exec.json` | `/Library/Application Support/ClaudeMonitor/exec.json` | `%ProgramFiles%\ClaudeMonitor\exec.json` |
+| Unit / definition | `/etc/systemd/system/cm-agent.service` | `/Library/LaunchDaemons/com.claudemonitor.agent.plist` | service `cm-agent` (`sc query cm-agent`) |
+| Login code (while not connected) | `<home>/login-code.txt`, `journalctl -u cm-agent` | `<home>/login-code.txt` | `<home>\login-code.txt` |
+
+The service units set `CM_SERVICE=1`, `CM_AGENT_HOME=<service home>` and the single-file extraction folder
+(`DOTNET_BUNDLE_EXTRACT_BASE_DIR=<home>/.net`); nobody sets them by hand. `cm-agent uninstall --service` removes the
+service and **keeps** the home (the login), the exec policy and the binary.
+
+**The exec policy file** is what decides how much a remote run may do on that machine. The service account cannot
+write it (on Unix it must be owned by root and not group- or world-writable, as must its folder, and neither may be a
+link; on Windows the service must not be able to open it for writing) and **anything doubtful means `off`**: a missing,
+unreadable, invalid or writable file grants nothing. `cm-agent install --service --exec off|argv|shell` writes it
+(default `off`; `shell` is a separate, stronger opt-in); an admin may edit it afterwards and restart the service:
+
+```json
+{
+  "level": "argv",
+  "allowedExecutables": ["/usr/bin/journalctl", "/usr/bin/tail"],
+  "allowedRoots": ["/var/log", "/srv/app/releases"]
+}
+```
+
+`level` is `off`, `argv` or `shell`. `allowedExecutables` and `allowedRoots` are the optional local **ceiling**: a
+list of absolute executables a run may start and of absolute folders a path argument must stay under (Windows paths
+likewise, e.g. `C:\Program Files\Git\cmd\git.exe`). An empty or missing list adds no restriction of its own; the
+web grants and the agent's own checks (never a shell or interpreter in a grant, no `/etc`, `/home`, the agent's home)
+apply either way. A relative path makes the whole file invalid, hence `off`. The API can never raise this level.
 
 ## Browser tests (e2e)
 
@@ -156,6 +197,16 @@ secrets.
 | the Cloudflare Origin certificate and key | TLS between Cloudflare and the server | Cloudflare, SSL/TLS, Origin Server | the server's `LocalMachine\My` store (key not exportable) | the maintainer | before it expires (15 years), or on any leak: revoke in Cloudflare, issue a new one |
 | the PostgreSQL `postgres` password | the database superuser (set-up and restore drills only) | chosen at the PostgreSQL install | the maintainer's password manager only | the maintainer | yearly |
 | `MONITOR_GOOGLE_CLIENT_SECRET` | the Google OAuth client's secret; redirect `https://<host>/api/auth/callback/google` | Google Cloud Console, APIs and Services, Credentials (one client per environment) | server environment file | the maintainer | add a new secret, deploy, disable the old one |
+
+A **service agent** (ADR-0004) holds one more secret, on each machine that runs one. It is never in the repository,
+never in a log and never leaves the machine except in the `Authorization` header to the API:
+
+| Secret | What it is | Where to get it | Stored | Owner | Rotation |
+|---|---|---|---|---|---|
+| a service agent's credentials (`cred-access-token`, `cred-refresh-token`) | the access and refresh tokens of that machine's service agent, issued when its login code is approved on the web | `cm-agent` service's own first login (the code is in its log and `login-code.txt`, approved on the web) | Linux and macOS: 0600 files `cred-*` in the service home (`/var/lib/cm-agent`, `/Library/Application Support/ClaudeMonitor/home`), refused if their owner or mode is wrong; Windows: DPAPI **CurrentUser** blobs `cred-*.bin` in `%ProgramData%\ClaudeMonitor\service` (never LocalMachine scope) | the machine's admin | on any doubt: revoke the agent on the web (Machines page), then log the service in again. Refresh tokens rotate on every use, so there is nothing else to rotate on a schedule |
+
+A remote run that executes as the service account can read that account's files, these tokens included
+(ADR-0004, "Consequences"); that is why the exec level is local, admin-owned and `off` by default.
 
 Already present on the maintainer's machine, for the macOS installer of phase 4 (they live in the macOS
 keychain, never in the repository, the shell environment or CI):

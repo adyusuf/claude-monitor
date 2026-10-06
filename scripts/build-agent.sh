@@ -8,7 +8,8 @@
 # environment names them; nothing secret is passed here, only names that resolve in the maintainer's keychain:
 #   AGENT_SIGN_IDENTITY="Developer ID Application: <name> (<team>)"   # skip signing when unset
 #   AGENT_NOTARY_PROFILE=<notarytool keychain profile>               # skip notarisation when unset
-# Windows builds are not signed yet (ADR-0002, open item: the signing route).
+# Windows and Linux builds are not signed (ADR-0002, open item: the signing route; ADR-0004): an admin verifies the
+# SHA-256 in SHA256SUMS before a service upgrade (docs/release.md). Single file, never compressed (see the csproj).
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
@@ -19,7 +20,7 @@ mkdir -p "$out"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-for rid in osx-arm64 osx-x64 win-x64 win-arm64; do
+for rid in osx-arm64 osx-x64 win-x64 win-arm64 linux-x64 linux-arm64; do
   echo "▶ $rid"
   dotnet publish "$project" -c Release -r "$rid" -o "$work/$rid" --nologo -v q
   case "$rid" in
@@ -27,6 +28,8 @@ for rid in osx-arm64 osx-x64 win-x64 win-arm64; do
     osx-x64) name="cm-agent-macos-x64" ;;
     win-x64) name="cm-agent-windows-x64" ;;
     win-arm64) name="cm-agent-windows-arm64" ;;
+    linux-x64) name="cm-agent-linux-x64" ;;
+    linux-arm64) name="cm-agent-linux-arm64" ;;
   esac
   binary="$work/$rid/cm-agent"
   [ -f "$binary.exe" ] && binary="$binary.exe"

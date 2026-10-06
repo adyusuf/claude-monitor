@@ -168,6 +168,13 @@ shell targets; that is recorded under "Open" below.
   refused if its owner or mode is wrong; on Windows DPAPI in the service account's **CurrentUser** scope (never
   LocalMachine), and the service refuses to start if that profile is not loaded. The interactive agent keeps the OS
   credential store.
+- **A service logs in by itself** (decided while building it, 06/10/2026): Windows gives a virtual account no
+  interactive session, so `cm-agent login` cannot run as it. `install --service --server <url>` sets `CM_SERVER`;
+  a service that is not connected runs the device flow itself and writes the code to its log and to
+  `login-code.txt` in its home, which only the service account, SYSTEM and administrators (read-only) can open. The
+  admin reads it and approves it on the web. The same path serves Linux and macOS (no `sudo -u` needed).
+- The exec policy file must be owned by root (uid 0) on Unix and must not be writable by the service process on
+  Windows; anything else reads as `off`.
 - Upgrades are done by an admin; the agent never updates itself and the API never pushes one. The API refuses an
   agent below a minimum version as a target.
 
@@ -192,3 +199,11 @@ exists, so a rollback of that slice is code-only.
 - **TOTP for every shell target** (security review): the maintainer chose "only when the approver has it on".
 - **Schedules for jobs**, shipping files or test bundles to a target, end-to-end signed approvals, a separate run
   account, a multi-instance API broker.
+- **Target-side checks not in v1** (security review items left open while building): refusing a grant root whose
+  folder chain is writable by a non-admin (it would refuse ordinary app-owned log folders), a pinned hash of the
+  executable, an ACL ownership check of the executable on Windows (Unix checks owner and modes), and resource limits
+  (rlimits) for runs on macOS. A process that leaves its process group with `setsid` survives a kill on macOS; on
+  Linux the service's cgroup ends it.
+- **Unverified platforms:** the Linux and Windows paths of the executor, the metrics and the service installer compile
+  and follow the platform contracts but have only run on macOS; they are verified on a Linux and a Windows Server
+  machine before a target there is trusted.
