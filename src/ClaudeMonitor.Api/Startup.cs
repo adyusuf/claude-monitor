@@ -27,6 +27,11 @@ public static class Startup
         services.AddDbContext<MonitorDb>(o => o.UseNpgsql(config.DatabaseUrl));
         services.AddSingleton<IMailer, SmtpMailer>();
         services.AddScoped<BatchIngestor>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.RunCreator>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.RunDecisions>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.RunReports>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.GrantService>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.JobService>();
         if (config.BackgroundJobs)
         {
             services.AddHostedService<Housekeeper>();
@@ -107,6 +112,15 @@ public static class Startup
         MachineEndpoints.Map(api);
         SessionEndpoints.Map(api);
         CommandEndpoints.Map(api);
+        AgentRunEndpoints.Map(api);
+        RunEndpoints.Map(api);
+        AgentMachineEndpoints.Map(api);
+        MachineMetricsEndpoints.Map(api);
+        RemoteSettingsEndpoints.Map(api);
+        AgentGrantEndpoints.Map(api);
+        GrantEndpoints.Map(api);
+        AgentJobEndpoints.Map(api);
+        JobEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (files is not null)
         {

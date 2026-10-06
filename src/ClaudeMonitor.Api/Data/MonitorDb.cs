@@ -31,6 +31,12 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<SessionCommand> SessionCommands => Set<SessionCommand>();
     public DbSet<PermissionRequest> PermissionRequests => Set<PermissionRequest>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<MachineGrant> MachineGrants => Set<MachineGrant>();
+    public DbSet<MachineJob> MachineJobs => Set<MachineJob>();
+    public DbSet<MachineMetric> MachineMetrics => Set<MachineMetric>();
+    public DbSet<MachineAlert> MachineAlerts => Set<MachineAlert>();
+    public DbSet<RemoteRun> RemoteRuns => Set<RemoteRun>();
+    public DbSet<RemoteRunOutput> RemoteRunOutput => Set<RemoteRunOutput>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -6,12 +6,13 @@ namespace ClaudeMonitor.Api.Data;
 /// <summary>Keys, indexes and CHECK constraints (docs/data-model.md). Names are mapped to snake_case afterwards.</summary>
 internal static class MonitorDbModel
 {
-    private static string In(string column, params string[] values) =>
+    internal static string In(string column, params string[] values) =>
         $"{column} IN ({string.Join(", ", values.Select(v => $"'{v}'"))})";
 
     public static void Configure(ModelBuilder b)
     {
         ForeignKeys(b);
+        MonitorDbModelRemote.Configure(b);
         b.Entity<HarnessKind>().HasData(new HarnessKind
         {
             Code = "claude_code",
@@ -47,7 +48,7 @@ internal static class MonitorDbModel
             e.HasIndex(x => x.UserId);
         });
         b.Entity<Workspace>(e =>
-            e.ToTable(t => t.HasCheckConstraint("ck_workspaces_status", In("status", "active", "archived"))));
+            e.ToTable(t => t.HasCheckConstraint("ck_workspaces_status", In("status", WorkspaceStatuses.Active, "archived"))));
         b.Entity<WorkspaceMember>(e =>
         {
             e.HasKey(x => new { x.WorkspaceId, x.UserId });
@@ -73,7 +74,7 @@ internal static class MonitorDbModel
         b.Entity<Machine>(e =>
         {
             e.HasIndex(x => new { x.WorkspaceId, x.MachineKeyHash }).IsUnique();
-            e.ToTable(t => t.HasCheckConstraint("ck_machines_os", In("os", "macos", "windows")));
+            e.ToTable(t => t.HasCheckConstraint("ck_machines_os", In("os", OsKinds.MacOs, OsKinds.Windows, OsKinds.Linux)));
         });
         b.Entity<Agent>(e =>
         {

@@ -18,9 +18,9 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
 
     public async Task<int> RunAsync(string? serverArg, HttpMessageHandler? handler, CancellationToken ct)
     {
-        if (os == "unsupported")
+        if (os == AgentConfig.Unsupported)
         {
-            await output.WriteLineAsync("cm-agent runs on macOS and Windows.");
+            await output.WriteLineAsync("cm-agent runs on macOS, Windows and Linux.");
             return 2;
         }
 

@@ -14,7 +14,7 @@ namespace ClaudeMonitor.Agent.Net;
 /// The agent's calls to the API. A 401 is answered once with a token refresh and a retry. Every authenticated call
 /// except the stream gives up after <c>callTimeout</c>, refresh included, with a <see cref="TimeoutException"/>.
 /// </summary>
-public sealed class ApiClient(HttpClient http, ICredentialStore credentials, TimeSpan callTimeout) : IDisposable
+public sealed partial class ApiClient(HttpClient http, ICredentialStore credentials, TimeSpan callTimeout) : IDisposable
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim refreshing = new(1, 1);
@@ -254,4 +254,7 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials, Tim
 public sealed class ApiException(HttpStatusCode status, string body) : Exception($"API answered {(int)status}: {body}")
 {
     public HttpStatusCode Status { get; } = status;
+
+    /// <summary>The answer's body (a problem document's title is the error code the MCP tools show).</summary>
+    public string Body { get; } = body;
 }

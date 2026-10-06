@@ -139,7 +139,9 @@ class Smoke(unittest.TestCase):
         self.assertEqual('osx-x64', rid('Darwin', 'x86_64'))
         self.assertEqual('win-x64', rid('Windows', 'AMD64'))
         self.assertEqual('win-arm64', rid('Windows', 'ARM64'))
-        self.assertIsNone(rid('Linux', 'x86_64'))
+        self.assertEqual('linux-x64', rid('Linux', 'x86_64'))
+        self.assertEqual('linux-arm64', rid('Linux', 'aarch64'))
+        self.assertIsNone(rid('FreeBSD', 'x86_64'))
         self.assertIsNone(rid('Darwin', 'ppc'))
 
     def test_publish_runs_the_shipped_command_and_names_the_binary(self):

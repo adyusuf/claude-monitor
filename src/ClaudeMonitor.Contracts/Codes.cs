@@ -62,5 +62,6 @@ public static class OsKinds
 {
     public const string MacOs = "macos";
     public const string Windows = "windows";
-    public static readonly IReadOnlySet<string> All = new HashSet<string> { MacOs, Windows };
+    public const string Linux = "linux";
+    public static readonly IReadOnlySet<string> All = new HashSet<string> { MacOs, Windows, Linux };
 }

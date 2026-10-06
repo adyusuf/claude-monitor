@@ -54,6 +54,37 @@ public sealed record ApiConfig
     public long MaxBatchBytes { get; init; } = 8 * 1024 * 1024;
     public int PageSizeMax { get; init; } = 100;
 
+    /// <summary>Remote work (ADR-0005): how long a run waits for its owner, and how many may wait per target.</summary>
+    public TimeSpan RunPendingLifetime { get; init; } = TimeSpan.FromMinutes(15);
+    public int RunPendingMaxPerTarget { get; init; } = 10;
+
+    /// <summary>An approved run the target has not started within this long is expired (it carries this as not_after).</summary>
+    public TimeSpan RunStartWindow { get; init; } = TimeSpan.FromMinutes(15);
+    public long RunOutputMax { get; init; } = 1024 * 1024;
+    public int RunChunkMax { get; init; } = 64 * 1024;
+    public int RunTextMax { get; init; } = 8192;
+    public int RunArgvMax { get; init; } = 64;
+    public int RunReasonMax { get; init; } = 500;
+
+    /// <summary>Runs a requester may create per minute (approval spam is a denial of service on the owner).</summary>
+    public int RunCreatesPerMinute { get; init; } = 20;
+    public int GrantDaysMax { get; init; } = 90;
+    public TimeSpan MetricsRetention { get; init; } = TimeSpan.FromDays(7);
+    public int MetricsReportMax { get; init; } = 60;
+
+    /// <summary>How old a sample may be when it arrives (an agent keeps samples while offline); older ones are dropped.</summary>
+    public TimeSpan MetricsReportWindow { get; init; } = TimeSpan.FromHours(1);
+
+    /// <summary>The most metric points one request returns (one day at one a minute).</summary>
+    public int MetricsPointsMax { get; init; } = 1440;
+
+    /// <summary>An agent whose heartbeat is older than this is shown offline.</summary>
+    public TimeSpan OnlineWindow { get; init; } = TimeSpan.FromMinutes(3);
+    public int MetricsDisksMax { get; init; } = 16;
+
+    /// <summary>A service agent silent this long gets an "offline" alert.</summary>
+    public TimeSpan OfflineAfter { get; init; } = TimeSpan.FromMinutes(5);
+
     /// <summary>How far an agent's clock may differ from the API's before a time it reports is not believed.</summary>
     public TimeSpan ClockSkewMax { get; init; } = TimeSpan.FromMinutes(2);
 

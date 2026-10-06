@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, Outlet, useNavigate, useParams } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { useSession } from "../auth/session";
 import { config } from "../config";
 import { useI18n, type Language } from "../i18n";
+import { usePendingApprovals } from "../lib/pending";
 
 type Theme = "light" | "dark" | "system";
 
@@ -39,11 +40,13 @@ export function Layout() {
   const workspaces = me?.workspaces ?? [];
   const current = workspaces.find((w) => w.id === ws) ?? workspaces[0];
   const [menuOpen, setMenuOpen] = useState(false);
+  const pending = usePendingApprovals(current?.id, useLocation().pathname);
 
-  const link = (to: string, label: string, icon: ReactNode) => (
+  const link = (to: string, label: string, icon: ReactNode, badge = 0) => (
     <NavLink to={to} className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")} onClick={() => setMenuOpen(false)}>
       <span className="nav-icon" aria-hidden>{icon}</span>
       {label}
+      {badge > 0 ? <span className="badge warn nav-badge" title={t("remote.pendingBadge", { n: badge })}>{badge}</span> : null}
     </NavLink>
   );
 
@@ -66,7 +69,7 @@ export function Layout() {
         {current ? (
           <nav className="nav">
             {link(`/w/${current.id}/sessions`, t("nav.sessions"), "▤")}
-            {link(`/w/${current.id}/machines`, t("nav.machines"), "▣")}
+            {link(`/w/${current.id}/machines`, t("nav.machines"), "▣", pending)}
             {link(`/w/${current.id}/members`, t("nav.members"), "◍")}
             {current.role === "owner" || current.role === "admin" ? link(`/w/${current.id}/settings`, t("nav.settings"), "⚙") : null}
             {link("/download", t("nav.download"), "↓")}

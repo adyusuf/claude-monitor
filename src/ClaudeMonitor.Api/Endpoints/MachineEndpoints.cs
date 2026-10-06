@@ -1,4 +1,5 @@
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Remote;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Streaming;
 using ClaudeMonitor.Api.Update;
@@ -59,19 +60,25 @@ public static class MachineEndpoints
         if (agent.Status == AgentStatuses.Revoked) return Results.NoContent();
 
         var now = clock.GetUtcNow();
+        // The revoke and the end of its remote work (grants, jobs, alerts, open runs) commit together.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         agent.Status = AgentStatuses.Revoked;
         agent.RevokedAt = now;
         agent.RevokedBy = userId;
         await AgentTokens.RevokeAllAsync(db, agent.Id, now, http.RequestAborted);
         Audit.Add(db, http, clock, AuditActions.AgentRevoked, agent.WorkspaceId, userId, targetType: "agent", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        var notices = new List<Action>();
+        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted, notices);
+        await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
         broker.Publish(Broker.Agent(id), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         return Results.NoContent();
     }
 
     /// <summary>Only the agent's own user moves it, and only into a workspace where they may contribute.
     /// Sessions already captured stay where they were recorded.</summary>
-    private static async Task<IResult> Move(Guid id, MoveRequest req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Move(Guid id, MoveRequest req, HttpContext http, MonitorDb db, TimeProvider clock, Broker broker)
     {
         var userId = http.User.UserId();
         var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId && a.Status == AgentStatuses.Active,
@@ -106,7 +113,13 @@ public static class MachineEndpoints
         agent.MachineId = targetMachine.Id;
         agent.WorkspaceId = target;
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
+        // The move and the end of the agent's remote work in its old workspace commit together.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await db.SaveChangesAsync(http.RequestAborted);
+        var notices = new List<Action>();
+        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted, notices);
+        await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
         return Results.NoContent();
     }
 

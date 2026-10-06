@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Exec;
+using ClaudeMonitor.Agent.Metrics;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
@@ -31,7 +33,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             return 1;
         }
 
-        // One connection per loop: a SQLite connection is not safe to share between threads, and the four loops run at once.
+        // One connection per loop: a SQLite connection is not safe to share between threads, and the loops run at once.
         // They meet in the database file itself (WAL, busy timeout).
         using var flushStore = new LocalStore(config.DatabasePath);
         using var beatStore = new LocalStore(config.DatabasePath);
@@ -42,9 +44,19 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var relay = new Relay(config, flushStore, api, clock);
         var beat = new Relay(config, beatStore, api, clock);
         var settings = new Relay(config, settingsStore, api, clock);
-        var stream = new Relay(config, streamStore, api, clock);
+        Relay stream;
         var tailer = new TranscriptTailer(config, flushStore, clock);
         using var updateStore = new LocalStore(config.DatabasePath);
+        using var remoteStore = new LocalStore(config.DatabasePath);
+        using var execStore = new LocalStore(config.DatabasePath);
+        using var metricsStore = new LocalStore(config.DatabasePath);
+        var remote = new RemoteRelay(config, remoteStore, api, clock);
+        var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os));
+        var executor = new RunExecutor(config, clock, log, run => ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
+            ExecPolicyLoader.RunningAsRoot);
+        using var runs = new RunRelay(config, execStore, api, clock, executor, log);
+        runs.Recover();
+        stream = new Relay(config, streamStore, api, clock) { Runs = runs };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
         updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
@@ -68,7 +80,14 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await relay.ReportCommandsAsync(ct);
             }, api, revoked, error => relay.UploadOutcome(error)),
             Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
-            Loop("settings", config.SettingsEvery, settings.SettingsAsync, api, revoked),
+            Loop("settings", config.SettingsEvery, async ct =>
+            {
+                await settings.SettingsAsync(ct);
+                await monitor.ProfileAsync(ct);
+            }, api, revoked),
+            Loop("remote", config.RemotePollEvery, remote.RunOnceAsync, api, revoked),
+            Loop("runs", config.FlushEvery, runs.ReportAsync, api, revoked),
+            Loop("metrics", config.MetricsEvery, monitor.SampleAsync, api, revoked),
             StreamAsync(api, stream, revoked));
         if (api.Disconnected)
         {

@@ -155,7 +155,7 @@ public sealed class DeviceTests(ApiFactory api)
     [Theory]
     [InlineData("short", "host", "macos", "arm64", "0.3.0")]
     [InlineData("machine-key-long-enough", "", "macos", "arm64", "0.3.0")]
-    [InlineData("machine-key-long-enough", "host", "linux", "arm64", "0.3.0")]
+    [InlineData("machine-key-long-enough", "host", "freebsd", "arm64", "0.3.0")]
     [InlineData("machine-key-long-enough", "host", "macos", "", "0.3.0")]
     [InlineData("machine-key-long-enough", "host", "macos", "arm64", "not-a-version")]
     public async Task A_device_code_request_is_validated(string key, string host, string os, string arch, string version)

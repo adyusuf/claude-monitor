@@ -6,6 +6,7 @@ import { useI18n } from "./i18n";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./pages/AccountPages";
 import { ForgotPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./pages/AuthPages";
 import { DevicePage, MachinesPage } from "./pages/MachinesPage";
+import { MachinePage } from "./pages/MachinePage";
 import { MembersPage } from "./pages/MembersPage";
 import { MfaPage } from "./pages/Mfa";
 import { SessionPage } from "./pages/SessionPage";
@@ -44,6 +45,7 @@ export function App() {
         <Route path="/w/:ws/sessions" element={<SessionsPage />} />
         <Route path="/w/:ws/sessions/:id" element={<SessionPage />} />
         <Route path="/w/:ws/machines" element={<MachinesPage />} />
+        <Route path="/w/:ws/machines/:agentId" element={<MachinePage />} />
         <Route path="/w/:ws/members" element={<MembersPage />} />
         <Route path="/w/:ws/settings" element={<WorkspaceSettingsPage />} />
         <Route path="*" element={<NotFound />} />
