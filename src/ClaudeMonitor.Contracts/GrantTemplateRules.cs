@@ -224,7 +224,10 @@ internal static class GrantTemplateRules
     }
 
     /// <summary>The program name the never-grantable list is matched on: base name, lower case, Windows extension and trailing version removed.</summary>
-    public static string ProgramKey(string argv0, string os)
+    public static string ProgramKey(string argv0, string os) => StripVersion(ProgramName(argv0, os));
+
+    /// <summary>The base name, lower case, Windows extension removed, version kept (rundll32 stays rundll32).</summary>
+    public static string ProgramName(string argv0, string os)
     {
         var start = Math.Max(argv0.LastIndexOf(UnixSeparator), argv0.LastIndexOf(WindowsSeparator)) + 1;
         var name = argv0[start..].ToLowerInvariant();
@@ -238,7 +241,7 @@ internal static class GrantTemplateRules
             }
         }
 
-        return StripVersion(name);
+        return name;
     }
 
     // python3.12 -> python, perl5.30 -> perl, bash-5.2 -> bash; a name that is only digits is kept as it is.
@@ -260,7 +263,10 @@ internal static class GrantTemplateRules
 
     public static bool IsNeverGrantable(string argv0, string os)
     {
-        var key = ProgramKey(argv0, os);
-        return NeverGrantable.Contains(key) || NeverGrantablePrefixes.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal));
+        // Both the name as it is and without a trailing version: python3.12 is python, but rundll32 and regsvr32 are listed as such.
+        var name = ProgramName(argv0, os);
+        var key = StripVersion(name);
+        return NeverGrantable.Contains(name) || NeverGrantable.Contains(key)
+            || NeverGrantablePrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal) || key.StartsWith(prefix, StringComparison.Ordinal));
     }
 }

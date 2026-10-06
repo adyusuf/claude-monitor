@@ -15,6 +15,9 @@ namespace ClaudeMonitor.Api.Background;
 public static class RemoteHousekeeping
 {
     public const int Batch = 1000;
+
+    // An array, not the contract's set: EF Core translates Contains on an array (IN), not on an IReadOnlySet.
+    private static readonly string[] Final = [.. RunStatuses.Final];
     public const string Lost = "target_lost";
 
     /// <summary>A running run is lost once this long past its own timeout without a final report.</summary>
@@ -93,7 +96,7 @@ public static class RemoteHousekeeping
             $"DELETE FROM machine_metrics WHERE ctid IN (SELECT ctid FROM machine_metrics WHERE sampled_at < {metricsBefore} LIMIT {Batch})", ct);
         var old = await (from r in db.RemoteRuns.AsNoTracking()
                          join s in db.WorkspaceSettings.AsNoTracking() on r.WorkspaceId equals s.WorkspaceId
-                         where RunStatuses.Final.Contains(r.Status) && r.CreatedAt < now.AddDays(-s.RetentionDays)
+                         where Final.Contains(r.Status) && r.CreatedAt < now.AddDays(-s.RetentionDays)
                          select r.Id).Take(Batch).ToListAsync(ct);
         if (old.Count > 0)
         {

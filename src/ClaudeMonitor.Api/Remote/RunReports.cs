@@ -16,6 +16,9 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
 {
     private const int ErrorChars = 500;
 
+    // An array, not the contract's set: EF Core translates Contains on an array (IN), not on an IReadOnlySet.
+    private static readonly string[] Live = [.. RunStatuses.Live];
+
     public async Task<IResult> StatusAsync(Guid id, RunStatusUpdate req, Guid agentId, HttpContext http)
     {
         ArgumentNullException.ThrowIfNull(req);
@@ -42,7 +45,7 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
                         .SetProperty(r => r.ResolvedExe, exe), ct);
                 break;
             default:
-                changed = await db.RemoteRuns.Where(r => r.Id == id && RunStatuses.Live.Contains(r.Status))
+                changed = await db.RemoteRuns.Where(r => r.Id == id && Live.Contains(r.Status))
                     .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, req.Status!).SetProperty(r => r.EndedAt, at)
                         .SetProperty(r => r.ExitCode, req.ExitCode).SetProperty(r => r.Error, error)
                         .SetProperty(r => r.OutputTruncated, r => r.OutputTruncated || req.OutputTruncated), ct);
@@ -98,7 +101,7 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
             }
 
             var counted = await db.RemoteRuns
-                .Where(r => r.Id == id && RunStatuses.Live.Contains(r.Status) && r.OutputBytes + bytes <= config.RunOutputMax)
+                .Where(r => r.Id == id && Live.Contains(r.Status) && r.OutputBytes + bytes <= config.RunOutputMax)
                 .ExecuteUpdateAsync(s => s.SetProperty(r => r.OutputBytes, r => r.OutputBytes + bytes), ct);
             if (counted == 1)
             {
