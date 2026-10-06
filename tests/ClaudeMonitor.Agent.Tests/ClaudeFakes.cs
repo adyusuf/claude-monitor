@@ -183,7 +183,7 @@ public sealed class ClaudeKit : IDisposable
     public void Consent(bool machine, string? workspace)
     {
         SavedSettings.SaveClaudeUpdate(Config, machine);
-        if (workspace is not null) Store.Set(ClaudePolicy.WorkspaceKey, workspace);
+        if (workspace is not null) TestWorkspace.Set(Config, Store, ClaudePolicy.WorkspaceKey, workspace);
     }
 
     public void AllowAll() => Consent(machine: true, workspace: "true");

@@ -1,4 +1,5 @@
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.Daemon;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Agent.Update;
 
@@ -14,7 +15,7 @@ public static class ClaudePolicy
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(store);
-        return SavedSettings.Apply(config).ClaudeUpdateEnabled && store.Get(WorkspaceKey) == "true"; // the saved setting is read afresh: this daemon may be old
+        return SavedSettings.Apply(config).ClaudeUpdateEnabled && WorkspaceSettings.Get(config, store, WorkspaceKey) == "true"; // the saved setting is read afresh: this daemon may be old
     }
 }
 

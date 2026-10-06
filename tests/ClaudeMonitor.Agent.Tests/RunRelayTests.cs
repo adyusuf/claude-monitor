@@ -54,6 +54,7 @@ public sealed class RunRelayTests : IDisposable
     public async Task A_run_from_the_stream_is_recorded_before_it_starts_and_a_replay_never_starts_it_twice()
     {
         if (!ExecFixture.Unix) return;
+        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "true");
         var run = Shell("echo once");
         Routes(run.Id);
         Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
@@ -155,11 +156,32 @@ public sealed class RunRelayTests : IDisposable
         Assert.True(fx.Store.ExecRunOf(run.Id.ToString())!.Reported);
     }
 
+    [Theory]
+    [InlineData(false)] // never read
+    [InlineData(true)] // read, but for another workspace than the one in agent.json
+    public async Task A_remote_runs_switch_that_is_unread_or_another_workspaces_fails_the_run_as_disabled(bool otherWorkspace)
+    {
+        if (!ExecFixture.Unix) return;
+        if (otherWorkspace)
+        {
+            TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "true");
+            WorkspaceSettings.Tag(fx.Store, Guid.NewGuid());
+        }
+
+        var run = Shell($"echo should-not-run > {Path.Combine(fx.Home.Dir, "ran")}");
+        Routes(run.Id);
+
+        Assert.True(await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None));
+        Assert.Equal(RemoteErrors.Disabled, fx.Store.ExecRunOf(run.Id.ToString())!.Error);
+        Assert.Equal(0, Volatile.Read(ref guardCalls));
+        Assert.False(File.Exists(Path.Combine(fx.Home.Dir, "ran")));
+    }
+
     [Fact]
     public async Task With_remote_runs_switched_off_locally_a_run_is_failed_as_disabled_without_executing()
     {
         if (!ExecFixture.Unix) return;
-        fx.Store.Set(MachineMonitor.RemoteRunsKey, "false");
+        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "false");
         var run = Shell($"echo should-not-run > {Path.Combine(fx.Home.Dir, "ran")}");
         Routes(run.Id);
 
@@ -189,7 +211,7 @@ public sealed class RunRelayTests : IDisposable
     public async Task A_run_cancel_message_stops_a_running_run()
     {
         if (!ExecFixture.Unix) return;
-        fx.Store.Set(MachineMonitor.RemoteRunsKey, "true");
+        TestWorkspace.Set(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey, "true");
         var run = Shell("sleep 300");
         Routes(run.Id);
         await stream.OnStreamAsync(AgentStreamEvents.Run, Message(run), CancellationToken.None);

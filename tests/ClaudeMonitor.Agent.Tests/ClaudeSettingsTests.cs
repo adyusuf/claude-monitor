@@ -102,14 +102,14 @@ public sealed class ClaudeSettingsTests : IDisposable
     public void Both_the_machine_and_the_workspace_must_allow_it(bool machine, string? workspace, bool allowed)
     {
         SavedSettings.SaveClaudeUpdate(home.Config, machine);
-        if (workspace is not null) store.Set(ClaudePolicy.WorkspaceKey, workspace);
+        if (workspace is not null) TestWorkspace.Set(home.Config, store, ClaudePolicy.WorkspaceKey, workspace);
         Assert.Equal(allowed, ClaudePolicy.Allowed(home.Config, store));
     }
 
     [Fact]
     public void The_environment_decides_the_machine_side_when_set()
     {
-        store.Set(ClaudePolicy.WorkspaceKey, "true");
+        TestWorkspace.Set(home.Config, store, ClaudePolicy.WorkspaceKey, "true");
         SavedSettings.SaveClaudeUpdate(home.Config, on: false);
         Assert.True(ClaudePolicy.Allowed(home.Config with { ClaudeUpdateFromEnvironment = true, ClaudeUpdateEnabled = true }, store));
         SavedSettings.SaveClaudeUpdate(home.Config, on: true);

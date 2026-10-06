@@ -42,7 +42,7 @@ public sealed class UpdateLoopInterruptedTests : IDisposable
     private void AllowInstalls()
     {
         SavedSettings.SaveAutoUpdate(kit.Config, UpdateModes.On);
-        store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.On);
+        TestWorkspace.Set(kit.Config, store, UpdatePolicy.WorkspaceKey, UpdateModes.On);
     }
 
     [Fact]
