@@ -49,6 +49,9 @@ class Server(http.server.ThreadingHTTPServer):
         self.refuse_heartbeat_from = None   # an agent version whose heartbeats get a 500
         self.heartbeats = []     # the X-Agent-Version of every answered heartbeat
 
+    def handle_error(self, request, client_address):
+        pass  # a daemon that is stopped resets its connections; that is not an error of the test
+
     @property
     def origin(self):
         return f'http://127.0.0.1:{self.server_address[1]}'
@@ -115,6 +118,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def host():
     arch = {'arm64': 'arm64', 'aarch64': 'arm64', 'x86_64': 'x64', 'amd64': 'x64'}.get(platform.machine().lower())
+    if platform.system() == 'Darwin':
+        # A Python running under Rosetta reports x86_64 on an Apple-silicon Mac, but the agent asks for the machine's own CPU
+        # (RuntimeInformation.OSArchitecture), so the build offered must be the machine's too.
+        native = subprocess.run(['sysctl', '-n', 'hw.optional.arm64'], capture_output=True, text=True, check=False).stdout.strip()
+        if native == '1':
+            arch = 'arm64'
     system = {'Darwin': 'osx', 'Windows': 'win'}.get(platform.system())
     return (system, arch) if system and arch else None
 
