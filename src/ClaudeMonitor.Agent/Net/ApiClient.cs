@@ -14,7 +14,7 @@ namespace ClaudeMonitor.Agent.Net;
 /// The agent's calls to the API. A 401 is answered once with a token refresh and a retry. Every authenticated call
 /// except the stream gives up after <c>callTimeout</c>, refresh included, with a <see cref="TimeoutException"/>.
 /// </summary>
-public sealed class ApiClient(HttpClient http, ICredentialStore credentials, TimeSpan callTimeout) : IDisposable
+public sealed partial class ApiClient(HttpClient http, ICredentialStore credentials, TimeSpan callTimeout) : IDisposable
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim refreshing = new(1, 1);
@@ -97,6 +97,20 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials, Tim
 
     public Task<AgentSettings> SettingsAsync(CancellationToken ct) => WithinDeadlineAsync(async t =>
         await ReadAsync<AgentSettings>(await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, "api/agent/settings"), t), t), ct);
+
+    /// <summary>The newest signed build the server hands out for this OS and CPU; null when none is published. The caller verifies it.</summary>
+    public Task<UpdateOffer?> LatestAsync(string os, string arch, CancellationToken ct) => WithinDeadlineAsync(async t =>
+    {
+        var url = $"api/agent/latest?os={Uri.EscapeDataString(os)}&arch={Uri.EscapeDataString(arch)}";
+        var response = await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, url), t);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            response.Dispose();
+            return null;
+        }
+
+        return await ReadAsync<UpdateOffer>(response, t);
+    }, ct);
 
     public Task CommandStatusAsync(string id, string status, string? result, CancellationToken ct, DateTimeOffset? at = null) => WithinDeadlineAsync(async t =>
     {
@@ -240,4 +254,7 @@ public sealed class ApiClient(HttpClient http, ICredentialStore credentials, Tim
 public sealed class ApiException(HttpStatusCode status, string body) : Exception($"API answered {(int)status}: {body}")
 {
     public HttpStatusCode Status { get; } = status;
+
+    /// <summary>The answer's body (a problem document's title is the error code the MCP tools show).</summary>
+    public string Body { get; } = body;
 }

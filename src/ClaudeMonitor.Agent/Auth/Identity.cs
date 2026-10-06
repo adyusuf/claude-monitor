@@ -6,11 +6,12 @@ namespace ClaudeMonitor.Agent.Auth;
 
 /// <summary>
 /// The agent's identity file (agent.json in the user-only home): which server it talks to, its agent and workspace
-/// ids, this installation's random machine key and the two settings `cm-agent install` saves (--stop-wait, --push). No token is in
-/// it; tokens are in the OS credential store.
+/// ids, this installation's random machine key and the settings the commands save (--stop-wait, --push, auto-update, and
+/// --exec for an interactive agent; a service agent reads its exec level from an admin-owned file instead, ADR-0005). No
+/// token is in it; tokens are in the OS credential store.
 /// </summary>
 public sealed record Identity(string MachineKey, string? Server = null, Guid? AgentId = null, Guid? WorkspaceId = null,
-    int? StopWaitSeconds = null, bool? Push = null)
+    int? StopWaitSeconds = null, bool? Push = null, string? AutoUpdate = null, string? ExecLevel = null, bool? ClaudeUpdate = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 

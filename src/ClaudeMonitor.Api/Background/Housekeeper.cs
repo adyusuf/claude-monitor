@@ -1,4 +1,6 @@
+using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Streaming;
 using ClaudeMonitor.Contracts;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,7 +23,10 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
-                await RunOnceAsync(scope.ServiceProvider.GetRequiredService<MonitorDb>(), clock.GetUtcNow(), stoppingToken);
+                var db = scope.ServiceProvider.GetRequiredService<MonitorDb>();
+                await RunOnceAsync(db, clock.GetUtcNow(), stoppingToken);
+                await RemoteHousekeeping.RunOnceAsync(db, scope.ServiceProvider.GetRequiredService<ApiConfig>(),
+                    scope.ServiceProvider.GetRequiredService<Broker>(), clock.GetUtcNow(), stoppingToken);
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

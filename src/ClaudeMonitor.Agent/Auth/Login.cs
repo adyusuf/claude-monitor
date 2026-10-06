@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
+using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
+using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Auth;
@@ -18,9 +20,9 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
 
     public async Task<int> RunAsync(string? serverArg, HttpMessageHandler? handler, CancellationToken ct)
     {
-        if (os == "unsupported")
+        if (os == AgentConfig.Unsupported)
         {
-            await output.WriteLineAsync("cm-agent runs on macOS and Windows.");
+            await output.WriteLineAsync("cm-agent runs on macOS, Windows and Linux.");
             return 2;
         }
 
@@ -84,6 +86,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
             var (tokens, error) = answer;
             if (tokens is not null)
             {
+                ForgetWorkspaceSettings();
                 api.SaveTokens(tokens);
                 (identity with { Server = server, AgentId = tokens.AgentId, WorkspaceId = tokens.WorkspaceId }).Save(config);
                 await output.WriteLineAsync("Connected. This machine now reports to Claude Monitor.");
@@ -148,8 +151,20 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         store.Delete(Credentials.Refresh);
         var identity = Identity.Load(config);
         (identity with { AgentId = null, WorkspaceId = null }).Save(config);
+        ForgetWorkspaceSettings();
         await output.WriteLineAsync("Signed out on this machine. Revoke it on the web (Machines) to remove it there too.");
         return 0;
+    }
+
+    /// <summary>
+    /// The workspace's consent to updating Claude Code belonged to the workspace this machine was in; the next one may forbid
+    /// it, so it reads as unread (off) until the daemon's next settings pass. Done before the new tokens are saved.
+    /// </summary>
+    private void ForgetWorkspaceSettings()
+    {
+        config.EnsureHome();
+        using var local = new LocalStore(config.DatabasePath);
+        local.Remove(ClaudePolicy.WorkspaceKey);
     }
 
     private static bool OpenBrowser(string url)

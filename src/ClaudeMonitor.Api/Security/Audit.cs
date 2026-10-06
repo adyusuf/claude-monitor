@@ -32,6 +32,20 @@ public static class AuditActions
     public const string CommandCreated = "session.command_created";
     public const string CommandCancelled = "session.command_cancelled";
     public const string PermissionAnswered = "session.permission_answered";
+    public const string RunCreated = "remote.run_created";
+    public const string RunApproved = "remote.run_approved";
+    public const string RunDenied = "remote.run_denied";
+    public const string RunCancelled = "remote.run_cancelled";
+    public const string RunFinished = "remote.run_finished";
+    public const string GrantRequested = "remote.grant_requested";
+    public const string GrantApproved = "remote.grant_approved";
+    public const string GrantDenied = "remote.grant_denied";
+    public const string GrantRevoked = "remote.grant_revoked";
+    public const string JobProposed = "remote.job_proposed";
+    public const string JobApproved = "remote.job_approved";
+    public const string JobDenied = "remote.job_denied";
+    public const string JobRetired = "remote.job_retired";
+    public const string RemoteSettingsChanged = "remote.settings_changed";
 }
 
 public static class Audit

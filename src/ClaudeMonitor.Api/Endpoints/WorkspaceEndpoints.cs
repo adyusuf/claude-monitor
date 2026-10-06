@@ -1,14 +1,19 @@
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Remote;
 using ClaudeMonitor.Api.Security;
+using ClaudeMonitor.Api.Streaming;
 using ClaudeMonitor.Api.Text;
+using ClaudeMonitor.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record NameRequest(string? Name);
 public sealed record WorkspaceResponse(Guid Id, string Name, string Role, SettingsResponse Settings);
-public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes);
-public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes);
+public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes, string AgentUpdate = UpdateModes.Off,
+    bool ClaudeUpdate = false);
+public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes, string? AgentUpdate = null,
+    bool? ClaudeUpdate = null);
 public sealed record MemberResponse(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset JoinedAt);
 public sealed record RoleRequest(string? Role);
 
@@ -46,7 +51,7 @@ public static class WorkspaceEndpoints
         if (member is null) return Http.NotFound();
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes)));
+        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate)));
     }
 
     private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, MonitorDb db)
@@ -66,16 +71,19 @@ public static class WorkspaceEndpoints
         if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         if (req.RetentionDays is < 1 or > 3650) return Http.Invalid("retentionDays", "out_of_range");
         if (req.EventMaxBytes is < EventMaxBytesMin or > EventMaxBytesMax) return Http.Invalid("eventMaxBytes", "out_of_range");
+        if (req.AgentUpdate is not null && !UpdateModes.IsValid(req.AgentUpdate)) return Http.Invalid("agentUpdate", "invalid_mode");
 
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        var before = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes);
+        var before = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate);
         s.MaskSecrets = req.MaskSecrets ?? s.MaskSecrets;
         s.RetentionDays = req.RetentionDays ?? s.RetentionDays;
         s.EventMaxBytes = req.EventMaxBytes ?? s.EventMaxBytes;
+        s.AgentUpdate = req.AgentUpdate ?? s.AgentUpdate;
+        s.ClaudeUpdate = req.ClaudeUpdate ?? s.ClaudeUpdate;
         s.UpdatedAt = clock.GetUtcNow();
         s.UpdatedBy = userId;
         Audit.Add(db, http, clock, AuditActions.SettingsChanged, id, userId,
-            detail: new { before, after = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes) });
+            detail: new { before, after = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate) });
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
@@ -117,7 +125,7 @@ public static class WorkspaceEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Remove(Guid id, Guid userId, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Remove(Guid id, Guid userId, HttpContext http, MonitorDb db, TimeProvider clock, Broker broker)
     {
         var self = http.User.UserId();
         var actor = await Access.MemberAsync(db, self, id, self == userId ? Roles.Viewer : Roles.Admin, http.RequestAborted);
@@ -128,10 +136,41 @@ public static class WorkspaceEndpoints
         if (target.Role == Roles.Owner && self != userId && actor.Role != Roles.Owner) return Results.Forbid();
         if (target.Role == Roles.Owner && await LastOwnerAsync(db, id, http.RequestAborted)) return Http.Invalid("userId", "last_owner");
 
-        target.RemovedAt = clock.GetUtcNow();
+        var now = clock.GetUtcNow();
+        // The removal, its agents' revocation and the end of their remote work commit together.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
+        var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
         await db.SaveChangesAsync(http.RequestAborted);
+        var notices = new List<Action>();
+        foreach (var agentId in agents) await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted, notices);
+        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices);
+        await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
+        foreach (var agentId in agents) broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
+
         return Results.NoContent();
+    }
+
+    /// <summary>A removed member's agents in this workspace stop at once: they are revoked with their tokens.</summary>
+    private static async Task<List<Guid>> RevokeAgentsAsync(
+        MonitorDb db, HttpContext http, TimeProvider clock, Guid workspaceId, Guid userId, Guid actor, DateTimeOffset now)
+    {
+        var agents = await db.Agents
+            .Where(a => a.WorkspaceId == workspaceId && a.UserId == userId && a.Status == AgentStatuses.Active)
+            .ToListAsync(http.RequestAborted);
+        foreach (var agent in agents)
+        {
+            agent.Status = AgentStatuses.Revoked;
+            agent.RevokedAt = now;
+            agent.RevokedBy = actor;
+            await AgentTokens.RevokeAllAsync(db, agent.Id, now, http.RequestAborted);
+            Audit.Add(db, http, clock, AuditActions.AgentRevoked, workspaceId, actor, targetType: "agent", targetId: agent.Id,
+                detail: new { reason = "member_removed" });
+        }
+
+        return agents.Select(a => a.Id).ToList();
     }
 
     private static async Task<bool> LastOwnerAsync(MonitorDb db, Guid workspaceId, CancellationToken ct) =>

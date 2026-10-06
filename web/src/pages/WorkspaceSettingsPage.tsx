@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "../api/endpoints";
-import type { AuditRow, WorkspaceInfo } from "../api/types";
+import type { AgentUpdateMode, AuditRow, WorkspaceInfo } from "../api/types";
 import { useSession } from "../auth/session";
 import { Button, Card, Field, Notice, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { RemoteSettingsCard } from "./RemoteSettingsCard";
 
 /** Name, capture settings and the audit log (admins). */
 export function WorkspaceSettingsPage() {
@@ -15,14 +16,15 @@ export function WorkspaceSettingsPage() {
   const errorText = useErrorText();
   const { refresh } = useSession();
   const [info, setInfo] = useState<WorkspaceInfo | null>(null);
-  const [form, setForm] = useState({ name: "", maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144 });
+  const [form, setForm] = useState<{ name: string; maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate: boolean }>(
+    { name: "", maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off", claudeUpdate: false });
   const [audit, setAudit] = useState<AuditRow[]>([]);
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
   useEffect(() => {
     api.workspace(ws).then((w) => {
       setInfo(w);
-      setForm({ name: w.name, ...w.settings });
+      setForm({ name: w.name, ...w.settings, agentUpdate: w.settings.agentUpdate ?? "off", claudeUpdate: w.settings.claudeUpdate ?? false });
     }).catch((e) => setNotice({ kind: "error", text: errorText(e) }));
     api.audit(ws).then((p) => setAudit(p.items)).catch(() => setAudit([]));
     // errorText changes identity every render; the workspace id is what matters
@@ -32,7 +34,7 @@ export function WorkspaceSettingsPage() {
   const save = async () => {
     try {
       if (form.name !== info?.name) await api.renameWorkspace(ws, form.name);
-      await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes });
+      await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes, agentUpdate: form.agentUpdate, claudeUpdate: form.claudeUpdate });
       await refresh();
       setNotice({ kind: "success", text: t("workspace.saved") });
     } catch (e) {
@@ -56,9 +58,24 @@ export function WorkspaceSettingsPage() {
             onChange={(e) => setForm({ ...form, retentionDays: Number(e.target.value) })} />
           <Field label={t("workspace.eventMax")} type="number" min={1024} max={4194304} value={form.eventMaxBytes}
             onChange={(e) => setForm({ ...form, eventMaxBytes: Number(e.target.value) })} />
+          <div className="field">
+            <label className="field-label" htmlFor="agent-update">{t("workspace.agentUpdate")}</label>
+            <select id="agent-update" className="input" value={form.agentUpdate} aria-describedby="agent-update-note"
+              onChange={(e) => setForm({ ...form, agentUpdate: e.target.value as AgentUpdateMode })}>
+              <option value="off">{t("workspace.agentUpdateOff")}</option>
+              <option value="check">{t("workspace.agentUpdateCheck")}</option>
+              <option value="on">{t("workspace.agentUpdateOn")}</option>
+            </select>
+            <span id="agent-update-note" className="field-hint">{t("workspace.agentUpdateHint")}</span>
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={form.claudeUpdate} onChange={(e) => setForm({ ...form, claudeUpdate: e.target.checked })} />
+            <span>{t("workspace.claudeUpdate")}<span className="field-hint">{t("workspace.claudeUpdateHint")}</span></span>
+          </label>
           <div><Button onClick={() => void save()}>{t("workspace.save")}</Button></div>
         </div>
       </Card>
+      <RemoteSettingsCard ws={ws} canEdit={info.role === "owner" || info.role === "admin"} />
       <Card title={t("workspace.audit")}>
         {audit.length === 0 ? <p className="muted">{t("workspace.noAudit")}</p> : (
           <ul className="plain audit">

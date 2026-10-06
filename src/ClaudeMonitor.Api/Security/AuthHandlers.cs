@@ -60,7 +60,10 @@ public sealed class SessionAuthHandler(
     }
 }
 
-/// <summary>An agent: "Authorization: Bearer &lt;access token&gt;", looked up hashed in agent_tokens.</summary>
+/// <summary>
+/// An agent: "Authorization: Bearer &lt;access token&gt;", looked up hashed in agent_tokens. Its user must still be a
+/// member of the agent's workspace and the workspace active (fail-closed, global #6).
+/// </summary>
 public sealed class AgentAuthHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder,
     MonitorDb db, TimeProvider clock) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
@@ -78,8 +81,11 @@ public sealed class AgentAuthHandler(
         var found = await (from t in db.AgentTokens
                            join a in db.Agents on t.AgentId equals a.Id
                            join u in db.Users on a.UserId equals u.Id
+                           join m in db.WorkspaceMembers on new { a.WorkspaceId, a.UserId } equals new { m.WorkspaceId, m.UserId }
+                           join w in db.Workspaces on a.WorkspaceId equals w.Id
                            where t.TokenHash == hash && t.Kind == AgentTokenKinds.Access && t.RevokedAt == null
                                  && t.ExpiresAt > now && a.Status == AgentStatuses.Active && u.Status == UserStatuses.Active
+                                 && m.RemovedAt == null && w.Status == WorkspaceStatuses.Active
                            select new { t, a }).FirstOrDefaultAsync(Context.RequestAborted);
         if (found is null)
         {

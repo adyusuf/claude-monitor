@@ -3,6 +3,7 @@ using ClaudeMonitor.Api.Background;
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
 using ClaudeMonitor.Api.Security;
+using ClaudeMonitor.Api.Streaming;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Endpoints;
@@ -18,7 +19,7 @@ public static class PrivacyEndpoints
 {
     public const string ConfirmWord = "DELETE";
     public const string DeletedName = "Deleted user";
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public static void Map(RouteGroupBuilder api)
     {
@@ -99,6 +100,7 @@ public static class PrivacyEndpoints
         }
 
         w.WriteEndArray();
+        await PrivacyRemoteData.ExportAsync(w, body, db, userId, ct);
         w.WriteEndObject();
         await w.FlushAsync(ct);
         await body.FlushAsync(ct);
@@ -106,7 +108,7 @@ public static class PrivacyEndpoints
 
     /// <summary>True when the current login session started within the re-authentication window. Fail-closed: a
     /// session that cannot be found counts as old.</summary>
-    private static async Task<bool> RecentSignInAsync(HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
+    internal static async Task<bool> RecentSignInAsync(HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
     {
         if (http.User.LoginSessionId() is not { } id) return false;
         var createdAt = await db.LoginSessions.Where(s => s.Id == id).Select(s => (DateTimeOffset?)s.CreatedAt)
@@ -114,13 +116,14 @@ public static class PrivacyEndpoints
         return createdAt is { } at && clock.GetUtcNow() - at <= config.ReauthWindow;
     }
 
-    private static void Write<T>(Utf8JsonWriter w, string name, T value)
+    internal static void Write<T>(Utf8JsonWriter w, string name, T value)
     {
         w.WritePropertyName(name);
         JsonSerializer.Serialize(w, value, Json);
     }
 
-    private static async Task<IResult> Delete(DeleteAccountRequest req, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
+    private static async Task<IResult> Delete(DeleteAccountRequest req, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock,
+        Broker broker)
     {
         var userId = http.User.UserId();
         var ct = http.RequestAborted;
@@ -180,6 +183,9 @@ public static class PrivacyEndpoints
         await db.SessionCommands.Where(c => sessionIds.Contains(c.SessionId) || c.CreatedBy == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Body, (string?)null), ct);
 
+        var notices = new List<Action>();
+        await PrivacyRemoteData.DeleteAsync(db, broker, userId, agentIds, now, ct, notices);
+
         // Every way in: closed.
         await db.Agents.Where(a => a.UserId == userId && a.Status == AgentStatuses.Active).ExecuteUpdateAsync(
             s => s.SetProperty(a => a.Status, AgentStatuses.Revoked).SetProperty(a => a.RevokedAt, now).SetProperty(a => a.RevokedBy, userId), ct);
@@ -212,6 +218,7 @@ public static class PrivacyEndpoints
             detail: new { sessions = sessionIds.Count, agents = agentIds.Count, archivedWorkspaces = solo.Count });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        notices.ForEach(n => n());
         if (sessions.Count > 0)
         {
             // The archived day files hold the same content past retention: it leaves them too.

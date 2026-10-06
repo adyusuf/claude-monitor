@@ -44,6 +44,8 @@ public sealed partial class LocalStore : IDisposable
             """);
         AddColumnIfMissing("commands", "taken_at", "TEXT"); // a database made before the hook's hand-over time was kept
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
+        CreateRemoteTables();
+        CreateClaudeTables();
     }
 
     /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>
@@ -70,6 +72,9 @@ public sealed partial class LocalStore : IDisposable
     public void Set(string key, string value) =>
         Exec("INSERT INTO kv (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             ("$k", key), ("$v", value));
+
+    /// <summary>Forgets a key: it then reads as never set.</summary>
+    public void Remove(string key) => Exec("DELETE FROM kv WHERE key = $k", ("$k", key));
 
     // ---- outbox -----------------------------------------------------------------------------------------------
 

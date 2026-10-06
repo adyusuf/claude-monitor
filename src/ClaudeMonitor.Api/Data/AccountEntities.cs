@@ -24,6 +24,11 @@ public static class TokenPurposes
     public const string MfaPending = "mfa_pending";
 }
 
+public static class WorkspaceStatuses
+{
+    public const string Active = "active";
+}
+
 public static class Roles
 {
     public const string Owner = "owner";
@@ -113,7 +118,7 @@ public sealed class Workspace
     public string NameSearch { get; set; } = "";
     public Guid CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public string Status { get; set; } = "active";
+    public string Status { get; set; } = WorkspaceStatuses.Active;
 }
 
 public sealed class WorkspaceMember
@@ -145,6 +150,17 @@ public sealed class WorkspaceSettings
     public bool MaskSecrets { get; set; } = true;
     public int RetentionDays { get; set; } = 90;
     public int EventMaxBytes { get; set; } = 262_144;
+
+    /// <summary>The most an agent of this workspace may do about updating itself (<see cref="ClaudeMonitor.Contracts.UpdateModes"/>); off until an admin says otherwise.</summary>
+    public string AgentUpdate { get; set; } = ClaudeMonitor.Contracts.UpdateModes.Off;
+    public int AlertCpuPct { get; set; } = 90;
+    public int AlertMemoryPct { get; set; } = 90;
+    public int AlertDiskPct { get; set; } = 90;
+    public int AlertSustainSeconds { get; set; } = 300;
+    public bool RemoteRunsEnabled { get; set; }
+
+    /// <summary>Whether agents of this workspace may update Claude Code itself on their machines (when idle, with a countdown; ADR-0006); off until an admin says otherwise.</summary>
+    public bool ClaudeUpdate { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
 }

@@ -1,4 +1,5 @@
 using ClaudeMonitor.Agent.Auth;
+using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Config;
 
@@ -20,7 +21,26 @@ public static class SavedSettings
             config = config with { StopWait = TimeSpan.FromSeconds(Math.Clamp(seconds, 0, AgentConfig.WaitMaxSeconds)) };
         }
 
+        if (!config.ClaudeUpdateFromEnvironment && saved?.ClaudeUpdate is { } claude) config = config with { ClaudeUpdateEnabled = claude };
+        if (!config.AutoUpdateFromEnvironment && saved?.AutoUpdate is { } update) config = config with { AutoUpdate = UpdateModes.Normalize(update) };
         return !config.PushFromEnvironment && saved?.Push is { } push ? config with { PushEnabled = push } : config;
+    }
+
+    /// <summary>Saves whether this machine lets the agent update Claude Code (ADR-0006) and returns the configuration that uses it.</summary>
+    public static AgentConfig SaveClaudeUpdate(AgentConfig config, bool on)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        (Identity.Load(config) with { ClaudeUpdate = on }).Save(config);
+        return config with { ClaudeUpdateEnabled = on };
+    }
+
+    /// <summary>Saves how far this machine lets the agent update itself (off, check, on; ADR-0004) and returns the configuration that uses it.</summary>
+    public static AgentConfig SaveAutoUpdate(AgentConfig config, string mode)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (!UpdateModes.IsValid(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+        (Identity.Load(config) with { AutoUpdate = mode }).Save(config);
+        return config with { AutoUpdate = mode };
     }
 
     /// <summary>Saves whether prompts from the web are pushed into an idle session (ADR-0003) and returns the configuration that uses it.</summary>

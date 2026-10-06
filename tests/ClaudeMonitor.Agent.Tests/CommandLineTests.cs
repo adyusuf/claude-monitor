@@ -109,7 +109,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal(2, await new Login(home.Config, output, clock, _ => true, "macos").RunAsync("http://monitor.invalid", null, CancellationToken.None));
         Assert.Equal(2, await new Login(home.Config, output, clock, _ => true, "macos").RunAsync(null, null, CancellationToken.None));
         Assert.Equal(2, await new Login(home.Config, output, clock, _ => true, "unsupported").RunAsync("https://m.invalid", null, CancellationToken.None));
-        Assert.Contains("macOS and Windows", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("macOS, Windows and Linux", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

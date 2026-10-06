@@ -70,6 +70,8 @@ export function DownloadPage() {
     { os: t("download.macos"), file: "cm-agent-macos-x64.zip", label: "Intel" },
     { os: t("download.windows"), file: "cm-agent-windows-x64.zip", label: "x64" },
     { os: t("download.windows"), file: "cm-agent-windows-arm64.zip", label: "ARM64" },
+    { os: t("download.linux"), file: "cm-agent-linux-x64.zip", label: "x64" },
+    { os: t("download.linux"), file: "cm-agent-linux-arm64.zip", label: "ARM64" },
   ];
   return (
     <div className="page narrow">
