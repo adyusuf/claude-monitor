@@ -39,8 +39,14 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
 {
     private static readonly TimeSpan DrainWait = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan ExitWait = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan MinTrackEvery = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan MaxTrackEvery = TimeSpan.FromSeconds(5);
     private const int LogValueMax = 200;
     private const string None = "none";
+
+    // zero keeps the tracker off; otherwise bounded so that a mistake cannot make it spin or never look
+    private TimeSpan TrackEvery => config.ExecTrackEvery <= TimeSpan.Zero ? TimeSpan.Zero
+        : TimeSpan.FromTicks(Math.Clamp(config.ExecTrackEvery.Ticks, MinTrackEvery.Ticks, MaxTrackEvery.Ticks));
 
     private int _active;
 
@@ -106,7 +112,7 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         IRunProcess process;
         try
         {
-            process = Start(run, decision, argv0);
+            process = Start(run, decision, argv0, timeout);
         }
         catch (Exception e) when (e is Win32Exception or IOException or ArgumentException or InvalidOperationException
             or UnauthorizedAccessException or PlatformNotSupportedException)
@@ -122,13 +128,14 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         }
     }
 
-    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0)
+    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0, TimeSpan timeout)
     {
         var env = RunEnvironment.Build(config.Home);
+        var limits = RunLimits.For(config, timeout);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
-        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe);
+        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe, limits, TrackEvery);
         // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).
-        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0);
+        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0, limits, TrackEvery);
     }
 
     private async Task<RunResult> SuperviseAsync(RunMessage run, IRunProcess process, string? exe, TimeSpan timeout, long began,
