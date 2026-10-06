@@ -139,6 +139,14 @@ public static class WorkspaceEndpoints
         var now = clock.GetUtcNow();
         // The removal, its agents' revocation and the end of their remote work commit together.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        // The rows are locked first, in the order a run creation takes them (the member, then the agents), so the
+        // two cannot wait on each other for what they hold; the member's lock also queues behind a run about to commit.
+        if (await db.WorkspaceMembers.Where(m => m.WorkspaceId == id && m.UserId == userId && m.RemovedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, m => m.Role), http.RequestAborted) != 1)
+        {
+            return Http.NotFound();
+        }
+
         target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
@@ -157,9 +165,18 @@ public static class WorkspaceEndpoints
     private static async Task<List<Guid>> RevokeAgentsAsync(
         MonitorDb db, HttpContext http, TimeProvider clock, Guid workspaceId, Guid userId, Guid actor, DateTimeOffset now)
     {
+        var active = await db.Agents
+            .Where(a => a.WorkspaceId == workspaceId && a.UserId == userId && a.Status == AgentStatuses.Active)
+            .Select(a => a.Id).ToListAsync(http.RequestAborted);
+        foreach (var agentId in active.Order())
+        {
+            await db.Agents.Where(a => a.Id == agentId && a.Status == AgentStatuses.Active)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevel, a => a.ExecLevel), http.RequestAborted);
+        }
+
         var agents = await db.Agents
             .Where(a => a.WorkspaceId == workspaceId && a.UserId == userId && a.Status == AgentStatuses.Active)
-            .ToListAsync(http.RequestAborted);
+            .OrderBy(a => a.Id).ToListAsync(http.RequestAborted);
         foreach (var agent in agents)
         {
             agent.Status = AgentStatuses.Revoked;
