@@ -184,8 +184,9 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
             return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.Disabled);
         }
 
-        // One member row per statement, in a fixed order: every path that locks several rows takes them in the order
-        // workspace switch, members (by user id), agent, so none of them can wait on the other for the rows it holds.
+        // One member row per statement, in a fixed order: run creation and member removal (WorkspaceEndpoints.Remove) both
+        // take members (by user id) before agents (by id), so neither waits on the other for a row it holds. The cascades'
+        // multi-row updates of grants and jobs (RemoteCleanup) have no such order; that is not covered here.
         foreach (var memberId in new[] { userId, ownerId }.Distinct().Order())
         {
             var member = await db.WorkspaceMembers
