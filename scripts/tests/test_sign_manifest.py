@@ -105,6 +105,32 @@ class SigningTests(unittest.TestCase):
         self.assertEqual(manifest['format'], 'cm-agent-update/1')
         self.assertEqual({e['channel'] for e in manifest['entries']}, {'prod'})
 
+    def test_a_signature_that_does_not_verify_is_never_published(self):
+        with mock.patch.object(sm, 'sign', return_value=base64.b64encode(b'not a signature').decode()):
+            with self.assertRaises(RuntimeError):
+                self.manifest()
+
+    def test_a_key_that_is_not_the_shipped_one_is_refused(self):
+        shipped = os.path.join(os.path.dirname(SCRIPT), '..', 'deploy', 'update-keys', 'test.pub')
+        with open(shipped, 'w', encoding='utf-8') as f:
+            f.write(sm.public_key(new_key()))
+        self.addCleanup(os.remove, shipped)
+        err = io.StringIO()
+        with mock.patch.dict(os.environ, {'TEST_KEY': self.key}), contextlib.redirect_stderr(err):
+            code = sm.main(['sign', '--channel', 'test', '--downloads', self.dir.name, '--version', '0.3.1', '--min-supported', '0.2.0', '--key-env', 'TEST_KEY'])
+        self.assertEqual(code, 1)
+        self.assertIn('deploy/update-keys/test.pub', err.getvalue())
+        self.assertFalse(os.path.exists(os.path.join(self.dir.name, 'manifest.json')))
+
+    def test_the_shipped_key_itself_is_accepted(self):
+        shipped = os.path.join(os.path.dirname(SCRIPT), '..', 'deploy', 'update-keys', 'test.pub')
+        with open(shipped, 'w', encoding='utf-8') as f:
+            f.write(self.public + '\n')
+        self.addCleanup(os.remove, shipped)
+        with mock.patch.dict(os.environ, {'TEST_KEY': self.key}), contextlib.redirect_stdout(io.StringIO()):
+            code = sm.main(['sign', '--channel', 'test', '--downloads', self.dir.name, '--version', '0.3.1', '--min-supported', '0.2.0', '--key-env', 'TEST_KEY'])
+        self.assertEqual(code, 0)
+
     def test_a_missing_key_fails_and_writes_nothing(self):
         err = io.StringIO()
         with mock.patch.dict(os.environ, {}, clear=False), contextlib.redirect_stderr(err):

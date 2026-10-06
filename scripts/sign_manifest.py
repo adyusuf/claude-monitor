@@ -80,6 +80,18 @@ def sign(private_b64, text):
         return base64.b64encode(openssl(['dgst', '-sha256', '-sign', '/dev/stdin', handle.name], pem(private_b64).encode())).decode()
 
 
+def verify(public_b64, text, signature_b64):
+    """True when openssl itself verifies the signature under the public key (the same check an agent makes)."""
+    with tempfile.TemporaryDirectory() as folder:
+        paths = {name: os.path.join(folder, name) for name in ('key', 'sig', 'msg')}
+        for name, mode, data in (('key', 'wb', base64.b64decode(public_b64)), ('sig', 'wb', base64.b64decode(signature_b64)), ('msg', 'w', text)):
+            with open(paths[name], mode) as f:
+                f.write(data)
+        done = subprocess.run(['openssl', 'dgst', '-sha256', '-verify', paths['key'], '-keyform', 'DER', '-signature', paths['sig'], paths['msg']],
+                              capture_output=True, check=False)
+        return done.returncode == 0
+
+
 def keygen(channel):
     if subprocess.run(['security', 'find-generic-password', '-s', service(channel), '-a', getpass.getuser()],
                       capture_output=True, check=False).returncode == 0:
@@ -108,8 +120,11 @@ def build_manifest(channel, downloads, version, min_supported, private_b64):
         with open(os.path.join(downloads, name), 'rb') as f:
             digest = hashlib.sha256(f.read()).hexdigest()
         text = payload(channel, version, match.group(1), match.group(2), digest, min_supported)
+        signature = sign(private_b64, text)
+        if not verify(public_key(private_b64), text, signature):
+            raise RuntimeError(f'the signature of {name} does not verify under its own key: not publishing')
         entries.append({'channel': channel, 'version': version, 'os': match.group(1), 'arch': match.group(2), 'file': name,
-                        'sha256': digest, 'minSupported': min_supported, 'signature': sign(private_b64, text)})
+                        'sha256': digest, 'minSupported': min_supported, 'signature': signature})
     if not entries:
         raise RuntimeError(f'no cm-agent-<os>-<arch>.zip in {downloads}')
     return {'format': FORMAT, 'entries': entries}
@@ -131,7 +146,13 @@ def main(argv=None):
         if args.command == 'keygen':
             print(keygen(args.channel))
             return 0
-        manifest = build_manifest(args.channel, args.downloads, args.version, args.min_supported, read_private(args.channel, args.key_env))
+        private_b64 = read_private(args.channel, args.key_env)
+        shipped = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'deploy', 'update-keys', args.channel + '.pub')
+        if os.path.exists(shipped):
+            with open(shipped, encoding='utf-8') as f:
+                if f.read().strip() != public_key(private_b64):
+                    raise RuntimeError(f'the signing key is not the one in deploy/update-keys/{args.channel}.pub: agents built with that file would refuse every update')
+        manifest = build_manifest(args.channel, args.downloads, args.version, args.min_supported, private_b64)
         target = os.path.join(args.downloads, 'manifest.json')
         with open(target, 'w', encoding='utf-8') as f:
             json.dump(manifest, f, indent=2)
