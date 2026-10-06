@@ -123,11 +123,11 @@ public static class PrivacyRemoteData
 
     /// <summary>Inside the deletion's transaction, before the user row changes: cancel, then empty.</summary>
     public static async Task DeleteAsync(MonitorDb db, Broker broker, Guid userId, List<Guid> agentIds, DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct, List<Action>? after = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(agentIds);
-        await RunDecisions.CancelOpenAsync(db, broker, now, null, null, userId, ct);
+        await RunDecisions.CancelOpenAsync(db, broker, now, null, null, userId, ct, after);
         var runIds = db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId).Select(r => r.Id);
         await db.RemoteRunOutput.Where(o => runIds.Contains(o.RunId)).ExecuteDeleteAsync(ct);
         await db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId)

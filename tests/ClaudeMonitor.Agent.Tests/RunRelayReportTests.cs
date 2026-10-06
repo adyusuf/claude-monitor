@@ -73,7 +73,7 @@ public sealed class RunRelayReportTests : IDisposable
         var first = Shell("echo one");
         var second = Shell("echo two");
         Routes(second.Id);
-        fx.Fake.On($"POST /api/agent/runs/{first.Id}/status", _ => (HttpStatusCode.Forbidden, "{}"));
+        fx.Fake.On($"POST /api/agent/runs/{first.Id}/status", _ => (HttpStatusCode.UnprocessableEntity, "{}"));
         fx.Fake.On($"POST /api/agent/runs/{first.Id}/output", RemoteFixture.NoContent);
         relay.Accept(first, CancellationToken.None);
         relay.Accept(second, CancellationToken.None);
@@ -86,6 +86,38 @@ public sealed class RunRelayReportTests : IDisposable
         Assert.True(fx.Store.ExecRunOf(second.Id.ToString())!.Reported);
         Assert.Contains(fx.Fake.Seen, s => s.Path == $"/api/agent/runs/{second.Id}/status" && s.Body.Contains("\"succeeded\"", StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.RequestTimeout)]
+    public async Task A_passing_client_error_keeps_the_output_and_the_outcome_for_the_next_pass(HttpStatusCode status)
+    {
+        if (!ExecFixture.Unix) return;
+        var run = Shell("echo keep-me");
+        fx.Fake.On($"POST /api/agent/runs/{run.Id}/output", _ => (status, "{}"));
+        fx.Fake.On($"POST /api/agent/runs/{run.Id}/status", _ => (status, "{}"));
+        relay.Accept(run, CancellationToken.None);
+        Assert.True(await Finished(run.Id));
+
+        await Assert.ThrowsAsync<ApiException>(() => relay.ReportAsync(CancellationToken.None));
+
+        Assert.NotEmpty(fx.Store.UnsentExecOutput(10));
+        Assert.False(fx.Store.ExecRunOf(run.Id.ToString())!.Reported);
+    }
+
+    [Theory]
+    [InlineData(400, true)]
+    [InlineData(404, true)]
+    [InlineData(409, true)]
+    [InlineData(422, true)]
+    [InlineData(401, false)]
+    [InlineData(403, false)]
+    [InlineData(408, false)]
+    [InlineData(429, false)]
+    [InlineData(500, false)]
+    public void Only_answers_that_a_retry_cannot_change_are_permanent(int status, bool permanent) =>
+        Assert.Equal(permanent, RunRelay.Permanent((HttpStatusCode)status));
 
     [Fact]
     public async Task A_server_error_on_the_outcome_keeps_it_unreported_for_the_next_pass()

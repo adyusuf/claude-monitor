@@ -69,9 +69,9 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
                     sent = await api.RunOutputAsync(Guid.Parse(group.Key),
                         part.Select(c => new RunOutputChunk(c.Seq, c.Stream, c.Body, c.Gap)).ToList(), ct);
                 }
-                catch (ApiException e) when ((int)e.Status is >= 400 and < 500)
+                catch (ApiException e) when (Permanent(e.Status))
                 {
-                    // refused for good (not a retryable failure): drop it so it cannot block later output
+                    // refused for good: drop it so it cannot block later output
                     log.Write($"run {group.Key} output refused ({(int)e.Status}), dropped");
                     sent = false;
                 }
@@ -94,7 +94,7 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
                 await api.RunStatusAsync(Guid.Parse(r.RunId),
                     new RunStatusUpdate(r.FinalStatus ?? RunStatuses.Failed, r.ExitCode, r.Error, r.Truncated, r.ResolvedExe, clock.GetUtcNow()), ct);
             }
-            catch (ApiException e) when ((int)e.Status is >= 400 and < 500)
+            catch (ApiException e) when (Permanent(e.Status))
             {
                 log.Write($"run {r.RunId} outcome refused ({(int)e.Status}), dropped");
             }
@@ -134,6 +134,12 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
             cts.Dispose();
         }
     }
+
+    /// <summary>
+    /// An answer that will not change on a retry: the request itself is wrong or the run is settled or gone. 401, 403, 408
+    /// and 429 (a token being renewed, a rate limit) are not: the report stays and goes again next pass.
+    /// </summary>
+    internal static bool Permanent(System.Net.HttpStatusCode status) => (int)status is 400 or 404 or 409 or 410 or 413 or 422;
 
     /// <summary>A live report that may fail (offline): the final outcome is stored and sent later anyway.</summary>
     private async Task Quietly(Func<Task> call)

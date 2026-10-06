@@ -183,6 +183,21 @@ public sealed class MachineMonitorTests : IDisposable
         Assert.False(string.IsNullOrEmpty(profile.OsVersion));
     }
 
+    [Theory]
+    [InlineData(new[] { "/usr/bin/tail" }, new string[0], "argv")]
+    [InlineData(new string[0], new[] { "/var/log" }, "argv")]
+    [InlineData(new string[0], new string[0], "shell")]
+    public async Task A_shell_policy_with_a_ceiling_is_reported_as_argv(string[] executables, string[] roots, string expected)
+    {
+        if (ExecPolicyLoader.RunningAsRoot()) return; // as root the level reported is always off
+        var policy = new ExecPolicy(ExecLevels.Shell, executables, roots);
+        var withPolicy = new MachineMonitor(fx.Home.Config, fx.Store, fx.Api, fx.Clock, source, () => policy);
+
+        await withPolicy.ProfileAsync(CancellationToken.None);
+
+        Assert.Equal(expected, Body<AgentProfile>(Assert.Single(fx.Fake.Seen, s => s.Path == "/api/agent/profile").Body).ExecLevel);
+    }
+
     [Fact]
     public async Task A_service_agent_reports_off_when_no_admin_owned_policy_exists_whatever_its_own_file_says()
     {

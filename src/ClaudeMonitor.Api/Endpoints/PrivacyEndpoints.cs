@@ -183,7 +183,8 @@ public static class PrivacyEndpoints
         await db.SessionCommands.Where(c => sessionIds.Contains(c.SessionId) || c.CreatedBy == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Body, (string?)null), ct);
 
-        await PrivacyRemoteData.DeleteAsync(db, broker, userId, agentIds, now, ct);
+        var notices = new List<Action>();
+        await PrivacyRemoteData.DeleteAsync(db, broker, userId, agentIds, now, ct, notices);
 
         // Every way in: closed.
         await db.Agents.Where(a => a.UserId == userId && a.Status == AgentStatuses.Active).ExecuteUpdateAsync(
@@ -217,6 +218,7 @@ public static class PrivacyEndpoints
             detail: new { sessions = sessionIds.Count, agents = agentIds.Count, archivedWorkspaces = solo.Count });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        notices.ForEach(n => n());
         if (sessions.Count > 0)
         {
             // The archived day files hold the same content past retention: it leaves them too.

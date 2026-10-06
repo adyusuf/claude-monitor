@@ -12,7 +12,8 @@ namespace ClaudeMonitor.Api.Remote;
 /// </summary>
 public static class RemoteCleanup
 {
-    public static async Task ForAgentAsync(MonitorDb db, Broker broker, Guid agentId, Guid? actor, DateTimeOffset now, CancellationToken ct)
+    public static async Task ForAgentAsync(MonitorDb db, Broker broker, Guid agentId, Guid? actor, DateTimeOffset now, CancellationToken ct,
+        List<Action>? after = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         await db.MachineGrants
@@ -25,11 +26,11 @@ public static class RemoteCleanup
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Retired).SetProperty(j => j.RetiredAt, now), ct);
         await db.MachineAlerts.Where(a => a.AgentId == agentId && a.State == AlertStates.Open)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, AlertStates.Resolved).SetProperty(a => a.ResolvedAt, now), ct);
-        await RunDecisions.CancelOpenAsync(db, broker, now, null, agentId, null, ct);
+        await RunDecisions.CancelOpenAsync(db, broker, now, null, agentId, null, ct, after);
     }
 
     public static async Task ForMemberAsync(MonitorDb db, Broker broker, Guid workspaceId, Guid userId, Guid? actor, DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct, List<Action>? after = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         await db.MachineGrants
@@ -41,6 +42,6 @@ public static class RemoteCleanup
             .Where(j => j.WorkspaceId == workspaceId && j.OwnerUserId == userId
                         && (j.Status == JobStatuses.Active || j.Status == JobStatuses.Proposed))
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Retired).SetProperty(j => j.RetiredAt, now), ct);
-        await RunDecisions.CancelOpenAsync(db, broker, now, workspaceId, null, userId, ct);
+        await RunDecisions.CancelOpenAsync(db, broker, now, workspaceId, null, userId, ct, after);
     }
 }

@@ -68,8 +68,10 @@ public static class MachineEndpoints
         await AgentTokens.RevokeAllAsync(db, agent.Id, now, http.RequestAborted);
         Audit.Add(db, http, clock, AuditActions.AgentRevoked, agent.WorkspaceId, userId, targetType: "agent", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
-        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted);
+        var notices = new List<Action>();
+        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted, notices);
         await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
         broker.Publish(Broker.Agent(id), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         return Results.NoContent();
     }
@@ -114,8 +116,10 @@ public static class MachineEndpoints
         // The move and the end of the agent's remote work in its old workspace commit together.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await db.SaveChangesAsync(http.RequestAborted);
-        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted);
+        var notices = new List<Action>();
+        await RemoteCleanup.ForAgentAsync(db, broker, id, userId, now, http.RequestAborted, notices);
         await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
         return Results.NoContent();
     }
 

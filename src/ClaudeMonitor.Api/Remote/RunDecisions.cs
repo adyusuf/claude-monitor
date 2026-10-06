@@ -110,9 +110,12 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
         return Results.NoContent();
     }
 
-    /// <summary>Cancels every open run of a workspace, or of one agent as requester or target (member removed, agent moved, switch off).</summary>
+    /// <summary>
+    /// Cancels every open run of a workspace, or of one agent as requester or target (member removed, agent moved, switch off).
+    /// Inside a caller's transaction the stream notices go to <paramref name="after"/>, to be published once it commits.
+    /// </summary>
     public static async Task CancelOpenAsync(MonitorDb db, Broker broker, DateTimeOffset now, Guid? workspaceId, Guid? agentId,
-        Guid? userId, CancellationToken ct)
+        Guid? userId, CancellationToken ct, List<Action>? after = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(broker);
@@ -129,8 +132,14 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
             if (changed != 1) continue;
             var was = run.Status;
             run.Status = RunStatuses.Cancelled;
-            RunNotices.Changed(broker, run);
-            if (was != RunStatuses.PendingApproval) RunNotices.Cancel(broker, run);
+            void Notify()
+            {
+                RunNotices.Changed(broker, run);
+                if (was != RunStatuses.PendingApproval) RunNotices.Cancel(broker, run);
+            }
+
+            if (after is null) Notify();
+            else after.Add(Notify);
         }
     }
 

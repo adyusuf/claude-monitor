@@ -17,7 +17,8 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// an alert. Samples and alerts the API did not take are kept (bounded) and sent with the next pass. An API that does not
 /// know these calls (404) switches the reports off until the daemon restarts.
 /// </summary>
-public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, IMetricsSource source)
+public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, IMetricsSource source,
+    Func<ExecPolicy>? policySource = null)
 {
     public const string ThresholdsKey = "settings.alert_thresholds";
     public const string RemoteRunsKey = "settings.remote_runs";
@@ -29,7 +30,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private bool unsupported;
 
     /// <summary>The exec level this agent allows now: the admin-owned file in service mode, agent.json otherwise.</summary>
-    public ExecPolicy Policy() => ExecPolicyLoader.Load(config, Identity.Peek(config)?.ExecLevel);
+    public ExecPolicy Policy() => policySource?.Invoke() ?? ExecPolicyLoader.Load(config, Identity.Peek(config)?.ExecLevel);
 
     public async Task ProfileAsync(CancellationToken ct)
     {

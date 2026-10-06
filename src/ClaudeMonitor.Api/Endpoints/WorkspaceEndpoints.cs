@@ -140,9 +140,11 @@ public static class WorkspaceEndpoints
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
         await db.SaveChangesAsync(http.RequestAborted);
-        foreach (var agentId in agents) await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted);
-        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted);
+        var notices = new List<Action>();
+        foreach (var agentId in agents) await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted, notices);
+        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices);
         await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
         foreach (var agentId in agents) broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
 
         return Results.NoContent();
