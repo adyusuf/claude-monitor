@@ -157,14 +157,18 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
     }
 
     /// <summary>
-    /// The workspace's consent to updating Claude Code belonged to the workspace this machine was in; the next one may forbid
-    /// it, so it reads as unread (off) until the daemon's next settings pass. Done before the new tokens are saved.
+    /// The workspace's switches (updating Claude Code, updating the agent, remote runs) belonged to the workspace this machine
+    /// was in; the next one may forbid them, so they read as unread (off) until the daemon's next settings pass. Done before
+    /// the new tokens are saved; a pass still in flight is caught by the workspace tag (WorkspaceSettings).
     /// </summary>
     private void ForgetWorkspaceSettings()
     {
         config.EnsureHome();
         using var local = new LocalStore(config.DatabasePath);
-        local.Remove(ClaudePolicy.WorkspaceKey);
+        foreach (var key in Daemon.WorkspaceSettings.Switches)
+        {
+            local.Remove(key);
+        }
     }
 
     private static bool OpenBrowser(string url)

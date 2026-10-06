@@ -40,7 +40,7 @@ public sealed class UpdateLoopTests : IDisposable
 
     private void Workspace(string? mode)
     {
-        if (mode is not null) store.Set(UpdatePolicy.WorkspaceKey, mode);
+        if (mode is not null) TestWorkspace.Set(kit.Config, store, UpdatePolicy.WorkspaceKey, mode);
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public sealed class UpdateLoopTests : IDisposable
         var forcedLoop = new UpdateLoop(forced.Config, forcedStore, forced.Updater, () => ++calls > 0, clock);
         forced.Publish(forced.Offer(forced.Zip()));
         SavedSettings.SaveAutoUpdate(forced.Config, UpdateModes.On);
-        forcedStore.Set(UpdatePolicy.WorkspaceKey, UpdateModes.On);
+        TestWorkspace.Set(forced.Config, forcedStore, UpdatePolicy.WorkspaceKey, UpdateModes.On);
         await forcedLoop.RunAsync(CancellationToken.None);
         Assert.Empty(forced.Api.Seen);
         Assert.Equal(0, calls);

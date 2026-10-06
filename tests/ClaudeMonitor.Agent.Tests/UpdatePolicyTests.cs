@@ -34,7 +34,7 @@ public sealed class UpdatePolicyTests : IDisposable
     public void Effective_is_the_lower_of_the_two_and_unknown_is_off(string machine, string? workspace, string expected)
     {
         using var store = new LocalStore(home.Config.DatabasePath);
-        if (workspace is not null) store.Set(UpdatePolicy.WorkspaceKey, workspace);
+        if (workspace is not null) TestWorkspace.Set(home.Config, store, UpdatePolicy.WorkspaceKey, workspace);
         Assert.Equal(expected, UpdatePolicy.Effective(home.Config with { AutoUpdate = machine }, store));
     }
 

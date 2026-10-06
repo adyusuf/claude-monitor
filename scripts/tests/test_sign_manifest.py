@@ -78,6 +78,19 @@ class SigningTests(unittest.TestCase):
         text = sm.payload('test', '0.3.1', 'macos', 'arm64', mac['sha256'], '0.2.0')
         self.assertTrue(verifies(self.public, text, mac['signature']))
 
+    def test_linux_zips_are_signed_and_an_unknown_os_is_not(self):
+        import hashlib
+        for name, body in (('cm-agent-linux-x64.zip', b'three'), ('cm-agent-linux-arm64.zip', b'four'), ('cm-agent-freebsd-x64.zip', b'five')):
+            with open(os.path.join(self.dir.name, name), 'wb') as f:
+                f.write(body)
+        entries = {e['file']: e for e in self.manifest()['entries']}
+        self.assertEqual(sorted(entries), ['cm-agent-linux-arm64.zip', 'cm-agent-linux-x64.zip', 'cm-agent-macos-arm64.zip', 'cm-agent-windows-x64.zip'])
+        for arch, body in (('x64', b'three'), ('arm64', b'four')):
+            linux = entries[f'cm-agent-linux-{arch}.zip']
+            self.assertEqual((linux['os'], linux['arch'], linux['sha256']), ('linux', arch, hashlib.sha256(body).hexdigest()))
+            text = sm.payload('test', '0.3.1', 'linux', arch, linux['sha256'], '0.2.0')
+            self.assertTrue(verifies(self.public, text, linux['signature']))
+
     def test_the_signature_covers_every_field(self):
         mac = self.manifest()['entries'][0]
         good = dict(channel='test', version='0.3.1', os_name='macos', arch='arm64', sha256=mac['sha256'], min_supported='0.2.0')

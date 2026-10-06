@@ -42,7 +42,7 @@ public static class AgentEndpoints
     /// <summary>The newest signed build for the caller's OS and CPU; the agent checks the signature, the hash and the version itself.</summary>
     private static IResult Latest(string? os, string? arch, UpdateCatalog catalog)
     {
-        if (os is not ("macos" or "windows")) return Http.Invalid("os", "invalid_os");
+        if (os is null || !OsKinds.All.Contains(os)) return Http.Invalid("os", "invalid_os");
         if (arch is not ("arm64" or "x64")) return Http.Invalid("arch", "invalid_arch");
         return catalog.Latest(os, arch) is { } offer ? Results.Ok(offer) : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "no_update");
     }

@@ -69,7 +69,8 @@ public sealed class RunExecutorTests : IDisposable
             Environment.SetEnvironmentVariable("DOTNET_TEST_LEAK", null);
         }
 
-        var lines = h.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Order().ToList();
+        // On macOS the launcher shell (RunLauncher) cannot avoid exporting SHLVL when it execs; nothing else may be added.
+        var lines = h.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(l => !(OperatingSystem.IsMacOS() && l == "SHLVL=0")).Order().ToList();
         Assert.Equal([$"HOME={h.Home.Config.Home}", "LANG=C.UTF-8", "LC_ALL=C.UTF-8", "PATH=/usr/bin:/bin"], lines);
     }
 

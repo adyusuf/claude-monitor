@@ -14,7 +14,7 @@ public sealed partial class Updater
     private async Task<UpdateResult> ReplaceAndWatchAsync(UpdateOffer offer, string staged, CancellationToken ct)
     {
         var from = AgentConfig.Version;
-        var style = BinarySwap.Native;
+        var style = BinarySwap.For(config.UpdateOs);
         var wasRunning = daemon.IsRunning();
         var connected = Auth.Identity.Load(config).Connected;
         BinarySwap.Install(config.BinaryPath, staged, style);

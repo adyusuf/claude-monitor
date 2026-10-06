@@ -160,20 +160,18 @@ public sealed partial class ServiceInstaller
         if (os != OsKinds.Windows) Step("hand the home to the service account", Chown(), [$"{l.Account}:{l.Account}", l.Home]);
     }
 
-    /// <summary>Waits until "sc query" no longer reports the service as running or stopping (at most StopWait).</summary>
+    /// <summary>Waits until "sc query" no longer reports the service as running or stopping (at most stopWaitSeconds, one look a second).</summary>
     private void WaitStopped()
     {
-        for (var i = 0; i < StopWaitSeconds; i++)
+        for (var i = 0; i < stopWaitSeconds; i++)
         {
             var state = (read ?? CaptureTool)(Sc(), WindowsServiceSetup.Query()) ?? "";
             if (!state.Contains("RUNNING", StringComparison.Ordinal) && !state.Contains("STOP_PENDING", StringComparison.Ordinal)) return;
-            Thread.Sleep(TimeSpan.FromSeconds(1));
+            (sleep ?? Thread.Sleep)(TimeSpan.FromSeconds(1));
         }
 
-        output.WriteLine($"The old service did not stop within {StopWaitSeconds} s; continuing.");
+        output.WriteLine($"The old service did not stop within {stopWaitSeconds} s; continuing.");
     }
-
-    private const int StopWaitSeconds = 30;
 
     private void WritePolicy(ServiceLayout l, string execLevel)
     {

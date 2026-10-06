@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Push;
@@ -83,12 +84,71 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
 
     public async Task SettingsAsync(CancellationToken ct)
     {
+        // The tag is the workspace agent.json names as the pass begins, not the one in the answer: a pass that `cm-agent login`
+        // overtakes is then tagged with the old workspace and reads as off, while an agent moved to another workspace on the web
+        // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
+        var workspace = Identity.Peek(config)?.WorkspaceId;
+        // Stamped with the time the read BEGAN: the server answers with the switch as of some moment during the request, so a
+        // stamp taken when the answer arrives could look newer than a decision the answer does not reflect.
+        var began = clock.GetUtcNow();
         var s = await api.SettingsAsync(ct);
-        store.Set("settings.mask_secrets", s.MaskSecrets ? "true" : "false");
-        store.Set("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture));
-        store.Set(UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate));
-        MachineMonitor.Remember(store, s);
-        store.Set(ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false");
+        // One transaction for the values AND their tag: two passes (this loop's and the stream's re-read) on separate connections
+        // cannot leave one pass's values under the other's tag.
+        List<(string Key, string Value)> entries =
+        [
+            ("settings.mask_secrets", s.MaskSecrets ? "true" : "false"),
+            ("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
+            (UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate)),
+            .. MachineMonitor.Entries(s),
+            (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
+        ];
+        if (workspace is { } w) entries.Add(WorkspaceSettings.TagEntry(w));
+        store.SetMany(entries);
+        StampSettingsRead(began);
+    }
+
+    // UTC ticks of the newest successful read's start. Two passes (this loop's and the stream's re-read) may overlap, so only a
+    // later start replaces it: the larger value wins.
+    private long lastSettingsTicks = DateTimeOffset.MinValue.UtcTicks;
+
+    private DateTimeOffset LastSettingsAt => new(Interlocked.Read(ref lastSettingsTicks), TimeSpan.Zero);
+
+    private void StampSettingsRead(DateTimeOffset began)
+    {
+        long seen;
+        do seen = Interlocked.Read(ref lastSettingsTicks);
+        while (began.UtcTicks > seen && Interlocked.CompareExchange(ref lastSettingsTicks, began.UtcTicks, seen) != seen);
+    }
+
+    /// <summary>
+    /// A settings read whose request began this recently is reused when a run finds the switch off: a burst of runs costs one read.
+    /// The age is measured from the time the read began, not from when its answer arrived.
+    /// </summary>
+    public static readonly TimeSpan SettingsReuse = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// How far a run's decision time (the server's clock) may be from the agent's clock for a cached settings read to still count as
+    /// begun after it: the read is trusted only when it began at least this much later. A server clock ahead of the agent's just costs
+    /// an extra read (it fails toward reading); one behind it by more than this could leave a read taken just before the decision
+    /// looking later, which is why the margin is there. A few seconds is far beyond what synchronised hosts differ by.
+    /// </summary>
+    public static readonly TimeSpan DecisionSkew = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// The workspace's remote-runs switch for this run. Unread, another workspace's or off is no; but a switch an admin has
+    /// just turned on is only learned at the next settings pass (SettingsEvery), so before refusing, the settings are read
+    /// again once. A read under <see cref="SettingsReuse"/> old is reused only if it was taken after the run was decided: the
+    /// server checks the switch when it approves, so a run approved after the read may have a switch the read does not show.
+    /// A failed read is not swallowed: the stream reconnects and the server replays the approved run.
+    /// </summary>
+    private async Task<bool> RemoteRunsOnAsync(RunMessage run, CancellationToken ct)
+    {
+        if (WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true") return true;
+        var now = clock.GetUtcNow();
+        var readBegan = LastSettingsAt;
+        var decidedAfterRead = run.DecidedAt is { } decided && readBegan < decided + DecisionSkew;
+        if (now - readBegan >= SettingsReuse || decidedAfterRead) await SettingsAsync(ct);
+        return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
     }
 
     /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
@@ -134,7 +194,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.Run:
                 var run = data.Deserialize<RunMessage>(ApiClient.Json)!;
-                if (Runs is null || store.Get(MachineMonitor.RemoteRunsKey) == "false")
+                if (Runs is null || !await RemoteRunsOnAsync(run, ct))
                 {
                     if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
                     {

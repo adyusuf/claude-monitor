@@ -37,13 +37,14 @@ internal sealed unsafe partial class WindowsRunProcess : RunProcessBase
     private readonly nint _process;
     private int _jobClosed;
 
-    private WindowsRunProcess(Stream stdout, Stream stderr, nint job, nint process) : base(stdout, stderr)
+    private WindowsRunProcess(Stream stdout, Stream stderr, nint job, nint process, Action<string>? log) : base(stdout, stderr, log)
     {
         _job = job;
         _process = process;
     }
 
-    public static WindowsRunProcess Start(string exe, string commandLine, string cwd, IReadOnlyDictionary<string, string> env)
+    public static WindowsRunProcess Start(string exe, string commandLine, string cwd, IReadOnlyDictionary<string, string> env,
+        Action<string>? log = null)
     {
         var job = CreateJob();
         var stdout = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
@@ -55,7 +56,7 @@ internal sealed unsafe partial class WindowsRunProcess : RunProcessBase
                 stdout.ClientSafePipeHandle.DangerousGetHandle(), stderr.ClientSafePipeHandle.DangerousGetHandle(), job);
             stdout.DisposeLocalCopyOfClientHandle(); // else the read end never sees the end of the output
             stderr.DisposeLocalCopyOfClientHandle();
-            var run = new WindowsRunProcess(stdout, stderr, job, process);
+            var run = new WindowsRunProcess(stdout, stderr, job, process, log);
             run.BeginWait();
             return run;
         }

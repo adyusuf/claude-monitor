@@ -48,7 +48,14 @@ target daemon --executes, masks, caps--> API --> requester's daemon --> local SQ
 A run executes only when **all** hold; each one defaults to "no".
 
 1. **Workspace switch** `remote_runs_enabled`, set by an admin (default off). Checked at create, delivery and exec;
-   turning it off cancels pending runs.
+   turning it off cancels pending runs. The target's own copy counts only when it was read for the workspace in its
+   `agent.json` (the daemon tags the stored settings with the workspace `agent.json` named when the read began, so an agent
+   moved on the web keeps working and a read that a login overtakes does not count); unread or another workspace's is off,
+   and `cm-agent login`/`logout` forget it. A settings pass writes its values and the tag in one SQLite transaction, so two
+   overlapping passes cannot leave one pass's value under the other's tag. Before refusing a run for an off or unread copy,
+   the target reads the settings once more (at most once per 10 s), so a switch an admin has just turned on is not missed until the next settings pass;
+   a cached read is reused only if it was taken after the run's `decidedAt` (server time, added to the run message; the
+   agent allows 2 s of clock difference and otherwise reads again; an older API sends none and keeps the 10 s rule).
 2. **Local exec level on the target**, `cm-agent install --exec off|argv|shell` (default `off`; `shell` is a separate,
    stronger opt-in). In service mode it lives in an **admin-owned file the service account cannot write**, with an
    optional local ceiling (allowed executables and roots). The API can never raise it. Shell text cannot be held to a
@@ -89,6 +96,27 @@ A run executes only when **all** hold; each one defaults to "no".
   executable pinned and owned by root or Administrators, its folders not writable by the service account). A grant a
   Claude session asks for is linted by the API for options that execute (`-exec`, `--to-command`, `-o ProxyCommand`
   and similar) and refused if it has one.
+- **Windows trust of the executable** (06/10/2026): the `.exe` and every folder above it up to the drive root must be
+  **owned by an admin principal** (Administrators `S-1-5-32-544`, SYSTEM `S-1-5-18`, TrustedInstaller
+  `S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464`) and carry **no ALLOW rule that applies to the path
+  and grants a write-like right to any other SID**: WriteData/CreateFiles, AppendData/CreateDirectories,
+  WriteAttributes, WriteExtendedAttributes, Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership
+  (Write, Modify and FullControl are made of these), and the unmapped GENERIC_ALL/GENERIC_WRITE. Deny rules neither
+  fail nor excuse anything. An **inherit-only** rule does not apply to the path it sits on (only to children, which
+  have their own ACL read), so Program Files' CREATOR OWNER rule and a drive root's inherit-only Authenticated Users
+  rule pass; CREATOR OWNER in a rule that does apply is refused because it is not an admin principal. The one
+  exception to the inherit-only exemption is the **executable's own folder**: its files (a DLL or manifest beside
+  the executable) are not in the chain, so an inherit-only rule that files inherit (ObjectInherit) counts there with
+  the full list, except CREATOR OWNER (it only becomes the creating account's rights); a container-inherit-only
+  rule there, and any inherit-only rule on the executable or above its folder, stay exempt. For folders
+  **above the executable's own folder** CreateFiles and CreateDirectories are not counted: the default drive root
+  lets every signed-in user create folders, which cannot replace the entry leading to the program, and counting it
+  would refuse every program on a default install; the executable and its own folder (a planted DLL or manifest
+  beside it) use the full list. Anything unreadable is untrusted, and so is a Windows target on a host that cannot
+  read ACLs. The decision is a pure function on SID/mask snapshots (`WindowsAclVerdict`, tested on any OS); only
+  `WindowsAclReader` touches the Windows API and **it has not run on a real Windows host**. Not covered: a change
+  between this check and the exec (the same gap as on Unix), and ACE order (the decision ignores it on purpose:
+  any applicable write allow to a non-admin refuses, whatever denies exist).
 - A grant is scoped to a **grantee user** (optionally one requester agent), expires within 90 days, can be revoked at
   once, and counts its uses. A grant asked for by Claude is only a request until the owner approves it, after
   re-authenticating within 10 minutes.
@@ -113,8 +141,31 @@ a job runs only when asked (a schedule would be an autonomous action and needs i
   120 s, at most 3600 s, measured on a monotonic clock; a run also carries a `not_after` the target enforces.
 - **The whole process tree dies** on timeout or cancel: Linux and macOS start the run in its own process group
   (SIGTERM, then SIGKILL after 5 s; the systemd unit uses `KillMode=control-group`); Windows puts it in a Job Object
-  with kill-on-close, a process limit and a memory limit, created suspended and resumed after assignment. A process
-  that escapes on macOS is a documented residual risk.
+  with kill-on-close, a process limit and a memory limit, created suspended and resumed after assignment.
+- **A process that leaves the process group (`setsid`)** is ended by the service's cgroup on Linux. macOS has no cgroup, so
+  there a **descendant tracker** polls every 250 ms (`ExecTrackEvery`, 50 ms to 5 s, zero turns it off) while the run
+  lives, through libproc: it records every descendant of the lead by following parent pids (from the lead and from what
+  it already recorded), each as pid **and** start time. A kill polls once more first, signals the process group, then
+  every recorded descendant that is still the same process (same start time, so a recycled pid is never signalled) and
+  has left the group, with the same signal (SIGTERM, later SIGKILL); the poller stops when the run is disposed. **This is
+  best effort:** a process that double-forks and re-parents to launchd between two polls (or whose parent dies before
+  it is seen) is never recorded and can still escape, as can one created after the last poll. The recorded set is
+  capped at 4096. Linux does not start the tracker.
+- **Resource limits on macOS.** `posix_spawn` has no rlimit attribute there, and `setrlimit` on the daemon is unsafe (the
+  CPU limit is cumulative and would signal the daemon), so a run starts through a trusted launcher: `/bin/sh` sets the
+  limits with `ulimit` (hard, so the run cannot raise them) and then **execs the target in the same process**. The pid,
+  the process group and the kill logic are unchanged; the target comes in as `"$0"`, its argv[0] as `"$1"` and its
+  arguments as `"$@"`, never as script text, so argv mode still never goes through shell parsing (shell mode runs
+  `/bin/sh -c <text>` as the target, as before). The limits are: CPU seconds = (timeout + kill grace) × the cores a run
+  may use (`ExecCpuCores`, default the processor count), which a multi-threaded run inside its timeout never meets but a
+  process that escaped the kill cannot exceed for ever (SIGXCPU); the largest file it may write (`ExecFileSizeMax`,
+  default 1 GiB, SIGXFSZ); open descriptors (`ExecOpenFilesMax`, default 1024, at most 10240); core files off. The
+  values are bounded in `RunLimits.For`. A limit the system refuses fails the run with exit 126; it never runs unlimited.
+  Known differences from a direct start: the launcher shell exports `SHLVL=0` to the target, a program that is missing
+  or not executable is still refused as `spawn_failed` (checked before the launcher starts), and `ulimit -f` counts
+  1024-byte blocks in macOS bash (a test writes past the limit to catch a change). **Linux does not use the launcher**:
+  the service unit is the place for `Limit*` settings and the cgroup, and `/bin/sh` there is often dash, which cannot
+  keep argv[0] through `exec`.
 - **Output** is read as a stream: the first 256 KB and a tail ring are kept, a run that prints more than 64 MB is
   killed (`output_limit`), and at most 1 MB per run is stored. Secrets are masked on whole lines (a pattern may span
   chunks), **always**, whatever the workspace's masking setting; control characters and ANSI sequences are stripped;
@@ -206,9 +257,7 @@ exists, so a rollback of that slice is code-only.
   account, a multi-instance API broker.
 - **Target-side checks not in v1** (security review items left open while building): refusing a grant root whose
   folder chain is writable by a non-admin (it would refuse ordinary app-owned log folders), a pinned hash of the
-  executable, an ACL ownership check of the executable on Windows (Unix checks owner and modes), and resource limits
-  (rlimits) for runs on macOS. A process that leaves its process group with `setsid` survives a kill on macOS; on
-  Linux the service's cgroup ends it.
-- **Unverified platforms:** the Linux and Windows paths of the executor, the metrics and the service installer compile
-  and follow the platform contracts but have only run on macOS; they are verified on a Linux and a Windows Server
+  executable.
+- **Unverified platforms:** the Linux and Windows paths of the executor (on Windows including the ACL reader of the executable
+  check), the metrics and the service installer compile and follow the platform contracts but have only run on macOS; they are verified on a Linux and a Windows Server
   machine before a target there is trusted.
