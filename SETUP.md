@@ -152,6 +152,23 @@ cm-agent config auto-update off|check|on # what the daemon may do by itself (def
 3. Deploy copies `downloads/` as before (`docs/deploy-windows.md`). **The server offers whatever its web root holds**, so deploy test builds to test and prod builds to prod.
 4. Agents already installed at that channel take it when a person runs `cm-agent update` or when `auto-update` allows it.
 
+## Updating Claude Code (optional, off by default)
+
+Design and limits: [ADR-0005](docs/adr-0005-claude-code-update.md). The agent can run Claude Code's own `claude update`, and nothing else:
+it never downloads or replaces a Claude binary and never ends or restarts a session (running sessions keep their version until their
+owner restarts them). It needs BOTH switches, and a CLI install (npm or native; the desktop app updates itself and is never touched):
+
+```bash
+cm-agent config claude-update on         # this machine; the workspace admin must also tick "Allow agents to update Claude Code"
+cm-agent claude-update cancel            # stop a countdown that is running (not tried again for a day)
+cm-agent status                          # shows claude-update: on/off, a running countdown, the last result and versions
+```
+
+It runs only when every Claude session on the machine has been idle for 10 minutes, after a 5-minute countdown announced in `agent.log`,
+`cm-agent status` and (macOS only) a desktop notification. `claude update` has no dry run, so an enabled machine gets this notice about
+once a day even when Claude Code is current. Not verified on this repository's machines: the native-installer paths, Windows, and the
+Windows notification (not built).
+
 ## Browser tests (e2e)
 
 Playwright (`e2e/`, Chromium and WebKit) drives the real web app and API. It is optional (global #33): the

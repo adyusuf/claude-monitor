@@ -10,7 +10,7 @@ namespace ClaudeMonitor.Agent.Auth;
 /// it; tokens are in the OS credential store.
 /// </summary>
 public sealed record Identity(string MachineKey, string? Server = null, Guid? AgentId = null, Guid? WorkspaceId = null,
-    int? StopWaitSeconds = null, bool? Push = null, string? AutoUpdate = null)
+    int? StopWaitSeconds = null, bool? Push = null, string? AutoUpdate = null, bool? ClaudeUpdate = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 

@@ -35,7 +35,7 @@ the EF Core migrations of phase 1 implement it and this file follows them.
 | `workspaces` | `id`, `name`, `name_search`, `created_by`, `created_at`, `status` (`active`, `archived`) | |
 | `workspace_members` | `workspace_id`, `user_id`, `role` (`owner`, `admin`, `member`, `viewer`), `joined_at`, `removed_at` | PK (`workspace_id`, `user_id`); (`user_id`) |
 | `workspace_invitations` | `id`, `workspace_id`, `email_normalized`, `role`, `token_hash`, `invited_by`, `created_at`, `expires_at`, `accepted_at`, `revoked_at` | UNIQUE `token_hash`; (`workspace_id`) |
-| `workspace_settings` | `workspace_id`, `mask_secrets` (default true), `retention_days` (default 90), `event_max_bytes`, `agent_update` (`off` default, `check`, `on`; CHECK `ck_workspace_settings_agent_update`; the most an agent may do about updating itself, ADR-0004), `updated_at`, `updated_by` | PK `workspace_id` |
+| `workspace_settings` | `workspace_id`, `mask_secrets` (default true), `retention_days` (default 90), `event_max_bytes`, `agent_update` (`off` default, `check`, `on`; CHECK `ck_workspace_settings_agent_update`; the most an agent may do about updating itself, ADR-0004), `claude_update` (boolean, default false; whether agents may update Claude Code when idle, ADR-0005), `updated_at`, `updated_by` | PK `workspace_id` |
 
 A workspace always has at least one owner; the API refuses the change that would leave it without one.
 
