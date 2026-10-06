@@ -190,7 +190,7 @@ cm-agent config auto-update off|check|on # what the daemon may do by itself (def
 1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `cm-agent-update-<channel>`) and is never written to a file; the public half is printed:
    `python3 scripts/sign_manifest.py keygen --channel test` and `... --channel prod`. Save the printed line as `deploy/update-keys/<channel>.pub` and commit it (it is public by design).
 2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
-   The channel's public key is built into the agent; `out/downloads` gets the four zips, `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
+   The channel's public key is built into the agent; `out/downloads` gets the six zips (macOS, Windows, Linux), `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
 3. Deploy copies `downloads/` as before (`docs/deploy-windows.md`). **The server offers whatever its web root holds**, so deploy test builds to test and prod builds to prod.
 4. Agents already installed at that channel take it when a person runs `cm-agent update` or when `auto-update` allows it.
 
