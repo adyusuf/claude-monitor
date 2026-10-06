@@ -9,9 +9,11 @@ namespace ClaudeMonitor.Agent.Install;
 /// </summary>
 public sealed partial class ServiceInstaller(TextWriter output, Func<string, IReadOnlyList<string>, int> run, string os, bool isAdmin,
     ServiceLayout? layout = null, string? definitionPath = null, string? systemdRunDir = null,
-    Func<string, IReadOnlyList<string>, string?>? read = null)
+    Func<string, IReadOnlyList<string>, string?>? read = null, int stopWaitSeconds = ServiceInstaller.DefaultStopWaitSeconds,
+    Action<TimeSpan>? sleep = null)
 {
     public const int ToolNotFound = 127;
+    public const int DefaultStopWaitSeconds = 30;
 
     private const string Systemctl = "/usr/bin/systemctl";
     private const string UserAdd = "/usr/sbin/useradd";
