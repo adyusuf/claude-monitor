@@ -152,8 +152,7 @@ public static class WorkspaceEndpoints
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
         await db.SaveChangesAsync(http.RequestAborted);
         var notices = new List<Action>();
-        foreach (var agentId in agents) await RemoteCleanup.ForAgentAsync(db, broker, agentId, self, now, http.RequestAborted, notices);
-        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices);
+        await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices, agents);
         await tx.CommitAsync(http.RequestAborted);
         notices.ForEach(n => n());
         foreach (var agentId in agents) broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
@@ -168,11 +167,7 @@ public static class WorkspaceEndpoints
         var active = await db.Agents
             .Where(a => a.WorkspaceId == workspaceId && a.UserId == userId && a.Status == AgentStatuses.Active)
             .Select(a => a.Id).ToListAsync(http.RequestAborted);
-        foreach (var agentId in active.Order())
-        {
-            await db.Agents.Where(a => a.Id == agentId && a.Status == AgentStatuses.Active)
-                .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevel, a => a.ExecLevel), http.RequestAborted);
-        }
+        await RemoteLocks.AgentsAsync(db, active, http.RequestAborted);
 
         var agents = await db.Agents
             .Where(a => a.WorkspaceId == workspaceId && a.UserId == userId && a.Status == AgentStatuses.Active)

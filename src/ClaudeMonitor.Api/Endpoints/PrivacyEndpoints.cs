@@ -165,6 +165,7 @@ public static class PrivacyEndpoints
 
         var now = clock.GetUtcNow();
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await PrivacyRemoteData.LockAsync(db, userId, ct);
         var email = user.EmailNormalized;
         var agentIds = await db.Agents.Where(a => a.UserId == userId).Select(a => a.Id).ToListAsync(ct);
         var sessions = await db.HarnessSessions.Where(s => agentIds.Contains(s.AgentId))
