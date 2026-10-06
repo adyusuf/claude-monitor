@@ -49,8 +49,10 @@ public static class JobQueries
                           {
                               j,
                               Proposer = u.DisplayName,
-                              Host = (from pa in db.Agents join pm in db.Machines on pa.MachineId equals pm.Id
-                                      where pa.Id == j.ProposedByAgentId select pm.Hostname).FirstOrDefault(),
+                              Host = (from pa in db.Agents
+                                      join pm in db.Machines on pa.MachineId equals pm.Id
+                                      where pa.Id == j.ProposedByAgentId
+                                      select pm.Hostname).FirstOrDefault(),
                           }).Take(limit).ToListAsync(ct);
         return rows.Select(x =>
         {

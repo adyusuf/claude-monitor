@@ -25,7 +25,13 @@ public static class MachineQueries
                           orderby a.ServiceMode descending, m.Hostname, a.Id
                           select new
                           {
-                              a.Id, m.Hostname, m.Os, u.DisplayName, a.ExecLevel, a.ServiceMode, a.LastHeartbeatAt,
+                              a.Id,
+                              m.Hostname,
+                              m.Os,
+                              u.DisplayName,
+                              a.ExecLevel,
+                              a.ServiceMode,
+                              a.LastHeartbeatAt,
                               Alerts = db.MachineAlerts.Count(x => x.AgentId == a.Id && x.State == AlertStates.Open),
                           }).Take(500).ToListAsync(ct);
         var ids = rows.Select(r => r.Id).ToList();

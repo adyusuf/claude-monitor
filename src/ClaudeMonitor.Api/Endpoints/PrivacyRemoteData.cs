@@ -59,14 +59,38 @@ public static class PrivacyRemoteData
         PrivacyEndpoints.Write(w, "grants", await db.MachineGrants.AsNoTracking().Where(g => g.OwnerUserId == userId || g.GranteeUserId == userId)
             .OrderBy(g => g.CreatedAt).Select(g => new
             {
-                g.Id, g.TargetAgentId, g.OwnerUserId, g.GranteeUserId, g.Template, g.Cwd, g.MaxTimeoutSeconds, g.Reason, g.Status,
-                g.CreatedAt, g.ExpiresAt, g.DecidedAt, g.RevokedAt, g.UseCount, g.LastUsedAt,
+                g.Id,
+                g.TargetAgentId,
+                g.OwnerUserId,
+                g.GranteeUserId,
+                g.Template,
+                g.Cwd,
+                g.MaxTimeoutSeconds,
+                g.Reason,
+                g.Status,
+                g.CreatedAt,
+                g.ExpiresAt,
+                g.DecidedAt,
+                g.RevokedAt,
+                g.UseCount,
+                g.LastUsedAt,
             }).ToListAsync(ct));
         PrivacyEndpoints.Write(w, "jobs", await db.MachineJobs.AsNoTracking().Where(j => j.OwnerUserId == userId || j.ProposedByUserId == userId)
             .OrderBy(j => j.CreatedAt).Select(j => new
             {
-                j.Id, j.TargetAgentId, j.OwnerUserId, j.ProposedByUserId, j.Name, j.Argv, j.Cwd, j.TimeoutSeconds, j.Reason, j.Status,
-                j.CreatedAt, j.DecidedAt, j.RetiredAt,
+                j.Id,
+                j.TargetAgentId,
+                j.OwnerUserId,
+                j.ProposedByUserId,
+                j.Name,
+                j.Argv,
+                j.Cwd,
+                j.TimeoutSeconds,
+                j.Reason,
+                j.Status,
+                j.CreatedAt,
+                j.DecidedAt,
+                j.RetiredAt,
             }).ToListAsync(ct));
 
         var agentIds = db.Agents.AsNoTracking().Where(a => a.UserId == userId).Select(a => a.Id);

@@ -55,8 +55,10 @@ public static class GrantQueries
                           {
                               g,
                               Grantee = u.DisplayName,
-                              Host = (from ra in db.Agents join rm in db.Machines on ra.MachineId equals rm.Id
-                                      where ra.Id == g.RequestedByAgentId select rm.Hostname).FirstOrDefault(),
+                              Host = (from ra in db.Agents
+                                      join rm in db.Machines on ra.MachineId equals rm.Id
+                                      where ra.Id == g.RequestedByAgentId
+                                      select rm.Hostname).FirstOrDefault(),
                           }).Take(limit).ToListAsync(ct);
         return rows.Select(x =>
         {

@@ -126,7 +126,8 @@ public sealed partial class ServiceInstaller
         undo.Add(("account created", () =>
         {
             foreach (var args in LaunchdDaemon.AccountDeleteCommands(l)) run(Dscl, args); // a half-made account may lack either record
-        }));
+        }
+        ));
         foreach (var args in LaunchdDaemon.AccountCommands(l, free[0])) Step($"create the {l.Account} account", Dscl, args);
     }
 
