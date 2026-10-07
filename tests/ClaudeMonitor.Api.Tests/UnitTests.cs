@@ -74,23 +74,26 @@ public sealed class UnitTests
     {
         var user = new User();
         user.PasswordHash = Secrets.HashPassword(user, "the password");
-        static TimeSpan Median(Func<bool> verify)
+        // The fastest of several samples, not a median: CPU contention (other tests running in parallel) only ever ADDS time, so the
+        // minimum is the truest cost of the work itself, where a median of a few samples can still be inflated by a busy machine.
+        static TimeSpan Fastest(Func<bool> verify)
         {
             verify(); // warm up: the first call pays for JIT and for the dummy hash being made
-            var times = new List<TimeSpan>();
-            for (var i = 0; i < 5; i++)
+            var fastest = TimeSpan.MaxValue;
+            for (var i = 0; i < 9; i++)
             {
                 var start = System.Diagnostics.Stopwatch.GetTimestamp();
                 Assert.False(verify());
-                times.Add(System.Diagnostics.Stopwatch.GetElapsedTime(start));
+                var took = System.Diagnostics.Stopwatch.GetElapsedTime(start);
+                if (took < fastest) fastest = took;
             }
 
-            return times.Order().ElementAt(2);
+            return fastest;
         }
 
-        var known = Median(() => Secrets.VerifyPasswordOrDummy(user, "not the password"));
-        var unknown = Median(() => Secrets.VerifyPasswordOrDummy(null, "not the password"));
-        var noPassword = Median(() => Secrets.VerifyPasswordOrDummy(new User(), "not the password"));
+        var known = Fastest(() => Secrets.VerifyPasswordOrDummy(user, "not the password"));
+        var unknown = Fastest(() => Secrets.VerifyPasswordOrDummy(null, "not the password"));
+        var noPassword = Fastest(() => Secrets.VerifyPasswordOrDummy(new User(), "not the password"));
         // Without the dummy verification an unknown address would return in microseconds; the real work factor is
         // milliseconds. The margin is wide (a quarter) so a busy machine does not make this flaky.
         Assert.True(unknown >= known * 0.25, $"unknown {unknown.TotalMilliseconds:F2} ms vs known {known.TotalMilliseconds:F2} ms");

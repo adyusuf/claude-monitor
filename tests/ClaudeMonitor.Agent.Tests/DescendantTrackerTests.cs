@@ -18,6 +18,7 @@ public sealed class DescendantTrackerTests
         private readonly Dictionary<int, ProcessStamp> procs = [];
         private int listings;
         public Exception? Failure { get; set; }
+        public (int Pid, Exception Failure)? FindFailure { get; set; }
         public int Listings => Volatile.Read(ref listings);
 
         public void Add(int pid, int parent, int group = Lead, long start = 1) { lock (gate) procs[pid] = new ProcessStamp(pid, start, group, parent); }
@@ -26,6 +27,7 @@ public sealed class DescendantTrackerTests
 
         public ProcessStamp? Find(int pid)
         {
+            if (FindFailure is { } broken && broken.Pid == pid) throw broken.Failure;
             lock (gate) return procs.GetValueOrDefault(pid);
         }
 
@@ -165,6 +167,24 @@ public sealed class DescendantTrackerTests
 
         Assert.Throws<IOException>(() => tracker.Signal(Term));
         Assert.Equal([102, 103], sent.Items.Select(i => i.Pid).Order());
+    }
+
+    [Fact]
+    public void A_descendant_whose_lookup_fails_with_any_exception_does_not_keep_the_others_from_being_signalled()
+    {
+        var (tracker, table, sent) = Make();
+        using (tracker)
+        {
+            table.Add(101, Lead, group: 101);
+            table.Add(102, Lead, group: 102);
+            tracker.Poll(); // both recorded, 101 first
+            table.FindFailure = (101, new InvalidOperationException("lookup broke"));
+
+            var thrown = Assert.Throws<InvalidOperationException>(() => tracker.Signal(Term)); // the first failure, at the end
+
+            Assert.Equal("lookup broke", thrown.Message);
+            Assert.Equal([(102, Term)], sent.Items);
+        }
     }
 
     [Fact]
