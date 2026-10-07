@@ -87,10 +87,18 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         // The tag is the workspace agent.json names as the pass begins, not the one in the answer: a pass that `cm-agent login`
         // overtakes is then tagged with the old workspace and reads as off, while an agent moved to another workspace on the web
         // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
-        var workspace = Identity.Peek(config)?.WorkspaceId;
         // Stamped with the time the read BEGAN: the server answers with the switch as of some moment during the request, so a
-        // stamp taken when the answer arrives could look newer than a decision the answer does not reflect.
-        var began = clock.GetUtcNow();
+        // stamp taken when the answer arrives could look newer than a decision the answer does not reflect. The tag and the
+        // stamp are taken together under the gate StoreRead uses: a pass pre-empted between the two could otherwise carry an
+        // older workspace than a pass that began before it, and its later stamp would then make StoreRead drop the newer one.
+        Guid? workspace;
+        DateTimeOffset began;
+        lock (settingsGate)
+        {
+            workspace = Identity.Peek(config)?.WorkspaceId;
+            began = clock.GetUtcNow();
+        }
+
         var s = await api.SettingsAsync(ct);
         // One transaction for the values AND their tag: two passes (this loop's and the stream's re-read) on separate connections
         // cannot leave one pass's values under the other's tag.
