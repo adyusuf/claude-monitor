@@ -167,4 +167,35 @@ public sealed class UnixKillPollFailureTests
         Assert.Contains(nameof(InvalidOperationException), line, StringComparison.Ordinal);
         Assert.DoesNotContain(SecretPath, line, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task When_the_freeze_and_then_the_kill_time_poll_both_fail_the_caller_gets_the_freeze_failure_and_the_kill_is_still_sent()
+    {
+        if (!ExecFixture.Unix) return;
+        var sent = new List<(int Pid, int Signal)>();
+        var lines = new List<string>();
+        Table? table = null;
+        DescendantTracker? tracker = null;
+        await using var run = UnixRunProcess.Start("/bin/sleep", ["sleep", "300"], Path.GetTempPath(), Env, log: lines.Add, trackerFor: pid =>
+        {
+            table = new Table(pid);
+            return tracker = new DescendantTracker(pid, table, (target, signal) =>
+            {
+                lock (sent) sent.Add((target, signal));
+                if (signal != Stop) return;
+                table.Failure = new IOException("table broke"); // the freeze's next poll and the kill-time poll fail ...
+                throw new InvalidOperationException("stop broke"); // ... after this, the FIRST failure
+            }, TimeSpan.Zero);
+        });
+        tracker!.Poll();
+
+        var thrown = Assert.Throws<InvalidOperationException>(run.KillNow);
+
+        Assert.Equal("stop broke", thrown.Message); // not the later poll's IOException
+        var exit = await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Equal(Kill, exit.Signal);
+        Assert.Equal([(Child, Stop), (Child, Kill)], sent);
+        var line = Assert.Single(lines); // one line per kill: the freeze's
+        Assert.Contains(nameof(InvalidOperationException), line, StringComparison.Ordinal);
+    }
 }
