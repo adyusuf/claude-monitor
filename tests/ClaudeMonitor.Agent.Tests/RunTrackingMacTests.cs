@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using ClaudeMonitor.Agent.Exec;
 using ClaudeMonitor.Contracts;
@@ -18,6 +19,24 @@ public sealed class RunTrackingMacTests : IDisposable
     private readonly string dir = Path.Combine(Path.GetTempPath(), "cm-track-" + Guid.NewGuid().ToString("N"));
     private readonly List<int> cleanup = [];
 
+    private const int Esrch = 3;
+    private const int ForkedBeforeKill = 10;
+    private static readonly TimeSpan TeardownWait = TimeSpan.FromSeconds(10);
+
+    // The lead forks a child that starts a session of its own (setsid) and sleeps, every 10 ms for 3 seconds, and appends each
+    // child's pid to the file named by its first argument; then it sleeps itself.
+    private const string ForkerScript = """
+        use POSIX; open(F, ">>$ARGV[0]"); select((select(F), $| = 1)[0]);
+        my $end = time + 3;
+        while (time < $end) {
+            my $pid = fork();
+            if ($pid == 0) { POSIX::setsid(); exec("/bin/sleep", "300"); exit 1 }
+            print F "$pid\n";
+            select(undef, undef, undef, 0.01);
+        }
+        sleep 300;
+        """;
+
     public RunTrackingMacTests() => Directory.CreateDirectory(dir);
 
     public void Dispose()
@@ -29,6 +48,25 @@ public sealed class RunTrackingMacTests : IDisposable
     private static bool Available => OperatingSystem.IsMacOS() && File.Exists(Perl);
 
     private string PidFile => Path.Combine(dir, "escaped.pid");
+
+    private string ForkedPids => Path.Combine(dir, "forked.pids");
+
+    // Whole lines only: the lead may be in the middle of writing the last one.
+    private List<int> ReadForkedPids()
+    {
+        if (!File.Exists(ForkedPids)) return [];
+        var text = File.ReadAllText(ForkedPids);
+        return [.. text[..(text.LastIndexOf('\n') + 1)].Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => int.Parse(l, System.Globalization.CultureInfo.InvariantCulture))];
+    }
+
+    // kill(pid, 0): nothing is sent, ESRCH says the process is gone (a zombie still exists until launchd reaps it, which the wait absorbs).
+    private static bool Exists(int pid) => kill(pid, 0) == 0 || Marshal.GetLastPInvokeError() != Esrch;
+
+#pragma warning disable SYSLIB1054 // the test project does not allow unsafe code, which LibraryImport needs; this is a test-only call
+    [DllImport("libc", SetLastError = true)]
+    private static extern int kill(int pid, int signal);
+#pragma warning restore SYSLIB1054
 
     // The lead (perl) forks a child that starts a session of its own, writes its pid and sleeps; the lead sleeps too.
     private IRunProcess StartEscaper(TimeSpan trackEvery) => ProcessTree.Start(Perl,
@@ -75,6 +113,30 @@ public sealed class RunTrackingMacTests : IDisposable
         run.Kill();
 
         Assert.True(await ExecHarness.UntilAsync(() => !ExecHarness.IsAlive(pid)), $"process {pid} survived SIGTERM");
+    }
+
+    [Fact]
+    public async Task KillNow_ends_every_session_leader_a_fork_loop_creates_while_the_kill_is_sent()
+    {
+        if (!Available) return;
+        var pids = new List<int>();
+        try
+        {
+            await using var run = ProcessTree.Start(Perl, ["-e", ForkerScript, ForkedPids], dir, Env, trackEvery: Fast);
+            Assert.True(await ExecHarness.UntilAsync(() => ReadForkedPids().Count >= ForkedBeforeKill), "the fork loop did not get going");
+
+            run.KillNow(); // the lead is still forking: the freeze must stop it before the kill, or a child escapes between the poll and the kill
+
+            await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
+            pids = ReadForkedPids(); // the lead is gone: the file is final
+            Assert.NotEmpty(pids);
+            var gone = await ExecHarness.UntilAsync(() => pids.All(pid => !Exists(pid)), (int)TeardownWait.TotalSeconds);
+            Assert.True(gone, $"{pids.Count(Exists)} of {pids.Count} session leaders survived KillNow");
+        }
+        finally
+        {
+            cleanup.AddRange(ReadForkedPids()); // a failing assertion must not leave them sleeping for 300 seconds
+        }
     }
 
     [Fact]
