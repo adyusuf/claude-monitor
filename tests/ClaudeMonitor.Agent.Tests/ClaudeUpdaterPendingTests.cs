@@ -41,6 +41,61 @@ public sealed class ClaudeUpdaterPendingTests : IDisposable
         kit.Clock.Advance(kit.Config.UpdateRetryAfter + TimeSpan.FromMinutes(1));
     }
 
+    // `claude update` is ended while it runs: it may have installed the new version already (or not), and nothing was read after it.
+    private async Task KilledDuringUpdateAsync()
+    {
+        runner.OnUpdate = _ => new(ProcessEnd.Cancelled, -1, "");
+        var outcome = await updater.RunAsync(CancellationToken.None);
+        Assert.Equal(ClaudeCodes.Interrupted, outcome.Code);
+        runner.OnUpdate = _ => new(ProcessEnd.Exited, 0, "");
+        kit.Clock.Advance(kit.Config.UpdateRetryAfter + TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task An_update_killed_while_it_ran_remembers_the_version_before_and_the_next_attempt_reports_a_changed_version()
+    {
+        await KilledDuringUpdateAsync();
+        Assert.Equal(Old, kit.State.PendingFrom);
+        runner.Version = $"{New} (Claude Code)"; // the partial install had already changed it
+
+        var next = await updater.RunAsync(CancellationToken.None);
+
+        Assert.Equal(ClaudeCodes.Updated, next.Code);
+        Assert.Contains($"Claude Code {Old} -> {New}", next.Detail, StringComparison.Ordinal);
+        Assert.Null(kit.State.PendingFrom);
+    }
+
+    [Fact]
+    public async Task An_update_killed_while_it_ran_and_found_at_the_same_version_is_up_to_date_and_clears_the_memory()
+    {
+        await KilledDuringUpdateAsync();
+        Assert.Equal(Old, kit.State.PendingFrom);
+
+        var next = await updater.RunAsync(CancellationToken.None); // the version is still Old
+
+        Assert.Equal(ClaudeCodes.Unchanged, next.Code);
+        Assert.Null(kit.State.PendingFrom);
+    }
+
+    [Fact]
+    public async Task A_remembered_version_is_kept_when_the_version_cannot_be_read_before_or_after_the_next_attempt()
+    {
+        await KilledDuringUpdateAsync();
+        runner.Version = ""; // `--version` prints nothing: unreadable both before and after the run
+
+        var unread = await updater.RunAsync(CancellationToken.None);
+
+        Assert.Equal(ClaudeCodes.Unchanged, unread.Code);
+        Assert.Equal(Old, kit.State.PendingFrom); // an unreadable version tells nothing about what changed
+        runner.Version = $"{New} (Claude Code)";
+        kit.Clock.Advance(kit.Config.ClaudeUpdateEvery + TimeSpan.FromMinutes(1));
+
+        var next = await updater.RunAsync(CancellationToken.None);
+
+        Assert.Equal(ClaudeCodes.Updated, next.Code);
+        Assert.Contains($"Claude Code {Old} -> {New}", next.Detail, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_cut_short_version_read_remembers_the_version_before_and_the_next_attempt_reports_the_update()
     {

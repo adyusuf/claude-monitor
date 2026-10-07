@@ -125,8 +125,15 @@ The level lives in an **admin-owned file the service account cannot write**; the
    non-admin) cannot change: `C:\Program Files\...` normally qualifies. The `.exe` and every folder above it must be
    owned by Administrators, SYSTEM or TrustedInstaller and grant `Users`, `Authenticated Users` and the service account
    nothing that writes, deletes or changes permissions on the program or its folder (a program under `C:\tools` that inherits "Authenticated Users: Modify" from the drive is
-   refused; fix its ACL, do not widen the policy). The refusal is `exe_untrusted`. Check with `icacls "<exe>"` and
-   `icacls "<folder>"`; this check has not yet run on a real Windows Server (ADR-0005).
+   refused; fix its ACL, do not widen the policy). The program's **own folder** is held to a stricter reading: a rule there
+   that files inherit (object-inherit, an inherit-only one included) and grants a write-like right to anyone but an
+   administrator, SYSTEM or TrustedInstaller makes the program untrusted, whether or not the rule applies to the folder
+   itself (a DLL beside the executable would inherit it); only an inherit-only CREATOR OWNER rule is excused (a CREATOR OWNER
+   rule that applies to the folder itself is refused like any other). In `icacls "<folder>"` look for any entry for a
+   non-admin account with a write-like right (`M`, `W`, `F`, `D`, `DC`, `WD`, `AD`, `WEA`, `WA`, `WDAC`, `WO`), with or
+   without `(OI)`, `(CI)` or `(IO)`, and remove it. The refusal is
+   `exe_untrusted`. Check with `icacls "<exe>"` and `icacls "<folder>"`; this check has not yet run on a real Windows
+   Server (ADR-0005).
 6. The service account needs ordinary read access to what you want read (for example a log folder), and nothing more.
    Granting it that is a deliberate admin decision; it is not given by this install.
 

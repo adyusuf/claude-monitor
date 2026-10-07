@@ -58,7 +58,8 @@ parts (update, restart, resume). A spike on the maintainer's Mac (06/10/2026) me
    `claude update` runs, the process tree is killed at once, the attempt is recorded as `interrupted` and is not tried again
    before the update retry delay. A stop that lands after `claude update` ended but before its version was read is also
    `interrupted`, never "up to date"; that state remembers the version before the update (`PendingFrom`), so the next attempt,
-   finding a different version, reports "old -> new" as updated. The stop must fit the self-update's budget (`UpdateStopWait`, 30 s; a daemon that misses it
+   finding a different version, reports "old -> new" as updated. The same is remembered when the stop killed `claude update` itself (a half-way install may already have changed the
+   version), and an attempt whose version cannot be read after its run keeps it. The stop must fit the self-update's budget (`UpdateStopWait`, 30 s; a daemon that misses it
    keeps the old version, and a rollback kills its whole process tree). Leaving `claude update` to finish detached was considered
    and rejected: it would not be left alone (that rollback kill, a systemd service's `KillMode=control-group`), its output pipes
    close with the daemon, and nobody would then bound or record it. The runner already killed the tree when

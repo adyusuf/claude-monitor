@@ -17,7 +17,21 @@ public sealed class UnixKillPollFailureTests
     {
         public Exception? Failure { get; set; }
 
-        public ProcessStamp? Find(int pid) => pid == lead ? new ProcessStamp(pid, 1, pid, 1) : pid == Child ? new ProcessStamp(Child, 1, Child, lead) : null;
+        /// <summary>When set, looking the LEAD up fails: the poll starts with the lead, so this is how a poll fails before it lists any child.</summary>
+        public Exception? LeadFindFailure { get; set; }
+
+        /// <summary>
+        /// When set, looking the DESCENDANT up fails: the signal step of a kill looks each recorded descendant up again. (A poll also
+        /// looks recorded descendants up, so a test that wants the poll to fail with another exception fails the lead's lookup.)
+        /// </summary>
+        public Exception? FindFailure { get; set; }
+
+        public ProcessStamp? Find(int pid)
+        {
+            if (pid == lead && LeadFindFailure is not null) throw LeadFindFailure;
+            if (pid == Child && FindFailure is not null) throw FindFailure;
+            return pid == lead ? new ProcessStamp(pid, 1, pid, 1) : pid == Child ? new ProcessStamp(Child, 1, Child, lead) : null;
+        }
 
         public IReadOnlyList<ProcessStamp> ChildrenOf(int pid)
         {
@@ -54,7 +68,7 @@ public sealed class UnixKillPollFailureTests
     }
 
     [Fact]
-    public async Task A_log_that_throws_cannot_keep_the_group_from_being_signalled()
+    public async Task A_log_that_throws_neither_keeps_the_group_from_being_signalled_nor_hides_the_failure()
     {
         if (!ExecFixture.Unix) return;
         var sent = new List<(int Pid, int Signal)>();
@@ -75,12 +89,37 @@ public sealed class UnixKillPollFailureTests
         tracker!.Poll();
         table!.Failure = new InvalidOperationException("table broke");
 
-        // The log's own failure replaces the report, after the signals: the message tells it from the table's failure.
+        // The table's failure is the one reported, after the signals, not the log's: the message tells them apart.
         var thrown = Assert.Throws<InvalidOperationException>(run.Kill);
-        Assert.Equal("the log is broken", thrown.Message);
+        Assert.Equal("table broke", thrown.Message);
 
         var exit = await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(Term, exit.Signal); // the group was signalled before the log was written
         Assert.Equal([(Child, Term)], sent);
+    }
+
+    [Fact]
+    public async Task A_signal_step_that_fails_with_any_exception_neither_skips_the_poll_failure_log_nor_replaces_the_first_failure()
+    {
+        if (!ExecFixture.Unix) return;
+        var lines = new List<string>();
+        Table? table = null;
+        DescendantTracker? tracker = null;
+        await using var run = UnixRunProcess.Start("/bin/sleep", ["sleep", "300"], Path.GetTempPath(), Env, log: lines.Add, trackerFor: pid =>
+        {
+            table = new Table(pid);
+            return tracker = new DescendantTracker(pid, table, (_, _) => { }, TimeSpan.Zero);
+        });
+        tracker!.Poll();
+        table!.LeadFindFailure = new InvalidOperationException("table broke"); // the poll at kill time fails (it starts with the lead) ...
+        table.FindFailure = new NotSupportedException("find broke"); // ... and so does the signal step (it looks the descendant up), with another type
+
+        var thrown = Assert.Throws<InvalidOperationException>(run.Kill);
+
+        Assert.Equal("table broke", thrown.Message); // the FIRST failure, not the later one
+        var exit = await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Equal(Term, exit.Signal); // the group was signalled whatever failed
+        var line = Assert.Single(lines); // the poll failure was logged (by type name) although the signal step failed after it
+        Assert.Contains(nameof(InvalidOperationException), line, StringComparison.Ordinal);
     }
 }
