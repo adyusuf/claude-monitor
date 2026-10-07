@@ -51,7 +51,7 @@ internal sealed unsafe partial class UnixRunProcess
         {
             _tracker?.Signal(signal);
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             failure ??= e;
         }
