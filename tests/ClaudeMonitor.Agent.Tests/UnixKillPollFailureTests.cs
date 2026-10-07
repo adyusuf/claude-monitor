@@ -54,7 +54,7 @@ public sealed class UnixKillPollFailureTests
     }
 
     [Fact]
-    public async Task A_log_that_throws_cannot_keep_the_group_from_being_signalled()
+    public async Task A_log_that_throws_neither_keeps_the_group_from_being_signalled_nor_hides_the_failure()
     {
         if (!ExecFixture.Unix) return;
         var sent = new List<(int Pid, int Signal)>();
@@ -75,9 +75,9 @@ public sealed class UnixKillPollFailureTests
         tracker!.Poll();
         table!.Failure = new InvalidOperationException("table broke");
 
-        // The log's own failure replaces the report, after the signals: the message tells it from the table's failure.
+        // The table's failure is the one reported, after the signals, not the log's: the message tells them apart.
         var thrown = Assert.Throws<InvalidOperationException>(run.Kill);
-        Assert.Equal("the log is broken", thrown.Message);
+        Assert.Equal("table broke", thrown.Message);
 
         var exit = await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(Term, exit.Signal); // the group was signalled before the log was written

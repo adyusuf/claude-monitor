@@ -45,8 +45,10 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
     private const string None = "none";
 
     // zero keeps the tracker off; otherwise bounded so that a mistake cannot make it spin or never look
-    private TimeSpan TrackEvery => config.ExecTrackEvery <= TimeSpan.Zero ? TimeSpan.Zero
-        : TimeSpan.FromTicks(Math.Clamp(config.ExecTrackEvery.Ticks, MinTrackEvery.Ticks, MaxTrackEvery.Ticks));
+    private TimeSpan TrackEvery => TrackInterval(config.ExecTrackEvery);
+
+    internal static TimeSpan TrackInterval(TimeSpan configured) => configured <= TimeSpan.Zero ? TimeSpan.Zero
+        : TimeSpan.FromTicks(Math.Clamp(configured.Ticks, MinTrackEvery.Ticks, MaxTrackEvery.Ticks));
 
     private int _active;
 
