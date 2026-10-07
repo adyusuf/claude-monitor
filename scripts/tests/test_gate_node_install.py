@@ -139,12 +139,46 @@ class NodeInstall(unittest.TestCase):
         self.assertEqual(calls[0], 'npm --prefix web ci')
         self.assertIn('✓ install dependencies (web)', done.stdout)
 
+    def test_root_pnpm_lock_selects_pnpm(self):
+        self.fake('pnpm', FAKE_PNPM)
+        self.write('pnpm-lock.yaml', 'lockfileVersion: 9\n')   # a workspace lock at the root, web/ has none
+        done, calls = self.gate()
+        self.assertEqual(calls[0], 'pnpm --dir web install --frozen-lockfile', done.stdout)
+
+    def test_missing_npm_is_a_failed_step_not_a_skip(self):
+        if shutil.which('npm', path='/usr/bin:/bin'):
+            self.skipTest('a system npm in /usr/bin hides the "npm is missing" case')
+        os.remove(os.path.join(self.bin, 'npm'))
+        done, _ = self.gate()
+        self.assertIn('✗ install dependencies (web): npm is missing', done.stdout)
+        self.assertNotIn('SKIPPED: install dependencies', done.stdout)
+        self.assertNotEqual(done.returncode, 0)
+
+    def make_listing_green(self):
+        """Give the fixture every non-Node step, so that a listing ends GATE GREEN (exit 0) like the real repository."""
+        self.write('scripts/merge-gate.conf', 'SECRET_CMD=true\nCOVERAGE_CMD=true\nSAST_CMD=true\nBACKCOMPAT_CMD=true\n')
+        self.write('scripts/md-size-gate.sh', '#!/bin/sh\n')
+        os.chmod(os.path.join(self.root, 'scripts', 'md-size-gate.sh'), 0o700)
+        self.write('scripts/md-rule-gate.py', '')
+        self.write('SETUP.md', '## Secret inventory\n')
+        self.write('.env.example', '')
+        self.write('web/tsconfig.json', '{}')   # else the typecheck step is skipped
+        self.write('web/e2e/.keep', '')         # else the e2e spec check is skipped
+        # The project's own step: if a listing reaches it, it leaves a mark in the call log.
+        self.write('scripts/agent_smoke.py', 'import os\nopen(os.environ["FAKE_LOG"], "a").write("agent_smoke ran\\n")\n')
+
     def test_merge_gate_list_runs_only_the_listing(self):
+        self.make_listing_green()
         done, calls = self.gate('--list', script='merge-gate.sh')
+        self.assertEqual(done.returncode, 0, done.stdout)   # green listing: the smoke test would run if it were not for --list
         self.assertEqual(calls, [])
         self.assertIn('install dependencies (web)', done.stdout)
-        self.assertNotIn('smoke', done.stdout)   # no scripts/agent_smoke.py in this repo: running it would show
 
+    def test_merge_gate_without_list_still_runs_its_own_step(self):
+        self.make_listing_green()
+        done, calls = self.gate(script='merge-gate.sh')
+        self.assertIn('GATE GREEN', done.stdout)
+        self.assertIn('agent_smoke ran', calls)   # proves the fixture reaches the step the listing must not run
 
 if __name__ == '__main__':
     unittest.main()
