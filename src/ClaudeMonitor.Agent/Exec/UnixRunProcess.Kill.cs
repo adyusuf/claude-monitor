@@ -22,20 +22,46 @@ internal sealed unsafe partial class UnixRunProcess
         }
     }
 
-    // The descendants are recorded first (while their parents live), then the group is signalled, then those that left it.
-    // Each step runs whatever the others did; the first failure is thrown at the end. The poll may fail with any exception: the
-    // run is killed all the same, so none may leave before the group is signalled.
-    private void SendToTree(int signal)
+    // The hard kill (freeze true) first stops the whole tree (macOS, with a tracker): nothing can fork any more, and the tracker
+    // polls until the set of descendants is stable. The graceful stop never freezes: a process has to run to handle SIGTERM.
+    // Then the descendants are recorded (while their parents live), the group is signalled, then those that left it.
+    // Each step runs whatever the others did; the first failure is thrown at the end. The freeze and the poll may fail with
+    // any exception: the run is killed all the same, so none may leave before the group is signalled. SIGKILL needs no SIGCONT.
+    private void SendToTree(int signal, bool freeze = false)
     {
         Exception? failure = null;
+        Exception? freezeFailure = null;
         Exception? pollFailure = null;
+        if (freeze && _tracker is not null)
+        {
+            try
+            {
+                SendToGroup(DescendantTracker.StopSignal);
+            }
+            catch (Exception e)
+            {
+                failure ??= e; // any failure: the kill below is sent whatever the freeze did
+            }
+
+            try
+            {
+                _tracker.Freeze();
+            }
+            catch (Exception e)
+            {
+                freezeFailure = e; // two statements: an earlier failure in failure must not keep this one from being logged
+                failure ??= e;
+            }
+        }
+
         try
         {
             _tracker?.Poll();
         }
         catch (Exception e)
         {
-            failure = pollFailure = e;
+            failure ??= e; // the first failure stays the one that is thrown
+            pollFailure = e;
         }
 
         try
@@ -56,10 +82,13 @@ internal sealed unsafe partial class UnixRunProcess
             failure ??= e;
         }
 
-        // Logged last: a logger that throws must not keep the group from being signalled. The message may hold a path: only the type.
+        // Logged last, at most one failure line per kill (the freeze first: it reads the table before the poll does; the deadline
+        // line is written by the freeze itself):
+        // a logger that throws must not keep the group from being signalled. The message may hold a path: only the type.
         try
         {
-            if (pollFailure is not null) _log?.Invoke($"descendant poll before kill failed ({pollFailure.GetType().Name})");
+            if (freezeFailure is not null) _log?.Invoke($"descendant freeze before kill failed ({freezeFailure.GetType().Name})");
+            else if (pollFailure is not null) _log?.Invoke($"descendant poll before kill failed ({pollFailure.GetType().Name})");
         }
         finally
         {
