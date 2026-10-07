@@ -40,7 +40,12 @@ public sealed class DescendantTrackerFreezeTests
             if (Failure is not null) throw Failure;
             IReadOnlyList<ProcessStamp> found;
             lock (gate) found = [.. procs.Values.Where(p => p.ParentPid == pid)];
-            if (pid == Lead) AfterLeadListing?.Invoke(Interlocked.Increment(ref leadListings));
+            if (pid == Lead)
+            {
+                var listing = Interlocked.Increment(ref leadListings); // counted whether or not a callback is set (`?.Invoke(<call>)` skips the call)
+                AfterLeadListing?.Invoke(listing);
+            }
+
             return found;
         }
     }
