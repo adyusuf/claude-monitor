@@ -127,6 +127,8 @@ class NodeInstall(unittest.TestCase):
         self.assertNotIn('npm --prefix web ci', calls)
 
     def test_pnpm_project_without_pnpm_is_a_failed_step(self):
+        if shutil.which('pnpm', path='/usr/bin:/bin'):
+            self.skipTest('a system pnpm in /usr/bin hides the "pnpm is missing" case')
         self.write('web/pnpm-lock.yaml', 'lockfileVersion: 9\n')
         done, calls = self.gate()
         self.assertIn('✗ install dependencies (web): pnpm is missing', done.stdout)
