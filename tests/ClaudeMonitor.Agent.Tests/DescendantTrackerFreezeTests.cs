@@ -9,6 +9,7 @@ public sealed class DescendantTrackerFreezeTests
 {
     private const int Lead = 100;
     private const int Stop = 17;
+    private const int Kill = 9;
     private static readonly TimeSpan Slow = TimeSpan.FromHours(1);
 
     /// <summary>A process table the test edits; <see cref="AfterLeadListing"/> runs after the lead's n-th listing, so a change shows up from the next poll on.</summary>
@@ -20,6 +21,9 @@ public sealed class DescendantTrackerFreezeTests
         public Action<int>? AfterLeadListing { get; set; }
         public Exception? Failure { get; set; }
 
+        /// <summary>When set, looking this pid up fails (any exception).</summary>
+        public (int Pid, Exception Failure)? FindFailure { get; set; }
+
         /// <summary>Polls so far: every poll lists the lead's children exactly once.</summary>
         public int Polls => Volatile.Read(ref leadListings);
 
@@ -27,6 +31,7 @@ public sealed class DescendantTrackerFreezeTests
 
         public ProcessStamp? Find(int pid)
         {
+            if (FindFailure is { } broken && broken.Pid == pid) throw broken.Failure;
             lock (gate) return procs.GetValueOrDefault(pid);
         }
 
@@ -40,7 +45,20 @@ public sealed class DescendantTrackerFreezeTests
         }
     }
 
-    private static (DescendantTracker Tracker, Table Table, List<(int Pid, int Signal)> Sent) Make(Action<int, int>? onSignal = null)
+    /// <summary>A clock that only moves when the test says so.</summary>
+    private sealed class FakeClock : TimeProvider
+    {
+        private long ticks;
+
+        public void Advance(TimeSpan by) => Interlocked.Add(ref ticks, by.Ticks);
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => Volatile.Read(ref ticks);
+    }
+
+    private static (DescendantTracker Tracker, Table Table, List<(int Pid, int Signal)> Sent) Make(Action<int, int>? onSignal = null,
+        TimeProvider? clock = null, Action<string>? log = null)
     {
         var table = new Table();
         table.Add(Lead, 1);
@@ -49,7 +67,7 @@ public sealed class DescendantTrackerFreezeTests
         {
             sent.Add((pid, signal));
             onSignal?.Invoke(pid, signal);
-        }, Slow);
+        }, Slow, log, clock);
         return (tracker, table, sent);
     }
 
@@ -173,6 +191,85 @@ public sealed class DescendantTrackerFreezeTests
             Assert.Throws<IOException>(() => tracker.Freeze());
 
             Assert.Equal([(101, Stop)], sent);
+        }
+    }
+
+    [Fact]
+    public void A_descendant_the_freeze_stopped_is_killed_even_when_its_lookup_fails_and_the_lookup_failure_is_reported()
+    {
+        var (tracker, table, sent) = Make();
+        using (tracker)
+        {
+            table.Add(101, Lead, group: 101);
+            tracker.Freeze();
+            table.FindFailure = (101, new IOException("lookup failed")); // from now on the identity check cannot be made
+
+            Assert.Throws<IOException>(() => tracker.Signal(Kill));
+
+            Assert.Equal([(101, Stop), (101, Kill)], sent); // stopped, then killed: never left stopped for ever
+            Assert.Throws<IOException>(() => tracker.Signal(Kill)); // the stopped set was spent: the second kill identity-checks and sends nothing
+            Assert.Equal(2, sent.Count);
+        }
+    }
+
+    [Fact]
+    public void A_descendant_the_freeze_did_not_stop_is_still_identity_checked_before_it_is_signalled()
+    {
+        var (tracker, table, sent) = Make();
+        using (tracker)
+        {
+            table.Add(101, Lead, group: 101);
+            table.Add(102, Lead, group: 102);
+            tracker.Poll(); // recorded, never frozen
+            table.FindFailure = (101, new IOException("lookup failed"));
+            table.Add(102, 1, group: 102, start: 99); // 102 is another process now
+
+            Assert.Throws<IOException>(() => tracker.Signal(Kill));
+
+            Assert.Empty(sent); // 101: no lookup, no signal; 102: another process, no signal
+        }
+    }
+
+    [Fact]
+    public void A_descendant_the_freeze_stopped_is_not_killed_when_the_pid_now_positively_belongs_to_another_process()
+    {
+        var (tracker, table, sent) = Make();
+        using (tracker)
+        {
+            table.Add(101, Lead, group: 101, start: 10);
+            tracker.Freeze();
+            table.Add(101, 1, group: 101, start: 99); // someone else ended the stopped process and the pid was recycled
+
+            tracker.Signal(Kill);
+
+            Assert.Equal([(101, Stop)], sent);
+        }
+    }
+
+    [Fact]
+    public void A_freeze_past_its_deadline_ends_the_rounds_below_the_bound_and_what_it_stopped_is_still_killed()
+    {
+        var clock = new FakeClock();
+        var lines = new List<string>();
+        var (tracker, table, sent) = Make(clock: clock, log: lines.Add);
+        using (tracker)
+        {
+            table.Add(101, Lead, group: 101);
+            table.AfterLeadListing = n =>
+            {
+                table.Add(1000 + n, Lead, group: 1000 + n); // the tree keeps growing
+                if (n == 2) clock.Advance(DescendantTracker.FreezeDeadline + TimeSpan.FromSeconds(1)); // the second poll was slow
+            };
+
+            tracker.Freeze(); // best effort: no exception
+
+            Assert.Equal(2, table.Polls); // far below the bound of 8, the tree still grows
+            Assert.Equal([(101, Stop)], sent); // the deadline passed before the processes the second poll found were stopped
+            Assert.Contains("deadline", Assert.Single(lines), StringComparison.Ordinal);
+
+            tracker.Signal(Kill);
+
+            Assert.Equal([(101, Stop), (101, Kill), (1001, Kill)], sent); // the stopped one directly, the other after its identity check
         }
     }
 }
