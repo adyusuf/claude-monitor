@@ -151,10 +151,26 @@ a job runs only when asked (a schedule would be an autonomous action and needs i
   lives, through libproc: it records every descendant of the lead by following parent pids (from the lead and from what
   it already recorded), each as pid **and** start time. A kill polls once more first, signals the process group, then
   every recorded descendant that is still the same process (same start time, so a recycled pid is never signalled) and
-  has left the group, with the same signal (SIGTERM, later SIGKILL); the poller stops when the run is disposed. **This is
-  best effort:** a process that double-forks and re-parents to launchd between two polls (or whose parent dies before
-  it is seen) is never recorded and can still escape, as can one created after the last poll. The recorded set is
-  capped at 4096. Linux does not start the tracker.
+  has left the group, with the same signal (SIGTERM, later SIGKILL); the poller stops when the run is disposed. **The hard
+  kill (SIGKILL) first freezes the tree:** one SIGSTOP to the process group and one to every recorded descendant that
+  left it (SIGSTOP is signal 17 on macOS, the only platform with a tracker), then polls (at most 8 rounds) until a poll
+  finds no pid the previous one did not know, stopping what each finds; then the SIGKILLs go out (a stopped process needs
+  no SIGCONT). A stopped process cannot fork, and a child forked before the stop is found through its parent's pid, so a
+  process can no longer escape by forking during the kill. The freeze is bounded by a **2 second wall-clock deadline**
+  (checked before each round and each stop) and not only by rounds: a poll walks the whole process table, a few
+  milliseconds for a small tree and seconds for a runaway one, and the tree stays stopped meanwhile. Past the deadline the
+  freeze just ends (logged), what it stopped is killed and the rest is signalled as usual. A descendant the freeze stopped
+  is SIGKILLed even when its identity lookup fails (a stopped process cannot exit by itself, so its pid is not recycled),
+  so a failing lookup can never leave it stopped; only a lookup that positively reports another start time skips it (it was
+  killed from outside and the pid now belongs to someone else). The kill is sent whatever the freeze did (a failing freeze or
+  poll step is logged by type; a failing group or signal step is only rethrown, and the caller logs it; the first failure
+  is rethrown at the end). The graceful SIGTERM never freezes: a process has to run to handle
+  it, so there the kill-time poll only narrows the window. **What remains (best effort):** a fork bomb past the cap of
+  4096 recorded descendants, the 8 rounds or the deadline; a process that was never recorded (it re-parented to launchd
+  before any poll saw its parent, for example a double fork between two polls); the platform (Linux relies on the cgroup
+  and does not start the tracker); and **the agent itself dying (OOM, crash, a launchd kill) between the group SIGSTOP and
+  the SIGKILLs, which leaves the whole tree stopped with nobody to kill it**. The deadline keeps that window short; a run
+  stopped that way is ended by hand (`kill -9` of its process group).
 - **Resource limits on macOS.** `posix_spawn` has no rlimit attribute there, and `setrlimit` on the daemon is unsafe (the
   CPU limit is cumulative and would signal the daemon), so a run starts through a trusted launcher: `/bin/sh` sets the
   limits with `ulimit` (hard, so the run cannot raise them) and then **execs the target in the same process**. The pid,

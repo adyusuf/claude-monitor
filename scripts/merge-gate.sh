@@ -2,12 +2,15 @@
 # Merge gate for claude-monitor: the project's orchestrator. It calls the shared core (scripts/gate-core.sh) and adds
 # one step of its own at the test -> prod gate: the OWASP ZAP baseline scan (global #19), after the core is green.
 #
-# Usage: scripts/merge-gate.sh <dev|test|prod>
+# Usage: scripts/merge-gate.sh <dev|test|prod> [--list]
+#   --list prints what the shared core WOULD run and stops there: no smoke test, no ZAP scan, nothing is executed.
 set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 target="${1:-dev}"
-bash "$ROOT/scripts/gate-core.sh" "$target"
+bash "$ROOT/scripts/gate-core.sh" "$target" "${@:2}"
 status=$?
+# The project's own steps run something (publish, scan); a listing must run nothing.
+[ "${2:-}" = "--list" ] && exit "$status"
 # The published agent binary must stay up (docs/adr-0002-agent-platform.md, "Published build"); 3 = not run, which blocks.
 if [ "$status" = 0 ]; then
   python3 "$ROOT/scripts/agent_smoke.py"

@@ -90,7 +90,7 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
 
     public override void Kill() => SendToTree(Sigterm);
 
-    public override void KillNow() => SendToTree(Sigkill);
+    public override void KillNow() => SendToTree(Sigkill, freeze: true);
 
     protected override void ReleaseNative() => _tracker?.Dispose();
 
