@@ -15,14 +15,22 @@ import tempfile
 import unittest
 
 SCRIPTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-GATE_FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh')
+GATE_FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh', 'merge-gate.sh')
+PACKAGE = '{"scripts": {"lint": "eslint .", "build": "vite build", "test": "vitest"}}'
 
 FAKE_NPM = """#!/bin/sh
 echo "npm $*" >> "$FAKE_LOG"
 case "$*" in
   *" ci"*)
     if [ -n "$FAKE_CI_FAIL" ]; then echo "npm error code ENOTFOUND" >&2; exit 1; fi
-    mkdir -p web/node_modules/.bin && : > web/node_modules/.bin/eslint ;;
+    dir="$2"; mkdir -p "$dir/node_modules/.bin" && : > "$dir/node_modules/.bin/eslint" ;;
+esac
+exit 0
+"""
+FAKE_PNPM = """#!/bin/sh
+echo "pnpm $*" >> "$FAKE_LOG"
+case "$*" in
+  *install*) dir="$2"; mkdir -p "$dir/node_modules/.bin" && : > "$dir/node_modules/.bin/eslint" ;;
 esac
 exit 0
 """
@@ -40,26 +48,34 @@ class NodeInstall(unittest.TestCase):
         os.makedirs(os.path.join(self.root, 'web'))
         for name in GATE_FILES:
             shutil.copy(os.path.join(SCRIPTS, name), os.path.join(self.root, 'scripts', name))
-        with open(os.path.join(self.root, 'web', 'package.json'), 'w') as f:
-            f.write('{"scripts": {"lint": "eslint .", "build": "vite build", "test": "vitest"}}')
+        self.write('web/package.json', PACKAGE)
         subprocess.run(['git', 'init', '-q', self.root], check=True)
         self.bin = os.path.join(self.home, 'bin')
         os.makedirs(self.bin)
-        for name, body in (('npm', FAKE_NPM), ('npx', FAKE_NPX)):
-            path = os.path.join(self.bin, name)
-            with open(path, 'w') as f:
-                f.write(body)
-            os.chmod(path, 0o700)
+        self.fake('npm', FAKE_NPM)
+        self.fake('npx', FAKE_NPX)
         self.log = os.path.join(self.home, 'calls.log')
 
     def tearDown(self):
         shutil.rmtree(self.home, ignore_errors=True)
 
-    def gate(self, *args, ci_fail=False):
-        env = {'PATH': self.bin + ':/usr/bin:/bin', 'FAKE_LOG': self.log, 'HOME': self.home}
+    def write(self, relative, body):
+        path = os.path.join(self.root, relative)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(body)
+
+    def fake(self, name, body):
+        path = os.path.join(self.bin, name)
+        with open(path, 'w') as f:
+            f.write(body)
+        os.chmod(path, 0o700)
+
+    def gate(self, *args, ci_fail=False, script='gate-core.sh', env_extra=None):
+        env = {'PATH': self.bin + ':/usr/bin:/bin', 'FAKE_LOG': self.log, 'HOME': self.home, **(env_extra or {})}
         if ci_fail:
             env['FAKE_CI_FAIL'] = '1'
-        done = subprocess.run(['bash', 'scripts/gate-core.sh', 'dev', *args], cwd=self.root, env=env,
+        done = subprocess.run(['bash', 'scripts/' + script, 'dev', *args], cwd=self.root, env=env,
                               capture_output=True, text=True, timeout=120)
         calls = []
         if os.path.exists(self.log):
@@ -96,6 +112,38 @@ class NodeInstall(unittest.TestCase):
         self.assertIn('install dependencies (web)', done.stdout)
         self.assertIn('npm --prefix web ci', done.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.root, 'web', 'node_modules')))
+
+    def test_mobile_project_is_installed_too(self):
+        self.write('mobile/package.json', PACKAGE)
+        done, calls = self.gate()
+        self.assertEqual([c for c in calls if ' ci' in c], ['npm --prefix web ci', 'npm --prefix mobile ci'], done.stdout)
+        self.assertLess(calls.index('npm --prefix mobile ci'), calls.index('npm --prefix web run lint'))
+
+    def test_pnpm_project_installs_with_the_frozen_lockfile(self):
+        self.fake('pnpm', FAKE_PNPM)
+        self.write('web/pnpm-lock.yaml', 'lockfileVersion: 9\n')
+        done, calls = self.gate()
+        self.assertEqual(calls[0], 'pnpm --dir web install --frozen-lockfile', done.stdout)
+        self.assertNotIn('npm --prefix web ci', calls)
+
+    def test_pnpm_project_without_pnpm_is_a_failed_step(self):
+        self.write('web/pnpm-lock.yaml', 'lockfileVersion: 9\n')
+        done, calls = self.gate()
+        self.assertIn('✗ install dependencies (web): pnpm is missing', done.stdout)
+        self.assertNotEqual(done.returncode, 0)
+
+    def test_parallel_node_track_installs_before_its_first_step(self):
+        self.write('Api/Api.csproj', '<Project/>')   # the track only runs beside .NET steps
+        done, calls = self.gate(env_extra={'GATE_PARALLEL_NODE': '1'})
+        self.assertEqual([c for c in calls if ' ci' in c], ['npm --prefix web ci'], done.stdout)
+        self.assertEqual(calls[0], 'npm --prefix web ci')
+        self.assertIn('✓ install dependencies (web)', done.stdout)
+
+    def test_merge_gate_list_runs_only_the_listing(self):
+        done, calls = self.gate('--list', script='merge-gate.sh')
+        self.assertEqual(calls, [])
+        self.assertIn('install dependencies (web)', done.stdout)
+        self.assertNotIn('smoke', done.stdout)   # no scripts/agent_smoke.py in this repo: running it would show
 
 
 if __name__ == '__main__':
