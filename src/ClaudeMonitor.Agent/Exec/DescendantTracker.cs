@@ -102,16 +102,16 @@ internal sealed class DescendantTracker : IDisposable
         List<ProcessStamp> targets;
         lock (_gate) targets = [.. _tracked.Values];
 
-        IOException? failure = null;
+        Exception? failure = null;
         foreach (var recorded in targets)
         {
             try
             {
                 if (_table.Find(recorded.Pid) is { } now && now.StartMicros == recorded.StartMicros && now.GroupId != _lead) _signal(recorded.Pid, signal);
             }
-            catch (IOException e)
+            catch (Exception e)
             {
-                failure ??= e;
+                failure ??= e; // any failure: the remaining descendants are still signalled
             }
         }
 

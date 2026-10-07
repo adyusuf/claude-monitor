@@ -181,9 +181,9 @@ internal abstract class RunProcessBase(Stream stdout, Stream stderr, Action<stri
             {
                 KillNow();
             }
-            catch (Exception e) when (e is IOException or Win32Exception or InvalidOperationException)
+            catch (Exception e)
             {
-                log?.Invoke($"kill on dispose failed ({e.GetType().Name})"); // the message may hold a path: not logged
+                log?.Invoke($"kill on dispose failed ({e.GetType().Name})"); // any type: a dispose must not throw because of a kill. The message may hold a path: not logged
             }
 
             await Task.WhenAny(_exited.Task, Task.Delay(CloseWait));
