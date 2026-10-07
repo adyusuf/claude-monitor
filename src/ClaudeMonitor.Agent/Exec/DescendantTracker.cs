@@ -140,7 +140,8 @@ internal sealed partial class DescendantTracker : IDisposable
             }
         }
 
-        foreach (var recorded in targets.Where(t => !stopped.Contains((t.Pid, t.StartMicros))))
+        var spent = stopped.ToHashSet();
+        foreach (var recorded in targets.Where(t => !spent.Contains((t.Pid, t.StartMicros))))
         {
             try
             {

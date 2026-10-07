@@ -82,7 +82,8 @@ internal sealed unsafe partial class UnixRunProcess
             failure ??= e;
         }
 
-        // Logged last, one line per kill (the freeze first: it reads the table before the poll does):
+        // Logged last, at most one failure line per kill (the freeze first: it reads the table before the poll does; the deadline
+        // line is written by the freeze itself):
         // a logger that throws must not keep the group from being signalled. The message may hold a path: only the type.
         try
         {

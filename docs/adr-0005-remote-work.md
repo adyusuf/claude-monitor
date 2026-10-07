@@ -161,8 +161,10 @@ a job runs only when asked (a schedule would be an autonomous action and needs i
   milliseconds for a small tree and seconds for a runaway one, and the tree stays stopped meanwhile. Past the deadline the
   freeze just ends (logged), what it stopped is killed and the rest is signalled as usual. A descendant the freeze stopped
   is SIGKILLed even when its identity lookup fails (a stopped process cannot exit by itself, so its pid is not recycled),
-  so a failing lookup can never leave it stopped. The kill is sent whatever the freeze did (a failing step is logged by
-  type and the first failure is rethrown at the end). The graceful SIGTERM never freezes: a process has to run to handle
+  so a failing lookup can never leave it stopped; only a lookup that positively reports another start time skips it (it was
+  killed from outside and the pid now belongs to someone else). The kill is sent whatever the freeze did (a failing freeze or
+  poll step is logged by type; a failing group or signal step is only rethrown, and the caller logs it; the first failure
+  is rethrown at the end). The graceful SIGTERM never freezes: a process has to run to handle
   it, so there the kill-time poll only narrows the window. **What remains (best effort):** a fork bomb past the cap of
   4096 recorded descendants, the 8 rounds or the deadline; a process that was never recorded (it re-parented to launchd
   before any poll saw its parent, for example a double fork between two polls); the platform (Linux relies on the cgroup

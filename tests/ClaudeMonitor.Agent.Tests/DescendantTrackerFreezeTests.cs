@@ -67,7 +67,7 @@ public sealed class DescendantTrackerFreezeTests
         {
             sent.Add((pid, signal));
             onSignal?.Invoke(pid, signal);
-        }, Slow, log, clock);
+        }, Slow, log, clock ?? new FakeClock()); // a clock that never moves: a slow runner cannot hit the freeze deadline by accident
         return (tracker, table, sent);
     }
 
