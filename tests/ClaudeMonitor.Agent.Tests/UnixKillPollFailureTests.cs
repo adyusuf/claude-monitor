@@ -8,6 +8,8 @@ namespace ClaudeMonitor.Agent.Tests;
 public sealed class UnixKillPollFailureTests
 {
     private const int Term = 15;
+    private const int Kill = 9;
+    private const int Stop = 17; // the tracker's SIGSTOP (macOS); on Linux the same number is SIGCHLD, which the sleeping lead ignores, so these run there too
     private const int Child = 4242;
     private const string SecretPath = "/home/someone/secret-folder";
     private static readonly IReadOnlyDictionary<string, string> Env = new Dictionary<string, string> { ["PATH"] = "/usr/bin:/bin" };
@@ -121,5 +123,48 @@ public sealed class UnixKillPollFailureTests
         Assert.Equal(Term, exit.Signal); // the group was signalled whatever failed
         var line = Assert.Single(lines); // the poll failure was logged (by type name) although the signal step failed after it
         Assert.Contains(nameof(InvalidOperationException), line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_hard_kill_stops_a_descendant_before_it_kills_it()
+    {
+        if (!ExecFixture.Unix) return;
+        var sent = new List<(int Pid, int Signal)>();
+        DescendantTracker? tracker = null;
+        await using var run = UnixRunProcess.Start("/bin/sleep", ["sleep", "300"], Path.GetTempPath(), Env, trackerFor: pid =>
+            tracker = new DescendantTracker(pid, new Table(pid), (target, signal) => { lock (sent) sent.Add((target, signal)); }, TimeSpan.Zero));
+        tracker!.Poll();
+
+        run.KillNow();
+
+        var exit = await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Equal(Kill, exit.Signal); // a stopped group is still ended by SIGKILL, no SIGCONT needed
+        Assert.Equal([(Child, Stop), (Child, Kill)], sent); // stopped first, then killed
+    }
+
+    [Fact]
+    public async Task A_freeze_that_fails_with_any_exception_does_not_keep_the_kill_from_being_sent_and_its_failure_reaches_the_caller()
+    {
+        if (!ExecFixture.Unix) return;
+        var sent = new List<(int Pid, int Signal)>();
+        var lines = new List<string>();
+        DescendantTracker? tracker = null;
+        await using var run = UnixRunProcess.Start("/bin/sleep", ["sleep", "300"], Path.GetTempPath(), Env, log: lines.Add, trackerFor: pid =>
+            tracker = new DescendantTracker(pid, new Table(pid), (target, signal) =>
+            {
+                lock (sent) sent.Add((target, signal));
+                if (signal == Stop) throw new InvalidOperationException($"stop broke at {SecretPath}");
+            }, TimeSpan.Zero));
+        tracker!.Poll();
+
+        var thrown = Assert.Throws<InvalidOperationException>(run.KillNow);
+
+        var exit = await run.Exited.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Equal(Kill, exit.Signal); // the group was killed although the freeze failed
+        Assert.Equal([(Child, Stop), (Child, Kill)], sent); // and so was the descendant
+        Assert.Contains(SecretPath, thrown.Message, StringComparison.Ordinal);
+        var line = Assert.Single(lines);
+        Assert.Contains(nameof(InvalidOperationException), line, StringComparison.Ordinal);
+        Assert.DoesNotContain(SecretPath, line, StringComparison.Ordinal);
     }
 }

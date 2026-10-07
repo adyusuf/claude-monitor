@@ -20,9 +20,10 @@ internal interface IProcessTable
 /// recorded, polling every <c>every</c> and once more right before a kill. Kill and KillNow then also signal every recorded
 /// descendant that is still the same process (same pid AND start time) and no longer in the run's group.
 /// BEST EFFORT: a process that forks and re-parents to launchd (double fork, or its parent dies) between two polls is never
-/// seen, and a descendant created after the last poll is missed. The kill-time poll narrows the window; it cannot close it.
+/// seen. The graceful stop only narrows the fork window with a poll right before it; the hard kill closes it with
+/// <see cref="Freeze"/> (stop everything, poll again until nothing new shows up).
 /// </summary>
-internal sealed class DescendantTracker : IDisposable
+internal sealed partial class DescendantTracker : IDisposable
 {
     /// <summary>Descendants kept at most; a fork bomb cannot make the tracker grow without bound.</summary>
     public const int MaxTracked = 4096;
