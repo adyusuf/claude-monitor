@@ -38,9 +38,9 @@ internal sealed unsafe partial class UnixRunProcess
             {
                 SendToGroup(DescendantTracker.StopSignal);
             }
-            catch (IOException e)
+            catch (Exception e)
             {
-                failure ??= e;
+                failure ??= e; // any failure: the kill below is sent whatever the freeze did
             }
 
             try
@@ -49,7 +49,8 @@ internal sealed unsafe partial class UnixRunProcess
             }
             catch (Exception e)
             {
-                failure ??= freezeFailure = e;
+                freezeFailure = e; // two statements: an earlier failure in failure must not keep this one from being logged
+                failure ??= e;
             }
         }
 
@@ -59,7 +60,8 @@ internal sealed unsafe partial class UnixRunProcess
         }
         catch (Exception e)
         {
-            failure = pollFailure = e;
+            failure ??= e; // the first failure stays the one that is thrown
+            pollFailure = e;
         }
 
         try
