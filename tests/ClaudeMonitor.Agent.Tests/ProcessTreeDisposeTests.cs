@@ -67,17 +67,21 @@ public sealed class ProcessTreeDisposeTests
     }
 
     [Fact]
-    public async Task A_failure_that_is_not_a_kill_failure_still_releases_everything_before_it_reaches_the_caller()
+    public async Task A_failure_that_is_not_a_kill_failure_is_logged_by_type_and_does_not_throw_after_releasing_everything()
     {
         var tracker = new DescendantTracker(100, new CountingTable(), (_, _) => { }, TimeSpan.Zero);
         var (stdout, stderr) = (new MemoryStream(), new MemoryStream());
-        var process = new FailingKillProcess(stdout, stderr, tracker, new NotSupportedException(), null);
+        var lines = new List<string>();
+        var process = new FailingKillProcess(stdout, stderr, tracker, new NotSupportedException($"kill broke at {SecretPath}"), lines.Add);
         process.Begin();
 
-        await Assert.ThrowsAsync<NotSupportedException>(async () => await process.DisposeAsync());
+        await process.DisposeAsync(); // does not throw
 
         Assert.True(process.Released);
         Assert.False(stdout.CanRead);
         Assert.False(stderr.CanRead);
+        var line = Assert.Single(lines);
+        Assert.Contains(nameof(NotSupportedException), line, StringComparison.Ordinal);
+        Assert.DoesNotContain(SecretPath, line, StringComparison.Ordinal);
     }
 }

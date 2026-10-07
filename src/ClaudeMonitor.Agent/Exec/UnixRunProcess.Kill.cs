@@ -51,14 +51,22 @@ internal sealed unsafe partial class UnixRunProcess
         {
             _tracker?.Signal(signal);
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             failure ??= e;
         }
 
         // Logged last: a logger that throws must not keep the group from being signalled. The message may hold a path: only the type.
-        if (pollFailure is not null) _log?.Invoke($"descendant poll before kill failed ({pollFailure.GetType().Name})");
-        if (failure is not null) ExceptionDispatchInfo.Throw(failure);
+        try
+        {
+            if (pollFailure is not null) _log?.Invoke($"descendant poll before kill failed ({pollFailure.GetType().Name})");
+        }
+        finally
+        {
+            // The real failure reaches the caller even if the logger threw: a throw in a finally replaces the logger's exception,
+            // which cannot be logged anywhere (it is the logger that failed).
+            if (failure is not null) ExceptionDispatchInfo.Throw(failure);
+        }
     }
 
     private static void SendToPid(int pid, int signal)
