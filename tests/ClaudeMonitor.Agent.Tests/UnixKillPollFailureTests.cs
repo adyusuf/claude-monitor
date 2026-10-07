@@ -17,12 +17,19 @@ public sealed class UnixKillPollFailureTests
     {
         public Exception? Failure { get; set; }
 
-        /// <summary>When set, looking a process up fails (the signal step of a kill looks each recorded descendant up again).</summary>
+        /// <summary>When set, looking the LEAD up fails: the poll starts with the lead, so this is how a poll fails before it lists any child.</summary>
+        public Exception? LeadFindFailure { get; set; }
+
+        /// <summary>
+        /// When set, looking the DESCENDANT up fails: the signal step of a kill looks each recorded descendant up again. (A poll also
+        /// looks recorded descendants up, so a test that wants the poll to fail with another exception fails the lead's lookup.)
+        /// </summary>
         public Exception? FindFailure { get; set; }
 
         public ProcessStamp? Find(int pid)
         {
-            if (FindFailure is not null) throw FindFailure;
+            if (pid == lead && LeadFindFailure is not null) throw LeadFindFailure;
+            if (pid == Child && FindFailure is not null) throw FindFailure;
             return pid == lead ? new ProcessStamp(pid, 1, pid, 1) : pid == Child ? new ProcessStamp(Child, 1, Child, lead) : null;
         }
 
@@ -104,8 +111,8 @@ public sealed class UnixKillPollFailureTests
             return tracker = new DescendantTracker(pid, table, (_, _) => { }, TimeSpan.Zero);
         });
         tracker!.Poll();
-        table!.Failure = new InvalidOperationException("table broke"); // the poll at kill time fails ...
-        table.FindFailure = new NotSupportedException("find broke"); // ... and so does the signal step, with another type
+        table!.LeadFindFailure = new InvalidOperationException("table broke"); // the poll at kill time fails (it starts with the lead) ...
+        table.FindFailure = new NotSupportedException("find broke"); // ... and so does the signal step (it looks the descendant up), with another type
 
         var thrown = Assert.Throws<InvalidOperationException>(run.Kill);
 
