@@ -41,8 +41,28 @@ public sealed class RunTrackingMacTests : IDisposable
 
     public void Dispose()
     {
-        foreach (var pid in cleanup.Where(ExecHarness.IsAlive)) Process.GetProcessById(pid).Kill();
-        Directory.Delete(dir, recursive: true);
+        try
+        {
+            foreach (var pid in cleanup.Where(ExecHarness.IsAlive)) Kill(pid);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    // A leftover may exit between the check and the kill: that is the goal, not a failure.
+    private static void Kill(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            process.Kill();
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // already gone
+        }
     }
 
     private static bool Available => OperatingSystem.IsMacOS() && File.Exists(Perl);
@@ -115,6 +135,9 @@ public sealed class RunTrackingMacTests : IDisposable
         Assert.True(await ExecHarness.UntilAsync(() => !ExecHarness.IsAlive(pid)), $"process {pid} survived SIGTERM");
     }
 
+    // A SMOKE test: no hang, no leak, bounded. A fork that lands in the race window without the freeze is too rare to fail it
+    // reliably; the deterministic proof that the tree is stopped BEFORE it is killed is DescendantTrackerFreezeTests and the
+    // signal-order tests in UnixKillPollFailureTests.
     [Fact]
     public async Task KillNow_ends_every_session_leader_a_fork_loop_creates_while_the_kill_is_sent()
     {
