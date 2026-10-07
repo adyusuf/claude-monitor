@@ -57,8 +57,9 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         var run = await Task.Run(() => runner.Run(install.Path!, ["update"], config.ClaudeUpdateTimeout, ct), CancellationToken.None);
         if (run.End == ProcessEnd.Cancelled)
         {
+            // ended half-way, it may already have changed the version: the next attempt tells it, as after a cut-short version read
             return Record(ClaudeCodes.Interrupted, $"the agent stopped while `claude update` ran, so it was ended{Killed(run)}; if `claude` no longer starts, run `claude update` by hand",
-                before, next: config.UpdateRetryAfter);
+                before, next: config.UpdateRetryAfter, pendingFrom: from);
         }
 
         var after = Version(install.Path!, ct);
@@ -157,7 +158,8 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
 
     /// <summary>
     /// Remembers the result; when it cannot be saved, no attempt starts in this process before the usual time (or a longer <paramref name="next"/>).
-    /// <paramref name="pendingFrom"/> is kept until an attempt reads a version (updated or up to date) and tells what changed since.
+    /// <paramref name="pendingFrom"/> is kept until an attempt reads a version after its run (updated or up to date) and tells what changed since;
+    /// an attempt that cannot read one even then tells nothing, so it is kept.
     /// </summary>
     private ClaudeOutcome Record(string code, string detail, string? before = null, string? after = null, TimeSpan? next = null, int? failures = null,
         string? pendingFrom = null)
@@ -173,7 +175,7 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
             NextAt = due,
             CountdownUntil = null,
             Failures = failures ?? s.Failures,
-            PendingFrom = code is ClaudeCodes.Updated or ClaudeCodes.Unchanged ? null : pendingFrom ?? s.PendingFrom,
+            PendingFrom = (code is ClaudeCodes.Updated or ClaudeCodes.Unchanged) && after is not null ? null : pendingFrom ?? s.PendingFrom,
         }, log);
         log.Write($"claude update {code}: {detail}");
         if (!saved)
