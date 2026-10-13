@@ -4,8 +4,8 @@
 Usage:
   python3 scripts/md-split.py <claude.md> <section-heading> <detail-file> <relative-link>
 
-⚠️ The canonical copy lives under ~/.claude/scripts/; every project takes a COPY
-   and commits it. The three tools are twins — changing one means changing all.
+⚠️ The master copy lives in the adyusuf plugin's `scripts/` (canonical); every
+   project takes a COPY and commits it. The three tools are twins — changing one means changing all.
 
 Method:
   · The DETAIL file receives every item **verbatim and in full** (not a single
