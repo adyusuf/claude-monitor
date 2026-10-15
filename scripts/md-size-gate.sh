@@ -9,20 +9,24 @@
 # Usage:
 #   scripts/md-size-gate.sh            # audit (the gate)
 #   scripts/md-size-gate.sh --update   # pull the ceilings down to TODAY's size
+#   scripts/md-size-gate.sh --init     # no budget yet: write one, ceiling = TODAY's size
 #
-# Exit code: 0 = passed, 1 = a budget was exceeded or a file has no budget.
+# Exit code: 0 = passed, 1 = a budget was exceeded or a file has no budget
+# (--init: 1 = a budget already exists and was left untouched).
 set -uo pipefail
 
 # ⚠️ ROOT and BUDGET can be supplied from outside. Reason: the CANONICAL copy of
-# this script lives under ~/.claude/scripts/, and when it is called from there a
-# ROOT derived from the script's own location is wrong (it resolves to ~/.claude,
-# not the project). For the copy COPIED INTO a project the defaults are correct;
+# this script lives in the adyusuf plugin's `scripts/` (canonical), and when it is
+# called from there a ROOT derived from the script's own location is wrong (it
+# resolves to the plugin, not the project). For the copy COPIED INTO a project the defaults are correct;
 # the hook passes MD_ROOT.
 ROOT="${MD_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 UPDATE=0
 HOOK=0
+INIT=0
 for arg in "$@"; do
   [ "$arg" = "--update" ] && UPDATE=1
+  [ "$arg" = "--init" ] && INIT=1
   [ "$arg" = "--hook" ] && HOOK=1
 done
 
@@ -31,20 +35,6 @@ if [ -n "${MD_BUDGET:-}" ]; then BUDGET="$MD_BUDGET"; else
   for candidate in "$ROOT/scripts/md-budget.tsv" "$ROOT/md-budget.tsv" "$ROOT/docs/md-budget.tsv"; do
     [ -f "$candidate" ] && { BUDGET="$candidate"; break; }
   done
-fi
-
-if [ -z "${BUDGET:-}" ] || [ ! -f "$BUDGET" ]; then
-  # ⚠️ In HOOK mode "no budget" is NOT an error, it means "not installed": the
-  # gate passes silently and says so in one line. When it runs as a merge gate
-  # (the default) a MISSING BUDGET IS AN ERROR — otherwise deleting the budget
-  # file would delete the gate along with it.
-  if [ "$HOOK" -eq 1 ]; then
-    echo "· No CLAUDE.md budget is installed in this project (md-budget.tsv is missing)."
-    echo "  To install it: /adyusuf:apply-project-standards  or"
-    echo "  cp ~/.claude/scripts/md-*.sh ~/.claude/scripts/md-*.py scripts/ && bash scripts/md-size-gate.sh --update"
-    exit 0
-  fi
-  echo "✗ No budget file: ${BUDGET:-<not found>}"; exit 1
 fi
 
 # ⚠️ LINE ENDINGS ARE NORMALIZED (a real incident). `wc -c` used to measure the
@@ -60,6 +50,59 @@ kb() {
   cr=$(tr -cd '\r' < "$1" | wc -c)
   echo $(( ( bytes - cr + 1023 ) / 1024 ))
 }
+
+# Every CLAUDE.md under ROOT, minus the trees that are never project instructions.
+claude_md_files() {
+  find "$ROOT" \( -path "$ROOT/.claude" -o -path "*/node_modules" -o -path "$ROOT/docs/claude-md-archive" \) -prune -o -name CLAUDE.md -print 2>/dev/null
+}
+
+# --init: a project adopting the gate has no budget, and copying this repository's
+# md-budget.tsv would bring OUR ceilings and exclusions (found 13/10/2026: the copied
+# file plus --update left the project's own CLAUDE.md files "NO BUDGET", because
+# --update only lowers rows that already exist). --init writes a fresh budget with
+# one row per CLAUDE.md, ceiling = target = today's size, and never overwrites one.
+if [ "$INIT" -eq 1 ]; then
+  if [ -n "${BUDGET:-}" ] && [ -f "$BUDGET" ]; then
+    echo "✗ A budget already exists: $BUDGET — --init never overwrites it (lower ceilings with --update)."
+    exit 1
+  fi
+  BUDGET="${MD_BUDGET:-$ROOT/scripts/md-budget.tsv}"
+  mkdir -p "$(dirname "$BUDGET")" || { echo "✗ Cannot create $(dirname "$BUDGET")"; exit 1; }
+  today="$(date -u +%d/%m/%Y)"
+  {
+    echo "# CLAUDE.md size budget — a RATCHET (written by md-size-gate.sh --init on $today)."
+    echo "# CEILING = the size on that day; the gate refuses growth. Lower: --update."
+    echo "# Raising a ceiling is done by hand, with the REASON in the note column."
+    echo "# Discovery exclusions (untracked third-party trees): one line each, '# exclude:<path>'."
+    echo "#"
+    echo "# Columns:  path <TAB> ceilingKB <TAB> targetKB <TAB> note"
+  } > "$BUDGET" || { echo "✗ Cannot write $BUDGET"; exit 1; }
+  count=0
+  while IFS= read -r file; do
+    rel="${file#"$ROOT"/}"
+    size=$(kb "$file")
+    printf '%s\t%s\t%s\t%s\n' "$rel" "$size" "$size" "initial ceiling: the size on $today" >> "$BUDGET"
+    echo "  + $rel  $size KB"
+    count=$((count + 1))
+  done < <(claude_md_files | LC_ALL=C sort)
+  echo "Budget written: $BUDGET ($count CLAUDE.md file(s))."
+  exit 0
+fi
+
+if [ -z "${BUDGET:-}" ] || [ ! -f "$BUDGET" ]; then
+  # ⚠️ In HOOK mode "no budget" is NOT an error, it means "not installed": the
+  # gate passes silently and says so in one line. When it runs as a merge gate
+  # (the default) a MISSING BUDGET IS AN ERROR — otherwise deleting the budget
+  # file would delete the gate along with it.
+  if [ "$HOOK" -eq 1 ]; then
+    echo "· No CLAUDE.md budget is installed in this project (md-budget.tsv is missing)."
+    echo "  To install it: /adyusuf:apply-project-standards  or"
+    echo "  copy md-*.sh and md-*.py into scripts/, then: bash scripts/md-size-gate.sh --init"
+    exit 0
+  fi
+  echo "✗ No budget file: ${BUDGET:-<not found>}"; exit 1
+fi
+
 
 FAILED=0
 LISTED=""
@@ -125,7 +168,7 @@ while IFS= read -r file; do
     printf '%-28s %7s %7s %7s  %s\n' "$rel" "$(kb "$file")" "-" "-" "✗ NO BUDGET"
     FAILED=1
   fi
-done < <(find "$ROOT" \( -path "$ROOT/.claude" -o -path "*/node_modules" -o -path "$ROOT/docs/claude-md-archive" \) -prune -o -name CLAUDE.md -print 2>/dev/null)
+done < <(claude_md_files)
 
 echo
 
