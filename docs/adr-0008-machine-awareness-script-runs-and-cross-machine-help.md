@@ -81,7 +81,12 @@ can run the application's tests on a test machine.
   environment of ADR-0005) only for a candidate that is trusted, or whose file is owned by the agent's own account**
   (the interactive agent probing its user's Homebrew is that user running their own binary); any other candidate is
   listed by path with the version `unknown`, because a service agent running a binary that another account can
-  replace would hand that account the service's credentials. A phase 1 test proves that a service-mode probe of an
+  replace would hand that account the service's credentials. A file counts as the account's own only when every folder above it is owned by that account or by root and is writable by neither
+  group nor others, so nobody else can swap it between the check and the start. Consequence, accepted (maintainer, 16/10/2026):
+  a binary under a group-writable folder (Homebrew's `/opt/homebrew/bin` is `rwxrwxr-x user admin` on Apple silicon) and a
+  `#!/usr/bin/env node` script shim (Homebrew or nvm `npm`, an npm-installed `claude`, whose `node` is not beside it) are listed with
+  the version `unknown`; the tool is still listed. The check is not relaxed to the file's owner only, because the version is
+  information and no decision depends on it. A phase 1 test proves that a service-mode probe of an
   untrusted, foreign-owned candidate starts no process. Re-probed every 6 hours or when a binary's mtime changes
   (an mtime change on a foreign-owned file only refreshes its path and ownership); at most 32 entries. It is listed on
   the Machines page, printed by `monitor_machines` (`tools=dotnet 10.0,node 22.1,git 2.4x`) and, names only, in the
