@@ -174,6 +174,16 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
 - **Listening services (off by default).** The machine's owner turns on "Report listening ports" on its page (a recent sign-in or a code is
   needed). The agent then reads the TCP ports it listens on, with the process name where the system shows it (on Linux for the account's own
   processes), and sends them; only the owner and admins see them. Turning it off drops what was stored. Nothing is started to read them.
+- **Script runs.** `monitor_run_script` asks a machine to run a script (sh, bash, python or powershell). It needs exec level `shell` on the target
+  without a ceiling, an environment an admin set on the machine's page (a machine's own claim does not count) and a trusted interpreter in its
+  inventory. The owner approves the exact text on the web (every line numbered, non-ASCII made visible, Allow only after the script was
+  scrolled to its end and three seconds later); a production or database machine also needs the approver's two-step code, and an approver
+  without two-step sign-in cannot approve there. A script never matches a grant or a job. The agent writes it to `<home>/runs/<run>/script.<ext>`
+  (private, never executable), starts it with the interpreter's safe flags and the scratch folder as working directory, with an empty
+  environment and `PATH=/usr/bin:/bin:/usr/sbin:/sbin` (set your own PATH inside the script for a user-installed tool), and removes the folder
+  afterwards. The workspace's "Output limit for script runs" (1 to 64 MB, default 8) is frozen on each run; `CM_EXEC_SCRIPT_OUTPUT_CEILING`
+  caps it on one machine. `monitor_run_result` says "output complete" or exactly what is missing and why. Shell and argv runs to a
+  production machine still need no code (decision deferred, ADR-0008 §9.13).
 - **Projects.** Every project a session works in is listed on the machine's page. For a machine without sessions, or for a folder no session
   visits, list the folder: `cm-agent config projects add <folder>` (interactive or standalone agent) or `"projects": ["/srv/shop"]` in the
   admin-owned `exec.json` (service agent). The agent reads the branch, the commit and the tag from the `.git` files without running git and

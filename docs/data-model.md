@@ -80,6 +80,16 @@ pair and marks the old one `replaced_by`; a reused, already-replaced refresh tok
 `alert_sustain_seconds` (default 300, 60-86400) and `remote_runs_enabled` (default false). New columns carry
 database defaults, so an older API keeps inserting rows.
 
+**Script runs (ADR-0008 phase 2, migration `ScriptRuns`).** `remote_runs.mode` gains `script` (the mode CHECK and the shape CHECK are dropped and
+re-added: a script run has no `argv`, `shell_command` or `cwd`; an emptied run keeps its shape), and the table gains `script_interpreter`
+(`sh`, `bash`, `powershell`, `python`; CHECK), `script_body` (text; emptied on account deletion, exported), `script_args` `text[]`,
+`target_environment` and `target_function` (the effective role frozen at creation, part of the approval hash), `approved_with_totp`
+(boolean, default false), `output_cap` (bytes, 1-64 MiB, the workspace limit frozen at creation; NULL for argv and shell runs) and the
+output account: `output_read_bytes`, `output_dropped_bytes` (as the target reports them), `output_refused_bytes`, `output_missing_from_seq`
+(what the server refused over the cap, always one range from a chunk on), `output_chunks` and `output_complete` (NULL for argv and shell
+runs; true only when nothing was dropped, refused or stopped at the read limit). `workspace_settings.script_output_max_bytes` (default 8 MiB;
+CHECK 1-64 MiB; set by an admin in the remote settings).
+
 - **Transitions are compare-and-set** (`UPDATE … WHERE status = <expected>`); a run, its audit row and a grant's
   use count change in one transaction; the API publishes to the stream after commit.
 - **Output** is masked by the target, at most 1 MB per run (checked atomically with the chunk insert), never logged,
