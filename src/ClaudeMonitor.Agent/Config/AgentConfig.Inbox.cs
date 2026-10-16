@@ -6,8 +6,8 @@ public sealed partial record AgentConfig
     /// <summary>"channel" (default, what push always was): the MCP process sends a Claude Code channel notification (ADR-0003). "inbox": the daemon writes the prompt to the session's socket (ADR-0007).</summary>
     public string PushTransport { get; init; } = PushTransports.Channel;
 
-    /// <summary>"full" (default): the inbox gets the notice, the wrapper and the message. "short": a one-line notice, the message is read with monitor_inbox_read (ADR-0007, A2).</summary>
-    public string InboxFormat { get; init; } = InboxFormats.Full;
+    /// <summary>"short" (default): a one-line notice, the message is read with monitor_inbox_read (ADR-0007, A2). "full": the inbox gets the notice, the wrapper and the message.</summary>
+    public string InboxFormat { get; init; } = InboxFormats.Brief;
 
     /// <summary>True when CM_INBOX_FORMAT was set: it then wins over the value `cm-agent config push-format` saved.</summary>
     public bool InboxFormatFromEnvironment { get; init; }

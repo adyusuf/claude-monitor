@@ -15,7 +15,7 @@ public sealed class InboxWireTests : IDisposable
 {
     private const string Token = "aaaa-bbbb-test";
     private static readonly DateTimeOffset Start = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero);
-    private readonly TempHome home = new(c => c with { PushEnabled = true, PushTransport = PushTransports.Inbox, MessagingSocket = "/tmp/cc-socks/9.sock", MessagingToken = Token });
+    private readonly TempHome home = new(c => c with { PushEnabled = true, PushTransport = PushTransports.Inbox, InboxFormat = InboxFormats.Full, MessagingSocket = "/tmp/cc-socks/9.sock", MessagingToken = Token });
     private readonly ManualClock clock = new(Start);
     private readonly LocalStore store;
 

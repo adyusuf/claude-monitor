@@ -124,8 +124,8 @@ failure. The older **channel** (`--push on`, also `--push channel`, below) stays
 inbox existed all still mean the channel. A prompt written to a session that never shows it in the transcript is **not written again**: after
 10 minutes (`InboxConfirmWait`) it is left to the hooks.
 
-**A short notice instead of the whole text (ADR-0007, A2).** `cm-agent config push-format short` (or `cm-agent install --push-format short`, or `CM_INBOX_FORMAT=short`; `full` is the default) makes the inbox get one line, `📩 claude-monitor web message <id> ...`,
-that holds nothing the web wrote. The session reads the message with the `monitor_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `cm-agent status` as "not read yet". The text of an applied message is forgotten after 7 days.
+**A short notice instead of the whole text (ADR-0007, A2), the default.** The inbox gets one line, `📩 claude-monitor web message <id> ...`,
+that holds nothing the web wrote. `cm-agent config push-format full` (or `cm-agent install --push-format full`, or `CM_INBOX_FORMAT=full`) brings back the whole text. The session reads the message with the `monitor_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `cm-agent status` as "not read yet". The text of an applied message is forgotten after 7 days.
 
 ### Pushing through a Claude Code channel (`--push channel`)
 

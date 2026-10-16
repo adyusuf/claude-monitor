@@ -244,13 +244,35 @@ public sealed class InboxShortTests : IDisposable
     // ---- the setting -----------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData("short", "short")]
     [InlineData("full", "full")]
-    [InlineData("SHORT", "full")] // exact values only; anything else is the whole text
-    [InlineData("on", "full")]
-    [InlineData("", "full")]
-    [InlineData(null, "full")]
-    public void Only_the_exact_word_short_selects_the_short_format(string? value, string expected) => Assert.Equal(expected, InboxFormats.Normalize(value));
+    [InlineData("short", "short")]
+    [InlineData("FULL", "short")] // only the exact word full asks for the whole text; anything else, and nothing, is the simple short notice
+    [InlineData("on", "short")]
+    [InlineData("", "short")]
+    [InlineData(null, "short")]
+    public void Only_the_exact_word_full_selects_the_whole_text(string? value, string expected) => Assert.Equal(expected, InboxFormats.Normalize(value));
+
+    [Fact]
+    public async Task Nothing_chosen_means_the_short_notice_for_a_fresh_install_and_for_the_environment()
+    {
+        Assert.Equal(InboxFormats.Brief, AgentConfig.FromEnvironment(_ => null).InboxFormat);
+        var plain = AgentConfig.FromEnvironment(k => k switch { "CM_AGENT_HOME" => home.Dir, "CM_PUSH" => "inbox", _ => null });
+        Assert.True(SavedSettings.Apply(plain).InboxShortEnabled);
+
+        Queue("c-1", "s-1");
+        await PumpAsync(plain);
+
+        Assert.StartsWith("📩 claude-monitor web message c-1 ", Assert.Single(sent), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Full_is_still_there_for_whoever_asks_for_it()
+    {
+        Assert.Equal(0, await UpdateCommand.ConfigAsync(["config", "push-format", "full"], home.Config, new StringWriter(), new StringWriter()));
+        var chosen = SavedSettings.Apply(home.Config with { InboxFormat = InboxFormats.Brief });
+        Assert.Equal(InboxFormats.Full, chosen.InboxFormat);
+        Assert.False(chosen.InboxShortEnabled);
+    }
 
     [Fact]
     public async Task The_format_is_saved_by_the_config_command_and_by_install_and_the_environment_wins()

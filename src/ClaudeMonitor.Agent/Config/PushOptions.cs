@@ -32,8 +32,8 @@ public static class InboxFormats
     public const string Full = "full";
     public const string Brief = "short"; // the value people type; the name avoids the type-name rule (CA1720)
 
-    /// <summary>"short" is the short notice; anything else, and nothing saved, is the full text, so an upgrade changes nothing for anyone.</summary>
-    public static string Normalize(string? value) => value == Brief ? Brief : Full;
+    /// <summary>"full" is the whole text; anything else, and nothing saved, is the short notice (the maintainer's decision, 16/10/2026: the simple form is the default).</summary>
+    public static string Normalize(string? value) => value == Full ? Full : Brief;
 
     public static bool IsValid(string? value) => value is Full or Brief;
 }
