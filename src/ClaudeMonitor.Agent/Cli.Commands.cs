@@ -47,9 +47,9 @@ public static partial class Cli
         }
         else if (!config.PushFromEnvironment && Identity.Peek(config)?.Push is null)
         {
-            // The first install turns the inbox push on (the maintainer's decision, 16/10/2026): a prompt sent from the web starts a turn in an idle
-            // session. Once anything is saved (--push off, config push off, or an earlier install) it is kept as chosen, never switched back on.
-            config = SavedSettings.SavePush(config, true, PushTransports.Inbox);
+            // The first install turns the push on, through the channel (the maintainer's decision, 16/10/2026; --push inbox picks the inbox instead): a
+            // prompt sent from the web reaches an idle session. Once anything is saved (--push off, config push off, or an earlier install) it is kept as chosen.
+            config = SavedSettings.SavePush(config, true, PushTransports.Channel);
         }
 
         return new PluginInstaller(config, stdout, run).Install(sourceBinary);

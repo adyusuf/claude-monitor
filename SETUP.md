@@ -114,7 +114,7 @@ inbox needs none); Windows needs Git for Windows (Claude Code requires it) and h
 
 ### Pushing web messages into an idle session
 
-On after the first `cm-agent install` (the inbox push; the maintainer's decision of 16/10/2026): nothing was saved about push yet, so the install saves it as on. A later choice is kept as it is: `cm-agent install --push off` or `cm-agent config push off` turns it off and a reinstall does not turn it back on; `CM_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
+On after the first `cm-agent install`, through the **channel** (the maintainer's decision of 16/10/2026): nothing was saved about push yet, so the install saves `channel`. The channel needs Claude Code started with the flag `install` prints (below); the desktop app and VS Code cannot pass it, so on a machine that uses them choose the inbox: `cm-agent install --push inbox`. A later choice is kept as it is: `cm-agent install --push off` or `cm-agent config push off` turns it off and a reinstall does not turn it back on; `CM_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
 sent from the web start a turn in an idle session within about a second, **with no start-up flag**: every Claude Code session (terminal, desktop app, VS Code) has an *inbox socket*, its hooks learn
 where it is (`CLAUDE_CODE_MESSAGING_SOCKET`), and the daemon writes the prompt there (ADR-0007). The text is wrapped, labelled as
 coming from the web and capped; the session is told to treat it as data and to ask you before any request with side effects. A
@@ -128,7 +128,7 @@ inbox existed all still mean the channel. A prompt written to a session that nev
 
 `cm-agent install --push channel` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
 Claude Code **channel**: a prompt sent from the web starts a turn in an idle session within about a second, wrapped as
-`<<<claude-monitor-message …>>>` and labelled as coming from the web (untrusted: the session is told to treat it as data and
+`<channel source="claude-monitor" origin="web" message_id="…">` (just the text inside; the session starts its reply with one `Web: …` line) and labelled as coming from the web (untrusted: the session is told to treat it as data and
 to ask you before any request with side effects). A channel is a Claude Code research preview and a custom one is not on its
 allowlist, so Claude Code must be started with the flag `install` prints:
 

@@ -102,9 +102,9 @@ public sealed class McpPushTests : IDisposable
             var sw = Stopwatch.StartNew();
             var n = await ReadAsync(p, m => m["method"]?.GetValue<string>() == "notifications/claude/channel", TimeSpan.FromSeconds(10));
             Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"arrived after {sw.Elapsed}");
-            Assert.Equal("<<<claude-monitor-message id=c-1\nplease run the tests\nclaude-monitor-message>>>", n["params"]!["content"]!.GetValue<string>());
-            Assert.Equal(("c-1", "s-on", "web"), (n["params"]!["meta"]!["message_id"]!.GetValue<string>(), n["params"]!["meta"]!["session_id"]!.GetValue<string>(),
-                n["params"]!["meta"]!["origin"]!.GetValue<string>()));
+            Assert.Equal("please run the tests", n["params"]!["content"]!.GetValue<string>());
+            Assert.Equal(("c-1", "web"), (n["params"]!["meta"]!["message_id"]!.GetValue<string>(), n["params"]!["meta"]!["origin"]!.GetValue<string>()));
+            Assert.Null(n["params"]!["meta"]!["session_id"]);
 
             var status = await CallStatusAsync(p);
             Assert.StartsWith("Connected to https://m.invalid", status, StringComparison.Ordinal);

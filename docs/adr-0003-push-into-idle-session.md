@@ -1,6 +1,6 @@
 # ADR-0003: Pushing web messages into an idle session
 
-**Status:** Accepted (05/10/2026), opt-in for the channel push. The inbox push (ADR-0007) is on after the first install (16/10/2026). Extends [ADR-0002](adr-0002-agent-platform.md), "Commands from the web".
+**Status:** Accepted (05/10/2026). Since 16/10/2026 the first `cm-agent install` turns the push on, through the channel (`--push inbox` is the other transport, ADR-0007); `--push off` stays off. Extends [ADR-0002](adr-0002-agent-platform.md), "Commands from the web".
 **Decider:** the maintainer asked for it; the mechanism was chosen from what the Claude Code plugin API supports.
 
 ## Context
@@ -46,10 +46,10 @@ not reliable). Windows reads the parent through `NtQueryInformationProcess`; tha
 
 ### Untrusted input
 
-Every web message is wrapped `<<<claude-monitor-message id=… … claude-monitor-message>>>`, labelled
-(`source`, `message_id`, `session_id`, `origin="web"`, `sent_at`), capped at 8000 characters, and anything in the body
-that could close the wrapper or forge a `<channel>` tag is defused. The server `instructions` tell the session to treat
-the text as data and to ask the user at the terminal before any side-effecting request. This is an instruction to the
+Every web message reaches the session as Claude Code's own `<channel source="claude-monitor" origin="web" message_id="…">text</channel>` (since 16/10/2026 the bare text:
+the earlier `<<<claude-monitor-message …>>>` fences and the `session_id` and `sent_at` attributes are gone from the channel; the inbox text keeps its fence), capped at 8000 characters, and anything in the body
+that could forge a `<channel>` tag or a fence is defused. The server `instructions` tell the session to treat
+the text as data, to begin its reply with one line `Web: <the message>` so the person need not read the tag, and to ask the user at the terminal before any side-effecting request. A transcript line confirms a channel push by its `message_id` attribute. This is an instruction to the
 model, not a sandbox: the authority that matters is that only the session's owner can send (ADR-0002) and that the
 channel is off unless the user enabled it.
 

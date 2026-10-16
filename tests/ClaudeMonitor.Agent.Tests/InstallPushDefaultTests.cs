@@ -3,7 +3,7 @@ using ClaudeMonitor.Agent.Config;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>The first `cm-agent install` turns the inbox push on; a choice made afterwards (off, channel) is never overridden by a later install.</summary>
+/// <summary>The first `cm-agent install` turns the channel push on; a choice made afterwards (off, inbox) is never overridden by a later install.</summary>
 public sealed class InstallPushDefaultTests : IDisposable
 {
     private readonly TempHome home = new();
@@ -25,7 +25,7 @@ public sealed class InstallPushDefaultTests : IDisposable
     }
 
     [Fact]
-    public void The_first_install_saves_the_inbox_push_as_on_and_says_so()
+    public void The_first_install_saves_the_channel_push_as_on_and_says_how_to_start_claude()
     {
         Assert.Null(Identity.Peek(home.Config));
 
@@ -34,8 +34,21 @@ public sealed class InstallPushDefaultTests : IDisposable
         Assert.Equal(0, code);
         var saved = Identity.Peek(home.Config)!;
         Assert.True(saved.Push);
+        Assert.Equal(PushTransports.Channel, saved.PushTransport);
+        Assert.Contains("Push is ON through a channel", output, StringComparison.Ordinal);
+        Assert.Contains("--dangerously-load-development-channels", output, StringComparison.Ordinal);
+        Assert.True(SavedSettings.Apply(home.Config).ChannelPushEnabled);
+    }
+
+    [Fact]
+    public void The_inbox_can_be_chosen_at_the_first_install_and_is_kept()
+    {
+        Install(home.Config, "--push", "inbox");
+        Install(home.Config);
+
+        var saved = Identity.Peek(home.Config)!;
+        Assert.True(saved.Push);
         Assert.Equal(PushTransports.Inbox, saved.PushTransport);
-        Assert.Contains("Push is ON through each session's inbox", output, StringComparison.Ordinal);
         Assert.True(SavedSettings.Apply(home.Config).InboxPushEnabled);
     }
 
@@ -71,17 +84,6 @@ public sealed class InstallPushDefaultTests : IDisposable
         Install(home.Config);
 
         Assert.False(Identity.Peek(home.Config)!.Push);
-    }
-
-    [Fact]
-    public void An_explicit_channel_choice_is_kept_and_not_replaced_by_the_inbox()
-    {
-        Install(home.Config, "--push", "channel");
-        Install(home.Config);
-
-        var saved = Identity.Peek(home.Config)!;
-        Assert.True(saved.Push);
-        Assert.Equal(PushTransports.Channel, saved.PushTransport);
     }
 
     [Fact]
