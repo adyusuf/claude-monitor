@@ -120,7 +120,7 @@ can run the application's tests on a test machine.
   captured) are joined by (agent, project key) in the query; nothing is copied; alerts have no project and are shown
   per machine as today. The web shows per machine per project: version, last runs by kind with result, recent errors;
   `monitor_machine` prints a capped summary. Retention follows `retention_days`; export and deletion treat the rows
-  like runs. A parsed test summary (passed/failed counts) is **open** (§9.16).
+  like runs. A parsed test summary (passed/failed counts) is in (§9.16).
 
 ### 3b. Claude knows without being asked (request 2)
 
@@ -433,30 +433,34 @@ the service home, the `systemd --user` unit and its start limit; the macOS servi
 10. **Start block — decided:** on by default when remote runs are on and another machine exists; `CM_MACHINES_CONTEXT=off`
     locally; the machine list inside the untrusted envelope, the rules outside.
 11. **Order — met:** `feature/inbox-push` is on `dev` (`43c835f`, `4702c16`); phases start from `dev`.
-12. **Standalone autostart — decided:** user-level LaunchAgent / `systemd --user` / logon task, login first, no exit loop
-    when not connected. **Open:** a Windows logon task may open a console window for a console binary; measure it on a
-    Windows host before release (the fallback, a hidden-window launcher, would be a new decision).
-13. **TOTP for shell and argv runs to strict targets — open, re-raised by the qa pass:** the maintainer first chose to
-    leave ADR-0005's item open. Without it the script rule (3) is bypassed by sending the same text as a shell run, or
-    as an argv run of an interpreter, or through an argv grant, none of which needs a code. **Recommendation:** on a
-    strict target every per-call approval (shell, argv of an interpreter, script) and every grant or job approval needs
-    a TOTP code, under the same "no two-step sign-in, no approval" rule; grants already approved keep working until they
-    expire. This changes shell behaviour on strict targets only, in phase 2.
+12. **Standalone autostart — decided (maintainer, 16/10/2026):** user-level LaunchAgent / `systemd --user` / logon task, login
+    first, no exit loop when not connected. **On macOS and Windows the autostarted agent is an application, not a console
+    program:** a Windows build of the standalone agent uses the GUI subsystem (no console window; its output goes to the log),
+    and macOS starts it as an app bundle's executable through the LaunchAgent. The console binary stays for the CLI verbs and for
+    Linux. Phase 4 builds both and measures that no window appears on a Windows host before release.
+13. **TOTP for shell and argv runs to strict targets — deferred (maintainer, 16/10/2026):** not built now, and phase 2 does not
+    change shell or argv approvals on strict targets. Until it is decided, the script rule (3) is only as strong as the weakest run
+    mode to the same strict target (§8). The recommendation stays on record: on a strict target every per-call approval (shell, argv
+    of an interpreter, script) and every grant or job approval needs a TOTP code, under the same "no two-step sign-in, no approval"
+    rule; grants already approved keep working until they expire.
 14. **Mode for implementation — decided:** mode C (the maintainer's choice over the mode rule's pointer to D); the
     security and schema dimensions are reviewed by `qa` with the orchestrator verifying the critical findings, and the
     coverage threshold by the gate.
 15. **Tool inventory — decided:** inventory only, no requirement profiles; user-owned installs are listed and marked
     untrusted.
 16. **Extra facts — decided:** tags, admin note, listening services (opt-in), projects with an automatic per-machine
-    history, all in phase 1b; project folders on machines without Claude Code are admin-listed. **Open:** whether a
-    project's history should also carry a parsed test summary (passed/failed counts) from a run's output; v1 records
-    exit code, duration and completeness only, since parsing is harness-specific.
-17. **Request 4's wording — flagged:** "the daemon gets help" is built as "a Claude session (or a person at the CLI)
-    gets help through the daemons"; a daemon never originates an ask (global #20). **Open** only if the maintainer
-    meant a daemon-originated ask, which would need its own trigger rules and decision.
-18. **Mobile app — open:** its stack (React Native with Expo and Maestro are the global default; this repository's stack
-    rule would gain them, global #10), where it lives, native sign-in, push notifications (a dependency and a secret),
-    and the first-version scope of §3h. Planned as ADR-0009 after phase 2.
+    history, all in phase 1b; project folders on machines without Claude Code are admin-listed. **A parsed test summary is in
+    (maintainer, 16/10/2026):** a `test` run's output is read for the passed, failed and skipped counts of the tools whose
+    summary line is known (dotnet test, vitest and jest, pytest); an unknown tool leaves the counts empty, and the exit code,
+    duration and completeness are recorded either way. The counts are stored on the run (`tests_passed`, `tests_failed`,
+    `tests_skipped`, NULL when not recognised) and shown in the project history.
+17. **Request 4's wording — decided (maintainer, 16/10/2026):** a daemon never originates an ask (global #20); whatever a person or
+    a Claude session requests, a daemon that does not understand the request gets help from Claude: it hands the request to a
+    Claude session on its own machine (phase 3, same-user asks through the inbox), and the answer goes back to the requester. The
+    trigger is always a request, never the daemon's own initiative.
+18. **Mobile app — deferred (maintainer, 16/10/2026):** after the machine phases; its stack (React Native with Expo and Maestro
+    are the global default; this repository's stack rule would gain them, global #10), where it lives, native sign-in, push
+    notifications (a dependency and a secret) and the first-version scope of §3h stay open and become ADR-0009 when it is taken up.
 
 ## 10. Not decided here, reported
 
