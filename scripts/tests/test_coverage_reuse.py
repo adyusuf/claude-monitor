@@ -137,5 +137,43 @@ class CoverageReuse(ToolCase):
         self.assertFalse(os.path.exists(self.results))
 
 
+class GateConf(unittest.TestCase):
+    """scripts/merge-gate.conf, sourced the way gate-core.sh does: what a child process (coverage.sh) will see."""
+
+    ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+
+    def sourced(self, **env):
+        run_env = {k: v for k, v in os.environ.items() if not k.startswith('COVERAGE_')}
+        run_env.update(env)
+        script = ('. scripts/merge-gate.conf; '
+                  'printf "MIN=%s\\nREUSE=%s\\nOWNED=%s\\nDIR=%s\\n" "${COVERAGE_MIN:-}" "${COVERAGE_REUSE:-}" '
+                  '"${COVERAGE_DIR_OWNED:-}" "${COVERAGE_DIR:-}"; env | grep "^COVERAGE_" | sort')
+        result = subprocess.run(['bash', '-c', script], cwd=self.ROOT, capture_output=True, text=True, env=run_env)
+        self.assertEqual(0, result.returncode, result.stderr)
+        values = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+        return values, result.stdout
+
+    def test_the_threshold_is_exported_so_coverage_sh_sees_it(self):
+        values, out = self.sourced(TARGET='prod')
+        self.assertEqual('80', values['MIN'])
+        self.assertIn('COVERAGE_MIN=80', out.split('DIR=', 1)[1])        # in the environment, not only a shell variable
+
+    def test_a_dev_gate_run_gets_a_fresh_coverage_directory_to_reuse(self):
+        values, _ = self.sourced(TARGET='dev')
+        try:
+            self.assertEqual('1', values['REUSE'])
+            self.assertEqual('1', values['OWNED'])
+            self.assertTrue(os.path.isdir(values['DIR']), values['DIR'])
+            self.assertEqual([], os.listdir(values['DIR']))                # fresh: nothing a stale run could have left
+        finally:
+            shutil.rmtree(values['DIR'], ignore_errors=True)
+
+    def test_the_prod_gate_and_a_listing_make_no_directory(self):
+        for env in ({'TARGET': 'prod'}, {'TARGET': 'dev', 'LIST_ONLY': '1'}):
+            values, _ = self.sourced(**env)
+            self.assertEqual('', values['DIR'], env)
+            self.assertEqual('', values['REUSE'], env)
+
+
 if __name__ == '__main__':
     unittest.main()
