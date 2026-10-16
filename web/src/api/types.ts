@@ -104,35 +104,7 @@ export interface DeviceLookup { userCode: string; hostname: string; os: string; 
 export interface AuditRow { id: number; action: string; actorUserId: string | null; actorAgentId: string | null; targetType: string | null; targetId: string | null; at: string; detail: unknown }
 
 // Remote work (ADR-0005): machines, metrics, alerts, runs, grants, jobs.
-export type ExecLevel = "off" | "argv" | "shell";
-export interface DiskSample { mount: string; usedBytes: number; totalBytes: number }
-export interface MetricSample { sampledAt: string; cpuPct: number; memUsedBytes: number; memTotalBytes: number; disks: DiskSample[] }
-export interface MachineView {
-  agentId: string;
-  hostname: string;
-  os: string;
-  userName: string;
-  execLevel: ExecLevel;
-  serviceMode: boolean;
-  online: boolean;
-  lastSeenAt: string | null;
-  latest: MetricSample | null;
-  openAlerts: number;
-}
-export type AlertKind = "cpu" | "memory" | "disk" | "offline";
-export interface AlertView {
-  id: string;
-  agentId: string;
-  hostname: string;
-  kind: AlertKind;
-  subject: string;
-  state: "open" | "resolved";
-  thresholdPct: number;
-  lastValue: number;
-  peakValue: number;
-  openedAt: string;
-  resolvedAt: string | null;
-}
+export * from "./typesMachines";
 
 export type RunStatus =
   | "pending_approval" | "approved" | "delivered" | "running" | "succeeded" | "failed" | "timed_out" | "denied" | "expired" | "cancelled";
