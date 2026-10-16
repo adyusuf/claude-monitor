@@ -1,0 +1,61 @@
+# The Playwright e2e suite (e2e/) on a GitHub runner — a TRIAL, not part of the gate: nothing in CI's gate waits for it
+# and a red run blocks nothing (global #33: e2e is optional). It sits beside ci.yml and does not touch it.
+# e2e/serve-local.sh builds this commit and starts its own PostgreSQL 18 and Mailpit (Docker, which the runner has),
+# so no test environment and no secret is needed. Chromium and WebKit, one worker, no retries (e2e/playwright.config.ts).
+# Whether this stays is the maintainer's decision. Ask for the verdict with: scripts/ci-status.sh <branch> --workflow e2e
+name: e2e
+
+on:
+  push:
+    branches:
+      - test
+      - feature/e2e-github-trial # TRIAL ONLY: remove this line before the branch is merged
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *" # nightly, 03:17 UTC, on the default branch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright (chromium + webkit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Third-party actions are pinned to a full commit SHA (the tag is in the comment).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Tool versions
+        run: |
+          dotnet --version
+          node --version
+          docker version --format '{{.Server.Version}}'
+
+      - name: Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium webkit
+          npx playwright test
+
+      - name: Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-traces
+          path: e2e/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
