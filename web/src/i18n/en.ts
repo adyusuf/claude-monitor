@@ -152,6 +152,11 @@ export const en = {
     step2: "Connect it to this workspace (a code appears; approve it on the page that opens):",
     step3: "Register it with Claude Code. From now on Claude Code starts it with every session:",
     macos: "macOS", windows: "Windows", linux: "Linux", notAvailable: "Not published yet for this system.",
+    pluginTitle: "Install as a Claude Code plugin (recommended)",
+    pluginIntro: "The plugin downloads the agent, checks it, connects it to this workspace and stops it when you remove the plugin. Nothing to download by hand.",
+    plugin1: "Install the plugin. Claude Code asks for the server address, which is:",
+    plugin2: "Then, in Claude Code, connect this machine (a code appears; approve it on the page that opens):",
+    orManual: "Or install the agent by hand:",
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: {
