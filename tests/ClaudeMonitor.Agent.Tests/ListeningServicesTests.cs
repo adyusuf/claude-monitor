@@ -86,7 +86,7 @@ public sealed class ListeningServicesTests
 
     // ---- Windows: the IP helper's listener table ---------------------------------------------------------------------
 
-    private static byte[] Table(bool ipv6, params (int Port, int Pid)[] rows)
+    private static byte[] ListenerTable(bool ipv6, params (int Port, int Pid)[] rows)
     {
         var size = ipv6 ? 56 : 24;
         var bytes = new byte[4 + (rows.Length * size)];
@@ -105,18 +105,18 @@ public sealed class ListeningServicesTests
     [Fact]
     public void The_listener_table_of_both_families_gives_port_and_owning_process()
     {
-        Assert.Equal([(5432, 4120), (443, 4)], ListeningServices.ParseTcpTable(Table(false, (5432, 4120), (443, 4)), ipv6: false));
-        Assert.Equal([(8080, 900)], ListeningServices.ParseTcpTable(Table(true, (8080, 900)), ipv6: true));
+        Assert.Equal([(5432, 4120), (443, 4)], ListeningServices.ParseTcpTable(ListenerTable(false, (5432, 4120), (443, 4)), ipv6: false));
+        Assert.Equal([(8080, 900)], ListeningServices.ParseTcpTable(ListenerTable(true, (8080, 900)), ipv6: true));
     }
 
     [Fact]
     public void A_truncated_or_empty_table_gives_the_rows_that_are_whole_and_never_throws()
     {
-        var whole = Table(false, (22, 1), (80, 2));
+        var whole = ListenerTable(false, (22, 1), (80, 2));
         Assert.Equal([(22, 1)], ListeningServices.ParseTcpTable(whole.AsSpan(0, 4 + 24 + 10), ipv6: false)); // the second row is cut
         Assert.Empty(ListeningServices.ParseTcpTable([], ipv6: false));
         Assert.Empty(ListeningServices.ParseTcpTable(new byte[2], ipv6: true));
-        var lying = Table(false, (22, 1));
+        var lying = ListenerTable(false, (22, 1));
         BinaryPrimitives.WriteInt32LittleEndian(lying, 1000); // a count larger than the buffer
         Assert.Single(ListeningServices.ParseTcpTable(lying, ipv6: false));
     }
