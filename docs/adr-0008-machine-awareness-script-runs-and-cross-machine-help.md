@@ -476,7 +476,7 @@ the service home, the `systemd --user` unit and its start limit; the macOS servi
 **Built.** Phase 0 (splits), 1 (roles, presence, tool inventory, the machines block), 1b (tags, note, listening services, projects, run `project` and
 `kind`, the parsed test summary, `monitor_machine`, retention, export, deletion), 2 (script runs, strict-target two-step code, the role re-check at delivery,
 the output cap and the completeness verdict, `monitor_run_script`), 3 (asks, `monitor_ask`, `monitor_ask_result`, `monitor_answer`) and 4 (`install --standalone`,
-the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is deferred by the maintainer.
+the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is deferred by the maintainer; [ADR-0009](adr-0009-mobile-app.md) is its planning document only (questions, nothing decided or built).
 
 **Differences from the plan, each on purpose.**
 - Shell and argv approvals on strict targets still need no code (§9.13 deferred), so the script rule is only as strong as the weakest run mode there.
@@ -484,13 +484,15 @@ the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is defer
   agent account's own processes are named (another account's port shows without a name).
 - Project facts: an admin-listed folder is read, and so is a folder a session worked in in the last 30 days (the hook remembers its path in the local database; the
   API only gets the key and an HMAC of the path). Such a project is reported with source `session`; a project in both is reported as listed.
-- The requester logic was not moved into a `Requests/` folder: the CLI verbs use `RemoteRequests`, `Targets` and the contracts where they are (a cosmetic move that would
-  have touched every MCP test); there is no `asks_out` table: `monitor_ask_result` asks the API each time. The local table of received asks is `asks_in`.
+- The requester logic lives in `Requests/` (`RemoteRequests`, `Targets`, and `RemoteClient`, the one layer the MCP tools and the CLI verbs both use). The asks this machine
+  sent have a local table, `asks_out`: the daemon follows an ask like a run (fetch at once, again on an `ask_update` stream event or when stale, give up on a 404, forget
+  finished ones after the retention), and `monitor_ask_result` and `cm-agent result` read only that table, so they never call the API (the agent's rule). An id the agent has
+  not heard of is followed from the first read and answered "not known yet". The local table of received asks is `asks_in`.
 - The Windows autostart is the same program with its PE subsystem set to GUI (`PeSubsystem`), made by the installer, because the release zip carries one binary; a
   `CmWindowless=true` build exists as the alternative. The macOS autostart runs the executable inside an application bundle.
 - The agent's `--exec` for a standalone agent is the existing interactive one.
 
-**Unverified (to do before anything is promoted).** Tests added after the run of 16/10/2026 (the tools of asks and scripts, `monitor_machine`, visited folders, the
+**Unverified (to do before anything is promoted).** Tests added after the run of 16/10/2026 (the requester layer and `asks_out`, the tools of asks and scripts, `monitor_machine`, visited folders, the
 `lsof` and listener-table parsers, the standalone command line) are written and have not been run. The merge gate (coverage per codebase, SAST, secret and dependency scans, backward-compatibility scan) has not run on
 this branch; the phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
 gate, interpreter paths and `-File` under a policy, `schtasks`); on Linux the `/proc` service names and `systemd --user` (the tests run on macOS); the macOS launchd
