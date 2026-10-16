@@ -50,8 +50,10 @@ public static class ExecPolicyLoader
             var claimEnv = Claim(file.Environment, MachineEnvironments.All);
             var claimFn = Claim(file.Function, MachineFunctions.All);
             var folders = Folders(file.Projects);
+            // A run account the file names but that is not a plain name means "runs as the service account" would be wrong: the file is not believed at all.
+            if (file.RunAccount is not null && !RunAccount.IsValidName(file.RunAccount)) return ExecPolicy.Off with { ClaimedEnvironment = claimEnv, ClaimedFunction = claimFn, ProjectFolders = folders };
             return AllAbsolute(executables) && AllAbsolute(roots)
-                ? new ExecPolicy(level, executables, roots, claimEnv, claimFn, folders)
+                ? new ExecPolicy(level, executables, roots, claimEnv, claimFn, folders, file.RunAccount)
                 : ExecPolicy.Off with { ClaimedEnvironment = claimEnv, ClaimedFunction = claimFn, ProjectFolders = folders };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
@@ -76,7 +78,8 @@ public static class ExecPolicyLoader
             var roots = file.AllowedRoots ?? [];
             // The claim rides with the ceiling (ADR-0008 §3a): a reinstall must not erase what an admin wrote.
             return AllAbsolute(executables) && AllAbsolute(roots)
-                ? new ExecPolicy(level, executables, roots, Claim(file.Environment, MachineEnvironments.All), Claim(file.Function, MachineFunctions.All), Folders(file.Projects))
+                ? new ExecPolicy(level, executables, roots, Claim(file.Environment, MachineEnvironments.All), Claim(file.Function, MachineFunctions.All), Folders(file.Projects),
+                    RunAccount.IsValidName(file.RunAccount) ? file.RunAccount : null)
                 : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
@@ -104,7 +107,7 @@ public static class ExecPolicyLoader
         try
         {
             var file = new ExecFile(policy.Level, [.. policy.AllowedExecutables], [.. policy.AllowedRoots], policy.ClaimedEnvironment, policy.ClaimedFunction,
-                policy.ProjectFolders is { Count: > 0 } folders ? [.. folders] : null);
+                policy.ProjectFolders is { Count: > 0 } folders ? [.. folders] : null, policy.RunAccount);
             File.WriteAllText(temp, JsonSerializer.Serialize(file, Json));
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, SavedFileMode);
             File.Move(temp, path, overwrite: true);
@@ -120,7 +123,7 @@ public static class ExecPolicyLoader
     public static string Describe(ExecPolicy p)
     {
         ArgumentNullException.ThrowIfNull(p);
-        return $"exec level {p.Level}, {p.AllowedExecutables.Count} allowed executables, {p.AllowedRoots.Count} allowed roots";
+        return $"exec level {p.Level}, {p.AllowedExecutables.Count} allowed executables, {p.AllowedRoots.Count} allowed roots{(p.RunAccount is { } a ? $", runs as {a}" : "")}";
     }
 
     /// <summary>True for root (Unix) or SYSTEM and administrators (Windows); the executor refuses to run then. Unknown counts as true.</summary>
@@ -189,5 +192,6 @@ public static class ExecPolicyLoader
     private sealed record ExecFile(string? Level, List<string>? AllowedExecutables, List<string>? AllowedRoots,
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Environment = null,
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Function = null,
-        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] List<string>? Projects = null);
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] List<string>? Projects = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? RunAccount = null);
 }

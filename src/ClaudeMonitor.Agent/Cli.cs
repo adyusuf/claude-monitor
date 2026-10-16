@@ -34,8 +34,9 @@ public static partial class Cli
         cm-agent uninstall --standalone
                                         this machine as a daemon without Claude Code: it logs in first, then starts when you log in
                                         (an application on macOS and Windows, systemd --user on Linux), in your own account (ADR-0008)
-        cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
-        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005)
+        cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root] [--run-account [<name>]]
+        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005); --run-account makes remote runs start
+                                        as a second unprivileged account (Linux and macOS, through sudo; ADR-0010)
         cm-agent connect [--server <url>]
                                         like login, from inside Claude Code: prints the code and returns; the login finishes in the background
         cm-agent restart                hand the running daemon over to this binary

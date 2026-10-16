@@ -17,10 +17,16 @@ public sealed class ScriptScratch : IDisposable
     /// <summary>The stdin text is kept in a file the process's stdin is opened from; a leading dot keeps the name out of the run's own file names (ADR-0010 §2).</summary>
     public const string StdinName = ".stdin";
 
-    private ScriptScratch(string folder, string scriptPath)
+    private readonly UnixFileMode dirMode;
+    private readonly UnixFileMode fileMode;
+
+    private ScriptScratch(string folder, string scriptPath, bool shared)
     {
         Folder = folder;
         ScriptPath = scriptPath;
+        // A run account works in a folder it shares with the service (ADR-0010 §5): its group can read and write, nobody else can.
+        dirMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | (shared ? UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute : 0);
+        fileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | (shared ? UnixFileMode.GroupRead | UnixFileMode.GroupWrite : 0);
     }
 
     public string Folder { get; }
@@ -34,23 +40,24 @@ public sealed class ScriptScratch : IDisposable
     public string TempFolder => Path.Combine(Folder, RunEnvironment.TempFolder);
 
     /// <summary>Makes the folder and writes the script. Throws <see cref="IOException"/> when the folder already exists (a run id is used once).</summary>
-    public static ScriptScratch Create(string home, Guid runId, string interpreter, string body, IReadOnlyList<ScriptFile>? files = null, string? stdin = null)
+    public static ScriptScratch Create(string home, Guid runId, string interpreter, string body, IReadOnlyList<ScriptFile>? files = null, string? stdin = null, bool shared = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(home);
         ArgumentNullException.ThrowIfNull(body);
         var extension = ScriptInterpreters.Extension(interpreter) ?? throw new ArgumentOutOfRangeException(nameof(interpreter));
-        var folder = Path.Combine(home, RunsFolder, runId.ToString("N"));
-        Directory.CreateDirectory(Path.Combine(home, RunsFolder));
+        // With a run account the scratch folders are made directly in the shared work folder (its setgid keeps their group); otherwise in runs/ of the home.
+        var folder = shared ? Path.Combine(home, runId.ToString("N")) : Path.Combine(home, RunsFolder, runId.ToString("N"));
+        var scratch = new ScriptScratch(folder, Path.Combine(folder, ScriptName + extension), shared);
+        Directory.CreateDirectory(shared ? home : Path.Combine(home, RunsFolder));
         if (Directory.Exists(folder)) throw new IOException("the scratch folder of this run already exists");
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(folder);
-        else Directory.CreateDirectory(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        var scratch = new ScriptScratch(folder, Path.Combine(folder, ScriptName + extension));
+        else Directory.CreateDirectory(folder, scratch.dirMode);
         try
         {
             if (OperatingSystem.IsWindows()) Directory.CreateDirectory(scratch.TempFolder);
-            else Directory.CreateDirectory(scratch.TempFolder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            else Directory.CreateDirectory(scratch.TempFolder, scratch.dirMode);
             var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
-            if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            if (!OperatingSystem.IsWindows()) options.UnixCreateMode = scratch.fileMode;
             using (var stream = new FileStream(scratch.ScriptPath, options))
             {
                 var bytes = new System.Text.UTF8Encoding(false).GetBytes(body);
@@ -61,7 +68,7 @@ public sealed class ScriptScratch : IDisposable
             scratch.HasFiles = files is { Count: > 0 };
             if (stdin is { Length: > 0 })
             {
-                WriteText(Path.Combine(folder, StdinName), stdin);
+                scratch.WriteText(Path.Combine(folder, StdinName), stdin);
                 scratch.StdinPath = Path.Combine(folder, StdinName);
             }
         }
@@ -84,16 +91,16 @@ public sealed class ScriptScratch : IDisposable
         if (!Directory.Exists(parent))
         {
             if (OperatingSystem.IsWindows()) Directory.CreateDirectory(parent);
-            else Directory.CreateDirectory(parent, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            else Directory.CreateDirectory(parent, dirMode);
         }
 
         WriteText(target, file.Text);
     }
 
-    private static void WriteText(string path, string text)
+    private void WriteText(string path, string text)
     {
         var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
-        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = fileMode;
         using var stream = new FileStream(path, options);
         stream.Write(new System.Text.UTF8Encoding(false).GetBytes(text));
     }
@@ -158,12 +165,24 @@ public sealed class ScriptScratch : IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(home);
         ArgumentNullException.ThrowIfNull(isRunning);
-        var runs = Path.Combine(home, RunsFolder);
+        return SweepFolder(Path.Combine(home, RunsFolder), isRunning, onlyRunFolders: false);
+    }
+
+    /// <summary>
+    /// The same for one folder: the shared work folder of a run account (ADR-0010 §5) is swept with <paramref name="onlyRunFolders"/>, so only a folder named like a run
+    /// (32 hex digits) is ever removed there.
+    /// </summary>
+    public static int SweepFolder(string runs, Func<Guid, bool> isRunning, bool onlyRunFolders)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(runs);
+        ArgumentNullException.ThrowIfNull(isRunning);
         if (!Directory.Exists(runs)) return 0;
         var removed = 0;
         foreach (var folder in Directory.EnumerateDirectories(runs))
         {
-            if (Guid.TryParseExact(Path.GetFileName(folder), "N", out var id) && isRunning(id)) continue;
+            var isRun = Guid.TryParseExact(Path.GetFileName(folder), "N", out var id);
+            if (onlyRunFolders && !isRun) continue;
+            if (isRun && isRunning(id)) continue;
             try
             {
                 Directory.Delete(folder, recursive: true);

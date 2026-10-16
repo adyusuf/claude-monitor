@@ -38,7 +38,7 @@ public sealed record RunResult(string Status, int? ExitCode, string? Error, bool
 /// A callback that throws ends the run's reporting: the process is cleaned up and the exception reaches the caller.
 /// </summary>
 public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog log, Func<RunMessage, ExecDecision> guard,
-    Func<bool> runningAsRoot)
+    Func<bool> runningAsRoot, Func<string?>? runAccount = null)
 {
     private static readonly TimeSpan DrainWait = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan ExitWait = TimeSpan.FromSeconds(5);
@@ -147,7 +147,10 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
     {
         try
         {
-            return ScriptScratch.Create(config.Home, run.Id, run.ScriptInterpreter!, run.ScriptBody!, run.ScriptFiles, run.ScriptStdin);
+            var account = runAccount?.Invoke();
+            return account is null
+                ? ScriptScratch.Create(config.Home, run.Id, run.ScriptInterpreter!, run.ScriptBody!, run.ScriptFiles, run.ScriptStdin)
+                : ScriptScratch.Create(RunAccount.WorkFolder(config.Home), run.Id, run.ScriptInterpreter!, run.ScriptBody!, run.ScriptFiles, run.ScriptStdin, shared: true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -159,18 +162,21 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
     private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0, TimeSpan timeout, ScriptScratch? scratch)
     {
         var limits = RunLimits.For(config, timeout);
+        // With a run account (ADR-0010 §5) the run starts as that account, and its home and working directory are the work folder it shares with the service.
+        var account = runAccount?.Invoke();
+        var home = account is null ? config.Home : RunAccount.WorkFolder(config.Home);
         if (run.Mode == RunModes.Script)
         {
             // The same argv start path as an argv run, so the ulimit launcher, the process group kill, the descendant tracker and the Job Object apply.
-            return ProcessTree.Start(decision.ResolvedExe!, scratch!.Arguments(run.ScriptInterpreter!, run.ScriptArgs), scratch.Folder, scratch.Environment(config.Home),
-                Path.GetFileName(decision.ResolvedExe!), limits, TrackEvery, Note(run), scratch.StdinPath);
+            return ProcessTree.Start(decision.ResolvedExe!, scratch!.Arguments(run.ScriptInterpreter!, run.ScriptArgs), scratch.Folder, scratch.Environment(home),
+                Path.GetFileName(decision.ResolvedExe!), limits, TrackEvery, Note(run), scratch.StdinPath, account);
         }
 
-        var env = RunEnvironment.Build(config.Home);
+        var env = RunEnvironment.Build(home);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
-        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe, limits, TrackEvery, Note(run));
+        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, home, env, decision.ResolvedExe, limits, TrackEvery, Note(run), account);
         // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).
-        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0, limits, TrackEvery, Note(run));
+        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? home, env, argv0, limits, TrackEvery, Note(run), runAs: account);
     }
 
     // What the process layer reports (an error type name, no content) goes to the agent's log under the run's id.

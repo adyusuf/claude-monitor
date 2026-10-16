@@ -60,10 +60,11 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var machines = new MachineCache(config, machinesStore, api, clock);
         var executor = new RunExecutor(config, clock, log,
             run => ApprovalVerifier.Refusal(config, run, clock.GetUtcNow()) is { } refused ? ExecDecision.Refuse(refused) : ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
-            ExecPolicyLoader.RunningAsRoot);
+            ExecPolicyLoader.RunningAsRoot, () => monitor.Policy().RunAccount);
         using var runs = new RunRelay(config, execStore, api, clock, executor, log);
         runs.Recover();
         ScriptScratch.Sweep(config.Home, _ => false); // no run is running yet: whatever a crash left in the scratch folders goes
+        if (monitor.Policy().RunAccount is not null) ScriptScratch.SweepFolder(RunAccount.WorkFolder(config.Home), _ => false, onlyRunFolders: true);
         stream = new Relay(config, streamStore, api, clock) { Runs = runs };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
