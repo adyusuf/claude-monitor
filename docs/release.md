@@ -85,6 +85,14 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `cm-agent plugin-files .` and commit the result (a test fails otherwise).
   `--push inbox` pushes through the session's inbox (no start-up flag); `--push on` and `--push channel` are the old channel, unchanged.
 
+- **Agent 0.4.0** (ADR-0008 machine awareness, ADR-0010 remote work v2, ADR-0007 follow-ups): the version is bumped
+  from 0.3.0 because an installed agent reports "no update" for an equal version, so `cm-agent update` would never
+  offer this build. The csproj `<Version>`, the plugin's `plugin.json` (rendered from it, `cm-agent plugin-files .`)
+  and the placeholder `agent-release.txt` move together. **Every release package after this one is built from 0.4.0**:
+  `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (the macOS zips on a Mac, signed and notarised), then
+  commit the pins it writes and publish the GitHub releases `test-<date>` / `prod-<date>`. The packages built on
+  16/10/2026 still report 0.3.0 and do not reach installed agents through `cm-agent update`.
+
 ## Rollback
 
 - **A change on `dev` or `test`:** a revert commit through the gate, like any other change. Nothing is ever

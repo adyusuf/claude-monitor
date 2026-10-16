@@ -6,7 +6,7 @@ export const e2e = {
   local: !base,
   baseUrl: base ?? `http://localhost:${port}`,
   mailpitUrl: process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:8125",
-  agentVersion: "0.3.0",
+  agentVersion: "0.4.0",
   password: "e2e password long enough",
 };
 
