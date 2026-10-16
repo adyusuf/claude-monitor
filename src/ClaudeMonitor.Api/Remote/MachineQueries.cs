@@ -45,6 +45,7 @@ public static class MachineQueries
                               a.Capabilities,
                               a.PresenceAt,
                               a.Tags,
+                              a.AcceptsAsks,
                           }).Take(500).ToListAsync(ct);
         var ids = rows.Select(r => r.Id).ToList();
         var since = now - config.MetricsReportWindow;
@@ -58,7 +59,7 @@ public static class MachineQueries
             r.Alerts, r.RoleEnvironment, r.RoleFunction, r.ClaimedEnvironment, r.ClaimedFunction,
             MachineRoles.EffectiveEnvironment(r.RoleEnvironment, r.ClaimedEnvironment), MachineRoles.EffectiveFunction(r.RoleFunction, r.ClaimedFunction),
             r.ClaudeKind, r.ClaudeVersion, r.ClaudeSessionsIdle, MachineFacts.Tools(r.Interpreters), MachineFacts.Tools(r.Tools),
-            r.Capabilities, r.PresenceAt, MachineFacts.TagsFrom(r.Tags))).ToList();
+            r.Capabilities, r.PresenceAt, MachineFacts.TagsFrom(r.Tags), r.AcceptsAsks)).ToList();
     }
 
     public static async Task<List<MetricSample>> MetricsAsync(MonitorDb db, ApiConfig config, Guid workspaceId, Guid agentId,

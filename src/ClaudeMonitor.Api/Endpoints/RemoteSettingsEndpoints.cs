@@ -60,7 +60,11 @@ public static class RemoteSettingsEndpoints
         s.UpdatedBy = userId;
         Audit.Add(db, http, clock, AuditActions.RemoteSettingsChanged, id, userId, detail: new { before, after = View(s) });
         await db.SaveChangesAsync(http.RequestAborted);
-        if (turnedOff) await RunDecisions.CancelOpenAsync(db, broker, clock.GetUtcNow(), id, null, null, http.RequestAborted);
+        if (turnedOff)
+        {
+            await RunDecisions.CancelOpenAsync(db, broker, clock.GetUtcNow(), id, null, null, http.RequestAborted);
+            await AskReports.CancelOpenAsync(db, broker, clock.GetUtcNow(), a => a.WorkspaceId == id, http.RequestAborted);
+        }
         return Results.Ok(View(s));
     }
 

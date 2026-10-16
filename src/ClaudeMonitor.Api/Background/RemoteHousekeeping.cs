@@ -28,10 +28,32 @@ public static class RemoteHousekeeping
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(config);
         await ExpireRunsAsync(db, broker, now, ct);
+        await ExpireAsksAsync(db, config, broker, now, ct);
         await db.MachineGrants.Where(g => (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested) && g.ExpiresAt <= now)
             .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Expired), ct);
         await OfflineAsync(db, config, broker, now, ct);
         await RetentionAsync(db, config, now, ct);
+    }
+
+    /// <summary>
+    /// An ask nobody took in time expires (it is never queued for later), and a delivered one nobody answered becomes <c>no_answer</c> after the
+    /// answer wait (ADR-0008 §3f); the requester's stream hears it. Each change is a compare-and-set, so an answer that arrived first stays.
+    /// </summary>
+    private static async Task ExpireAsksAsync(MonitorDb db, ApiConfig config, Broker broker, DateTimeOffset now, CancellationToken ct)
+    {
+        var answerBefore = now - config.AskAnswerWait;
+        var due = await db.MachineAsks.AsNoTracking()
+            .Where(a => (a.Status == AskStatuses.Queued && a.ExpiresAt <= now) || (a.Status == AskStatuses.Delivered && a.DeliveredAt <= answerBefore))
+            .OrderBy(a => a.Id).Take(Batch).ToListAsync(ct);
+        foreach (var ask in due)
+        {
+            var next = ask.Status == AskStatuses.Queued ? AskStatuses.Expired : AskStatuses.NoAnswer;
+            var changed = await db.MachineAsks.Where(a => a.Id == ask.Id && a.Status == ask.Status)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, next).SetProperty(a => a.EndedAt, now), ct);
+            if (changed != 1) continue;
+            broker.Publish(Broker.Agent(ask.RequesterAgentId), new StreamMessage(AgentStreamEvents.AskUpdate, new AskUpdateMessage(ask.Id, next)));
+            broker.Publish(Broker.Agent(ask.TargetAgentId), new StreamMessage(AgentStreamEvents.AskCancel, new AskCancelMessage(ask.Id)));
+        }
     }
 
     private static async Task ExpireRunsAsync(MonitorDb db, Broker broker, DateTimeOffset now, CancellationToken ct)
@@ -118,6 +140,12 @@ public static class RemoteHousekeeping
         {
             await db.MachineProjects.Where(p => p.AgentId == row.AgentId && p.ProjectKey == row.ProjectKey).ExecuteDeleteAsync(ct);
         }
+
+        var oldAsks = await (from a in db.MachineAsks.AsNoTracking()
+                             join s in db.WorkspaceSettings.AsNoTracking() on a.WorkspaceId equals s.WorkspaceId
+                             where a.EndedAt != null && a.EndedAt < now.AddDays(-s.RetentionDays)
+                             select a.Id).Take(Batch).ToListAsync(ct);
+        if (oldAsks.Count > 0) await db.MachineAsks.Where(a => oldAsks.Contains(a.Id)).ExecuteDeleteAsync(ct);
 
         var alerts = await (from x in db.MachineAlerts.AsNoTracking()
                             join s in db.WorkspaceSettings.AsNoTracking() on x.WorkspaceId equals s.WorkspaceId

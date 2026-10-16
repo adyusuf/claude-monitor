@@ -30,6 +30,8 @@ public static class Startup
         services.AddScoped<ClaudeMonitor.Api.Remote.RunCreator>();
         services.AddScoped<ClaudeMonitor.Api.Remote.RunDecisions>();
         services.AddScoped<ClaudeMonitor.Api.Remote.RunReports>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.AskCreator>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.AskReports>();
         services.AddScoped<ClaudeMonitor.Api.Remote.GrantService>();
         services.AddScoped<ClaudeMonitor.Api.Remote.JobService>();
         if (config.BackgroundJobs)
@@ -119,6 +121,7 @@ public static class Startup
         RemoteSettingsEndpoints.Map(api);
         AgentRoleEndpoints.Map(api);
         AgentFactsEndpoints.Map(api);
+        AskEndpoints.Map(api);
         AgentGrantEndpoints.Map(api);
         GrantEndpoints.Map(api);
         AgentJobEndpoints.Map(api);
