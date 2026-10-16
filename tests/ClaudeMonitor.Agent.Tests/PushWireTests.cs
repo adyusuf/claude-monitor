@@ -192,8 +192,8 @@ public sealed class PushWireTests : IDisposable
 
         var plain = Install();
         Assert.Equal(0, plain.Code);
-        Assert.DoesNotContain("channels", Manifest(), StringComparison.Ordinal); // additive: the plugin is what it was
-        Assert.Contains("next prompt", plain.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("channels", Manifest(), StringComparison.Ordinal); // the first install pushes through the inbox: no channel entry, the plugin is what it was
+        Assert.Contains("Push is ON through each session's inbox", plain.Out, StringComparison.Ordinal);
 
         var on = Install("--push", "channel");
         Assert.Contains("--dangerously-load-development-channels plugin:monitor-agent@monitor-agent-local", on.Out, StringComparison.Ordinal);

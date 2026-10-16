@@ -412,7 +412,7 @@ for both). `cm-agent connect` (device login in a detached child, returns with th
 
 | §3 said | Built | Why |
 |---|---|---|
-| push default **on** once measured | stays **off**; `--push inbox`, `cm-agent config push inbox` and the plugin's *push* option turn it on | the project rule is that push is opt-in (ADR-0003); the owner's decision to reverse it, not mine |
+| push default **on** once measured | **on at the first `cm-agent install`** (16/10/2026, the owner's decision: it saves `push: inbox` when nothing about push was saved yet; `--push off` / `config push off` stay off, `CM_PUSH` wins); before that it stayed off | the project rule had been that push is opt-in (ADR-0003); the owner reversed it for the inbox push only, the channel push stays opt-in |
 | binary in `${CLAUDE_PLUGIN_DATA}/bin`, `BinaryPath` recorded in the agent home | the wrapper sets `CM_BINARY`; `AgentConfig.BinaryPath` honours it | self-update (ADR-0004) and the daemon respawn then act on the plugin's copy with no change |
 | `agent-release.json`, a `cm-agent ensure` verb | `agent-release.txt` (version, then `<os>-<arch> <sha256> <zip>`), no `ensure` verb | the bootstrap runs before any binary exists, so it must be shell, and shell cannot read JSON without a tool; nothing was left for an `ensure` verb to do |
 | the daemon watches `installed_plugins.json` | it watches the plugin's data directory (deleted on uninstall, documented) and `enabledPlugins` (settings, documented) | the registry file is internal; both signals used are in the docs |

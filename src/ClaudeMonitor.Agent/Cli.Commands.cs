@@ -15,7 +15,7 @@ namespace ClaudeMonitor.Agent;
 /// <summary>The commands a person runs by hand: install, restart and status.</summary>
 public static partial class Cli
 {
-    /// <summary>"cm-agent install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it.</summary>
+    /// <summary>"cm-agent install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it. The first install, with no push choice saved yet, turns the inbox push on.</summary>
     public static int Install(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr, string sourceBinary,
         Func<string, string[], int>? run = null)
     {
@@ -44,6 +44,12 @@ public static partial class Cli
             }
 
             config = SavedSettings.SavePush(config, value != "off", value == "off" ? null : PushTransports.Normalize(value));
+        }
+        else if (!config.PushFromEnvironment && Identity.Peek(config)?.Push is null)
+        {
+            // The first install turns the inbox push on (the maintainer's decision, 16/10/2026): a prompt sent from the web starts a turn in an idle
+            // session. Once anything is saved (--push off, config push off, or an earlier install) it is kept as chosen, never switched back on.
+            config = SavedSettings.SavePush(config, true, PushTransports.Inbox);
         }
 
         return new PluginInstaller(config, stdout, run).Install(sourceBinary);

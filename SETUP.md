@@ -112,9 +112,9 @@ A maintainer renders the plugin's manifest, hooks and MCP file from the one list
 plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
 
-### Pushing web messages into an idle session (opt-in)
+### Pushing web messages into an idle session
 
-Off by default. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
+On after the first `cm-agent install` (the inbox push; the maintainer's decision of 16/10/2026): nothing was saved about push yet, so the install saves it as on. A later choice is kept as it is: `cm-agent install --push off` or `cm-agent config push off` turns it off and a reinstall does not turn it back on; `CM_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
 sent from the web start a turn in an idle session within about a second, **with no start-up flag**: every Claude Code session (terminal, desktop app, VS Code) has an *inbox socket*, its hooks learn
 where it is (`CLAUDE_CODE_MESSAGING_SOCKET`), and the daemon writes the prompt there (ADR-0007). The text is wrapped, labelled as
 coming from the web and capped; the session is told to treat it as data and to ask you before any request with side effects. A

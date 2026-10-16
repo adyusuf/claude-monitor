@@ -1,6 +1,6 @@
 # ADR-0003: Pushing web messages into an idle session
 
-**Status:** Accepted (05/10/2026), opt-in. Extends [ADR-0002](adr-0002-agent-platform.md), "Commands from the web".
+**Status:** Accepted (05/10/2026), opt-in for the channel push. The inbox push (ADR-0007) is on after the first install (16/10/2026). Extends [ADR-0002](adr-0002-agent-platform.md), "Commands from the web".
 **Decider:** the maintainer asked for it; the mechanism was chosen from what the Claude Code plugin API supports.
 
 ## Context
