@@ -53,6 +53,26 @@ public sealed class Agent
     public string ExecLevel { get; set; } = ClaudeMonitor.Contracts.ExecLevels.Off;
     public bool ServiceMode { get; set; }
     public DateTimeOffset? ProfileAt { get; set; }
+
+    // ADR-0008 §3a: the role a workspace admin set and the claim the agent reports. NULL is "not set"; a claim only tightens.
+    public string? RoleEnvironment { get; set; }
+    public string? RoleFunction { get; set; }
+    public DateTimeOffset? RoleSetAt { get; set; }
+    public Guid? RoleSetBy { get; set; }
+    public string? ClaimedEnvironment { get; set; }
+    public string? ClaimedFunction { get; set; }
+
+    // ADR-0008 §3e and §3a′: Claude Code on the machine and the tool inventory, as the agent reported them. NULL: an older agent (unknown).
+    public string? ClaudeKind { get; set; }
+    public string? ClaudePath { get; set; }
+    public string? ClaudeVersion { get; set; }
+    public int? ClaudeSessionsLive { get; set; }
+    public int? ClaudeSessionsIdle { get; set; }
+    public DateTimeOffset? PresenceAt { get; set; }
+    /// <summary>JSON arrays of {name, path, version, trusted}; NULL = unknown, [] = none found.</summary>
+    public string? Interpreters { get; set; }
+    public string? Tools { get; set; }
+    public string[]? Capabilities { get; set; }
 }
 
 public sealed class AgentToken

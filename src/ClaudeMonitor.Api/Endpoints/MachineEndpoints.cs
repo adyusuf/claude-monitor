@@ -112,6 +112,11 @@ public static class MachineEndpoints
 
         agent.MachineId = targetMachine.Id;
         agent.WorkspaceId = target;
+        // The role belongs to the workspace that set it (ADR-0008 §3a): the new one starts unset.
+        agent.RoleEnvironment = null;
+        agent.RoleFunction = null;
+        agent.RoleSetAt = null;
+        agent.RoleSetBy = null;
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
         // The move and the end of the agent's remote work in its old workspace commit together.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);

@@ -31,6 +31,38 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.PrimitiveCollection<string[]>("Capabilities")
+                        .HasColumnType("text[]")
+                        .HasColumnName("capabilities");
+
+                    b.Property<string>("ClaimedEnvironment")
+                        .HasColumnType("text")
+                        .HasColumnName("claimed_environment");
+
+                    b.Property<string>("ClaimedFunction")
+                        .HasColumnType("text")
+                        .HasColumnName("claimed_function");
+
+                    b.Property<string>("ClaudeKind")
+                        .HasColumnType("text")
+                        .HasColumnName("claude_kind");
+
+                    b.Property<string>("ClaudePath")
+                        .HasColumnType("text")
+                        .HasColumnName("claude_path");
+
+                    b.Property<int?>("ClaudeSessionsIdle")
+                        .HasColumnType("integer")
+                        .HasColumnName("claude_sessions_idle");
+
+                    b.Property<int?>("ClaudeSessionsLive")
+                        .HasColumnType("integer")
+                        .HasColumnName("claude_sessions_live");
+
+                    b.Property<string>("ClaudeVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("claude_version");
+
                     b.Property<DateTimeOffset>("EnrolledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("enrolled_at");
@@ -42,6 +74,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasDefaultValue("off")
                         .HasColumnName("exec_level");
 
+                    b.Property<string>("Interpreters")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("interpreters");
+
                     b.Property<DateTimeOffset?>("LastHeartbeatAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_heartbeat_at");
@@ -49,6 +85,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<Guid>("MachineId")
                         .HasColumnType("uuid")
                         .HasColumnName("machine_id");
+
+                    b.Property<DateTimeOffset?>("PresenceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("presence_at");
 
                     b.Property<DateTimeOffset?>("ProfileAt")
                         .HasColumnType("timestamp with time zone")
@@ -62,6 +102,22 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("revoked_by");
 
+                    b.Property<string>("RoleEnvironment")
+                        .HasColumnType("text")
+                        .HasColumnName("role_environment");
+
+                    b.Property<string>("RoleFunction")
+                        .HasColumnType("text")
+                        .HasColumnName("role_function");
+
+                    b.Property<DateTimeOffset?>("RoleSetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("role_set_at");
+
+                    b.Property<Guid?>("RoleSetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_set_by");
+
                     b.Property<bool>("ServiceMode")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -72,6 +128,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("status");
+
+                    b.Property<string>("Tools")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tools");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -89,6 +149,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_agents");
 
+                    b.HasIndex("RoleSetBy")
+                        .HasDatabaseName("ix_agents_role_set_by");
+
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_agents_user_id");
 
@@ -102,7 +165,19 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("agents", t =>
                         {
+                            t.HasCheckConstraint("ck_agents_claimed_environment", "claimed_environment IS NULL OR claimed_environment IN ('dev', 'test', 'stage', 'preprod', 'production', 'other')");
+
+                            t.HasCheckConstraint("ck_agents_claimed_function", "claimed_function IS NULL OR claimed_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
+
+                            t.HasCheckConstraint("ck_agents_claude_kind", "claude_kind IS NULL OR claude_kind IN ('none', 'npm', 'native', 'unsupported')");
+
+                            t.HasCheckConstraint("ck_agents_claude_sessions", "(claude_sessions_live IS NULL OR claude_sessions_live >= 0) AND (claude_sessions_idle IS NULL OR claude_sessions_idle >= 0)");
+
                             t.HasCheckConstraint("ck_agents_exec_level", "exec_level IN ('off', 'argv', 'shell')");
+
+                            t.HasCheckConstraint("ck_agents_role_environment", "role_environment IS NULL OR role_environment IN ('dev', 'test', 'stage', 'preprod', 'production', 'other')");
+
+                            t.HasCheckConstraint("ck_agents_role_function", "role_function IS NULL OR role_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
 
                             t.HasCheckConstraint("ck_agents_status", "status IN ('active', 'revoked')");
                         });
@@ -2020,6 +2095,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_agents_machines_machine_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("RoleSetBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agents_users_role_set_by");
 
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()

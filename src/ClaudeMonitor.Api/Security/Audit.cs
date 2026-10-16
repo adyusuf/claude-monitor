@@ -28,6 +28,7 @@ public static class AuditActions
     public const string DeviceDenied = "agent.device_denied";
     public const string AgentRevoked = "agent.revoked";
     public const string AgentMoved = "agent.moved";
+    public const string AgentRoleChanged = "agent.role_changed";
     public const string RefreshReuse = "agent.refresh_reuse";
     public const string CommandCreated = "session.command_created";
     public const string CommandCancelled = "session.command_cancelled";

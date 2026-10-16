@@ -117,6 +117,7 @@ public static class Startup
         AgentMachineEndpoints.Map(api);
         MachineMetricsEndpoints.Map(api);
         RemoteSettingsEndpoints.Map(api);
+        AgentRoleEndpoints.Map(api);
         AgentGrantEndpoints.Map(api);
         GrantEndpoints.Map(api);
         AgentJobEndpoints.Map(api);
