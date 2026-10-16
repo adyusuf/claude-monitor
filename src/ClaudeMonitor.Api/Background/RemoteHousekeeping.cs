@@ -109,6 +109,16 @@ public static class RemoteHousekeeping
             await tx.CommitAsync(ct);
         }
 
+        // Project rows follow the workspace's retention (ADR-0008 §3a′): a project nobody has worked in or listed for that long is forgotten.
+        var stale = await (from p in db.MachineProjects.AsNoTracking()
+                           join s in db.WorkspaceSettings.AsNoTracking() on p.WorkspaceId equals s.WorkspaceId
+                           where p.LastSeenAt < now.AddDays(-s.RetentionDays)
+                           select new { p.AgentId, p.ProjectKey }).Take(Batch).ToListAsync(ct);
+        foreach (var row in stale)
+        {
+            await db.MachineProjects.Where(p => p.AgentId == row.AgentId && p.ProjectKey == row.ProjectKey).ExecuteDeleteAsync(ct);
+        }
+
         var alerts = await (from x in db.MachineAlerts.AsNoTracking()
                             join s in db.WorkspaceSettings.AsNoTracking() on x.WorkspaceId equals s.WorkspaceId
                             where x.State == AlertStates.Resolved && x.ResolvedAt < now.AddDays(-s.RetentionDays)

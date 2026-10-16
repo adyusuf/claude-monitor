@@ -169,6 +169,17 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
   prints the workspace's machines (role, online, Claude, tools) with the rules for treating them, from a cache the daemon refreshes every
   `CM_MACHINE_CACHE_EVERY` seconds. It is empty while remote runs are off for the workspace or this is the only machine;
   `CM_MACHINES_CONTEXT=off` turns it off on one machine. The hook reads the local database only and always exits 0.
+- **Tags and the note.** A workspace admin sets a machine's tags (`key=value`, at most ten) and a runbook note on its page; both are untrusted
+  text for Claude, which gets the tags as labels in the machines list and the note only through `monitor_machine`, marked as written by an admin.
+- **Listening services (off by default).** The machine's owner turns on "Report listening ports" on its page (a recent sign-in or a code is
+  needed). The agent then reads the TCP ports it listens on, with the process name where the system shows it (on Linux for the account's own
+  processes), and sends them; only the owner and admins see them. Turning it off drops what was stored. Nothing is started to read them.
+- **Projects.** Every project a session works in is listed on the machine's page. For a machine without sessions, or for a folder no session
+  visits, list the folder: `cm-agent config projects add <folder>` (interactive or standalone agent) or `"projects": ["/srv/shop"]` in the
+  admin-owned `exec.json` (service agent). The agent reads the branch, the commit and the tag from the `.git` files without running git and
+  sends them with an HMAC of the path (the key is generated here and kept in the credential store; the path never leaves the machine).
+  `CM_PROJECT_FACTS_EVERY` sets how often they are read again. A run may name a `project` and a `kind` (`test`, `build`, `deploy`, `other`);
+  its result, and for a `test` run the passed, failed and skipped counts of dotnet test, vitest, jest and pytest, appear under that project.
 
 ## Service agent (boot service, remote work)
 

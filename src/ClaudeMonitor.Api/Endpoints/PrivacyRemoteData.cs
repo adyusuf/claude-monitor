@@ -34,6 +34,8 @@ public static class PrivacyRemoteData
             w.WriteString("shellCommand", r.ShellCommand);
             w.WriteString("cwd", r.Cwd);
             w.WriteString("status", r.Status);
+            w.WriteString("projectKey", r.ProjectKey);
+            w.WriteString("kind", r.Kind);
             w.WriteString("createdAt", r.CreatedAt);
             WriteTime(w, "startedAt", r.StartedAt);
             WriteTime(w, "endedAt", r.EndedAt);
@@ -97,6 +99,8 @@ public static class PrivacyRemoteData
         PrivacyEndpoints.Write(w, "alerts", await db.MachineAlerts.AsNoTracking().Where(a => agentIds.Contains(a.AgentId)).OrderBy(a => a.OpenedAt)
             .Select(a => new { a.Id, a.AgentId, a.Kind, a.Subject, a.State, a.ThresholdPct, a.LastValue, a.PeakValue, a.OpenedAt, a.ResolvedAt })
             .ToListAsync(ct));
+        PrivacyEndpoints.Write(w, "machineProjects", await db.MachineProjects.AsNoTracking().Where(p => agentIds.Contains(p.AgentId)).OrderBy(p => p.AgentId).ThenBy(p => p.ProjectKey)
+            .Select(p => new { p.AgentId, p.ProjectKey, p.Name, p.Branch, p.HeadSha, p.Tag, p.LastSeenAt, p.Source }).ToListAsync(ct));
         w.WriteStartArray("metrics");
         foreach (var agentId in await agentIds.ToListAsync(ct))
         {
@@ -171,7 +175,11 @@ public static class PrivacyRemoteData
         await db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Argv, (List<string>?)null).SetProperty(r => r.ShellCommand, (string?)null)
                 .SetProperty(r => r.Cwd, (string?)null).SetProperty(r => r.Reason, (string?)null)
-                .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null), ct);
+                .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null).SetProperty(r => r.ProjectKey, (string?)null), ct);
+        // ADR-0008 §3a′: the user's machines' project rows and listening services are captured facts, and the project key of an emptied run goes too.
+        await db.MachineProjects.Where(p => agentIds.Contains(p.AgentId)).ExecuteDeleteAsync(ct);
+        await db.Agents.Where(a => agentIds.Contains(a.Id)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Services, (string?)null)
+            .SetProperty(a => a.ServicesAt, (DateTimeOffset?)null).SetProperty(a => a.ShareServices, false), ct);
         await db.MachineMetrics.Where(m => agentIds.Contains(m.AgentId)).ExecuteDeleteAsync(ct);
         await db.MachineAlerts.Where(a => agentIds.Contains(a.AgentId)).ExecuteDeleteAsync(ct);
     }
