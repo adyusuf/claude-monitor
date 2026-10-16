@@ -174,6 +174,14 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
 - **Listening services (off by default).** The machine's owner turns on "Report listening ports" on its page (a recent sign-in or a code is
   needed). The agent then reads the TCP ports it listens on, with the process name where the system shows it (on Linux for the account's own
   processes), and sends them; only the owner and admins see them. Turning it off drops what was stored. Nothing is started to read them.
+- **A machine without Claude Code (standalone agent).** `cm-agent install --standalone --server https://<your Claude Monitor address>` (run as your own user, never
+  as root or administrator) logs in first (approve the code on the web), copies the binary into the agent home and then starts the agent at your login: a
+  LaunchAgent that runs an application bundle on macOS (no window, no Dock icon), a logon task that runs a windowless copy of the program on Windows, a
+  `systemd --user` unit on Linux (without `loginctl enable-linger` it runs only while you are logged in; the installer says so). `uninstall --standalone`
+  removes the autostart and keeps the data. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
+  seconds. It reports `claude=none`; another machine's ask to it is refused (`no_claude`), but it is a normal target for runs. From it, `cm-agent machines`,
+  `machine <x>`, `metrics <x>`, `alerts`, `jobs`, `job-run <id>`, `run --machine <x> (--script <file> --interpreter <i> | --argv ...)`, `result <id> --wait 30` and
+  `ask --machine <x> "<question>"` reach the other machines without the web; an approval is still the owner's, on the web.
 - **Asks across your machines.** A Claude session can ask a Claude session on ANOTHER machine of the same user a question (`monitor_ask`, then
   `monitor_ask_result`; the other session answers with `monitor_answer`). It works only when: the push through the inbox is on on the target (`cm-agent
   install --push inbox`), its owner turned "Allow asks" on its machine page (a recent sign-in is needed), an admin set its environment, it is not a
