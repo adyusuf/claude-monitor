@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using ClaudeMonitor.Agent.Config;
 
 namespace ClaudeMonitor.Agent.Daemon;
@@ -6,8 +5,10 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// <summary>
 /// Whether the Claude Code plugin that started this daemon is still there (ADR-0007). Claude Code runs nothing when a plugin is uninstalled, so
 /// the daemon looks for the two traces it does leave: the plugin's data directory is deleted on uninstall, and a plugin that is switched off
-/// is <c>false</c> in the user's <c>enabledPlugins</c>. Anything unreadable counts as "still there": a daemon that stays up does no harm, one that
-/// stops by mistake silences the machine.
+/// is <c>false</c> in the user's <c>enabledPlugins</c>. Two more signals come from Claude Code's plugin list (<see cref="PluginRegistry"/>): a plugin
+/// no longer listed was uninstalled even when its data was kept (<c>--keep-data</c>), and a plugin that is switched off is only gone when it is off
+/// everywhere it is installed, so one project switching it off does not stop it for the others. Anything unreadable counts as "still there": a daemon
+/// that stays up does no harm, one that stops by mistake silences the machine.
 /// </summary>
 public static class PluginWatch
 {
@@ -16,7 +17,10 @@ public static class PluginWatch
     {
         ArgumentNullException.ThrowIfNull(config);
         if (config.PluginDataDir is { } data && dataExistedAtStart && !Directory.Exists(data)) return "the plugin's data directory is gone: the plugin was uninstalled";
-        if (config.PluginId is { } id && Disabled(config, id)) return "Claude Code has the plugin switched off";
+        if (config.PluginId is not { } id) return null;
+        var installs = PluginRegistry.Installs(config, id);
+        if (installs is { Count: 0 }) return "Claude Code's plugin list no longer has the plugin: it was uninstalled and its data kept";
+        if (installs is null ? Disabled(config, id) : PluginRegistry.AllDisabled(config, id, installs)) return "Claude Code has the plugin switched off";
         return null;
     }
 
@@ -49,19 +53,9 @@ public static class PluginWatch
 
     public static bool DataExists(AgentConfig config) => config.PluginDataDir is { } data && Directory.Exists(data);
 
-    /// <summary>True when the user's settings say <c>enabledPlugins[id]</c> is exactly false.</summary>
+    /// <summary>True when the user's settings say <c>enabledPlugins[id]</c> is exactly false (the signal used when Claude Code's plugin list cannot be read).</summary>
     public static bool Disabled(AgentConfig config, string id)
     {
-        try
-        {
-            var path = Path.Combine(config.ClaudeConfigDir, "settings.json");
-            if (!File.Exists(path)) return false;
-            return JsonNode.Parse(File.ReadAllText(path)) is JsonObject root && root["enabledPlugins"] is JsonObject enabled
-                && enabled[id] is JsonValue value && value.TryGetValue<bool>(out var on) && !on;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException)
-        {
-            return false;
-        }
+        return PluginRegistry.Flag(Path.Combine(config.ClaudeConfigDir, "settings.json"), id) == false;
     }
 }

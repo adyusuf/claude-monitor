@@ -232,12 +232,27 @@ public sealed class InboxWireTests : IDisposable
     }
 
     [Fact]
-    public async Task A_plugin_started_agent_takes_no_stop_wait_because_the_plugins_hook_timeouts_are_fixed()
+    public async Task A_plugin_started_agent_takes_the_stop_wait_only_as_far_as_its_plugin_versions_hook_timeout_allows()
     {
-        var plugin = home.Config with { PluginId = "monitor-agent@monitor-agent-releases", StopWait = TimeSpan.FromSeconds(60) };
-        Assert.Equal(TimeSpan.Zero, SavedSettings.Apply(plugin).StopWait);
-        Assert.Equal(TimeSpan.FromSeconds(60), SavedSettings.Apply(home.Config with { StopWait = TimeSpan.FromSeconds(60) }).StopWait);
+        var sixty = TimeSpan.FromSeconds(60);
+        var id = "monitor-agent@monitor-agent-releases";
+        // An older plugin version's wrapper says nothing about a long Stop timeout: its fixed 15 s would cut a wait off, so the wait is zero.
+        Assert.Equal(TimeSpan.Zero, SavedSettings.Apply(home.Config with { PluginId = id, StopWait = sixty }).StopWait);
+        // A version with the long timeout says how long a wait fits.
+        var longer = home.Config with { PluginId = id, PluginStopWaitMax = TimeSpan.FromSeconds(590) };
+        Assert.Equal(sixty, SavedSettings.Apply(longer with { StopWait = sixty }).StopWait);
+        Assert.Equal(TimeSpan.FromSeconds(100), SavedSettings.Apply(home.Config with { PluginId = id, PluginStopWaitMax = TimeSpan.FromSeconds(100), StopWait = TimeSpan.FromSeconds(300) }).StopWait);
+        // A daemon the plugin did not start is not held to any plugin's timeout.
+        Assert.Equal(sixty, SavedSettings.Apply(home.Config with { StopWait = sixty }).StopWait);
         await Task.CompletedTask;
+    }
+
+    [Fact]
+    public void The_plugins_wrapper_says_how_long_a_stop_wait_fits_from_the_environment()
+    {
+        Assert.Equal(TimeSpan.Zero, AgentConfig.FromEnvironment(_ => null).PluginStopWaitMax);
+        Assert.Equal(TimeSpan.FromSeconds(590), AgentConfig.FromEnvironment(k => k == "CM_PLUGIN_STOP_WAIT_MAX" ? "590" : null).PluginStopWaitMax);
+        Assert.Equal(TimeSpan.FromSeconds(590), AgentConfig.FromEnvironment(k => k == "CM_PLUGIN_STOP_WAIT_MAX" ? "9999" : null).PluginStopWaitMax); // never above what a person can set
     }
 
     [Fact]
