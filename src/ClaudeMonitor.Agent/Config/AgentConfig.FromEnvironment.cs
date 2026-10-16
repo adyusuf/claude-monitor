@@ -45,6 +45,9 @@ public sealed partial record AgentConfig
             MachinesContextEnabled = read("CM_MACHINES_CONTEXT") != "off",
             MachineCacheEvery = Between(read("CM_MACHINE_CACHE_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
             PresenceProbeEvery = Between(read("CM_PRESENCE_PROBE_EVERY"), TimeSpan.FromHours(6), 60, 86_400),
+            AsksEnabled = !string.Equals(read("CM_ASKS"), "off", StringComparison.OrdinalIgnoreCase),
+            AskIdleFor = Between(read("CM_ASK_IDLE_FOR"), TimeSpan.FromSeconds(30), 5, 600),
+            AskConfirmWait = Between(read("CM_ASK_CONFIRM_WAIT"), TimeSpan.FromMinutes(2), 30, 600),
             ProjectFactsEvery = Between(read("CM_PROJECT_FACTS_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
             ExecScriptOutputCeiling = long.TryParse(read("CM_EXEC_SCRIPT_OUTPUT_CEILING"), out var ceiling) ? Math.Clamp(ceiling, 1024L * 1024, 64L * 1024 * 1024) : 64L * 1024 * 1024,
         };

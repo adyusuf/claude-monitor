@@ -59,7 +59,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var (claude, tools) = Facts();
         var (services, projects) = Extras(policy);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
-            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools), services, projects);
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects);
         var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
@@ -69,9 +69,15 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     /// The listening services (only while the owner opted in, which the settings pass remembered) and the facts of the listed project folders,
     /// read again every <see cref="AgentConfig.ProjectFactsEvery"/> or at once when the opt-in changes.
     /// </summary>
-    /// <summary>What this agent says it can do beyond runs (ADR-0008 §3e): scripts, when the level is shell without a ceiling and a trusted interpreter exists.</summary>
-    private static List<string> Capabilities(string level, IReadOnlyList<ToolInfo> tools) =>
-        level == ExecLevels.Shell && ToolInventory.Interpreters(tools).Count > 0 ? [AgentCapabilities.Script] : [];
+    /// <summary>What this agent says it can do beyond runs (ADR-0008 §3e): `script`, when the level is shell without a ceiling and a trusted interpreter exists, and `ask`.</summary>
+    private List<string> Capabilities(string level, IReadOnlyList<ToolInfo> tools, ClaudePresence? claude)
+    {
+        var list = new List<string>();
+        if (level == ExecLevels.Shell && ToolInventory.Interpreters(tools).Count > 0) list.Add(AgentCapabilities.Script);
+        // `ask`: the inbox push is on, this machine did not turn asks off, and Claude Code is here to receive one (ADR-0008 §3e).
+        if (config.InboxPushEnabled && config.AsksEnabled && claude is { Kind: not ClaudeKinds.None }) list.Add(AgentCapabilities.Ask);
+        return list;
+    }
 
     private (IReadOnlyList<ServiceInfo>? Services, IReadOnlyList<ProjectFact>? Projects) Extras(ExecPolicy policy)
     {

@@ -233,6 +233,12 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
             case AgentStreamEvents.RunUpdate:
                 store.RunChanged(data.Deserialize<RunUpdateMessage>(ApiClient.Json)!.Id.ToString());
                 return true;
+            case AgentStreamEvents.Ask:
+                store.SaveAskIn(data.Deserialize<AskMessage>(ApiClient.Json)!, clock.GetUtcNow());
+                return true;
+            case AgentStreamEvents.AskCancel:
+                store.CloseAsk(data.Deserialize<AskCancelMessage>(ApiClient.Json)!.Id.ToString());
+                return true;
             case AgentStreamEvents.Revoked:
                 return false;
             default:

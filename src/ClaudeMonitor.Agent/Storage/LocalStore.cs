@@ -48,6 +48,8 @@ public sealed partial class LocalStore : IDisposable
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
         CreateRemoteTables();
         CreateClaudeTables();
+        CreateAskTables();
+        AddColumnIfMissing("session_inboxes", "permission_mode", "TEXT"); // a database made before the mode of a session was kept (ADR-0008 §3f)
     }
 
     /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>

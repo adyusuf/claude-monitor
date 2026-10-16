@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Config;
@@ -9,6 +10,7 @@ using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Agent.Update;
+using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Daemon;
 
@@ -75,6 +77,10 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var claudeStore = new LocalStore(config.DatabasePath);
         using var inboxStore = new LocalStore(config.DatabasePath);
         var inbox = new InboxPump(new LiveSettings(config, clock).Current, inboxStore, new SocketInboxTransport(), clock);
+        using var askStore = new LocalStore(config.DatabasePath);
+        var asks = new AskPump(new LiveSettings(config, clock).Current, askStore, new SocketInboxTransport(),
+            async (id, update, ct) => await api.RemoteAsync(HttpMethod.Post, $"api/agent/asks/{id}/status", JsonSerializer.SerializeToElement(update, ApiClient.Json), ct),
+            () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), clock);
         var claudeUpdates = new ClaudeUpdater(config, claudeStore, new SystemProcessRunner(), new SystemNotifier(new SystemProcessRunner(), config.UpdateProbeTimeout), log, clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
         await Task.WhenAll(
@@ -90,6 +96,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await relay.ReportCommandsAsync(ct);
             }, api, revoked, error => relay.UploadOutcome(error)),
             Loop("inbox", config.PushPollEvery, ct => inbox.PumpAsync(ct), api, revoked),
+            Loop("asks", config.PushPollEvery, ct => asks.PumpAsync(ct), api, revoked),
             Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
             Loop("settings", config.SettingsEvery, async ct =>
             {

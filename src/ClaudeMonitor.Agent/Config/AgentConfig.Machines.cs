@@ -23,6 +23,15 @@ public sealed partial record AgentConfig
     /// <summary>CM_PROJECT_FACTS_EVERY: how often the listed project folders' .git facts and, when the owner opted in, the listening services are read again (30 s to 1 h).</summary>
     public TimeSpan ProjectFactsEvery { get; init; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>CM_ASKS=off: this machine takes no ask from another machine whatever its owner said on the web (ADR-0008 §3f); default on.</summary>
+    public bool AsksEnabled { get; init; } = true;
+
+    /// <summary>CM_ASK_IDLE_FOR (seconds, 5 to 600): how long a session must have been idle to receive an ask.</summary>
+    public TimeSpan AskIdleFor { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>CM_ASK_CONFIRM_WAIT (seconds, 30 to 600): how long a delivered ask may stay out of the transcript before it counts as not taken.</summary>
+    public TimeSpan AskConfirmWait { get; init; } = TimeSpan.FromMinutes(2);
+
     /// <summary>How long a tool's --version may take before the probe gives up on it.</summary>
     public TimeSpan ToolVersionTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
