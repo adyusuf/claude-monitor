@@ -8,8 +8,10 @@ export interface CodeGate {
   attempt: (act: (code?: string) => Promise<void>) => Promise<boolean>;
   busy: boolean;
   error: string | null;
-  /** The code field, once the API has asked for it; null before. */
+  /** The code field, once the API has asked for it (or from the start when forced); null before. */
   field: ReactNode;
+  /** False while a code is asked for and not typed yet: the action waits. */
+  ready: boolean;
 }
 
 /**
@@ -17,7 +19,7 @@ export interface CodeGate {
  * approval 403 "reauth_required" (the sign-in is not recent). The code field appears on that answer; a wrong code is
  * reported as such. Any other failure is shown as it is.
  */
-export function useCodeGate(needCode: "mfa_required" | "reauth_required", hint: Key): CodeGate {
+export function useCodeGate(needCode: "mfa_required" | "reauth_required", hint: Key, force = false): CodeGate {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [asking, setAsking] = useState(false);
@@ -29,7 +31,7 @@ export function useCodeGate(needCode: "mfa_required" | "reauth_required", hint: 
     setBusy(true);
     setError(null);
     try {
-      await act(asking && code.trim() ? code.trim() : undefined);
+      await act((asking || force) && code.trim() ? code.trim() : undefined);
       setAsking(false);
       setCode("");
       return true;
@@ -46,9 +48,10 @@ export function useCodeGate(needCode: "mfa_required" | "reauth_required", hint: 
     }
   };
 
-  const field = asking ? (
+  const showing = asking || force;
+  const field = showing ? (
     <Field label={t("remote.codeLabel")} hint={t(hint)} value={code} inputMode="numeric" autoComplete="one-time-code" autoFocus
       onChange={(e) => setCode(e.target.value)} />
   ) : null;
-  return { attempt, busy, error, field };
+  return { attempt, busy, error, field, ready: !showing || code.trim() !== "" };
 }

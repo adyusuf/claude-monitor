@@ -118,7 +118,7 @@ export interface WebRunView {
   requesterUser: string;
   requesterSessionId: string | null;
   visible: boolean;
-  mode: "argv" | "shell";
+  mode: "argv" | "shell" | "script";
   argv: string[] | null;
   shellCommand: string | null;
   cwd: string | null;
@@ -139,6 +139,28 @@ export interface WebRunView {
   hash: string | null;
   interpreter: boolean;
   recentOutput: boolean;
+  // ADR-0008: the project and kind a run named, a script run's text and the role the card shows, and what its output account says.
+  // Optional: an older API omits them.
+  projectKey?: string | null;
+  kind?: string | null;
+  scriptInterpreter?: string | null;
+  scriptBody?: string | null;
+  scriptArgs?: string[] | null;
+  interpreterPath?: string | null;
+  targetEnvironment?: string | null;
+  targetFunction?: string | null;
+  strict?: boolean;
+  needsCode?: boolean;
+  outputCap?: number | null;
+  outputReadBytes?: number | null;
+  outputDroppedBytes?: number | null;
+  outputRefusedBytes?: number | null;
+  outputMissingFromSeq?: number | null;
+  outputChunks?: number | null;
+  outputComplete?: boolean | null;
+  testsPassed?: number | null;
+  testsFailed?: number | null;
+  testsSkipped?: number | null;
 }
 export interface RunOutputChunk { seq: number; stream: string; body: string; gapBefore: boolean }
 export interface RunOutputPage { chunks: RunOutputChunk[]; nextSeq: number; done: boolean }
@@ -191,4 +213,4 @@ export interface WebJobView {
   canRetire: boolean;
 }
 
-export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number }
+export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number; scriptOutputMaxBytes?: number }

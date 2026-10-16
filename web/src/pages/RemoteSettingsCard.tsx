@@ -10,6 +10,10 @@ const PCT_MAX = 100;
 const SUSTAIN_MIN = 60;
 const SUSTAIN_MAX = 86_400;
 
+const MIB = 1024 * 1024;
+const CAP_MIN = 1;
+const CAP_MAX = 64;
+
 const inRange = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
 
 /** The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; only an admin changes them. */
@@ -45,7 +49,8 @@ export function RemoteSettingsCard({ ws, canEdit }: { ws: string; canEdit: boole
 
   const save = async () => {
     const pctOk = [form.alertCpuPct, form.alertMemoryPct, form.alertDiskPct].every((n) => inRange(n, PCT_MIN, PCT_MAX));
-    if (!pctOk || !inRange(form.alertSustainSeconds, SUSTAIN_MIN, SUSTAIN_MAX)) return setNotice({ kind: "error", text: t("errors.out_of_range") });
+    const capOk = form.scriptOutputMaxBytes === undefined || inRange(form.scriptOutputMaxBytes / MIB, CAP_MIN, CAP_MAX);
+    if (!pctOk || !capOk || !inRange(form.alertSustainSeconds, SUSTAIN_MIN, SUSTAIN_MAX)) return setNotice({ kind: "error", text: t("errors.out_of_range") });
     if (saved?.remoteRunsEnabled && !form.remoteRunsEnabled && !window.confirm(t("remote.disableConfirm"))) return;
     try {
       const stored = await api.saveRemoteSettings(ws, form);
@@ -74,6 +79,10 @@ export function RemoteSettingsCard({ ws, canEdit }: { ws: string; canEdit: boole
           <Field label={t("remote.alertSustain")} type="number" min={SUSTAIN_MIN} max={SUSTAIN_MAX} value={form.alertSustainSeconds} disabled={!canEdit}
             hint={t("remote.alertSustainHint")} onChange={(e) => set({ alertSustainSeconds: Number(e.target.value) })} />
         </div>
+        {form.scriptOutputMaxBytes !== undefined ? (
+          <Field label={t("remote.outputCap")} type="number" min={CAP_MIN} max={CAP_MAX} value={Math.round(form.scriptOutputMaxBytes / MIB)} disabled={!canEdit}
+            hint={t("remote.outputCapHint")} onChange={(e) => set({ scriptOutputMaxBytes: Number(e.target.value) * MIB })} />
+        ) : null}
         {canEdit ? <div><Button onClick={() => void save()}>{t("workspace.save")}</Button></div> : null}
       </div>
     </Card>

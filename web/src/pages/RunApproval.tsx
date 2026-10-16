@@ -19,11 +19,13 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   const { t } = useI18n();
   const errorText = useErrorText();
   const now = useNow(config.countdownTickMs);
+  const isScript = run.mode === "script";
   const [armed, setArmed] = useState(!run.interpreter);
+  const [read, setRead] = useState(!isScript); // a script must have been scrolled to its end before it can be allowed
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
   const [denyError, setDenyError] = useState<string | null>(null);
-  const gate = useCodeGate("mfa_required", "remote.codeHintRun");
+  const gate = useCodeGate("mfa_required", "remote.codeHintRun", isScript && run.needsCode === true);
   const left = countdown(run.expiresAt, now);
 
   useEffect(() => {
@@ -51,9 +53,11 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   return (
     <Card className="card-attention run-approval" title={t("remote.approvalTitle", { host: run.targetHostname })}
       actions={<span className="muted small">{left ? t("remote.timeLeft", { time: left }) : t("remote.timeUp")}</span>}>
-      {run.interpreter ? <div className="notice notice-error" role="alert">{run.mode === "shell" ? t("remote.interpreterShell") : t("remote.interpreterArgv")}</div> : null}
+      {isScript ? <div className="notice notice-error" role="alert">{run.strict ? t("remote.scriptBannerStrict", { role: run.targetFunction === "database" ? t("remote.scriptDatabase") : t("remote.scriptProduction") }) : t("remote.scriptBanner")}</div>
+        : run.interpreter ? <div className="notice notice-error" role="alert">{run.mode === "shell" ? t("remote.interpreterShell") : t("remote.interpreterArgv")}</div> : null}
+      {isScript && run.needsCode ? <p className="muted small">{t("remote.scriptNeedsCode")}</p> : null}
       {run.recentOutput ? <div className="notice notice-warn" role="alert">{t("remote.recentOutput")}</div> : null}
-      <RunFacts run={run} ws={ws} />
+      <RunFacts run={run} ws={ws} onScriptEnd={() => setRead(true)} />
       {gate.field}
       {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}
       {denyError ? <Notice kind="error">{denyError}</Notice> : null}
@@ -66,9 +70,9 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
         </div>
       ) : (
         <div className="permission-actions">
-          {!armed ? <span className="muted small">{t("remote.allowWait")}</span> : null}
+          {!read ? <span className="muted small">{t("remote.scriptScroll")}</span> : !armed ? <span className="muted small">{t("remote.allowWait")}</span> : null}
           <Button variant="danger" onClick={() => setDenying(true)}>{t("remote.deny")}</Button>
-          <Button busy={gate.busy} disabled={gate.busy || !armed || !run.hash || !left} onClick={() => void allow()}>{t("remote.allow")}</Button>
+          <Button busy={gate.busy} disabled={gate.busy || !armed || !read || !gate.ready || !run.hash || !left} onClick={() => void allow()}>{t("remote.allow")}</Button>
         </div>
       )}
     </Card>
