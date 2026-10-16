@@ -30,6 +30,10 @@ public static partial class Cli
                                         session's own socket, no start-up flag (ADR-0007); channel (also "on"): a Claude Code channel (ADR-0003)
         cm-agent install --exec off|argv|shell
                                         whether approved remote runs may execute on this machine (default off)
+        cm-agent install --standalone [--server <url>] [--exec off|argv|shell]
+        cm-agent uninstall --standalone
+                                        this machine as a daemon without Claude Code: it logs in first, then starts when you log in
+                                        (an application on macOS and Windows, systemd --user on Linux), in your own account (ADR-0008)
         cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
         cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005)
         cm-agent connect [--server <url>]
@@ -56,6 +60,8 @@ public static partial class Cli
         // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0005).
         if (args.FirstOrDefault() == "install" && ServiceCommands.IsService(args)) return ServiceCommands.Install(args, stdout, stderr);
         if (args.FirstOrDefault() == "uninstall" && ServiceCommands.IsService(args)) return ServiceCommands.Uninstall(stdout);
+        if (args.FirstOrDefault() == "install" && StandaloneCommands.IsStandalone(args)) return await StandaloneCommands.InstallAsync(args, config, stdout, stderr, clock);
+        if (args.FirstOrDefault() == "uninstall" && StandaloneCommands.IsStandalone(args)) return StandaloneCommands.Uninstall(config, stdout);
         var log = new AgentLog(config, clock);
         HomeMigration.Run(config, log);
         config = SavedSettings.Apply(config);

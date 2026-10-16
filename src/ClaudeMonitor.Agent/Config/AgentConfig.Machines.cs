@@ -32,6 +32,12 @@ public sealed partial record AgentConfig
     /// <summary>CM_ASK_CONFIRM_WAIT (seconds, 30 to 600): how long a delivered ask may stay out of the transcript before it counts as not taken.</summary>
     public TimeSpan AskConfirmWait { get; init; } = TimeSpan.FromMinutes(2);
 
+    /// <summary>CM_STANDALONE=1 (set by the autostart of `install --standalone`, ADR-0008 §3g): a daemon that is not connected waits and re-reads its identity instead of exiting.</summary>
+    public bool Standalone { get; init; }
+
+    /// <summary>How often a standalone daemon that is not connected looks for its identity again.</summary>
+    public TimeSpan StandaloneIdentityPoll { get; init; } = TimeSpan.FromSeconds(30);
+
     /// <summary>How long a tool's --version may take before the probe gives up on it.</summary>
     public TimeSpan ToolVersionTimeout { get; init; } = TimeSpan.FromSeconds(5);
 

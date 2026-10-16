@@ -42,6 +42,7 @@ public sealed partial record AgentConfig
             AutoUpdateFromEnvironment = read("CM_AUTO_UPDATE") is { Length: > 0 },
             PushScope = read("CM_PUSH_SCOPE") == PushScopes.Machine ? PushScopes.Machine : PushScopes.Session,
             ServiceMode = read("CM_SERVICE") == "1",
+            Standalone = read("CM_STANDALONE") == "1",
             MachinesContextEnabled = read("CM_MACHINES_CONTEXT") != "off",
             MachineCacheEvery = Between(read("CM_MACHINE_CACHE_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
             PresenceProbeEvery = Between(read("CM_PRESENCE_PROBE_EVERY"), TimeSpan.FromHours(6), 60, 86_400),
