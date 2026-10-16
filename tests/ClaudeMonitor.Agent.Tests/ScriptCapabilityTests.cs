@@ -43,7 +43,7 @@ public sealed class ScriptCapabilityTests : IDisposable
     [Fact]
     public async Task Shell_level_without_a_ceiling_and_a_trusted_interpreter_reports_script()
     {
-        Assert.Equal([AgentCapabilities.Script], await CapabilitiesAsync());
+        Assert.Equal([AgentCapabilities.Script, AgentCapabilities.ScriptFiles], await CapabilitiesAsync()); // an agent that runs scripts also runs their files and stdin (ADR-0010 §2)
     }
 
     [Fact]

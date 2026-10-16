@@ -211,7 +211,9 @@ public sealed class RunAccountTests
         Assert.True(fx.Called($"/bin/chown cm-agent:cm-run {work}"));
         Assert.True(fx.Called("/usr/sbin/visudo -cf"));
         Assert.True(Directory.Exists(work));
-        Assert.NotEqual(0, (int)(File.GetUnixFileMode(work) & UnixFileMode.SetGroup));
+        // The setgid bit is asked for, but the system keeps it only for a folder whose group is one its owner belongs to, which root's chown makes true on a real
+        // install and a fake chown does not: the group access is what can be checked here, the setgid bit is in the host checks (ADR-0010 §8).
+        Assert.Equal(UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute, File.GetUnixFileMode(work) & UnixFileMode.GroupRead | File.GetUnixFileMode(work) & UnixFileMode.GroupWrite | File.GetUnixFileMode(work) & UnixFileMode.GroupExecute);
         Assert.Equal(RunAccount.SudoersText("cm-agent", "cm-run"), File.ReadAllText($"{fx.Dir}/sudoers.d/cm-agent-run"));
         Assert.Equal("cm-run", ExecPolicyLoader.ReadExisting(fx.Layout.ExecConfigPath)!.RunAccount);
         var order = fx.Calls.ToList();

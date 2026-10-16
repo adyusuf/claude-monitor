@@ -126,7 +126,7 @@ public sealed class CommandTransportTests(ApiFactory api)
     // ---- the push transport a machine has on, told with the profile ------------------------------------------------------
 
     private static Task<HttpResponseMessage> ProfileAsync(TestAgent agent, string? push) =>
-        agent.Http.PutAsJsonAsync("/api/agent/profile", new AgentProfile(ExecLevels.Off, false, null, null, 2, push), TestUser.Json);
+        agent.Http.PutAsJsonAsync("/api/agent/profile", new AgentProfile(ExecLevels.Off, false, null, null, 2, PushTransport: push), TestUser.Json);
 
     [Theory]
     [InlineData(CommandTransports.Inbox, CommandTransports.Inbox)]
@@ -137,7 +137,7 @@ public sealed class CommandTransportTests(ApiFactory api)
     {
         var (owner, agent, sessionId, _) = await NewCommandAsync();
         (await ProfileAsync(agent, reported)).EnsureSuccessStatusCode();
-        var session = await owner.GetJsonAsync($"/api/sessions/{sessionId}");
+        var session = (await owner.GetJsonAsync($"/api/sessions/{sessionId}")).GetProperty("session");
         Assert.Equal(expected, session.GetProperty("pushTransport").ValueKind == JsonValueKind.Null ? null : session.GetProperty("pushTransport").GetString());
     }
 
@@ -147,6 +147,6 @@ public sealed class CommandTransportTests(ApiFactory api)
         var (owner, agent, sessionId, _) = await NewCommandAsync();
         await ProfileAsync(agent, CommandTransports.Inbox);
         await ProfileAsync(agent, null);
-        Assert.Equal(JsonValueKind.Null, (await owner.GetJsonAsync($"/api/sessions/{sessionId}")).GetProperty("pushTransport").ValueKind);
+        Assert.Equal(JsonValueKind.Null, (await owner.GetJsonAsync($"/api/sessions/{sessionId}")).GetProperty("session").GetProperty("pushTransport").ValueKind);
     }
 }

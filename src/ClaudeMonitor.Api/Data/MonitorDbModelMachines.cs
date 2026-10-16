@@ -62,7 +62,7 @@ internal static class MonitorDbModelMachines
             e.Property(x => x.Kind).HasMaxLength(16);
             e.Property(x => x.ScriptInterpreter).HasMaxLength(16);
             e.Property(x => x.ScriptFilesJson).HasColumnType("jsonb");
-                        e.Property(x => x.TargetEnvironment).HasMaxLength(16);
+            e.Property(x => x.TargetEnvironment).HasMaxLength(16);
             e.Property(x => x.TargetFunction).HasMaxLength(16);
             e.HasIndex(x => new { x.TargetAgentId, x.ProjectKey, x.CreatedAt }).IsDescending(false, false, true).HasFilter("project_key IS NOT NULL");
             e.ToTable(t =>

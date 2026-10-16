@@ -40,7 +40,7 @@ describe("the schedules of a machine", () => {
 
   it("shows an interval and a daily schedule in words and what stopped a paused one", () => {
     show([schedule(), schedule({ id: "s2", kind: "daily", intervalMinutes: null, dailyAtMinutes: 185, jobName: "Nightly" }),
-      schedule({ id: "s3", status: "paused", pauseReason: "failures", failuresInARow: 3, nextRunAt: null, jobName: "Broken" })]);
+      schedule({ id: "s3", status: "paused", pauseReason: "failures", failuresInARow: 3, nextRunAt: null, jobName: "Broken", intervalMinutes: 120 })]);
     expect(screen.getByText("every 60 minutes")).toBeInTheDocument();
     expect(screen.getByText("every day at 03:05 UTC")).toBeInTheDocument();
     expect(screen.getByText(en.schedules.reason.failures)).toBeInTheDocument();

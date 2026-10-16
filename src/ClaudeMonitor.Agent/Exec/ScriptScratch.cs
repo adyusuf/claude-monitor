@@ -51,11 +51,11 @@ public sealed class ScriptScratch : IDisposable
         Directory.CreateDirectory(shared ? home : Path.Combine(home, RunsFolder));
         if (Directory.Exists(folder)) throw new IOException("the scratch folder of this run already exists");
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(folder);
-        else Directory.CreateDirectory(folder, scratch.dirMode);
+        else scratch.MakeDirectory(folder);
         try
         {
             if (OperatingSystem.IsWindows()) Directory.CreateDirectory(scratch.TempFolder);
-            else Directory.CreateDirectory(scratch.TempFolder, scratch.dirMode);
+            else scratch.MakeDirectory(scratch.TempFolder);
             var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
             if (!OperatingSystem.IsWindows()) options.UnixCreateMode = scratch.fileMode;
             using (var stream = new FileStream(scratch.ScriptPath, options))
@@ -64,6 +64,7 @@ public sealed class ScriptScratch : IDisposable
                 stream.Write(bytes);
             }
 
+            Chmod(scratch.ScriptPath, scratch.fileMode);
             foreach (var file in files ?? []) scratch.WriteFile(file);
             scratch.HasFiles = files is { Count: > 0 };
             if (stdin is { Length: > 0 })
@@ -87,22 +88,30 @@ public sealed class ScriptScratch : IDisposable
         if (!ScriptFiles.IsSafePath(file.Path)) throw new ArgumentException("an unsafe file path", nameof(file));
         var target = Path.GetFullPath(Path.Combine(Folder, file.Path.Replace('/', Path.DirectorySeparatorChar)));
         if (!target.StartsWith(Folder + Path.DirectorySeparatorChar, StringComparison.Ordinal)) throw new ArgumentException("a file outside the run's folder", nameof(file));
-        var parent = Path.GetDirectoryName(target)!;
-        if (!Directory.Exists(parent))
-        {
-            if (OperatingSystem.IsWindows()) Directory.CreateDirectory(parent);
-            else Directory.CreateDirectory(parent, dirMode);
-        }
-
+        // One level at a time, each made and then given its mode by chmod: a creation mode is cut by the process's umask (a service runs under 0077), a chmod is not.
+        var missing = new Stack<string>();
+        for (var dir = Path.GetDirectoryName(target)!; dir.Length > Folder.Length && !Directory.Exists(dir); dir = Path.GetDirectoryName(dir)!) missing.Push(dir);
+        foreach (var dir in missing) MakeDirectory(dir);
         WriteText(target, file.Text);
+    }
+
+    private void MakeDirectory(string path)
+    {
+        Directory.CreateDirectory(path);
+        Chmod(path, dirMode);
+    }
+
+    private static void Chmod(string path, UnixFileMode mode)
+    {
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, mode);
     }
 
     private void WriteText(string path, string text)
     {
         var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
         if (!OperatingSystem.IsWindows()) options.UnixCreateMode = fileMode;
-        using var stream = new FileStream(path, options);
-        stream.Write(new System.Text.UTF8Encoding(false).GetBytes(text));
+        using (var stream = new FileStream(path, options)) stream.Write(new System.Text.UTF8Encoding(false).GetBytes(text));
+        Chmod(path, fileMode);
     }
 
     /// <summary>

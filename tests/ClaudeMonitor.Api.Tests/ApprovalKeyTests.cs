@@ -78,8 +78,8 @@ public sealed class ApprovalKeyTests(ApiFactory api)
     {
         var team = await RemoteKit.TeamAsync(api);
         using var rsa = RSA.Create(2048);
-        await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync("/api/me/approval-keys", new { name = "x", publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()) }), HttpStatusCode.BadRequest, RemoteErrors.InvalidApprovalKey);
-        await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync("/api/me/approval-keys", new { name = "x", publicKey = "%%%" }), HttpStatusCode.BadRequest, RemoteErrors.InvalidApprovalKey);
+        await RemoteKit.AssertInvalidAsync(await team.Owner.PostAsync("/api/me/approval-keys", new { name = "x", publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()) }), "publicKey", RemoteErrors.InvalidApprovalKey);
+        await RemoteKit.AssertInvalidAsync(await team.Owner.PostAsync("/api/me/approval-keys", new { name = "x", publicKey = "%%%" }), "publicKey", RemoteErrors.InvalidApprovalKey);
         using var key = new Key();
         Assert.Equal(HttpStatusCode.BadRequest, (await team.Owner.PostAsync("/api/me/approval-keys", new { name = "", publicKey = key.Spki })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await RegisterAsync(team.Owner, key)).StatusCode);

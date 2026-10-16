@@ -129,7 +129,7 @@ public sealed class ScheduleTests(ApiFactory api)
         foreach (var bad in new object[] { new { jobId = job.Id, kind = "interval", intervalMinutes = 5 }, new { jobId = job.Id, kind = "daily", dailyAtMinutes = 1440 },
                      new { jobId = job.Id, kind = "cron", intervalMinutes = 60 }, new { jobId = job.Id, kind = "interval", intervalMinutes = 60, dailyAtMinutes = 5 } })
         {
-            await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync("/api/schedules", bad), HttpStatusCode.BadRequest, RemoteErrors.InvalidSchedule);
+            await RemoteKit.AssertInvalidAsync(await team.Owner.PostAsync("/api/schedules", bad), "kind", RemoteErrors.InvalidSchedule);
         }
     }
 
@@ -149,7 +149,7 @@ public sealed class ScheduleTests(ApiFactory api)
     public async Task A_job_with_a_placeholder_a_machine_that_cannot_run_commands_and_a_sixth_schedule_are_refused()
     {
         var team = await TeamAsync(api);
-        var placeholder = await ActiveJobAsync(team, ["/opt/ci/run-tests", "--ref", "{ref}"], "By ref");
+        var placeholder = await ActiveJobAsync(team, ["/opt/ci/run-tests", "--ref", "{word}"], "By ref");
         await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync("/api/schedules", new { jobId = placeholder.Id, kind = "interval", intervalMinutes = 60 }), HttpStatusCode.Conflict, RemoteErrors.SchedulePlaceholder);
 
         var job = await ActiveJobAsync(team);
@@ -164,8 +164,8 @@ public sealed class ScheduleTests(ApiFactory api)
     {
         var team = await TeamAsync(api, execLevel: ExecLevels.Shell);
         await ScriptKit.ProfileAsync(team, ExecLevels.Shell, [ScriptKit.Sh]);
+        var job = await ActiveJobAsync(team); // approved while the machine is not strict (on a strict one the approval itself needs a code)
         await ScriptKit.SetRoleAsync(team, environment, function);
-        var job = await ActiveJobAsync(team);
         await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync("/api/schedules", new { jobId = job.Id, kind = "interval", intervalMinutes = 60 }), HttpStatusCode.Conflict, RemoteErrors.ScheduleStrict);
     }
 
