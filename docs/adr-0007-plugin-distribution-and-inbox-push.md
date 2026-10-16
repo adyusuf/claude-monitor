@@ -186,7 +186,12 @@ approval happens on the web, as today.
 (or the legacy local one), that the plugin is not disabled in `enabledPlugins`, and that its own binary still exists. When any of
 these fails it flushes the outbox once, stops the stream and exits; `agent.log` says why. Claude Code deletes
 `${CLAUDE_PLUGIN_DATA}` on uninstall, so the binary is gone too; the home stays. A **disabled** plugin runs no hooks and no MCP
-server, so the daemon stopping there is consistent with "active only while enabled". Reinstall or re-enable: the bootstrap
+server, so the daemon stopping there is consistent with "active only while enabled". Two more checks come from Claude Code's plugin list
+(`installed_plugins.json`, believed only when it is `version` 2 with a `plugins` object; otherwise the older signals alone decide): a plugin that is no
+longer listed was uninstalled even when its data was kept (`--keep-data`), and a plugin switched off is gone only when it is off everywhere it is installed:
+an install for the account is read from the user's settings alone, a project or local install from that project's `settings.local.json`, then
+`settings.json`, then the user's. One project switching it off never stops a daemon that others still use; a project folder that no longer exists counts as
+still there. Reinstall or re-enable: the bootstrap
 runs again and continues from the existing identity. The service agent (ADR-0005) is not affected: it has no plugin.
 
 **B6. Updates.** A new agent release = a new plugin version (same number) with new pins; `claude plugin update
@@ -424,7 +429,9 @@ the plugin installed from a real marketplace; a published build (the pins file i
   (`session_commands.transport`, nullable; an older agent sends nothing and the web shows nothing), and the command's row reads "Reached the session ...".
   Still open: showing "pushed, not shown yet" or "the session refuses messages" before applied needs the agent to report push state earlier, and the
   idle-session warning is still worded for the hooks, which is wrong while push is on.
-- **`--stop-wait` for the plugin's hooks:** their timeouts are static.
+- **`--stop-wait` for the plugin's hooks (done):** the plugin's Stop hook now has a timeout that fits the longest wait (600 s), and the wrapper tells the agent so
+  (`CM_PLUGIN_STOP_WAIT_MAX`); a plugin-started agent takes the saved wait up to that. A plugin version without the wrapper's line keeps a wait of zero, because its
+  fixed 15 s would cut a longer wait off.
 - **Serving the plugin from the server itself** (a marketplace `archive` source on the site's own `/downloads`, no GitHub coordinates in the web build) would make
   `VITE_PLUGIN_MARKETPLACE` unnecessary; it needs a deploy step that writes `marketplace.json` with the site's address and the zip's hash.
 - Hold expiry, the terminal approval dialog and `bypassPermissions` without the key were measured or reasoned in §8 only for macOS.
@@ -443,7 +450,7 @@ the plugin installed from a real marketplace; a published build (the pins file i
 | a Linux or Windows machine without `unzip` could not install; Windows could not replace a running binary | `unzip`, PowerShell `Expand-Archive`, `bsdtar`, `python3 -m zipfile`, a clear message otherwise; the old file is renamed aside on Windows (not run there) |
 | an idle session lost its inbox after a day | 30 days, and a dead socket is dropped at its first failed write |
 | the session key could reach a log through the configuration's text form; the daemon inherited the starting session's key | `SecretText` hides it; the daemon's environment is scrubbed; a socket that is a symlink or not the user's own is not written to |
-| a stop wait saved for the agent was cut off by the plugin's fixed hook timeout | a plugin-started agent takes no stop wait |
+| a stop wait saved for the agent was cut off by the plugin's fixed hook timeout | a plugin-started agent takes no stop wait (later: it takes it up to the plugin version's Stop timeout) |
 | two files over 300 lines | split |
 
 **Second pass (same reviewer, on the fixes):** findings 1-13 closed or documented-open, and two new ones from the fixes, both fixed with a test that failed first.
@@ -453,5 +460,5 @@ recorded in `connect.log.server` when a login starts). Also: a failed install is
 binary back, a server value with a second line is refused, `write_plugin_pins.py --replace` starts a version's list over, and the script tests are split into small files.
 
 **Open after the QA pass:** Windows (the named-pipe branch has no test anywhere, `sh` for the MCP server must be on the Windows PATH, the detached login may not outlive a job
-object); a plugin disabled only at project or local scope is not noticed.
+object). The lifecycle gaps found in the QA pass (a plugin switched off only at project or local scope, `--keep-data`, `--stop-wait`) were closed afterwards (B5).
 

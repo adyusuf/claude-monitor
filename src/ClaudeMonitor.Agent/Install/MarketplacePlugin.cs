@@ -23,8 +23,17 @@ public static class MarketplacePlugin
 
     private static readonly JsonSerializerOptions Format = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    /// <summary>Claude Code's own limit for a hook, which the agent's waits stay under: a prompt wait of 120 s and no stop wait by default.</summary>
-    public static int Timeout(string hook, int declared) => declared > 0 ? declared : hook == "PermissionRequest" ? 120 + 15 : 0 + 15;
+    /// <summary>
+    /// The timeout of a hook (the plugin's hooks are fixed): the permission wait of 120 s plus a margin, and for Stop the longest wait a person can set
+    /// (<see cref="AgentConfig.WaitMaxSeconds"/>) plus a margin, so `cm-agent install --stop-wait` works for a plugin-started agent too; a Stop hook waits only as long
+    /// as the saved wait, zero by default.
+    /// </summary>
+    public static int Timeout(string hook, int declared) => declared > 0 ? declared : hook switch
+    {
+        "PermissionRequest" => 120 + 15,
+        "Stop" => AgentConfig.WaitMaxSeconds + 10,
+        _ => 15,
+    };
 
     /// <summary>Every file as (path relative to the repository root, content).</summary>
     public static IReadOnlyDictionary<string, string> Render(string version)

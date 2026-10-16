@@ -36,6 +36,15 @@ public sealed class PluginFilesTests : IDisposable
     }
 
     [Fact]
+    public void The_stop_hook_fits_the_longest_stop_wait_and_the_wrapper_says_so_with_the_same_number()
+    {
+        var hooks = JsonNode.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), MarketplacePlugin.PluginFolder, "hooks", "hooks.json")))!["hooks"]!.AsObject();
+        Assert.True(hooks["Stop"]![0]!["hooks"]![0]!["timeout"]!.GetValue<int>() >= AgentConfig.WaitMaxSeconds + 10, "a stop wait would be cut off");
+        var wrapper = File.ReadAllText(Path.Combine(RepositoryRoot(), MarketplacePlugin.PluginFolder, "scripts", "run.sh"));
+        Assert.Contains($"export CM_PLUGIN_STOP_WAIT_MAX={AgentConfig.WaitMaxSeconds}\n", wrapper, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Every_hook_the_local_install_registers_is_in_the_plugin_with_the_same_timing_and_goes_through_the_wrapper()
     {
         var hooks = JsonNode.Parse(MarketplacePlugin.Render("1.0.0")[$"{MarketplacePlugin.PluginFolder}/hooks/hooks.json"])!["hooks"]!.AsObject();
@@ -52,7 +61,7 @@ public sealed class PluginFilesTests : IDisposable
         var start = hooks["SessionStart"]![0]!["hooks"]!.AsArray();
         Assert.Equal(2, start.Count);
         Assert.Contains("ensure.sh", start[0]!["command"]!.GetValue<string>(), StringComparison.Ordinal); // the bootstrap comes first
-        Assert.Equal((135, 15), (MarketplacePlugin.Timeout("PermissionRequest", 0), MarketplacePlugin.Timeout("Stop", 0)));
+        Assert.Equal((135, AgentConfig.WaitMaxSeconds + 10), (MarketplacePlugin.Timeout("PermissionRequest", 0), MarketplacePlugin.Timeout("Stop", 0))); // the Stop hook fits the longest stop wait
     }
 
     [Fact]

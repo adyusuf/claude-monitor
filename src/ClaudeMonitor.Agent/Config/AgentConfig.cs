@@ -244,6 +244,7 @@ public sealed partial record AgentConfig
             BinaryOverride = read("CM_BINARY") is { Length: > 0 } binary ? binary : null,
             PluginId = read("CM_PLUGIN_ID") is { Length: > 0 } pluginId ? pluginId : null,
             PluginDataDir = read("CLAUDE_PLUGIN_DATA") is { Length: > 0 } pluginData ? pluginData : null,
+            PluginStopWaitMax = Seconds(read("CM_PLUGIN_STOP_WAIT_MAX"), TimeSpan.Zero, WaitMaxSeconds),
             MessagingSocket = read("CLAUDE_CODE_MESSAGING_SOCKET") is { Length: > 0 } socket ? socket : null,
             MessagingToken = read("CLAUDE_CODE_MESSAGING_TOKEN") is { Length: > 0 } token ? new SecretText(token) : null,
             ClaudeUpdateEnabled = read("CM_CLAUDE_UPDATE") == "on",
