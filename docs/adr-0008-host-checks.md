@@ -41,9 +41,9 @@ Host names stay out of this file and out of the repository; write them in your o
 ## 4. Roles, presence and the two-step code rule
 
 1. Set the machine's role to production on its page (admin). The page shows the role badge, "Claude: running/idle/none" and the tool inventory within a minute.
-2. A shell command (`cm-agent run --machine <host> --shell "uname -a"` or `monitor_run`) on this machine waits on the web. Allow needs a code. With an owner account
+2. A shell command (`monitor_run` in shell mode from a Claude session; the command line has no shell option) on this machine waits on the web. Allow needs a code. With an owner account
    that has no two-step sign-in, Allow is refused ("you need two-step sign-in"), and the run expires.
-3. The same for an argv run of an interpreter and for approving a grant or a job. A plain argv run of another program needs only the click.
+3. The same for an argv run of an interpreter (`cm-agent run --machine <host> --argv /bin/sh -c true`) and for approving a grant or a job. A plain argv run of another program needs only the click.
 4. Change the role to test: the shell command needs no code. Change it to production after approving without a code and before the agent starts it: the run is cancelled.
 
 ## 5. A real ask, end to end

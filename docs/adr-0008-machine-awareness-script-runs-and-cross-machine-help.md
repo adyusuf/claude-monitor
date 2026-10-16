@@ -500,7 +500,7 @@ tsc and eslint clean; the shared gate (`gate-core.sh dev`: coverage per codebase
 published-agent smoke test passed. The faults the runs found were test faults, fixed without loosening: a pending-ask test that raced the fake daemon (its clock now waits until
 the machine lookup is answered) and a web test that took its read count before the page had settled. The gate's e2e check only warns (global #33): no e2e spec was run.
 
-**Unverified (to do before anything reaches a real host).** The phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
+**Unverified (to do before anything reaches a real host; the steps are in [adr-0008-host-checks.md](adr-0008-host-checks.md)).** The phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
 gate, interpreter paths and `-File` under a policy, `schtasks`); on Linux the `/proc` service names and `systemd --user` (the tests run on macOS); the macOS launchd
 bootstrap of the LaunchAgent and the application bundle (the installer's tool calls are tested with a fake, not run); and a real Claude Code session receiving an ask
 end to end. Measured on macOS by the tests: the migrations apply and their CHECKs hold on PostgreSQL 18, real processes run a script from its scratch file with the fixed
