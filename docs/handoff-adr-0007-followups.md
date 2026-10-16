@@ -17,24 +17,13 @@ clean worktrees), so every item below is still open.
 | Old local plugin | `monitor-agent-local` on the Mac was `connected:false`; `/monitor-agent:connect` replaces it. |
 | Promotion | `dev` to `test` to `prod` when satisfied: `bash scripts/merge-gate.sh test`, then `prod`; the `prod` push is the maintainer's. |
 
-## Code work still open (independent, one branch each, off `dev`)
+## Code work: what was done and what is still open (updated 16/10/2026)
 
-1. **Show which transport delivered a command.** The agent reports inbox / channel / hook when it marks a command
-   pushed or taken; the API stores it additively (nullable column); the web shows a label (i18n `en` and `tr`).
-   Old agents that report nothing keep working. Files: `Push/InboxPump.cs`, `Storage/LocalStorePush.cs`, the
-   API command state + migration, `web/src` command rows.
-2. **Plugin lifecycle gaps** (`Daemon/PluginWatch.cs`, `Config/SavedSettings.cs`):
-   a plugin disabled only at project or local scope is not noticed (stop only when disabled everywhere it was
-   enabled for the user, never for one project); `--keep-data` uninstall hides the removal (find a signal such as
-   `installed_plugins.json`, or document the limit with a test); `--stop-wait` is ignored for plugin-started agents.
-   Tests use temp dirs, never real Claude config.
-3. **Serve the marketplace from our own server** (deferred in ADR section 9). First an ADR addendum measured with
-   `claude plugin marketplace add` against a local source using a temporary `CLAUDE_CONFIG_DIR`; code only if
-   feasible and the trust model (pins, signed manifest) still holds. Removes the need for a public repo.
-4. **Windows** (needs a Windows machine): the named-pipe branch of `SocketInboxTransport`, `sh` for the MCP server
-   on PATH, `Detach` (a no-op there) and the rename-aside in `ensure.sh` have never run.
-5. **Real end-to-end with Claude Code:** the daemon's write into a real session's inbox and a real marketplace
-   install were measured by the probe but not run end to end.
+Done (ADR-0007 sections 9.1 and 9.2, ADR-0010 for the rest of the day's work): the command's transport label and the "pushed, not shown yet" state with the push-aware idle warning;
+the plugin lifecycle gaps (a plugin missing from Claude Code's list, project and local scopes, `--keep-data`, `--stop-wait`); the marketplace served from the site itself
+(`scripts/build_plugin_site.py`, `AGENT_SITE_URL`, `VITE_PLUGIN_FROM_SERVER`).
 
-Rules for every item: own branch, one commit per task, `bash scripts/merge-gate.sh dev`, files under 300 lines,
-backward compatible, no host or real names, no push to `prod`. Mode C (sonnet) is in `.claude/mode`.
+Still open, and needing a real machine: **Windows** (the named-pipe branch of `SocketInboxTransport`, `sh` for the MCP server on PATH, `Detach`, the rename-aside in `ensure.sh` have never run) and
+a **real end-to-end with Claude Code** (the daemon's write into a real session's inbox, a real marketplace install from the site's own address with a public certificate). The checklist is `docs/adr-0008-host-checks.md`.
+
+Rules for any further item: own branch, one commit per task, files under 300 lines, backward compatible, no host or real names, no push to `prod`.
