@@ -11,7 +11,7 @@ namespace ClaudeMonitor.Api.Endpoints;
 public sealed record CommandRequest(string? Kind, string? Body);
 public sealed record CommandRow(Guid Id, string Kind, string? Body, string Status, Guid CreatedBy, DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt, DateTimeOffset? DeliveredAt, DateTimeOffset? AppliedAt, string? Result,
-    long? ReplyEventId = null, string? ReplyText = null, bool ReplyMore = false);
+    long? ReplyEventId = null, string? ReplyText = null, bool ReplyMore = false, string? Transport = null);
 public sealed record PermissionRow(Guid Id, string ToolName, System.Text.Json.JsonDocument ToolInput, string Status,
     DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, string? Decision, string? Reason, DateTimeOffset? AnsweredAt);
 public sealed record AnswerRequest(string? Decision, string? Reason, Dictionary<string, string>? Answers = null);
@@ -41,7 +41,7 @@ public static class CommandEndpoints
     {
         if (await Access.SessionAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
         var rows = await db.SessionCommands.AsNoTracking().Where(c => c.SessionId == id).OrderByDescending(c => c.CreatedAt).Take(50)
-            .Select(c => new CommandRow(c.Id, c.Kind, c.Body, c.Status, c.CreatedBy, c.CreatedAt, c.ExpiresAt, c.DeliveredAt, c.AppliedAt, c.Result))
+            .Select(c => new CommandRow(c.Id, c.Kind, c.Body, c.Status, c.CreatedBy, c.CreatedAt, c.ExpiresAt, c.DeliveredAt, c.AppliedAt, c.Result, null, null, false, c.Transport))
             .ToListAsync(http.RequestAborted);
         var replies = await CommandReplies.FindAsync(db, id, rows, config, http.RequestAborted);
         return Results.Ok(rows.Select(c => replies.TryGetValue(c.Id, out var r) ? c with { ReplyEventId = r.EventId, ReplyText = r.Text, ReplyMore = r.More } : c));

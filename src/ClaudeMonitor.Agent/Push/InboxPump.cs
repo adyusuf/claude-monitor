@@ -31,7 +31,7 @@ public sealed class InboxPump(Func<AgentConfig> settings, LocalStore store, IInb
         var pushed = 0;
         foreach (var inbox in store.Inboxes())
         {
-            var prompts = store.TakePromptsForPush(inbox.Session, CommandKinds.Prompt, now);
+            var prompts = store.TakePromptsForPush(inbox.Session, CommandKinds.Prompt, now, CommandTransports.Inbox);
             for (var i = 0; i < prompts.Count; i++)
             {
                 try

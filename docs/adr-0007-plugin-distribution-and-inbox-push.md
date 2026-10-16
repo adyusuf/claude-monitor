@@ -420,8 +420,10 @@ the daemon's write (the probe of §8 used the same line from a script, a desktop
 the plugin installed from a real marketplace; a published build (the pins file is the placeholder until `build-agent.sh` runs for a release).
 
 **Deferred, with the reason.**
-- **The web does not yet say which transport took a command.** The API learns `delivered` and `applied` only; showing "pushed" or "the session refuses messages"
-  needs the agent to report push state to the API (a protocol addition) and a rewording of the idle-session warning, which is wrong while push is on.
+- **The web says which transport an applied command used, not what happens before.** The agent reports `hook`, `inbox` or `channel` with "applied"
+  (`session_commands.transport`, nullable; an older agent sends nothing and the web shows nothing), and the command's row reads "Reached the session ...".
+  Still open: showing "pushed, not shown yet" or "the session refuses messages" before applied needs the agent to report push state earlier, and the
+  idle-session warning is still worded for the hooks, which is wrong while push is on.
 - **`--stop-wait` for the plugin's hooks:** their timeouts are static.
 - **Serving the plugin from the server itself** (a marketplace `archive` source on the site's own `/downloads`, no GitHub coordinates in the web build) would make
   `VITE_PLUGIN_MARKETPLACE` unnecessary; it needs a deploy step that writes `marketplace.json` with the site's address and the zip's hash.

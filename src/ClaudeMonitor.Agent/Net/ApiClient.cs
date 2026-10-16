@@ -112,9 +112,9 @@ public sealed partial class ApiClient(HttpClient http, ICredentialStore credenti
         return await ReadAsync<UpdateOffer>(response, t);
     }, ct);
 
-    public Task CommandStatusAsync(string id, string status, string? result, CancellationToken ct, DateTimeOffset? at = null) => WithinDeadlineAsync(async t =>
+    public Task CommandStatusAsync(string id, string status, string? result, CancellationToken ct, DateTimeOffset? at = null, string? transport = null) => WithinDeadlineAsync(async t =>
     {
-        using var response = await SendAsync(() => Json_(HttpMethod.Post, $"api/agent/commands/{id}/status", new CommandStatusUpdate(status, result, at)), t);
+        using var response = await SendAsync(() => Json_(HttpMethod.Post, $"api/agent/commands/{id}/status", new CommandStatusUpdate(status, result, at, transport)), t);
         if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.NotFound) return; // already settled or gone
         await EnsureAsync(response, t);
     }, ct);

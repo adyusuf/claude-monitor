@@ -105,7 +105,7 @@ database defaults, so an older API keeps inserting rows.
 
 | Table | Columns | Keys and indexes |
 |---|---|---|
-| `session_commands` | `id`, `workspace_id`, `session_id`, `agent_id`, `kind` (`prompt`, `stop`), `body`, `created_by`, `created_at`, `expires_at`, `status` (`queued`, `delivered`, `applied`, `failed`, `expired`, `cancelled`), `delivered_at`, `applied_at`, `result` | (`agent_id`, `status`) WHERE `status IN ('queued', 'delivered')`; (`session_id`, `created_at` DESC) |
+| `session_commands` | `id`, `workspace_id`, `session_id`, `agent_id`, `kind` (`prompt`, `stop`), `body`, `created_by`, `created_at`, `expires_at`, `status` (`queued`, `delivered`, `applied`, `failed`, `expired`, `cancelled`), `delivered_at`, `applied_at`, `result`, `transport` (`hook`, `inbox`, `channel`; nullable: how an applied command reached its session, as the agent reported it) | (`agent_id`, `status`) WHERE `status IN ('queued', 'delivered')`; (`session_id`, `created_at` DESC) |
 
 | `permission_requests` | `id`, `workspace_id`, `session_id`, `agent_id`, `tool_name`, `tool_input` `jsonb`, `status` (`open`, `answered`, `expired`), `created_at`, `expires_at`, `decision` (`allow`, `deny`), `reason`, `answered_by`, `answered_at` | (`session_id`, `status`) |
 

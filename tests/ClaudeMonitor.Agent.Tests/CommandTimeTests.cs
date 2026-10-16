@@ -62,6 +62,6 @@ public sealed class CommandTimeTests : IDisposable
         var at = clock.GetUtcNow();
         store.SaveCommand(new LocalCommand("new", "s1", CommandKinds.Prompt, "b", at.AddMinutes(5)));
         store.TakeCommand("s1", CommandKinds.Prompt, at);
-        Assert.Contains(new TakenCommand("new", at), store.TakenCommands());
+        Assert.Contains(new TakenCommand("new", at, CommandTransports.Hook), store.TakenCommands()); // a hook took it, and the way is kept
     }
 }

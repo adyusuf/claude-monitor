@@ -20,12 +20,14 @@ export function CommandItem({ command: c, sessionId, ended, now, canCancel, onCa
     : c.status === "delivered" ? t("commandHint.delivered")
       : c.status === "expired" ? t(c.deliveredAt ? "commandHint.expiredIdle" : "commandHint.expiredUnreached")
         : null;
+  const how = c.status === "applied" && c.transport ? (dict.commandTransport as Record<string, string>)[c.transport] : undefined; // an unknown way is not shown
   return (
     <li>
       <span className={`badge status-${c.status}`}>{t(`commandStatus.${c.status}` as never)}</span>
       <span>{c.kind === "stop" ? t("session.stop") : c.body}</span>
       <span className="muted small">{dateTime(c.createdAt)}</span>
       {canCancel && c.status === "queued" ? <button type="button" className="link" onClick={() => onCancel(c.id)}>{t("session.cancel")}</button> : null}
+      {how ? <div className="muted small command-hint">{t("commandTransport.via", { how })}</div> : null}
       {hint ? <div className="muted small command-hint">{hint}{left ? ` · ${t("session.expiresIn", { time: left })}` : ""}</div> : null}
       <CommandReply command={c} sessionId={sessionId} ended={ended} now={now} />
     </li>

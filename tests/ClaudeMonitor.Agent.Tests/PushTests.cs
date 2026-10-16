@@ -141,6 +141,16 @@ public sealed class PushTests : IDisposable
     // ---- the pump ---------------------------------------------------------------------------------------------------
 
     [Fact]
+    public async Task A_prompt_the_channel_pump_sent_is_reported_as_applied_through_the_channel()
+    {
+        store.BindSession("mine", 4242, Start);
+        Queue("c-mine", "mine");
+        await Pump().PumpAsync(_ => Task.CompletedTask);
+        Assert.True(store.ConfirmPush("c-mine", Start.AddSeconds(2)));
+        Assert.Equal([new TakenCommand("c-mine", Start.AddSeconds(2), CommandTransports.Channel)], store.TakenCommands());
+    }
+
+    [Fact]
     public async Task The_pump_pushes_only_what_is_addressed_to_its_own_session()
     {
         store.BindSession("mine", 4242, Start);
