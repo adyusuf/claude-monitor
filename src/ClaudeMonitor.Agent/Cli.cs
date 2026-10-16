@@ -32,6 +32,9 @@ public static class Cli
                                         whether approved remote runs may execute on this machine (default off)
         cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
         cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005)
+        cm-agent connect [--server <url>]
+                                        like login, from inside Claude Code: prints the code and returns; the login finishes in the background
+        cm-agent restart                hand the running daemon over to this binary
         cm-agent status                 connection and queue
         cm-agent update [--check]       install the newest signed agent build from the server (--check: only look)
         cm-agent config [auto-update off|check|on] [claude-update on|off]
@@ -65,9 +68,21 @@ public static class Cli
 
             case "login":
                 var server = Option(args, "--server");
-                var code = await new Login(config, stdout, clock).RunAsync(server, null, CancellationToken.None);
-                if (code == 0) DaemonHost.EnsureRunning(config, log);
-                return code;
+                if (Array.IndexOf(args, "--detach") >= 0) DaemonHost.Detach(); // started by `connect`: outlive the session that asked
+                await using (var file = Option(args, "--output") is { } target ? new StreamWriter(target) { AutoFlush = true } : null)
+                {
+                    var code = await new Login(config, file ?? stdout, clock).RunAsync(server, null, CancellationToken.None);
+                    if (code == 0) DaemonHost.EnsureRunning(config, log);
+                    return code;
+                }
+
+            case "restart":
+                return await RestartAsync(config, log, clock, stdout);
+            case "connect":
+                return await new ConnectCommand(config, stdout, clock, new DetachedProcess()).RunAsync(Option(args, "--server"), Environment.ProcessPath!, CancellationToken.None);
+            case "plugin-files" when args.Length > 1:
+                stdout.WriteLine($"{MarketplacePlugin.WriteTo(args[1], AgentConfig.Version)} files written under {args[1]}");
+                return 0;
             case "logout":
                 return await new Login(config, stdout, clock).LogoutAsync();
             case "install" when Array.IndexOf(args, ServiceCommands.ExecOption) >= 0:
@@ -154,6 +169,26 @@ public static class Cli
             log.Write($"hook {hookEvent} failed: {e.GetType().Name} {e.Message}");
         }
 
+        return 0;
+    }
+
+    /// <summary>"cm-agent restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
+    public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout)
+    {
+        if (!Identity.Load(config).Connected)
+        {
+            await stdout.WriteLineAsync("Not connected: there is no daemon to restart.");
+            return 0;
+        }
+
+        var daemon = new Update.DaemonControl(config, log, clock);
+        if (daemon.IsRunning() && !await daemon.StopAsync(config.UpdateStopWait, CancellationToken.None) && !daemon.Kill())
+        {
+            await stdout.WriteLineAsync("The daemon did not stop; it keeps running its older version until it ends.");
+            return 1;
+        }
+
+        await stdout.WriteLineAsync(daemon.Start(config.BinaryPath) ? "The daemon was restarted." : "The daemon could not be started.");
         return 0;
     }
 

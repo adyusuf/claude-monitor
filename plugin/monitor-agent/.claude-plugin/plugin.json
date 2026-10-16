@@ -1,0 +1,16 @@
+{
+  "name": "monitor-agent",
+  "version": "0.3.0",
+  "description": "Claude Monitor agent: installs itself, connects to your server, reports sessions and delivers web messages.",
+  "author": {
+    "name": "Claude Monitor"
+  },
+  "userConfig": {
+    "server": {
+      "type": "string",
+      "title": "Server address",
+      "description": "The https address of your Claude Monitor server: the address you open in the browser.",
+      "required": true
+    }
+  }
+}

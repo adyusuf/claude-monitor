@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "claude-monitor": {
+      "command": "sh",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/scripts/run.sh",
+        "mcp"
+      ],
+      "env": {
+        "CM_SERVER": "${user_config.server}"
+      }
+    }
+  }
+}

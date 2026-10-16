@@ -77,6 +77,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         await Task.WhenAll(
             Loop("claude-update", config.UpdatePollEvery, claudeUpdates.RunAsync, api, revoked),
             StopRequestAsync(revoked),
+            PluginWatchAsync(revoked, PluginWatch.DataExists(config)),
             Loop("update", config.UpdatePollEvery, updates.RunAsync, api, revoked),
             Loop("flush", config.FlushEvery, async ct =>
             {
@@ -144,6 +145,23 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             }
 
             await Wait(config.StopPollEvery, cts.Token);
+        }
+    }
+
+    /// <summary>Ends the daemon when the Claude Code plugin that started it is uninstalled or switched off (ADR-0007). Its events stay in the local database for the next daemon.</summary>
+    private async Task PluginWatchAsync(CancellationTokenSource cts, bool dataExisted)
+    {
+        if (config.PluginDataDir is null && config.PluginId is null) return; // not started by the plugin: nothing to watch
+        while (!cts.IsCancellationRequested)
+        {
+            await Wait(config.PluginWatchEvery, cts.Token);
+            if (cts.IsCancellationRequested) return;
+            if (PluginWatch.Gone(config, dataExisted) is { } why)
+            {
+                log.Write($"stopping: {why}");
+                await cts.CancelAsync();
+                return;
+            }
         }
     }
 
@@ -269,6 +287,12 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             log.Write($"could not start the daemon: {e.Message}");
             return false;
         }
+    }
+
+    /// <summary>Leaves the process group of whoever started this process, so that its end does not end us.</summary>
+    public static void Detach()
+    {
+        if (!OperatingSystem.IsWindows()) _ = SetSid();
     }
 
     [LibraryImport("libc", EntryPoint = "setsid")]

@@ -201,7 +201,7 @@ public sealed partial record AgentConfig
     public string IdentityPath => Path.Combine(Home, "agent.json");
     public string PluginDir => Path.Combine(Home, "claude-plugin");
     public string LogPath => Path.Combine(Home, "agent.log");
-    public string BinaryPath => Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
+    public string BinaryPath => BinaryOverride ?? Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
 
     /// <summary>What the last update check and install left behind (shown by `cm-agent status`).</summary>
     public string UpdateStatePath => Path.Combine(Home, "update-state.json");
@@ -260,6 +260,9 @@ public sealed partial record AgentConfig
             PushEnabled = PushTransports.Enables(read("CM_PUSH")),
             PushFromEnvironment = read("CM_PUSH") is { Length: > 0 },
             PushTransport = PushTransports.Normalize(read("CM_PUSH")),
+            BinaryOverride = read("CM_BINARY") is { Length: > 0 } binary ? binary : null,
+            PluginId = read("CM_PLUGIN_ID") is { Length: > 0 } pluginId ? pluginId : null,
+            PluginDataDir = read("CLAUDE_PLUGIN_DATA") is { Length: > 0 } pluginData ? pluginData : null,
             MessagingSocket = read("CLAUDE_CODE_MESSAGING_SOCKET") is { Length: > 0 } socket ? socket : null,
             MessagingToken = read("CLAUDE_CODE_MESSAGING_TOKEN") is { Length: > 0 } token ? token : null,
             ClaudeUpdateEnabled = read("CM_CLAUDE_UPDATE") == "on",
