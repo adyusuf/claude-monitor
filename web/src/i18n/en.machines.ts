@@ -38,6 +38,13 @@ export const enMachines = {
     turnOn: "Report listening ports", turnOff: "Stop reporting", saved: "Saved.", ownerOnly: "Only the machine's owner decides this.",
     enableHint: "Turning this on needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
   },
+  asks: {
+    title: "Asks from your other machines", hint: "A Claude session on another machine of yours can ask a question of an idle Claude session here (not a production or database machine, and only if an admin has set this machine's environment). The answer comes back as text. Off by default: only this machine's owner turns it on.",
+    off: "This machine takes no asks.", on: "This machine takes asks from your other machines.", turnOn: "Allow asks", turnOff: "Stop allowing asks", saved: "Saved.",
+    ownerOnly: "Only the machine's owner decides this.", enableHint: "Turning this on needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
+    none: "No ask yet.", question: "Question", answer: "Answer", answerCut: "The answer was cut at the server's limit.",
+    status: { queued: "waiting", delivered: "delivered, waiting for the answer", answered: "answered", no_idle_session: "no idle session", not_accepting: "not accepting", no_answer: "no answer", expired: "expired", cancelled: "cancelled" },
+  },
   projects: {
     title: "Projects", none: "No project is known on this machine yet.", noneHint: "A project appears when a session works in it, or when a folder is listed with cm-agent config projects add.",
     listed: "listed folder", session: "from a session", errors: "{n} tool errors in 7 days", noRuns: "No run for this project yet.", run: "run", cut: "output cut",

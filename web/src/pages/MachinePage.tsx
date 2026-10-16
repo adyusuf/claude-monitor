@@ -12,6 +12,7 @@ import { JobList } from "./JobList";
 import { ToolList } from "./MachineBadges";
 import { MachineMetrics } from "./MachineMetrics";
 import { NoteEditor, TagsEditor } from "./MachineFacts";
+import { MachineAsks } from "./MachineAsks";
 import { MachineProjects } from "./MachineProjects";
 import { MachineRoleEditor } from "./MachineRoleEditor";
 import { MachineServices } from "./MachineServices";
@@ -79,6 +80,7 @@ export function MachinePage() {
       {data.detail ? (
         <>
           <Card title={t("machines.services.title")}><MachineServices agentId={agentId} detail={data.detail} owned={data.owned} onChanged={() => void reload()} /></Card>
+          <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
           <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} /></Card>
         </>
       ) : null}

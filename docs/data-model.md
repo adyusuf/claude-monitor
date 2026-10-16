@@ -90,6 +90,18 @@ output account: `output_read_bytes`, `output_dropped_bytes` (as the target repor
 runs; true only when nothing was dropped, refused or stopped at the read limit). `workspace_settings.script_output_max_bytes` (default 8 MiB;
 CHECK 1-64 MiB; set by an admin in the remote settings).
 
+**Asks across machines (ADR-0008 phase 3, migration `MachineAsks`).** `agents` gains `accepts_asks` (boolean, default false: the machine owner's opt-in),
+`accepts_asks_set_at` and `accepts_asks_set_by` (FK users). New table `machine_asks`: `id`, `workspace_id`, `requester_agent_id`, `requester_user_id`,
+`requester_session_id` (FK sessions), `target_agent_id`, `target_user_id`, `target_session` (the Claude session that received it), `client_key`,
+`project_key`, `question` (1-8000; NULL once emptied), `status` (`queued`, `delivered`, `answered`, `no_idle_session`, `not_accepting`, `no_answer`,
+`expired`, `cancelled`; CHECK), `answer` (≤ 100 000; NULL once emptied), `answer_truncated`, `error`, `created_at`, `expires_at`, `delivered_at`,
+`answered_at`, `ended_at`; CHECKs `requester_user_id = target_user_id` and `requester_agent_id <> target_agent_id`; UNIQUE (`requester_agent_id`,
+`client_key`); indexes on (`target_agent_id`, `status`) WHERE open, (`requester_agent_id`, `created_at`) and (`workspace_id`, `created_at` DESC). The
+question and the answer are personal data like a command: exported (`asks`), emptied on account deletion and the rows deleted after `retention_days`
+past their end; the audit rows name an ask by id only. Every transition is a compare-and-set; the housekeeping loop expires a queued ask after 2 minutes
+and a delivered one after 15 without an answer, and member removal, an agent move or revoke, the opt-in turning off and the workspace switch turning off
+cancel the open ones.
+
 - **Transitions are compare-and-set** (`UPDATE … WHERE status = <expected>`); a run, its audit row and a grant's
   use count change in one transaction; the API publishes to the stream after commit.
 - **Output** is masked by the target, at most 1 MB per run (checked atomically with the chunk insert), never logged,

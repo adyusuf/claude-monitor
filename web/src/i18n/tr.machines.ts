@@ -40,6 +40,13 @@ export const trMachines: Dictionary["machines"] = {
     turnOn: "Dinleyen portları bildir", turnOff: "Bildirmeyi bırak", saved: "Kaydedildi.", ownerOnly: "Buna yalnızca makinenin sahibi karar verir.",
     enableHint: "Açmak yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
   },
+  asks: {
+    title: "Diğer makinelerinizden sorular", hint: "Sizin başka bir makinenizdeki bir Claude oturumu, buradaki boşta bir Claude oturumuna soru sorabilir (canlı ya da veritabanı makinesine değil; bir yönetici bu makinenin ortamını belirlemişse). Cevap metin olarak döner. Varsayılan kapalı: yalnızca bu makinenin sahibi açar.",
+    off: "Bu makine soru kabul etmiyor.", on: "Bu makine diğer makinelerinizden gelen soruları kabul ediyor.", turnOn: "Sorulara izin ver", turnOff: "Sorulara izin vermeyi bırak", saved: "Kaydedildi.",
+    ownerOnly: "Buna yalnızca makinenin sahibi karar verir.", enableHint: "Açmak yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
+    none: "Henüz soru yok.", question: "Soru", answer: "Cevap", answerCut: "Cevap sunucunun sınırında kesildi.",
+    status: { queued: "bekliyor", delivered: "iletildi, cevap bekleniyor", answered: "cevaplandı", no_idle_session: "boşta oturum yok", not_accepting: "kabul etmiyor", no_answer: "cevap yok", expired: "süresi doldu", cancelled: "iptal edildi" },
+  },
   projects: {
     title: "Projeler", none: "Bu makinede henüz bilinen proje yok.", noneHint: "Bir oturum projede çalışınca ya da bir klasör cm-agent config projects add ile listelenince proje görünür.",
     listed: "listelenen klasör", session: "bir oturumdan", errors: "7 günde {n} araç hatası", noRuns: "Bu proje için henüz çalıştırma yok.", run: "çalıştırma", cut: "çıktı kesildi",

@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentAsksView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
@@ -64,6 +64,8 @@ export const api = {
   setAgentTags: (agentId: string, tags: Record<string, string>) => request<{ agentId: string; tags: Record<string, string> }>("PUT", `/agents/${agentId}/tags`, { tags }),
   setAgentNote: (agentId: string, note: string | null) => request<{ agentId: string; note: string | null }>("PUT", `/agents/${agentId}/note`, { note }),
   setAgentServices: (agentId: string, share: boolean, code?: string) => request<AgentServicesView>("PUT", `/agents/${agentId}/services`, { share, code }),
+  setAgentAsks: (agentId: string, accept: boolean, code?: string) => request<AgentAsksView>("PUT", `/agents/${agentId}/asks`, { accept, code }),
+  agentAsks: (agentId: string) => request<AskView[]>("GET", `/agents/${agentId}/asks`),
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>
     request<AlertView[]>("GET", `/workspaces/${id}/alerts${q({ agent, resolved: includeResolved ? "true" : "false" })}`),

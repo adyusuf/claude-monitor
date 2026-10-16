@@ -174,6 +174,14 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
 - **Listening services (off by default).** The machine's owner turns on "Report listening ports" on its page (a recent sign-in or a code is
   needed). The agent then reads the TCP ports it listens on, with the process name where the system shows it (on Linux for the account's own
   processes), and sends them; only the owner and admins see them. Turning it off drops what was stored. Nothing is started to read them.
+- **Asks across your machines.** A Claude session can ask a Claude session on ANOTHER machine of the same user a question (`monitor_ask`, then
+  `monitor_ask_result`; the other session answers with `monitor_answer`). It works only when: the push through the inbox is on on the target (`cm-agent
+  install --push inbox`), its owner turned "Allow asks" on its machine page (a recent sign-in is needed), an admin set its environment, it is not a
+  production or database machine, a session there has been idle for 30 seconds and the workspace allows remote runs. An ask goes to one idle session
+  (the one working in the same project first); nothing is queued for later. On macOS and Linux the message is written without the session's key, so Claude
+  Code holds it for the person at that terminal; on Windows it goes only to a session in default or plan mode. A machine asked a moment ago may not ask on,
+  a machine that was asked may not ask back, and an agent is limited to 30 asks an hour (5 per session in 10 minutes). `CM_ASKS=off` turns asks off on one
+  machine. The question and the answer are masked, never logged, and deleted after the retention period.
 - **Script runs.** `monitor_run_script` asks a machine to run a script (sh, bash, python or powershell). It needs exec level `shell` on the target
   without a ceiling, an environment an admin set on the machine's page (a machine's own claim does not count) and a trusted interpreter in its
   inventory. The owner approves the exact text on the web (every line numbered, non-ASCII made visible, Allow only after the script was

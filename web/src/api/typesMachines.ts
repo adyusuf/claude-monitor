@@ -36,6 +36,8 @@ export interface MachineView {
   presenceAt?: string | null;
   /** The admin's key=value tags (ADR-0008 §3a′); an older API omits them. */
   tags?: Record<string, string> | null;
+  /** Whether the machine's owner lets their other machines ask a Claude session here (ADR-0008 §3f). */
+  acceptsAsks?: boolean | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
@@ -74,3 +76,11 @@ export interface MachineDetail {
   services: ServiceInfo[] | null; servicesAt: string | null; projects: MachineProjectView[];
 }
 export interface AgentServicesView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }
+
+export type AskStatus = "queued" | "delivered" | "answered" | "no_idle_session" | "not_accepting" | "no_answer" | "expired" | "cancelled";
+/** One ask to a machine (ADR-0008 §3f); the question and the answer are untrusted text and are sent only to the user they belong to. */
+export interface AskView {
+  id: string; targetAgentId: string; targetHostname: string; status: AskStatus; question: string | null; answer: string | null; answerTruncated: boolean;
+  error: string | null; createdAt: string; expiresAt: string; deliveredAt: string | null; answeredAt: string | null;
+}
+export interface AgentAsksView { agentId: string; accept: boolean; setAt: string | null; setBy: string | null }
