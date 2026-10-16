@@ -46,6 +46,7 @@ public static class MachineFacts
         agent.Interpreters = profile.Interpreters is null ? null : Serialize(profile.Interpreters.Where(t => t is { Trusted: true } && ToolNames.Interpreters.Contains(t.Name)));
         agent.Tools = profile.Tools is null ? null : Serialize(profile.Tools);
         agent.Capabilities = profile.Capabilities is null ? null : [.. profile.Capabilities.Where(AgentCapabilities.All.Contains).Distinct()];
+        ApplyServices(agent, profile, now);
     }
 
     /// <summary>
@@ -59,6 +60,57 @@ public static class MachineFacts
         {
             var tools = JsonSerializer.Deserialize<List<ToolInfo>>(json, Json) ?? [];
             return forView ? tools.Select(t => t.Name == ToolNames.Claude ? t with { Path = "" } : t).ToList() : tools;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>The stored tags back as pairs; NULL (none set) stays null, anything unreadable is none.</summary>
+    public static IReadOnlyDictionary<string, string>? TagsFrom(string? json)
+    {
+        if (json is null) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(json, Json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    public const int ServicesMax = 64;
+    public const int ProcessMax = 64;
+
+    /// <summary>
+    /// Keeps the listening services only while the machine's owner opted in (ADR-0008 §3a′); otherwise nothing is stored and what was
+    /// stored goes. Ports outside 1-65535, a protocol other than tcp and a repeated (port, protocol) are dropped, the process name is cleaned.
+    /// </summary>
+    public static void ApplyServices(Agent agent, AgentProfile profile, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(profile);
+        if (!agent.ShareServices || profile.Services is null)
+        {
+            agent.Services = agent.ShareServices ? agent.Services : null;
+            agent.ServicesAt = agent.ShareServices ? agent.ServicesAt : null;
+            return;
+        }
+
+        agent.Services = JsonSerializer.Serialize(profile.Services.Where(s => s is { Port: >= 1 and <= 65535, Proto: "tcp" })
+            .GroupBy(s => s.Port).Select(g => g.First()).OrderBy(s => s.Port).Take(ServicesMax)
+            .Select(s => new ServiceInfo(s.Port, s.Proto, s.Process is { Length: > 0 } p ? MachineReports.Clean(p, ProcessMax) : null)), Json);
+        agent.ServicesAt = now;
+    }
+
+    public static IReadOnlyList<ServiceInfo>? ServicesFrom(string? json)
+    {
+        if (json is null) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<List<ServiceInfo>>(json, Json) ?? [];
         }
         catch (JsonException)
         {

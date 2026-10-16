@@ -6,7 +6,17 @@ namespace ClaudeMonitor.Contracts;
 /// <summary>What a target tells the API about itself after every start and every settings change.</summary>
 public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent,
     string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
-    IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null);
+    IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
+    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null);
+
+/// <summary>One listening TCP port (ADR-0008 §3a′): the port, the protocol (<c>tcp</c>) and the owning process name when the OS lets the agent see it.</summary>
+public sealed record ServiceInfo(int Port, string Proto, string? Process);
+
+/// <summary>
+/// What the agent read from one project folder's <c>.git</c> files (ADR-0008 §3a′): the key and name, an HMAC of the folder path (never the path),
+/// the branch, the commit and the tag that points at it. Reported for admin-listed folders and for folders a session visited.
+/// </summary>
+public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source);
 
 /// <summary>
 /// Claude Code on the agent's machine (ADR-0008 §3e): how it is installed (<see cref="ClaudeKinds"/>), where (home-relative, never

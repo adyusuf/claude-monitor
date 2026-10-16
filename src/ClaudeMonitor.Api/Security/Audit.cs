@@ -29,6 +29,9 @@ public static class AuditActions
     public const string AgentRevoked = "agent.revoked";
     public const string AgentMoved = "agent.moved";
     public const string AgentRoleChanged = "agent.role_changed";
+    public const string AgentTagsChanged = "agent.tags_changed";
+    public const string AgentNoteChanged = "agent.note_changed";
+    public const string AgentServicesChanged = "agent.services_changed";
     public const string RefreshReuse = "agent.refresh_reuse";
     public const string CommandCreated = "session.command_created";
     public const string CommandCancelled = "session.command_cancelled";
