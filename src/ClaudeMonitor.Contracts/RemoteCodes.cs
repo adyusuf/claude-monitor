@@ -109,4 +109,7 @@ public static class RemoteErrors
     public const string NotPending = "not_pending";
     public const string BadTemplate = "bad_template";
     public const string Ambiguous = "ambiguous_machine";
+
+    /// <summary>A role value outside the closed sets (ADR-0008 §3a).</summary>
+    public const string InvalidMachineRole = "invalid_machine_role";
 }

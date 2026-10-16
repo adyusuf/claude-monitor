@@ -4,7 +4,22 @@ namespace ClaudeMonitor.Contracts;
 // the end of a record with a default, never removed, renamed or retyped.
 
 /// <summary>What a target tells the API about itself after every start and every settings change.</summary>
-public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent);
+public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent,
+    string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
+    IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null);
+
+/// <summary>
+/// Claude Code on the agent's machine (ADR-0008 §3e): how it is installed (<see cref="ClaudeKinds"/>), where (home-relative, never
+/// shown to other members), its version, and how many sessions run and how many of them are idle. An older agent sends none.
+/// </summary>
+public sealed record ClaudePresence(string Kind, string? Path, string? Version, int SessionsLive, int SessionsIdle, DateTimeOffset SeenAt);
+
+/// <summary>
+/// One tool of the inventory (ADR-0008 §3a′): its name (<see cref="ToolNames"/>), its resolved path (home-relative), the first line of
+/// its --version (null when the agent did not run it: only a trusted or self-owned binary is run), and whether it passes the
+/// ADR-0005 executable trust check. Only a trusted interpreter may run a script.
+/// </summary>
+public sealed record ToolInfo(string Name, string Path, string? Version, bool Trusted);
 
 public sealed record DiskSample(string Mount, long UsedBytes, long TotalBytes);
 
@@ -21,7 +36,11 @@ public sealed record AlertThresholds(int CpuPct, int MemoryPct, int DiskPct, int
 
 /// <summary>An agent of the workspace as a requester sees it, for choosing a target.</summary>
 public sealed record MachineView(Guid AgentId, string Hostname, string Os, string UserName, string ExecLevel, bool ServiceMode,
-    bool Online, DateTimeOffset? LastSeenAt, MetricSample? Latest, int OpenAlerts);
+    bool Online, DateTimeOffset? LastSeenAt, MetricSample? Latest, int OpenAlerts,
+    string? RoleEnvironment = null, string? RoleFunction = null, string? ClaimedEnvironment = null, string? ClaimedFunction = null,
+    string? EffectiveEnvironment = null, string? EffectiveFunction = null, string? ClaudeKind = null, string? ClaudeVersion = null,
+    int? ClaudeSessionsIdle = null, IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null,
+    IReadOnlyList<string>? Capabilities = null, DateTimeOffset? PresenceAt = null);
 
 public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Kind, string Subject, string State,
     double ThresholdPct, double LastValue, double PeakValue, DateTimeOffset OpenedAt, DateTimeOffset? ResolvedAt);
