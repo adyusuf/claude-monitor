@@ -54,6 +54,13 @@ Host names stay out of this file and out of the repository; write them in your o
    on A returns the answer wrapped as coming from another Claude. With no idle session on B the result says so (`no_idle_session`), after the 2-minute wait for confirmation.
 4. Ask from a machine of another user: refused. An ask with a token-shaped string in it: arrives masked.
 
+## 5a. ADR-0010: files, schedules, signed approvals, a run account
+
+1. Files and stdin: send a script with a helper file and a stdin text (`cm-agent run --machine <host> --script main.py --interpreter python --file helper.py=./helper.py --stdin ./in.txt`); the card shows every box and Allow waits until each was read; the output shows the script read both.
+2. Schedules: an admin turns on "Allow schedules"; an owner starts a 15-minute schedule on an approved job on a test machine; a run appears every tick, none while the last is open; make the job fail three times and see it pause; make the machine production and see it stop.
+3. Signed approvals: make a key on the account page, `cm-agent approvers add <key>` on a machine, compare the fingerprints, `cm-agent config approvals required`; allow a run on the web (it runs); stop the web server from signing (or use a browser profile without the key) and see the machine refuse; an approval by a job or grant there waits for a signature.
+4. The run account (Linux and macOS service only): `sudo cm-agent install --service --server <url> --exec argv --run-account`, then run `id` and `ls -la <home>` as a remote argv/shell run: it reports the run account and cannot read the service home. **Kill a long run (cancel on the web) and look at `ps`: a process that ignores TERM may remain (ADR-0010 §5, kill reach).** Check `cat /etc/sudoers.d/cm-agent-run` and that `uninstall --service` removes it.
+
 ## 6. Results
 
 | Step | Pass / fail | What you saw |
