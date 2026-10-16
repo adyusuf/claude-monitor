@@ -156,6 +156,20 @@ lost). The old plugin keeps running the old binary until you run `cm-agent insta
 from a normal terminal, then check that `cm-agent status` and `monitor_status` in a new Claude session show the same
 `home:`. The old folder is left in place and can be deleted afterwards.
 
+### Machine roles, the tool inventory and the session-start block (ADR-0008)
+
+- **Role.** A workspace admin sets each machine's **environment** (dev, test, stage, preprod, production, other) and **function**
+  (development, application, web, database, ci, storage, other) on the machine's page; "not set" never means test. Lowering a machine
+  away from production or database asks for a recent sign-in. The machine may say what it is (`cm-agent config role <environment|none>
+  <function|none>`; a service agent: `environment` and `function` in its admin-owned `exec.json`); a claim only makes the role stricter.
+- **What the agent reports.** Whether Claude Code is installed and how many sessions are idle, and a tool inventory (git, dotnet, node,
+  npm, python3, pwsh, docker, psql, java, claude and the shell interpreters) probed by absolute path, each marked trusted or not; the
+  agent runs `--version` only for a trusted or self-owned binary. `CM_PRESENCE_PROBE_EVERY` sets the probe interval.
+- **The block every session gets.** The plugin's `SessionStart` hooks now include a synchronous `hook SessionStart --context` entry: it
+  prints the workspace's machines (role, online, Claude, tools) with the rules for treating them, from a cache the daemon refreshes every
+  `CM_MACHINE_CACHE_EVERY` seconds. It is empty while remote runs are off for the workspace or this is the only machine;
+  `CM_MACHINES_CONTEXT=off` turns it off on one machine. The hook reads the local database only and always exits 0.
+
 ## Service agent (boot service, remote work)
 
 `cm-agent install --service` registers the daemon to start at boot with no Claude session, so other machines of a
