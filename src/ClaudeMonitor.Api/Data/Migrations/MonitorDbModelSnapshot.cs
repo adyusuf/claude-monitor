@@ -31,6 +31,18 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AcceptsAsks")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepts_asks");
+
+                    b.Property<DateTimeOffset?>("AcceptsAsksSetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepts_asks_set_at");
+
+                    b.Property<Guid?>("AcceptsAsksSetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accepts_asks_set_by");
+
                     b.Property<string>("AdminNote")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -193,6 +205,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_agents");
+
+                    b.HasIndex("AcceptsAsksSetBy")
+                        .HasDatabaseName("ix_agents_accepts_asks_set_by");
 
                     b.HasIndex("AdminNoteSetBy")
                         .HasDatabaseName("ix_agents_admin_note_set_by");
@@ -811,6 +826,139 @@ namespace ClaudeMonitor.Api.Data.Migrations
                             t.HasCheckConstraint("ck_machine_alerts_kind", "kind IN ('cpu', 'memory', 'disk', 'offline')");
 
                             t.HasCheckConstraint("ck_machine_alerts_state", "state IN ('open', 'resolved')");
+                        });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.MachineAsk", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Answer")
+                        .HasColumnType("text")
+                        .HasColumnName("answer");
+
+                    b.Property<bool>("AnswerTruncated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("answer_truncated");
+
+                    b.Property<DateTimeOffset?>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<string>("ClientKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("client_key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("ProjectKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("project_key");
+
+                    b.Property<string>("Question")
+                        .HasColumnType("text")
+                        .HasColumnName("question");
+
+                    b.Property<Guid>("RequesterAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requester_agent_id");
+
+                    b.Property<Guid?>("RequesterSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requester_session_id");
+
+                    b.Property<Guid>("RequesterUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requester_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("queued")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TargetAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_agent_id");
+
+                    b.Property<string>("TargetSession")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("target_session");
+
+                    b.Property<Guid>("TargetUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_user_id");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_machine_asks");
+
+                    b.HasIndex("RequesterSessionId")
+                        .HasDatabaseName("ix_machine_asks_requester_session_id");
+
+                    b.HasIndex("RequesterUserId")
+                        .HasDatabaseName("ix_machine_asks_requester_user_id");
+
+                    b.HasIndex("TargetUserId")
+                        .HasDatabaseName("ix_machine_asks_target_user_id");
+
+                    b.HasIndex("RequesterAgentId", "ClientKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_machine_asks_requester_agent_id_client_key");
+
+                    b.HasIndex("RequesterAgentId", "CreatedAt")
+                        .HasDatabaseName("ix_machine_asks_requester_agent_id_created_at");
+
+                    b.HasIndex("TargetAgentId", "Status")
+                        .HasDatabaseName("ix_machine_asks_target_agent_id_status")
+                        .HasFilter("status IN ('queued', 'delivered')");
+
+                    b.HasIndex("WorkspaceId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_machine_asks_workspace_id_created_at");
+
+                    b.ToTable("machine_asks", t =>
+                        {
+                            t.HasCheckConstraint("ck_machine_asks_answer", "answer IS NULL OR char_length(answer) <= 100000");
+
+                            t.HasCheckConstraint("ck_machine_asks_question", "question IS NULL OR char_length(question) BETWEEN 1 AND 8000");
+
+                            t.HasCheckConstraint("ck_machine_asks_same_user", "requester_user_id = target_user_id");
+
+                            t.HasCheckConstraint("ck_machine_asks_status", "status IN ('queued', 'delivered', 'answered', 'no_idle_session', 'not_accepting', 'no_answer', 'expired', 'cancelled')");
+
+                            t.HasCheckConstraint("ck_machine_asks_two_agents", "requester_agent_id <> target_agent_id");
                         });
                 });
 
@@ -2312,6 +2460,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                 {
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()
+                        .HasForeignKey("AcceptsAsksSetBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agents_users_accepts_asks_set_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
                         .HasForeignKey("AdminNoteSetBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_agents_users_admin_note_set_by");
@@ -2451,6 +2605,50 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_machine_alerts_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.MachineAsk", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("RequesterAgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_asks_agents_requester_agent_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.HarnessSession", null)
+                        .WithMany()
+                        .HasForeignKey("RequesterSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_machine_asks_harness_sessions_requester_session_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequesterUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_asks_users_requester_user_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("TargetAgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_asks_agents_target_agent_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("TargetUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_asks_users_target_user_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_asks_workspaces_workspace_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.MachineGrant", b =>

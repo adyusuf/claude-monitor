@@ -82,6 +82,9 @@ public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid Wor
 
 public static class AgentStreamEvents
 {
+    public const string Ask = "ask";
+    public const string AskCancel = "ask_cancel";
+    public const string AskUpdate = "ask_update";
     public const string Command = "command";
     public const string PermissionAnswer = "permission_answer";
     public const string Revoked = "revoked";

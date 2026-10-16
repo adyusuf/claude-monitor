@@ -14,6 +14,7 @@ internal static class MonitorDbModel
         ForeignKeys(b);
         MonitorDbModelRemote.Configure(b);
         MonitorDbModelMachines.Configure(b);
+        MonitorDbModelAsks.Configure(b);
         b.Entity<HarnessKind>().HasData(new HarnessKind
         {
             Code = "claude_code",

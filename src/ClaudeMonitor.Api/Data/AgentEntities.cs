@@ -90,6 +90,11 @@ public sealed class Agent
     /// <summary>JSON array of {port, proto, process}, at most 64; NULL = not reported (opt-in is off or an older agent).</summary>
     public string? Services { get; set; }
     public DateTimeOffset? ServicesAt { get; set; }
+
+    /// <summary>ADR-0008 §3f: the machine's owner lets another machine of the same user ask a question of a Claude session here; off until they say so.</summary>
+    public bool AcceptsAsks { get; set; }
+    public DateTimeOffset? AcceptsAsksSetAt { get; set; }
+    public Guid? AcceptsAsksSetBy { get; set; }
 }
 
 public sealed class AgentToken
@@ -139,4 +144,33 @@ public sealed class MachineProject
     public string? Tag { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
     public string Source { get; set; } = ProjectSources.Session;
+}
+
+/// <summary>
+/// A question one machine of a user asks of another machine of the same user (ADR-0008 §3f). The question and the answer are untrusted text, personal
+/// data like a command: masked before upload, never logged, exported, emptied on account deletion and deleted after the retention period.
+/// </summary>
+public sealed class MachineAsk
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid WorkspaceId { get; set; }
+    public Guid RequesterAgentId { get; set; }
+    public Guid RequesterUserId { get; set; }
+    public Guid? RequesterSessionId { get; set; }
+    public Guid TargetAgentId { get; set; }
+    public Guid TargetUserId { get; set; }
+    /// <summary>The Claude session on the target that received the ask (its external id), set when it was delivered; the answer must come from it.</summary>
+    public string? TargetSession { get; set; }
+    public string ClientKey { get; set; } = "";
+    public string? ProjectKey { get; set; }
+    public string? Question { get; set; }
+    public string Status { get; set; } = AskStatuses.Queued;
+    public string? Answer { get; set; }
+    public bool AnswerTruncated { get; set; }
+    public string? Error { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset? DeliveredAt { get; set; }
+    public DateTimeOffset? AnsweredAt { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
 }
