@@ -25,7 +25,7 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
   const [denyError, setDenyError] = useState<string | null>(null);
-  const gate = useCodeGate("mfa_required", "remote.codeHintRun", isScript && run.needsCode === true);
+  const gate = useCodeGate("mfa_required", "remote.codeHintRun", run.needsCode === true);
   const left = countdown(run.expiresAt, now);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
       actions={<span className="muted small">{left ? t("remote.timeLeft", { time: left }) : t("remote.timeUp")}</span>}>
       {isScript ? <div className="notice notice-error" role="alert">{run.strict ? t("remote.scriptBannerStrict", { role: run.targetFunction === "database" ? t("remote.scriptDatabase") : t("remote.scriptProduction") }) : t("remote.scriptBanner")}</div>
         : run.interpreter ? <div className="notice notice-error" role="alert">{run.mode === "shell" ? t("remote.interpreterShell") : t("remote.interpreterArgv")}</div> : null}
-      {isScript && run.needsCode ? <p className="muted small">{t("remote.scriptNeedsCode")}</p> : null}
+      {run.needsCode ? <p className="muted small">{t("remote.scriptNeedsCode")}</p> : null}
       {run.recentOutput ? <div className="notice notice-warn" role="alert">{t("remote.recentOutput")}</div> : null}
       <RunFacts run={run} ws={ws} onScriptEnd={() => setRead(true)} />
       {gate.field}

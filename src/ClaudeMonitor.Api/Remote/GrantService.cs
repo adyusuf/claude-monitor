@@ -73,7 +73,7 @@ public sealed class GrantService(MonitorDb db, ApiConfig config, TimeProvider cl
         var granteeId = req.GranteeUserId ?? userId;
         if (await Access.MemberAsync(db, granteeId, agent.WorkspaceId, Roles.Member, ct) is null) return Http.Invalid("granteeUserId", "not_member");
         if (RemoteChecks.TemplateProblem(req.Template, req.Cwd, req.MaxTimeoutSeconds, target.Os, false) is { } bad) return bad;
-        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, target.Agent, req.Code) is { } refused) return refused;
 
         var now = clock.GetUtcNow();
         var grant = New(agent.WorkspaceId, agent, granteeId, req.Template, req.Cwd, req.MaxTimeoutSeconds, req.Days, req.Reason);
@@ -105,7 +105,7 @@ public sealed class GrantService(MonitorDb db, ApiConfig config, TimeProvider cl
         }
 
         if (RemoteChecks.TemplateProblem(template, cwd, grant.MaxTimeoutSeconds, target.Os, false) is { } bad) return bad;
-        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req?.Code)) return RemoteChecks.ReauthRefused();
+        if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, target.Agent, req?.Code) is { } refused) return refused;
 
         var changed = await db.MachineGrants
             .Where(g => g.Id == id && g.Status == GrantStatuses.Requested && g.ExpiresAt > now && g.OwnerUserId == userId)

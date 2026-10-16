@@ -22,7 +22,7 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
     private static readonly string[] Cancellable =
         [RunStatuses.PendingApproval, RunStatuses.Approved, RunStatuses.Delivered, RunStatuses.Running];
 
-    /// <summary>Only the target agent's owner, still a member, with the hash of the run they saw; TOTP for shell when they have it on.</summary>
+    /// <summary>Only the target agent's owner, still a member, with the hash of the run they saw; a TOTP code for a script, a shell command and an interpreter run on a strict target, and for shell or script elsewhere when they have it on.</summary>
     public async Task<IResult> ApproveAsync(Guid id, RunApproval req, HttpContext http)
     {
         ArgumentNullException.ThrowIfNull(req);
@@ -42,20 +42,18 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
 
         var now = clock.GetUtcNow();
         var withTotp = false;
-        if (run.Mode is RunModes.Shell or RunModes.Script)
+        var env = MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment);
+        var fn = MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction);
+        var strict = MachineRoles.IsStrict(env, fn);
+        // A script is approved against the role the card showed (ADR-0008 §3c): a role changed since then asks the owner to look again.
+        if (run.Mode == RunModes.Script && (env != run.TargetEnvironment || fn != run.TargetFunction)) return Conflict(RemoteErrors.RoleChanged);
+        var os = await db.Machines.AsNoTracking().Where(m => m.Id == target.MachineId).Select(m => m.Os).FirstAsync(ct);
+        var needsCode = RunCodeRule.NeedsCode(run.Mode, run.Argv, os, strict);
+        if (run.Mode is RunModes.Shell or RunModes.Script || needsCode)
         {
-            // A script is approved against the role the card showed (ADR-0008 §3c): a role changed since then asks the owner to look again.
-            var strict = false;
-            if (run.Mode == RunModes.Script)
-            {
-                var env = MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment);
-                var fn = MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction);
-                if (env != run.TargetEnvironment || fn != run.TargetFunction) return Conflict(RemoteErrors.RoleChanged);
-                strict = MachineRoles.IsStrict(env, fn);
-            }
-
             var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
-            if (strict && user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
+            // Strict target: no two-step sign-in, no approval (decision §9.13); elsewhere a code is asked of whoever has it on (shell and script).
+            if (needsCode && user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
             if (user.TotpEnabledAt is not null)
             {
                 if (!await MfaEndpoints.CheckAsync(db, config, user, req.Code, now, ct))

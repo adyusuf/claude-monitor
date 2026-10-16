@@ -48,7 +48,7 @@ export const tr: Dictionary = {
     bad_template: "Bu komut şablonu bu makine için geçerli değil: program tam yol olmalı ve bazı programlara hiçbir zaman izin verilemez.",
     grant_conflict: "Bu şablon için bir izin zaten var.", invalid_reason: "Bu gerekçe çok uzun.", not_member: "Bu kişi çalışma alanının üyesi değil.",
     invalid_machine_role: "Listelerden bir ortam ve bir işlev seçin.",
-    totp_required: "Bu makine canlı ya da veritabanı: burada bir betiğe izin vermek için iki adımlı giriş gerekir.",
+    totp_required: "Bu makine canlı ya da veritabanı: burada buna izin vermek için iki adımlı giriş gerekir.",
     role_changed: "Makinenin rolü bu kart yapıldıktan sonra değişti. Çalıştırmaya yeniden bakın.",
     role_not_set: "Bir yönetici bu makinenin ortamını henüz belirlemedi.",
     interpreter_missing: "Makine bu betik için güvenilen bir yorumlayıcı bildirmedi.",

@@ -47,7 +47,7 @@ export const en = {
     bad_template: "That command template is not valid for this machine: the program must be a full path, and some programs can never be granted.",
     grant_conflict: "A grant for that template already exists.", invalid_reason: "That reason is too long.", not_member: "That person is not a member of this workspace.",
     invalid_machine_role: "Pick an environment and a function from the lists.",
-    totp_required: "This machine is production or a database: you need two-step sign-in to allow a script here.",
+    totp_required: "This machine is production or a database: you need two-step sign-in to allow this here.",
     role_changed: "The machine's role changed since this card was made. Look at the run again.",
     role_not_set: "No admin has set this machine's environment yet.",
     interpreter_missing: "The machine has not reported a trusted interpreter for this script.",

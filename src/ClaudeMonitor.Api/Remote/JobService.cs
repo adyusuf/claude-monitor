@@ -92,7 +92,9 @@ public sealed class JobService(MonitorDb db, ApiConfig config, TimeProvider cloc
         var job = await OwnedAsync(id, userId, ct);
         if (job is null) return Http.NotFound();
         if (job.Status != JobStatuses.Proposed) return RemoteChecks.Conflict(RemoteErrors.NotPending);
-        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req?.Code)) return RemoteChecks.ReauthRefused();
+        var target = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == job.TargetAgentId, ct);
+        if (target is null) return RemoteChecks.Conflict(RemoteErrors.TargetCannotRun);
+        if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, target, req?.Code) is { } refused) return refused;
 
         var changed = await db.MachineJobs.Where(j => j.Id == id && j.Status == JobStatuses.Proposed && j.OwnerUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Active).SetProperty(j => j.DecidedAt, now)

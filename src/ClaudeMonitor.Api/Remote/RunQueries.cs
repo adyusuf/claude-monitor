@@ -60,10 +60,9 @@ public static class RunQueries
         return MachineFacts.Tools(interpretersJson, forView: false)?.FirstOrDefault(t => t.Trusted && tools.Contains(t.Name))?.Path;
     }
 
-    /// <summary>True for a script whose target is strict now (production or database, set or claimed): it needs the approver's two-step code.</summary>
-    private static bool StrictNow(RemoteRun r, string? roleEnvironment, string? roleFunction, string? claimedEnvironment, string? claimedFunction) =>
-        r.Mode == RunModes.Script && MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(roleEnvironment, claimedEnvironment),
-            MachineRoles.EffectiveFunction(roleFunction, claimedFunction));
+    /// <summary>True when the target is strict now (production or database, set or claimed).</summary>
+    private static bool StrictNow(string? roleEnvironment, string? roleFunction, string? claimedEnvironment, string? claimedFunction) =>
+        MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(roleEnvironment, claimedEnvironment), MachineRoles.EffectiveFunction(roleFunction, claimedFunction));
 
     /// <summary>Runs of a workspace for the web, newest first, key-paged; optionally one target agent's.</summary>
     public static async Task<List<WebRunView>> ForWebAsync(MonitorDb db, ApiConfig config, Guid workspaceId, Guid userId,
@@ -106,8 +105,8 @@ public static class RunQueries
                 ScriptInterpreter: r.ScriptInterpreter, ScriptBody: visible ? r.ScriptBody : null, ScriptArgs: visible ? r.ScriptArgs : null,
                 InterpreterPath: r.Mode == RunModes.Script && visible ? ScriptPath(x.Interpreters, r.ScriptInterpreter) : null,
                 TargetEnvironment: r.TargetEnvironment, TargetFunction: r.TargetFunction,
-                Strict: StrictNow(r, x.RoleEnvironment, x.RoleFunction, x.ClaimedEnvironment, x.ClaimedFunction),
-                NeedsCode: pending && StrictNow(r, x.RoleEnvironment, x.RoleFunction, x.ClaimedEnvironment, x.ClaimedFunction),
+                Strict: r.Mode == RunModes.Script && StrictNow(x.RoleEnvironment, x.RoleFunction, x.ClaimedEnvironment, x.ClaimedFunction),
+                NeedsCode: pending && RunCodeRule.NeedsCode(r.Mode, r.Argv, x.TargetOs, StrictNow(x.RoleEnvironment, x.RoleFunction, x.ClaimedEnvironment, x.ClaimedFunction)),
                 OutputCap: r.OutputCap, OutputReadBytes: r.OutputReadBytes, OutputDroppedBytes: r.OutputDroppedBytes, OutputRefusedBytes: r.OutputRefusedBytes,
                 OutputMissingFromSeq: r.OutputMissingFromSeq, OutputChunks: r.OutputChunks, OutputComplete: r.OutputComplete,
                 TestsPassed: r.TestsPassed, TestsFailed: r.TestsFailed, TestsSkipped: r.TestsSkipped);

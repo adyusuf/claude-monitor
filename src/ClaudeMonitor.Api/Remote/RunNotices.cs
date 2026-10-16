@@ -32,18 +32,22 @@ public static class RunNotices
     }
 
     /// <summary>
-    /// The role is checked again at delivery (ADR-0008 §3c): a script approved without a two-step code whose target has become strict since
-    /// is cancelled with <c>role_changed</c> and never delivered. True when it was cancelled.
+    /// The role is checked again at delivery (ADR-0008 §3c): a script, shell command or interpreter run approved without a two-step code whose
+    /// target has become strict since is cancelled with <c>role_changed</c> and never delivered. True when it was cancelled.
     /// </summary>
     public static async Task<bool> RoleBlocksAsync(MonitorDb db, Broker broker, RemoteRun run, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(broker);
         ArgumentNullException.ThrowIfNull(run);
-        if (run.Mode != RunModes.Script || run.ApprovedWithTotp) return false;
-        var target = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == run.TargetAgentId, ct);
-        if (target is null || !MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment),
-                MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction)))
+        if (run.ApprovedWithTotp || run.Mode is not (RunModes.Script or RunModes.Shell or RunModes.Argv)) return false;
+        var row = await (from a in db.Agents.AsNoTracking()
+                         join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
+                         where a.Id == run.TargetAgentId
+                         select new { a, m.Os }).FirstOrDefaultAsync(ct);
+        if (row is null || !RunCodeRule.NeedsCode(run.Mode, run.Argv, row.Os, MachineRoles.IsStrict(
+                MachineRoles.EffectiveEnvironment(row.a.RoleEnvironment, row.a.ClaimedEnvironment),
+                MachineRoles.EffectiveFunction(row.a.RoleFunction, row.a.ClaimedFunction))))
         {
             return false;
         }

@@ -53,7 +53,7 @@ public static class ExecGuard
 
         return run.Mode switch
         {
-            RunModes.Shell => CheckShell(run, os),
+            RunModes.Shell => CheckShell(run, policy, os),
             RunModes.Argv => CheckArgv(run, policy, os, agentHome),
             RunModes.Script => CheckScript(run, policy, os, toolPath ?? (name => ToolInventory.RealPath(name, os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))),
                 trusted ?? (real => ExecPaths.IsTrustedExecutable(real, os))),
@@ -61,8 +61,12 @@ public static class ExecGuard
         };
     }
 
+    /// <summary>A target whose own claim is strict refuses a shell command or an interpreter run not approved with a two-step code (decision §9.13; this catches an API bug, not a compromised API).</summary>
+    private static bool NeedsCodeNow(RunMessage run, ExecPolicy policy, string os) =>
+        !run.ApprovedWithTotp && RunCodeRule.NeedsCode(run.Mode, run.Argv, os, MachineRoles.IsStrict(policy.ClaimedEnvironment, policy.ClaimedFunction));
+
     // The shell runs in the service home, chosen by the executor; a caller never picks its directory or a grant for it.
-    private static ExecDecision CheckShell(RunMessage run, string os)
+    private static ExecDecision CheckShell(RunMessage run, ExecPolicy policy, string os)
     {
         if (run.Grant is not null || run.GrantId is not null)
         {
@@ -74,6 +78,7 @@ public static class ExecGuard
             return ExecDecision.Refuse(ExecErrors.Malformed);
         }
 
+        if (NeedsCodeNow(run, policy, os)) return ExecDecision.Refuse(RemoteErrors.TotpRequired);
         return run.Cwd is not null ? ExecDecision.Refuse(ExecErrors.ShellCwd) : new ExecDecision(true, null, ShellPath(os));
     }
 
@@ -119,6 +124,7 @@ public static class ExecGuard
             return ExecDecision.Refuse(ExecErrors.Malformed);
         }
 
+        if (NeedsCodeNow(run, policy, os)) return ExecDecision.Refuse(RemoteErrors.TotpRequired);
         IReadOnlyList<GrantPathUse> uses = [];
         if (run.Grant is not null)
         {
