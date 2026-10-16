@@ -492,9 +492,12 @@ the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is defer
   `CmWindowless=true` build exists as the alternative. The macOS autostart runs the executable inside an application bundle.
 - The agent's `--exec` for a standalone agent is the existing interactive one.
 
-**Unverified (to do before anything is promoted).** Tests added after the run of 16/10/2026 (the requester layer and `asks_out`, the tools of asks and scripts, `monitor_machine`, visited folders, the
-`lsof` and listener-table parsers, the standalone command line) are written and have not been run. The merge gate (coverage per codebase, SAST, secret and dependency scans, backward-compatibility scan) has not run on
-this branch; the phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
+**Run (16/10/2026, on the merged branch, tip `cde1b19`).** Every suite ran together: agent 1743, API 968, web 366 (97.3 % lines), the plugin script tests 106; `dotnet format`,
+tsc and eslint clean; the shared gate (`gate-core.sh dev`: coverage per codebase, secret scan, dependency scan, SAST, backward-compatibility scan, document gates) and the
+published-agent smoke test passed. The faults the runs found were test faults, fixed without loosening: a pending-ask test that raced the fake daemon (its clock now waits until
+the machine lookup is answered) and a web test that took its read count before the page had settled. The gate's e2e check only warns (global #33): no e2e spec was run.
+
+**Unverified (to do before anything reaches a real host).** The phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
 gate, interpreter paths and `-File` under a policy, `schtasks`); on Linux the `/proc` service names and `systemd --user` (the tests run on macOS); the macOS launchd
 bootstrap of the LaunchAgent and the application bundle (the installer's tool calls are tested with a fake, not run); and a real Claude Code session receiving an ask
 end to end. Measured on macOS by the tests: the migrations apply and their CHECKs hold on PostgreSQL 18, real processes run a script from its scratch file with the fixed
