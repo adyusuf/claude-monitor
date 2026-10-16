@@ -31,6 +31,19 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("admin_note");
+
+                    b.Property<DateTimeOffset?>("AdminNoteSetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("admin_note_set_at");
+
+                    b.Property<Guid?>("AdminNoteSetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admin_note_set_by");
+
                     b.PrimitiveCollection<string[]>("Capabilities")
                         .HasColumnType("text[]")
                         .HasColumnName("capabilities");
@@ -124,10 +137,42 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("service_mode");
 
+                    b.Property<string>("Services")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("services");
+
+                    b.Property<DateTimeOffset?>("ServicesAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("services_at");
+
+                    b.Property<bool>("ShareServices")
+                        .HasColumnType("boolean")
+                        .HasColumnName("share_services");
+
+                    b.Property<DateTimeOffset?>("ShareServicesSetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("share_services_set_at");
+
+                    b.Property<Guid?>("ShareServicesSetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("share_services_set_by");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("status");
+
+                    b.Property<string>("Tags")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tags");
+
+                    b.Property<DateTimeOffset?>("TagsSetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tags_set_at");
+
+                    b.Property<Guid?>("TagsSetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tags_set_by");
 
                     b.Property<string>("Tools")
                         .HasColumnType("jsonb")
@@ -149,8 +194,17 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_agents");
 
+                    b.HasIndex("AdminNoteSetBy")
+                        .HasDatabaseName("ix_agents_admin_note_set_by");
+
                     b.HasIndex("RoleSetBy")
                         .HasDatabaseName("ix_agents_role_set_by");
+
+                    b.HasIndex("ShareServicesSetBy")
+                        .HasDatabaseName("ix_agents_share_services_set_by");
+
+                    b.HasIndex("TagsSetBy")
+                        .HasDatabaseName("ix_agents_tags_set_by");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_agents_user_id");
@@ -179,7 +233,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_agents_role_function", "role_function IS NULL OR role_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
 
+                            t.HasCheckConstraint("ck_agents_services", "services IS NULL OR (jsonb_typeof(services) = 'array' AND jsonb_array_length(services) <= 64)");
+
                             t.HasCheckConstraint("ck_agents_status", "status IN ('active', 'revoked')");
+
+                            t.HasCheckConstraint("ck_agents_tags", "tags IS NULL OR (jsonb_typeof(tags) = 'object' AND jsonb_array_length(jsonb_path_query_array(tags, '$.keyvalue()')) <= 10)");
                         });
                 });
 
@@ -1046,6 +1104,69 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.MachineProject", b =>
+                {
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agent_id");
+
+                    b.Property<string>("ProjectKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("project_key");
+
+                    b.Property<string>("Branch")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("branch");
+
+                    b.Property<string>("HeadSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("head_sha");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PathHmac")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("path_hmac");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Tag")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("tag");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("AgentId", "ProjectKey")
+                        .HasName("pk_machine_projects");
+
+                    b.HasIndex("WorkspaceId", "ProjectKey")
+                        .HasDatabaseName("ix_machine_projects_workspace_id_project_key");
+
+                    b.ToTable("machine_projects", t =>
+                        {
+                            t.HasCheckConstraint("ck_machine_projects_source", "source IN ('session', 'listed')");
+                        });
+                });
+
             modelBuilder.Entity("ClaudeMonitor.Api.Data.PermissionRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1218,6 +1339,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("job_id");
 
+                    b.Property<string>("Kind")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1230,6 +1356,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<bool>("OutputTruncated")
                         .HasColumnType("boolean")
                         .HasColumnName("output_truncated");
+
+                    b.Property<string>("ProjectKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("project_key");
 
                     b.Property<string>("Reason")
                         .HasColumnType("text")
@@ -1273,6 +1404,18 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<Guid>("TargetUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("target_user_id");
+
+                    b.Property<int?>("TestsFailed")
+                        .HasColumnType("integer")
+                        .HasColumnName("tests_failed");
+
+                    b.Property<int?>("TestsPassed")
+                        .HasColumnType("integer")
+                        .HasColumnName("tests_passed");
+
+                    b.Property<int?>("TestsSkipped")
+                        .HasColumnType("integer")
+                        .HasColumnName("tests_skipped");
 
                     b.Property<int>("TimeoutSeconds")
                         .HasColumnType("integer")
@@ -1320,15 +1463,24 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .IsDescending(false, true, true)
                         .HasDatabaseName("ix_remote_runs_target_agent_id_created_at_id");
 
+                    b.HasIndex("TargetAgentId", "ProjectKey", "CreatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_remote_runs_target_agent_id_project_key_created_at")
+                        .HasFilter("project_key IS NOT NULL");
+
                     b.ToTable("remote_runs", t =>
                         {
                             t.HasCheckConstraint("ck_remote_runs_client_key", "char_length(client_key) BETWEEN 1 AND 100");
+
+                            t.HasCheckConstraint("ck_remote_runs_kind", "kind IS NULL OR kind IN ('test', 'build', 'deploy', 'other')");
 
                             t.HasCheckConstraint("ck_remote_runs_mode", "mode IN ('argv', 'shell')");
 
                             t.HasCheckConstraint("ck_remote_runs_mode_shape", "(mode = 'argv' AND shell_command IS NULL) OR (mode = 'shell' AND argv IS NULL)");
 
                             t.HasCheckConstraint("ck_remote_runs_status", "status IN ('pending_approval', 'approved', 'delivered', 'running', 'succeeded', 'failed', 'timed_out', 'denied', 'expired', 'cancelled')");
+
+                            t.HasCheckConstraint("ck_remote_runs_tests", "(tests_passed IS NULL OR tests_passed >= 0) AND (tests_failed IS NULL OR tests_failed >= 0) AND (tests_skipped IS NULL OR tests_skipped >= 0)");
 
                             t.HasCheckConstraint("ck_remote_runs_timeout", "timeout_seconds BETWEEN 1 AND 3600");
                         });
@@ -2089,6 +2241,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.Agent", b =>
                 {
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdminNoteSetBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agents_users_admin_note_set_by");
+
                     b.HasOne("ClaudeMonitor.Api.Data.Machine", null)
                         .WithMany()
                         .HasForeignKey("MachineId")
@@ -2101,6 +2259,18 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasForeignKey("RoleSetBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_agents_users_role_set_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("ShareServicesSetBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agents_users_share_services_set_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("TagsSetBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agents_users_tags_set_by");
 
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()
@@ -2327,6 +2497,23 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_machine_metrics_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.MachineProject", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_projects_agents_agent_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_projects_workspaces_workspace_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.PermissionRequest", b =>

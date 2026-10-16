@@ -1,3 +1,5 @@
+using ClaudeMonitor.Contracts;
+
 namespace ClaudeMonitor.Api.Data;
 
 // Machines, agents and how they connect (docs/data-model.md §3).
@@ -73,6 +75,21 @@ public sealed class Agent
     public string? Interpreters { get; set; }
     public string? Tools { get; set; }
     public string[]? Capabilities { get; set; }
+
+    // ADR-0008 §3a′: what an admin typed (tags, note, untrusted text) and the opt-in listening-services report of the owner.
+    /// <summary>JSON object of key=value pairs, at most ten; NULL = none.</summary>
+    public string? Tags { get; set; }
+    public DateTimeOffset? TagsSetAt { get; set; }
+    public Guid? TagsSetBy { get; set; }
+    public string? AdminNote { get; set; }
+    public DateTimeOffset? AdminNoteSetAt { get; set; }
+    public Guid? AdminNoteSetBy { get; set; }
+    public bool ShareServices { get; set; }
+    public DateTimeOffset? ShareServicesSetAt { get; set; }
+    public Guid? ShareServicesSetBy { get; set; }
+    /// <summary>JSON array of {port, proto, process}, at most 64; NULL = not reported (opt-in is off or an older agent).</summary>
+    public string? Services { get; set; }
+    public DateTimeOffset? ServicesAt { get; set; }
 }
 
 public sealed class AgentToken
@@ -104,4 +121,22 @@ public sealed class DeviceAuthorization
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset? LastPolledAt { get; set; }
+}
+
+/// <summary>
+/// One project on one machine (ADR-0008 §3a′): the key a session reported or an admin listed, with what the agent read from the folder's
+/// <c>.git</c> files. The folder path never leaves the machine; <see cref="PathHmac"/> is an HMAC under a per-agent key.
+/// </summary>
+public sealed class MachineProject
+{
+    public Guid AgentId { get; set; }
+    public string ProjectKey { get; set; } = "";
+    public Guid WorkspaceId { get; set; }
+    public string Name { get; set; } = "";
+    public string? PathHmac { get; set; }
+    public string? Branch { get; set; }
+    public string? HeadSha { get; set; }
+    public string? Tag { get; set; }
+    public DateTimeOffset LastSeenAt { get; set; }
+    public string Source { get; set; } = ProjectSources.Session;
 }

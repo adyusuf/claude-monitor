@@ -64,6 +64,15 @@ public sealed class RemoteRun
     public bool OutputTruncated { get; set; }
     public Guid? GrantId { get; set; }
     public Guid? JobId { get; set; }
+
+    /// <summary>The project this run was for (ADR-0008 §3a′), with its <see cref="Kind"/>; both NULL when the run named none.</summary>
+    public string? ProjectKey { get; set; }
+    public string? Kind { get; set; }
+
+    /// <summary>The counts parsed from the output of a <c>test</c> run of a known tool (ADR-0008 §9.16); NULL when none was recognised.</summary>
+    public int? TestsPassed { get; set; }
+    public int? TestsFailed { get; set; }
+    public int? TestsSkipped { get; set; }
 }
 
 public sealed class RemoteRunOutput

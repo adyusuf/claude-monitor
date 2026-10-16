@@ -14,6 +14,12 @@ internal static class MonitorDbModelMachines
         {
             e.Property(x => x.Interpreters).HasColumnType("jsonb");
             e.Property(x => x.Tools).HasColumnType("jsonb");
+            e.Property(x => x.Tags).HasColumnType("jsonb");
+            e.Property(x => x.Services).HasColumnType("jsonb");
+            e.Property(x => x.AdminNote).HasMaxLength(MachineTags.NoteMax);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.TagsSetBy).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.AdminNoteSetBy).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.ShareServicesSetBy).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.RoleSetBy).OnDelete(DeleteBehavior.Restrict);
             e.ToTable(t =>
             {
@@ -22,7 +28,37 @@ internal static class MonitorDbModelMachines
                 t.HasCheckConstraint("ck_agents_claimed_environment", Optional("claimed_environment", MachineEnvironments.All));
                 t.HasCheckConstraint("ck_agents_claimed_function", Optional("claimed_function", MachineFunctions.All));
                 t.HasCheckConstraint("ck_agents_claude_kind", Optional("claude_kind", ClaudeKinds.All));
+                t.HasCheckConstraint("ck_agents_tags", $"tags IS NULL OR (jsonb_typeof(tags) = 'object' AND jsonb_array_length(jsonb_path_query_array(tags, '$.keyvalue()')) <= {MachineTags.Max})");
+                t.HasCheckConstraint("ck_agents_services", "services IS NULL OR (jsonb_typeof(services) = 'array' AND jsonb_array_length(services) <= 64)");
                 t.HasCheckConstraint("ck_agents_claude_sessions", "(claude_sessions_live IS NULL OR claude_sessions_live >= 0) AND (claude_sessions_idle IS NULL OR claude_sessions_idle >= 0)");
+            });
+        });
+
+        b.Entity<MachineProject>(e =>
+        {
+            e.HasKey(x => new { x.AgentId, x.ProjectKey });
+            e.HasIndex(x => new { x.WorkspaceId, x.ProjectKey });
+            e.Property(x => x.ProjectKey).HasMaxLength(RunKinds.ProjectKeyMax);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.PathHmac).HasMaxLength(128);
+            e.Property(x => x.Branch).HasMaxLength(200);
+            e.Property(x => x.HeadSha).HasMaxLength(64);
+            e.Property(x => x.Tag).HasMaxLength(64);
+            e.Property(x => x.Source).HasMaxLength(16);
+            e.HasOne<Agent>().WithMany().HasForeignKey(x => x.AgentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("ck_machine_projects_source", MonitorDbModel.In("source", [.. ProjectSources.All])));
+        });
+
+        b.Entity<RemoteRun>(e =>
+        {
+            e.Property(x => x.ProjectKey).HasMaxLength(RunKinds.ProjectKeyMax);
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.HasIndex(x => new { x.TargetAgentId, x.ProjectKey, x.CreatedAt }).IsDescending(false, false, true).HasFilter("project_key IS NOT NULL");
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_remote_runs_kind", Optional("kind", RunKinds.All));
+                t.HasCheckConstraint("ck_remote_runs_tests", "(tests_passed IS NULL OR tests_passed >= 0) AND (tests_failed IS NULL OR tests_failed >= 0) AND (tests_skipped IS NULL OR tests_skipped >= 0)");
             });
         });
     }

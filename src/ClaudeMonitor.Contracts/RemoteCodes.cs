@@ -27,6 +27,25 @@ public static class RunModes
     public static readonly IReadOnlyList<string> All = [Argv, Shell];
 }
 
+/// <summary>What a run was for, so a machine's project history can group results (ADR-0008 §3a′). Null means the run named none.</summary>
+public static class RunKinds
+{
+    public const string Test = "test";
+    public const string Build = "build";
+    public const string Deploy = "deploy";
+    public const string Other = "other";
+    public static readonly IReadOnlyList<string> All = [Test, Build, Deploy, Other];
+    public const int ProjectKeyMax = 200;
+}
+
+/// <summary>Where the agent learned about a project folder: a session that reported it, or an admin-listed folder (ADR-0008 §3a′).</summary>
+public static class ProjectSources
+{
+    public const string Session = "session";
+    public const string Listed = "listed";
+    public static readonly IReadOnlyList<string> All = [Session, Listed];
+}
+
 public static class RunStatuses
 {
     public const string PendingApproval = "pending_approval";
@@ -112,4 +131,10 @@ public static class RemoteErrors
 
     /// <summary>A role value outside the closed sets (ADR-0008 §3a).</summary>
     public const string InvalidMachineRole = "invalid_machine_role";
+
+    /// <summary>A tag set that breaks the limits of <c>MachineTags</c> (ADR-0008 §3a′).</summary>
+    public const string InvalidTag = "invalid_tag";
+
+    /// <summary>An admin note with control characters or over the limit (ADR-0008 §3a′).</summary>
+    public const string InvalidNote = "invalid_note";
 }
