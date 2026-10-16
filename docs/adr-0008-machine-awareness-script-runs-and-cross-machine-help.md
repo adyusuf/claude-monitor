@@ -480,16 +480,18 @@ the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is defer
 
 **Differences from the plan, each on purpose.**
 - Shell and argv approvals on strict targets still need no code (§9.13 deferred), so the script rule is only as strong as the weakest run mode there.
-- Listening-service process names are shown on Linux only (from `/proc`, for the agent account's own processes); macOS and Windows show the port without a name.
-- Project facts are reported for admin-listed folders; a folder a session visits is known to the API from the session's project key (key, name, branch) but its
-  commit and tag are not read for it.
+- Listening-service process names come from `/proc` on Linux, from the trusted system `lsof` on macOS and from the IP helper's listener table on Windows; only the
+  agent account's own processes are named (another account's port shows without a name).
+- Project facts: an admin-listed folder is read, and so is a folder a session worked in in the last 30 days (the hook remembers its path in the local database; the
+  API only gets the key and an HMAC of the path). Such a project is reported with source `session`; a project in both is reported as listed.
 - The requester logic was not moved into a `Requests/` folder: the CLI verbs use `RemoteRequests`, `Targets` and the contracts where they are (a cosmetic move that would
   have touched every MCP test); there is no `asks_out` table: `monitor_ask_result` asks the API each time. The local table of received asks is `asks_in`.
 - The Windows autostart is the same program with its PE subsystem set to GUI (`PeSubsystem`), made by the installer, because the release zip carries one binary; a
   `CmWindowless=true` build exists as the alternative. The macOS autostart runs the executable inside an application bundle.
 - The agent's `--exec` for a standalone agent is the existing interactive one.
 
-**Unverified (to do before anything is promoted).** The merge gate (coverage per codebase, SAST, secret and dependency scans, backward-compatibility scan) has not run on
+**Unverified (to do before anything is promoted).** Tests added after the run of 16/10/2026 (the tools of asks and scripts, `monitor_machine`, visited folders, the
+`lsof` and listener-table parsers, the standalone command line) are written and have not been run. The merge gate (coverage per codebase, SAST, secret and dependency scans, backward-compatibility scan) has not run on
 this branch; the phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
 gate, interpreter paths and `-File` under a policy, `schtasks`); on Linux the `/proc` service names and `systemd --user` (the tests run on macOS); the macOS launchd
 bootstrap of the LaunchAgent and the application bundle (the installer's tool calls are tested with a fake, not run); and a real Claude Code session receiving an ask
