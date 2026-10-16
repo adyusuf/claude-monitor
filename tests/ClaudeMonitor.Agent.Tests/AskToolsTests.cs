@@ -89,7 +89,7 @@ public sealed class AskToolsTests : IDisposable
     public async Task A_daemon_that_has_not_answered_yet_leaves_the_ask_queued_here_and_says_how_to_follow_it()
     {
         using var daemon = new RemoteFakeDaemon(home).Machines(RemoteFakeDaemon.Machine("web01")); // no answer for "ask"
-        var quick = new AskTools(home.Config with { RemoteWaitPoll = TimeSpan.FromMilliseconds(5) }, new FastForwardClock());
+        var quick = new AskTools(home.Config with { RemoteWaitPoll = TimeSpan.FromMilliseconds(5) }, new FastForwardClock(() => daemon.OfKind("ask").Any()));
         var text = await quick.Ask("web01", "q");
         Assert.Contains("Queued on this machine as request", text, StringComparison.Ordinal);
     }
@@ -271,9 +271,10 @@ public sealed class AskToolsTests : IDisposable
     }
 
     /// <summary>A clock that jumps forward when asked to wait, so a call that gives up waiting does so at once.</summary>
-    private sealed class FastForwardClock : TimeProvider
+    /// <summary>Stands still until <paramref name="ready"/> (the machine lookup must be answered in real time), then jumps 20 s at every read so the next wait runs out at once.</summary>
+    private sealed class FastForwardClock(Func<bool> ready) : TimeProvider
     {
         private DateTimeOffset now = DateTimeOffset.UtcNow;
-        public override DateTimeOffset GetUtcNow() => now += TimeSpan.FromSeconds(20);
+        public override DateTimeOffset GetUtcNow() => ready() ? now += TimeSpan.FromSeconds(20) : now;
     }
 }
