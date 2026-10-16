@@ -135,6 +135,7 @@ internal static class MonitorDbModel
         b.Entity<EventArchive>(e => e.HasIndex(x => new { x.WorkspaceId, x.Day }));
         b.Entity<SessionCommand>(e =>
         {
+            e.Property(x => x.Transport).HasMaxLength(16);
             e.HasIndex(x => new { x.AgentId, x.Status }).HasFilter("status IN ('queued', 'delivered')");
             e.HasIndex(x => new { x.SessionId, x.CreatedAt }).IsDescending(false, true);
             e.ToTable(t =>

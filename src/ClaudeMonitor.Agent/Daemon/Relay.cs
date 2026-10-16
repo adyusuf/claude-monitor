@@ -77,7 +77,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     {
         foreach (var taken in store.TakenCommands())
         {
-            await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At);
+            await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At, taken.Transport);
             store.MarkCommandReported(taken.Id);
         }
     }

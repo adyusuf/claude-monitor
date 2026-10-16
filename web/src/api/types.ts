@@ -65,6 +65,8 @@ export interface CommandRow {
   deliveredAt: string | null;
   appliedAt: string | null;
   result: string | null;
+  /** How an applied command reached the session; absent or null on an older API or an older agent. */
+  transport?: "hook" | "inbox" | "channel" | string | null;
   /** Claude's first message with text after the command was applied; absent on an older API. */
   replyEventId?: number | null;
   /** The start of that message; replyMore says the message goes on. */

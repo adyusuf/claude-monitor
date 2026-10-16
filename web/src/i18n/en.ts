@@ -77,6 +77,7 @@ export const en = {
     showAll: "Show all", showLess: "Show less",
   },
   commandStatus: { queued: "Queued", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
+  commandTransport: { hook: "at the next hook", inbox: "through the session's inbox", channel: "as a channel message", via: "Reached the session {how}" },
   commandHint: {
     queued: "waiting for the agent on the machine to pick it up",
     delivered: "reached the agent, waiting for the session's next step",

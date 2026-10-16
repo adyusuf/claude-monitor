@@ -197,6 +197,16 @@ public sealed class InboxPushTests : IDisposable
     }
 
     [Fact]
+    public async Task A_prompt_the_inbox_pump_wrote_is_reported_as_applied_through_the_inbox_once_the_session_showed_it()
+    {
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);
+        Queue("c-1", "s-1");
+        await Pump().PumpAsync(CancellationToken.None);
+        Assert.True(store.ConfirmPush("c-1", Start.AddSeconds(3)));
+        Assert.Equal([new TakenCommand("c-1", Start.AddSeconds(3), CommandTransports.Inbox)], store.TakenCommands());
+    }
+
+    [Fact]
     public async Task A_push_waits_for_the_inbox_confirmation_time_not_the_channels_before_it_is_given_up()
     {
         store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);

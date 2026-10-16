@@ -79,6 +79,7 @@ export const tr: Dictionary = {
     showAll: "Tümünü göster", showLess: "Azalt",
   },
   commandStatus: { queued: "Sırada", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal edildi" },
+  commandTransport: { hook: "bir sonraki kanca ile", inbox: "oturumun gelen kutusundan", channel: "kanal mesajı olarak", via: "Oturuma {how} ulaştı" },
   commandHint: {
     queued: "makinedeki ajanın alması bekleniyor",
     delivered: "ajana ulaştı, oturumun bir sonraki adımını bekliyor",

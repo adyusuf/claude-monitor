@@ -32,6 +32,15 @@ public static class CommandKinds
     public static readonly IReadOnlySet<string> All = new HashSet<string> { Prompt, Stop };
 }
 
+/// <summary>How a command reached the session (ADR-0007 section 9): at a hook, through the session's inbox socket, or as a channel message from the MCP process.</summary>
+public static class CommandTransports
+{
+    public const string Hook = "hook";
+    public const string Inbox = "inbox";
+    public const string Channel = "channel";
+    public static readonly IReadOnlySet<string> All = new HashSet<string> { Hook, Inbox, Channel };
+}
+
 public static class CommandStatuses
 {
     public const string Queued = "queued";

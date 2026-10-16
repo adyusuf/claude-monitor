@@ -45,6 +45,7 @@ public sealed partial class LocalStore : IDisposable
             """);
         AddColumnIfMissing("commands", "taken_at", "TEXT"); // a database made before the hook's hand-over time was kept
         AddColumnIfMissing("commands", "push_tried", "INTEGER"); // a database made before a given-up push was remembered
+        AddColumnIfMissing("commands", "transport", "TEXT"); // a database made before the way a command reached its session was kept
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
         CreateRemoteTables();
         CreateClaudeTables();

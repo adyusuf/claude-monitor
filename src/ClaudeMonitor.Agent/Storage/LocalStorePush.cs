@@ -1,3 +1,5 @@
+using ClaudeMonitor.Contracts;
+
 namespace ClaudeMonitor.Agent.Storage;
 
 public sealed record PushedCommand(string Id, string Session, DateTimeOffset PushedAt);
@@ -28,9 +30,9 @@ public sealed partial class LocalStore
 
     /// <summary>
     /// Takes every unexpired queued prompt of a session (every session when null) for pushing, oldest first, and marks it
-    /// pushed. A prompt is taken once: the hooks no longer see it.
+    /// pushed through <paramref name="transport"/> (the channel by default; the inbox pump says so). A prompt is taken once: the hooks no longer see it.
     /// </summary>
-    public List<LocalCommand> TakePromptsForPush(string? session, string kind, DateTimeOffset now)
+    public List<LocalCommand> TakePromptsForPush(string? session, string kind, DateTimeOffset now, string transport = CommandTransports.Channel)
     {
         using var tx = db.BeginTransaction(deferred: false);
         var taken = new List<LocalCommand>();
@@ -46,7 +48,7 @@ public sealed partial class LocalStore
             }
         }
 
-        taken.RemoveAll(c => Exec("UPDATE commands SET state = 'pushed' WHERE id = $i AND state = 'queued'", tx, ("$i", c.Id)) != 1);
+        taken.RemoveAll(c => Exec("UPDATE commands SET state = 'pushed', transport = $x WHERE id = $i AND state = 'queued'", tx, ("$i", c.Id), ("$x", transport)) != 1);
         foreach (var c in taken)
         {
             Exec("INSERT OR REPLACE INTO pushes (command_id, pushed_at) VALUES ($i, $t)", tx, ("$i", c.Id), ("$t", Iso(now)));
@@ -59,7 +61,7 @@ public sealed partial class LocalStore
     /// <summary>A push could not be written: the prompt goes back to the queue untouched.</summary>
     public void PushFailed(string id)
     {
-        Exec("UPDATE commands SET state = 'queued' WHERE id = $i AND state = 'pushed'", ("$i", id));
+        Exec("UPDATE commands SET state = 'queued', transport = NULL WHERE id = $i AND state = 'pushed'", ("$i", id));
         Exec("DELETE FROM pushes WHERE command_id = $i AND confirmed_at IS NULL", ("$i", id));
     }
 
