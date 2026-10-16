@@ -61,10 +61,17 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var (claude, tools) = Facts();
         var (services, projects) = Extras(policy);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
-            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects);
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported());
         var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
+    }
+
+    /// <summary>The push transport this machine has on now (the saved setting, read fresh), or null when push is off: the web words its idle-session warning by it.</summary>
+    private string? PushReported()
+    {
+        var current = SavedSettings.Apply(config);
+        return current.PushEnabled ? current.PushTransport : null;
     }
 
     /// <summary>

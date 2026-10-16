@@ -97,7 +97,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook Stop",
-            "timeout": 15
+            "timeout": 600
           }
         ]
       }

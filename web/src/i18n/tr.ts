@@ -91,6 +91,7 @@ export const tr: Dictionary = {
     reason: "Gerekçe (isteğe bağlı)", answered: "Yanıtlandı", expired: "Süresi doldu", expires: "Bitiş",
     expiresIn: "{time} sonra sona erer",
     idleWarning: "Bu oturum boşta. Komut, oturumda bir şey yazıldığında ya da bir tur bittiğinde uygulanır.",
+    idleWarningPush: "Bu oturum boşta. Bu makinede itme açık: mesaj hemen oturuma yazılır; gösterilmezse oturumda bir şey yazıldığında ya da bir tur bittiğinde uygulanır.",
   },
   chat: {
     label: "Oturum konuşması", view: "Görünüm", view_chat: "Konuşma", view_raw: "Ham olaylar", newBelow: "Yeni mesajlar",
@@ -102,7 +103,9 @@ export const tr: Dictionary = {
     showAll: "Tümünü göster", showLess: "Azalt",
   },
   commandStatus: { queued: "Sırada", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal edildi" },
+  commandTransport: { hook: "bir sonraki kanca ile", inbox: "oturumun gelen kutusundan", channel: "kanal mesajı olarak", via: "Oturuma {how} ulaştı" },
   commandHint: {
+    pushed: "Oturuma {how} itildi; oturumun mesajı göstermesi bekleniyor",
     queued: "makinedeki ajanın alması bekleniyor",
     delivered: "ajana ulaştı, oturumun bir sonraki adımını bekliyor",
     expiredIdle: "Süresi doldu (oturum boştaydı)",

@@ -28,6 +28,7 @@ public static class MachineReports
         agent.ProfileAt = now;
         MachineFacts.Apply(agent, profile, now);
         await MachineProjects.ApplyAsync(db, agent.Id, agent.WorkspaceId, profile.Projects, now, ct);
+        agent.PushTransport = profile.PushTransport is CommandTransports.Inbox or CommandTransports.Channel ? profile.PushTransport : null;
         if (profile.OsVersion is { Length: > 0 } version)
         {
             var clean = Clean(version, OsVersionMax);

@@ -81,6 +81,7 @@ internal static class MonitorDbModel
         });
         b.Entity<Agent>(e =>
         {
+            e.Property(x => x.PushTransport).HasMaxLength(16);
             e.HasIndex(x => new { x.MachineId, x.UserId }).IsUnique().HasFilter("status = 'active'");
             e.HasIndex(x => x.WorkspaceId);
             e.HasIndex(x => x.UserId);
@@ -137,6 +138,7 @@ internal static class MonitorDbModel
         b.Entity<EventArchive>(e => e.HasIndex(x => new { x.WorkspaceId, x.Day }));
         b.Entity<SessionCommand>(e =>
         {
+            e.Property(x => x.Transport).HasMaxLength(16);
             e.HasIndex(x => new { x.AgentId, x.Status }).HasFilter("status IN ('queued', 'delivered')");
             e.HasIndex(x => new { x.SessionId, x.CreatedAt }).IsDescending(false, true);
             e.ToTable(t =>

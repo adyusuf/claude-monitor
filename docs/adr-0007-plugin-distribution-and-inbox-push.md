@@ -186,7 +186,12 @@ approval happens on the web, as today.
 (or the legacy local one), that the plugin is not disabled in `enabledPlugins`, and that its own binary still exists. When any of
 these fails it flushes the outbox once, stops the stream and exits; `agent.log` says why. Claude Code deletes
 `${CLAUDE_PLUGIN_DATA}` on uninstall, so the binary is gone too; the home stays. A **disabled** plugin runs no hooks and no MCP
-server, so the daemon stopping there is consistent with "active only while enabled". Reinstall or re-enable: the bootstrap
+server, so the daemon stopping there is consistent with "active only while enabled". Two more checks come from Claude Code's plugin list
+(`installed_plugins.json`, believed only when it is `version` 2 with a `plugins` object; otherwise the older signals alone decide): a plugin that is no
+longer listed was uninstalled even when its data was kept (`--keep-data`), and a plugin switched off is gone only when it is off everywhere it is installed:
+an install for the account is read from the user's settings alone, a project or local install from that project's `settings.local.json`, then
+`settings.json`, then the user's. One project switching it off never stops a daemon that others still use; a project folder that no longer exists counts as
+still there. Reinstall or re-enable: the bootstrap
 runs again and continues from the existing identity. The service agent (ADR-0005) is not affected: it has no plugin.
 
 **B6. Updates.** A new agent release = a new plugin version (same number) with new pins; `claude plugin update
@@ -420,11 +425,15 @@ the daemon's write (the probe of §8 used the same line from a script, a desktop
 the plugin installed from a real marketplace; a published build (the pins file is the placeholder until `build-agent.sh` runs for a release).
 
 **Deferred, with the reason.**
-- **The web does not yet say which transport took a command.** The API learns `delivered` and `applied` only; showing "pushed" or "the session refuses messages"
-  needs the agent to report push state to the API (a protocol addition) and a rewording of the idle-session warning, which is wrong while push is on.
-- **`--stop-wait` for the plugin's hooks:** their timeouts are static.
-- **Serving the plugin from the server itself** (a marketplace `archive` source on the site's own `/downloads`, no GitHub coordinates in the web build) would make
-  `VITE_PLUGIN_MARKETPLACE` unnecessary; it needs a deploy step that writes `marketplace.json` with the site's address and the zip's hash.
+- **The web says which transport an applied command used, and what happens before (done, 16/10/2026).** The agent reports `hook`, `inbox` or `channel` with "applied"
+  (`session_commands.transport`, nullable). Before that it reports a push that was written into the session and not shown yet as `delivered` with the transport (taken back with an
+  empty transport when the push is given up and the hooks will deliver it), and the web's hint reads "Pushed into the session ...". The agent also tells the API which push transport is on with
+  its profile (`agents.push_transport`), so the idle-session warning says push is on and no longer says the command waits for something to be typed. An older agent sends none of this and
+  the older wording stays.
+- **`--stop-wait` for the plugin's hooks (done):** the plugin's Stop hook now has a timeout that fits the longest wait (600 s), and the wrapper tells the agent so
+  (`CM_PLUGIN_STOP_WAIT_MAX`); a plugin-started agent takes the saved wait up to that. A plugin version without the wrapper's line keeps a wait of zero, because its
+  fixed 15 s would cut a longer wait off.
+- **Serving the plugin from the server itself (done, section 9.2).**
 - Hold expiry, the terminal approval dialog and `bypassPermissions` without the key were measured or reasoned in §8 only for macOS.
 
 ### 9.1 Found by the independent QA pass (16/10/2026) and fixed
@@ -441,7 +450,7 @@ the plugin installed from a real marketplace; a published build (the pins file i
 | a Linux or Windows machine without `unzip` could not install; Windows could not replace a running binary | `unzip`, PowerShell `Expand-Archive`, `bsdtar`, `python3 -m zipfile`, a clear message otherwise; the old file is renamed aside on Windows (not run there) |
 | an idle session lost its inbox after a day | 30 days, and a dead socket is dropped at its first failed write |
 | the session key could reach a log through the configuration's text form; the daemon inherited the starting session's key | `SecretText` hides it; the daemon's environment is scrubbed; a socket that is a symlink or not the user's own is not written to |
-| a stop wait saved for the agent was cut off by the plugin's fixed hook timeout | a plugin-started agent takes no stop wait |
+| a stop wait saved for the agent was cut off by the plugin's fixed hook timeout | a plugin-started agent takes no stop wait (later: it takes it up to the plugin version's Stop timeout) |
 | two files over 300 lines | split |
 
 **Second pass (same reviewer, on the fixes):** findings 1-13 closed or documented-open, and two new ones from the fixes, both fixed with a test that failed first.
@@ -451,5 +460,26 @@ recorded in `connect.log.server` when a login starts). Also: a failed install is
 binary back, a server value with a second line is refused, `write_plugin_pins.py --replace` starts a version's list over, and the script tests are split into small files.
 
 **Open after the QA pass:** Windows (the named-pipe branch has no test anywhere, `sh` for the MCP server must be on the Windows PATH, the detached login may not outlive a job
-object); a plugin disabled only at project or local scope is not noticed.
+object). The lifecycle gaps found in the QA pass (a plugin switched off only at project or local scope, `--keep-data`, `--stop-wait`) were closed afterwards (B5).
 
+### 9.2 The plugin served from the site itself (16/10/2026, measured with Claude Code 2.1.294 in a throwaway `CLAUDE_CONFIG_DIR`)
+
+What each way of putting a marketplace on our own server did, with a local server and a self-signed certificate (`NODE_EXTRA_CA_CERTS`):
+
+| Way | Result |
+|---|---|
+| a hosted `marketplace.json` whose plugin is a relative path | the marketplace is added; the install is refused: a relative entry in a URL catalog has no local directory |
+| the plugin as a git repository served as static files (dumb HTTP) | refused: `dumb http transport does not support shallow capabilities` (Claude Code clones shallow; a real git server would be needed) |
+| the plugin as `{"source": "archive", "url", "sha256"}` over http on a loopback | refused: archive URLs must be https and not loopback, link-local or cloud-metadata |
+| the same over https on a LAN address | **installs** (user scope; `installed_plugins.json` version 2, the plugin's scripts keep their executable bit) |
+| the same with a wrong `sha256` | refused: "Plugin archive integrity check failed ... The archive was not installed" |
+| `source` types `zip` and `http` | not supported by this Claude Code version |
+| `npm` with an http registry | refused unless the registry is https (and a registry would be a new service) |
+
+So the site can serve the plugin with no GitHub coordinates: `scripts/build_plugin_site.py <downloads> --base-url https://<site>` (run by `build-agent.sh` when `AGENT_SITE_URL` is set) writes
+`monitor-agent-plugin.zip` (reproducible, the plugin folder with its pins) and `marketplace.json` (name `monitor-agent-releases`, the archive source with the zip's SHA-256, which Claude Code enforces,
+so the trust model of ADR-0004 and the pins holds). A person runs `claude plugin marketplace add <site>/downloads/marketplace.json` and
+`claude plugin install monitor-agent@monitor-agent-releases`; the web build with `VITE_PLUGIN_FROM_SERVER=1` shows exactly that on the download page (`VITE_PLUGIN_MARKETPLACE`, when set, still wins).
+The site's address is a deployment value passed to the script, never kept in the repository; the script refuses what Claude Code refuses (http, loopback, link-local). `claude plugin validate` passes on the output.
+Also measured in the same run: a project-scope install is listed in `installed_plugins.json` with `"scope": "project"` and a `projectPath`, and the project's `.claude/settings.json` gets `enabledPlugins`, which is the shape the daemon's plugin watch reads (section 9.1).
+Not measured: auto-update of a plugin from a URL catalog (the person turns it on, as for any non-official marketplace), and a real public certificate.

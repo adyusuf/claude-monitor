@@ -95,6 +95,9 @@ public sealed class Agent
     public bool AcceptsAsks { get; set; }
     public DateTimeOffset? AcceptsAsksSetAt { get; set; }
     public Guid? AcceptsAsksSetBy { get; set; }
+
+    /// <summary>The push transport the agent has on (<c>inbox</c> or <c>channel</c>), or null when it is off or the agent does not say.</summary>
+    public string? PushTransport { get; set; }
 }
 
 public sealed class AgentToken

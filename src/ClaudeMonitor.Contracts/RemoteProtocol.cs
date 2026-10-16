@@ -7,7 +7,7 @@ namespace ClaudeMonitor.Contracts;
 public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent,
     string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
     IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
-    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null);
+    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null);
 
 /// <summary>One listening TCP port (ADR-0008 §3a′): the port, the protocol (<c>tcp</c>) and the owning process name when the OS lets the agent see it.</summary>
 public sealed record ServiceInfo(int Port, string Proto, string? Process);

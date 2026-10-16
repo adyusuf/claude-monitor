@@ -90,6 +90,7 @@ export const en = {
     reason: "Reason (optional)", answered: "Answered", expired: "Expired", expires: "Expires",
     expiresIn: "expires in {time}",
     idleWarning: "This session is idle. A command is applied when something is typed in the session or when a turn ends.",
+    idleWarningPush: "This session is idle. Push is on for this machine: the message is written into the session at once; if it is not shown, it is applied when something is typed or a turn ends.",
   },
   chat: {
     label: "Session conversation", view: "View", view_chat: "Conversation", view_raw: "Raw events", newBelow: "New messages",
@@ -101,7 +102,9 @@ export const en = {
     showAll: "Show all", showLess: "Show less",
   },
   commandStatus: { queued: "Queued", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
+  commandTransport: { hook: "at the next hook", inbox: "through the session's inbox", channel: "as a channel message", via: "Reached the session {how}" },
   commandHint: {
+    pushed: "Pushed into the session {how}; waiting for it to show the message",
     queued: "waiting for the agent on the machine to pick it up",
     delivered: "reached the agent, waiting for the session's next step",
     expiredIdle: "Expired (the session was idle)",

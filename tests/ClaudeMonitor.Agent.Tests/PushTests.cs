@@ -99,7 +99,7 @@ public sealed class PushTests : IDisposable
         Assert.Equal(2, store.TakePromptsForPush("s-1", CommandKinds.Prompt, clock.GetUtcNow()).Count);
         Assert.True(store.ConfirmPush("c-1", clock.GetUtcNow()));
         Assert.False(store.ConfirmPush("c-1", clock.GetUtcNow())); // once
-        Assert.Equal([new TakenCommand("c-1", clock.GetUtcNow())], store.TakenCommands()); // now it is reported as applied, at the moment it was seen
+        Assert.Equal([new TakenCommand("c-1", clock.GetUtcNow(), CommandTransports.Channel)], store.TakenCommands()); // now it is reported as applied, at the moment it was seen, through the channel
         Assert.Equal(1, store.PushedTotal());
         store.PushFailed("c-2");
         Assert.Equal("c-2", store.TakeCommand("s-1", CommandKinds.Prompt, clock.GetUtcNow())!.Id);
@@ -139,6 +139,16 @@ public sealed class PushTests : IDisposable
     }
 
     // ---- the pump ---------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_prompt_the_channel_pump_sent_is_reported_as_applied_through_the_channel()
+    {
+        store.BindSession("mine", 4242, Start);
+        Queue("c-mine", "mine");
+        await Pump().PumpAsync(_ => Task.CompletedTask);
+        Assert.True(store.ConfirmPush("c-mine", Start.AddSeconds(2)));
+        Assert.Equal([new TakenCommand("c-mine", Start.AddSeconds(2), CommandTransports.Channel)], store.TakenCommands());
+    }
 
     [Fact]
     public async Task The_pump_pushes_only_what_is_addressed_to_its_own_session()

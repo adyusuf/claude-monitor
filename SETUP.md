@@ -101,15 +101,15 @@ it against the SHA-256 the plugin pins in `agent-release.txt`, puts it in the pl
 `/monitor-agent:connect` shows a code to approve on the web, `/monitor-agent:status` shows how the install and the connection
 are doing, `/monitor-agent:disconnect` signs the machine out. The first session after installing reports nothing (the binary is
 not there yet); the transcript is read later, so nothing of it is lost. **Uninstalling or disabling the plugin stops the daemon within
-30 s**: Claude Code runs nothing at uninstall, so the daemon watches for its data directory to disappear and for a `false` in
-`enabledPlugins`. The agent home, the login and the credential store stay: installing the plugin again continues from them.
-`claude plugin uninstall --keep-data` keeps the data directory, so the daemon does not see that uninstall (it still stops at a user-level disable, or when the
-machine restarts). A plugin switched off only in a project's settings is not seen either. The old local plugin (`cm-agent install`, `monitor-agent-local`) reports
+30 s**: Claude Code runs nothing at uninstall, so the daemon watches for its data directory to disappear, for the plugin to drop out of Claude Code's plugin list, and for a `false` in
+`enabledPlugins` where the plugin is installed (everywhere it is installed: a plugin switched off in one project's settings only does not stop it). The agent home, the login and the credential store stay: installing the plugin again continues from them.
+`claude plugin uninstall --keep-data` keeps the data directory, but the plugin leaves Claude Code's plugin list, which the daemon also reads (when that list has an
+unknown shape it falls back to the data directory and the settings alone). The old local plugin (`cm-agent install`, `monitor-agent-local`) reports
 every event a second time if it stays enabled: `/monitor-agent:connect` removes it, and the bootstrap says so while it is there.
 
 A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
-`dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). Limits: `--stop-wait`
-is ignored for a plugin-started agent (the plugin's hook timeouts are fixed at the defaults); the plugin has no channel entry (push through the
+`dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
+plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
 
 ### Pushing web messages into an idle session (opt-in)
@@ -279,7 +279,7 @@ cm-agent config auto-update off|check|on # what the daemon may do by itself (def
 
 1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `cm-agent-update-<channel>`) and is never written to a file; the public half is printed:
    `python3 scripts/sign_manifest.py keygen --channel test` and `... --channel prod`. Save the printed line as `deploy/update-keys/<channel>.pub` and commit it (it is public by design).
-2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
+2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SITE_URL=https://<site>` also writes `marketplace.json` and `monitor-agent-plugin.zip` so the site serves the plugin itself (with `VITE_PLUGIN_FROM_SERVER=1` in the web build); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
    The channel's public key is built into the agent; `out/downloads` gets the six zips (macOS, Windows, Linux), `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
 3. Deploy copies `downloads/` as before (`docs/deploy-windows.md`). **The server offers whatever its web root holds**, so deploy test builds to test and prod builds to prod.
 4. Agents already installed at that channel take it when a person runs `cm-agent update` or when `auto-update` allows it.

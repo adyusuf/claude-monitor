@@ -27,6 +27,8 @@ elif [ -z "${CM_SERVER:-}" ] && [ -f "$data/server.txt" ]; then
   CM_SERVER="$(head -n 1 "$data/server.txt" | tr -d '\r')"
   export CM_SERVER
 fi
+# The Stop hook of this plugin version has a timeout that fits the longest stop wait (cm-agent install --stop-wait); an older version's wrapper does not say so, and the agent then waits for nothing.
+export CM_PLUGIN_STOP_WAIT_MAX=590
 # The plugin's push option: "inbox" starts a turn in an idle session when a message is sent from the web. Anything else leaves what the agent has saved.
 case "${CLAUDE_PLUGIN_OPTION_PUSH:-}" in inbox) export CM_PUSH=inbox ;; esac
 exec "$bin" "$@"
