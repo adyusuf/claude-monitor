@@ -162,8 +162,8 @@ class EnsureScript(PluginScriptsCase):
         self.addCleanup(server.close)
         self.pins('0.3.0')
         self.install_fake('0.2.9')
-        os.chmod(os.path.dirname(self.bin), 0o555)  # nothing can be written into the folder: neither the rename nor the move succeeds
-        self.addCleanup(os.chmod, os.path.dirname(self.bin), 0o755)
+        os.chmod(os.path.dirname(self.bin), 0o500)  # nothing can be written into the folder: neither the rename nor the move succeeds
+        self.addCleanup(os.chmod, os.path.dirname(self.bin), 0o700)
         self.run_script(ENSURE, server=server.url)
         self.assertTrue(self.wait_for('could not replace the installed binary'))
         self.assertEqual(subprocess.run([self.bin, 'version'], capture_output=True, text=True).stdout.strip(), '0.2.9')

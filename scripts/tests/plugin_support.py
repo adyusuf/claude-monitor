@@ -43,7 +43,7 @@ def zip_of(version):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, 'w') as z:
         info = zipfile.ZipInfo('cm-agent')
-        info.external_attr = 0o755 << 16
+        info.external_attr = 0o700 << 16
         z.writestr(info, FAKE.format(version=version))
     return buffer.getvalue()
 
@@ -109,4 +109,4 @@ class PluginScriptsCase(unittest.TestCase):
         os.makedirs(os.path.dirname(self.bin), exist_ok=True)
         with open(self.bin, 'w') as f:
             f.write(FAKE.format(version=version))
-        os.chmod(self.bin, 0o755)
+        os.chmod(self.bin, 0o700)
