@@ -61,13 +61,15 @@ public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Ki
 /// Exactly one of Argv (mode argv) and ShellCommand (mode shell) is set.
 /// </summary>
 public sealed record RunCreate(string ClientKey, Guid TargetAgentId, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand,
-    string? Cwd, int TimeoutSeconds, string? Reason, string? SessionExternalId = null, Guid? JobId = null);
+    string? Cwd, int TimeoutSeconds, string? Reason, string? SessionExternalId = null, Guid? JobId = null,
+    string? ProjectKey = null, string? Kind = null);
 
 public sealed record RunCreated(Guid Id, string Status, Guid? GrantId, DateTimeOffset ExpiresAt);
 
 public sealed record RunView(Guid Id, Guid TargetAgentId, string TargetHostname, string Mode, IReadOnlyList<string>? Argv,
     string? ShellCommand, string? Cwd, int TimeoutSeconds, string Status, int? ExitCode, string? Error, long OutputBytes,
-    bool OutputTruncated, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, DateTimeOffset? EndedAt, Guid? GrantId, Guid? JobId);
+    bool OutputTruncated, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, DateTimeOffset? EndedAt, Guid? GrantId, Guid? JobId,
+    string? ProjectKey = null, string? Kind = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null);
 
 /// <summary>One piece of a run's output, numbered from 0 by the target. GapBefore marks output cut out before it.</summary>
 public sealed record RunOutputChunk(int Seq, string Stream, string Body, bool GapBefore = false);
@@ -104,3 +106,18 @@ public sealed record JobProposal(Guid TargetAgentId, string Name, IReadOnlyList<
 
 public sealed record JobView(Guid Id, Guid TargetAgentId, string Name, IReadOnlyList<string> Argv, string Cwd, int TimeoutSeconds,
     string Status, DateTimeOffset CreatedAt);
+
+/// <summary>One run of a project on a machine, as its history shows it (ADR-0008 §3a′); the counts are empty when the tool was not recognised.</summary>
+public sealed record ProjectRunSummary(string? Kind, string Status, int? ExitCode, DateTimeOffset At, bool OutputTruncated,
+    int? TestsPassed, int? TestsFailed, int? TestsSkipped);
+
+/// <summary>A project on a machine: what the agent read from its folder, the last runs per kind and the tool failures sessions had in it recently.</summary>
+public sealed record MachineProjectView(string Key, string Name, string? Branch, string? HeadSha, string? Tag, DateTimeOffset LastSeenAt,
+    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors);
+
+/// <summary>
+/// Everything about one machine (ADR-0008 §3a′): its list entry, the admin's note (untrusted text), the listening services when the caller may
+/// see them (the machine's owner and workspace admins; null otherwise, and when the owner has not opted in) and its projects.
+/// </summary>
+public sealed record MachineDetail(MachineView Machine, string? Note, DateTimeOffset? NoteSetAt, bool ServicesShared,
+    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects);

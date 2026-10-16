@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Remote;
 using ClaudeMonitor.Api.Streaming;
 using ClaudeMonitor.Api.Text;
 using ClaudeMonitor.Contracts;
@@ -131,6 +132,7 @@ public sealed class BatchIngestor(MonitorDb db, ApiConfig config, Broker broker,
         if (e.ProjectKey is { Length: > 0 } projectKey)
         {
             session.ProjectId = await ProjectAsync(workspaceId, projectKey, e.ProjectName ?? projectKey, ct);
+            await MachineProjects.SeenInSessionAsync(db, agentId, workspaceId, projectKey, e.ProjectName ?? projectKey, e.GitBranch, e.OccurredAt, ct);
         }
 
         session.GitBranch = e.GitBranch ?? session.GitBranch;

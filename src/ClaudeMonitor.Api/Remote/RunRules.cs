@@ -16,6 +16,8 @@ public static class RunRules
     public const string BadCwd = "invalid_cwd";
     public const string BadTimeout = "invalid_timeout";
     public const string BadReason = "invalid_reason";
+    public const string BadProject = "invalid_project";
+    public const string BadKind = "invalid_kind";
     public const int ClientKeyMax = 100;
     public const int CwdMax = 1024;
 
@@ -39,6 +41,8 @@ public static class RunRules
         if (req.Mode == RunModes.Shell && req.Cwd is not null) return BadCwd;
         if (req.TimeoutSeconds is < 1 or > 3600) return BadTimeout;
         if (req.Reason is { } reason && (reason.Length > config.RunReasonMax || reason.Contains('\0'))) return BadReason;
+        if (req.ProjectKey is { } project && (project.Length is < 1 or > RunKinds.ProjectKeyMax || HasControl(project))) return BadProject;
+        if (req.Kind is { } kind && !RunKinds.All.Contains(kind)) return BadKind;
         return null;
     }
 

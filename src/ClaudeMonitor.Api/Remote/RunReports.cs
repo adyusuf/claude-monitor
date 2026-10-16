@@ -54,6 +54,7 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
                     Audit.Add(db, http, clock, AuditActions.RunFinished, run.WorkspaceId, agentId: agentId, targetType: "run",
                         targetId: id, detail: new { status = req.Status, exitCode = req.ExitCode });
                     await db.SaveChangesAsync(ct);
+                    if (run.Kind == RunKinds.Test) await StoreTestCountsAsync(id, ct);
                 }
 
                 break;
@@ -63,6 +64,16 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
         run.Status = req.Status!;
         RunNotices.Changed(broker, run);
         return Results.NoContent();
+    }
+
+    /// <summary>The counts of a finished <c>test</c> run, read from the tail of its output; left empty when the tool is not recognised.</summary>
+    private async Task StoreTestCountsAsync(Guid id, CancellationToken ct)
+    {
+        var tail = await db.RemoteRunOutput.AsNoTracking().Where(o => o.RunId == id).OrderByDescending(o => o.Seq).Take(24)
+            .Select(o => new { o.Seq, o.Body }).ToListAsync(ct);
+        if (TestSummary.Parse(string.Concat(tail.OrderBy(o => o.Seq).Select(o => o.Body))) is not { } counts) return;
+        await db.RemoteRuns.Where(r => r.Id == id).ExecuteUpdateAsync(s => s.SetProperty(r => r.TestsPassed, counts.Passed)
+            .SetProperty(r => r.TestsFailed, counts.Failed).SetProperty(r => r.TestsSkipped, counts.Skipped), ct);
     }
 
     /// <summary>

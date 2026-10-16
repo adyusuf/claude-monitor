@@ -35,7 +35,8 @@ public static class RunQueries
     {
         ArgumentNullException.ThrowIfNull(r);
         return new RunView(r.Id, r.TargetAgentId, hostname, r.Mode, r.Argv, r.ShellCommand, r.Cwd, r.TimeoutSeconds, r.Status,
-            r.ExitCode, r.Error, r.OutputBytes, r.OutputTruncated, r.CreatedAt, r.ExpiresAt, r.EndedAt, r.GrantId, r.JobId);
+            r.ExitCode, r.Error, r.OutputBytes, r.OutputTruncated, r.CreatedAt, r.ExpiresAt, r.EndedAt, r.GrantId, r.JobId,
+            r.ProjectKey, r.Kind, r.TestsPassed, r.TestsFailed, r.TestsSkipped);
     }
 
     public static async Task<RunOutputPage> OutputAsync(MonitorDb db, Guid runId, int after, int limit, bool done, CancellationToken ct)

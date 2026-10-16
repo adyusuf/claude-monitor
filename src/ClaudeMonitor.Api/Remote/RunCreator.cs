@@ -69,6 +69,8 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
             Cwd = req.Cwd,
             TimeoutSeconds = req.TimeoutSeconds,
             Reason = req.Reason,
+            ProjectKey = req.ProjectKey,
+            Kind = req.Kind,
             CreatedAt = now,
             ExpiresAt = now + config.RunPendingLifetime,
         };

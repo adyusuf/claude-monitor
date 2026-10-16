@@ -27,6 +27,7 @@ public static class MachineReports
         agent.ServiceMode = profile.ServiceMode;
         agent.ProfileAt = now;
         MachineFacts.Apply(agent, profile, now);
+        await MachineProjects.ApplyAsync(db, agent.Id, agent.WorkspaceId, profile.Projects, now, ct);
         if (profile.OsVersion is { Length: > 0 } version)
         {
             var clean = Clean(version, OsVersionMax);
