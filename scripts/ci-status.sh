@@ -56,7 +56,7 @@ if not runs:
     print("none")
 else:
     r = runs[0]
-    print("\t".join([r.get("status") or "", r.get("conclusion") or "", r.get("url") or ""]))
+    print("\t".join([r.get("status") or "-", r.get("conclusion") or "-", r.get("url") or "-"]))   # "-": tab is IFS whitespace, empty fields would collapse
 ')" || { echo "NOT CHECKED: python3 could not read gh's answer"; exit 5; }
 
 IFS=$'\t' read -r status conclusion url <<<"$verdict"

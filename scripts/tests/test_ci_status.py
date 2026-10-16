@@ -46,6 +46,7 @@ class CiStatus(ToolCase):
         out, code = self.run_tool(SCRIPT, 'dev', self.sha)
         self.assertEqual(3, code, out)
         self.assertIn('NOT FINISHED', out)
+        self.assertIn("is 'in_progress' — https://example.invalid/run/1", out)   # the run's address survives an empty conclusion
 
     def test_a_queued_run_is_not_a_pass(self):
         self.gh([{'status': 'queued', 'conclusion': None}])
