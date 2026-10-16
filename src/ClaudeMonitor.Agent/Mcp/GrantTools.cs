@@ -7,6 +7,7 @@ using ClaudeMonitor.Agent.Daemon;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Contracts;
 using ModelContextProtocol.Server;
+using ClaudeMonitor.Agent.Requests;
 
 namespace ClaudeMonitor.Agent.Mcp;
 
@@ -17,7 +18,8 @@ namespace ClaudeMonitor.Agent.Mcp;
 [McpServerToolType]
 public sealed class GrantTools(AgentConfig config, TimeProvider clock)
 {
-    private readonly RemoteRequests requests = new(config, clock);
+    private readonly RemoteClient client = new(config, clock);
+    private RemoteRequests requests => client.Requests;
 
     [McpServerTool(Name = "monitor_request_grant")]
     [Description("Asks a machine's owner for a standing permission to run one command template without asking each time. The template is a fixed list: an absolute executable, literal arguments, and placeholders {int:1..5000}, {word}, {path:/allowed/root/}, {enum:a|b}. The working directory is fixed by the grant. Shells, interpreters (python, node, git, dotnet...) and options that execute (-exec, --to-command...) are refused. Nothing is allowed until the owner approves it on the web.")]
@@ -114,10 +116,10 @@ public sealed class GrantTools(AgentConfig config, TimeProvider clock)
         if (job.Status != JobStatuses.Active) return $"Job {id} is {job.Status}; only an approved job runs.";
         var clientKey = Guid.NewGuid().ToString();
         var create = new RunCreate(clientKey, job.TargetAgentId, RunModes.Argv, job.Argv, null, job.Cwd, job.TimeoutSeconds, reason, sessionId, job.Id);
-        var answer = await requests.AskAsync(RemoteRelay.RunKind, HttpMethod.Post, "api/agent/runs", create, RemoteRequests.ReadWait, clientKey);
-        if (answer.Error == RemoteAnswer.Pending) return $"Queued as request {clientKey}. Call monitor_run_result with runId {clientKey}.";
-        if (!answer.Ok) return MachineTools.Failure(answer.Error!);
-        var run = answer.Json!.Value.Deserialize<RunCreated>(ApiClient.Json)!;
+        var outcome = await client.CreateRunAsync(create);
+        if (outcome.Pending) return $"Queued as request {clientKey}. Call monitor_run_result with runId {clientKey}.";
+        if (!outcome.Ok) return MachineTools.Failure(outcome.Error!);
+        var run = outcome.Value!;
         return $"Job \"{job.Name}\" started as run {run.Id}: {run.Status}. Call monitor_run_result with runId {run.Id}.";
     }
 

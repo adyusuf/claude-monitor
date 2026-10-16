@@ -41,13 +41,20 @@ public sealed partial class LocalStore : IDisposable
                 PRIMARY KEY (session, message_id));
             CREATE TABLE IF NOT EXISTS session_bindings (session TEXT PRIMARY KEY, parent_pid INTEGER NOT NULL, seen_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS pushes (command_id TEXT PRIMARY KEY, pushed_at TEXT NOT NULL, confirmed_at TEXT);
+            CREATE TABLE IF NOT EXISTS push_retractions (command_id TEXT PRIMARY KEY);
             CREATE TABLE IF NOT EXISTS session_inboxes (session TEXT PRIMARY KEY, endpoint TEXT NOT NULL, token TEXT, seen_at TEXT NOT NULL);
             """);
         AddColumnIfMissing("commands", "taken_at", "TEXT"); // a database made before the hook's hand-over time was kept
         AddColumnIfMissing("commands", "push_tried", "INTEGER"); // a database made before a given-up push was remembered
+        AddColumnIfMissing("pushes", "reported", "INTEGER"); // a database made before the web was told about a push
+        AddColumnIfMissing("commands", "transport", "TEXT"); // a database made before the way a command reached its session was kept
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
         CreateRemoteTables();
         CreateClaudeTables();
+        CreateAskTables();
+        CreateAsksOutTable();
+        CreateFolderTables();
+        AddColumnIfMissing("session_inboxes", "permission_mode", "TEXT"); // a database made before the mode of a session was kept (ADR-0008 §3f)
     }
 
     /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>

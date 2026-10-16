@@ -15,12 +15,28 @@ public static class MachineMetricsEndpoints
         g.MapGet("/workspaces/{id:guid}/machines", Machines);
         g.MapGet("/workspaces/{id:guid}/alerts", Alerts);
         g.MapGet("/agents/{id:guid}/metrics", Metrics);
+        g.MapGet("/agents/{id:guid}/detail", Detail);
     }
 
     private static async Task<IResult> Machines(Guid id, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
         return Results.Ok(await MachineQueries.MachinesAsync(db, config, id, clock.GetUtcNow(), http.RequestAborted));
+    }
+
+    private static async Task<IResult> Detail(Guid id, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
+    {
+        var ws = await db.Agents.AsNoTracking().Where(a => a.Id == id).Select(a => (Guid?)a.WorkspaceId).FirstOrDefaultAsync(http.RequestAborted);
+        var userId = http.User.UserId();
+        if (ws is not { } workspaceId || await Access.MemberAsync(db, userId, workspaceId, Roles.Viewer, http.RequestAborted) is null)
+        {
+            return Http.NotFound();
+        }
+
+        var admin = await Access.MemberAsync(db, userId, workspaceId, Roles.Admin, http.RequestAborted) is not null;
+        return await MachineDetails.GetAsync(db, config, workspaceId, id, userId, admin, clock.GetUtcNow(), http.RequestAborted) is { } detail
+            ? Results.Ok(detail)
+            : Http.NotFound();
     }
 
     private static async Task<IResult> Alerts(Guid id, Guid? agent, bool? resolved, HttpContext http, MonitorDb db)

@@ -15,6 +15,7 @@ public static class ServiceCommands
     public const string ServiceFlag = "--service";
     public const string ExecOption = "--exec";
     public const string AllowRootFlag = "--allow-root";
+    public const string RunAccountOption = "--run-account";
     public const string ServerOption = "--server";
 
     public static bool IsService(string[] args) => Array.IndexOf(args ?? [], ServiceFlag) >= 0;
@@ -34,12 +35,31 @@ public static class ServiceCommands
             return 2;
         }
 
+        string? runAccount = null;
+        if (Array.IndexOf(args, RunAccountOption) >= 0)
+        {
+            // The name is optional: the next argument when it is not another option, else the default of this OS (cm-run, _cmrun).
+            var at = Array.IndexOf(args, RunAccountOption);
+            runAccount = at + 1 < args.Length && !args[at + 1].StartsWith("--", StringComparison.Ordinal) ? args[at + 1] : RunAccount.DefaultName(AgentConfig.Os);
+            if (runAccount is null)
+            {
+                stderr.WriteLine($"{RunAccountOption} is supported on Linux and macOS only (ADR-0010 §5).");
+                return 2;
+            }
+
+            if (!RunAccount.IsValidName(runAccount))
+            {
+                stderr.WriteLine($"{RunAccountOption} takes a plain account name (letters, digits, underscore, dash), not \"{runAccount}\".");
+                return 2;
+            }
+        }
+
         var layout = ServiceLayout.For(AgentConfig.Os) with { Server = server };
         // Without --exec a reinstall keeps the level an admin chose before; a first install starts off.
         if (Array.IndexOf(args, ExecOption) < 0) level = ExecPolicyLoader.ReadExisting(layout.ExecConfigPath)?.Level ?? ExecLevels.Off;
         if (level == ExecLevels.Shell) stdout.WriteLine("Warning: exec level shell lets approved runs execute any shell text on this machine.");
         return new ServiceInstaller(stdout, run ?? ServiceInstaller.RunTool, AgentConfig.Os, isAdmin ?? ExecPolicyLoader.RunningAsRoot(), layout)
-            .Install(Environment.ProcessPath!, level, Array.IndexOf(args, AllowRootFlag) >= 0);
+            .Install(Environment.ProcessPath!, level, Array.IndexOf(args, AllowRootFlag) >= 0, runAccount);
     }
 
     public static int Uninstall(TextWriter stdout, Func<string, IReadOnlyList<string>, int>? run = null, bool? isAdmin = null) =>

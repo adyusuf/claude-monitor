@@ -23,9 +23,12 @@ public static class RunFailures
 
 /// <summary>The one final answer on a run. Duration is on the monotonic clock; BytesRead is raw output including what was dropped.</summary>
 public sealed record RunResult(string Status, int? ExitCode, string? Error, bool OutputTruncated, string? ResolvedExe, long BytesRead,
-    TimeSpan Duration)
+    TimeSpan Duration, long BytesDropped = 0, int Chunks = 0)
 {
-    public RunStatusUpdate ToUpdate(DateTimeOffset at) => new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at);
+    /// <summary>The final status. A script run also says what it read, dropped and sent, so the server can say what is missing (ADR-0008 §3d).</summary>
+    public RunStatusUpdate ToUpdate(DateTimeOffset at, bool withOutput = false) => withOutput
+        ? new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, BytesRead, BytesDropped, Chunks)
+        : new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at);
 }
 
 /// <summary>
@@ -34,14 +37,17 @@ public sealed record RunResult(string Status, int? ExitCode, string? Error, bool
 /// and reports exactly one final status. It logs the run id, grant id, exit code, sizes, duration, kill reason and argv[0] only.
 /// A callback that throws ends the run's reporting: the process is cleaned up and the exception reaches the caller.
 /// </summary>
-public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog log, Func<RunMessage, ExecDecision> guard,
-    Func<bool> runningAsRoot)
+public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog log, Func<RunMessage, ExecDecision> guard,
+    Func<bool> runningAsRoot, Func<string?>? runAccount = null)
 {
     private static readonly TimeSpan DrainWait = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan ExitWait = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MinTrackEvery = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan MaxTrackEvery = TimeSpan.FromSeconds(5);
     private const int LogValueMax = 200;
+    private const long ScriptDefaultCap = 8L * 1024 * 1024;
+    private const long ScriptMinCap = 1024L * 1024;
+    private const long ScriptTailBytes = 256L * 1024;
     private const string None = "none";
 
     // zero keeps the tracker off; otherwise bounded so that a mistake cannot make it spin or never look
@@ -59,6 +65,8 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         public const string OutputLimit = "output_limit";
         public const string Straggler = "straggler";
     }
+
+    private static string? ScriptOutputKey(RunMessage run) => run.Mode == RunModes.Script ? run.ScriptInterpreter : null;
 
     public async Task<RunResult> ExecuteAsync(RunMessage run, Func<RunOutputChunk, Task> onChunk, Func<RunStatusUpdate, Task> onStatus,
         CancellationToken cancel)
@@ -104,17 +112,22 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         {
             RunModes.Argv => argv0 is not null && decision.ResolvedExe is not null,
             RunModes.Shell => !string.IsNullOrEmpty(run.ShellCommand),
+            RunModes.Script => !string.IsNullOrEmpty(run.ScriptBody) && decision.ResolvedExe is not null,
             _ => false,
         };
         if (!runnable) return await RefuseAsync(run, RunFailures.BadRun, decision.ResolvedExe, began, onStatus);
 
         var timeout = TimeSpan.FromSeconds(Math.Clamp(run.TimeoutSeconds, 1, (int)config.ExecTimeoutMax.TotalSeconds));
-        log.Write($"run start id={run.Id} grant={GrantOf(run)} mode={run.Mode} exe={LogSafe(argv0 ?? run.Mode)} timeout_s={(int)timeout.TotalSeconds}");
+        // The script text is never logged: only the interpreter name (ADR-0008 §3d).
+        log.Write($"run start id={run.Id} grant={GrantOf(run)} mode={run.Mode} exe={LogSafe(ScriptOutputKey(run) ?? argv0 ?? run.Mode)} timeout_s={(int)timeout.TotalSeconds}");
+
+        using var scratch = run.Mode == RunModes.Script ? TryScratch(run) : null;
+        if (run.Mode == RunModes.Script && scratch is null) return await FinishAsync(run, RunStatuses.Failed, null, RunFailures.SpawnFailed, decision.ResolvedExe, began, onStatus, None, null);
 
         IRunProcess process;
         try
         {
-            process = Start(run, decision, argv0, timeout);
+            process = Start(run, decision, argv0, timeout, scratch);
         }
         catch (Exception e) when (e is Win32Exception or IOException or ArgumentException or InvalidOperationException
             or UnauthorizedAccessException or PlatformNotSupportedException)
@@ -130,131 +143,45 @@ public sealed class RunExecutor(AgentConfig config, TimeProvider clock, AgentLog
         }
     }
 
-    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0, TimeSpan timeout)
+    private ScriptScratch? TryScratch(RunMessage run)
     {
-        var env = RunEnvironment.Build(config.Home);
+        try
+        {
+            var account = runAccount?.Invoke();
+            return account is null
+                ? ScriptScratch.Create(config.Home, run.Id, run.ScriptInterpreter!, run.ScriptBody!, run.ScriptFiles, run.ScriptStdin)
+                : ScriptScratch.Create(RunAccount.WorkFolder(config.Home), run.Id, run.ScriptInterpreter!, run.ScriptBody!, run.ScriptFiles, run.ScriptStdin, shared: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            log.Write($"run {run.Id}: scratch folder failed ({e.GetType().Name})");
+            return null;
+        }
+    }
+
+    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0, TimeSpan timeout, ScriptScratch? scratch)
+    {
         var limits = RunLimits.For(config, timeout);
+        // With a run account (ADR-0010 §5) the run starts as that account, and its home and working directory are the work folder it shares with the service.
+        var account = runAccount?.Invoke();
+        var home = account is null ? config.Home : RunAccount.WorkFolder(config.Home);
+        if (run.Mode == RunModes.Script)
+        {
+            // The same argv start path as an argv run, so the ulimit launcher, the process group kill, the descendant tracker and the Job Object apply.
+            return ProcessTree.Start(decision.ResolvedExe!, scratch!.Arguments(run.ScriptInterpreter!, run.ScriptArgs), scratch.Folder, scratch.Environment(home),
+                Path.GetFileName(decision.ResolvedExe!), limits, TrackEvery, Note(run), scratch.StdinPath, account);
+        }
+
+        var env = RunEnvironment.Build(home);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
-        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe, limits, TrackEvery, Note(run));
+        if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, home, env, decision.ResolvedExe, limits, TrackEvery, Note(run), account);
         // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).
-        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? config.Home, env, argv0, limits, TrackEvery, Note(run));
+        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? home, env, argv0, limits, TrackEvery, Note(run), runAs: account);
     }
 
     // What the process layer reports (an error type name, no content) goes to the agent's log under the run's id.
     private Action<string> Note(RunMessage run) => line => log.Write($"run {run.Id}: {line}");
 
-    private async Task<RunResult> SuperviseAsync(RunMessage run, IRunProcess process, string? exe, TimeSpan timeout, long began,
-        Func<RunOutputChunk, Task> onChunk, Func<RunStatusUpdate, Task> onStatus, CancellationToken cancel)
-    {
-        var collector = new OutputCollector(config);
-        using var stop = new CancellationTokenSource();
-        var readers = Task.WhenAll(collector.PumpAsync(RunStreams.Stdout, process.Stdout, stop.Token),
-            collector.PumpAsync(RunStreams.Stderr, process.Stderr, stop.Token));
-        var sender = SendAsync(collector.Chunks, onChunk);
-        using var flush = clock.CreateTimer(_ => collector.FlushHead(), null, config.FlushEvery, config.FlushEvery);
-
-        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var registration = cancel.Register(() => cancelled.TrySetResult());
-        using var timer = new CancellationTokenSource();
-        var timedOut = Task.Delay(timeout, clock, timer.Token);
-
-        var first = await Task.WhenAny(process.Exited, timedOut, cancelled.Task, collector.CapReached);
-        var kill = first == process.Exited ? null
-            : first == timedOut ? KillReasons.Timeout
-            : first == cancelled.Task ? KillReasons.Cancelled
-            : KillReasons.OutputLimit;
-        await timer.CancelAsync();
-        if (kill is not null) await TerminateAsync(run, process);
-
-        var exit = await ExitOf(run, process, ExitWait);
-        if (!await ReadersDoneAsync(readers))
-        {
-            kill ??= KillReasons.Straggler; // the lead is gone but something it started still holds the pipes
-            TryKill(run, process.KillNow);
-            await ReadersDoneAsync(readers);
-        }
-
-        await stop.CancelAsync();
-        await flush.DisposeAsync();
-        collector.Complete();
-        await sender;
-
-        var (status, code, error) = kill switch
-        {
-            KillReasons.Timeout => (RunStatuses.TimedOut, (int?)null, (string?)null),
-            KillReasons.Cancelled => (RunStatuses.Cancelled, null, null),
-            KillReasons.OutputLimit => (RunStatuses.Failed, null, RunFailures.OutputLimit),
-            _ when exit is null => (RunStatuses.Failed, null, RunFailures.ExitUnknown),
-            _ when exit.Code == 0 && exit.Signal is null => (RunStatuses.Succeeded, 0, null),
-            _ => (RunStatuses.Failed, exit.Code, exit.Signal is { } s ? $"{RunFailures.SignalPrefix}{s}" : null),
-        };
-        return await FinishAsync(run, status, code, error, exe, began, onStatus, kill ?? None, collector);
-    }
-
-    // The polite stop, the grace period, then the hard one whether or not the lead left (its children may ignore the first).
-    private async Task TerminateAsync(RunMessage run, IRunProcess process)
-    {
-        TryKill(run, process.Kill);
-        await Task.WhenAny(process.Exited, Task.Delay(config.ExecKillGrace, clock));
-        TryKill(run, process.KillNow);
-    }
-
-    private void TryKill(RunMessage run, Action kill)
-    {
-        try
-        {
-            kill();
-        }
-        catch (Exception e) when (e is IOException or Win32Exception or InvalidOperationException)
-        {
-            log.Write($"run {run.Id}: kill failed ({e.GetType().Name})");
-        }
-    }
-
-    private async Task<RunExit?> ExitOf(RunMessage run, IRunProcess process, TimeSpan wait)
-    {
-        if (await Task.WhenAny(process.Exited, Task.Delay(wait, clock)) != process.Exited) return null;
-        try
-        {
-            return await process.Exited;
-        }
-        catch (Exception e) when (e is IOException or Win32Exception)
-        {
-            log.Write($"run {run.Id}: exit unknown ({e.GetType().Name})");
-            return null;
-        }
-    }
-
-    private async Task<bool> ReadersDoneAsync(Task readers) =>
-        await Task.WhenAny(readers, Task.Delay(DrainWait, clock)) == readers && readers.IsCompletedSuccessfully;
-
-    private static async Task SendAsync(ChannelReader<RunOutputChunk> chunks, Func<RunOutputChunk, Task> onChunk)
-    {
-        await foreach (var chunk in chunks.ReadAllAsync())
-        {
-            await onChunk(chunk);
-        }
-    }
-
-    private async Task<RunResult> RefuseAsync(RunMessage run, string error, string? exe, long began, Func<RunStatusUpdate, Task> onStatus)
-    {
-        log.Write($"run refused id={run.Id} grant={GrantOf(run)} reason={error}");
-        return await FinishAsync(run, RunStatuses.Failed, null, error, exe, began, onStatus, None, null, logEnd: false);
-    }
-
-    private async Task<RunResult> FinishAsync(RunMessage run, string status, int? code, string? error, string? exe, long began,
-        Func<RunStatusUpdate, Task> onStatus, string kill, OutputCollector? collector, bool logEnd = true)
-    {
-        var result = new RunResult(status, code, error, collector?.Truncated ?? false, exe, collector?.BytesRead ?? 0, clock.GetElapsedTime(began));
-        if (logEnd)
-        {
-            log.Write($"run end id={run.Id} grant={GrantOf(run)} status={status} exit={code?.ToString() ?? None} read_bytes={result.BytesRead} "
-                + $"kept_bytes={collector?.BytesKept ?? 0} truncated={result.OutputTruncated} duration_ms={(long)result.Duration.TotalMilliseconds} kill={kill}");
-        }
-
-        await onStatus(result.ToUpdate(clock.GetUtcNow()));
-        return result;
-    }
 
     private static string GrantOf(RunMessage run) => run.GrantId?.ToString() ?? None;
 

@@ -30,6 +30,24 @@ public static class RemoteChecks
         return user.TotpEnabledAt is not null && await MfaEndpoints.CheckAsync(db, config, user, code, clock.GetUtcNow(), http.RequestAborted);
     }
 
+    /// <summary>
+    /// The gate of an owner's grant or job approval (and of creating a grant for another user): on a strict target (production or database) a fresh
+    /// two-step code is always needed, a recent sign-in does not count, and no two-step sign-in means no approval (<c>totp_required</c>); elsewhere
+    /// the re-authentication rule above. Null when the approval may go on (decision §9.13).
+    /// </summary>
+    public static async Task<IResult?> ApprovalGateAsync(HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock, Guid userId, Agent target, string? code)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(target);
+        var strict = MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment),
+            MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction));
+        if (!strict) return await ReauthAsync(http, db, config, clock, userId, code) ? null : ReauthRefused();
+        var user = await db.Users.FirstAsync(u => u.Id == userId, http.RequestAborted);
+        if (user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
+        return await MfaEndpoints.CheckAsync(db, config, user, code, clock.GetUtcNow(), http.RequestAborted) ? null : ReauthRefused();
+    }
+
     public static IResult ReauthRefused() => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ReauthRequired);
 
     public static IResult Conflict(string error) => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: error);

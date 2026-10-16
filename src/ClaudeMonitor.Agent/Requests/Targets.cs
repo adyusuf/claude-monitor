@@ -1,8 +1,9 @@
 using System.Text.Json;
+using ClaudeMonitor.Agent.Mcp;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Contracts;
 
-namespace ClaudeMonitor.Agent.Mcp;
+namespace ClaudeMonitor.Agent.Requests;
 
 /// <summary>A machine named by the model, resolved to one agent; Error is the answer to give when it cannot be.</summary>
 public sealed record Target(Guid? AgentId, string Hostname, string Os, string? Error);

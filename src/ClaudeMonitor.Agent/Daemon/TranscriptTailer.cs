@@ -24,7 +24,7 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
     public int RunOnce()
     {
         var taken = 0;
-        pending = store.UnconfirmedPushes().Select(p => p.Id).ToList();
+        pending = [.. store.UnconfirmedPushes().Select(p => p.Id), .. store.UnconfirmedAsks().Select(a => a.Id)];
         foreach (var t in store.Transcripts(clock.GetUtcNow() - ActiveWindow))
         {
             taken += Follow(t);
@@ -79,7 +79,7 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         // The wrapper's own text, not the bare id: `monitor_status` also prints ids, and that must not confirm a push.
         foreach (var pushed in pending.Where(p => line.Contains($"{ChannelEnvelopes.Open} id={p}", StringComparison.Ordinal)).ToList())
         {
-            if (store.ConfirmPush(pushed, now)) pending.Remove(pushed);
+            if (store.ConfirmPush(pushed, now) || store.ConfirmAsk(pushed, now)) pending.Remove(pushed);
         }
 
         recorder.Record(EventKinds.Transcript, t.Session, obj, project, now);

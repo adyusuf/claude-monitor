@@ -73,15 +73,22 @@ public sealed record AgentCommandMessage(Guid Id, Guid SessionId, string Session
 public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, string Decision, string? Reason,
     IReadOnlyDictionary<string, string>? Answers = null);
 
-/// <summary>The agent's report on a command. At is when the hook handed it to the session (an older agent sends none).</summary>
-public sealed record CommandStatusUpdate(string Status, string? Result, DateTimeOffset? At = null);
+/// <summary>
+/// The agent's report on a command. At is when the hook handed it to the session and Transport how it got there, one of <see cref="CommandTransports"/>
+/// (an older agent sends neither). With "delivered", Transport says the command was written into the session through the inbox or the channel and has not been
+/// shown yet; an empty Transport takes that back (the push was given up, the hooks will deliver it).
+/// </summary>
+public sealed record CommandStatusUpdate(string Status, string? Result, DateTimeOffset? At = null, string? Transport = null);
 
 /// <summary>What the agent must know of its workspace's settings before it captures anything. AgentUpdate is the most the workspace lets an agent do about updating itself; ClaudeUpdate whether it may update Claude Code on the machine (ADR-0006).</summary>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, string AgentUpdate = UpdateModes.Off,
-    bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false);
+    bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false, bool ShareServices = false);
 
 public static class AgentStreamEvents
 {
+    public const string Ask = "ask";
+    public const string AskCancel = "ask_cancel";
+    public const string AskUpdate = "ask_update";
     public const string Command = "command";
     public const string PermissionAnswer = "permission_answer";
     public const string Revoked = "revoked";

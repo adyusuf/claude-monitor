@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Remote;
 
-public sealed record RunApproval(string? Hash, string? Code);
+public sealed record RunApproval(string? Hash, string? Code, string? KeyId = null, string? Signature = null);
 
 public sealed record RunDenial(string? Reason);
 
@@ -22,7 +22,7 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
     private static readonly string[] Cancellable =
         [RunStatuses.PendingApproval, RunStatuses.Approved, RunStatuses.Delivered, RunStatuses.Running];
 
-    /// <summary>Only the target agent's owner, still a member, with the hash of the run they saw; TOTP for shell when they have it on.</summary>
+    /// <summary>Only the target agent's owner, still a member, with the hash of the run they saw; a TOTP code for a script, a shell command and an interpreter run on a strict target, and for shell or script elsewhere when they have it on.</summary>
     public async Task<IResult> ApproveAsync(Guid id, RunApproval req, HttpContext http)
     {
         ArgumentNullException.ThrowIfNull(req);
@@ -41,27 +41,68 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
         }
 
         var now = clock.GetUtcNow();
-        if (run.Mode == RunModes.Shell)
+        var withTotp = false;
+        var env = MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment);
+        var fn = MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction);
+        var strict = MachineRoles.IsStrict(env, fn);
+        // A script is approved against the role the card showed (ADR-0008 §3c): a role changed since then asks the owner to look again.
+        if (run.Mode == RunModes.Script && (env != run.TargetEnvironment || fn != run.TargetFunction)) return Conflict(RemoteErrors.RoleChanged);
+        var os = await db.Machines.AsNoTracking().Where(m => m.Id == target.MachineId).Select(m => m.Os).FirstAsync(ct);
+        var needsCode = RunCodeRule.NeedsCode(run.Mode, run.Argv, os, strict);
+        if (run.Mode is RunModes.Shell or RunModes.Script || needsCode)
         {
             var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
-            if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, config, user, req.Code, now, ct))
+            // Strict target: no two-step sign-in, no approval (decision §9.13); elsewhere a code is asked of whoever has it on (shell and script).
+            if (needsCode && user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
+            if (user.TotpEnabledAt is not null)
             {
-                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.MfaRequired);
+                if (!await MfaEndpoints.CheckAsync(db, config, user, req.Code, now, ct))
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.MfaRequired);
+                }
+
+                withTotp = true;
             }
+        }
+
+        // A signed approval (ADR-0010 §4): the owner's browser signed this exact run; the API checks it against the owner's registered key as well, but the target
+        // trusts only the key its own admin pinned. A target that requires signatures refuses an approval without one.
+        string? signedKey = null, signature = null;
+        DateTimeOffset? signedNotAfter = null;
+        if (req.Signature is { Length: > 0 } sig)
+        {
+            var registered = await db.ApprovalKeys.AsNoTracking()
+                .Where(k => k.UserId == userId && k.Fingerprint == req.KeyId && k.RetiredAt == null).Select(k => k.PublicKey).FirstOrDefaultAsync(ct);
+            var key = ApprovalSigning.FromBase64(registered);
+            var bytes = ApprovalSigning.FromBase64(sig);
+            if (key is null || bytes is null || !ApprovalSigning.Verify(key, ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt), bytes))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ApprovalErrors.Invalid);
+            }
+
+            (signedKey, signature, signedNotAfter) = (req.KeyId, sig, run.ExpiresAt);
+        }
+        else if (target.ApprovalsRequired)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ApprovalErrors.Required);
         }
 
         var startBy = RunNotices.StartBy(config, now);
         var changed = await db.RemoteRuns
             .Where(r => r.Id == id && r.Status == RunStatuses.PendingApproval && r.ExpiresAt > now && r.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Approved).SetProperty(r => r.DecidedAt, now)
-                .SetProperty(r => r.DecidedBy, userId).SetProperty(r => r.ExpiresAt, startBy), ct);
+                .SetProperty(r => r.DecidedBy, userId).SetProperty(r => r.ExpiresAt, startBy)
+                .SetProperty(r => r.ApprovedWithTotp, withTotp).SetProperty(r => r.ApprovalKeyId, signedKey).SetProperty(r => r.ApprovalSignature, signature)
+                .SetProperty(r => r.ApprovalNotAfter, signedNotAfter), ct);
         if (changed != 1) return Conflict(RemoteErrors.NotPending);
         Audit.Add(db, http, clock, AuditActions.RunApproved, run.WorkspaceId, userId, targetType: "run", targetId: id,
-            detail: new { hash = req.Hash, mode = run.Mode });
+            detail: new { hash = req.Hash, mode = run.Mode, totp = withTotp });
         await db.SaveChangesAsync(ct);
         run.Status = RunStatuses.Approved;
         run.DecidedAt = now;
         run.ExpiresAt = startBy;
+        run.ApprovedWithTotp = withTotp;
+        (run.ApprovalKeyId, run.ApprovalSignature, run.ApprovalNotAfter) = (signedKey, signature, signedNotAfter);
         RunNotices.Changed(broker, run);
         await RunNotices.DeliverAsync(broker, db, run, ct);
         return Results.NoContent();

@@ -13,6 +13,11 @@
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook SessionStart",
             "timeout": 10,
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook SessionStart --context",
+            "timeout": 5
           }
         ]
       }
@@ -92,7 +97,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook Stop",
-            "timeout": 15
+            "timeout": 600
           }
         ]
       }

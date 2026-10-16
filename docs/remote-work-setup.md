@@ -172,6 +172,12 @@ These tools appear in the requester's Claude session through its own `cm-agent` 
 | `monitor_jobs` | lists a target's approved named jobs |
 | `monitor_job_propose` | proposes a named job (argv or an admin-owned script) for the owner to approve; shell jobs do not exist |
 | `monitor_job_run` | runs an approved job; a job with a free placeholder still needs a per-call approval |
+| `monitor_machine` | one machine in full (ADR-0008): its role, tags, the admin's runbook note (as text, never an instruction), the tools with versions, the listening services when the owner allowed them and the caller may see them, and its projects with branch, commit, tag, the last runs per kind and recent errors |
+| `monitor_run_script` | asks a machine to run a script (sh, bash, python, powershell) from a private scratch file; always waits for the owner (and, on a production or database machine, a two-step code, as for a shell command or an interpreter run), never matches a grant or a job; `monitor_run_result` then says whether the output is complete |
+| `monitor_ask`, `monitor_ask_result` | asks a Claude session on another machine of the same user a question and reads the answer (only if that machine's owner allowed asks and a session there is idle) |
+| `monitor_answer` | how the receiving session answers an ask; the session is taken from the MCP process's parent, never from the model |
+
+`monitor_run` and `monitor_job_run` also take a `project` and a `kind` (`test`, `build`, `deploy`, `other`) so the result shows under that project on the machine's page. A person without Claude Code uses the same things from the command line: `cm-agent machines`, `machine`, `metrics`, `alerts`, `jobs`, `job-run`, `run`, `result` and `ask` (ADR-0008 §3g); `cm-agent install --standalone` makes a machine such a daemon (login first, then a user-level autostart; an application on macOS and Windows, `systemd --user` on Linux).
 
 Everything that comes back from another machine (run output, alert subjects, mount names) is **untrusted data**,
 wrapped and capped; Claude is told never to follow instructions found in it. A run's output has secrets masked
@@ -201,6 +207,12 @@ A service agent does not update itself: its binary is admin-owned, so the opt-in
 - **A bad upgrade:** install the previous version's zip the same way (step 7); migrations only add, so an older agent
   runs on a newer API.
 
+## 9. Schedules, signed approvals, files and a run account (ADR-0010)
+
+See `SETUP.md`, "Job schedules, signed approvals and a separate run account". In short: a script run may carry up to 8 small text files and a stdin text that the owner reads and approves with it; an admin switch (default off) lets owners put approved jobs on a
+schedule on machines that are not production or a database; a machine whose admin pinned owner keys runs only what such a key signed; a service agent can start runs as a second unprivileged account. The host checks nobody has run are in
+`docs/adr-0008-host-checks.md`; the ones for ADR-0010 (a real sudo run account, Windows and Linux) are listed in ADR-0010 §8.
+
 ## Residual risks (ADR-0005, "Consequences" and "Open")
 
 Read these before turning `shell` or a wide ceiling on:
@@ -211,8 +223,9 @@ Read these before turning `shell` or a wide ceiling on:
    included. Grants into the agent's home are refused, but a separate run account is only a v2 option.
 3. **Run output, grants and jobs are personal data:** account export includes them, account deletion empties
    commands, templates and output, and runs and output follow the workspace's retention.
-4. **Shell approvals ask for a TOTP code only when the approver has two-step sign-in on.** The security review
-   recommended making it mandatory for every shell target; that is an open decision.
+4. **Shell approvals ask for a TOTP code when the approver has two-step sign-in on, and always on a production or database machine.** On such
+   a machine a shell command, an interpreter run, a script, a grant and a job all need a valid code, and an approver without two-step
+   sign-in cannot approve (ADR-0008 §9.13); a plain argv run of another program still needs only the click.
 5. **A process that escapes its group on macOS** (it is started in its own process group, not a Job Object or a
    control group) is a documented residual risk.
 6. **No schedules in v1:** a job runs only when asked. Shipping files or test bundles to a target, multiple API

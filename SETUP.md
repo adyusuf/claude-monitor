@@ -101,15 +101,15 @@ it against the SHA-256 the plugin pins in `agent-release.txt`, puts it in the pl
 `/monitor-agent:connect` shows a code to approve on the web, `/monitor-agent:status` shows how the install and the connection
 are doing, `/monitor-agent:disconnect` signs the machine out. The first session after installing reports nothing (the binary is
 not there yet); the transcript is read later, so nothing of it is lost. **Uninstalling or disabling the plugin stops the daemon within
-30 s**: Claude Code runs nothing at uninstall, so the daemon watches for its data directory to disappear and for a `false` in
-`enabledPlugins`. The agent home, the login and the credential store stay: installing the plugin again continues from them.
-`claude plugin uninstall --keep-data` keeps the data directory, so the daemon does not see that uninstall (it still stops at a user-level disable, or when the
-machine restarts). A plugin switched off only in a project's settings is not seen either. The old local plugin (`cm-agent install`, `monitor-agent-local`) reports
+30 s**: Claude Code runs nothing at uninstall, so the daemon watches for its data directory to disappear, for the plugin to drop out of Claude Code's plugin list, and for a `false` in
+`enabledPlugins` where the plugin is installed (everywhere it is installed: a plugin switched off in one project's settings only does not stop it). The agent home, the login and the credential store stay: installing the plugin again continues from them.
+`claude plugin uninstall --keep-data` keeps the data directory, but the plugin leaves Claude Code's plugin list, which the daemon also reads (when that list has an
+unknown shape it falls back to the data directory and the settings alone). The old local plugin (`cm-agent install`, `monitor-agent-local`) reports
 every event a second time if it stays enabled: `/monitor-agent:connect` removes it, and the bootstrap says so while it is there.
 
 A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
-`dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). Limits: `--stop-wait`
-is ignored for a plugin-started agent (the plugin's hook timeouts are fixed at the defaults); the plugin has no channel entry (push through the
+`dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
+plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
 
 ### Pushing web messages into an idle session (opt-in)
@@ -156,6 +156,59 @@ lost). The old plugin keeps running the old binary until you run `cm-agent insta
 from a normal terminal, then check that `cm-agent status` and `monitor_status` in a new Claude session show the same
 `home:`. The old folder is left in place and can be deleted afterwards.
 
+### Machine roles, the tool inventory and the session-start block (ADR-0008)
+
+- **Role.** A workspace admin sets each machine's **environment** (dev, test, stage, preprod, production, other) and **function**
+  (development, application, web, database, ci, storage, other) on the machine's page; "not set" never means test. Lowering a machine
+  away from production or database asks for a recent sign-in. The machine may say what it is (`cm-agent config role <environment|none>
+  <function|none>`; a service agent: `environment` and `function` in its admin-owned `exec.json`); a claim only makes the role stricter.
+- **What the agent reports.** Whether Claude Code is installed and how many sessions are idle, and a tool inventory (git, dotnet, node,
+  npm, python3, pwsh, docker, psql, java, claude and the shell interpreters) probed by absolute path, each marked trusted or not; the
+  agent runs `--version` only for a trusted or self-owned binary. `CM_PRESENCE_PROBE_EVERY` sets the probe interval.
+- **The block every session gets.** The plugin's `SessionStart` hooks now include a synchronous `hook SessionStart --context` entry: it
+  prints the workspace's machines (role, online, Claude, tools) with the rules for treating them, from a cache the daemon refreshes every
+  `CM_MACHINE_CACHE_EVERY` seconds. It is empty while remote runs are off for the workspace or this is the only machine;
+  `CM_MACHINES_CONTEXT=off` turns it off on one machine. The hook reads the local database only and always exits 0.
+- **Tags and the note.** A workspace admin sets a machine's tags (`key=value`, at most ten) and a runbook note on its page; both are untrusted
+  text for Claude, which gets the tags as labels in the machines list and the note only through `monitor_machine`, marked as written by an admin.
+- **Listening services (off by default).** The machine's owner turns on "Report listening ports" on its page (a recent sign-in or a code is
+  needed). The agent then reads the TCP ports it listens on, with the process name where the system shows it (on Linux for the account's own
+  processes), and sends them; only the owner and admins see them. Turning it off drops what was stored. Nothing is started to read them.
+- **A machine without Claude Code (standalone agent).** `cm-agent install --standalone --server https://<your Claude Monitor address>` (run as your own user, never
+  as root or administrator) logs in first (approve the code on the web), copies the binary into the agent home and then starts the agent at your login: a
+  LaunchAgent that runs an application bundle on macOS (no window, no Dock icon), a logon task that runs a windowless copy of the program on Windows, a
+  `systemd --user` unit on Linux (without `loginctl enable-linger` it runs only while you are logged in; the installer says so). `uninstall --standalone`
+  removes the autostart and keeps the data. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
+  seconds. It reports `claude=none`; another machine's ask to it is refused (`no_claude`), but it is a normal target for runs. From it, `cm-agent machines`,
+  `machine <x>`, `metrics <x>`, `alerts`, `jobs`, `job-run <id>`, `run --machine <x> (--script <file> --interpreter <i> | --argv ...)`, `result <id> --wait 30` and
+  `ask --machine <x> "<question>"` reach the other machines without the web; an approval is still the owner's, on the web.
+- **Asks across your machines.** A Claude session can ask a Claude session on ANOTHER machine of the same user a question (`monitor_ask`, then
+  `monitor_ask_result`; the other session answers with `monitor_answer`). It works only when: the push through the inbox is on on the target (`cm-agent
+  install --push inbox`), its owner turned "Allow asks" on its machine page (a recent sign-in is needed), an admin set its environment, it is not a
+  production or database machine, a session there has been idle for 30 seconds and the workspace allows remote runs. An ask goes to one idle session
+  (the one working in the same project first); nothing is queued for later. On macOS and Linux the message is written without the session's key, so Claude
+  Code holds it for the person at that terminal; on Windows it goes only to a session in default or plan mode. A machine asked a moment ago may not ask on,
+  a machine that was asked may not ask back, and an agent is limited to 30 asks an hour (5 per session in 10 minutes). `CM_ASKS=off` turns asks off on one
+  machine. The question and the answer are masked, never logged, and deleted after the retention period.
+- **Script runs.** `monitor_run_script` asks a machine to run a script (sh, bash, python or powershell). It needs exec level `shell` on the target
+  without a ceiling, an environment an admin set on the machine's page (a machine's own claim does not count) and a trusted interpreter in its
+  inventory. The owner approves the exact text on the web (every line numbered, non-ASCII made visible, Allow only after the script was
+  scrolled to its end and three seconds later); a production or database machine also needs the approver's two-step code, and an approver
+  without two-step sign-in cannot approve there. A script never matches a grant or a job. A script run may also carry up to 8 small text files (64 KiB each, 256 KiB together, relative paths of letters, digits, dot, underscore and dash, at most 4 levels) that are written next to it, and a text for its standard input (64 KiB); the owner reads each one on the approval card (Allow waits until every box was read to its end) and the approval covers them all. `cm-agent run --script main.py --interpreter python --file helper.py=./helper.py --stdin ./input.txt` and `monitor_run_script` send them. A Python script with files runs with `-E -s -B` (its own folder on the module path) instead of `-I -B`. Binary files and archives are not supported (ADR-0010). The agent writes it to `<home>/runs/<run>/script.<ext>`
+  (private, never executable), starts it with the interpreter's safe flags and the scratch folder as working directory, with an empty
+  environment and `PATH=/usr/bin:/bin:/usr/sbin:/sbin` (set your own PATH inside the script for a user-installed tool), and removes the folder
+  afterwards. The workspace's "Output limit for script runs" (1 to 64 MB, default 8) is frozen on each run; `CM_EXEC_SCRIPT_OUTPUT_CEILING`
+  caps it on one machine. `monitor_run_result` says "output complete" or exactly what is missing and why. On a production or database
+  machine a shell command, an argv run of an interpreter, and every grant or job approval need the approver's two-step code too (a recent
+  sign-in does not replace it), and an approver without two-step sign-in cannot approve there; a plain argv run of another program does not
+  (ADR-0008 §9.13).
+- **Projects.** Every project a session works in is listed on the machine's page. For a machine without sessions, or for a folder no session
+  visits, list the folder: `cm-agent config projects add <folder>` (interactive or standalone agent) or `"projects": ["/srv/shop"]` in the
+  admin-owned `exec.json` (service agent). The agent reads the branch, the commit and the tag from the `.git` files without running git and
+  sends them with an HMAC of the path (the key is generated here and kept in the credential store; the path never leaves the machine).
+  `CM_PROJECT_FACTS_EVERY` sets how often they are read again. A run may name a `project` and a `kind` (`test`, `build`, `deploy`, `other`);
+  its result, and for a `test` run the passed, failed and skipped counts of dotnet test, vitest, jest and pytest, appear under that project.
+
 ## Service agent (boot service, remote work)
 
 `cm-agent install --service` registers the daemon to start at boot with no Claude session, so other machines of a
@@ -197,6 +250,18 @@ held to it). An empty or missing list adds no restriction of its own; the
 web grants and the agent's own checks (never a shell or interpreter in a grant, no `/etc`, `/home`, the agent's home)
 apply either way. A relative path makes the whole file invalid, hence `off`. The API can never raise this level.
 
+### Job schedules, signed approvals and a separate run account (ADR-0010)
+
+- **Schedules.** An admin turns on "Allow schedules" in the workspace's remote work settings (off by default). The owner of a machine then starts a schedule for an approved job without a placeholder in its command, on a machine that is not production or a
+  database: every 15 minutes to 7 days, or once a day at a UTC time. At most 5 per machine, never overlapping its own last run, no catch-up after downtime, paused after three failed runs in a row, stoppable on the machine's page at any time.
+- **Signed approvals.** Each owner makes a key on their account page (the browser makes it; its private half never leaves the browser) and registers it. On a machine that should trust it, the admin runs `cm-agent approvers add <public key> --name <name>`
+  (copy the key from the account page and compare the fingerprint it prints), then `cm-agent config approvals required`. From then on the machine runs only what a pinned key signed; it takes no job, grant or schedule (each run needs its own signature),
+  and it refuses everything until a key is pinned. `cm-agent approvers list|remove <fingerprint>` and `cm-agent status` show what is pinned. The file is `approvers.json` beside `exec.json` on a service (root-owned: the agent distrusts it otherwise) and in the
+  agent's home for an interactive one. Off by default; nothing changes for a machine that does not turn it on.
+- **A separate run account (Linux and macOS service agents).** `sudo cm-agent install --service --server <url> --exec argv --run-account [<name>]` (default `cm-run` on Linux, `_cmrun` on macOS) creates a non-login account, adds the service account to its
+  group, makes `<home>/run-work` (setgid, shared by the two accounts) and writes `/etc/sudoers.d/cm-agent-run` (checked with `visudo -cf` first) so that only the service account may start commands, and only as the run account. Remote runs then start as that account, with
+  `run-work` as their home and working directory. `uninstall --service` removes the sudoers file and keeps the accounts. Windows is refused. Not verified on a real host (ADR-0010 §5).
+
 ## Updating the agent
 
 Design, trust model and limits: [ADR-0004](docs/adr-0004-agent-self-update.md). **Off by default**: an agent never asks the server for an update
@@ -226,7 +291,7 @@ cm-agent config auto-update off|check|on # what the daemon may do by itself (def
 
 1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `cm-agent-update-<channel>`) and is never written to a file; the public half is printed:
    `python3 scripts/sign_manifest.py keygen --channel test` and `... --channel prod`. Save the printed line as `deploy/update-keys/<channel>.pub` and commit it (it is public by design).
-2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
+2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SITE_URL=https://<site>` also writes `marketplace.json` and `monitor-agent-plugin.zip` so the site serves the plugin itself (with `VITE_PLUGIN_FROM_SERVER=1` in the web build); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
    The channel's public key is built into the agent; `out/downloads` gets the six zips (macOS, Windows, Linux), `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
 3. Deploy copies `downloads/` as before (`docs/deploy-windows.md`). **The server offers whatever its web root holds**, so deploy test builds to test and prod builds to prod.
 4. Agents already installed at that channel take it when a person runs `cm-agent update` or when `auto-update` allows it.

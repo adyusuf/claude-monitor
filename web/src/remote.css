@@ -55,3 +55,10 @@ circle.spark-line { fill: var(--accent); stroke: none; }
 .bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
 .bar-fill { height: 100%; background: var(--accent); }
 .settings-numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+
+/* Script runs (ADR-0008 §3c): the whole script with line numbers in a scrolling box, and the verdict on its output. */
+.script-scroll { max-height: 22rem; overflow: auto; border: 1px solid var(--border, #8884); border-radius: 6px; padding: 0.5rem; background: var(--code-bg, #8881); }
+.script-lines { list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.script-lines li { display: grid; grid-template-columns: 3.2em 1fr; gap: 0.5em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.script-lines .ln { text-align: right; color: var(--muted, #888); user-select: none; }
+.run-output-account { margin: 0.5rem 0; }

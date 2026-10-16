@@ -28,6 +28,14 @@ public static class AuditActions
     public const string DeviceDenied = "agent.device_denied";
     public const string AgentRevoked = "agent.revoked";
     public const string AgentMoved = "agent.moved";
+    public const string AgentRoleChanged = "agent.role_changed";
+    public const string AgentTagsChanged = "agent.tags_changed";
+    public const string AgentNoteChanged = "agent.note_changed";
+    public const string AgentServicesChanged = "agent.services_changed";
+    public const string AgentAsksChanged = "agent.asks_changed";
+    public const string AskCreated = "ask.created";
+    public const string AskAnswered = "ask.answered";
+    public const string AskCancelled = "ask.cancelled";
     public const string RefreshReuse = "agent.refresh_reuse";
     public const string CommandCreated = "session.command_created";
     public const string CommandCancelled = "session.command_cancelled";
@@ -45,6 +53,12 @@ public static class AuditActions
     public const string JobApproved = "remote.job_approved";
     public const string JobDenied = "remote.job_denied";
     public const string JobRetired = "remote.job_retired";
+    public const string ApprovalKeyRegistered = "remote.approval_key_registered";
+    public const string ApprovalKeyRetired = "remote.approval_key_retired";
+    public const string ScheduleCreated = "remote.schedule_created";
+    public const string SchedulePaused = "remote.schedule_paused";
+    public const string ScheduleResumed = "remote.schedule_resumed";
+    public const string ScheduleEnded = "remote.schedule_ended";
     public const string RemoteSettingsChanged = "remote.settings_changed";
 }
 

@@ -4,7 +4,32 @@ namespace ClaudeMonitor.Contracts;
 // the end of a record with a default, never removed, renamed or retyped.
 
 /// <summary>What a target tells the API about itself after every start and every settings change.</summary>
-public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent);
+public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent,
+    string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
+    IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
+    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null);
+
+/// <summary>One listening TCP port (ADR-0008 §3a′): the port, the protocol (<c>tcp</c>) and the owning process name when the OS lets the agent see it.</summary>
+public sealed record ServiceInfo(int Port, string Proto, string? Process);
+
+/// <summary>
+/// What the agent read from one project folder's <c>.git</c> files (ADR-0008 §3a′): the key and name, an HMAC of the folder path (never the path),
+/// the branch, the commit and the tag that points at it. Reported for admin-listed folders and for folders a session visited.
+/// </summary>
+public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source);
+
+/// <summary>
+/// Claude Code on the agent's machine (ADR-0008 §3e): how it is installed (<see cref="ClaudeKinds"/>), where (home-relative, never
+/// shown to other members), its version, and how many sessions run and how many of them are idle. An older agent sends none.
+/// </summary>
+public sealed record ClaudePresence(string Kind, string? Path, string? Version, int SessionsLive, int SessionsIdle, DateTimeOffset SeenAt);
+
+/// <summary>
+/// One tool of the inventory (ADR-0008 §3a′): its name (<see cref="ToolNames"/>), its resolved path (home-relative), the first line of
+/// its --version (null when the agent did not run it: only a trusted or self-owned binary is run), and whether it passes the
+/// ADR-0005 executable trust check. Only a trusted interpreter may run a script.
+/// </summary>
+public sealed record ToolInfo(string Name, string Path, string? Version, bool Trusted);
 
 public sealed record DiskSample(string Mount, long UsedBytes, long TotalBytes);
 
@@ -21,7 +46,12 @@ public sealed record AlertThresholds(int CpuPct, int MemoryPct, int DiskPct, int
 
 /// <summary>An agent of the workspace as a requester sees it, for choosing a target.</summary>
 public sealed record MachineView(Guid AgentId, string Hostname, string Os, string UserName, string ExecLevel, bool ServiceMode,
-    bool Online, DateTimeOffset? LastSeenAt, MetricSample? Latest, int OpenAlerts);
+    bool Online, DateTimeOffset? LastSeenAt, MetricSample? Latest, int OpenAlerts,
+    string? RoleEnvironment = null, string? RoleFunction = null, string? ClaimedEnvironment = null, string? ClaimedFunction = null,
+    string? EffectiveEnvironment = null, string? EffectiveFunction = null, string? ClaudeKind = null, string? ClaudeVersion = null,
+    int? ClaudeSessionsIdle = null, IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null,
+    IReadOnlyList<string>? Capabilities = null, DateTimeOffset? PresenceAt = null,
+    IReadOnlyDictionary<string, string>? Tags = null, bool? AcceptsAsks = null);
 
 public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Kind, string Subject, string State,
     double ThresholdPct, double LastValue, double PeakValue, DateTimeOffset OpenedAt, DateTimeOffset? ResolvedAt);
@@ -31,13 +61,20 @@ public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Ki
 /// Exactly one of Argv (mode argv) and ShellCommand (mode shell) is set.
 /// </summary>
 public sealed record RunCreate(string ClientKey, Guid TargetAgentId, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand,
-    string? Cwd, int TimeoutSeconds, string? Reason, string? SessionExternalId = null, Guid? JobId = null);
+    string? Cwd, int TimeoutSeconds, string? Reason, string? SessionExternalId = null, Guid? JobId = null,
+    string? ProjectKey = null, string? Kind = null, string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null,
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
 
 public sealed record RunCreated(Guid Id, string Status, Guid? GrantId, DateTimeOffset ExpiresAt);
 
 public sealed record RunView(Guid Id, Guid TargetAgentId, string TargetHostname, string Mode, IReadOnlyList<string>? Argv,
     string? ShellCommand, string? Cwd, int TimeoutSeconds, string Status, int? ExitCode, string? Error, long OutputBytes,
-    bool OutputTruncated, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, DateTimeOffset? EndedAt, Guid? GrantId, Guid? JobId);
+    bool OutputTruncated, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, DateTimeOffset? EndedAt, Guid? GrantId, Guid? JobId,
+    string? ProjectKey = null, string? Kind = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null,
+    string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, string? TargetEnvironment = null,
+    string? TargetFunction = null, long? OutputCap = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, long? OutputRefusedBytes = null,
+    int? OutputMissingFromSeq = null, int? OutputChunks = null, bool? OutputComplete = null,
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
 
 /// <summary>One piece of a run's output, numbered from 0 by the target. GapBefore marks output cut out before it.</summary>
 public sealed record RunOutputChunk(int Seq, string Stream, string Body, bool GapBefore = false);
@@ -52,7 +89,10 @@ public sealed record GrantTemplate(IReadOnlyList<string> Argv, string Cwd, int M
 /// (server clock; null from an older API), so a target that refuses a run for an off switch knows whether its last settings read is older.
 /// </summary>
 public sealed record RunMessage(Guid Id, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand, string? Cwd,
-    int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null);
+    int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null,
+    string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, long? OutputCap = null, bool ApprovedWithTotp = false,
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null,
+    string? ApprovalKeyId = null, string? ApprovalSignature = null, DateTimeOffset? ApprovalNotAfter = null, string? TargetEnvironment = null, string? TargetFunction = null);
 
 public sealed record RunCancelMessage(Guid Id);
 
@@ -61,7 +101,7 @@ public sealed record RunUpdateMessage(Guid Id, string Status);
 
 /// <summary>The target's report on a run. At is when it happened on the target.</summary>
 public sealed record RunStatusUpdate(string Status, int? ExitCode = null, string? Error = null, bool OutputTruncated = false,
-    string? ResolvedExe = null, DateTimeOffset? At = null);
+    string? ResolvedExe = null, DateTimeOffset? At = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, int? OutputChunks = null);
 
 public sealed record GrantRequest(Guid TargetAgentId, IReadOnlyList<string> Template, string Cwd, int MaxTimeoutSeconds, int Days,
     string? Reason);
@@ -74,3 +114,18 @@ public sealed record JobProposal(Guid TargetAgentId, string Name, IReadOnlyList<
 
 public sealed record JobView(Guid Id, Guid TargetAgentId, string Name, IReadOnlyList<string> Argv, string Cwd, int TimeoutSeconds,
     string Status, DateTimeOffset CreatedAt);
+
+/// <summary>One run of a project on a machine, as its history shows it (ADR-0008 §3a′); the counts are empty when the tool was not recognised.</summary>
+public sealed record ProjectRunSummary(string? Kind, string Status, int? ExitCode, DateTimeOffset At, bool OutputTruncated,
+    int? TestsPassed, int? TestsFailed, int? TestsSkipped);
+
+/// <summary>A project on a machine: what the agent read from its folder, the last runs per kind and the tool failures sessions had in it recently.</summary>
+public sealed record MachineProjectView(string Key, string Name, string? Branch, string? HeadSha, string? Tag, DateTimeOffset LastSeenAt,
+    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors);
+
+/// <summary>
+/// Everything about one machine (ADR-0008 §3a′): its list entry, the admin's note (untrusted text), the listening services when the caller may
+/// see them (the machine's owner and workspace admins; null otherwise, and when the owner has not opted in) and its projects.
+/// </summary>
+public sealed record MachineDetail(MachineView Machine, string? Note, DateTimeOffset? NoteSetAt, bool ServicesShared,
+    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects);

@@ -19,7 +19,7 @@ using Microsoft.Extensions.Logging;
 namespace ClaudeMonitor.Agent;
 
 /// <summary>The command line. Each command is a thin call into its own class.</summary>
-public static class Cli
+public static partial class Cli
 {
     public const string Usage = """
         cm-agent login --server <url>   connect this machine (shows a code to approve on the web)
@@ -30,8 +30,13 @@ public static class Cli
                                         session's own socket, no start-up flag (ADR-0007); channel (also "on"): a Claude Code channel (ADR-0003)
         cm-agent install --exec off|argv|shell
                                         whether approved remote runs may execute on this machine (default off)
-        cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
-        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005)
+        cm-agent install --standalone [--server <url>] [--exec off|argv|shell]
+        cm-agent uninstall --standalone
+                                        this machine as a daemon without Claude Code: it logs in first, then starts when you log in
+                                        (an application on macOS and Windows, systemd --user on Linux), in your own account (ADR-0008)
+        cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root] [--run-account [<name>]]
+        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005); --run-account makes remote runs start
+                                        as a second unprivileged account (Linux and macOS, through sudo; ADR-0010)
         cm-agent connect [--server <url>]
                                         like login, from inside Claude Code: prints the code and returns; the login finishes in the background
         cm-agent restart                hand the running daemon over to this binary
@@ -40,6 +45,19 @@ public static class Cli
         cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
                                         whether the agent looks for / installs agent updates by itself, and whether it may
                                         update Claude Code when every session is idle (both default off; the workspace must allow too)
+        cm-agent config projects add|remove|list [<folder>]  the project folders this machine reports facts about (ADR-0008)
+        cm-agent config role <environment|none> <function|none>
+                                        what this machine says it is (dev|test|stage|preprod|production|other; development|application|web|
+                                        database|ci|storage|other); an admin sets the role on the web, a claim only makes it stricter (ADR-0008)
+        cm-agent approvers add <public key> [--name <n>] | remove <fingerprint> | list
+        cm-agent config approvals required|off
+                                        pin an owner's approval key (copy it from the web; compare the fingerprint) and require that every remote run is
+                                        signed by a pinned key; off by default. An admin runs these (the file is admin-owned on a service) (ADR-0010)
+        cm-agent machines | machine <x> | metrics <x> | alerts [<x>] | jobs [<x>] | job-run <job id>
+        cm-agent run --machine <x> (--script <file> --interpreter <i> [--arg <v>]... | --argv <exe> [args...]) [--timeout] [--reason] [--project] [--kind]
+        cm-agent result <run or ask id> [--wait <seconds>] [--offset <chars>]
+        cm-agent ask --machine <x> "<question>"
+                                        reach the other machines of the workspace from here, without the web (an approval is still the owner's, on the web; ADR-0008)
         cm-agent claude-update cancel   stop a Claude Code update that is counting down
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
@@ -52,11 +70,15 @@ public static class Cli
         // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0005).
         if (args.FirstOrDefault() == "install" && ServiceCommands.IsService(args)) return ServiceCommands.Install(args, stdout, stderr);
         if (args.FirstOrDefault() == "uninstall" && ServiceCommands.IsService(args)) return ServiceCommands.Uninstall(stdout);
+        if (args.FirstOrDefault() == "install" && StandaloneCommands.IsStandalone(args)) return await StandaloneCommands.InstallAsync(args, config, stdout, stderr, clock);
+        if (args.FirstOrDefault() == "uninstall" && StandaloneCommands.IsStandalone(args)) return StandaloneCommands.Uninstall(config, stdout);
         var log = new AgentLog(config, clock);
         HomeMigration.Run(config, log);
         config = SavedSettings.Apply(config);
         switch (args.FirstOrDefault())
         {
+            case "hook" when args.Length > 2 && args[1] == SessionContext.HookEvent && args[2] == SessionContext.ContextOption:
+                return await SessionContext.RunAsync(config, stdout, stderr, clock); // the machines block, no network, exit 0 (ADR-0008)
             case "hook" when args.Length > 1:
                 return await HookAsync(args[1], config, stdin, stdout, stderr, clock, log);
             case "mcp":
@@ -85,6 +107,8 @@ public static class Cli
                 return 0;
             case "logout":
                 return await new Login(config, stdout, clock).LogoutAsync();
+            case var verb when verb is not null && RemoteVerbs.Names.Contains(verb):
+                return await RemoteVerbs.RunAsync(args, config, stdout, stderr, clock, log);
             case "install" when Array.IndexOf(args, ServiceCommands.ExecOption) >= 0:
                 var saved = ServiceCommands.SaveExecLevel(args, config, stdout, stderr);
                 return saved != 0 || args.Length == 3 ? saved : Install(args, config, stdout, stderr, Environment.ProcessPath!);
@@ -98,6 +122,8 @@ public static class Cli
                 return await ClaudeUpdateCommand.RunAsync(args, config, stdout, stderr, clock);
             case "config":
                 return await UpdateCommand.ConfigAsync(args, config, stdout, stderr);
+            case "approvers":
+                return await Approvals.ApproversCommand.RunAsync(args, config, stdout, stderr);
             case "status":
                 return await StatusAsync(config, stdout, clock);
             case "version":
@@ -109,111 +135,6 @@ public static class Cli
         }
     }
 
-    /// <summary>"cm-agent install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it.</summary>
-    public static int Install(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr, string sourceBinary,
-        Func<string, string[], int>? run = null)
-    {
-        ArgumentNullException.ThrowIfNull(args);
-        ArgumentNullException.ThrowIfNull(stderr);
-        config = SavedSettings.Apply(config);
-        if (Array.IndexOf(args, "--stop-wait") >= 0)
-        {
-            var text = Option(args, "--stop-wait") ?? "";
-            if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) || seconds > AgentConfig.WaitMaxSeconds)
-            {
-                stderr.WriteLine($"--stop-wait takes whole seconds from 0 to {AgentConfig.WaitMaxSeconds}, not \"{text}\".");
-                return 2;
-            }
-
-            config = SavedSettings.SaveStopWait(config, seconds);
-        }
-
-        if (Array.IndexOf(args, "--push") >= 0)
-        {
-            var value = Option(args, "--push");
-            if (value != "off" && !PushTransports.Enables(value))
-            {
-                stderr.WriteLine($"--push takes on, off, inbox or channel, not \"{value}\".");
-                return 2;
-            }
-
-            config = SavedSettings.SavePush(config, value != "off", value == "off" ? null : PushTransports.Normalize(value));
-        }
-
-        return new PluginInstaller(config, stdout, run).Install(sourceBinary);
-    }
-
-    /// <summary>A hook never fails its session: whatever happens, exit 0 (project rule).</summary>
-    public static async Task<int> HookAsync(string hookEvent, AgentConfig config, TextReader stdin, TextWriter stdout,
-        TextWriter stderr, TimeProvider clock, AgentLog log)
-    {
-        ArgumentNullException.ThrowIfNull(stdin);
-        ArgumentNullException.ThrowIfNull(stdout);
-        ArgumentNullException.ThrowIfNull(stderr);
-        try
-        {
-            config.EnsureHome();
-            var input = await stdin.ReadToEndAsync();
-            string? output;
-            using (var store = new LocalStore(config.DatabasePath))
-            {
-                output = await new HookRunner(config, store, clock).RunAsync(hookEvent, input, CancellationToken.None);
-            }
-
-            if (Identity.Load(config).Connected) DaemonHost.EnsureRunning(config, log);
-            if (output is not null) await stdout.WriteAsync(output);
-        }
-        catch (Exception e)
-        {
-            await stderr.WriteLineAsync($"cm-agent hook {hookEvent}: {e.GetType().Name}: {e.Message}");
-            log.Write($"hook {hookEvent} failed: {e.GetType().Name} {e.Message}");
-        }
-
-        return 0;
-    }
-
-    /// <summary>"cm-agent restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
-    public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout, Update.IDaemonControl? control = null)
-    {
-        if (!Identity.Load(config).Connected)
-        {
-            await stdout.WriteLineAsync("Not connected: there is no daemon to restart.");
-            return 0;
-        }
-
-        var daemon = control ?? new Update.DaemonControl(config, log, clock);
-        if (daemon.IsRunning() && !await daemon.StopAsync(config.UpdateStopWait, CancellationToken.None) && !daemon.Kill())
-        {
-            await stdout.WriteLineAsync("The daemon did not stop; it keeps running its older version until it ends.");
-            return 1;
-        }
-
-        await stdout.WriteLineAsync(daemon.Start(config.BinaryPath) ? "The daemon was restarted." : "The daemon could not be started.");
-        return 0;
-    }
-
-    public static async Task<int> StatusAsync(AgentConfig config, TextWriter stdout, TimeProvider? clock = null)
-    {
-        ArgumentNullException.ThrowIfNull(stdout);
-        var identity = Identity.Load(config);
-        using var store = new LocalStore(config.DatabasePath);
-        using var probe = DaemonHost.TryLock(config.LockPath);
-        await stdout.WriteLineAsync($"home: {config.Home}");
-        await stdout.WriteLineAsync(identity.Connected ? $"connected: {identity.Server}" : "not connected (cm-agent login --server <url>)");
-        await stdout.WriteLineAsync($"daemon: {(probe is null ? "running" : "not running")}");
-        await stdout.WriteLineAsync($"events waiting: {store.OutboxCount()}");
-        var (commands, soonest) = store.WaitingCommands((clock ?? TimeProvider.System).GetUtcNow());
-        await stdout.WriteLineAsync(soonest is { } expires
-            ? $"commands waiting: {commands} (oldest expires {expires.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)})"
-            : "commands waiting: 0");
-        await stdout.WriteLineAsync($"stop wait: {(int)config.StopWait.TotalSeconds} s");
-        await stdout.WriteLineAsync($"remote runs: {ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel))}{(config.ServiceMode ? " (service)" : "")}");
-        foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
-        foreach (var line in UpdateCommand.Describe(config, store)) await stdout.WriteLineAsync(line);
-        foreach (var line in ClaudeUpdateCommand.Describe(config, store, clock ?? TimeProvider.System)) await stdout.WriteLineAsync(line);
-        await stdout.WriteLineAsync($"version: {AgentConfig.Version}");
-        return identity.Connected ? 0 : 1;
-    }
 
     public static string? Option(string[] args, string name)
     {
@@ -236,7 +157,7 @@ public static class Cli
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
             o.ServerInstructions = ChannelEnvelopes.Instructions;
         });
-        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<GrantTools>();
+        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<ScriptTools>().WithTools<AskTools>().WithTools<GrantTools>();
         if (config.ChannelPushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }

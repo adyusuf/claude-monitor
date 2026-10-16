@@ -15,6 +15,7 @@ namespace ClaudeMonitor.Agent.Daemon;
 public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock)
 {
     public const string RunKind = "run";
+    public const string AskKind = "ask";
     public const string Unavailable = "remote_unavailable";
     public const string Offline = "offline";
     public const string BadAnswer = "bad_answer";
@@ -26,7 +27,9 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
     {
         await SendRequestsAsync(ct);
         await FollowRunsAsync(ct);
+        await FollowAsksAsync(ct);
         store.ForgetRequests(clock.GetUtcNow() - ForgetAfter);
+        store.ForgetAsksOut(clock.GetUtcNow() - config.RemoteLocalRetention);
         store.ForgetRuns(clock.GetUtcNow() - config.RemoteLocalRetention);
     }
 
@@ -44,6 +47,10 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
                 if (r.Kind == RunKind && json is not null && JsonSerializer.Deserialize<RunCreated>(json, ApiClient.Json) is { } created)
                 {
                     store.FollowRun(created.Id.ToString(), created.Status, now);
+                }
+                else if (r.Kind == AskKind && json is not null && JsonSerializer.Deserialize<AskCreated>(json, ApiClient.Json) is { } ask)
+                {
+                    store.FollowAsk(ask.Id.ToString(), ask.Status, now); // the asks this machine sent are followed like its runs (ADR-0008 §3f)
                 }
             }
             catch (ApiException e)
@@ -89,6 +96,24 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
             catch (ApiException e) when (e.Status == HttpStatusCode.NotFound)
             {
                 store.RunFetched(run.RunId, run.Status, run.View ?? "{}", run.NextSeq, true, clock.GetUtcNow());
+            }
+        }
+    }
+
+    /// <summary>Reads the asks this machine sent that changed (or were last read a poll ago) and keeps what it read, answer included, until they end.</summary>
+    public async Task FollowAsksAsync(CancellationToken ct)
+    {
+        foreach (var ask in store.AsksToFetch(clock.GetUtcNow() - config.RemotePollEvery, 20))
+        {
+            try
+            {
+                var view = await api.RemoteAsync(HttpMethod.Get, $"api/agent/asks/{ask.AskId}", null, ct);
+                var status = view.GetProperty("status").GetString() ?? ask.Status;
+                store.AskFetched(ask.AskId, status, view.GetRawText(), AskStatuses.Final.Contains(status), clock.GetUtcNow());
+            }
+            catch (ApiException e) when (e.Status == HttpStatusCode.NotFound)
+            {
+                store.AskFetched(ask.AskId, ask.Status, ask.View ?? "{}", true, clock.GetUtcNow()); // gone (deleted after its retention): nothing more to follow
             }
         }
     }

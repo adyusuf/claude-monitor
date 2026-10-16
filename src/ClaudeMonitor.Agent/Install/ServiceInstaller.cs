@@ -32,7 +32,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
 
     private sealed class StepFailedException(string message) : Exception(message);
 
-    public int Install(string currentBinary, string execLevel, bool allowRoot)
+    public int Install(string currentBinary, string execLevel, bool allowRoot, string? runAccount = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(currentBinary);
         if (!ExecLevels.All.Contains(execLevel))
@@ -42,6 +42,12 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
         }
 
         if (!Supported()) return Unsupported();
+        if (runAccount is not null && os is not (OsKinds.Linux or OsKinds.MacOs))
+        {
+            output.WriteLine("--run-account is not supported on Windows: starting a process as another local account needs a stored password or a design that was not built (ADR-0010 §5).");
+            return 2;
+        }
+
         var l = Layout();
         if (!isAdmin) return NeedAdmin(currentBinary, execLevel, allowRoot);
         if (PrivilegedAccounts.Contains(l.Account.ToLowerInvariant()))
@@ -72,7 +78,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
                     break;
                 case OsKinds.MacOs:
                 case OsKinds.Linux:
-                    InstallUnix(l, currentBinary, execLevel);
+                    InstallUnix(l, currentBinary, execLevel, runAccount);
                     break;
                 default:
                     return Unsupported();
@@ -121,6 +127,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
                     if (os == OsKinds.Linux) Step("stop and disable the service", Systemctl, ["disable", "--now", ServiceLayout.ServiceName]);
                     else run(Launchctl, ["bootout", $"system/{LaunchdDaemon.Label}"]); // not loaded is fine
                     File.Delete(Definition());
+                    RemoveRunAccountAccess();
                     if (os == OsKinds.Linux) Step("reload systemd", Systemctl, ["daemon-reload"]);
                     break;
                 default:

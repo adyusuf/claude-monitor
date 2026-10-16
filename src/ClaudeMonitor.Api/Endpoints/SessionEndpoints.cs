@@ -9,7 +9,7 @@ namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record SessionRow(Guid Id, string HarnessKind, string? Title, string? Model, string? GitBranch, string Status,
     DateTimeOffset StartedAt, DateTimeOffset LastEventAt, DateTimeOffset? EndedAt, Guid? ProjectId, string? ProjectName,
-    Guid AgentId, string Hostname, Guid OwnerId, string OwnerName, decimal? CostUsd, int OpenPermissions);
+    Guid AgentId, string Hostname, Guid OwnerId, string OwnerName, decimal? CostUsd, int OpenPermissions, string? PushTransport = null);
 public sealed record Page<T>(IReadOnlyList<T> Items, string? Next);
 public sealed record TaskRow(Guid Id, string ExternalId, string Subject, string Status, DateTimeOffset UpdatedAt);
 public sealed record SubagentRow(Guid Id, string AgentType, string? Description, string Status, DateTimeOffset StartedAt, DateTimeOffset? EndedAt);
@@ -65,7 +65,7 @@ public static class SessionEndpoints
                             join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
                             join u in db.Users.AsNoTracking() on a.UserId equals u.Id
                             where agentIds.Contains(a.Id)
-                            select new { a.Id, m.Hostname, a.UserId, u.DisplayName }).ToDictionaryAsync(x => x.Id, ct);
+                            select new { a.Id, m.Hostname, a.UserId, u.DisplayName, a.PushTransport }).ToDictionaryAsync(x => x.Id, ct);
         var projects = await db.Projects.AsNoTracking().Where(p => projectIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => p.DisplayName, ct);
         var usage = await db.SessionUsage.AsNoTracking().Where(u => ids.Contains(u.SessionId)).ToListAsync(ct);
@@ -79,7 +79,7 @@ public static class SessionEndpoints
             decimal? cost = mine.Count == 0 ? 0m : mine.Any(u => u.CostUsd is null) ? null : mine.Sum(u => u.CostUsd!.Value);
             return new SessionRow(s.Id, s.HarnessKind, s.Title, s.Model, s.GitBranch, s.Status, s.StartedAt, s.LastEventAt,
                 s.EndedAt, s.ProjectId, s.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null, s.AgentId, a.Hostname,
-                a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id));
+                a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id), a.PushTransport);
         }).ToList();
     }
 

@@ -21,6 +21,13 @@ public sealed partial record AgentConfig
     /// </summary>
     public string? PluginDataDir { get; init; }
 
+    /// <summary>
+    /// The longest Stop-hook wait the plugin's hook timeout allows (CM_PLUGIN_STOP_WAIT_MAX, set by the plugin's wrapper script of a version whose
+    /// hooks have the long timeout; zero when it is not set, as for an older plugin version, whose fixed 15 s would cut a longer wait off and could
+    /// lose a prompt taken just before). The saved stop wait (`cm-agent install --stop-wait`) is held to it for a plugin-started agent.
+    /// </summary>
+    public TimeSpan PluginStopWaitMax { get; init; } = TimeSpan.Zero;
+
     /// <summary>How often the daemon looks at whether its plugin is still installed and enabled.</summary>
     public TimeSpan PluginWatchEvery { get; init; } = TimeSpan.FromSeconds(30);
 

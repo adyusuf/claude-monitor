@@ -27,7 +27,42 @@ public static class RunNotices
     public static async Task DeliverAsync(Broker broker, MonitorDb db, RemoteRun run, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(broker);
+        if (await RoleBlocksAsync(db, broker, run, ct)) return;
         broker.Publish(Broker.Agent(run.TargetAgentId), new StreamMessage(AgentStreamEvents.Run, await MessageAsync(db, run, ct)));
+    }
+
+    /// <summary>
+    /// The role is checked again at delivery (ADR-0008 §3c): a script, shell command or interpreter run approved without a two-step code whose
+    /// target has become strict since is cancelled with <c>role_changed</c> and never delivered. True when it was cancelled.
+    /// </summary>
+    public static async Task<bool> RoleBlocksAsync(MonitorDb db, Broker broker, RemoteRun run, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(broker);
+        ArgumentNullException.ThrowIfNull(run);
+        if (run.ApprovedWithTotp || run.Mode is not (RunModes.Script or RunModes.Shell or RunModes.Argv)) return false;
+        var row = await (from a in db.Agents.AsNoTracking()
+                         join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
+                         where a.Id == run.TargetAgentId
+                         select new { a, m.Os }).FirstOrDefaultAsync(ct);
+        if (row is null || !RunCodeRule.NeedsCode(run.Mode, run.Argv, row.Os, MachineRoles.IsStrict(
+                MachineRoles.EffectiveEnvironment(row.a.RoleEnvironment, row.a.ClaimedEnvironment),
+                MachineRoles.EffectiveFunction(row.a.RoleFunction, row.a.ClaimedFunction))))
+        {
+            return false;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var changed = await db.RemoteRuns.Where(r => r.Id == run.Id && (r.Status == RunStatuses.Approved || r.Status == RunStatuses.Delivered))
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Cancelled).SetProperty(r => r.EndedAt, now)
+                .SetProperty(r => r.Error, RemoteErrors.RoleChanged), ct);
+        if (changed == 1)
+        {
+            run.Status = RunStatuses.Cancelled;
+            Changed(broker, run);
+        }
+
+        return true;
     }
 
     public static void Cancel(Broker broker, RemoteRun run)
@@ -50,11 +85,12 @@ public static class RunNotices
         }
 
         return new RunMessage(run.Id, run.Mode, run.Argv, run.ShellCommand, run.Cwd, run.TimeoutSeconds, run.ExpiresAt,
-            run.GrantId, grant, run.DecidedAt);
+            run.GrantId, grant, run.DecidedAt, run.ScriptInterpreter, run.ScriptBody, run.ScriptArgs, run.OutputCap, run.ApprovedWithTotp, run.ScriptFiles, run.ScriptStdin,
+            run.ApprovalKeyId, run.ApprovalSignature, run.ApprovalNotAfter, run.TargetEnvironment, run.TargetFunction);
     }
 
     /// <summary>The approved runs a target still owes an answer for, replayed on every stream connection.</summary>
-    public static async Task<List<RunMessage>> WaitingForAsync(MonitorDb db, Guid targetAgentId, DateTimeOffset now, CancellationToken ct)
+    public static async Task<List<RunMessage>> WaitingForAsync(MonitorDb db, Guid targetAgentId, DateTimeOffset now, CancellationToken ct, Broker? broker = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         var runs = await db.RemoteRuns.AsNoTracking()
@@ -64,6 +100,7 @@ public static class RunNotices
         var messages = new List<RunMessage>(runs.Count);
         foreach (var run in runs)
         {
+            if (broker is not null && await RoleBlocksAsync(db, broker, run, ct)) continue;
             messages.Add(await MessageAsync(db, run, ct));
         }
 
