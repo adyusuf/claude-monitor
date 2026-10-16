@@ -10,6 +10,14 @@ case "$(uname -s)" in
   *) bin="$data/bin/cm-agent" ;;
 esac
 [ -x "$bin" ] || exit 0
+# The machines block (ADR-0008) needs a binary that knows `--context`: an older one, still installed while ensure.sh downloads the new
+# one, would read it as a second recording hook. The plugin's pin is the oldest binary that knows it.
+if [ "${1:-}" = "hook" ] && [ "${2:-}" = "SessionStart" ] && [ "${3:-}" = "--context" ]; then
+  pinned="$(head -n 1 "${CLAUDE_PLUGIN_ROOT:-.}/agent-release.txt" 2>/dev/null | tr -d '\r')"
+  have="$("$bin" version 2>/dev/null | tr -d '\r')"
+  [ -n "$pinned" ] && [ -n "$have" ] || exit 0
+  [ "$(printf '%s\n%s\n' "$pinned" "$have" | sort -V | head -n 1)" = "$pinned" ] || exit 0
+fi
 export CM_BINARY="$bin"
 export CM_PLUGIN_ID="monitor-agent@monitor-agent-releases"
 # The server: the plugin's option (hooks have it), else what the MCP server was given, else what the bootstrap kept (a Bash tool has neither).

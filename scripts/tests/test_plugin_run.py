@@ -26,6 +26,24 @@ class RunScript(PluginScriptsCase):
         self.assertIn('args: hook PreToolUse', result.stdout)
         self.assertIn(f'BIN={self.bin} ID=monitor-agent@monitor-agent-releases SERVER=https://monitor.invalid', result.stdout)
 
+    def test_run_hands_the_context_entry_only_to_a_binary_at_least_as_new_as_the_pin(self):
+        # ADR-0008: an older binary (still installed while ensure.sh downloads the pinned one) would read `--context` as a second recording hook.
+        self.install_fake('0.3.0')
+        self.pins('0.4.0')
+        skipped = self.run_script(RUN, 'hook', 'SessionStart', '--context')
+        self.assertEqual((skipped.returncode, skipped.stdout), (0, ''))
+        self.install_fake('0.4.0')
+        same = self.run_script(RUN, 'hook', 'SessionStart', '--context')
+        self.assertIn('args: hook SessionStart --context', same.stdout)
+        self.install_fake('0.10.0')  # newer than the pin, compared as versions and not as text
+        newer = self.run_script(RUN, 'hook', 'SessionStart', '--context')
+        self.assertIn('args: hook SessionStart --context', newer.stdout)
+        os.remove(os.path.join(self.root, 'agent-release.txt'))
+        no_pin = self.run_script(RUN, 'hook', 'SessionStart', '--context')
+        self.assertEqual((no_pin.returncode, no_pin.stdout), (0, ''))
+        plain = self.run_script(RUN, 'hook', 'SessionStart')  # the recording entry is never gated
+        self.assertIn('args: hook SessionStart', plain.stdout)
+
     def test_run_finds_the_server_in_the_option_the_mcp_environment_or_the_kept_file_in_that_order(self):
         self.install_fake('0.3.0')
         os.makedirs(self.data, exist_ok=True)

@@ -43,18 +43,22 @@ public static class MachineFacts
             agent.PresenceAt = profile.Interpreters is null && profile.Tools is null ? null : now;
         }
 
-        agent.Interpreters = profile.Interpreters is null ? null : Serialize(profile.Interpreters);
+        agent.Interpreters = profile.Interpreters is null ? null : Serialize(profile.Interpreters.Where(t => t is { Trusted: true } && ToolNames.Interpreters.Contains(t.Name)));
         agent.Tools = profile.Tools is null ? null : Serialize(profile.Tools);
         agent.Capabilities = profile.Capabilities is null ? null : [.. profile.Capabilities.Where(AgentCapabilities.All.Contains).Distinct()];
     }
 
-    /// <summary>The stored JSON back as tools; NULL stays null (unknown), anything unreadable is an empty list.</summary>
-    public static IReadOnlyList<ToolInfo>? Tools(string? json)
+    /// <summary>
+    /// The stored JSON back as tools; NULL stays null (unknown), anything unreadable is an empty list. For a view every member reads, the
+    /// path of the `claude` entry is withheld (ADR-0008 §9.9: where Claude Code lives is for the owner and admins only).
+    /// </summary>
+    public static IReadOnlyList<ToolInfo>? Tools(string? json, bool forView = true)
     {
         if (json is null) return null;
         try
         {
-            return JsonSerializer.Deserialize<List<ToolInfo>>(json, Json) ?? [];
+            var tools = JsonSerializer.Deserialize<List<ToolInfo>>(json, Json) ?? [];
+            return forView ? tools.Select(t => t.Name == ToolNames.Claude ? t with { Path = "" } : t).ToList() : tools;
         }
         catch (JsonException)
         {
@@ -62,8 +66,10 @@ public static class MachineFacts
         }
     }
 
-    private static string Serialize(IReadOnlyList<ToolInfo> tools) =>
-        JsonSerializer.Serialize(tools.Where(t => t is { Name.Length: > 0, Path.Length: > 0 }).Take(ToolsMax)
-            .Select(t => new ToolInfo(MachineReports.Clean(t.Name, NameMax), MachineReports.Clean(t.Path, PathMax),
+    /// <summary>Only the names of the list, once each, cleaned and capped; anything else from the machine is dropped.</summary>
+    private static string Serialize(IEnumerable<ToolInfo> tools) =>
+        JsonSerializer.Serialize(tools.Where(t => t is { Name.Length: > 0, Path.Length: > 0 } && ToolNames.All.Contains(t.Name))
+            .GroupBy(t => t.Name, StringComparer.Ordinal).Select(g => g.First()).Take(ToolsMax)
+            .Select(t => new ToolInfo(t.Name, MachineReports.Clean(t.Path, PathMax),
                 t.Version is { Length: > 0 } v ? MachineReports.Clean(v, VersionMax) : null, t.Trusted)), Json);
 }

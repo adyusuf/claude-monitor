@@ -23,7 +23,7 @@ public sealed class MachineCache(AgentConfig config, LocalStore store, ApiClient
     public async Task RefreshAsync(CancellationToken ct)
     {
         if (unsupported) return;
-        if (!config.MachinesContextEnabled || store.Get(MachineMonitor.RemoteRunsKey) != "true")
+        if (!config.MachinesContextEnabled || WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) != "true")
         {
             Clear();
             return;

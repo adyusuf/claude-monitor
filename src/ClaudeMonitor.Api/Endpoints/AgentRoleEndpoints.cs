@@ -60,13 +60,22 @@ public static class AgentRoleEndpoints
         }
 
         var before = new { environment = agent.RoleEnvironment, function = agent.RoleFunction };
-        agent.RoleEnvironment = req.Environment;
-        agent.RoleFunction = req.Function;
-        agent.RoleSetAt = clock.GetUtcNow();
-        agent.RoleSetBy = userId;
+        var now = clock.GetUtcNow();
+        // Compare-and-set on the values the decision was made on: a concurrent raise to production is never overwritten without its re-authentication.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var changed = await db.Agents
+            .Where(a => a.Id == id && a.Status == AgentStatuses.Active && a.RoleEnvironment == before.environment && a.RoleFunction == before.function)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.RoleEnvironment, req.Environment).SetProperty(a => a.RoleFunction, req.Function)
+                .SetProperty(a => a.RoleSetAt, now).SetProperty(a => a.RoleSetBy, userId), http.RequestAborted);
+        if (changed != 1) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "conflict");
         Audit.Add(db, http, clock, AuditActions.AgentRoleChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: id,
             detail: new { before, after = new { environment = req.Environment, function = req.Function } });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
+        agent.RoleEnvironment = req.Environment;
+        agent.RoleFunction = req.Function;
+        agent.RoleSetAt = now;
+        agent.RoleSetBy = userId;
         broker.Publish(Broker.Workspace(agent.WorkspaceId), new StreamMessage(MachineEvent, new { agentId = id }));
         return Results.Ok(View(agent));
     }

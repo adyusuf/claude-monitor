@@ -16,6 +16,10 @@ public static class MachineContext
     public const string Kind = "machines";
     public const string Origin = "web";
 
+    /// <summary>One machine never fills the block alone: at most this many tool names per list, and one line is cut at LineMax.</summary>
+    public const int NamesMax = 16;
+    public const int LineMax = 600;
+
     public const string Rules =
         "Machines of this Claude Monitor workspace, from the agent's cache (live values and details: monitor_machines, monitor_metrics, monitor_alerts; "
         + "work on another machine: monitor_run, which its owner approves on the web).\n"
@@ -55,7 +59,7 @@ public static class MachineContext
         b.Append("- ").Append(RemoteEnvelope.Label(m.Hostname)).Append(" (agent ").Append(m.AgentId.ToString("D")).Append(')');
         if (self) b.Append(" (this machine)");
         b.Append(": role=").Append(MachineRoles.Code(m.EffectiveEnvironment, m.EffectiveFunction));
-        if (m.EffectiveEnvironment is not null) b.Append(" (").Append(MachineRoles.Describe(m.EffectiveEnvironment, m.EffectiveFunction)).Append(')');
+        if (m.EffectiveEnvironment is not null || m.EffectiveFunction is not null) b.Append(" (").Append(MachineRoles.Describe(m.EffectiveEnvironment, m.EffectiveFunction)).Append(')');
         if (m.ClaimedEnvironment is not null || m.ClaimedFunction is not null)
         {
             b.Append(" [machine says ").Append(MachineRoles.Code(m.ClaimedEnvironment, m.ClaimedFunction)).Append(']');
@@ -66,15 +70,15 @@ public static class MachineContext
         b.Append(" claude=").Append(Claude(m));
         if (m.Tools is { Count: > 0 } tools)
         {
-            b.Append(" tools=").Append(string.Join(',', tools.Select(t => RemoteEnvelope.Label(t.Name))));
+            b.Append(" tools=").Append(string.Join(',', tools.Take(NamesMax).Select(t => RemoteEnvelope.Label(t.Name))));
         }
 
         if (m.Interpreters is { Count: > 0 } interpreters)
         {
-            b.Append(" interpreters=").Append(string.Join(',', interpreters.Select(t => RemoteEnvelope.Label(t.Name))));
+            b.Append(" interpreters=").Append(string.Join(',', interpreters.Take(NamesMax).Select(t => RemoteEnvelope.Label(t.Name))));
         }
 
-        return b.ToString();
+        return b.Length > LineMax ? b.ToString(0, LineMax) : b.ToString();
     }
 
     /// <summary>"unknown" for an agent that reported nothing (older), "none", or "native 2.1.300 idle=1".</summary>

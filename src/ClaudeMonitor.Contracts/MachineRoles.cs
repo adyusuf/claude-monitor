@@ -101,7 +101,9 @@ public static class MachineRoles
     /// <summary>The maintainer's four names, for people and for the session-start block; "not set" when there is no environment.</summary>
     public static string Describe(string? environment, string? function) => (environment, function) switch
     {
-        (null, _) => "not set",
+        (null, null) => "not set",
+        (null, MachineFunctions.Database) => "database server, environment not set",
+        (null, _) => $"{function} machine, environment not set",
         (MachineEnvironments.Production, MachineFunctions.Database) => "live database server",
         (_, MachineFunctions.Database) => $"{environment} database server",
         (MachineEnvironments.Production, _) => "live server",
@@ -111,7 +113,7 @@ public static class MachineRoles
         _ => $"{environment} {function} machine",
     };
 
-    /// <summary>"production/database", "test/not set", "not set".</summary>
+    /// <summary>"production/database", "test/not set", "not set/database", "not set". A set function is never hidden behind "not set".</summary>
     public static string Code(string? environment, string? function) =>
-        environment is null ? "not set" : $"{environment}/{function ?? "not set"}";
+        environment is null && function is null ? "not set" : $"{environment ?? "not set"}/{function ?? "not set"}";
 }

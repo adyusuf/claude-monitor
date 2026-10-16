@@ -89,17 +89,25 @@ public sealed class MachineTools(AgentConfig config, TimeProvider clock)
     private static string Line(MachineView m) => string.Create(CultureInfo.InvariantCulture,
         $"{m.Hostname} (agent {m.AgentId}) os={m.Os} owner={m.UserName} role={Role(m)} exec={m.ExecLevel} service={(m.ServiceMode ? "yes" : "no")} online={(m.Online ? "yes" : "no")} alerts={m.OpenAlerts} claude={Capture.MachineContext.Claude(m)}{Tools(m)}{(m.Latest is { } s ? " " + Sample(s) : "")}");
 
-    /// <summary>"production/application (admin; machine says production/not set)", "not set".</summary>
-    private static string Role(MachineView m)
+    /// <summary>
+    /// The effective role, then what an admin set and what the machine claims when they differ from it: "production/application (admin)",
+    /// "production/not set (admin: not set; machine says production/not set)", "not set".
+    /// </summary>
+    internal static string Role(MachineView m)
     {
-        var code = MachineRoles.Code(m.EffectiveEnvironment, m.EffectiveFunction);
-        var claim = m.ClaimedEnvironment is not null || m.ClaimedFunction is not null ? $"; machine says {MachineRoles.Code(m.ClaimedEnvironment, m.ClaimedFunction)}" : "";
-        return m.EffectiveEnvironment is null && claim.Length == 0 ? code : $"{code} (set by an admin{claim})";
+        var effective = MachineRoles.Code(m.EffectiveEnvironment, m.EffectiveFunction);
+        var set = MachineRoles.Code(m.RoleEnvironment, m.RoleFunction);
+        var claim = m.ClaimedEnvironment is not null || m.ClaimedFunction is not null ? MachineRoles.Code(m.ClaimedEnvironment, m.ClaimedFunction) : null;
+        if (set == "not set" && claim is null) return effective;
+        var parts = new List<string>();
+        parts.Add(set == effective ? "admin" : $"admin: {set}");
+        if (claim is not null) parts.Add($"machine says {claim}");
+        return $"{effective} ({string.Join("; ", parts)})";
     }
 
-    private static string Tools(MachineView m)
+    internal static string Tools(MachineView m)
     {
-        var tools = m.Tools is { Count: > 0 } list ? " tools=" + string.Join(',', list.Select(t => RemoteEnvelope.Label(t.Name) + (t.Version is { } v ? " " + RemoteEnvelope.Label(v.Split(' ').LastOrDefault() ?? v) : "") + (t.Trusted ? "" : "(untrusted)"))) : "";
+        var tools = m.Tools is { Count: > 0 } list ? " tools=" + string.Join(',', list.Select(t => RemoteEnvelope.Label(t.Name) + (Exec.ToolInventory.ShortVersion(t.Version) is { } v ? " " + RemoteEnvelope.Label(v) : "") + (t.Trusted ? "" : "(untrusted)"))) : "";
         var interpreters = m.Interpreters is { Count: > 0 } i ? " scripts=" + string.Join(',', i.Select(t => RemoteEnvelope.Label(t.Name))) : "";
         return tools + interpreters;
     }

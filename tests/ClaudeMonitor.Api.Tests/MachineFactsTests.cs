@@ -138,8 +138,9 @@ public sealed class MachineFactsTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task Tools_are_capped_at_the_limit_and_their_text_is_cleaned()
+    public async Task A_tool_name_is_kept_once_with_its_first_entry_and_its_text_is_cleaned()
     {
+        // Only the names of the closed list are stored, once each (the qa pass of 16/10/2026); a cap of ToolsMax stays as a ceiling.
         var team = await RemoteKit.TeamAsync(api);
         var tools = Enumerable.Range(0, 40).Select(i => Tool("git", $"/usr/bin/git{i}", i == 0 ? "git version\u0000 2.\n4‮5​" : $"v{i}")).ToList();
         tools.Insert(0, Tool("", "/usr/bin/none"));
@@ -147,9 +148,9 @@ public sealed class MachineFactsTests(ApiFactory api)
 
         var machine = await MachineAsync(team);
         var stored = machine.GetProperty("tools").EnumerateArray().ToList();
-        Assert.Equal(MachineFacts.ToolsMax, stored.Count);
+        Assert.Single(stored);
         Assert.Equal("git version 2.45", stored[0].GetProperty("version").GetString());
-        Assert.Equal("/usr/bin/git31", stored[^1].GetProperty("path").GetString());
+        Assert.Equal("/usr/bin/git0", stored[0].GetProperty("path").GetString());
         var interpreter = Assert.Single(machine.GetProperty("interpreters").EnumerateArray());
         Assert.Equal(("sh", "5.2", true), (interpreter.GetProperty("name").GetString(), interpreter.GetProperty("version").GetString(), interpreter.GetProperty("trusted").GetBoolean()));
         Assert.NotEqual(JsonValueKind.Null, machine.GetProperty("presenceAt").ValueKind);

@@ -31,6 +31,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private string? lastSent;
     private (ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)? facts;
     private DateTimeOffset factsAt;
+    private string factsStamp = "";
 
     /// <summary>The exec level this agent allows now: the admin-owned file in service mode, agent.json otherwise (with the role claim, ADR-0008).</summary>
     public ExecPolicy Policy()
@@ -62,17 +63,21 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private (ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools) Facts()
     {
         var now = clock.GetUtcNow();
-        if (facts is { } cached && now - factsAt < config.PresenceProbeEvery && now >= factsAt)
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var stamp = factsSource is null ? ToolInventory.Stamp(ToolInventory.Candidates(AgentConfig.Os, profile), ClaudeUpdate.ClaudeLocator.Locate(config).Path) : "";
+        if (facts is { } cached && stamp == factsStamp && now - factsAt < config.PresenceProbeEvery && now >= factsAt)
         {
             // the sessions change often and cost one folder read; the inventory and the version are kept for the probe interval
             var (live, idle) = PresenceProbe.Sessions(config, store, now);
             return (cached.Claude is { } c ? c with { SessionsLive = live, SessionsIdle = idle, SeenAt = now } : null, cached.Tools);
         }
 
-        var fresh = factsSource?.Invoke() ?? (PresenceProbe.Probe(config, store, real => ToolInventory.FirstLine(new Update.SystemProcessRunner().Run(real, ["--version"], config.ToolVersionTimeout).Output), now),
+        // The Claude version goes through the same rule as every tool: a binary the agent may not run is never started (ADR-0008 §3a′).
+        var fresh = factsSource?.Invoke() ?? (PresenceProbe.Probe(config, store, real => ToolInventory.VersionIfRunnable(ToolNames.Claude, real, config.ToolVersionTimeout, AgentConfig.Os), now),
             ToolInventory.Live(config, AgentConfig.Os));
         facts = fresh;
         factsAt = now;
+        factsStamp = stamp;
         return fresh;
     }
 

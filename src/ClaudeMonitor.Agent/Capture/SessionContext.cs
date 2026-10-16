@@ -22,17 +22,19 @@ public static class SessionContext
         ArgumentNullException.ThrowIfNull(stderr);
         ArgumentNullException.ThrowIfNull(clock);
         if (!config.MachinesContextEnabled) return 0;
+#pragma warning disable CA1031 // a hook exits 0 whatever happens (project rule)
         try
         {
             var read = Task.Run(() => Read(config));
             var text = await read.WaitAsync(config.ContextReadWait, clock);
             if (text is { Length: > 0 }) await stdout.WriteAsync(Output(text));
         }
-        catch (Exception e) when (e is TimeoutException or IOException or UnauthorizedAccessException or InvalidOperationException
-                                      or Microsoft.Data.Sqlite.SqliteException)
+        catch (Exception e)
         {
+            // whatever happened (a timeout, a locked database, a native library that failed to load): the session is never blocked
             await stderr.WriteLineAsync($"cm-agent hook SessionStart --context: {e.GetType().Name}");
         }
+#pragma warning restore CA1031
 
         return 0;
     }

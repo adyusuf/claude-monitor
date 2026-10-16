@@ -10,7 +10,7 @@ export const enMachines = {
     claimed: "The machine itself says: {role}.", claimTightens: "A claim only makes the role stricter; it never sets or loosens it.",
     adminOnly: "Only a workspace admin sets the role.", save: "Save role", saved: "Role saved.",
     lowerHint: "Moving a machine away from production or database needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
-    strict: "Scripts on this machine need a code from the approver's authenticator app.",
+    strict: "Strict target (production or database): the stricter approval rules of ADR-0008 apply here.",
     env: { dev: "development", test: "test", stage: "staging", preprod: "pre-production", production: "production", other: "other" },
     fn: { development: "developer machine", application: "application server", web: "web server", database: "database server", ci: "CI runner", storage: "storage", other: "other" },
   },

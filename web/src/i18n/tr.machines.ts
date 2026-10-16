@@ -12,7 +12,7 @@ export const trMachines: Dictionary["machines"] = {
     claimed: "Makinenin kendi beyanı: {role}.", claimTightens: "Beyan rolü yalnızca sıkılaştırır; hiçbir zaman belirlemez ya da gevşetmez.",
     adminOnly: "Rolü yalnızca bir çalışma alanı yöneticisi belirler.", save: "Rolü kaydet", saved: "Rol kaydedildi.",
     lowerHint: "Bir makineyi production ya da database rolünden çıkarmak yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
-    strict: "Bu makinedeki scriptler, onaylayanın doğrulama uygulamasından bir kod ister.",
+    strict: "Sıkı hedef (production ya da database): ADR-0008'in daha sıkı onay kuralları burada geçerlidir.",
     env: { dev: "geliştirme", test: "test", stage: "staging", preprod: "ön-canlı", production: "canlı", other: "diğer" },
     fn: { development: "geliştirici makinesi", application: "uygulama sunucusu", web: "web sunucusu", database: "veritabanı sunucusu", ci: "CI koşucusu", storage: "depolama", other: "diğer" },
   },

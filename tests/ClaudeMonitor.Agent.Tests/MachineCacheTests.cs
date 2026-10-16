@@ -15,6 +15,7 @@ public sealed class MachineCacheTests : IDisposable
     private const string Route = "GET /api/agent/machines";
 
     private readonly Guid self = Guid.NewGuid();
+    private readonly Guid workspace = Guid.NewGuid();
     private readonly MachineView me;
     private readonly MachineView other = View("other-host", effectiveEnvironment: "production", effectiveFunction: "database");
     private readonly RemoteFixture fx;
@@ -24,7 +25,8 @@ public sealed class MachineCacheTests : IDisposable
     {
         fx = new RemoteFixture();
         me = View("my-host", self);
-        new Identity(new string('k', 24), AgentId: self).Save(fx.Home.Config);
+        new Identity(new string('k', 24), AgentId: self, WorkspaceId: workspace).Save(fx.Home.Config);
+        WorkspaceSettings.Tag(fx.Store, workspace); // the switch counts only for the workspace it was read for
         fx.Store.Set(MachineMonitor.RemoteRunsKey, "true");
         fx.Fake.On(Route, HttpStatusCode.OK, new[] { me, other });
         cache = new MachineCache(fx.Home.Config, fx.Store, fx.Api, fx.Clock);
@@ -147,6 +149,8 @@ public sealed class MachineCacheTests : IDisposable
     public async Task The_block_is_cut_at_the_configured_cap()
     {
         using var small = new RemoteFixture(c => c with { MachinesContextMax = 300 });
+        new Identity(new string('k', 24), AgentId: Guid.NewGuid(), WorkspaceId: workspace).Save(small.Home.Config);
+        WorkspaceSettings.Tag(small.Store, workspace);
         small.Store.Set(MachineMonitor.RemoteRunsKey, "true");
         small.Fake.On(Route, HttpStatusCode.OK, Enumerable.Range(0, 20).Select(i => View($"host-{i:00}")).ToArray());
 

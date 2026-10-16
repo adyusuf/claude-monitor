@@ -87,7 +87,8 @@ can run the application's tests on a test machine.
   the Machines page, printed by `monitor_machines` (`tools=dotnet 10.0,node 22.1,git 2.4x`) and, names only, in the
   session-start block. **Inventory only**: there are no requirement profiles and no "missing" computation (maintainer,
   16/10/2026); Claude reads the list and decides. The tool descriptions say that a script's PATH is the fixed one of
-  §3c, so a script that needs a user-owned tool sets its own PATH, which the approver then sees.
+  §3c, so a script that needs a user-owned tool sets its own PATH, which the approver then sees. The `claude` entry's path is
+  withheld from `MachineView` (decision 9): members see that Claude Code is there, not where.
 - **Tags** `key=value`: at most 10 per agent, keys and values in `[A-Za-z0-9._-]{1,32}` (`invalid_tag` otherwise), set
   by an admin on the web, audited. Shown everywhere a role is shown. In the session-start block they are **inside the
   untrusted envelope** (§3b): a tag is admin-typed text, not a rule.

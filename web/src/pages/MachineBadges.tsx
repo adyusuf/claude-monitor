@@ -6,8 +6,8 @@ export const isStrict = (m: MachineView): boolean => m.effectiveEnvironment === 
 
 /** "production/database", "test/not set", or "not set"; the server computed the effective role, the claim only tightened it. */
 export function roleCode(m: MachineView, notSet: string): string {
-  if (!m.effectiveEnvironment) return notSet;
-  return `${m.effectiveEnvironment}/${m.effectiveFunction ?? notSet}`;
+  if (!m.effectiveEnvironment && !m.effectiveFunction) return notSet;
+  return `${m.effectiveEnvironment ?? notSet}/${m.effectiveFunction ?? notSet}`;
 }
 
 /** The effective role, red when strict, with the machine's own claim in the title. */
@@ -16,8 +16,9 @@ export function RoleBadge({ view: m }: { view: MachineView }) {
   const code = roleCode(m, t("machines.role.notSet"));
   const claim = m.claimedEnvironment || m.claimedFunction
     ? t("machines.role.claimed", { role: `${m.claimedEnvironment ?? t("machines.role.notSet")}/${m.claimedFunction ?? t("machines.role.notSet")}` }) : "";
-  if (!m.effectiveEnvironment) return <span className="muted small" title={claim}>{code}</span>;
-  return <span className={isStrict(m) ? "badge status-failed" : "badge"} title={claim}>{code}</span>;
+  if (isStrict(m)) return <span className="badge status-failed" title={claim}>{code}</span>;
+  if (!m.effectiveEnvironment && !m.effectiveFunction) return <span className="muted small" title={claim}>{code}</span>;
+  return <span className="badge" title={claim}>{code}</span>;
 }
 
 /** Whether Claude Code is there: "unknown" for an agent that reported nothing (older), "not installed", or the kind, version and idle sessions. */
