@@ -31,6 +31,7 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
         store.ForgetRequests(clock.GetUtcNow() - ForgetAfter);
         store.ForgetAsksOut(clock.GetUtcNow() - config.RemoteLocalRetention);
         store.ForgetRuns(clock.GetUtcNow() - config.RemoteLocalRetention);
+        store.ForgetCommandBodies(clock.GetUtcNow() - config.RemoteLocalRetention); // captured content is deleted after the retention
     }
 
     public async Task SendRequestsAsync(CancellationToken ct)

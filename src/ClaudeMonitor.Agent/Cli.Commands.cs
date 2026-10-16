@@ -45,7 +45,20 @@ public static partial class Cli
 
             config = SavedSettings.SavePush(config, value != "off", value == "off" ? null : PushTransports.Normalize(value));
         }
-        else if (!config.PushFromEnvironment && Identity.Peek(config)?.Push is null)
+
+        if (Array.IndexOf(args, "--push-format") >= 0)
+        {
+            var format = Option(args, "--push-format");
+            if (!InboxFormats.IsValid(format))
+            {
+                stderr.WriteLine($"--push-format takes full or short, not \"{format}\".");
+                return 2;
+            }
+
+            config = SavedSettings.SaveInboxFormat(config, format!);
+        }
+
+        if (Array.IndexOf(args, "--push") < 0 && !config.PushFromEnvironment && Identity.Peek(config)?.Push is null)
         {
             // The first install turns the push on, through the channel (the maintainer's decision, 16/10/2026; --push inbox picks the inbox instead): a
             // prompt sent from the web reaches an idle session. Once anything is saved (--push off, config push off, or an earlier install) it is kept as chosen.

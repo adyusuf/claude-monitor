@@ -97,6 +97,15 @@ public static class UpdateCommand
             return 0;
         }
 
+        if (args.Length == 3 && args[1] == "push-format" && InboxFormats.IsValid(args[2]))
+        {
+            SavedSettings.SaveInboxFormat(config, args[2]);
+            await stdout.WriteLineAsync(args[2] == InboxFormats.Brief
+                ? "push-format: short (the inbox gets a one-line notice; the session reads the message with monitor_inbox_read)"
+                : "push-format: full (the inbox gets the whole message)");
+            return 0;
+        }
+
         if (args.Length == 4 && args[1] == "role")
         {
             var environment = args[2] == "none" ? null : args[2];
@@ -126,7 +135,7 @@ public static class UpdateCommand
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
+        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
         return 2;
     }
 
