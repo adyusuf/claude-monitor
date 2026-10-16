@@ -7,17 +7,19 @@ namespace ClaudeMonitor.Agent.Exec;
 /// <summary>
 /// The TCP ports this machine listens on and, where the OS lets the agent see it, the name of the process that owns each (ADR-0008 §3a′).
 /// Read only and no new dependency: the ports come from the framework's socket table, the names from <c>/proc</c> on Linux (only for
-/// processes the agent's own account may inspect; another account's process shows the port with no name). It starts no process. Sent
+/// processes the agent's own account may inspect; on macOS from the system's own <c>lsof</c> at its fixed path, run only when it passes the executable trust
+/// check, with an empty environment and a timeout; on Windows from the IP helper's table of listeners and the name of the owning process; another account's process
+/// shows the port with no name). Nothing a user or a repository supplies is ever started. Sent
 /// only when the machine's owner switched the report on.
 /// </summary>
-public static class ListeningServices
+public static partial class ListeningServices
 {
     public const int Max = 64;
     private const int ProcessesScanned = 4000;
     private const string Tcp = "tcp";
 
     public static IReadOnlyList<ServiceInfo> Live() =>
-        Probe(Ports, OperatingSystem.IsLinux() ? LinuxNames : () => new Dictionary<int, string>());
+        Probe(Ports, OperatingSystem.IsLinux() ? LinuxNames : OperatingSystem.IsMacOS() ? MacNames : OperatingSystem.IsWindows() ? WindowsNames : () => new Dictionary<int, string>());
 
     /// <summary>The services of a port list and a (port to process name) map; one entry per port, lowest ports first, at most <see cref="Max"/>.</summary>
     public static IReadOnlyList<ServiceInfo> Probe(Func<IReadOnlyList<int>> ports, Func<IReadOnlyDictionary<int, string>> names)

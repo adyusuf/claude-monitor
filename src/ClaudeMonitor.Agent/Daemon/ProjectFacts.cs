@@ -18,17 +18,25 @@ public sealed class ProjectFacts(AgentConfig config, ICredentialStore? credentia
     public const string KeyAccount = "project-hmac-key";
     private readonly ICredentialStore store = credentials ?? Credentials.For(config);
 
-    public IReadOnlyList<ProjectFact> Read(IReadOnlyList<string>? folders)
+    /// <summary>
+    /// The facts of the listed folders (source <c>listed</c>) and of the folders sessions worked in (<c>session</c>); a project in both is reported as listed.
+    /// </summary>
+    public IReadOnlyList<ProjectFact> Read(IReadOnlyList<string>? folders, IReadOnlyList<string>? visited = null)
     {
-        if (folders is not { Count: > 0 } || Key() is not { } key) return [];
+        if ((folders is not { Count: > 0 } && visited is not { Count: > 0 }) || Key() is not { } key) return [];
         var facts = new List<ProjectFact>();
-        foreach (var folder in folders.Where(ProjectFolderList.IsAbsolute).Distinct(StringComparer.Ordinal).Take(ProjectFolderList.Max))
+        void Add(IEnumerable<string>? paths, string source, int max)
         {
-            if (!Directory.Exists(folder) || ProjectInfo.Resolve(folder) is not { } info) continue;
-            var git = GitFacts.Read(folder);
-            facts.Add(new ProjectFact(info.Key, info.Name, Hmac(key, Path.GetFullPath(folder)), git?.Branch ?? info.Branch, git?.HeadSha, git?.Tag, ProjectSources.Listed));
+            foreach (var folder in (paths ?? []).Where(ProjectFolderList.IsAbsolute).Distinct(StringComparer.Ordinal).Take(max))
+            {
+                if (!Directory.Exists(folder) || ProjectInfo.Resolve(folder) is not { } info || facts.Any(f => f.Key == info.Key)) continue;
+                var git = GitFacts.Read(folder);
+                facts.Add(new ProjectFact(info.Key, info.Name, Hmac(key, Path.GetFullPath(folder)), git?.Branch ?? info.Branch, git?.HeadSha, git?.Tag, source));
+            }
         }
 
+        Add(folders, ProjectSources.Listed, ProjectFolderList.Max);
+        Add(visited, ProjectSources.Session, ProjectFolderList.Max);
         return facts;
     }
 

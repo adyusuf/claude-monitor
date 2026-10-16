@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using ClaudeMonitor.Agent.Exec;
 
 namespace ClaudeMonitor.Agent.Tests;
@@ -57,5 +58,66 @@ public sealed class ListeningServicesTests
     {
         var services = ListeningServices.Live();
         Assert.All(services, s => Assert.InRange(s.Port, 1, 65535));
+    }
+
+    // ---- macOS: the system's lsof, parsed ----------------------------------------------------------------------------
+
+    [Fact]
+    public void The_lsof_field_output_gives_each_listening_port_the_name_of_its_process_and_the_first_process_wins()
+    {
+        const string output = "p101\ncpostgres\nn*:5432\nn[::]:5432\np202\ncnode\nn127.0.0.1:8080\nn[::1]:8081\np303\ncimposter\nn*:5432\n";
+        var names = ListeningServices.ParseLsof(output);
+        Assert.Equal(("postgres", "node", "node"), (names[5432], names[8080], names[8081]));
+        Assert.Equal(3, names.Count);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("p1\nn*:80\n")] // an address before a name
+    [InlineData("p1\ncx\nn*:notaport\nn*:0\nn*:70000\n")]
+    public void Output_without_a_usable_name_or_port_gives_nothing(string? output) => Assert.Empty(ListeningServices.ParseLsof(output));
+
+    [Fact]
+    public void A_control_character_in_a_process_name_is_removed_before_it_is_kept()
+    {
+        Assert.Equal("evil", ListeningServices.ParseLsof("p1\nce\u0007vil\nn*:80\n")[80]);
+    }
+
+    // ---- Windows: the IP helper's listener table ---------------------------------------------------------------------
+
+    private static byte[] Table(bool ipv6, params (int Port, int Pid)[] rows)
+    {
+        var size = ipv6 ? 56 : 24;
+        var bytes = new byte[4 + (rows.Length * size)];
+        BinaryPrimitives.WriteInt32LittleEndian(bytes, rows.Length);
+        for (var i = 0; i < rows.Length; i++)
+        {
+            var at = 4 + (i * size);
+            var network = (uint)(((rows[i].Port & 0xFF) << 8) | ((rows[i].Port >> 8) & 0xFF)); // network byte order in the low 16 bits
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(at + (ipv6 ? 20 : 8)), network);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(at + (ipv6 ? 52 : 20)), rows[i].Pid);
+        }
+
+        return bytes;
+    }
+
+    [Fact]
+    public void The_listener_table_of_both_families_gives_port_and_owning_process()
+    {
+        Assert.Equal([(5432, 4120), (443, 4)], ListeningServices.ParseTcpTable(Table(false, (5432, 4120), (443, 4)), ipv6: false));
+        Assert.Equal([(8080, 900)], ListeningServices.ParseTcpTable(Table(true, (8080, 900)), ipv6: true));
+    }
+
+    [Fact]
+    public void A_truncated_or_empty_table_gives_the_rows_that_are_whole_and_never_throws()
+    {
+        var whole = Table(false, (22, 1), (80, 2));
+        Assert.Equal([(22, 1)], ListeningServices.ParseTcpTable(whole.AsSpan(0, 4 + 24 + 10), ipv6: false)); // the second row is cut
+        Assert.Empty(ListeningServices.ParseTcpTable([], ipv6: false));
+        Assert.Empty(ListeningServices.ParseTcpTable(new byte[2], ipv6: true));
+        var lying = Table(false, (22, 1));
+        BinaryPrimitives.WriteInt32LittleEndian(lying, 1000); // a count larger than the buffer
+        Assert.Single(ListeningServices.ParseTcpTable(lying, ipv6: false));
     }
 }

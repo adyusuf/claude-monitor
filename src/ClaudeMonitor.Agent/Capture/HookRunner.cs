@@ -29,6 +29,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
         var now = clock.GetUtcNow();
         var project = ProjectInfo.Resolve(payload["cwd"]?.GetValue<string>());
         Record(hookEvent, session, payload, project, now);
+        if (project is not null && ProjectInfo.RootOf(payload["cwd"]?.GetValue<string>()) is { } root) store.SeeFolder(project.Key, root, now); // for the commit and tag of a folder no one listed (ADR-0008 §3a′)
         if (Push.ParentProcess.Id() is > 0 and var claude) store.BindSession(session, claude, now); // which Claude Code process runs it (ADR-0003)
         SyncInbox(hookEvent, session, now, payload["permission_mode"] is JsonValue mode && mode.TryGetValue<string>(out var modeText) ? modeText : null);
         store.ClaudeConfigDirSeen(config.ClaudeConfigDir, now); // the session's CLAUDE_CONFIG_DIR: the Claude updater watches its sessions too (ADR-0006)

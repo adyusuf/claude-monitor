@@ -25,6 +25,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     public const string RemoteRunsKey = "settings.remote_runs";
     public const string ShareServicesKey = "settings.share_services";
     public const int KeepSamples = 60;
+    /// <summary>A folder a session worked in is read for its commit and tag for this long after the last visit (ADR-0008 §3a′).</summary>
+    public static readonly TimeSpan VisitedFor = TimeSpan.FromDays(30);
     private static readonly AlertThresholds Defaults = new(90, 90, 90, 300);
     private readonly AlertEvaluator evaluator = new(Defaults);
     private readonly List<MetricSample> samples = [];
@@ -84,8 +86,9 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var now = clock.GetUtcNow();
         var share = store.Get(ShareServicesKey) == "true";
         if (extras is { } cached && cached.Share == share && now - extrasAt < config.ProjectFactsEvery && now >= extrasAt) return (cached.Services, cached.Projects);
+        store.ForgetFolders(now - 2 * VisitedFor);
         var services = share ? servicesSource?.Invoke() ?? ListeningServices.Live() : null;
-        var read = projectsSource?.Invoke() ?? new ProjectFacts(config).Read(policy.ProjectFolders);
+        var read = projectsSource?.Invoke() ?? new ProjectFacts(config).Read(policy.ProjectFolders, store.VisitedFolders(now - VisitedFor));
         extras = (services, read.Count > 0 ? read : null, share);
         extrasAt = now;
         return (extras.Value.Services, extras.Value.Projects);
