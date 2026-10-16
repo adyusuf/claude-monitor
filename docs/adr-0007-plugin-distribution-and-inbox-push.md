@@ -1,6 +1,6 @@
 # ADR-0007: The agent ships as a Claude Code plugin, and web messages enter a session through its inbox socket
 
-**Status:** Proposal (16/10/2026), no code written; phase 0 measured on macOS the same day (§8). The maintainer decides.
+**Status:** Proposal (16/10/2026); phase 0 measured on macOS the same day (§8); phases 1 and 2 built on `feature/inbox-push` the same day (§9), not yet released. The maintainer decides.
 **Extends:** [ADR-0002](adr-0002-agent-platform.md) (distribution, commands from the web), [ADR-0003](adr-0003-push-into-idle-session.md)
 (push into an idle session), [ADR-0004](adr-0004-agent-self-update.md) (trust model for downloaded builds).
 **Asked for (16/10/2026):** (1) a message sent from the web reaches a session at once, the way Claude's own Remote Control
@@ -389,3 +389,39 @@ are not reaped promptly, so the pid must be checked alive); `version` is the rea
   poll interval but need not wait for the reply.
 - A busy session reads the line at its next tool round (§8.3); the web status can say "delivered, will be read when the
   current tool finishes" from the registry's `status: busy`.
+
+## 9. Built (16/10/2026, branch `feature/inbox-push`) and where it differs from §3
+
+**Phase 1 (push).** `Push/InboxPump` (the daemon's 500 ms loop) writes the auth line and the user-message line of §8.7 to the socket a session's
+hooks stored (`session_inboxes`, user-only database, the key never uploaded or logged). A failed write returns the prompt to the hooks, forgets the
+inbox until a hook says where the session listens, and records the exception type name: no retry loop. The transcript tailer confirms the push as
+before, by the wrapper text (`<<<claude-monitor-message id=…`), which the inbox text keeps; it does not need the `uuid` §8.7 suggested (the `uuid` is
+still sent). `cm-agent install --push on|inbox|channel|off`; `on` means the inbox; the saved choice is `agent.json` `pushTransport`.
+
+**Phase 2 (plugin).** `.claude-plugin/marketplace.json` and `plugin/monitor-agent/` (manifest, hooks and MCP file rendered by `cm-agent plugin-files .` from
+`PluginInstaller.Hooks`, a test fails on drift; `scripts/run.sh`, `scripts/ensure.sh`, three skills, `agent-release.txt`; `claude plugin validate` passes
+for both). `cm-agent connect` (device login in a detached child, returns with the code), `cm-agent restart`, the daemon's plugin watch (30 s).
+`scripts/write_plugin_pins.py` is called by `scripts/build-agent.sh`. The download page shows the plugin install first when
+`VITE_PLUGIN_MARKETPLACE` names where it is published.
+
+| §3 said | Built | Why |
+|---|---|---|
+| push default **on** once measured | stays **off**; `--push on` and the plugin's option turn it on | the project rule is that push is opt-in (ADR-0003); the owner's decision to reverse it, not mine |
+| binary in `${CLAUDE_PLUGIN_DATA}/bin`, `BinaryPath` recorded in the agent home | the wrapper sets `CM_BINARY`; `AgentConfig.BinaryPath` honours it | self-update (ADR-0004) and the daemon respawn then act on the plugin's copy with no change |
+| `agent-release.json`, a `cm-agent ensure` verb | `agent-release.txt` (version, then `<os>-<arch> <sha256> <zip>`), no `ensure` verb | the bootstrap runs before any binary exists, so it must be shell, and shell cannot read JSON without a tool; nothing was left for an `ensure` verb to do |
+| the daemon watches `installed_plugins.json` | it watches the plugin's data directory (deleted on uninstall, documented) and `enabledPlugins` (settings, documented) | the registry file is internal; both signals used are in the docs |
+| the old local plugin is removed by `ensure` | `/monitor-agent:connect` runs `cm-agent uninstall` (the existing verb); the bootstrap warns while it is enabled | removing another plugin is the person's call, made by invoking the skill |
+
+**Verified:** 1352 agent tests (the push, hook, socket, plugin-watch, connect and drift tests among them), the plugin scripts against a loopback server
+and a fake agent (12 tests), the web tests, `claude plugin validate` on the marketplace and the plugin. **Not verified:** a real Claude Code session receiving
+the daemon's write (the probe of §8 used the same line from a script, a desktop-app session was not used); Windows (named pipe, `sh`, the plugin data path);
+the plugin installed from a real marketplace; a published build (the pins file is the placeholder until `build-agent.sh` runs for a release).
+
+**Deferred, with the reason.**
+- **The web does not yet say which transport took a command.** The API learns `delivered` and `applied` only; showing "pushed" or "the session refuses messages"
+  needs the agent to report push state to the API (a protocol addition) and a rewording of the idle-session warning, which is wrong while push is on.
+- **`--stop-wait` for the plugin's hooks:** their timeouts are static.
+- **Serving the plugin from the server itself** (a marketplace `archive` source on the site's own `/downloads`, no GitHub coordinates in the web build) would make
+  `VITE_PLUGIN_MARKETPLACE` unnecessary; it needs a deploy step that writes `marketplace.json` with the site's address and the zip's hash.
+- Hold expiry, the terminal approval dialog and `bypassPermissions` without the key were measured or reasoned in §8 only for macOS.
+
