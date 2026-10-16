@@ -49,7 +49,8 @@ docker compose -f deploy/dev-services.yml up -d          # PostgreSQL 18 on 127.
 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/ClaudeMonitor.Api -- --migrate   # apply migrations
 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/ClaudeMonitor.Api                # the API
 dotnet test                                                # all .NET tests (Docker must be running)
-bash scripts/merge-gate.sh dev                             # everything CI runs
+bash scripts/quick-check.sh [--tests]                      # the fast local look before a merge (not the gate)
+bash scripts/merge-gate.sh dev                             # the whole gate locally, when you want it (CI runs it for you)
 ```
 
 In Development every variable has a default (`.env.example`); sign-up mails land in Mailpit
@@ -61,8 +62,19 @@ retype, an edited merged migration, a removed route and a removed or reordered c
 
 `.github/workflows/ci.yml` runs `bash scripts/gate-core.sh dev` on every push to `dev`, `test` and `prod`
 and on every pull request: the same script and the same thresholds as a local `scripts/merge-gate.sh dev`,
-never a second rule set. Third-party actions are pinned to a commit SHA and gitleaks is
+never a second rule set. **CI owns the full gate** (this repository is public, so its minutes are free); locally only
+`scripts/quick-check.sh` is the habit: the gate's own format, build, shellcheck and secret-scan commands, the script tests when
+a script changed, and with `--tests` only the test projects the change reaches. It is a first look: a missing tool is
+reported as SKIPPED and the run is not green. Before a merge the maintainer is asked whether CI and e2e will run; what is not
+run is recorded on the merge commit as `Gate-Waived: <gates> (neden: <reason>)`. The helpers: `scripts/ci-status.sh <branch>
+[commit] [--workflow ci|e2e]` (is the workflow green for that commit; only completed + success exits 0) and
+`scripts/waived-gates.sh <source> <target>` (the waived gates between two refs, exit 1 when any). Details:
+[docs/release.md](docs/release.md#promotion). Third-party actions are pinned to a commit SHA and gitleaks is
 checksum-verified. To change a version, change it there and in the Prerequisites table above.
+
+A gate run collects coverage while the unit tests run and the coverage step judges those files, so no test runs twice
+(`scripts/merge-gate.conf`, `tests/coverage.props`, `web/vite.config.ts`); `bash scripts/coverage.sh` on its own still runs
+the tests itself.
 
 ## The agent (cm-agent)
 
