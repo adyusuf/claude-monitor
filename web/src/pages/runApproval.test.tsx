@@ -244,3 +244,30 @@ describe("deciding", () => {
     expect(onChanged).not.toHaveBeenCalled();
   });
 });
+
+describe("a shell command or an interpreter run on a strict machine needs the owner's code too", () => {
+  it("shows the hint and the code field for a shell command and sends the code with the hash", async () => {
+    const calls = mockApi({ "POST /runs/r1/approve": { status: 204 } });
+    show(run({ mode: "shell", argv: null, shellCommand: "ls -l", interpreter: true, needsCode: true, hash: "h1" }));
+    expect(screen.getByText(en.remote.scriptNeedsCode)).toBeInTheDocument();
+    const code = screen.getByLabelText(en.remote.codeLabel);
+    await userEvent.type(code, "123456");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, config.runAllowDelayMs + 100));
+    });
+    await userEvent.click(allow());
+    await vi.waitFor(() => expect(calls.some((c) => c.path === "/runs/r1/approve")).toBe(true));
+    expect(body(calls, "/runs/r1/approve")).toEqual({ hash: "h1", code: "123456" });
+  });
+
+  it("shows the code field for an interpreter run and none for a plain command run", () => {
+    show(run({ argv: ["/bin/sh", "-c", "true"], interpreter: true, needsCode: true }));
+    expect(screen.getByLabelText(en.remote.codeLabel)).toBeInTheDocument();
+  });
+
+  it("shows no code field when the machine is not strict", () => {
+    show(run({ mode: "shell", argv: null, shellCommand: "ls", interpreter: true, needsCode: false }));
+    expect(screen.queryByLabelText(en.remote.codeLabel)).toBeNull();
+    expect(screen.queryByText(en.remote.scriptNeedsCode)).toBeNull();
+  });
+});

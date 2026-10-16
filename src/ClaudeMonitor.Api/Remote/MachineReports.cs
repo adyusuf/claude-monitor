@@ -26,6 +26,10 @@ public static class MachineReports
         agent.ExecLevel = ExecLevels.All.Contains(profile.ExecLevel) ? profile.ExecLevel : ExecLevels.Off;
         agent.ServiceMode = profile.ServiceMode;
         agent.ProfileAt = now;
+        MachineFacts.Apply(agent, profile, now);
+        await MachineProjects.ApplyAsync(db, agent.Id, agent.WorkspaceId, profile.Projects, now, ct);
+        agent.ApprovalsRequired = profile.ApprovalsRequired == true;
+        agent.PushTransport = profile.PushTransport is CommandTransports.Inbox or CommandTransports.Channel ? profile.PushTransport : null;
         if (profile.OsVersion is { Length: > 0 } version)
         {
             var clean = Clean(version, OsVersionMax);

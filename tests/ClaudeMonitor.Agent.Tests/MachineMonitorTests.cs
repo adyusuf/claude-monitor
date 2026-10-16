@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using ClaudeMonitor.Agent.Auth;
+using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Daemon;
 using ClaudeMonitor.Agent.Exec;
 using ClaudeMonitor.Agent.Metrics;
@@ -181,6 +182,21 @@ public sealed class MachineMonitorTests : IDisposable
         Assert.Equal((ExecLevels.Argv, false, fx.Home.Config.ExecMaxConcurrent, Environment.UserName),
             (profile.ExecLevel, profile.ServiceMode, profile.MaxConcurrent, profile.OsAccount));
         Assert.False(string.IsNullOrEmpty(profile.OsVersion));
+    }
+
+    [Fact]
+    public async Task The_profile_says_which_push_transport_is_on_and_nothing_when_push_is_off()
+    {
+        await monitor.ProfileAsync(CancellationToken.None);
+        Assert.Null(Body<AgentProfile>(Assert.Single(fx.Fake.Seen, s => s.Path == "/api/agent/profile").Body).PushTransport);
+
+        SavedSettings.SavePush(fx.Home.Config, true, PushTransports.Inbox); // saved after the daemon started: read fresh
+        await monitor.ProfileAsync(CancellationToken.None);
+        Assert.Equal(PushTransports.Inbox, Body<AgentProfile>(fx.Fake.Seen.Last(s => s.Path == "/api/agent/profile").Body).PushTransport);
+
+        SavedSettings.SavePush(fx.Home.Config, false);
+        await monitor.ProfileAsync(CancellationToken.None);
+        Assert.Null(Body<AgentProfile>(fx.Fake.Seen.Last(s => s.Path == "/api/agent/profile").Body).PushTransport);
     }
 
     [Theory]

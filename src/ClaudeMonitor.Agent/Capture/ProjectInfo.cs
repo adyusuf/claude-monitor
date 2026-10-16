@@ -28,6 +28,19 @@ public sealed partial record ProjectInfo(string Key, string Name, string? Branch
         return new ProjectInfo("dir:" + Hash(dir.FullName), dir.Name, null);
     }
 
+    /// <summary>The folder that holds the checkout around a working directory (the one with a <c>.git</c>), or null outside git: where a session's project lives on this machine.</summary>
+    public static string? RootOf(string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return null;
+        for (var d = new DirectoryInfo(cwd); d is not null; d = d.Parent)
+        {
+            var dotGit = Path.Combine(d.FullName, ".git");
+            if (Directory.Exists(dotGit) || File.Exists(dotGit)) return d.FullName;
+        }
+
+        return null;
+    }
+
     private static ProjectInfo FromCheckout(string root, string dotGit)
     {
         var gitDir = dotGit;

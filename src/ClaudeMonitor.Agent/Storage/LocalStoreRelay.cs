@@ -1,3 +1,4 @@
+using ClaudeMonitor.Contracts;
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 
@@ -6,7 +7,7 @@ namespace ClaudeMonitor.Agent.Storage;
 public sealed record LocalCommand(string Id, string Session, string Kind, string? Body, DateTimeOffset ExpiresAt);
 
 /// <summary>A command a hook took, and when (null for one taken before the agent recorded the time).</summary>
-public sealed record TakenCommand(string Id, DateTimeOffset? At);
+public sealed record TakenCommand(string Id, DateTimeOffset? At, string? Transport = null);
 public sealed record PermissionAsk(string LocalId, string Harness, string Session, string ToolName, string ToolInput, int WaitSeconds,
     DateTimeOffset CreatedAt, string? RemoteId, string? Decision, string? Reason, string State, string? Answers = null);
 public sealed record TranscriptCursor(string Session, string Harness, string Path, long Offset, string? ProjectKey, string? ProjectName,
@@ -38,7 +39,7 @@ public sealed partial class LocalStore
 
     /// <summary>
     /// Takes (once) the oldest unexpired command of a kind for a session; a taken command is not taken again. The state
-    /// change is checked, so a hook and the push pump racing for one command cannot both get it.
+    /// change is checked, so a hook and the push pump racing for one command cannot both get it. The caller is a hook.
     /// </summary>
     public LocalCommand? TakeCommand(string session, string kind, DateTimeOffset now)
     {
@@ -56,7 +57,8 @@ public sealed partial class LocalStore
         }
 
         if (found is not null
-            && Exec("UPDATE commands SET state = 'taken', taken_at = $t WHERE id = $i AND state = 'queued'", tx, ("$i", found.Id), ("$t", Iso(now))) != 1)
+            && Exec("UPDATE commands SET state = 'taken', taken_at = $t, transport = $x WHERE id = $i AND state = 'queued'", tx, ("$i", found.Id), ("$t", Iso(now)),
+                ("$x", CommandTransports.Hook)) != 1)
         {
             found = null;
         }
@@ -83,9 +85,9 @@ public sealed partial class LocalStore
     public List<TakenCommand> TakenCommands()
     {
         var taken = new List<TakenCommand>();
-        using var cmd = Command("SELECT id, taken_at FROM commands WHERE state = 'taken'", null);
+        using var cmd = Command("SELECT id, taken_at, transport FROM commands WHERE state = 'taken'", null);
         using var r = cmd.ExecuteReader();
-        while (r.Read()) taken.Add(new TakenCommand(r.GetString(0), Str(r, 1) is { } at ? At(at) : null));
+        while (r.Read()) taken.Add(new TakenCommand(r.GetString(0), Str(r, 1) is { } at ? At(at) : null, Str(r, 2)));
         return taken;
     }
 

@@ -40,6 +40,8 @@ export interface SessionRow {
   ownerName: string;
   costUsd: number | null;
   openPermissions: number;
+  /** The push transport the session's machine has on ("inbox" or "channel"); absent or null when it is off or the agent is older. */
+  pushTransport?: string | null;
 }
 export interface TaskRow { id: string; externalId: string; subject: string; status: string; updatedAt: string }
 export interface SubagentRow { id: string; agentType: string; description: string | null; status: string; startedAt: string; endedAt: string | null }
@@ -65,6 +67,8 @@ export interface CommandRow {
   deliveredAt: string | null;
   appliedAt: string | null;
   result: string | null;
+  /** How an applied command reached the session; absent or null on an older API or an older agent. */
+  transport?: "hook" | "inbox" | "channel" | string | null;
   /** Claude's first message with text after the command was applied; absent on an older API. */
   replyEventId?: number | null;
   /** The start of that message; replyMore says the message goes on. */
@@ -104,35 +108,7 @@ export interface DeviceLookup { userCode: string; hostname: string; os: string; 
 export interface AuditRow { id: number; action: string; actorUserId: string | null; actorAgentId: string | null; targetType: string | null; targetId: string | null; at: string; detail: unknown }
 
 // Remote work (ADR-0005): machines, metrics, alerts, runs, grants, jobs.
-export type ExecLevel = "off" | "argv" | "shell";
-export interface DiskSample { mount: string; usedBytes: number; totalBytes: number }
-export interface MetricSample { sampledAt: string; cpuPct: number; memUsedBytes: number; memTotalBytes: number; disks: DiskSample[] }
-export interface MachineView {
-  agentId: string;
-  hostname: string;
-  os: string;
-  userName: string;
-  execLevel: ExecLevel;
-  serviceMode: boolean;
-  online: boolean;
-  lastSeenAt: string | null;
-  latest: MetricSample | null;
-  openAlerts: number;
-}
-export type AlertKind = "cpu" | "memory" | "disk" | "offline";
-export interface AlertView {
-  id: string;
-  agentId: string;
-  hostname: string;
-  kind: AlertKind;
-  subject: string;
-  state: "open" | "resolved";
-  thresholdPct: number;
-  lastValue: number;
-  peakValue: number;
-  openedAt: string;
-  resolvedAt: string | null;
-}
+export * from "./typesMachines";
 
 export type RunStatus =
   | "pending_approval" | "approved" | "delivered" | "running" | "succeeded" | "failed" | "timed_out" | "denied" | "expired" | "cancelled";
@@ -146,7 +122,7 @@ export interface WebRunView {
   requesterUser: string;
   requesterSessionId: string | null;
   visible: boolean;
-  mode: "argv" | "shell";
+  mode: "argv" | "shell" | "script";
   argv: string[] | null;
   shellCommand: string | null;
   cwd: string | null;
@@ -167,6 +143,34 @@ export interface WebRunView {
   hash: string | null;
   interpreter: boolean;
   recentOutput: boolean;
+  // ADR-0008: the project and kind a run named, a script run's text and the role the card shows, and what its output account says.
+  // Optional: an older API omits them.
+  projectKey?: string | null;
+  kind?: string | null;
+  scriptInterpreter?: string | null;
+  scriptBody?: string | null;
+  scriptArgs?: string[] | null;
+  /** ADR-0010: the text files a script run carries next to the script, and the text for its stdin. Absent on an older API. */
+  scriptFiles?: { path: string; text: string }[] | null;
+  scriptStdin?: string | null;
+  /** ADR-0010 §4: the target runs nothing that a pinned owner key did not sign; the card then needs this browser's key. */
+  approvalsRequired?: boolean;
+  approvalKeyId?: string | null;
+  interpreterPath?: string | null;
+  targetEnvironment?: string | null;
+  targetFunction?: string | null;
+  strict?: boolean;
+  needsCode?: boolean;
+  outputCap?: number | null;
+  outputReadBytes?: number | null;
+  outputDroppedBytes?: number | null;
+  outputRefusedBytes?: number | null;
+  outputMissingFromSeq?: number | null;
+  outputChunks?: number | null;
+  outputComplete?: boolean | null;
+  testsPassed?: number | null;
+  testsFailed?: number | null;
+  testsSkipped?: number | null;
 }
 export interface RunOutputChunk { seq: number; stream: string; body: string; gapBefore: boolean }
 export interface RunOutputPage { chunks: RunOutputChunk[]; nextSeq: number; done: boolean }
@@ -219,4 +223,29 @@ export interface WebJobView {
   canRetire: boolean;
 }
 
-export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number }
+export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number; scriptOutputMaxBytes?: number; remoteSchedulesEnabled?: boolean }
+
+/** ADR-0010 §3: an approved job run on a schedule by the API. */
+export interface ScheduleView {
+  id: string;
+  jobId: string;
+  jobName: string;
+  targetAgentId: string;
+  kind: "interval" | "daily" | string;
+  intervalMinutes: number | null;
+  dailyAtMinutes: number | null;
+  status: "active" | "paused" | "ended" | string;
+  pauseReason: string | null;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  failuresInARow: number;
+  ownerUserId: string;
+  isOwner: boolean;
+  createdAt: string;
+}
+
+export interface ScheduleCreate { jobId: string; kind: "interval" | "daily"; intervalMinutes?: number; dailyAtMinutes?: number; code?: string }
+
+/** ADR-0010 §4: the public half of an approval key a person registered. */
+export interface ApprovalKeyView { id: string; name: string; fingerprint: string; publicKey: string; createdAt: string; retiredAt: string | null }

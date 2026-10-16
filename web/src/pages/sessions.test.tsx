@@ -184,10 +184,11 @@ describe("one session", () => {
 
   describe("the idle warning above the prompt box", () => {
     const idle = /This session is idle\. A command is applied when something is typed/;
-    const open = async (minutesAgo: number) => {
+    const pushIdle = /This session is idle\. Push is on for this machine/;
+    const open = async (minutesAgo: number, pushTransport: string | null = null) => {
       mockApi({
         "GET /me": { body: ME },
-        "GET /sessions/s1": { body: detail({ session: row({ lastEventAt: new Date(Date.now() - minutesAgo * 60_000).toISOString() }) }) },
+        "GET /sessions/s1": { body: detail({ session: row({ lastEventAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(), pushTransport }) }) },
         "GET /sessions/s1/permission-requests": { body: [] },
         "GET /sessions/s1/events": { body: { items: [], next: null } },
         "GET /sessions/s1/commands": { body: [] },
@@ -199,6 +200,18 @@ describe("one session", () => {
     it("shows once the last event is older than the idle limit", async () => {
       await open(config.idleSessionMinutes + 1);
       expect(screen.getByText(idle)).toBeInTheDocument();
+    });
+
+    it("says push is on for a machine that has it, and not that a command waits for something to be typed", async () => {
+      await open(config.idleSessionMinutes + 1, "inbox");
+      expect(screen.getByText(pushIdle)).toBeInTheDocument();
+      expect(screen.queryByText(idle)).not.toBeInTheDocument();
+    });
+
+    it("keeps the older wording for a machine with push off or an older agent", async () => {
+      await open(config.idleSessionMinutes + 1, null);
+      expect(screen.getByText(idle)).toBeInTheDocument();
+      expect(screen.queryByText(pushIdle)).not.toBeInTheDocument();
     });
 
     it("stays away while the session is recent", async () => {

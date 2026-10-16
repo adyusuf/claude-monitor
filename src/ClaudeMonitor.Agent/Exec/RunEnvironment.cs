@@ -13,7 +13,7 @@ public static class RunEnvironment
     /// <summary>Every name a run may have. Anything else is refused by <see cref="AssertClean"/>.</summary>
     public static readonly IReadOnlySet<string> AllowedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "PATH", "HOME", "LANG", "LC_ALL", "SystemRoot", "USERPROFILE", "TEMP", "TMP",
+        "PATH", "HOME", "LANG", "LC_ALL", "SystemRoot", "USERPROFILE", "TEMP", "TMP", "TMPDIR",
     };
 
     /// <summary>Name prefixes that must never reach a run: they load code, change the runtime or redirect tools.</summary>

@@ -3,7 +3,7 @@ using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Storage;
 
-namespace ClaudeMonitor.Agent.Mcp;
+namespace ClaudeMonitor.Agent.Requests;
 
 /// <summary>The answer to a relayed call: the API's JSON, or an error code (an API error, "offline", or "pending" while it waits).</summary>
 public sealed record RemoteAnswer(JsonElement? Json, string? Error)

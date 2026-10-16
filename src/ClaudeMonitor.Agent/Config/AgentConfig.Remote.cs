@@ -44,6 +44,9 @@ public sealed partial record AgentConfig
     /// <summary>A run that prints more than this in total is killed (output_limit).</summary>
     public long RunReadCap { get; init; } = 64L * 1024 * 1024;
 
+    /// <summary>CM_EXEC_SCRIPT_OUTPUT_CEILING: the most output of a script run this agent keeps, whatever the workspace allows (1 to 64 MiB).</summary>
+    public long ExecScriptOutputCeiling { get; init; } = 64L * 1024 * 1024;
+
     /// <summary>The most one output chunk carries to the API (the API refuses more than 64 KB).</summary>
     public int RunChunkBytes { get; init; } = 32 * 1024;
 
@@ -54,6 +57,11 @@ public sealed partial record AgentConfig
 
     /// <summary>How often the daemon sends queued remote requests and polls open runs it asked for (fallback to run_update).</summary>
     public TimeSpan RemotePollEvery { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// The signed-approval policy file (ADR-0010 §4): beside the exec policy of a service agent, in the home of an interactive one.
+    /// </summary>
+    public string ApproversPath => ServiceMode ? Path.Combine(Path.GetDirectoryName(ExecConfigPath) ?? Home, "approvers.json") : Path.Combine(Home, "approvers.json");
 
     /// <summary>How often the MCP process looks in the local database for an answer while a tool waits.</summary>
     public TimeSpan RemoteWaitPoll { get; init; } = TimeSpan.FromMilliseconds(250);

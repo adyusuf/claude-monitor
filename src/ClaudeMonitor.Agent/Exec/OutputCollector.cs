@@ -69,6 +69,24 @@ public sealed class OutputCollector
 
     public long BytesRead => Interlocked.Read(ref _read);
 
+    /// <summary>Masked bytes dropped between the head and the tail.</summary>
+    public long BytesDropped
+    {
+        get
+        {
+            lock (_sink) return _tail.Dropped;
+        }
+    }
+
+    /// <summary>How many chunks were produced (the next sequence number).</summary>
+    public int ChunksProduced
+    {
+        get
+        {
+            lock (_sink) return _seq;
+        }
+    }
+
     /// <summary>Masked bytes kept (head and tail), not counting what was dropped.</summary>
     public long BytesKept
     {

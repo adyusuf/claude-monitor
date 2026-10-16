@@ -159,6 +159,12 @@ public sealed class WorkspaceSettings
     public int AlertSustainSeconds { get; set; } = 300;
     public bool RemoteRunsEnabled { get; set; }
 
+    /// <summary>Whether approved jobs may run on a schedule in this workspace (ADR-0010 §3); default off.</summary>
+    public bool RemoteSchedulesEnabled { get; set; }
+
+    /// <summary>The most output a script run keeps (ADR-0008 §3d): 1 to 64 MiB, set by an admin, frozen on each run at creation.</summary>
+    public long ScriptOutputMaxBytes { get; set; } = 8 * 1024 * 1024;
+
     /// <summary>Whether agents of this workspace may update Claude Code itself on their machines (when idle, with a countdown; ADR-0006); off until an admin says otherwise.</summary>
     public bool ClaudeUpdate { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

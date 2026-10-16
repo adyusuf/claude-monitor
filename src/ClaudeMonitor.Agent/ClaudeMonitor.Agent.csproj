@@ -2,8 +2,11 @@
 
   <!-- The agent (ADR-0002): one self-contained binary per OS/arch, named cm-agent. -->
   <PropertyGroup>
+    <!-- CmWindowless=true publishes cm-agentw.exe: the same program as a Windows GUI-subsystem build, for the standalone autostart (no console window; ADR-0008 §9.12) -->
     <OutputType>Exe</OutputType>
-    <AssemblyName>cm-agent</AssemblyName>
+    <OutputType Condition="'$(CmWindowless)' == 'true'">WinExe</OutputType>
+    <AssemblyName Condition="'$(CmWindowless)' == 'true'">cm-agentw</AssemblyName>
+    <AssemblyName Condition="'$(CmWindowless)' != 'true'">cm-agent</AssemblyName>
     <RootNamespace>ClaudeMonitor.Agent</RootNamespace>
     <Version>0.3.0</Version>
     <InvariantGlobalization>true</InvariantGlobalization>

@@ -17,19 +17,28 @@ export function UntrustedReason({ text }: { text: string | null }) {
   );
 }
 
+/** The role the approval card was made against: the environment and function as the API froze them, red when strict. */
+function RoleOfRun({ run }: { run: WebRunView }) {
+  const { t } = useI18n();
+  const code = `${run.targetEnvironment ?? t("remote.scriptRoleNotSet")}/${run.targetFunction ?? t("remote.scriptRoleNotSet")}`;
+  return <span className={run.strict ? "badge status-failed" : "badge"}>{code}</span>;
+}
+
 /** Everything the owner must see before allowing a run (ADR-0005, "The owner's approval"). */
-export function RunFacts({ run, ws }: { run: WebRunView; ws: string }) {
+export function RunFacts({ run, ws, onScriptEnd }: { run: WebRunView; ws: string; onScriptEnd?: () => void }) {
   const { t } = useI18n();
   return (
     <dl className="facts">
       <dt>{t("remote.target")}</dt>
       <dd><strong>{run.targetHostname}</strong> <span className="muted small">{t("remote.agent")} <code>{run.targetAgentId}</code></span></dd>
       <dt>{t("remote.mode")}</dt>
-      <dd><span className={`badge run-mode-${run.mode}`}>{run.mode === "shell" ? t("remote.modeShell") : t("remote.modeArgv")}</span></dd>
+      <dd><span className={`badge run-mode-${run.mode}`}>{run.mode === "script" ? t("remote.modeScript") : run.mode === "shell" ? t("remote.modeShell") : t("remote.modeArgv")}</span></dd>
+      {run.mode === "script" ? <><dt>{t("remote.scriptRole")}</dt><dd><RoleOfRun run={run} /></dd></> : null}
       <dt>{t("remote.command")}</dt>
-      <dd><RunCommand run={run} /></dd>
-      <dt>{t("remote.cwd")}</dt>
-      <dd>{run.cwd ? <code className="shell-inline"><VisibleText text={run.cwd} /></code> : <span className="muted">{t("remote.cwdNone")}</span>}</dd>
+      <dd><RunCommand run={run} onScriptEnd={onScriptEnd} /></dd>
+      {run.mode === "script" ? null : <><dt>{t("remote.cwd")}</dt>
+      <dd>{run.cwd ? <code className="shell-inline"><VisibleText text={run.cwd} /></code> : <span className="muted">{t("remote.cwdNone")}</span>}</dd></>}
+      {run.projectKey || run.kind ? <><dt>{t("remote.project")}</dt><dd>{run.projectKey ? <code>{run.projectKey}</code> : <span className="muted">{t("remote.kindNone")}</span>}{run.kind ? <> · <span className="badge">{run.kind}</span></> : null}</dd></> : null}
       <dt>{t("remote.timeout")}</dt>
       <dd>{t("remote.seconds", { n: run.timeoutSeconds })}</dd>
       <dt>{t("remote.grant")}</dt>

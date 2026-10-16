@@ -1,3 +1,5 @@
+using ClaudeMonitor.Contracts;
+
 namespace ClaudeMonitor.Api.Data;
 
 // Machines, agents and how they connect (docs/data-model.md §3).
@@ -53,6 +55,52 @@ public sealed class Agent
     public string ExecLevel { get; set; } = ClaudeMonitor.Contracts.ExecLevels.Off;
     public bool ServiceMode { get; set; }
     public DateTimeOffset? ProfileAt { get; set; }
+
+    // ADR-0008 §3a: the role a workspace admin set and the claim the agent reports. NULL is "not set"; a claim only tightens.
+    public string? RoleEnvironment { get; set; }
+    public string? RoleFunction { get; set; }
+    public DateTimeOffset? RoleSetAt { get; set; }
+    public Guid? RoleSetBy { get; set; }
+    public string? ClaimedEnvironment { get; set; }
+    public string? ClaimedFunction { get; set; }
+
+    // ADR-0008 §3e and §3a′: Claude Code on the machine and the tool inventory, as the agent reported them. NULL: an older agent (unknown).
+    public string? ClaudeKind { get; set; }
+    public string? ClaudePath { get; set; }
+    public string? ClaudeVersion { get; set; }
+    public int? ClaudeSessionsLive { get; set; }
+    public int? ClaudeSessionsIdle { get; set; }
+    public DateTimeOffset? PresenceAt { get; set; }
+    /// <summary>JSON arrays of {name, path, version, trusted}; NULL = unknown, [] = none found.</summary>
+    public string? Interpreters { get; set; }
+    public string? Tools { get; set; }
+    public string[]? Capabilities { get; set; }
+
+    // ADR-0008 §3a′: what an admin typed (tags, note, untrusted text) and the opt-in listening-services report of the owner.
+    /// <summary>JSON object of key=value pairs, at most ten; NULL = none.</summary>
+    public string? Tags { get; set; }
+    public DateTimeOffset? TagsSetAt { get; set; }
+    public Guid? TagsSetBy { get; set; }
+    public string? AdminNote { get; set; }
+    public DateTimeOffset? AdminNoteSetAt { get; set; }
+    public Guid? AdminNoteSetBy { get; set; }
+    public bool ShareServices { get; set; }
+    public DateTimeOffset? ShareServicesSetAt { get; set; }
+    public Guid? ShareServicesSetBy { get; set; }
+    /// <summary>JSON array of {port, proto, process}, at most 64; NULL = not reported (opt-in is off or an older agent).</summary>
+    public string? Services { get; set; }
+    public DateTimeOffset? ServicesAt { get; set; }
+
+    /// <summary>ADR-0008 §3f: the machine's owner lets another machine of the same user ask a question of a Claude session here; off until they say so.</summary>
+    public bool AcceptsAsks { get; set; }
+    public DateTimeOffset? AcceptsAsksSetAt { get; set; }
+    public Guid? AcceptsAsksSetBy { get; set; }
+
+    /// <summary>The push transport the agent has on (<c>inbox</c> or <c>channel</c>), or null when it is off or the agent does not say.</summary>
+    public string? PushTransport { get; set; }
+
+    /// <summary>ADR-0010 §4: the machine only runs what a pinned owner key signed; the agent reports it with its profile. False for an older agent.</summary>
+    public bool ApprovalsRequired { get; set; }
 }
 
 public sealed class AgentToken
@@ -84,4 +132,51 @@ public sealed class DeviceAuthorization
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset? LastPolledAt { get; set; }
+}
+
+/// <summary>
+/// One project on one machine (ADR-0008 §3a′): the key a session reported or an admin listed, with what the agent read from the folder's
+/// <c>.git</c> files. The folder path never leaves the machine; <see cref="PathHmac"/> is an HMAC under a per-agent key.
+/// </summary>
+public sealed class MachineProject
+{
+    public Guid AgentId { get; set; }
+    public string ProjectKey { get; set; } = "";
+    public Guid WorkspaceId { get; set; }
+    public string Name { get; set; } = "";
+    public string? PathHmac { get; set; }
+    public string? Branch { get; set; }
+    public string? HeadSha { get; set; }
+    public string? Tag { get; set; }
+    public DateTimeOffset LastSeenAt { get; set; }
+    public string Source { get; set; } = ProjectSources.Session;
+}
+
+/// <summary>
+/// A question one machine of a user asks of another machine of the same user (ADR-0008 §3f). The question and the answer are untrusted text, personal
+/// data like a command: masked before upload, never logged, exported, emptied on account deletion and deleted after the retention period.
+/// </summary>
+public sealed class MachineAsk
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid WorkspaceId { get; set; }
+    public Guid RequesterAgentId { get; set; }
+    public Guid RequesterUserId { get; set; }
+    public Guid? RequesterSessionId { get; set; }
+    public Guid TargetAgentId { get; set; }
+    public Guid TargetUserId { get; set; }
+    /// <summary>The Claude session on the target that received the ask (its external id), set when it was delivered; the answer must come from it.</summary>
+    public string? TargetSession { get; set; }
+    public string ClientKey { get; set; } = "";
+    public string? ProjectKey { get; set; }
+    public string? Question { get; set; }
+    public string Status { get; set; } = AskStatuses.Queued;
+    public string? Answer { get; set; }
+    public bool AnswerTruncated { get; set; }
+    public string? Error { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset? DeliveredAt { get; set; }
+    public DateTimeOffset? AnsweredAt { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
 }

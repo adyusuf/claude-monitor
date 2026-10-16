@@ -104,6 +104,14 @@ public static class RemoteKit
     public static Task<HttpResponseMessage> ApproveAsync(TestUser owner, Guid runId, RunCreate req, string? code = null) =>
         owner.PostAsync($"/api/runs/{runId}/approve", new { hash = HashOf(req), code });
 
+    /// <summary>A validation problem (400) whose field carries the given code, the way the web reads it.</summary>
+    public static async Task AssertInvalidAsync(HttpResponseMessage response, string field, string code)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(code, body.GetProperty("errors").GetProperty(field)[0].GetString());
+    }
+
     public static async Task<string?> TitleAsync(HttpResponseMessage response) =>
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString();
 

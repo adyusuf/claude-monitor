@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/endpoints";
+import { approvalKeys, payloadFor } from "../lib/approvalKey";
 import type { WebRunView } from "../api/types";
 import { Button, Card, Notice } from "../components/ui";
 import { config } from "../config";
@@ -19,11 +20,14 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   const { t } = useI18n();
   const errorText = useErrorText();
   const now = useNow(config.countdownTickMs);
+  const isScript = run.mode === "script";
   const [armed, setArmed] = useState(!run.interpreter);
+  const [read, setRead] = useState(!isScript); // a script must have been scrolled to its end before it can be allowed
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
   const [denyError, setDenyError] = useState<string | null>(null);
-  const gate = useCodeGate("mfa_required", "remote.codeHintRun");
+  const [signProblem, setSignProblem] = useState<string | null>(null);
+  const gate = useCodeGate("mfa_required", "remote.codeHintRun", run.needsCode === true);
   const left = countdown(run.expiresAt, now);
 
   useEffect(() => {
@@ -35,7 +39,17 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   const allow = async () => {
     if (!run.hash) return;
     const hash = run.hash;
-    if (await gate.attempt((code) => api.approveRun(run.id, hash, code))) onChanged();
+    setSignProblem(null);
+    // A signed approval (ADR-0010 §4): this browser's key signs the exact run; a machine that requires it refuses an approval without one.
+    let proof: { keyId: string; signature: string } | null = null;
+    try {
+      proof = await approvalKeys.sign(payloadFor("run", run.id, run.targetAgentId, hash, run.expiresAt));
+    } catch {
+      proof = null;
+    }
+
+    if (run.approvalsRequired && !proof) return setSignProblem(t("approvals.needKey"));
+    if (await gate.attempt((code) => api.approveRun(run.id, hash, code, proof ?? undefined))) onChanged();
   };
 
   const deny = async () => {
@@ -51,10 +65,14 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   return (
     <Card className="card-attention run-approval" title={t("remote.approvalTitle", { host: run.targetHostname })}
       actions={<span className="muted small">{left ? t("remote.timeLeft", { time: left }) : t("remote.timeUp")}</span>}>
-      {run.interpreter ? <div className="notice notice-error" role="alert">{run.mode === "shell" ? t("remote.interpreterShell") : t("remote.interpreterArgv")}</div> : null}
+      {isScript ? <div className="notice notice-error" role="alert">{run.strict ? t("remote.scriptBannerStrict", { role: run.targetFunction === "database" ? t("remote.scriptDatabase") : t("remote.scriptProduction") }) : t("remote.scriptBanner")}</div>
+        : run.interpreter ? <div className="notice notice-error" role="alert">{run.mode === "shell" ? t("remote.interpreterShell") : t("remote.interpreterArgv")}</div> : null}
+      {run.needsCode ? <p className="muted small">{t("remote.scriptNeedsCode")}</p> : null}
       {run.recentOutput ? <div className="notice notice-warn" role="alert">{t("remote.recentOutput")}</div> : null}
-      <RunFacts run={run} ws={ws} />
+      <RunFacts run={run} ws={ws} onScriptEnd={() => setRead(true)} />
       {gate.field}
+      {run.approvalsRequired ? <p className="muted small">{t("approvals.runNeedsKey")}</p> : null}
+      {signProblem ? <Notice kind="error">{signProblem}</Notice> : null}
       {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}
       {denyError ? <Notice kind="error">{denyError}</Notice> : null}
       {denying ? (
@@ -66,9 +84,9 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
         </div>
       ) : (
         <div className="permission-actions">
-          {!armed ? <span className="muted small">{t("remote.allowWait")}</span> : null}
+          {!read ? <span className="muted small">{t("remote.scriptScroll")}</span> : !armed ? <span className="muted small">{t("remote.allowWait")}</span> : null}
           <Button variant="danger" onClick={() => setDenying(true)}>{t("remote.deny")}</Button>
-          <Button busy={gate.busy} disabled={gate.busy || !armed || !run.hash || !left} onClick={() => void allow()}>{t("remote.allow")}</Button>
+          <Button busy={gate.busy} disabled={gate.busy || !armed || !read || !gate.ready || !run.hash || !left} onClick={() => void allow()}>{t("remote.allow")}</Button>
         </div>
       )}
     </Card>
