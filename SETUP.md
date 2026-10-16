@@ -198,8 +198,10 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
   (private, never executable), starts it with the interpreter's safe flags and the scratch folder as working directory, with an empty
   environment and `PATH=/usr/bin:/bin:/usr/sbin:/sbin` (set your own PATH inside the script for a user-installed tool), and removes the folder
   afterwards. The workspace's "Output limit for script runs" (1 to 64 MB, default 8) is frozen on each run; `CM_EXEC_SCRIPT_OUTPUT_CEILING`
-  caps it on one machine. `monitor_run_result` says "output complete" or exactly what is missing and why. Shell and argv runs to a
-  production machine still need no code (decision deferred, ADR-0008 §9.13).
+  caps it on one machine. `monitor_run_result` says "output complete" or exactly what is missing and why. On a production or database
+  machine a shell command, an argv run of an interpreter, and every grant or job approval need the approver's two-step code too (a recent
+  sign-in does not replace it), and an approver without two-step sign-in cannot approve there; a plain argv run of another program does not
+  (ADR-0008 §9.13).
 - **Projects.** Every project a session works in is listed on the machine's page. For a machine without sessions, or for a folder no session
   visits, list the folder: `cm-agent config projects add <folder>` (interactive or standalone agent) or `"projects": ["/srv/shop"]` in the
   admin-owned `exec.json` (service agent). The agent reads the branch, the commit and the tag from the `.git` files without running git and

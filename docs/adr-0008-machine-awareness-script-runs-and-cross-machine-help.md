@@ -4,7 +4,7 @@
 16/10/2026 on macOS and are green (agent 1658, API 968 on PostgreSQL in Testcontainers, web 366 with 97 % lines, plugin scripts 106); **the merge gate has
 not run and nothing is promoted**, and nothing was measured on another host (§11 lists what is still unverified). Planned in mode C (product-manager, analyst,
 architect, qa; the qa pass sent it back once, its findings are folded in). The maintainer answered the planning questions on 16/10/2026 (§9); the mobile app
-(§9.18) and the TOTP rule for shell and argv runs (§9.13) are deferred by the maintainer. The facts about today's code were checked on `origin/dev` at `4702c16`,
+(§9.18) is deferred by the maintainer; the TOTP rule for shell, interpreter, grant and job approvals (§9.13) was first deferred and then taken up the same day. The facts about today's code were checked on `origin/dev` at `4702c16`,
 which already contains [ADR-0007](adr-0007-plugin-distribution-and-inbox-push.md).
 **Extends:** [ADR-0005](adr-0005-remote-work.md) (remote runs, grants, jobs, the four fail-closed keys, the executor),
 ADR-0007 (the plugin, the inbox push into a session). Data model: [`data-model.md`](data-model.md) §3 and §3b grow as in §4.
@@ -164,13 +164,15 @@ can run the application's tests on a test machine.
   `RunCreator.LockAsync` must list `[shell]` for every mode but argv (today it lists `[argv, shell]` for every mode but
   shell); and the target's `ExecPolicy.Allows` must refuse script under a ceiling as it refuses shell (today it names
   shell only). All three get a test.
-- **Strict targets need a TOTP code** from the approver for a script run; an approver without two-step sign-in cannot
-  approve (`totp_required`), and the run expires unanswered. Other targets keep the shell rule (a code only when the
-  approver has one). `approved_with_totp` is stored and sent to the target; a target whose own claim is strict refuses a
-  script not marked so. **That target check catches an API bug, not a compromised API** (a compromised API sends
-  `true`); end-to-end signed approvals stay an ADR-0005 open item. **This rule protects nothing on its own while a
-  shell run, an argv run of an interpreter, or an argv grant to the same strict target needs no code**: the same
-  payload sent through `monitor_run` in shell mode is approved with a click. Closing that is decision §9.13, re-raised.
+- **Strict targets need a TOTP code** from the approver for every per-call approval that lets a person run arbitrary text: a script, a
+  shell command, and an argv run of an interpreter (`RunCodeRule`, one definition for the API and the agent); and for every grant or job
+  approval (and an owner creating a grant) on such a target, where a recent sign-in no longer stands in for the code. An approver without
+  two-step sign-in cannot approve (`totp_required`), and the run expires unanswered. A plain argv run (not an interpreter) and the runs
+  a grant or job already covers keep the older rule (a code only when the approver has one, for shell and script). `approved_with_totp`
+  is stored and sent to the target; a target whose own claim is strict refuses a shell command or an interpreter run not marked so.
+  **That target check catches an API bug, not a compromised API** (a compromised API sends `true`); end-to-end signed approvals stay an
+  ADR-0005 open item. Grants already active when the rule arrived keep working until they expire (an interpreter is never grantable, so
+  a grant cannot carry the payload the rule exists for).
 - **The role is re-checked at delivery** (the four keys are checked at create, delivery and exec): a run approved
   without a code whose target became strict since is cancelled `role_changed`, never delivered.
 - **Interpreters.** Only inventory entries that are **trusted** (§3a′) are interpreters: `/bin/sh`, `/bin/bash`,
@@ -408,7 +410,7 @@ the service home, the `systemd --user` unit and its start limit; the macOS servi
   `bypassPermissions` session, and on Windows only to a `default` or `plan` session. The notice asking to confirm side
   effects is text, not a control. A compromised API still cannot reach a target past its local exec level; the target's
   check of `approved_with_totp` catches an API bug only.
-- The TOTP rule for scripts is only as strong as the weakest run mode to the same strict target (§9.13).
+- The TOTP rule covers a script, a shell command, an interpreter run, a grant and a job on a strict target (§9.13); a plain argv run of a program that is not an interpreter still needs only the click, and it can do only what that program does.
 - A machine without Claude Code joins the workspace as a full participant: it reports, it can be a target, and its person
   can request work from it from the CLI, approved test jobs included.
 - The project facts are read without running `git`, so a repository cannot make the daemon execute anything; the path
@@ -440,11 +442,12 @@ the service home, the `systemd --user` unit and its start limit; the macOS servi
     program:** a Windows build of the standalone agent uses the GUI subsystem (no console window; its output goes to the log),
     and macOS starts it as an app bundle's executable through the LaunchAgent. The console binary stays for the CLI verbs and for
     Linux. Phase 4 builds both and measures that no window appears on a Windows host before release.
-13. **TOTP for shell and argv runs to strict targets — deferred (maintainer, 16/10/2026):** not built now, and phase 2 does not
-    change shell or argv approvals on strict targets. Until it is decided, the script rule (3) is only as strong as the weakest run
-    mode to the same strict target (§8). The recommendation stays on record: on a strict target every per-call approval (shell, argv
-    of an interpreter, script) and every grant or job approval needs a TOTP code, under the same "no two-step sign-in, no approval"
-    rule; grants already approved keep working until they expire.
+13. **TOTP for shell and argv runs to strict targets — deferred, then decided (maintainer, 16/10/2026):** first deferred, then taken up the same day
+    ("finish the remaining phases"). On a strict target every per-call approval that runs arbitrary text (shell, argv of an interpreter,
+    script) and every grant or job approval needs a TOTP code, under the same "no two-step sign-in, no approval" rule; a recent sign-in does
+    not replace the code for a grant or a job there. Grants already active keep working until they expire. A run approved without a code whose
+    target became strict before delivery is cancelled `role_changed`, as a script already was. Built with `RunCodeRule`, the approval gate
+    in `RemoteChecks`, the delivery re-check, the web card and the target's own check.
 14. **Mode for implementation — decided:** mode C (the maintainer's choice over the mode rule's pointer to D); the
     security and schema dimensions are reviewed by `qa` with the orchestrator verifying the critical findings, and the
     coverage threshold by the gate.
@@ -479,7 +482,7 @@ the output cap and the completeness verdict, `monitor_run_script`), 3 (asks, `mo
 the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is deferred by the maintainer; [ADR-0009](adr-0009-mobile-app.md) is its planning document only (questions, nothing decided or built).
 
 **Differences from the plan, each on purpose.**
-- Shell and argv approvals on strict targets still need no code (§9.13 deferred), so the script rule is only as strong as the weakest run mode there.
+- The two-step code rule of scripts was extended (§9.13) to shell commands, interpreter runs, grants and jobs on strict targets, after the first version of this section.
 - Listening-service process names come from `/proc` on Linux, from the trusted system `lsof` on macOS and from the IP helper's listener table on Windows; only the
   agent account's own processes are named (another account's port shows without a name).
 - Project facts: an admin-listed folder is read, and so is a folder a session worked in in the last 30 days (the hook remembers its path in the local database; the
