@@ -1,0 +1,55 @@
+using System.IO.Pipes;
+using System.Net.Sockets;
+using System.Text;
+
+namespace ClaudeMonitor.Agent.Push;
+
+/// <summary>Writes lines to a session's inbox (ADR-0007). A seam: tests never open a real Claude Code socket.</summary>
+public interface IInboxTransport
+{
+    /// <summary>Connects to the endpoint, writes the lines in order (each ends with a newline) and closes. Throws when it cannot.</summary>
+    Task SendAsync(string endpoint, IReadOnlyList<string> lines, TimeSpan connectTimeout, CancellationToken ct);
+}
+
+/// <summary>
+/// The real inbox: a Unix domain socket on macOS and Linux, a named pipe on Windows (<c>\\.\pipe\name</c>). Claude Code answers nothing
+/// on either, so a send that returned means "written", never "read".
+/// </summary>
+public sealed class SocketInboxTransport : IInboxTransport
+{
+    public const string PipePrefix = @"\\.\pipe\";
+
+    /// <summary>True when the endpoint is something this transport may connect to: an absolute socket path, or a local named pipe.</summary>
+    public static bool IsEndpoint(string? endpoint) =>
+        endpoint is { Length: > 0 } && endpoint.All(c => c != '\0')
+        && (endpoint.StartsWith(PipePrefix, StringComparison.OrdinalIgnoreCase) ? OperatingSystem.IsWindows() && endpoint.Length > PipePrefix.Length
+            : !OperatingSystem.IsWindows() && Path.IsPathRooted(endpoint));
+
+    public async Task SendAsync(string endpoint, IReadOnlyList<string> lines, TimeSpan connectTimeout, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        if (!IsEndpoint(endpoint)) throw new InvalidOperationException("not an inbox endpoint");
+        var bytes = Encoding.UTF8.GetBytes(string.Concat(lines.Select(l => l + "\n")));
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(connectTimeout);
+        try
+        {
+            if (endpoint.StartsWith(PipePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                await using var pipe = new NamedPipeClientStream(".", endpoint[PipePrefix.Length..], PipeDirection.Out, PipeOptions.Asynchronous);
+                await pipe.ConnectAsync(limit.Token);
+                await pipe.WriteAsync(bytes, limit.Token);
+                await pipe.FlushAsync(limit.Token);
+                return;
+            }
+
+            using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            await socket.ConnectAsync(new UnixDomainSocketEndPoint(endpoint), limit.Token);
+            await socket.SendAsync(bytes, SocketFlags.None, limit.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new TimeoutException("the inbox did not answer in time"); // the session's own limit, not a stop of the daemon
+        }
+    }
+}

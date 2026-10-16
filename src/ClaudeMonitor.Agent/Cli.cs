@@ -23,10 +23,11 @@ public static class Cli
 {
     public const string Usage = """
         cm-agent login --server <url>   connect this machine (shows a code to approve on the web)
-        cm-agent install [--stop-wait <seconds>] [--push on|off]
+        cm-agent install [--stop-wait <seconds>] [--push on|off|inbox|channel]
                                         register the Claude Code plugin (hooks + MCP) that starts the agent;
                                         --stop-wait: how long a finished turn waits for a prompt from the web (0-590, default 0)
-                                        --push: deliver web messages into an idle session as a Claude Code channel (default off)
+                                        --push: deliver web messages into an idle session (default off). on = inbox: the daemon writes to
+                                        the session's own socket, no start-up flag; channel = the older Claude Code channel (ADR-0003)
         cm-agent install --exec off|argv|shell
                                         whether approved remote runs may execute on this machine (default off)
         cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
@@ -115,13 +116,13 @@ public static class Cli
         if (Array.IndexOf(args, "--push") >= 0)
         {
             var value = Option(args, "--push");
-            if (value is not ("on" or "off"))
+            if (value != "off" && !PushTransports.Enables(value))
             {
-                stderr.WriteLine($"--push takes on or off, not \"{value}\".");
+                stderr.WriteLine($"--push takes on, off, inbox or channel, not \"{value}\".");
                 return 2;
             }
 
-            config = SavedSettings.SavePush(config, value == "on");
+            config = SavedSettings.SavePush(config, value != "off", value == "off" ? null : PushTransports.Normalize(value));
         }
 
         return new PluginInstaller(config, stdout, run).Install(sourceBinary);
@@ -196,12 +197,12 @@ public static class Cli
         builder.Services.AddSingleton(clock);
         var mcp = builder.Services.AddMcpServer(o =>
         {
-            if (!config.PushEnabled) return; // off: the server is exactly what it was before the push existed
+            if (!config.ChannelPushEnabled) return; // off, or through the inbox: the server is exactly what it was before the push existed
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
             o.ServerInstructions = ChannelEnvelopes.Instructions;
         });
         mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<GrantTools>();
-        if (config.PushEnabled) builder.Services.AddHostedService<ChannelHost>();
+        if (config.ChannelPushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }
 }

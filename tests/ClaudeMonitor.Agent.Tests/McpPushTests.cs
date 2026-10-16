@@ -89,7 +89,7 @@ public sealed class McpPushTests : IDisposable
     public async Task With_push_on_an_idle_server_writes_the_web_message_as_a_channel_notification_once()
     {
         (Identity.Load(home.Config) with { Server = "https://m.invalid", AgentId = Guid.NewGuid(), WorkspaceId = Guid.NewGuid() }).Save(home.Config);
-        using var p = Start("on", "s-on");
+        using var p = Start("channel", "s-on");
         try
         {
             var init = await InitializeAsync(p);

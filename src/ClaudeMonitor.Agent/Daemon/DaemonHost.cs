@@ -70,6 +70,8 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var updates = new UpdateLoop(config, updateStore, new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock),
             () => DaemonControl.SpawnAutoUpdate(config, log), clock);
         using var claudeStore = new LocalStore(config.DatabasePath);
+        using var inboxStore = new LocalStore(config.DatabasePath);
+        var inbox = new InboxPump(new LiveSettings(config, clock).Current, inboxStore, new SocketInboxTransport(), clock);
         var claudeUpdates = new ClaudeUpdater(config, claudeStore, new SystemProcessRunner(), new SystemNotifier(new SystemProcessRunner(), config.UpdateProbeTimeout), log, clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
         await Task.WhenAll(
@@ -83,6 +85,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 await relay.UploadAsync(ct);
                 await relay.ReportCommandsAsync(ct);
             }, api, revoked, error => relay.UploadOutcome(error)),
+            Loop("inbox", config.PushPollEvery, ct => inbox.PumpAsync(ct), api, revoked),
             Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
             Loop("settings", config.SettingsEvery, async ct =>
             {
