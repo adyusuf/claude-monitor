@@ -25,7 +25,7 @@ def make_plugin(root):
         handle.write('{"name": "monitor-agent"}')
     with open(os.path.join(root, 'scripts', 'run.sh'), 'w') as handle:
         handle.write('#!/bin/sh\n')
-    os.chmod(os.path.join(root, 'scripts', 'run.sh'), 0o755)
+    os.chmod(os.path.join(root, 'scripts', 'run.sh'), 0o700)  # owner-only execute: all the build reads is S_IXUSR
     with open(os.path.join(root, 'agent-release.txt'), 'w') as handle:
         handle.write('1.2.3\n')
     with open(os.path.join(root, '.DS_Store'), 'w') as handle:
