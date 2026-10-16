@@ -33,16 +33,23 @@ public sealed class UpdaterRefusalTests : IDisposable
     }
 
     [Theory]
-    [InlineData("https://evil.invalid/downloads/a.zip")]
-    [InlineData("https://monitor.invalid:8443/downloads/a.zip")]
-    [InlineData("http://monitor.invalid/downloads/a.zip")]
-    [InlineData("https://monitor.invalid/other/a.zip")]
-    [InlineData("https://monitor.invalid/downloadsx/a.zip")]
-    [InlineData("https://monitor.invalid/")]
+    [InlineData("https://monitor.invalid:8443/downloads/a.zip")] // another port
+    [InlineData("http://monitor.invalid/downloads/a.zip")] // not https
+    [InlineData("http://downloads.invalid/daemons/prod/a.zip")]
+    [InlineData("https://monitor.invalid/")] // no file
+    [InlineData("https://downloads.invalid:8443/daemons/prod/a.zip")]
+    [InlineData("https://203.0.113.7/daemons/prod/a.zip")] // an address, not a name
+    [InlineData("https://[2001:db8::1]/daemons/prod/a.zip")]
+    [InlineData("https://localhost/daemons/prod/a.zip")]
+    [InlineData("https://nas.local/daemons/prod/a.zip")]
+    [InlineData("https://user:pw@downloads.invalid/daemons/prod/a.zip")]
+    [InlineData("https://downloads.invalid/daemons/prod/a.zip?token=1")]
+    [InlineData("https://downloads.invalid/daemons/prod/a.zip#x")]
+    [InlineData("https://downloads.invalid/daemons/prod/.hidden")]
     [InlineData("/downloads/a.zip")]
     [InlineData("not a url")]
     [InlineData("")]
-    public async Task A_download_address_off_this_servers_downloads_is_refused_before_anything_is_fetched(string url)
+    public async Task A_download_address_that_is_neither_this_server_nor_a_plain_public_https_file_is_refused_before_anything_is_fetched(string url)
     {
         kit.InstallOld();
         var zip = kit.Zip();

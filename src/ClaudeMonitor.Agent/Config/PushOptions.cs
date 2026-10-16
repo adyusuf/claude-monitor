@@ -22,6 +22,22 @@ public static class PushTransports
     public static bool Enables(string? value) => value is "on" or Inbox or Channel;
 }
 
+/// <summary>
+/// What a prompt written to a session's inbox looks like (ADR-0007, amendment A2): the whole text (the notice, the wrapper and the message), or a
+/// one-line notice that holds no text from the web and tells the session to read the message with the monitor_inbox_read tool. Not a transport:
+/// the transport (and what the API is told about it) stays the inbox.
+/// </summary>
+public static class InboxFormats
+{
+    public const string Full = "full";
+    public const string Brief = "short"; // the value people type; the name avoids the type-name rule (CA1720)
+
+    /// <summary>"full" is the whole text; anything else, and nothing saved, is the short notice (the maintainer's decision, 16/10/2026: the simple form is the default).</summary>
+    public static string Normalize(string? value) => value == Full ? Full : Brief;
+
+    public static bool IsValid(string? value) => value is Full or Brief;
+}
+
 /// <summary>A secret that cannot reach a log by accident: its text form, which a record's generated ToString and every interpolation use, hides it.</summary>
 public sealed record SecretText(string Value)
 {
