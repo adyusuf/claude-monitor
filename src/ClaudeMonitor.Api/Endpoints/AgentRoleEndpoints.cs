@@ -63,11 +63,11 @@ public static class AgentRoleEndpoints
         var now = clock.GetUtcNow();
         // Compare-and-set on the values the decision was made on: a concurrent raise to production is never overwritten without its re-authentication.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        var changed = await db.Agents
-            .Where(a => a.Id == id && a.Status == AgentStatuses.Active && a.RoleEnvironment == before.environment && a.RoleFunction == before.function)
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.RoleEnvironment, req.Environment).SetProperty(a => a.RoleFunction, req.Function)
-                .SetProperty(a => a.RoleSetAt, now).SetProperty(a => a.RoleSetBy, userId), http.RequestAborted);
-        if (changed != 1) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "conflict");
+        if (!await TrySetAsync(db, id, before.environment, before.function, req.Environment, req.Function, now, userId, http.RequestAborted))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "conflict");
+        }
+
         Audit.Add(db, http, clock, AuditActions.AgentRoleChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: id,
             detail: new { before, after = new { environment = req.Environment, function = req.Function } });
         await db.SaveChangesAsync(http.RequestAborted);
@@ -78,6 +78,18 @@ public static class AgentRoleEndpoints
         agent.RoleSetBy = userId;
         broker.Publish(Broker.Workspace(agent.WorkspaceId), new StreamMessage(MachineEvent, new { agentId = id }));
         return Results.Ok(View(agent));
+    }
+
+    /// <summary>Writes the role only while the row still holds the values the decision was made on; false when it changed in between.</summary>
+    public static async Task<bool> TrySetAsync(MonitorDb db, Guid id, string? beforeEnvironment, string? beforeFunction, string? environment,
+        string? function, DateTimeOffset now, Guid userId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        var changed = await db.Agents
+            .Where(a => a.Id == id && a.Status == AgentStatuses.Active && a.RoleEnvironment == beforeEnvironment && a.RoleFunction == beforeFunction)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.RoleEnvironment, environment).SetProperty(a => a.RoleFunction, function)
+                .SetProperty(a => a.RoleSetAt, now).SetProperty(a => a.RoleSetBy, userId), ct);
+        return changed == 1;
     }
 
     public static AgentRoleView View(Agent a)

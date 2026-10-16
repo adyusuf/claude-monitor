@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using ClaudeMonitor.Api.Endpoints;
 using ClaudeMonitor.Api.Tests.Infrastructure;
 using ClaudeMonitor.Contracts;
 
@@ -83,16 +84,18 @@ public sealed class MachineFactsViewTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task Two_admins_cannot_both_win_a_race_the_second_write_on_a_stale_role_is_a_conflict()
+    public async Task A_write_decided_on_a_stale_role_changes_nothing_and_is_refused()
     {
         var team = await RemoteKit.TeamAsync(api);
-        var first = await team.Admin.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/role", new { environment = "production", function = "application" });
-        Assert.Equal(System.Net.HttpStatusCode.OK, first.StatusCode);
-        // The compare-and-set writes only when the row still holds the values the decision was made on: a raise and a lowering decided on
-        // the same "before" cannot both win. With a recent sign-in the lowering itself is allowed and lands.
-        var second = await team.Admin.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/role", new { environment = "test", function = "application" });
-        Assert.Equal(System.Net.HttpStatusCode.OK, second.StatusCode);
+        (await team.Admin.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/role", new { environment = "production", function = "application" }))
+            .EnsureSuccessStatusCode();
+        await using var db = api.Db();
+        // The decision was made on the row as it was before the raise (nothing set); the write must not overwrite the production role.
+        var written = await AgentRoleEndpoints.TrySetAsync(db, team.TargetId, null, null, "test", "application", DateTimeOffset.UtcNow, team.Admin.Id, default);
+        Assert.False(written);
         var (machine, _) = await MachineAsync(team);
-        Assert.Equal("test", machine.GetProperty("roleEnvironment").GetString());
+        Assert.Equal("production", machine.GetProperty("roleEnvironment").GetString());
+        // The same write on the values the row holds lands.
+        Assert.True(await AgentRoleEndpoints.TrySetAsync(db, team.TargetId, "production", "application", "test", "application", DateTimeOffset.UtcNow, team.Admin.Id, default));
     }
 }
