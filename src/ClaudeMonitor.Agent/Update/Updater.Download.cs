@@ -11,14 +11,18 @@ namespace ClaudeMonitor.Agent.Update;
 
 public sealed partial class Updater
 {
+    private bool OnOwnServer(Uri url) =>
+        downloads.BaseAddress is { } server && url.GetLeftPart(UriPartial.Authority) == server.GetLeftPart(UriPartial.Authority)
+        && url.AbsolutePath.StartsWith("/" + UpdatePaths.DownloadsFolder + "/", StringComparison.Ordinal);
+
     /// <summary>Null when the verified binary is staged next to the installed one; otherwise why it was refused.</summary>
     private async Task<UpdateResult?> DownloadAndStageAsync(UpdateOffer offer, string staged, CancellationToken ct)
     {
-        if (!Uri.TryCreate(offer.Url, UriKind.Absolute, out var url) || downloads.BaseAddress is not { } server
-            || url.GetLeftPart(UriPartial.Authority) != server.GetLeftPart(UriPartial.Authority)
-            || !url.AbsolutePath.StartsWith("/" + UpdatePaths.DownloadsFolder + "/", StringComparison.Ordinal))
+        // Either this agent's own server (/downloads/), or a download host the API's MONITOR_DOWNLOADS_URL names: https on a public DNS
+        // name, a plain file. The address is not what makes the build trusted: the signed SHA-256 below is.
+        if (!Uri.TryCreate(offer.Url, UriKind.Absolute, out var url) || !(OnOwnServer(url) || UpdateUrls.IsExternalFile(url)))
         {
-            return new(UpdateCodes.BadUrl, "the download address is not on this agent's own server");
+            return new(UpdateCodes.BadUrl, "the download address is neither on this agent's own server nor a plain https file on a public host");
         }
 
         Directory.CreateDirectory(config.UpdateDir);
