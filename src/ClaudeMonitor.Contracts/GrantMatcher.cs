@@ -33,6 +33,7 @@ public static partial class GrantMatcher
 
     private const string RunHashTag = "run1";
     private const string ScriptHashTag = "script1";
+    private const string ScriptHashTagWithFiles = "script2";
     private const string GrantHashTag = "grant1";
 
     /// <summary>Null when the template is valid, else a <see cref="GrantErrors"/> code.</summary>

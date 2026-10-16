@@ -187,6 +187,8 @@ public static class RemoteErrors
     public const string RoleChanged = "role_changed";
 
     public const string InvalidScript = "invalid_script";
+    public const string InvalidFiles = "invalid_files";
+    public const string FilesUnsupported = "files_unsupported";
     public const string InvalidInterpreter = "invalid_interpreter";
 
     /// <summary>An admin note with control characters or over the limit (ADR-0008 §3a′).</summary>

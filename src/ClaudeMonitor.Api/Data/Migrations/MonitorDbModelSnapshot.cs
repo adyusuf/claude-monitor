@@ -1570,10 +1570,18 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("script_body");
 
+                    b.Property<string>("ScriptFilesJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("script_files_json");
+
                     b.Property<string>("ScriptInterpreter")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("script_interpreter");
+
+                    b.Property<string>("ScriptStdin")
+                        .HasColumnType("text")
+                        .HasColumnName("script_stdin");
 
                     b.Property<string>("ShellCommand")
                         .HasColumnType("text")
@@ -1682,6 +1690,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
                             t.HasCheckConstraint("ck_remote_runs_mode_shape", "(mode = 'argv' AND shell_command IS NULL AND script_body IS NULL) OR (mode = 'shell' AND argv IS NULL AND script_body IS NULL) OR (mode = 'script' AND argv IS NULL AND shell_command IS NULL AND cwd IS NULL)");
 
                             t.HasCheckConstraint("ck_remote_runs_output_cap", "output_cap IS NULL OR output_cap BETWEEN 1048576 AND 67108864");
+
+                            t.HasCheckConstraint("ck_remote_runs_script_extras", "(script_files_json IS NULL AND script_stdin IS NULL) OR mode = 'script'");
 
                             t.HasCheckConstraint("ck_remote_runs_script_interpreter", "script_interpreter IS NULL OR script_interpreter IN ('sh', 'bash', 'powershell', 'python')");
 

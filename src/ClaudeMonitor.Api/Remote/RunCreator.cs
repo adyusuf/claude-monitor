@@ -39,6 +39,11 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
         if (target is null) return NotFound();
         if (RunRules.Check(req, config, target.Os) is { } invalid) return RunCreateResult.Refused(StatusCodes.Status400BadRequest, invalid);
         if (req.Mode == RunModes.Script && ScriptRefusal(target.a, req.ScriptInterpreter) is { } refusal) return RunCreateResult.Refused(StatusCodes.Status409Conflict, refusal);
+        // An agent that does not report it cannot run files or a stdin text: it would run the script without them, so it is not offered the run.
+        if (req.Mode == RunModes.Script && ScriptFiles.Any(req.ScriptFiles, req.ScriptStdin) && target.a.Capabilities?.Contains(AgentCapabilities.ScriptFiles) != true)
+        {
+            return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.FilesUnsupported);
+        }
 
         var existing = await db.RemoteRuns.AsNoTracking()
             .FirstOrDefaultAsync(r => r.RequesterAgentId == agentId && r.ClientKey == req.ClientKey, ct);
@@ -110,7 +115,7 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
 
     public static string RunHash(RemoteRun run) => run.Mode == RunModes.Script
         ? GrantMatcher.ScriptHash(run.ScriptInterpreter ?? "", run.ScriptBody ?? "", run.ScriptArgs, run.TimeoutSeconds, run.TargetAgentId,
-            run.TargetEnvironment, run.TargetFunction)
+            run.TargetEnvironment, run.TargetFunction, run.ScriptFiles, run.ScriptStdin)
         : GrantMatcher.RunHash(run.Mode, run.Argv, run.ShellCommand, run.Cwd, run.TimeoutSeconds, run.TargetAgentId);
 
     /// <summary>
@@ -138,6 +143,8 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
         run.ScriptInterpreter = req.ScriptInterpreter;
         run.ScriptBody = req.ScriptBody;
         run.ScriptArgs = req.ScriptArgs?.ToList();
+        run.ScriptFiles = req.ScriptFiles?.OrderBy(f => f.Path, StringComparer.Ordinal).ToList();
+        run.ScriptStdin = req.ScriptStdin is { Length: > 0 } stdin ? stdin : null;
         run.TargetEnvironment = MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment);
         run.TargetFunction = MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction);
         run.OutputCap = Math.Clamp(settings.ScriptOutputMaxBytes, config.ScriptOutputFloor, config.ScriptOutputCeiling);

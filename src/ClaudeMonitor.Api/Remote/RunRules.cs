@@ -29,7 +29,7 @@ public static class RunRules
         ArgumentNullException.ThrowIfNull(config);
         if (req.ClientKey is not { Length: >= 1 and <= ClientKeyMax } || HasControl(req.ClientKey)) return BadClientKey;
         if (req.Mode == RunModes.Script) return CheckScript(req, config);
-        if (req.ScriptBody is not null || req.ScriptInterpreter is not null || req.ScriptArgs is not null) return BadCommand;
+        if (req.ScriptBody is not null || req.ScriptInterpreter is not null || req.ScriptArgs is not null || req.ScriptFiles is not null || req.ScriptStdin is not null) return BadCommand;
         var command = req.Mode switch
         {
             RunModes.Argv => req.ShellCommand is null && req.Argv is { Count: > 0 } argv && argv.Count <= config.RunArgvMax
@@ -61,6 +61,7 @@ public static class RunRules
         var max = Math.Min(config.RunScriptMax, ScriptInterpreters.BodyCeiling);
         if (req.ScriptBody is not { Length: >= 1 } body || body.Length > max || body.Contains('\0') || string.IsNullOrWhiteSpace(body)) return InvalidScript;
         if (req.ScriptArgs is { } args && (args.Count > ScriptInterpreters.ArgsMax || args.Any(a => a is null || a.Length > ScriptInterpreters.ArgChars || a.Contains('\0')))) return InvalidScript;
+        if (ScriptFiles.Validate(req.ScriptFiles, req.ScriptStdin) is { } invalidFiles) return invalidFiles;
         if (req.Argv is not null || req.ShellCommand is not null) return BadCommand;
         if (req.Cwd is not null) return BadCwd;
         if (req.TimeoutSeconds is < 1 or > 3600) return BadTimeout;
@@ -86,7 +87,9 @@ public static class RunRules
                && req.Cwd == run.Cwd && req.TimeoutSeconds == run.TimeoutSeconds
                && (req.Argv ?? []).SequenceEqual(run.Argv ?? [])
                && req.ScriptInterpreter == run.ScriptInterpreter && req.ScriptBody == run.ScriptBody
-               && (req.ScriptArgs ?? []).SequenceEqual(run.ScriptArgs ?? []);
+               && (req.ScriptArgs ?? []).SequenceEqual(run.ScriptArgs ?? [])
+               && req.ScriptStdin == run.ScriptStdin
+               && (req.ScriptFiles ?? []).OrderBy(f => f.Path, StringComparer.Ordinal).SequenceEqual((run.ScriptFiles ?? []).OrderBy(f => f.Path, StringComparer.Ordinal));
     }
 
     private static bool HasControl(string value) => value.Any(char.IsControl);

@@ -85,7 +85,7 @@ public static class RunNotices
         }
 
         return new RunMessage(run.Id, run.Mode, run.Argv, run.ShellCommand, run.Cwd, run.TimeoutSeconds, run.ExpiresAt,
-            run.GrantId, grant, run.DecidedAt, run.ScriptInterpreter, run.ScriptBody, run.ScriptArgs, run.OutputCap, run.ApprovedWithTotp);
+            run.GrantId, grant, run.DecidedAt, run.ScriptInterpreter, run.ScriptBody, run.ScriptArgs, run.OutputCap, run.ApprovedWithTotp, run.ScriptFiles, run.ScriptStdin);
     }
 
     /// <summary>The approved runs a target still owes an answer for, replayed on every stream connection.</summary>

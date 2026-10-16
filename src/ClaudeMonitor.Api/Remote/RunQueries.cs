@@ -18,7 +18,8 @@ public sealed record WebRunView(Guid Id, Guid TargetAgentId, string TargetHostna
     string? ProjectKey = null, string? Kind = null, string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null,
     string? InterpreterPath = null, string? TargetEnvironment = null, string? TargetFunction = null, bool Strict = false, bool NeedsCode = false,
     long? OutputCap = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, long? OutputRefusedBytes = null, int? OutputMissingFromSeq = null,
-    int? OutputChunks = null, bool? OutputComplete = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null);
+    int? OutputChunks = null, bool? OutputComplete = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null,
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
 
 public static class RunQueries
 {
@@ -41,7 +42,7 @@ public static class RunQueries
         return new RunView(r.Id, r.TargetAgentId, hostname, r.Mode, r.Argv, r.ShellCommand, r.Cwd, r.TimeoutSeconds, r.Status,
             r.ExitCode, r.Error, r.OutputBytes, r.OutputTruncated, r.CreatedAt, r.ExpiresAt, r.EndedAt, r.GrantId, r.JobId,
             r.ProjectKey, r.Kind, r.TestsPassed, r.TestsFailed, r.TestsSkipped, r.ScriptInterpreter, r.ScriptBody, r.ScriptArgs, r.TargetEnvironment,
-            r.TargetFunction, r.OutputCap, r.OutputReadBytes, r.OutputDroppedBytes, r.OutputRefusedBytes, r.OutputMissingFromSeq, r.OutputChunks, r.OutputComplete);
+            r.TargetFunction, r.OutputCap, r.OutputReadBytes, r.OutputDroppedBytes, r.OutputRefusedBytes, r.OutputMissingFromSeq, r.OutputChunks, r.OutputComplete, ScriptFiles: r.ScriptFiles, ScriptStdin: r.ScriptStdin);
     }
 
     public static async Task<RunOutputPage> OutputAsync(MonitorDb db, Guid runId, int after, int limit, bool done, CancellationToken ct)
@@ -109,7 +110,8 @@ public static class RunQueries
                 NeedsCode: pending && RunCodeRule.NeedsCode(r.Mode, r.Argv, x.TargetOs, StrictNow(x.RoleEnvironment, x.RoleFunction, x.ClaimedEnvironment, x.ClaimedFunction)),
                 OutputCap: r.OutputCap, OutputReadBytes: r.OutputReadBytes, OutputDroppedBytes: r.OutputDroppedBytes, OutputRefusedBytes: r.OutputRefusedBytes,
                 OutputMissingFromSeq: r.OutputMissingFromSeq, OutputChunks: r.OutputChunks, OutputComplete: r.OutputComplete,
-                TestsPassed: r.TestsPassed, TestsFailed: r.TestsFailed, TestsSkipped: r.TestsSkipped);
+                TestsPassed: r.TestsPassed, TestsFailed: r.TestsFailed, TestsSkipped: r.TestsSkipped,
+                ScriptFiles: visible ? r.ScriptFiles : null, ScriptStdin: visible ? r.ScriptStdin : null);
         }).ToList();
     }
 }

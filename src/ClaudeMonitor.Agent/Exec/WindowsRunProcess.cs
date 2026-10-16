@@ -44,14 +44,14 @@ internal sealed unsafe partial class WindowsRunProcess : RunProcessBase
     }
 
     public static WindowsRunProcess Start(string exe, string commandLine, string cwd, IReadOnlyDictionary<string, string> env,
-        Action<string>? log = null)
+        Action<string>? log = null, string? stdinFile = null)
     {
         var job = CreateJob();
         var stdout = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
         var stderr = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
         try
         {
-            using var nul = File.OpenHandle(NulDevice, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var nul = File.OpenHandle(stdinFile ?? NulDevice, FileMode.Open, FileAccess.Read, FileShare.ReadWrite); // the run's approved stdin text, else NUL
             var process = Create(exe, commandLine, cwd, env, nul.DangerousGetHandle(),
                 stdout.ClientSafePipeHandle.DangerousGetHandle(), stderr.ClientSafePipeHandle.DangerousGetHandle(), job);
             stdout.DisposeLocalCopyOfClientHandle(); // else the read end never sees the end of the output

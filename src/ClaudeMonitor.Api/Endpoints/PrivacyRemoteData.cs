@@ -35,6 +35,8 @@ public static class PrivacyRemoteData
             w.WriteString("scriptInterpreter", r.ScriptInterpreter);
             w.WriteString("scriptBody", r.ScriptBody);
             PrivacyEndpoints.Write(w, "scriptArgs", r.ScriptArgs);
+            w.WriteString("scriptFiles", r.ScriptFilesJson);
+            w.WriteString("scriptStdin", r.ScriptStdin);
             w.WriteString("cwd", r.Cwd);
             w.WriteString("status", r.Status);
             w.WriteString("projectKey", r.ProjectKey);
@@ -181,7 +183,7 @@ public static class PrivacyRemoteData
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Argv, (List<string>?)null).SetProperty(r => r.ShellCommand, (string?)null)
                 .SetProperty(r => r.Cwd, (string?)null).SetProperty(r => r.Reason, (string?)null)
                 .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null).SetProperty(r => r.ProjectKey, (string?)null).SetProperty(r => r.ScriptBody, (string?)null)
-                .SetProperty(r => r.ScriptArgs, (List<string>?)null), ct);
+                .SetProperty(r => r.ScriptArgs, (List<string>?)null).SetProperty(r => r.ScriptFilesJson, (string?)null).SetProperty(r => r.ScriptStdin, (string?)null), ct);
         // ADR-0008 §3f: an ask is personal data like a command: the open ones are cancelled above, and the text of every one is emptied (the rows stay for the audit).
         await AskReports.CancelOpenAsync(db, broker, now, a => a.RequesterUserId == userId || a.TargetUserId == userId, ct, after);
         await db.MachineAsks.Where(a => a.RequesterUserId == userId || a.TargetUserId == userId)

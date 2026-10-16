@@ -36,11 +36,12 @@ public static class ProcessTree
     /// Starts exe with args (argv mode). The environment is exactly <paramref name="env"/>, never inherited. argv0 is what
     /// the child sees as its own name (default: exe). Throws when the OS refuses to start it; the message carries no argument.
     /// <paramref name="limits"/> are applied on macOS through <see cref="RunLauncher"/> (and nowhere else, see <see cref="RunLimits"/>).
+    /// <paramref name="stdinFile"/>, when given, is opened read-only as the child's stdin instead of the null device (a script run's approved stdin text).
     /// <paramref name="trackEvery"/> above zero makes a kill reach descendants that left the process group, on macOS only
     /// (<see cref="DescendantTracker"/>, best effort).
     /// </summary>
     public static IRunProcess Start(string exe, IReadOnlyList<string> args, string cwd, IReadOnlyDictionary<string, string> env,
-        string? argv0 = null, RunLimits? limits = null, TimeSpan trackEvery = default, Action<string>? log = null)
+        string? argv0 = null, RunLimits? limits = null, TimeSpan trackEvery = default, Action<string>? log = null, string? stdinFile = null)
     {
         Validate(exe, args, cwd, env);
         if (OperatingSystem.IsWindows())
@@ -53,16 +54,16 @@ public static class ProcessTree
 
             var line = new StringBuilder(QuoteWindowsArg(argv0 ?? exe));
             foreach (var a in args) line.Append(' ').Append(QuoteWindowsArg(a));
-            return WindowsRunProcess.Start(exe, line.ToString(), cwd, env, log);
+            return WindowsRunProcess.Start(exe, line.ToString(), cwd, env, log, stdinFile);
         }
 
         if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
         {
             IReadOnlyList<string> argv = [argv0 ?? exe, .. args];
-            if (limits is null || !RunLimits.AppliesHere) return UnixRunProcess.Start(exe, argv, cwd, env, trackEvery, log);
+            if (limits is null || !RunLimits.AppliesHere) return UnixRunProcess.Start(exe, argv, cwd, env, trackEvery, log, stdinFile: stdinFile);
             UnixRunProcess.RequireExecutable(exe);
             var (launcher, wrapped) = RunLauncher.Wrap(exe, argv, limits);
-            return UnixRunProcess.Start(launcher, wrapped, cwd, env, trackEvery, log);
+            return UnixRunProcess.Start(launcher, wrapped, cwd, env, trackEvery, log, stdinFile: stdinFile);
         }
 
         throw new PlatformNotSupportedException("Remote runs are supported on Windows, macOS and Linux.");

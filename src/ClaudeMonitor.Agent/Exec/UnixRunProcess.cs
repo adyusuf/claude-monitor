@@ -55,14 +55,14 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
     /// <paramref name="trackerFor"/> (tests) replaces the tracker that would be started: it gets the new process's pid.
     /// </summary>
     public static UnixRunProcess Start(string exe, IReadOnlyList<string> argv, string cwd, IReadOnlyDictionary<string, string> env,
-        TimeSpan trackEvery = default, Action<string>? log = null, Func<int, DescendantTracker?>? trackerFor = null)
+        TimeSpan trackEvery = default, Action<string>? log = null, Func<int, DescendantTracker?>? trackerFor = null, string? stdinFile = null)
     {
         // .NET creates both pipes close-on-exec, so no other child can inherit them; the spawn dup2s the write ends to 1 and 2.
         var stdout = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
         var stderr = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
         try
         {
-            var pid = Spawn(exe, argv, cwd, env, FdOf(stdout.ClientSafePipeHandle), FdOf(stderr.ClientSafePipeHandle));
+            var pid = Spawn(exe, argv, cwd, env, FdOf(stdout.ClientSafePipeHandle), FdOf(stderr.ClientSafePipeHandle), stdinFile);
             stdout.DisposeLocalCopyOfClientHandle(); // else the read end never sees the end of the output
             stderr.DisposeLocalCopyOfClientHandle();
             var tracker = trackerFor is null ? StartTracker(pid, trackEvery, log) : trackerFor(pid);
@@ -117,7 +117,7 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
         return fd;
     }
 
-    private static int Spawn(string exe, IReadOnlyList<string> argv, string cwd, IReadOnlyDictionary<string, string> env, int outFd, int errFd)
+    private static int Spawn(string exe, IReadOnlyList<string> argv, string cwd, IReadOnlyDictionary<string, string> env, int outFd, int errFd, string? stdinFile = null)
     {
         var argvPtrs = new nint[argv.Count + 1];
         var envPtrs = new nint[env.Count + 1];
@@ -147,7 +147,7 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
 
             Check(posix_spawn_file_actions_init(actions), "file_actions_init");
             actionsReady = true;
-            Check(posix_spawn_file_actions_addopen(actions, 0, DevNull, ORdOnly, 0), "stdin");
+            Check(posix_spawn_file_actions_addopen(actions, 0, stdinFile ?? DevNull, ORdOnly, 0), "stdin"); // the run's approved stdin text, else the null device
             Check(posix_spawn_file_actions_adddup2(actions, outFd, 1), "stdout");
             Check(posix_spawn_file_actions_adddup2(actions, errFd, 2), "stderr");
             if (AddCloseFrom != 0) Check(((delegate* unmanaged<nint, int, int>)AddCloseFrom)(actions, FirstFreeFd), "closefrom");

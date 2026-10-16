@@ -146,6 +146,9 @@ export interface WebRunView {
   scriptInterpreter?: string | null;
   scriptBody?: string | null;
   scriptArgs?: string[] | null;
+  /** ADR-0010: the text files a script run carries next to the script, and the text for its stdin. Absent on an older API. */
+  scriptFiles?: { path: string; text: string }[] | null;
+  scriptStdin?: string | null;
   interpreterPath?: string | null;
   targetEnvironment?: string | null;
   targetFunction?: string | null;

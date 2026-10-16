@@ -78,6 +78,19 @@ public sealed class RemoteRun
     public string? ScriptInterpreter { get; set; }
     public string? ScriptBody { get; set; }
     public List<string>? ScriptArgs { get; set; }
+
+    /// <summary>The files a script run carries as JSON (jsonb), and the text written to its stdin (ADR-0010 §2); both null for a run without.</summary>
+    public string? ScriptFilesJson { get; set; }
+    public string? ScriptStdin { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public IReadOnlyList<ClaudeMonitor.Contracts.ScriptFile>? ScriptFiles
+    {
+        get => ScriptFilesJson is null ? null : System.Text.Json.JsonSerializer.Deserialize<List<ClaudeMonitor.Contracts.ScriptFile>>(ScriptFilesJson, FilesJson);
+        set => ScriptFilesJson = value is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(value, FilesJson) : null;
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions FilesJson = new(System.Text.Json.JsonSerializerDefaults.Web);
     public string? TargetEnvironment { get; set; }
     public string? TargetFunction { get; set; }
     public bool ApprovedWithTotp { get; set; }

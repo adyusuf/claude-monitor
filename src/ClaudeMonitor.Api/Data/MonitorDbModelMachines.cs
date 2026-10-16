@@ -61,7 +61,8 @@ internal static class MonitorDbModelMachines
             e.Property(x => x.ProjectKey).HasMaxLength(RunKinds.ProjectKeyMax);
             e.Property(x => x.Kind).HasMaxLength(16);
             e.Property(x => x.ScriptInterpreter).HasMaxLength(16);
-            e.Property(x => x.TargetEnvironment).HasMaxLength(16);
+            e.Property(x => x.ScriptFilesJson).HasColumnType("jsonb");
+                        e.Property(x => x.TargetEnvironment).HasMaxLength(16);
             e.Property(x => x.TargetFunction).HasMaxLength(16);
             e.HasIndex(x => new { x.TargetAgentId, x.ProjectKey, x.CreatedAt }).IsDescending(false, false, true).HasFilter("project_key IS NOT NULL");
             e.ToTable(t =>
@@ -69,6 +70,7 @@ internal static class MonitorDbModelMachines
                 t.HasCheckConstraint("ck_remote_runs_kind", Optional("kind", RunKinds.All));
                 t.HasCheckConstraint("ck_remote_runs_script_interpreter", Optional("script_interpreter", ScriptInterpreters.All));
                 t.HasCheckConstraint("ck_remote_runs_target_role", "(" + Optional("target_environment", MachineEnvironments.All) + ") AND (" + Optional("target_function", MachineFunctions.All) + ")");
+                t.HasCheckConstraint("ck_remote_runs_script_extras", "(script_files_json IS NULL AND script_stdin IS NULL) OR mode = 'script'");
                 t.HasCheckConstraint("ck_remote_runs_output_cap", "output_cap IS NULL OR output_cap BETWEEN 1048576 AND 67108864");
                 t.HasCheckConstraint("ck_remote_runs_tests", "(tests_passed IS NULL OR tests_passed >= 0) AND (tests_failed IS NULL OR tests_failed >= 0) AND (tests_skipped IS NULL OR tests_skipped >= 0)");
             });

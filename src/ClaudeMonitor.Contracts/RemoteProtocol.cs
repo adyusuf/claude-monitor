@@ -62,7 +62,8 @@ public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Ki
 /// </summary>
 public sealed record RunCreate(string ClientKey, Guid TargetAgentId, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand,
     string? Cwd, int TimeoutSeconds, string? Reason, string? SessionExternalId = null, Guid? JobId = null,
-    string? ProjectKey = null, string? Kind = null, string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null);
+    string? ProjectKey = null, string? Kind = null, string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null,
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
 
 public sealed record RunCreated(Guid Id, string Status, Guid? GrantId, DateTimeOffset ExpiresAt);
 
@@ -72,7 +73,8 @@ public sealed record RunView(Guid Id, Guid TargetAgentId, string TargetHostname,
     string? ProjectKey = null, string? Kind = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null,
     string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, string? TargetEnvironment = null,
     string? TargetFunction = null, long? OutputCap = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, long? OutputRefusedBytes = null,
-    int? OutputMissingFromSeq = null, int? OutputChunks = null, bool? OutputComplete = null);
+    int? OutputMissingFromSeq = null, int? OutputChunks = null, bool? OutputComplete = null,
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
 
 /// <summary>One piece of a run's output, numbered from 0 by the target. GapBefore marks output cut out before it.</summary>
 public sealed record RunOutputChunk(int Seq, string Stream, string Body, bool GapBefore = false);
@@ -88,7 +90,8 @@ public sealed record GrantTemplate(IReadOnlyList<string> Argv, string Cwd, int M
 /// </summary>
 public sealed record RunMessage(Guid Id, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand, string? Cwd,
     int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null,
-    string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, long? OutputCap = null, bool ApprovedWithTotp = false);
+    string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, long? OutputCap = null, bool ApprovedWithTotp = false,
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
 
 public sealed record RunCancelMessage(Guid Id);
 

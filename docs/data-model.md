@@ -90,6 +90,10 @@ output account: `output_read_bytes`, `output_dropped_bytes` (as the target repor
 runs; true only when nothing was dropped, refused or stopped at the read limit). `workspace_settings.script_output_max_bytes` (default 8 MiB;
 CHECK 1-64 MiB; set by an admin in the remote settings).
 
+**Files and stdin on a script run (ADR-0010 §2, migration `ScriptRunFiles`).** `remote_runs` gains `script_files_json` (jsonb: the run's text files as `[{path, text}]`, sorted by path; null for none) and `script_stdin` (text; null for none), with a CHECK that only a `script` run carries either. The
+hash of a run with files or stdin uses the tag `script2`; one without keeps `script1` and its old bytes. `agents.capabilities` may now contain `script_files`, which an agent reports when it writes a script's files and stdin; the API refuses a run with either to an agent that does not (`files_unsupported`).
+Both columns are cleared by account deletion and included in the export.
+
 **Asks across machines (ADR-0008 phase 3, migration `MachineAsks`).** `agents` gains `accepts_asks` (boolean, default false: the machine owner's opt-in),
 `accepts_asks_set_at` and `accepts_asks_set_by` (FK users). New table `machine_asks`: `id`, `workspace_id`, `requester_agent_id`, `requester_user_id`,
 `requester_session_id` (FK sessions), `target_agent_id`, `target_user_id`, `target_session` (the Claude session that received it), `client_key`,

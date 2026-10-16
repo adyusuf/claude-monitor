@@ -75,7 +75,11 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private List<string> Capabilities(string level, IReadOnlyList<ToolInfo> tools, ClaudePresence? claude)
     {
         var list = new List<string>();
-        if (level == ExecLevels.Shell && ToolInventory.Interpreters(tools).Count > 0) list.Add(AgentCapabilities.Script);
+        if (level == ExecLevels.Shell && ToolInventory.Interpreters(tools).Count > 0)
+        {
+            list.Add(AgentCapabilities.Script);
+            list.Add(AgentCapabilities.ScriptFiles); // this agent writes a script's files and stdin (ADR-0010 §2)
+        }
         // `ask`: the inbox push is on, this machine did not turn asks off, and Claude Code is here to receive one (ADR-0008 §3e).
         if (config.InboxPushEnabled && config.AsksEnabled && claude is { Kind: not ClaudeKinds.None }) list.Add(AgentCapabilities.Ask);
         return list;

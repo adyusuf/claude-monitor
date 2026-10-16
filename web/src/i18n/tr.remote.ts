@@ -47,7 +47,7 @@ export const trRemote: Dictionary["remote"] = {
   scriptBannerStrict: "{role} MAKİNE. Bu betik, önemli bir makinede ajanın hesabıyla çalışır. Her satırı okuyun.",
   scriptBanner: "Bir betik, ajanın hesabının yapabildiği her şeyi yapabilir. İzin vermeden önce aşağıdaki her satırı okuyun.",
   scriptProduction: "CANLI", scriptDatabase: "VERİTABANI",
-  scriptScroll: "İzin verebilmek için betiği sonuna kadar kaydırın.", scriptLines: "{n} satır", scriptNoText: "(boş betik)",
+  scriptScroll: "İzin verebilmek için betiği sonuna kadar kaydırın.", scriptFiles: "Betiğin yanındaki dosyalar", scriptFile: "Dosya {path}", scriptStdin: "Betiğin standart girdisi için metin", scriptExtras: "Bu betik {n} dosya ve/veya bir standart girdi metni taşıyor. Her birini sonuna kadar okuyun.", scriptChars: "{n} karakter", scriptLines: "{n} satır", scriptNoText: "(boş betik)",
   scriptNeedsCode: "Bu makine canlı ya da veritabanı: izin vermek doğrulama uygulamasından bir kod ister.",
   scriptNoTotp: "Bu makine canlı ya da veritabanı ve iki adımlı girişiniz yok: burada bir betiğe izin veremezsiniz. Hesap ayarlarınızdan iki adımlı girişi açın.",
   project: "Proje", kind: "Tür", kindNone: "yok",

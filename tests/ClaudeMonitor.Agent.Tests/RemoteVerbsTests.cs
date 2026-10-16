@@ -100,6 +100,35 @@ public sealed class RemoteVerbsTests : IDisposable
         Assert.Null(body.Argv);
     }
 
+    [Fact]
+    public async Task A_script_run_reads_its_files_and_its_stdin_from_local_files_and_refuses_what_cannot_be_read_or_breaks_the_rules()
+    {
+        var web = RemoteFakeDaemon.Machine("web01");
+        var created = new RunCreated(Guid.NewGuid(), RunStatuses.PendingApproval, null, DateTimeOffset.UtcNow.AddMinutes(15));
+        Directory.CreateDirectory(home.Dir);
+        var script = Path.Combine(home.Dir, "main.py");
+        var helper = Path.Combine(home.Dir, "helper-local.py");
+        var input = Path.Combine(home.Dir, "in.txt");
+        await File.WriteAllTextAsync(script, "import helper\n");
+        await File.WriteAllTextAsync(helper, "VALUE = 1\n");
+        await File.WriteAllTextAsync(input, "typed\n");
+        using var daemon = new RemoteFakeDaemon(home).Machines(web).Answer(RemoteRelay.RunKind, created);
+
+        Assert.Equal(0, await RunAsync("run", "--machine", "web01", "--script", script, "--interpreter", "python", "--file", $"helper.py={helper}", "--stdin", input));
+        var body = JsonSerializer.Deserialize<RunCreate>(Assert.Single(daemon.OfKind("run")).Body!, ApiClient.Json)!;
+        Assert.Equal(new ScriptFile("helper.py", "VALUE = 1\n"), Assert.Single(body.ScriptFiles!));
+        Assert.Equal("typed\n", body.ScriptStdin);
+
+        foreach (var bad in new[] { new[] { "--file", "no-equals" }, new[] { "--file", $"helper.py={Path.Combine(home.Dir, "missing")}" }, new[] { "--file", $"../x={helper}" }, new[] { "--stdin", Path.Combine(home.Dir, "missing") } })
+        {
+            stderr.GetStringBuilder().Clear();
+            Assert.Equal(1, await RunAsync(["run", "--machine", "web01", "--script", script, "--interpreter", "python", .. bad]));
+            Assert.NotEmpty(stderr.ToString());
+        }
+
+        Assert.Single(daemon.OfKind("run")); // none of the refused ones was sent
+    }
+
     [Theory]
     [InlineData("run", "--machine", "web01")]
     [InlineData("run", "--machine", "web01", "--script", "/no/such/file", "--interpreter", "sh")]

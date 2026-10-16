@@ -42,11 +42,30 @@ public sealed class ScriptToolsTests : IDisposable
         Assert.Equal(request.LocalId, body.ClientKey);
     }
 
+    [Fact]
+    public async Task Files_and_stdin_are_sent_with_the_script_and_a_call_without_them_sends_none()
+    {
+        var machine = RemoteFakeDaemon.Machine("web01");
+        var created = new RunCreated(Guid.NewGuid(), RunStatuses.PendingApproval, null, DateTimeOffset.UtcNow.AddMinutes(15));
+        using var daemon = new RemoteFakeDaemon(home).Machines(machine).Answer(RemoteRelay.RunKind, created);
+
+        await script.RunScript("web01", "python", "import helper\n", "use a module", files: new Dictionary<string, string> { ["helper.py"] = "x = 1\n", ["data/in.txt"] = "1\n" }, stdin: "typed\n");
+        await script.RunScript("web01", "sh", "true\n", "plain");
+
+        var bodies = daemon.OfKind("run").Select(r => JsonSerializer.Deserialize<RunCreate>(r.Body!, ApiClient.Json)!).ToList();
+        Assert.Equal(["data/in.txt", "helper.py"], bodies[0].ScriptFiles!.Select(f => f.Path).Order());
+        Assert.Equal("typed\n", bodies[0].ScriptStdin);
+        Assert.Null(bodies[1].ScriptFiles);
+        Assert.Null(bodies[1].ScriptStdin);
+    }
+
     [Theory]
     [InlineData(RemoteErrors.RoleNotSet, "no admin has set this machine's environment")]
     [InlineData(RemoteErrors.InterpreterMissing, "has not reported a trusted tool for that interpreter")]
     [InlineData(RemoteErrors.InvalidScript, "empty, longer than 32768 characters")]
     [InlineData(RemoteErrors.InvalidInterpreter, "sh, bash, python or powershell")]
+    [InlineData(RemoteErrors.InvalidFiles, "at most 8 text files")]
+    [InlineData(RemoteErrors.FilesUnsupported, "does not run scripts with files or stdin yet")]
     [InlineData(RemoteErrors.TargetCannotRun, "")]
     public async Task Each_refusal_is_explained_with_its_code(string error, string phrase)
     {

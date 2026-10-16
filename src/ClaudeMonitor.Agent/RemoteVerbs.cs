@@ -150,9 +150,39 @@ public static class RemoteVerbs
         return await SubmitRunAsync(client, create, stdout, stderr);
     }
 
+    /// <summary>The files (<c>--file path=local</c>) and the stdin (<c>--stdin local</c>) of a script run, read here so the owner approves exactly this text; null (and a message) when one cannot be read.</summary>
+    private static async Task<(IReadOnlyList<ScriptFile>? Files, string? Stdin)?> ReadAttachmentsAsync(string[] args, TextWriter stderr)
+    {
+        var files = new List<ScriptFile>();
+        foreach (var spec in Values(args, "--file"))
+        {
+            var cut = spec.IndexOf('=', StringComparison.Ordinal);
+            if (cut < 1 || cut == spec.Length - 1) return await Fail(stderr, $"--file takes <path in the run's folder>=<local file>, not \"{spec}\".");
+            var local = spec[(cut + 1)..];
+            if (!File.Exists(local) || new FileInfo(local).Length > ScriptFiles.FileMax * 4L) return await Fail(stderr, $"The file {local} is missing or too large.");
+            files.Add(new ScriptFile(spec[..cut], await File.ReadAllTextAsync(local)));
+        }
+
+        string? stdin = null;
+        if (Option(args, "--stdin") is { } stdinFile)
+        {
+            if (!File.Exists(stdinFile) || new FileInfo(stdinFile).Length > ScriptFiles.StdinMax * 4L) return await Fail(stderr, $"The stdin file {stdinFile} is missing or too large.");
+            stdin = await File.ReadAllTextAsync(stdinFile);
+        }
+
+        if (ScriptFiles.Validate(files, stdin) is not null) return await Fail(stderr, "The files or the stdin are not acceptable: at most 8 text files of 64 KiB (256 KiB together) at relative paths of letters, digits, dot, underscore and dash, and a stdin of at most 65536 characters.");
+        return (files.Count > 0 ? files : null, stdin);
+    }
+
+    private static async Task<(IReadOnlyList<ScriptFile>? Files, string? Stdin)?> Fail(TextWriter stderr, string message)
+    {
+        await stderr.WriteLineAsync(message);
+        return null;
+    }
+
     private static async Task<int> StartRunAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
-        const string usage = "cm-agent run --machine <x> [--timeout <s>] [--reason <why>] [--project <key>] [--kind test|build|deploy|other] (--script <file> --interpreter sh|bash|python|powershell [--arg <value>]... | --argv <exe> [args...])";
+        const string usage = "cm-agent run --machine <x> [--timeout <s>] [--reason <why>] [--project <key>] [--kind test|build|deploy|other] (--script <file> --interpreter sh|bash|python|powershell [--arg <value>]... [--file <path>=<local file>]... [--stdin <local file>] | --argv <exe> [args...])";
         if (Option(args, "--machine") is not { } machine) return await Usage(stderr, usage);
         var target = await Targets.ResolveAsync(client.Requests, machine);
         if (target.Error is { } error) return await Say(stderr, error);
@@ -167,7 +197,10 @@ public static class RemoteVerbs
             if (!File.Exists(file) || new FileInfo(file).Length > ScriptInterpreters.BodyCeiling * 4L) return await Say(stderr, $"The script file {file} is missing or too large.");
             var body = await File.ReadAllTextAsync(file);
             var scriptArgs = Values(args, "--arg");
-            create = new RunCreate(clientKey, target.AgentId!.Value, RunModes.Script, null, null, null, timeout, reason, null, null, common.Project, common.Kind, interpreter, body, scriptArgs.Count > 0 ? scriptArgs : null);
+            var attached = await ReadAttachmentsAsync(args, stderr);
+            if (attached is null) return 1;
+            create = new RunCreate(clientKey, target.AgentId!.Value, RunModes.Script, null, null, null, timeout, reason, null, null, common.Project, common.Kind, interpreter, body, scriptArgs.Count > 0 ? scriptArgs : null,
+                attached.Value.Files, attached.Value.Stdin);
         }
         else if (Array.IndexOf(args, "--argv") is var at and >= 0 && at + 1 < args.Length)
         {

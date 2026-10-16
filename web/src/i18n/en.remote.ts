@@ -45,7 +45,7 @@ export const enRemote = {
   scriptBannerStrict: "{role} MACHINE. This script runs with the agent's account on a machine that matters. Read every line.",
   scriptBanner: "A script can do anything the agent's account can. Read every line below before you allow it.",
   scriptProduction: "PRODUCTION", scriptDatabase: "DATABASE",
-  scriptScroll: "Scroll the script to its end to be able to allow it.", scriptLines: "{n} lines", scriptNoText: "(empty script)",
+  scriptScroll: "Scroll the script to its end to be able to allow it.", scriptFiles: "Files next to the script", scriptFile: "File {path}", scriptStdin: "Text for the script's standard input", scriptExtras: "This script carries {n} file(s) and/or a standard input text. Read each one to its end.", scriptChars: "{n} characters", scriptLines: "{n} lines", scriptNoText: "(empty script)",
   scriptNeedsCode: "This machine is production or a database: allowing needs a code from your authenticator app.",
   scriptNoTotp: "This machine is production or a database, and you have no two-step sign-in: you cannot allow a script here. Turn on two-step sign-in in your account settings.",
   project: "Project", kind: "Kind", kindNone: "none",

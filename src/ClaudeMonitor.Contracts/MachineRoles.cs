@@ -43,7 +43,10 @@ public static class AgentCapabilities
 {
     public const string Script = "script";
     public const string Ask = "ask";
-    public static readonly IReadOnlyList<string> All = [Script, Ask];
+
+    /// <summary>The agent runs a script with files and a stdin text (ADR-0010 §2); reported together with <see cref="Script"/> by an agent that can.</summary>
+    public const string ScriptFiles = "script_files";
+    public static readonly IReadOnlyList<string> All = [Script, Ask, ScriptFiles];
 }
 
 /// <summary>The names of the tools an agent probes for its inventory (ADR-0008 §3a′), as they are reported.</summary>

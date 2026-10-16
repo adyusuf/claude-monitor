@@ -37,10 +37,11 @@ public static partial class GrantMatcher
     /// role as the card showed it. The argv and shell hash above does not change.
     /// </summary>
     public static string ScriptHash(string interpreter, string body, IReadOnlyList<string>? args, int timeoutSeconds, Guid targetAgentId,
-        string? targetEnvironment, string? targetFunction)
+        string? targetEnvironment, string? targetFunction, IReadOnlyList<ScriptFile>? files = null, string? stdin = null)
     {
         using var buffer = new MemoryStream();
-        Put(buffer, ScriptHashTag);
+        var extra = ScriptFiles.Any(files, stdin);
+        Put(buffer, extra ? ScriptHashTagWithFiles : ScriptHashTag);
         Put(buffer, targetAgentId.ToString("D"));
         Put(buffer, interpreter);
         Put(buffer, body);
@@ -48,6 +49,20 @@ public static partial class GrantMatcher
         PutInt(buffer, timeoutSeconds);
         Put(buffer, targetEnvironment);
         Put(buffer, targetFunction);
+        if (extra)
+        {
+            // The files by path, so the order the requester sent them in does not change what the owner approved; the stdin as it is.
+            var ordered = (files ?? []).OrderBy(f => f.Path, StringComparer.Ordinal).ToList();
+            PutInt(buffer, ordered.Count);
+            foreach (var file in ordered)
+            {
+                Put(buffer, file.Path);
+                Put(buffer, file.Text);
+            }
+
+            Put(buffer, stdin);
+        }
+
         return Convert.ToHexStringLower(SHA256.HashData(buffer.ToArray()));
     }
 

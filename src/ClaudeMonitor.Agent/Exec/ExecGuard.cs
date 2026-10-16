@@ -96,6 +96,7 @@ public static class ExecGuard
         if (!ScriptInterpreters.All.Contains(run.ScriptInterpreter ?? "")) return ExecDecision.Refuse(ExecErrors.Malformed);
         if (run.ScriptBody is not { Length: > 0 } body || body.Length > ScriptInterpreters.BodyCeiling || body.Contains('\0')) return ExecDecision.Refuse(ExecErrors.Malformed);
         if (run.ScriptArgs is { } args && (args.Count > ScriptInterpreters.ArgsMax || args.Any(a => a is null || a.Length > ScriptInterpreters.ArgChars || a.Contains('\0')))) return ExecDecision.Refuse(ExecErrors.Malformed);
+        if (ScriptFiles.Validate(run.ScriptFiles, run.ScriptStdin) is not null) return ExecDecision.Refuse(ExecErrors.Malformed);
         if (MachineRoles.IsStrict(policy.ClaimedEnvironment, policy.ClaimedFunction) && !run.ApprovedWithTotp) return ExecDecision.Refuse(RemoteErrors.TotpRequired);
         foreach (var name in ScriptInterpreters.Tools(run.ScriptInterpreter))
         {

@@ -147,7 +147,7 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
     {
         try
         {
-            return ScriptScratch.Create(config.Home, run.Id, run.ScriptInterpreter!, run.ScriptBody!);
+            return ScriptScratch.Create(config.Home, run.Id, run.ScriptInterpreter!, run.ScriptBody!, run.ScriptFiles, run.ScriptStdin);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -163,7 +163,7 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
         {
             // The same argv start path as an argv run, so the ulimit launcher, the process group kill, the descendant tracker and the Job Object apply.
             return ProcessTree.Start(decision.ResolvedExe!, scratch!.Arguments(run.ScriptInterpreter!, run.ScriptArgs), scratch.Folder, scratch.Environment(config.Home),
-                Path.GetFileName(decision.ResolvedExe!), limits, TrackEvery, Note(run));
+                Path.GetFileName(decision.ResolvedExe!), limits, TrackEvery, Note(run), scratch.StdinPath);
         }
 
         var env = RunEnvironment.Build(config.Home);
