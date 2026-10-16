@@ -115,6 +115,13 @@ public sealed class PluginFilesTests : IDisposable
         }
     }
 
+    /// <summary>What a detached login leaves: its log, and the server `connect` recorded when it started it.</summary>
+    private void Logged(string server, string log)
+    {
+        File.WriteAllText(home.Config.ConnectLogPath, log);
+        File.WriteAllText(home.Config.ConnectServerPath, server);
+    }
+
     private Task<int> Connect(FakeStarter starter, StringWriter output, string? server = "https://monitor.invalid") =>
         new ConnectCommand(home.Config, output, TimeProvider.System, starter).RunAsync(server, "/bin/cm-agent", CancellationToken.None);
 
@@ -133,7 +140,7 @@ public sealed class PluginFilesTests : IDisposable
     [Fact]
     public async Task A_code_shown_a_moment_ago_is_shown_again_and_no_second_login_is_started()
     {
-        File.WriteAllText(home.Config.ConnectLogPath, "Open https://monitor.invalid/device and enter the code WXYZ-0001\n");
+        Logged("https://monitor.invalid", "Open https://monitor.invalid/device and enter the code WXYZ-0001\n");
         var starter = new FakeStarter(home.Config, null);
         var output = new StringWriter();
         Assert.Equal(0, await Connect(starter, output));
@@ -152,7 +159,7 @@ public sealed class PluginFilesTests : IDisposable
     [InlineData("The server did not answer (HttpRequestException). Check the address and the connection, then run cm-agent login again.")]
     public async Task A_code_whose_login_has_ended_is_not_shown_again_and_a_new_login_starts(string outcome)
     {
-        File.WriteAllText(home.Config.ConnectLogPath, "Open https://monitor.invalid/device and enter the code DEAD-0001\n" + outcome + "\n");
+        Logged("https://monitor.invalid", "Open https://monitor.invalid/device and enter the code DEAD-0001\n" + outcome + "\n");
         var starter = new FakeStarter(home.Config, "Open https://monitor.invalid/device and enter the code NEWC-0002\n");
         var output = new StringWriter();
         Assert.Equal(0, await Connect(starter, output));
@@ -164,8 +171,7 @@ public sealed class PluginFilesTests : IDisposable
     [Fact]
     public async Task A_code_still_being_polled_is_shown_again_but_only_for_the_same_server()
     {
-        File.WriteAllText(home.Config.ConnectLogPath,
-            "Open https://monitor.invalid/device and enter the code WAIT-0003\nThe server did not answer (X); trying again in 10 s.\n");
+        Logged("https://monitor.invalid", "Open https://monitor.invalid/device and enter the code WAIT-0003\nThe server did not answer (X); trying again in 10 s.\n");
         var same = new FakeStarter(home.Config, null);
         var output = new StringWriter();
         Assert.Equal(0, await Connect(same, output));
@@ -177,6 +183,21 @@ public sealed class PluginFilesTests : IDisposable
         Assert.Equal(0, await Connect(other, shown, "https://other.invalid")); // another server: its own login
         Assert.Single(other.Started);
         Assert.Contains("OTHR-0004", shown.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_code_on_a_verification_page_of_another_host_than_the_server_is_still_shown_again()
+    {
+        Logged("https://api.invalid", "Open https://web.invalid/device and enter the code SPLT-0005\n"); // the page is the API's public origin, not the address typed
+        var starter = new FakeStarter(home.Config, null);
+        var output = new StringWriter();
+        Assert.Equal(0, await Connect(starter, output, "https://api.invalid"));
+        Assert.Empty(starter.Started);
+        Assert.Contains("SPLT-0005", output.ToString(), StringComparison.Ordinal);
+        var fresh = new FakeStarter(home.Config, "Open https://web.invalid/device and enter the code SPLT-0006\n");
+        Assert.Equal(0, await Connect(fresh, new StringWriter(), "https://other-api.invalid"));
+        Assert.Single(fresh.Started);
+        Assert.Equal("https://other-api.invalid", File.ReadAllText(home.Config.ConnectServerPath)); // recorded when a login is started
     }
 
     [Fact]

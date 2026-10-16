@@ -78,7 +78,8 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   `stop wait`. No API change. Web and agent both need the usual deploy to test, then prod.
 
 - **Claude Code plugin** (`feature/inbox-push`, ADR-0007): `bash scripts/build-agent.sh` now also writes `plugin/monitor-agent/agent-release.txt`
-  (the version and the SHA-256 of every zip). **Commit that file with the release**: the plugin's bootstrap installs exactly the zips it pins and refuses
+  (the version and the SHA-256 of every zip; the digests of one version accumulate across environments, `scripts/write_plugin_pins.py <dir> <version> --replace` starts over).
+  **Commit that file with the release**: the plugin's bootstrap installs exactly the zips it pins and refuses
   anything else, so a plugin published before its pins names no build and installs nothing. Order: build -> commit the pins -> promote; the zips must be in the
   environment's `/downloads` before the plugin version that pins them is published. Set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
   (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `cm-agent plugin-files .` and commit the result (a test fails otherwise).

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Writes plugin/monitor-agent/agent-release.txt from a build's SHA256SUMS (ADR-0007).
 
-    python3 scripts/write_plugin_pins.py <downloads-dir> <version>
+    python3 scripts/write_plugin_pins.py <downloads-dir> <version> [--replace]
 
 The first line of the file is the agent version; each following line is "<os>-<arch> <sha256> <zip file>". The plugin's bootstrap
 (scripts/ensure.sh) downloads exactly that zip and refuses anything whose SHA-256 differs, so the server cannot substitute a build.
-Run it after scripts/build-agent.sh and commit the file with the release. Exit 0 = written, 2 = refused (a missing or unreadable input).
+Digests of the same version accumulate (test and prod each build their own zips); --replace starts the list over, for a rebuild that
+supersedes the earlier builds. Run it after scripts/build-agent.sh and commit the file with the release. Exit 0 = written, 2 = refused (a missing or unreadable input).
 """
 import os
 import re
@@ -58,8 +59,10 @@ def render(version, merged):
 
 
 def main(argv):
+    replace = '--replace' in argv
+    argv = [a for a in argv if a != '--replace']
     if len(argv) != 3 or not VERSION.match(argv[2]):
-        print(__doc__.strip().splitlines()[0] + '\nusage: write_plugin_pins.py <downloads-dir> <x.y.z>', file=sys.stderr)
+        print(__doc__.strip().splitlines()[0] + '\nusage: write_plugin_pins.py <downloads-dir> <x.y.z> [--replace]', file=sys.stderr)
         return 2
     sums = os.path.join(argv[1], 'SHA256SUMS')
     try:
@@ -76,7 +79,7 @@ def main(argv):
     except OSError:
         earlier = ''
     with open(target, 'w', encoding='utf-8', newline='\n') as handle:
-        handle.write(render(argv[2], merge(argv[2], found, earlier)))
+        handle.write(render(argv[2], merge(argv[2], found, '' if replace else earlier)))
     print(f'{len(found)} pins for version {argv[2]} written to {target}')
     return 0
 

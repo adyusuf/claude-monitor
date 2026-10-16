@@ -12,7 +12,8 @@ public interface IDetachedStarter
 /// <summary>
 /// "cm-agent connect [--server url]" (ADR-0007): the device login from inside a Claude Code session. A login waits for a person to approve a
 /// code on the web, which can take minutes, so this starts it detached (writing to <see cref="AgentConfig.ConnectLogPath"/>), waits only until the code
-/// has appeared, prints it and returns. The detached login saves the identity and starts the daemon when the code is approved.
+/// has appeared, prints it and returns. The detached login saves the identity and starts the daemon when the code is approved. A code is shown
+/// again only while that login is alive (nothing but retries after it in the log) and was started for the same server.
 /// </summary>
 public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimeProvider clock, IDetachedStarter starter)
 {
@@ -35,13 +36,14 @@ public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimePr
         }
 
         config.EnsureHome();
-        if (ShownCode(uri.Host) is { } shown)
+        if (ShownCode(server) is { } shown)
         {
             await Show(shown);
             return 0;
         }
 
         File.WriteAllText(config.ConnectLogPath, "");
+        File.WriteAllText(config.ConnectServerPath, server);
         if (!starter.Start(exe, ["login", "--server", server, "--output", config.ConnectLogPath, "--detach"]))
         {
             await output.WriteLineAsync("Could not start the login. Run: cm-agent login --server " + server);
@@ -51,7 +53,7 @@ public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimePr
         var deadline = clock.GetUtcNow() + config.ConnectWait;
         while (clock.GetUtcNow() < deadline)
         {
-            if (ShownCode(uri.Host) is { } code)
+            if (ShownCode(server) is { } code)
             {
                 await Show(code);
                 return 0;
@@ -68,14 +70,16 @@ public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimePr
     /// The login line with the code, when it is still good: written recently, for this server, and followed by nothing but retries. Anything else after it
     /// (approved, denied, expired, a failure) means that login is over and its code is dead.
     /// </summary>
-    private string? ShownCode(string host)
+    private string? ShownCode(string server)
     {
         try
         {
             if (!File.Exists(config.ConnectLogPath) || clock.GetUtcNow() - File.GetLastWriteTimeUtc(config.ConnectLogPath) > config.ConnectReuse) return null;
+            // For this server: the verification page is the API's public origin, which need not be the address typed here, so the server is recorded when the login starts.
+            if (!File.Exists(config.ConnectServerPath) || File.ReadAllText(config.ConnectServerPath) != server) return null;
             var lines = File.ReadAllLines(config.ConnectLogPath);
             var at = Array.FindLastIndex(lines, l => l.Contains(CodeMarker, StringComparison.Ordinal));
-            if (at < 0 || !lines[at].Contains(host, StringComparison.OrdinalIgnoreCase)) return null;
+            if (at < 0) return null;
             return lines.Skip(at + 1).All(l => l.Length == 0 || l.Contains("trying again", StringComparison.Ordinal)) ? lines[at] : null;
         }
         catch (IOException)

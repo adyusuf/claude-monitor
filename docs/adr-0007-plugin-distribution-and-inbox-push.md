@@ -444,6 +444,12 @@ the plugin installed from a real marketplace; a published build (the pins file i
 | a stop wait saved for the agent was cut off by the plugin's fixed hook timeout | a plugin-started agent takes no stop wait |
 | two files over 300 lines | split |
 
+**Second pass (same reviewer, on the fixes):** findings 1-13 closed or documented-open, and two new ones from the fixes, both fixed with a test that failed first.
+The restart after an upgrade ran the binary without the wrapper's environment, so a user with the push option lost it until some other start (the bootstrap now restarts
+through `run.sh`); and `connect` compared the verification page's host with the server, which differ when the web and the API are on separate addresses (the server is
+recorded in `connect.log.server` when a login starts). Also: a failed install is keyed by version and digests (re-pinning is a new chance), a failed replacement puts the old
+binary back, a server value with a second line is refused, `write_plugin_pins.py --replace` starts a version's list over, and the script tests are split into small files.
+
 **Open after the QA pass:** Windows (the named-pipe branch has no test anywhere, `sh` for the MCP server must be on the Windows PATH, the detached login may not outlive a job
 object); a plugin disabled only at project or local scope is not noticed.
 

@@ -31,4 +31,7 @@ public sealed partial record AgentConfig
     public TimeSpan ConnectReuse { get; init; } = TimeSpan.FromMinutes(10);
 
     public string ConnectLogPath => Path.Combine(Home, "connect.log");
+
+    /// <summary>The server the login in <see cref="ConnectLogPath"/> was started for (the login truncates the log itself, so it cannot hold this).</summary>
+    public string ConnectServerPath => ConnectLogPath + ".server";
 }

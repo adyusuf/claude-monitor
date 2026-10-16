@@ -21,7 +21,8 @@ if [ -f "$data/install.log" ] && [ "$(wc -c < "$data/install.log")" -gt 200000 ]
 fi
 
 # The server address: https, or http on this machine. Only characters a URL needs, so it can be put in a command line as it is.
-valid_server() { printf '%s' "$1" | grep -Eq '^(https://[A-Za-z0-9._:/@%~+-]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/[A-Za-z0-9._/%~+-]*)?)$'; }
+valid_server() { case "$1" in *"
+"*) return 1 ;; esac; printf '%s' "$1" | grep -Eq '^(https://[A-Za-z0-9._:/@%~+-]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/[A-Za-z0-9._/%~+-]*)?)$'; }
 # Kept for `status` and `connect` run from a session's Bash tool, which has no plugin options in its environment.
 if valid_server "$server"; then printf '%s\n' "$server" > "$data/server.txt"; fi
 
@@ -52,6 +53,7 @@ pinned="$(sed -n '1p' "$pins" 2>/dev/null | tr -d '\r ')"
 pin_lines="$(grep "^$os-$arch " "$pins" 2>/dev/null | tr -d '\r')"
 file="$(printf '%s\n' "$pin_lines" | head -n 1 | awk '{print $3}')"
 shas="$(printf '%s\n' "$pin_lines" | awk -v f="$file" '$3 == f {print $2}')" # one per build of this version (each environment has its own)
+failure_key="$pinned $(printf '%s' "$shas" | tr '\n' ' ')" # a different pin of the same version is a new chance
 installed=""
 [ -x "$bin" ] && installed="$("$bin" version 2>/dev/null | head -n 1 | tr -d '\r ')"
 
@@ -76,7 +78,7 @@ if ! command -v curl > /dev/null 2>&1; then
   finish
 fi
 # A failed install of this version is not tried again at every session start: a download of up to 250 MB each time would be worse than the failure.
-if [ -f "$data/install.failed" ] && [ "$(cat "$data/install.failed" 2> /dev/null)" = "$pinned" ] && [ -n "$(find "$data/install.failed" -mmin -360 2> /dev/null)" ]; then
+if [ -f "$data/install.failed" ] && [ "$(cat "$data/install.failed" 2> /dev/null)" = "$failure_key" ] && [ -n "$(find "$data/install.failed" -mmin -360 2> /dev/null)" ]; then
   msg="${msg:+$msg }Claude Monitor: the last install of version $pinned failed; it is tried again after a few hours. /monitor-agent:status has the details."
   finish
 fi
@@ -89,7 +91,7 @@ sha256() { if command -v sha256sum > /dev/null 2>&1; then sha256sum "$1" | awk '
 (
   trap 'rmdir "$lock" 2>/dev/null; rm -rf "$data/download.$$"' EXIT
   tmp="$data/download.$$"
-  fail() { say "$1"; printf '%s\n' "$pinned" > "$data/install.failed"; exit 0; }
+  fail() { say "$1"; printf '%s\n' "$failure_key" > "$data/install.failed"; exit 0; }
   mkdir -p "$tmp/x" || exit 0
   say "installing version $pinned for $os-$arch from the server"
   curl -fsSL --max-time 300 --max-filesize 262144000 -o "$tmp/$file" "$server/downloads/$file" || fail "download failed"
@@ -104,11 +106,15 @@ sha256() { if command -v sha256sum > /dev/null 2>&1; then sha256sum "$1" | awk '
   chmod +x "$tmp/x/$exe"
   # Windows cannot overwrite a running program but can rename it: the running daemon keeps its old file until it is restarted below.
   if [ "$os" = windows ] && [ -f "$bin" ]; then rm -f "$bin.old" 2> /dev/null; mv -f "$bin" "$bin.old" 2> /dev/null; fi
-  mv -f "$tmp/x/$exe" "$bin" || fail "could not replace the installed binary"
+  if ! mv -f "$tmp/x/$exe" "$bin"; then
+    [ -f "$bin" ] || { [ -f "$bin.old" ] && mv -f "$bin.old" "$bin"; } # never leave the machine with no binary at all
+    fail "could not replace the installed binary"
+  fi
   rm -f "$data/install.failed"
   say "installed version $pinned"
-  # A daemon of the older version hands over to the new one; it must know it was started by the plugin, as the wrapper tells it.
-  CM_BINARY="$bin" CM_PLUGIN_ID="monitor-agent@monitor-agent-releases" "$bin" restart > /dev/null 2>&1 || true
+  # A daemon of the older version hands over to the new one. Through the wrapper, so that it has what every other start has: the plugin id,
+  # the server and the push option (without them the new daemon would not notice the plugin being switched off, or would stop pushing).
+  sh "$root/scripts/run.sh" restart > /dev/null 2>&1 || true
 ) < /dev/null >> "$data/install.log" 2>&1 &
 
 msg="${msg:+$msg }Claude Monitor: installing the agent (version ${pinned:-?}) in the background. /monitor-agent:status shows how it went."
