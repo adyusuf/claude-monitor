@@ -33,6 +33,19 @@ public static class MachineQueries
                               a.ServiceMode,
                               a.LastHeartbeatAt,
                               Alerts = db.MachineAlerts.Count(x => x.AgentId == a.Id && x.State == AlertStates.Open),
+                              a.RoleEnvironment,
+                              a.RoleFunction,
+                              a.ClaimedEnvironment,
+                              a.ClaimedFunction,
+                              a.ClaudeKind,
+                              a.ClaudeVersion,
+                              a.ClaudeSessionsIdle,
+                              a.Interpreters,
+                              a.Tools,
+                              a.Capabilities,
+                              a.PresenceAt,
+                              a.Tags,
+                              a.AcceptsAsks,
                           }).Take(500).ToListAsync(ct);
         var ids = rows.Select(r => r.Id).ToList();
         var since = now - config.MetricsReportWindow;
@@ -43,7 +56,10 @@ public static class MachineQueries
             .ToListAsync(ct);
         return rows.Select(r => new MachineView(r.Id, r.Hostname, r.Os, r.DisplayName, r.ExecLevel, r.ServiceMode,
             r.LastHeartbeatAt > online, r.LastHeartbeatAt, latest.FirstOrDefault(x => x.AgentId == r.Id) is { } s ? Sample(s) : null,
-            r.Alerts)).ToList();
+            r.Alerts, r.RoleEnvironment, r.RoleFunction, r.ClaimedEnvironment, r.ClaimedFunction,
+            MachineRoles.EffectiveEnvironment(r.RoleEnvironment, r.ClaimedEnvironment), MachineRoles.EffectiveFunction(r.RoleFunction, r.ClaimedFunction),
+            r.ClaudeKind, r.ClaudeVersion, r.ClaudeSessionsIdle, MachineFacts.Tools(r.Interpreters), MachineFacts.Tools(r.Tools),
+            r.Capabilities, r.PresenceAt, MachineFacts.TagsFrom(r.Tags), r.AcceptsAsks)).ToList();
     }
 
     public static async Task<List<MetricSample>> MetricsAsync(MonitorDb db, ApiConfig config, Guid workspaceId, Guid agentId,

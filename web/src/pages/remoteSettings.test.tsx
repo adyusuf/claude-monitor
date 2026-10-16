@@ -37,6 +37,26 @@ describe("the remote work settings card", () => {
     expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ remoteRunsEnabled: true, alertCpuPct: 70, alertMemoryPct: 60, alertDiskPct: 50, alertSustainSeconds: 600 });
   });
 
+  it("shows the schedules switch only when the API has it, off by default, and sends it when an admin turns it on", async () => {
+    const calls = mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/remote-settings": { body: settings({ remoteSchedulesEnabled: false }) }, "PUT /workspaces/w1/remote-settings": (c) => ({ body: c.body }) });
+    card(true);
+    await screen.findByLabelText(en.remote.alertCpu);
+    const [, schedules] = screen.getAllByRole("switch");
+    expect(schedules).not.toBeChecked();
+    expect(screen.getByText(en.schedules.enabledHint)).toBeInTheDocument();
+    await userEvent.click(schedules!);
+    await save();
+    expect(await screen.findByText(en.workspace.saved)).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "PUT")?.body).toMatchObject({ remoteSchedulesEnabled: true });
+  });
+
+  it("shows no schedules switch for an API that does not know schedules", async () => {
+    mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/remote-settings": { body: settings() } });
+    card(true);
+    await screen.findByLabelText(en.remote.alertCpu);
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
+  });
+
   it("is read-only for a non-admin: disabled fields, no Save, an explanation", async () => {
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/remote-settings": { body: settings() } });
     card(false);

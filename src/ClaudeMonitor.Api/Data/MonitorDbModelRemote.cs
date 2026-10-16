@@ -33,6 +33,7 @@ internal static class MonitorDbModelRemote
             e.Property(x => x.AlertDiskPct).HasDefaultValue(90);
             e.Property(x => x.AlertSustainSeconds).HasDefaultValue(300);
             e.Property(x => x.RemoteRunsEnabled).HasDefaultValue(false);
+            e.Property(x => x.RemoteSchedulesEnabled).HasDefaultValue(false);
             e.ToTable(t => t.HasCheckConstraint("ck_workspace_settings_alerts",
                 "alert_cpu_pct BETWEEN 1 AND 100 AND alert_memory_pct BETWEEN 1 AND 100 AND alert_disk_pct BETWEEN 1 AND 100 "
                 + "AND alert_sustain_seconds BETWEEN 60 AND 86400"));
@@ -76,7 +77,8 @@ internal static class MonitorDbModelRemote
                 t.HasCheckConstraint("ck_remote_runs_mode", In("mode", RunModes.All));
                 t.HasCheckConstraint("ck_remote_runs_status", In("status", RunStatuses.All));
                 t.HasCheckConstraint("ck_remote_runs_mode_shape",
-                    "(mode = 'argv' AND shell_command IS NULL) OR (mode = 'shell' AND argv IS NULL)");
+                    "(mode = 'argv' AND shell_command IS NULL AND script_body IS NULL) OR (mode = 'shell' AND argv IS NULL AND script_body IS NULL) "
+                    + "OR (mode = 'script' AND argv IS NULL AND shell_command IS NULL AND cwd IS NULL)");
                 t.HasCheckConstraint("ck_remote_runs_timeout", "timeout_seconds BETWEEN 1 AND 3600");
                 t.HasCheckConstraint("ck_remote_runs_client_key", "char_length(client_key) BETWEEN 1 AND 100");
             });
@@ -145,6 +147,41 @@ internal static class MonitorDbModelRemote
         Fk<MachineJob, User>(b, x => x.ProposedByUserId);
         Fk<MachineJob, User>(b, x => x.DecidedBy);
         Fk<RemoteRun, MachineJob>(b, x => x.JobId);
+        b.Entity<JobSchedule>(e =>
+        {
+            e.HasIndex(x => x.NextRunAt).HasFilter("status = 'active'");
+            e.HasIndex(x => x.JobId);
+            e.HasIndex(x => x.TargetAgentId);
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.Property(x => x.Status).HasMaxLength(16).HasDefaultValue(ScheduleStatuses.Active);
+            e.Property(x => x.PauseReason).HasMaxLength(32);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_job_schedules_status", In("status", ScheduleStatuses.All));
+                t.HasCheckConstraint("ck_job_schedules_kind", In("kind", ScheduleKinds.All));
+                t.HasCheckConstraint("ck_job_schedules_shape",
+                    "(kind = 'interval' AND interval_minutes BETWEEN 15 AND 10080 AND daily_at_minutes IS NULL) OR (kind = 'daily' AND daily_at_minutes BETWEEN 0 AND 1439 AND interval_minutes IS NULL)");
+                t.HasCheckConstraint("ck_job_schedules_failures", "failures_in_arow >= 0");
+            });
+        });
+        Fk<JobSchedule, Workspace>(b, x => x.WorkspaceId);
+        Fk<JobSchedule, MachineJob>(b, x => x.JobId);
+        Fk<JobSchedule, Agent>(b, x => x.TargetAgentId);
+        Fk<JobSchedule, User>(b, x => x.OwnerUserId);
+        Fk<RemoteRun, JobSchedule>(b, x => x.ScheduleId);
+        b.Entity<ApprovalKey>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.Fingerprint }).IsUnique().HasFilter("retired_at IS NULL");
+            e.Property(x => x.Name).HasMaxLength(64);
+            e.Property(x => x.PublicKey).HasMaxLength(256);
+            e.Property(x => x.Fingerprint).HasMaxLength(64);
+        });
+        Fk<ApprovalKey, User>(b, x => x.UserId);
+        b.Entity<RemoteRun>(e =>
+        {
+            e.Property(x => x.ApprovalKeyId).HasMaxLength(64);
+            e.Property(x => x.ApprovalSignature).HasMaxLength(256);
+        });
     }
 
     private static void Fk<TChild, TParent>(ModelBuilder b, System.Linq.Expressions.Expression<Func<TChild, object?>> key)

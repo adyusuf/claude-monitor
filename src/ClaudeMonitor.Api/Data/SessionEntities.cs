@@ -138,6 +138,9 @@ public sealed class SessionCommand
     public DateTimeOffset? DeliveredAt { get; set; }
     public DateTimeOffset? AppliedAt { get; set; }
     public string? Result { get; set; }
+
+    /// <summary>How the command reached its session: <c>hook</c>, <c>inbox</c> or <c>channel</c> (ADR-0007); null for an older agent or before it was applied.</summary>
+    public string? Transport { get; set; }
 }
 
 public sealed class PermissionRequest

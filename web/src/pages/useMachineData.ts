@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
-import type { AlertView, MachineView, MetricSample, WebGrantView, WebJobView, WebRunView } from "../api/types";
+import type { AlertView, MachineDetail, MachineView, MetricSample, ScheduleView, WebGrantView, WebJobView, WebRunView } from "../api/types";
 import { config } from "../config";
 
 export interface MachineData {
   /** Null until loaded, and when the workspace has no such machine. */
   machine: MachineView | null;
+  /** The note, the services the user may see and the projects; null while unread or when the API has no detail. */
+  detail: MachineDetail | null;
   loaded: boolean;
   /** True when the signed-in user owns this machine's agent (only the owner gives grants). */
   owned: boolean;
@@ -14,6 +16,7 @@ export interface MachineData {
   runs: WebRunView[];
   grants: WebGrantView[];
   jobs: WebJobView[];
+  schedules: ScheduleView[];
   hasMoreRuns: boolean;
   error: unknown;
   /** Reads everything again (a live message, or a decision just made). */
@@ -31,6 +34,7 @@ function mergeRuns(first: WebRunView[], previous: WebRunView[]): WebRunView[] {
 /** Everything the machine page shows, read from the API; the metrics also refresh on their own (the agent reports every minute). */
 export function useMachineData(ws: string, agentId: string, userId: string | undefined, showResolved: boolean): MachineData {
   const [machine, setMachine] = useState<MachineView | null>(null);
+  const [detail, setDetail] = useState<MachineDetail | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [owned, setOwned] = useState(false);
   const [metrics, setMetrics] = useState<MetricSample[]>([]);
@@ -38,23 +42,28 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const [runs, setRuns] = useState<WebRunView[]>([]);
   const [grants, setGrants] = useState<WebGrantView[]>([]);
   const [jobs, setJobs] = useState<WebJobView[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleView[]>([]);
   const [hasMoreRuns, setHasMoreRuns] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const pagedOlder = useRef(false);
 
   const reload = useCallback(async () => {
     try {
-      const [machines, agents, alertRows, runRows, grantRows, jobRows] = await Promise.all([
+      const [machines, agents, alertRows, runRows, grantRows, jobRows, detailRow, scheduleRows] = await Promise.all([
         api.machines(ws), api.agents(ws), api.alerts(ws, agentId, showResolved),
         api.runs(ws, { agent: agentId, limit: config.runPageSize }), api.grants(agentId), api.jobs(agentId),
+        api.machineDetail(agentId).catch(() => null), // an older API has no detail: the page shows what the list gives
+        api.schedules(agentId).catch(() => [] as ScheduleView[]), // an older API has no schedules
       ]);
       setMachine(machines.find((m) => m.agentId === agentId) ?? null);
+      setDetail(detailRow);
       setOwned(agents.some((a) => a.id === agentId && a.userId === userId));
       setAlerts(alertRows);
       setRuns((previous) => mergeRuns(runRows, previous));
       if (!pagedOlder.current) setHasMoreRuns(runRows.length >= config.runPageSize);
       setGrants(grantRows);
       setJobs(jobRows);
+      setSchedules(scheduleRows);
       setError(null);
     } catch (e) {
       setError(e);
@@ -94,5 +103,5 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     return () => clearInterval(timer);
   }, [loadMetrics]);
 
-  return { machine, loaded, owned, metrics, alerts, runs, grants, jobs, hasMoreRuns, error, reload, moreRuns };
+  return { machine, detail, loaded, owned, metrics, alerts, runs, grants, jobs, schedules, hasMoreRuns, error, reload, moreRuns };
 }

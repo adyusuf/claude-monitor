@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRow } from "../api/types";
+import { config } from "../config";
 import { ME, mockApi, renderAt } from "../test/helpers";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./AccountPages";
 import { DevicePage, MachinesPage } from "./MachinesPage";
@@ -245,5 +246,52 @@ describe("workspace settings and account", () => {
     renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
     expect(await screen.findByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "macOS · Apple silicon" })).toHaveAttribute("href", "/downloads/cm-agent-macos-arm64.zip");
+    expect(screen.queryByText(/Install as a Claude Code plugin/)).not.toBeInTheDocument(); // no marketplace configured: the zips only
+  });
+
+  it("offers the plugin first when the environment names its marketplace, with this site's address as the server", async () => {
+    const settable = config as { pluginMarketplace: string };
+    settable.pluginMarketplace = "owner/repo#prod";
+    try {
+      mockApi({ "GET /me": { body: ME } });
+      renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
+      expect(await screen.findByText("Install as a Claude Code plugin (recommended)")).toBeInTheDocument();
+      expect(screen.getByText("claude plugin install monitor-agent --marketplace owner/repo#prod")).toBeInTheDocument();
+      expect(screen.getByText(window.location.origin)).toBeInTheDocument();
+      expect(screen.getByText("/monitor-agent:connect")).toBeInTheDocument();
+      expect(screen.getByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument(); // the manual way stays
+    } finally {
+      settable.pluginMarketplace = "";
+    }
+  });
+
+  it("offers the plugin from this site's own marketplace when the build says the site serves it", async () => {
+    const settable = config as { pluginFromServer: boolean };
+    settable.pluginFromServer = true;
+    try {
+      mockApi({ "GET /me": { body: ME } });
+      renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
+      expect(await screen.findByText("Install as a Claude Code plugin (recommended)")).toBeInTheDocument();
+      expect(screen.getByText(`claude plugin marketplace add ${window.location.origin}/downloads/marketplace.json`)).toBeInTheDocument();
+      expect(screen.getByText("claude plugin install monitor-agent@monitor-agent-releases")).toBeInTheDocument();
+      expect(screen.getByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument();
+    } finally {
+      settable.pluginFromServer = false;
+    }
+  });
+
+  it("prefers the repository marketplace when both are set", async () => {
+    const settable = config as { pluginMarketplace: string; pluginFromServer: boolean };
+    settable.pluginMarketplace = "owner/repo#prod";
+    settable.pluginFromServer = true;
+    try {
+      mockApi({ "GET /me": { body: ME } });
+      renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
+      expect(await screen.findByText("claude plugin install monitor-agent --marketplace owner/repo#prod")).toBeInTheDocument();
+      expect(screen.queryByText(/marketplace add/)).not.toBeInTheDocument();
+    } finally {
+      settable.pluginMarketplace = "";
+      settable.pluginFromServer = false;
+    }
   });
 });

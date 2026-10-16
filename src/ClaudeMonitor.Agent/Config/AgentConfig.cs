@@ -4,12 +4,6 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Config;
 
-public static class PushScopes
-{
-    public const string Session = "session";
-    public const string Machine = "machine";
-}
-
 /// <summary>
 /// The agent's ONE configuration module (global #2): the only place that reads the environment or holds a path,
 /// URL, interval or limit. Every other file takes an <see cref="AgentConfig"/>. Every variable is in .env.example.
@@ -188,7 +182,7 @@ public sealed partial record AgentConfig
     public string IdentityPath => Path.Combine(Home, "agent.json");
     public string PluginDir => Path.Combine(Home, "claude-plugin");
     public string LogPath => Path.Combine(Home, "agent.log");
-    public string BinaryPath => Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
+    public string BinaryPath => BinaryOverride ?? Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
 
     /// <summary>What the last update check and install left behind (shown by `cm-agent status`).</summary>
     public string UpdateStatePath => Path.Combine(Home, "update-state.json");
@@ -227,56 +221,6 @@ public sealed partial record AgentConfig
 
     public const string Unsupported = "unsupported";
 
-    public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null)
-    {
-        read ??= Environment.GetEnvironmentVariable;
-        legacyHome ??= LegacyHome;
-        static TimeSpan Seconds(string? value, TimeSpan fallback, int max) =>
-            int.TryParse(value, out var s) && s >= 0 ? TimeSpan.FromSeconds(Math.Min(s, max)) : fallback;
-
-        var explicitHome = read("CM_AGENT_HOME") is { Length: > 0 };
-        return new AgentConfig
-        {
-            Home = explicitHome ? read("CM_AGENT_HOME")! : DefaultHome(),
-            MigrateFrom = explicitHome ? null : legacyHome(),
-            ServerOverride = read("CM_SERVER") is { Length: > 0 } s ? s.TrimEnd('/') : null,
-            CredentialStore = read("CM_CREDENTIALS") == "file" ? "file" : "keychain",
-            PermissionWait = Seconds(read("CM_PERMISSION_WAIT"), TimeSpan.FromSeconds(120), WaitMaxSeconds),
-            StopWait = Seconds(read("CM_STOP_WAIT"), TimeSpan.Zero, WaitMaxSeconds),
-            StopWaitFromEnvironment = read("CM_STOP_WAIT") is { Length: > 0 },
-            PushEnabled = read("CM_PUSH") == "on",
-            PushFromEnvironment = read("CM_PUSH") is { Length: > 0 },
-            ClaudeUpdateEnabled = read("CM_CLAUDE_UPDATE") == "on",
-            ClaudeUpdateFromEnvironment = read("CM_CLAUDE_UPDATE") is { Length: > 0 },
-            ClaudeConfigDir = read("CLAUDE_CONFIG_DIR") is { Length: > 0 } claudeDir ? claudeDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude"),
-            ClaudeBinary = read("CM_CLAUDE_BINARY") is { Length: > 0 } claudeBinary ? claudeBinary : null,
-            PathVariable = read("PATH") ?? "",
-            AutoUpdate = UpdateModes.Normalize(read("CM_AUTO_UPDATE")),
-            UpdateHealthWait = Seconds(read("CM_UPDATE_HEALTH_WAIT"), TimeSpan.FromSeconds(90), 600),
-            AutoUpdateFromEnvironment = read("CM_AUTO_UPDATE") is { Length: > 0 },
-            PushScope = read("CM_PUSH_SCOPE") == PushScopes.Machine ? PushScopes.Machine : PushScopes.Session,
-            ServiceMode = read("CM_SERVICE") == "1",
-        };
-    }
-
-    /// <summary>
-    /// macOS: ~/Library/Application Support/ClaudeMonitor; Windows: %USERPROFILE%\.claude-monitor. Not under AppData: the
-    /// Claude desktop app is a packaged (MSIX) app, and every process it starts sees %LOCALAPPDATA% redirected to a private
-    /// copy, so a login made in a normal terminal was invisible to its hooks and MCP server.
-    /// </summary>
-    public static string DefaultHome() => HomeFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-
-    /// <summary>The older Windows default (%LOCALAPPDATA%\ClaudeMonitor), kept only to migrate from and to find old installs; null on macOS.</summary>
-    public static string? LegacyHome() =>
-        OperatingSystem.IsWindows() ? LegacyHomeFor(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)) : null;
-
-    public static string HomeFor(bool windows, string userProfile) => HomeFor(windows ? OsKinds.Windows : OsKinds.MacOs, userProfile);
-
-    /// <summary>macOS keeps the Library folder; Windows and Linux use a dot folder in the user's profile.</summary>
-    public static string HomeFor(string os, string userProfile) =>
-        os == OsKinds.MacOs ? Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor") : Path.Combine(userProfile, ".claude-monitor");
-
-    public static string LegacyHomeFor(string localAppData) => Path.Combine(localAppData, "ClaudeMonitor");
 
     /// <summary>Creates the home directory readable by the user only.</summary>
     public void EnsureHome()

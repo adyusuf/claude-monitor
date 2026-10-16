@@ -64,6 +64,27 @@ public static class DaemonRole
             }
         }
 
+        // A standalone daemon (ADR-0008 §3g) that is not connected does not exit with 1, as it would under a supervisor that restarts it in a loop: it logs
+        // once, re-reads its identity every poll and starts when `cm-agent login` has saved one.
+        if (config.Standalone && !Identity.Load(config).Connected)
+        {
+            log.Write("standalone agent not connected: run `cm-agent login --server <url>`; waiting for the login");
+            while (!stop.IsCancellationRequested && !Identity.Load(config).Connected)
+            {
+                try
+                {
+                    await Task.Delay(config.StandaloneIdentityPoll, clock, stop);
+                }
+                catch (OperationCanceledException)
+                {
+                    return 0;
+                }
+            }
+
+            if (stop.IsCancellationRequested) return 0;
+            log.Write("standalone agent connected");
+        }
+
         return await new DaemonHost(config, clock, log).RunAsync(stop);
     }
 

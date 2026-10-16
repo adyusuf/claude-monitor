@@ -7,6 +7,7 @@ import { useErrorText, useI18n, type Key } from "../i18n";
 import { dateTime } from "../lib/format";
 import { RunFacts } from "./RunFacts";
 import { RunOutput } from "./RunOutput";
+import { RunOutputAccount } from "./RunOutputAccount";
 
 function statusKey(status: RunStatus | string): Key {
   switch (status) {
@@ -65,7 +66,7 @@ const CANCELLABLE: readonly string[] = ["approved", "delivered", "running"];
 function Preview({ run }: { run: WebRunView }) {
   const { t } = useI18n();
   if (!run.visible) return <span className="muted small">{t("remote.commandHidden")}</span>;
-  return <code className="run-preview"><VisibleText text={run.mode === "shell" ? (run.shellCommand ?? "") : (run.argv ?? []).join(" ")} /></code>;
+  return <code className="run-preview"><VisibleText text={run.mode === "script" ? `${run.scriptInterpreter ?? "script"}: ${(run.scriptBody ?? "").split("\n")[0] ?? ""}` : run.mode === "shell" ? (run.shellCommand ?? "") : (run.argv ?? []).join(" ")} /></code>;
 }
 
 function RunRow({ run, ws, version, onChanged }: { run: WebRunView; ws: string; version: number; onChanged: () => void }) {
@@ -101,6 +102,7 @@ function RunRow({ run, ws, version, onChanged }: { run: WebRunView; ws: string; 
           {run.exitCode !== null ? <p className="small">{t("remote.exitCode", { code: run.exitCode })}</p> : null}
           {run.error ? <p className="small">{t("remote.runError")}: {run.error}</p> : null}
           {run.visible && run.outputBytes > 0 ? <RunOutput runId={run.id} truncated={run.outputTruncated} version={version} /> : null}
+          {run.visible ? <RunOutputAccount run={run} /> : null}
         </div>
       ) : null}
     </li>

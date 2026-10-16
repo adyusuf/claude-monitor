@@ -49,6 +49,16 @@ export const config = {
   grantDaysDefault: 7,
   grantDaysMax: 90,
   grantTimeoutMax: 3_600,
+  /**
+   * Where the Claude Code plugin is published, as `claude plugin install --marketplace` takes it ("owner/repo#branch", or a git URL),
+   * set per environment at build time (ADR-0007). Empty: the download page offers the zips only.
+   */
+  pluginMarketplace: import.meta.env.VITE_PLUGIN_MARKETPLACE ?? "",
+  /**
+   * "1" when this site serves the plugin itself (`AGENT_SITE_URL` at build time wrote marketplace.json and the plugin zip into /downloads, ADR-0007
+   * section 9.2): the download page then offers `claude plugin marketplace add <this site>/downloads/marketplace.json` and needs no repository coordinates.
+   */
+  pluginFromServer: import.meta.env.VITE_PLUGIN_FROM_SERVER === "1",
   languageKey: "cm.language",
   themeKey: "cm.theme",
 } as const;

@@ -7,14 +7,15 @@ namespace ClaudeMonitor.Agent.Exec;
 /// ceiling. Empty ceiling lists mean "no extra limit"; the level alone still applies. Unknown or unreadable means
 /// <see cref="Off"/>.
 /// </summary>
-public sealed record ExecPolicy(string Level, IReadOnlyList<string> AllowedExecutables, IReadOnlyList<string> AllowedRoots)
+public sealed record ExecPolicy(string Level, IReadOnlyList<string> AllowedExecutables, IReadOnlyList<string> AllowedRoots,
+    string? ClaimedEnvironment = null, string? ClaimedFunction = null, IReadOnlyList<string>? ProjectFolders = null, string? RunAccount = null)
 {
     public static readonly ExecPolicy Off = new(ExecLevels.Off, [], []);
 
-    /// <summary>A ceiling (allowed executables or roots) limits what runs; free shell text could not be held to it, so a policy with one never allows shell.</summary>
+    /// <summary>A ceiling (allowed executables or roots) limits what runs; free shell text and a script could not be held to it, so a policy with one never allows either.</summary>
     public bool HasCeiling => AllowedExecutables.Count > 0 || AllowedRoots.Count > 0;
 
-    public bool Allows(string mode) => ExecLevels.Allows(Level, mode) && !(HasCeiling && mode == RunModes.Shell);
+    public bool Allows(string mode) => ExecLevels.Allows(Level, mode) && !(HasCeiling && mode is RunModes.Shell or RunModes.Script);
 }
 
 /// <summary>The target's verdict on one run just before it would start. ResolvedExe is the real path of argv[0].</summary>

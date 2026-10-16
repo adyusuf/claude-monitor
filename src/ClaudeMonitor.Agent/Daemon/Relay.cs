@@ -75,9 +75,22 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     /// <summary>A command a hook took has been applied to its session: the web hears so.</summary>
     public async Task ReportCommandsAsync(CancellationToken ct)
     {
+        // What happened before a command was applied: a push the session has not shown yet, or one that was given up (the web words its hint by it).
+        foreach (var id in store.PushRetractions())
+        {
+            await api.CommandStatusAsync(id, CommandStatuses.Delivered, null, ct, null, "");
+            store.ClearPushRetraction(id);
+        }
+
+        foreach (var push in store.PushesToReport())
+        {
+            await api.CommandStatusAsync(push.Id, CommandStatuses.Delivered, null, ct, push.PushedAt, push.Transport);
+            store.MarkPushReported(push.Id);
+        }
+
         foreach (var taken in store.TakenCommands())
         {
-            await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At);
+            await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At, taken.Transport);
             store.MarkCommandReported(taken.Id);
         }
     }
@@ -232,6 +245,15 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.RunUpdate:
                 store.RunChanged(data.Deserialize<RunUpdateMessage>(ApiClient.Json)!.Id.ToString());
+                return true;
+            case AgentStreamEvents.Ask:
+                store.SaveAskIn(data.Deserialize<AskMessage>(ApiClient.Json)!, clock.GetUtcNow());
+                return true;
+            case AgentStreamEvents.AskCancel:
+                store.CloseAsk(data.Deserialize<AskCancelMessage>(ApiClient.Json)!.Id.ToString());
+                return true;
+            case AgentStreamEvents.AskUpdate:
+                store.AskChanged(data.Deserialize<AskUpdateMessage>(ApiClient.Json)!.Id.ToString());
                 return true;
             case AgentStreamEvents.Revoked:
                 return false;

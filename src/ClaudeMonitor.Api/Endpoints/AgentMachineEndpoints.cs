@@ -22,6 +22,7 @@ public static class AgentMachineEndpoints
         g.MapPost("/metrics", Metrics);
         g.MapPost("/alerts", Alerts);
         g.MapGet("/machines", Machines);
+        g.MapGet("/machines/{id:guid}/detail", Detail);
         g.MapGet("/machines/{id:guid}/metrics", MachineMetrics);
         g.MapGet("/alerts", ListAlerts);
     }
@@ -51,6 +52,17 @@ public static class AgentMachineEndpoints
         var ws = http.User.AgentWorkspaceId();
         if (await Access.MemberAsync(db, http.User.UserId(), ws, Roles.Member, http.RequestAborted) is null) return Http.NotFound();
         return Results.Ok(await MachineQueries.MachinesAsync(db, config, ws, clock.GetUtcNow(), http.RequestAborted));
+    }
+
+    private static async Task<IResult> Detail(Guid id, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock)
+    {
+        var ws = http.User.AgentWorkspaceId();
+        var userId = http.User.UserId();
+        if (await Access.MemberAsync(db, userId, ws, Roles.Member, http.RequestAborted) is null) return Http.NotFound();
+        var admin = await Access.MemberAsync(db, userId, ws, Roles.Admin, http.RequestAborted) is not null;
+        return await MachineDetails.GetAsync(db, config, ws, id, userId, admin, clock.GetUtcNow(), http.RequestAborted) is { } detail
+            ? Results.Ok(detail)
+            : Http.NotFound();
     }
 
     private static async Task<IResult> MachineMetrics(Guid id, int? minutes, HttpContext http, MonitorDb db, ApiConfig config,

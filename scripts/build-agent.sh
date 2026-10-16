@@ -8,8 +8,11 @@
 # environment names them; nothing secret is passed here, only names that resolve in the maintainer's keychain:
 #   AGENT_SIGN_IDENTITY="Developer ID Application: <name> (<team>)"   # skip signing when unset
 #   AGENT_NOTARY_PROFILE=<notarytool keychain profile>               # skip notarisation when unset
+#   AGENT_SITE_URL=https://<site>                                     # also write marketplace.json and the plugin zip for this site (ADR-0007 section 9.2)
 # Windows and Linux builds are not signed (ADR-0002, open item: the signing route; ADR-0005): an admin verifies the
 # SHA-256 in SHA256SUMS before a service upgrade (docs/release.md). Single file, never compressed (see the csproj).
+#
+# The plugin's pins (ADR-0007): the SHA-256 of every zip is written to plugin/monitor-agent/agent-release.txt for the release commit.
 #
 # Self-update (ADR-0004): AGENT_UPDATE_CHANNEL=test|prod builds the channel's public key (deploy/update-keys/<channel>.pub)
 # into the agent and signs a manifest.json for the zips with the channel's PRIVATE key, which lives only in the
@@ -60,11 +63,19 @@ done
 
 mv "$work/SHA256SUMS" "$out/SHA256SUMS"
 rm -f "$out/manifest.json"
+version="$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' "$project/ClaudeMonitor.Agent.csproj" | head -1)"
+# The Claude Code plugin pins these zips by SHA-256 (ADR-0007): commit plugin/monitor-agent/agent-release.txt with the release.
+python3 "$root/scripts/write_plugin_pins.py" "$out" "$version"
 if [ -n "$channel" ]; then
-  version="$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' "$project/ClaudeMonitor.Agent.csproj" | head -1)"
   python3 "$root/scripts/sign_manifest.py" sign --channel "$channel" --downloads "$out" --version "$version" \
     --min-supported "${AGENT_MIN_SUPPORTED:-$version}"
 else
   echo "! no AGENT_UPDATE_CHANNEL: built without an update key and without manifest.json (these agents cannot self-update)"
+fi
+# The plugin served by this site itself (ADR-0007 section 9.2): needs the site's https address, which is a deployment value (AGENT_SITE_URL), never in the repository.
+if [ -n "${AGENT_SITE_URL:-}" ]; then
+  python3 "$root/scripts/build_plugin_site.py" "$out" --base-url "$AGENT_SITE_URL"
+else
+  echo "! no AGENT_SITE_URL: no marketplace.json and no plugin zip for this site (the plugin comes from the repository's marketplace)"
 fi
 echo "✓ $(find "$out" -type f | wc -l | tr -d ' ') files in $out"

@@ -92,8 +92,9 @@ public static class AgentEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
+        var share = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => a.ShareServices).FirstOrDefaultAsync(http.RequestAborted);
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
-            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate));
+            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, share));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
@@ -110,10 +111,12 @@ public static class AgentEndpoints
                              select new AgentCommandMessage(c.Id, c.SessionId, s.ExternalId, c.Kind, c.Body, c.ExpiresAt))
             .ToListAsync(http.RequestAborted);
         // "ready" first: the response headers go out with the first message, and an idle stream would otherwise look unconnected for 20 s.
-        var runs = await RunNotices.WaitingForAsync(db, agentId, now, http.RequestAborted);
+        var runs = await RunNotices.WaitingForAsync(db, agentId, now, http.RequestAborted, broker);
+        var asks = await AskQueries.WaitingForAsync(db, agentId, now, http.RequestAborted);
         var first = new[] { new StreamMessage(AgentStreamEvents.Ready, new { }) }
             .Concat(waiting.Select(c => new StreamMessage(AgentStreamEvents.Command, c)))
-            .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)));
+            .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)))
+            .Concat(asks.Select(a => new StreamMessage(AgentStreamEvents.Ask, a)));
         return Sse.Stream(subscription, first, http.RequestAborted);
     }
 
@@ -132,8 +135,19 @@ public static class AgentEndpoints
         var now = clock.GetUtcNow();
         command.Status = req.Status!;
         command.Result = req.Result is { Length: > 500 } r ? r[..500] : req.Result;
-        if (req.Status == CommandStatuses.Delivered) command.DeliveredAt = now;
-        else command.AppliedAt = AppliedMoment(req.At, command.CreatedAt, now, config.ClockSkewMax);
+        if (req.Status == CommandStatuses.Delivered)
+        {
+            command.DeliveredAt ??= now;
+            // Delivered with a transport: written into the session, not shown yet. Empty: that was given up. Anything else is ignored.
+            if (req.Transport == "") command.Transport = null;
+            else if (req.Transport is CommandTransports.Inbox or CommandTransports.Channel) command.Transport = req.Transport;
+        }
+        else
+        {
+            command.AppliedAt = AppliedMoment(req.At, command.CreatedAt, now, config.ClockSkewMax);
+            // An unknown value is dropped, not refused: a newer agent may name a way this API does not know yet.
+            if (req.Status == CommandStatuses.Applied && req.Transport is { } transport && CommandTransports.All.Contains(transport)) command.Transport = transport;
+        }
         await db.SaveChangesAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(command.WorkspaceId),
             new StreamMessage("command", new { sessionId = command.SessionId, id, status = command.Status }));

@@ -38,6 +38,12 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
                             select new { a, m.Os }).FirstOrDefaultAsync(ct);
         if (target is null) return NotFound();
         if (RunRules.Check(req, config, target.Os) is { } invalid) return RunCreateResult.Refused(StatusCodes.Status400BadRequest, invalid);
+        if (req.Mode == RunModes.Script && ScriptRefusal(target.a, req.ScriptInterpreter) is { } refusal) return RunCreateResult.Refused(StatusCodes.Status409Conflict, refusal);
+        // An agent that does not report it cannot run files or a stdin text: it would run the script without them, so it is not offered the run.
+        if (req.Mode == RunModes.Script && ScriptFiles.Any(req.ScriptFiles, req.ScriptStdin) && target.a.Capabilities?.Contains(AgentCapabilities.ScriptFiles) != true)
+        {
+            return RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.FilesUnsupported);
+        }
 
         var existing = await db.RemoteRuns.AsNoTracking()
             .FirstOrDefaultAsync(r => r.RequesterAgentId == agentId && r.ClientKey == req.ClientKey, ct);
@@ -69,13 +75,17 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
             Cwd = req.Cwd,
             TimeoutSeconds = req.TimeoutSeconds,
             Reason = req.Reason,
+            ProjectKey = req.ProjectKey,
+            Kind = req.Kind,
             CreatedAt = now,
             ExpiresAt = now + config.RunPendingLifetime,
         };
+        if (req.Mode == RunModes.Script) FreezeScript(run, req, target.a, settings);
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (await LockAsync(workspaceId, userId, target.a.Id, target.a.UserId, req.Mode, ct) is { } refused) return refused;
-        var approvedBy = await ApproveByJobAsync(req, run, now, ct) ?? await ApproveByGrantAsync(run, target.Os, now, ct);
+        // A target that requires signed approvals takes no job or grant: each run waits for a signature of its own (ADR-0010 §4).
+        var approvedBy = target.a.ApprovalsRequired ? null : await ApproveByJobAsync(req, run, now, ct) ?? await ApproveByGrantAsync(run, target.Os, now, ct);
         if (approvedBy is null
             && await db.RemoteRuns.CountAsync(r => r.TargetAgentId == run.TargetAgentId && r.Status == RunStatuses.PendingApproval, ct)
                >= config.RunPendingMaxPerTarget)
@@ -104,8 +114,42 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
         return new RunCreateResult(new RunCreated(run.Id, run.Status, run.GrantId, run.ExpiresAt), StatusCodes.Status200OK, null);
     }
 
-    public static string RunHash(RemoteRun run) =>
-        GrantMatcher.RunHash(run.Mode, run.Argv, run.ShellCommand, run.Cwd, run.TimeoutSeconds, run.TargetAgentId);
+    public static string RunHash(RemoteRun run) => run.Mode == RunModes.Script
+        ? GrantMatcher.ScriptHash(run.ScriptInterpreter ?? "", run.ScriptBody ?? "", run.ScriptArgs, run.TimeoutSeconds, run.TargetAgentId,
+            run.TargetEnvironment, run.TargetFunction, run.ScriptFiles, run.ScriptStdin)
+        : GrantMatcher.RunHash(run.Mode, run.Argv, run.ShellCommand, run.Cwd, run.TimeoutSeconds, run.TargetAgentId);
+
+    /// <summary>
+    /// Why a script cannot run on this target now (ADR-0008 §3c): no admin has set its environment (a claim alone does not count, the existing
+    /// runs are unchanged), or it has not reported a trusted tool for the interpreter. Null when it can.
+    /// </summary>
+    public static string? ScriptRefusal(Agent target, string? interpreter = null)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (target.RoleEnvironment is null) return RemoteErrors.RoleNotSet;
+        return interpreter is null || HasInterpreter(target, interpreter) ? null : RemoteErrors.InterpreterMissing;
+    }
+
+    /// <summary>True when the target reported a trusted tool that can run scripts of this interpreter.</summary>
+    public static bool HasInterpreter(Agent target, string interpreter)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        var tools = ScriptInterpreters.Tools(interpreter);
+        return MachineFacts.Tools(target.Interpreters, forView: false) is { } list && list.Any(t => t.Trusted && tools.Contains(t.Name));
+    }
+
+    /// <summary>The script, the role the approval card will show and the output cap, fixed at creation so the approval always matches them.</summary>
+    private void FreezeScript(RemoteRun run, RunCreate req, Agent target, WorkspaceSettings settings)
+    {
+        run.ScriptInterpreter = req.ScriptInterpreter;
+        run.ScriptBody = req.ScriptBody;
+        run.ScriptArgs = req.ScriptArgs?.ToList();
+        run.ScriptFiles = req.ScriptFiles?.OrderBy(f => f.Path, StringComparer.Ordinal).ToList();
+        run.ScriptStdin = req.ScriptStdin is { Length: > 0 } stdin ? stdin : null;
+        run.TargetEnvironment = MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment);
+        run.TargetFunction = MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction);
+        run.OutputCap = Math.Clamp(settings.ScriptOutputMaxBytes, config.ScriptOutputFloor, config.ScriptOutputCeiling);
+    }
 
     private static RunCreateResult NotFound() => RunCreateResult.Refused(StatusCodes.Status404NotFound, "not_found");
 
@@ -177,7 +221,8 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
     /// </summary>
     private async Task<RunCreateResult?> LockAsync(Guid workspaceId, Guid userId, Guid targetId, Guid ownerId, string mode, CancellationToken ct)
     {
-        var levels = mode == RunModes.Shell ? new[] { ExecLevels.Shell } : new[] { ExecLevels.Argv, ExecLevels.Shell };
+        // Only argv runs may go to an argv-level target; shell and script runs need the shell level (ADR-0008 §3c).
+        var levels = mode == RunModes.Argv ? new[] { ExecLevels.Argv, ExecLevels.Shell } : new[] { ExecLevels.Shell };
         if (await db.WorkspaceSettings.Where(s => s.WorkspaceId == workspaceId && s.RemoteRunsEnabled)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.RemoteRunsEnabled, x => x.RemoteRunsEnabled), ct) != 1)
         {

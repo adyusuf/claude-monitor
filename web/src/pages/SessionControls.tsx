@@ -69,7 +69,7 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
 }
 
 /** Send a prompt or a stop to the session, and what was sent before. */
-export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, version, onChange }: Props & { canCommand: boolean; ended: boolean; lastEventAt: string }) {
+export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, pushTransport, version, onChange }: Props & { canCommand: boolean; ended: boolean; lastEventAt: string; pushTransport?: string | null }) {
   const { t } = useI18n();
   const now = useNow(config.clockTickMs);
   const errorText = useErrorText();
@@ -116,7 +116,7 @@ export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, versio
         <div className="compose">
           <textarea className="input" rows={3} maxLength={config.promptMax} placeholder={t("session.promptPlaceholder")}
             value={text} onChange={(e) => setText(e.target.value)} />
-          {isIdle(lastEventAt, now) ? <Notice kind="info">{t("session.idleWarning")}</Notice> : null}
+          {isIdle(lastEventAt, now) ? <Notice kind="info">{t(pushTransport ? "session.idleWarningPush" : "session.idleWarning")}</Notice> : null}
           <div className="compose-actions">
             <Button variant="danger" busy={busy} onClick={() => void send("stop")}>{t("session.stop")}</Button>
             <Button busy={busy} onClick={() => void send("prompt")}>{t("session.send")}</Button>

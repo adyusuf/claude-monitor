@@ -50,14 +50,15 @@ public sealed partial class ServiceInstaller
         }
     }
 
-    private void InstallUnix(ServiceLayout l, string currentBinary, string execLevel)
+    private void InstallUnix(ServiceLayout l, string currentBinary, string execLevel, string? runAccount)
     {
         if (os == OsKinds.Linux) EnsureLinuxAccount(l);
         else EnsureMacAccount(l);
         var upgrade = File.Exists(Definition());
         InstallBinary(l, currentBinary);
         PrepareHome(l);
-        WritePolicy(l, execLevel);
+        if (runAccount is not null) EnsureRunAccount(l, runAccount);
+        WritePolicy(l, execLevel, runAccount);
         if (os == OsKinds.Linux)
         {
             undo.Add(("systemd reloaded", () => Step("reload systemd", Systemctl, ["daemon-reload"]))); // runs after the unit is deleted
@@ -173,13 +174,14 @@ public sealed partial class ServiceInstaller
         output.WriteLine($"The old service did not stop within {stopWaitSeconds} s; continuing.");
     }
 
-    private void WritePolicy(ServiceLayout l, string execLevel)
+    private void WritePolicy(ServiceLayout l, string execLevel, string? runAccount = null)
     {
         EnsureAdminDir(Path.GetDirectoryName(l.ExecConfigPath)!);
         var existed = File.Exists(l.ExecConfigPath);
-        // A reinstall (an upgrade) keeps the ceiling an admin wrote by hand.
+        // A reinstall (an upgrade) keeps the ceiling and the role claim an admin wrote by hand (ADR-0008 §3a).
         var before = ExecPolicyLoader.ReadExisting(l.ExecConfigPath);
-        ExecPolicyLoader.Save(l.ExecConfigPath, new ExecPolicy(execLevel, before?.AllowedExecutables ?? [], before?.AllowedRoots ?? []));
+        ExecPolicyLoader.Save(l.ExecConfigPath, new ExecPolicy(execLevel, before?.AllowedExecutables ?? [], before?.AllowedRoots ?? [],
+            before?.ClaimedEnvironment, before?.ClaimedFunction, RunAccount: runAccount ?? before?.RunAccount)); // a reinstall without the option keeps the account an admin chose
         if (!existed) undo.Add(("exec policy written", () => File.Delete(l.ExecConfigPath)));
     }
 

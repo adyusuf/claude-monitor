@@ -1,0 +1,14 @@
+{
+  "name": "monitor-agent-releases",
+  "owner": {
+    "name": "Claude Monitor"
+  },
+  "description": "The Claude Monitor agent as a Claude Code plugin: it installs, connects and stops the agent, which reports this machine's sessions and carries web messages back.",
+  "plugins": [
+    {
+      "name": "monitor-agent",
+      "source": "./plugin/monitor-agent",
+      "description": "Installs the Claude Monitor agent, connects it to your server and starts it with your Claude Code sessions."
+    }
+  ]
+}

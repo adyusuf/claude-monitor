@@ -58,5 +58,7 @@ public static class RemoteCleanup
         await db.MachineAlerts.Where(alerts)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, AlertStates.Resolved).SetProperty(a => a.ResolvedAt, now), ct);
         await RunDecisions.CancelOpenAsync(db, broker, now, runs, ct, after);
+        await AskReports.CancelOpenAsync(db, broker, now, a => agents.Contains(a.RequesterAgentId) || agents.Contains(a.TargetAgentId)
+            || (a.WorkspaceId == ws && (a.RequesterUserId == user || a.TargetUserId == user)), ct, after);
     }
 }

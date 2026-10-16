@@ -134,7 +134,7 @@ public sealed class PushWireTests : IDisposable
         Assert.Contains("Push into the session: off", off, StringComparison.Ordinal);
 
         store.SaveCommand(new LocalCommand("w-1", "s-1", CommandKinds.Prompt, "x", Start.AddMinutes(9)));
-        var on = string.Join(' ', PushStatus.Describe(home.Config with { PushEnabled = true }, store, Start, "s-1", daemonRunning: true));
+        var on = string.Join(' ', PushStatus.Describe(home.Config with { PushEnabled = true, PushTransport = PushTransports.Channel }, store, Start, "s-1", daemonRunning: true));
         Assert.Contains("on for this session (s-1)", on, StringComparison.Ordinal);
         Assert.Contains("nothing pushed yet", on, StringComparison.Ordinal);
         Assert.Contains("1 waiting for a hook", on, StringComparison.Ordinal);
@@ -195,7 +195,7 @@ public sealed class PushWireTests : IDisposable
         Assert.DoesNotContain("channels", Manifest(), StringComparison.Ordinal); // additive: the plugin is what it was
         Assert.Contains("next prompt", plain.Out, StringComparison.Ordinal);
 
-        var on = Install("--push", "on");
+        var on = Install("--push", "channel");
         Assert.Contains("--dangerously-load-development-channels plugin:monitor-agent@monitor-agent-local", on.Out, StringComparison.Ordinal);
         var channel = JsonNode.Parse(Manifest())!["channels"]![0]!;
         Assert.Equal(("claude-monitor", "Claude Monitor"), (channel["server"]!.GetValue<string>(), channel["displayName"]!.GetValue<string>()));
@@ -206,7 +206,7 @@ public sealed class PushWireTests : IDisposable
         Assert.Equal(0, Install("--push", "off").Code);
         Assert.DoesNotContain("channels", Manifest(), StringComparison.Ordinal);
         Assert.Equal(2, Install("--push", "maybe").Code);
-        Assert.Contains("--push takes on or off", Install("--push").Err, StringComparison.Ordinal);
+        Assert.Contains("--push takes on, off, inbox or channel", Install("--push").Err, StringComparison.Ordinal);
     }
 
     [Fact]

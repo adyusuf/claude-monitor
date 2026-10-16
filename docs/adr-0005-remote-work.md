@@ -132,7 +132,7 @@ owner; running it creates an ordinary run. Shell jobs do not exist. A job whose 
 (for example a git ref) still needs a per-call approval for each run, because the placeholder can select code the
 attacker controls. A test run on a test machine is such a job: an admin-owned script that fetches and tests.
 Approving a job freezes its command; changing it means retiring it and proposing a new one. **No schedules in v1:**
-a job runs only when asked (a schedule would be an autonomous action and needs its own decision, global #20).
+a job runs only when asked (a schedule would be an autonomous action and needs its own decision, global #20; ADR-0010 decided it).
 
 ### The executor on the target
 
@@ -273,8 +273,8 @@ exists, so a rollback of that slice is code-only.
 ## Open (reported, not decided here)
 
 - **TOTP for every shell target** (security review): the maintainer chose "only when the approver has it on".
-- **Schedules for jobs**, shipping files or test bundles to a target, end-to-end signed approvals, a separate run
-  account, a multi-instance API broker.
+- **A multi-instance API broker.** (Schedules for jobs, files for a script run, end-to-end signed approvals and a separate run account were taken up in
+  [ADR-0010](adr-0010-remote-work-v2.md); what of them is still open is listed there.)
 - **Target-side checks not in v1** (security review items left open while building): refusing a grant root whose
   folder chain is writable by a non-admin (it would refuse ordinary app-owned log folders), a pinned hash of the
   executable.
