@@ -48,6 +48,11 @@ public static partial class Cli
         cm-agent config role <environment|none> <function|none>
                                         what this machine says it is (dev|test|stage|preprod|production|other; development|application|web|
                                         database|ci|storage|other); an admin sets the role on the web, a claim only makes it stricter (ADR-0008)
+        cm-agent machines | machine <x> | metrics <x> | alerts [<x>] | jobs [<x>] | job-run <job id>
+        cm-agent run --machine <x> (--script <file> --interpreter <i> [--arg <v>]... | --argv <exe> [args...]) [--timeout] [--reason] [--project] [--kind]
+        cm-agent result <run or ask id> [--wait <seconds>] [--offset <chars>]
+        cm-agent ask --machine <x> "<question>"
+                                        reach the other machines of the workspace from here, without the web (an approval is still the owner's, on the web; ADR-0008)
         cm-agent claude-update cancel   stop a Claude Code update that is counting down
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
@@ -97,6 +102,8 @@ public static partial class Cli
                 return 0;
             case "logout":
                 return await new Login(config, stdout, clock).LogoutAsync();
+            case var verb when verb is not null && RemoteVerbs.Names.Contains(verb):
+                return await RemoteVerbs.RunAsync(args, config, stdout, stderr, clock, log);
             case "install" when Array.IndexOf(args, ServiceCommands.ExecOption) >= 0:
                 var saved = ServiceCommands.SaveExecLevel(args, config, stdout, stderr);
                 return saved != 0 || args.Length == 3 ? saved : Install(args, config, stdout, stderr, Environment.ProcessPath!);
