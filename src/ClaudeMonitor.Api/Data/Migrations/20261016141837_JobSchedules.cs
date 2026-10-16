@@ -49,7 +49,7 @@ namespace ClaudeMonitor.Api.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_job_schedules", x => x.id);
-                    table.CheckConstraint("ck_job_schedules_failures", "failures_in_a_row >= 0");
+                    table.CheckConstraint("ck_job_schedules_failures", "failures_in_arow >= 0");
                     table.CheckConstraint("ck_job_schedules_kind", "kind IN ('interval', 'daily')");
                     table.CheckConstraint("ck_job_schedules_shape", "(kind = 'interval' AND interval_minutes BETWEEN 15 AND 10080 AND daily_at_minutes IS NULL) OR (kind = 'daily' AND daily_at_minutes BETWEEN 0 AND 1439 AND interval_minutes IS NULL)");
                     table.CheckConstraint("ck_job_schedules_status", "status IN ('active', 'paused', 'ended')");

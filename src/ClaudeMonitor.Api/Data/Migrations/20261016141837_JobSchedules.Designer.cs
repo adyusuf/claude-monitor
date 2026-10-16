@@ -750,7 +750,7 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("job_schedules", t =>
                         {
-                            t.HasCheckConstraint("ck_job_schedules_failures", "failures_in_a_row >= 0");
+                            t.HasCheckConstraint("ck_job_schedules_failures", "failures_in_arow >= 0");
 
                             t.HasCheckConstraint("ck_job_schedules_kind", "kind IN ('interval', 'daily')");
 
