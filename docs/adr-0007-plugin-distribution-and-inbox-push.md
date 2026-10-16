@@ -425,10 +425,11 @@ the daemon's write (the probe of §8 used the same line from a script, a desktop
 the plugin installed from a real marketplace; a published build (the pins file is the placeholder until `build-agent.sh` runs for a release).
 
 **Deferred, with the reason.**
-- **The web says which transport an applied command used, not what happens before.** The agent reports `hook`, `inbox` or `channel` with "applied"
-  (`session_commands.transport`, nullable; an older agent sends nothing and the web shows nothing), and the command's row reads "Reached the session ...".
-  Still open: showing "pushed, not shown yet" or "the session refuses messages" before applied needs the agent to report push state earlier, and the
-  idle-session warning is still worded for the hooks, which is wrong while push is on.
+- **The web says which transport an applied command used, and what happens before (done, 16/10/2026).** The agent reports `hook`, `inbox` or `channel` with "applied"
+  (`session_commands.transport`, nullable). Before that it reports a push that was written into the session and not shown yet as `delivered` with the transport (taken back with an
+  empty transport when the push is given up and the hooks will deliver it), and the web's hint reads "Pushed into the session ...". The agent also tells the API which push transport is on with
+  its profile (`agents.push_transport`), so the idle-session warning says push is on and no longer says the command waits for something to be typed. An older agent sends none of this and
+  the older wording stays.
 - **`--stop-wait` for the plugin's hooks (done):** the plugin's Stop hook now has a timeout that fits the longest wait (600 s), and the wrapper tells the agent so
   (`CM_PLUGIN_STOP_WAIT_MAX`); a plugin-started agent takes the saved wait up to that. A plugin version without the wrapper's line keeps a wait of zero, because its
   fixed 15 s would cut a longer wait off.

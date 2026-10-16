@@ -132,7 +132,13 @@ public static class AgentEndpoints
         var now = clock.GetUtcNow();
         command.Status = req.Status!;
         command.Result = req.Result is { Length: > 500 } r ? r[..500] : req.Result;
-        if (req.Status == CommandStatuses.Delivered) command.DeliveredAt = now;
+        if (req.Status == CommandStatuses.Delivered)
+        {
+            command.DeliveredAt ??= now;
+            // Delivered with a transport: written into the session, not shown yet. Empty: that was given up. Anything else is ignored.
+            if (req.Transport == "") command.Transport = null;
+            else if (req.Transport is CommandTransports.Inbox or CommandTransports.Channel) command.Transport = req.Transport;
+        }
         else
         {
             command.AppliedAt = AppliedMoment(req.At, command.CreatedAt, now, config.ClockSkewMax);

@@ -26,6 +26,7 @@ public static class MachineReports
         agent.ExecLevel = ExecLevels.All.Contains(profile.ExecLevel) ? profile.ExecLevel : ExecLevels.Off;
         agent.ServiceMode = profile.ServiceMode;
         agent.ProfileAt = now;
+        agent.PushTransport = profile.PushTransport is CommandTransports.Inbox or CommandTransports.Channel ? profile.PushTransport : null;
         if (profile.OsVersion is { Length: > 0 } version)
         {
             var clean = Clean(version, OsVersionMax);

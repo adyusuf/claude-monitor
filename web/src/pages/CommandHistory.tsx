@@ -16,8 +16,9 @@ export function CommandItem({ command: c, sessionId, ended, now, canCancel, onCa
 }) {
   const { t, dict } = useI18n();
   const left = c.status === "queued" || c.status === "delivered" ? remaining(c.expiresAt, now, dict.time) : null;
+  const pushedHow = c.status === "delivered" && c.transport ? (dict.commandTransport as Record<string, string>)[c.transport] : undefined;
   const hint = c.status === "queued" ? t("commandHint.queued")
-    : c.status === "delivered" ? t("commandHint.delivered")
+    : c.status === "delivered" ? (pushedHow && c.transport !== "hook" ? t("commandHint.pushed", { how: pushedHow }) : t("commandHint.delivered"))
       : c.status === "expired" ? t(c.deliveredAt ? "commandHint.expiredIdle" : "commandHint.expiredUnreached")
         : null;
   const how = c.status === "applied" && c.transport ? (dict.commandTransport as Record<string, string>)[c.transport] : undefined; // an unknown way is not shown

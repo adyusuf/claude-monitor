@@ -79,6 +79,7 @@ internal static class MonitorDbModel
         });
         b.Entity<Agent>(e =>
         {
+            e.Property(x => x.PushTransport).HasMaxLength(16);
             e.HasIndex(x => new { x.MachineId, x.UserId }).IsUnique().HasFilter("status = 'active'");
             e.HasIndex(x => x.WorkspaceId);
             e.HasIndex(x => x.UserId);

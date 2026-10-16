@@ -40,6 +40,8 @@ export interface SessionRow {
   ownerName: string;
   costUsd: number | null;
   openPermissions: number;
+  /** The push transport the session's machine has on ("inbox" or "channel"); absent or null when it is off or the agent is older. */
+  pushTransport?: string | null;
 }
 export interface TaskRow { id: string; externalId: string; subject: string; status: string; updatedAt: string }
 export interface SubagentRow { id: string; agentType: string; description: string | null; status: string; startedAt: string; endedAt: string | null }

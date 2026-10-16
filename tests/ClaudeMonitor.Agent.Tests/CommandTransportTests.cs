@@ -97,4 +97,99 @@ public sealed class CommandTransportTests : IDisposable
         using var again = new LocalStore(home.Config.DatabasePath); // opening twice must not add the column twice
         Assert.Equal([new TakenCommand("old", null, null)], store.TakenCommands());
     }
+
+    // ---- the push the web is told about before the command is applied --------------------------------------------------
+
+    private (Relay Relay, FakeApi Fake, ApiClient Api, HttpClient Http) NewRelay(LocalStore store)
+    {
+        var fake = new FakeApi().On("POST /api/agent/commands/*", HttpStatusCode.NoContent, "");
+        var http = ApiClient.CreateHttp("https://monitor.invalid", fake);
+        var creds = Credentials.For(home.Config);
+        creds.Write(Credentials.Access, "access-1");
+        creds.Write(Credentials.Refresh, "refresh-1");
+        var api = new ApiClient(http, creds, home.Config.ApiCallTimeout);
+        return (new Relay(home.Config, store, api, clock), fake, api, http);
+    }
+
+    private static List<CommandStatusUpdate> Reports(FakeApi fake) =>
+        [.. fake.Seen.Where(s => s.Path.EndsWith("/status", StringComparison.Ordinal)).Select(s => JsonSerializer.Deserialize<CommandStatusUpdate>(s.Body, ApiClient.Json)!)];
+
+    [Fact]
+    public async Task A_pushed_command_is_reported_once_as_delivered_with_its_transport_and_then_as_applied_when_the_session_shows_it()
+    {
+        using var store = new LocalStore(home.Config.DatabasePath);
+        var (relay, fake, api, http) = NewRelay(store);
+        using (api) using (http)
+        {
+            Queue(store, "c1");
+            store.TakePromptsForPush("s1", CommandKinds.Prompt, clock.GetUtcNow(), CommandTransports.Inbox);
+
+            await relay.ReportCommandsAsync(CancellationToken.None);
+            await relay.ReportCommandsAsync(CancellationToken.None); // nothing new
+            var pushed = Assert.Single(Reports(fake));
+            Assert.Equal((CommandStatuses.Delivered, CommandTransports.Inbox, clock.GetUtcNow()), (pushed.Status, pushed.Transport, pushed.At));
+
+            store.ConfirmPush("c1", clock.GetUtcNow());
+            await relay.ReportCommandsAsync(CancellationToken.None);
+            var all = Reports(fake);
+            Assert.Equal([CommandStatuses.Delivered, CommandStatuses.Applied], all.Select(r => r.Status));
+            Assert.Equal(CommandTransports.Inbox, all[1].Transport);
+        }
+    }
+
+    [Fact]
+    public async Task A_push_given_up_after_the_web_was_told_is_taken_back_once_and_one_never_told_is_not()
+    {
+        using var store = new LocalStore(home.Config.DatabasePath);
+        var (relay, fake, api, http) = NewRelay(store);
+        using (api) using (http)
+        {
+            Queue(store, "told");
+            Queue(store, "quiet");
+            store.TakePromptsForPush("s1", CommandKinds.Prompt, clock.GetUtcNow(), CommandTransports.Channel);
+            store.PushFailed("quiet"); // given up before the daemon's next pass: the web never heard of it
+            await relay.ReportCommandsAsync(CancellationToken.None);
+            Assert.Equal("channel", Assert.Single(Reports(fake)).Transport);
+
+            store.PushFailed("told");
+            await relay.ReportCommandsAsync(CancellationToken.None);
+            await relay.ReportCommandsAsync(CancellationToken.None);
+            var taken = Reports(fake).Skip(1).ToList();
+            Assert.Equal((CommandStatuses.Delivered, ""), (Assert.Single(taken).Status, taken[0].Transport));
+            Assert.Empty(store.PushRetractions());
+        }
+    }
+
+    [Fact]
+    public async Task A_command_a_hook_takes_is_never_reported_as_pushed()
+    {
+        using var store = new LocalStore(home.Config.DatabasePath);
+        var (relay, fake, api, http) = NewRelay(store);
+        using (api) using (http)
+        {
+            Queue(store, "c1");
+            store.TakeCommand("s1", CommandKinds.Prompt, clock.GetUtcNow());
+            await relay.ReportCommandsAsync(CancellationToken.None);
+            var only = Assert.Single(Reports(fake));
+            Assert.Equal((CommandStatuses.Applied, CommandTransports.Hook), (only.Status, only.Transport));
+        }
+    }
+
+    [Fact]
+    public void A_database_an_older_agent_made_gains_the_push_columns_and_tables()
+    {
+        Directory.CreateDirectory(home.Dir);
+        using (var old = new SqliteConnection($"Data Source={home.Config.DatabasePath};Pooling=False"))
+        {
+            old.Open();
+            using var create = old.CreateCommand();
+            create.CommandText = "CREATE TABLE pushes (command_id TEXT PRIMARY KEY, pushed_at TEXT NOT NULL, confirmed_at TEXT);";
+            create.ExecuteNonQuery();
+        }
+
+        using var store = new LocalStore(home.Config.DatabasePath);
+        using var again = new LocalStore(home.Config.DatabasePath);
+        Assert.Empty(store.PushesToReport());
+        Assert.Empty(store.PushRetractions());
+    }
 }

@@ -40,3 +40,19 @@ describe("the way an applied command reached its session", () => {
     }
   });
 });
+
+describe("a command pushed into the session that it has not shown yet", () => {
+  it.each([
+    ["inbox", en.commandTransport.inbox],
+    ["channel", en.commandTransport.channel],
+  ])("says it was pushed %s and waits for the session, not for the next hook", (transport, how) => {
+    const li = show(command({ status: "delivered", transport, appliedAt: null }));
+    expect(within(li).getByText(en.commandHint.pushed.replace("{how}", how), { exact: false })).toBeInTheDocument(); // the countdown follows in the same line
+    expect(within(li).queryByText(en.commandHint.delivered, { exact: false })).toBeNull();
+  });
+
+  it("keeps the older hint when nothing was pushed", () => {
+    const li = show(command({ status: "delivered", transport: null, appliedAt: null }));
+    expect(within(li).getByText(en.commandHint.delivered, { exact: false })).toBeInTheDocument();
+  });
+});

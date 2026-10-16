@@ -45,7 +45,7 @@ A workspace always has at least one owner; the API refuses the change that would
 | Table | Columns | Keys and indexes |
 |---|---|---|
 | `machines` | `id`, `workspace_id`, `machine_key_hash`, `hostname`, `os` (`macos`, `windows`, `linux`), `os_version`, `arch`, `first_seen_at`, `last_seen_at` | UNIQUE (`workspace_id`, `machine_key_hash`) |
-| `agents` | `id`, `machine_id`, `user_id`, `workspace_id`, `version`, `status` (`active`, `revoked`), `enrolled_at`, `last_heartbeat_at`, `revoked_at`, `revoked_by`; from ADR-0005 `exec_level` (`off`, `argv`, `shell`; default `off`), `service_mode` (default false), `profile_at` | UNIQUE (`machine_id`, `user_id`) WHERE `status = 'active'`; (`workspace_id`) |
+| `agents` | `id`, `machine_id`, `user_id`, `workspace_id`, `version`, `status` (`active`, `revoked`), `enrolled_at`, `last_heartbeat_at`, `revoked_at`, `revoked_by`; from ADR-0005 `exec_level` (`off`, `argv`, `shell`; default `off`), `service_mode` (default false), `profile_at`; from ADR-0007 `push_transport` (`inbox`, `channel`; nullable: the push the agent said it has on with its last profile) | UNIQUE (`machine_id`, `user_id`) WHERE `status = 'active'`; (`workspace_id`) |
 | `agent_tokens` | `id`, `agent_id`, `kind` (`access`, `refresh`), `token_hash`, `created_at`, `expires_at`, `replaced_by`, `revoked_at`, `last_used_at` | UNIQUE `token_hash`; (`agent_id`) |
 | `device_authorizations` | `id`, `device_code_hash`, `user_code`, `machine_key_hash`, `requested_hostname`, `requested_os`, `requested_arch`, `agent_version`, `status` (`pending`, `approved`, `denied`, `expired`, `consumed`), `workspace_id`, `approved_by`, `created_at`, `expires_at`, `last_polled_at` | UNIQUE `device_code_hash`; UNIQUE `user_code` WHERE `status = 'pending'` |
 
@@ -105,7 +105,7 @@ database defaults, so an older API keeps inserting rows.
 
 | Table | Columns | Keys and indexes |
 |---|---|---|
-| `session_commands` | `id`, `workspace_id`, `session_id`, `agent_id`, `kind` (`prompt`, `stop`), `body`, `created_by`, `created_at`, `expires_at`, `status` (`queued`, `delivered`, `applied`, `failed`, `expired`, `cancelled`), `delivered_at`, `applied_at`, `result`, `transport` (`hook`, `inbox`, `channel`; nullable: how an applied command reached its session, as the agent reported it) | (`agent_id`, `status`) WHERE `status IN ('queued', 'delivered')`; (`session_id`, `created_at` DESC) |
+| `session_commands` | `id`, `workspace_id`, `session_id`, `agent_id`, `kind` (`prompt`, `stop`), `body`, `created_by`, `created_at`, `expires_at`, `status` (`queued`, `delivered`, `applied`, `failed`, `expired`, `cancelled`), `delivered_at`, `applied_at`, `result`, `transport` (`hook`, `inbox`, `channel`; nullable: how an applied command reached its session, as the agent reported it; on a `delivered` command `inbox` or `channel` means it was written into the session and not shown yet) | (`agent_id`, `status`) WHERE `status IN ('queued', 'delivered')`; (`session_id`, `created_at` DESC) |
 
 | `permission_requests` | `id`, `workspace_id`, `session_id`, `agent_id`, `tool_name`, `tool_input` `jsonb`, `status` (`open`, `answered`, `expired`), `created_at`, `expires_at`, `decision` (`allow`, `deny`), `reason`, `answered_by`, `answered_at` | (`session_id`, `status`) |
 

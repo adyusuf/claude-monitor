@@ -4,6 +4,9 @@ namespace ClaudeMonitor.Agent.Storage;
 
 public sealed record PushedCommand(string Id, string Session, DateTimeOffset PushedAt);
 
+/// <summary>A push the web has not been told about yet: the command, when it was written into the session, and through which transport.</summary>
+public sealed record PushToReport(string Id, DateTimeOffset PushedAt, string Transport);
+
 /// <summary>
 /// What the push into an idle session (ADR-0003) needs from the local database: which Claude Code process runs which
 /// session, and the life of a pushed prompt (queued -> pushed -> taken once it shows in the transcript, or back to
@@ -61,9 +64,38 @@ public sealed partial class LocalStore
     /// <summary>A push could not be written: the prompt goes back to the queue untouched.</summary>
     public void PushFailed(string id)
     {
+        // The web was told it was pushed: it is told that it was not, once, so it does not wait for a message that will never show.
+        Exec("INSERT OR IGNORE INTO push_retractions (command_id) SELECT command_id FROM pushes WHERE command_id = $i AND confirmed_at IS NULL AND reported = 1", ("$i", id));
         Exec("UPDATE commands SET state = 'queued', transport = NULL WHERE id = $i AND state = 'pushed'", ("$i", id));
         Exec("DELETE FROM pushes WHERE command_id = $i AND confirmed_at IS NULL", ("$i", id));
     }
+
+    /// <summary>Pushes written into a session that the web has not heard about, oldest first.</summary>
+    public List<PushToReport> PushesToReport()
+    {
+        var list = new List<PushToReport>();
+        using var cmd = Command("""
+            SELECT c.id, p.pushed_at, c.transport FROM pushes p JOIN commands c ON c.id = p.command_id
+            WHERE p.confirmed_at IS NULL AND c.state = 'pushed' AND p.reported IS NULL AND c.transport IS NOT NULL ORDER BY c.rowid
+            """, null);
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) list.Add(new PushToReport(r.GetString(0), At(r.GetString(1)), r.GetString(2)));
+        return list;
+    }
+
+    public void MarkPushReported(string id) => Exec("UPDATE pushes SET reported = 1 WHERE command_id = $i", ("$i", id));
+
+    /// <summary>Commands whose push the web was told about and that went back to the hooks since.</summary>
+    public List<string> PushRetractions()
+    {
+        var list = new List<string>();
+        using var cmd = Command("SELECT command_id FROM push_retractions ORDER BY rowid", null);
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) list.Add(r.GetString(0));
+        return list;
+    }
+
+    public void ClearPushRetraction(string id) => Exec("DELETE FROM push_retractions WHERE command_id = $i", ("$i", id));
 
     public List<PushedCommand> UnconfirmedPushes()
     {

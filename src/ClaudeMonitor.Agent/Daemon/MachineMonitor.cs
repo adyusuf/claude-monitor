@@ -39,7 +39,14 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var level = ExecPolicyLoader.RunningAsRoot() ? ExecLevels.Off
             : policy.Level == ExecLevels.Shell && policy.HasCeiling ? ExecLevels.Argv : policy.Level;
         await Guard(() => api.ProfileAsync(new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription,
-            Environment.UserName, config.ExecMaxConcurrent), ct));
+            Environment.UserName, config.ExecMaxConcurrent, PushReported()), ct));
+    }
+
+    /// <summary>The push transport this machine has on now (the saved setting, read fresh), or null when push is off: the web words its idle-session warning by it.</summary>
+    private string? PushReported()
+    {
+        var current = SavedSettings.Apply(config);
+        return current.PushEnabled ? current.PushTransport : null;
     }
 
     public async Task SampleAsync(CancellationToken ct)

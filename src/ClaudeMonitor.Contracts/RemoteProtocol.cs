@@ -4,7 +4,7 @@ namespace ClaudeMonitor.Contracts;
 // the end of a record with a default, never removed, renamed or retyped.
 
 /// <summary>What a target tells the API about itself after every start and every settings change.</summary>
-public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent);
+public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent, string? PushTransport = null);
 
 public sealed record DiskSample(string Mount, long UsedBytes, long TotalBytes);
 

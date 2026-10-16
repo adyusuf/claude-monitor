@@ -72,4 +72,81 @@ public sealed class CommandTransportTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal(CommandStatuses.Applied, (await RowAsync(owner, sessionId)).GetProperty("status").GetString());
     }
+
+    // ---- delivered with a transport: written into the session, not shown yet --------------------------------------------
+
+    [Theory]
+    [InlineData(CommandTransports.Inbox)]
+    [InlineData(CommandTransports.Channel)]
+    public async Task A_command_pushed_into_the_session_shows_the_transport_while_it_is_still_delivered(string transport)
+    {
+        var (owner, agent, sessionId, id) = await NewCommandAsync();
+        Assert.Equal(HttpStatusCode.NoContent, (await ReportAsync(agent, id, CommandStatuses.Delivered, null)).StatusCode); // the stream hands it over
+        Assert.Equal(HttpStatusCode.NoContent, (await ReportAsync(agent, id, CommandStatuses.Delivered, transport)).StatusCode);
+        var row = await RowAsync(owner, sessionId);
+        Assert.Equal((CommandStatuses.Delivered, transport), (row.GetProperty("status").GetString(), row.GetProperty("transport").GetString()));
+    }
+
+    [Fact]
+    public async Task A_push_taken_back_clears_the_transport_and_the_hook_that_then_applies_it_sets_its_own()
+    {
+        var (owner, agent, sessionId, id) = await NewCommandAsync();
+        await ReportAsync(agent, id, CommandStatuses.Delivered, CommandTransports.Inbox);
+        Assert.Equal(HttpStatusCode.NoContent, (await ReportAsync(agent, id, CommandStatuses.Delivered, "")).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await RowAsync(owner, sessionId)).GetProperty("transport").ValueKind);
+        await ReportAsync(agent, id, CommandStatuses.Applied, CommandTransports.Hook);
+        Assert.Equal(CommandTransports.Hook, (await RowAsync(owner, sessionId)).GetProperty("transport").GetString());
+    }
+
+    [Fact]
+    public async Task A_late_push_report_never_takes_an_applied_command_back_and_the_first_delivery_time_stands()
+    {
+        var (owner, agent, sessionId, id) = await NewCommandAsync();
+        await ReportAsync(agent, id, CommandStatuses.Delivered, null);
+        var first = (await RowAsync(owner, sessionId)).GetProperty("deliveredAt").GetString();
+        api.Clock.Advance(TimeSpan.FromSeconds(30));
+        await ReportAsync(agent, id, CommandStatuses.Delivered, CommandTransports.Channel);
+        Assert.Equal(first, (await RowAsync(owner, sessionId)).GetProperty("deliveredAt").GetString());
+
+        await ReportAsync(agent, id, CommandStatuses.Applied, CommandTransports.Channel);
+        Assert.Equal(HttpStatusCode.Conflict, (await ReportAsync(agent, id, CommandStatuses.Delivered, "")).StatusCode);
+        var row = await RowAsync(owner, sessionId);
+        Assert.Equal((CommandStatuses.Applied, CommandTransports.Channel), (row.GetProperty("status").GetString(), row.GetProperty("transport").GetString()));
+    }
+
+    [Fact]
+    public async Task A_delivered_report_with_a_strange_transport_keeps_what_was_there()
+    {
+        var (owner, agent, sessionId, id) = await NewCommandAsync();
+        await ReportAsync(agent, id, CommandStatuses.Delivered, CommandTransports.Inbox);
+        Assert.Equal(HttpStatusCode.NoContent, (await ReportAsync(agent, id, CommandStatuses.Delivered, "carrier-pigeon")).StatusCode);
+        Assert.Equal(CommandTransports.Inbox, (await RowAsync(owner, sessionId)).GetProperty("transport").GetString());
+    }
+
+    // ---- the push transport a machine has on, told with the profile ------------------------------------------------------
+
+    private static Task<HttpResponseMessage> ProfileAsync(TestAgent agent, string? push) =>
+        agent.Http.PutAsJsonAsync("/api/agent/profile", new AgentProfile(ExecLevels.Off, false, null, null, 2, push), TestUser.Json);
+
+    [Theory]
+    [InlineData(CommandTransports.Inbox, CommandTransports.Inbox)]
+    [InlineData(CommandTransports.Channel, CommandTransports.Channel)]
+    [InlineData("carrier-pigeon", null)]
+    [InlineData(null, null)]
+    public async Task The_session_says_which_push_transport_its_machine_has_on(string? reported, string? expected)
+    {
+        var (owner, agent, sessionId, _) = await NewCommandAsync();
+        (await ProfileAsync(agent, reported)).EnsureSuccessStatusCode();
+        var session = await owner.GetJsonAsync($"/api/sessions/{sessionId}");
+        Assert.Equal(expected, session.GetProperty("pushTransport").ValueKind == JsonValueKind.Null ? null : session.GetProperty("pushTransport").GetString());
+    }
+
+    [Fact]
+    public async Task Turning_push_off_is_heard_with_the_next_profile()
+    {
+        var (owner, agent, sessionId, _) = await NewCommandAsync();
+        await ProfileAsync(agent, CommandTransports.Inbox);
+        await ProfileAsync(agent, null);
+        Assert.Equal(JsonValueKind.Null, (await owner.GetJsonAsync($"/api/sessions/{sessionId}")).GetProperty("pushTransport").ValueKind);
+    }
 }

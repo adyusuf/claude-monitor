@@ -78,7 +78,7 @@ export function SessionPage() {
               <EventsCard sessionId={id} owner={{ ownerId: s.ownerId, ownerName: s.ownerName }} version={version} />
               <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
             </>}
-          <CommandsCard sessionId={id} canCommand={detail.canCommand} ended={s.status === "ended"} lastEventAt={s.lastEventAt} version={version} onChange={reload} />
+          <CommandsCard sessionId={id} canCommand={detail.canCommand} ended={s.status === "ended"} lastEventAt={s.lastEventAt} pushTransport={s.pushTransport} version={version} onChange={reload} />
         </div>
         <div className="col side">
           <Card title={t("session.tasks")}>
