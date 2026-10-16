@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClaudeMonitor.Agent.Daemon;
 using ClaudeMonitor.Agent.Net;
+using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
@@ -135,19 +136,25 @@ public sealed class RemoteVerbsTests : IDisposable
         Assert.Contains($"cm-agent result {created.Id}", stdout.ToString(), StringComparison.Ordinal);
     }
 
+    private void SeedAsk(AskView view)
+    {
+        using var store = new LocalStore(home.Config.DatabasePath);
+        var now = DateTimeOffset.UtcNow;
+        store.FollowAsk(view.Id.ToString(), AskStatuses.Queued, now);
+        store.AskFetched(view.Id.ToString(), view.Status, JsonSerializer.Serialize(view, ApiClient.Json), AskStatuses.Final.Contains(view.Status), now);
+    }
+
     [Fact]
     public async Task Result_of_an_ask_prints_its_status_and_the_answer_and_exits_zero_only_for_a_live_or_answered_ask()
     {
         var id = Guid.NewGuid();
         var answered = new AskView(id, Guid.NewGuid(), "web01", AskStatuses.Answered, "q", "The build is on main.", false, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, null);
-        using (var daemon = new RemoteFakeDaemon(home).Answer("ask-result", answered))
-        {
-            Assert.Equal(0, await RunAsync("result", id.ToString()));
-            Assert.Contains("The build is on main.", stdout.ToString(), StringComparison.Ordinal);
-        }
+        SeedAsk(answered);
+        Assert.Equal(0, await RunAsync("result", id.ToString()));
+        Assert.Contains("The build is on main.", stdout.ToString(), StringComparison.Ordinal);
 
         stdout.GetStringBuilder().Clear();
-        using var failing = new RemoteFakeDaemon(home).Answer("ask-result", answered with { Status = AskStatuses.NoIdleSession, Answer = null });
+        SeedAsk(answered with { Status = AskStatuses.NoIdleSession, Answer = null });
         Assert.Equal(1, await RunAsync("result", id.ToString()));
         Assert.Contains("no_idle_session", stdout.ToString(), StringComparison.Ordinal);
     }

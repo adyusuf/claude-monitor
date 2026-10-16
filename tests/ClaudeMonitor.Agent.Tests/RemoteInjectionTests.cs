@@ -3,6 +3,7 @@ using ClaudeMonitor.Agent.Mcp;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
+using ClaudeMonitor.Agent.Requests;
 
 namespace ClaudeMonitor.Agent.Tests;
 

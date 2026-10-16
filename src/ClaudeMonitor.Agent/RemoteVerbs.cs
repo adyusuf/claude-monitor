@@ -7,6 +7,7 @@ using ClaudeMonitor.Agent.Mcp;
 using ClaudeMonitor.Agent.Net;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
+using ClaudeMonitor.Agent.Requests;
 
 namespace ClaudeMonitor.Agent;
 
@@ -34,20 +35,21 @@ public static class RemoteVerbs
 
         if (wake is not null) wake();
         else DaemonHost.EnsureRunning(config, log);
-        var requests = new RemoteRequests(config, clock);
+        var client = new RemoteClient(config, clock);
+        var requests = client.Requests;
         try
         {
             return args[0] switch
             {
-                "machines" => await MachinesAsync(requests, stdout, stderr),
-                "machine" => await DetailAsync(requests, args, stdout, stderr),
+                "machines" => await MachinesAsync(client, stdout, stderr),
+                "machine" => await DetailAsync(client, args, stdout, stderr),
                 "metrics" => await MetricsAsync(requests, args, stdout, stderr),
                 "alerts" => await AlertsAsync(requests, args, stdout, stderr),
-                "jobs" => await JobsAsync(requests, args, stdout, stderr),
-                "job-run" => await JobRunAsync(requests, args, stdout, stderr),
-                "run" => await StartRunAsync(requests, args, stdout, stderr),
-                "result" => await ResultAsync(requests, config, clock, args, stdout, stderr),
-                "ask" => await AskAsync(requests, args, stdout, stderr),
+                "jobs" => await JobsAsync(client, args, stdout, stderr),
+                "job-run" => await JobRunAsync(client, args, stdout, stderr),
+                "run" => await StartRunAsync(client, args, stdout, stderr),
+                "result" => await ResultAsync(client, config, args, stdout, stderr),
+                "ask" => await AskAsync(client, args, stdout, stderr),
                 _ => 2,
             };
         }
@@ -60,22 +62,22 @@ public static class RemoteVerbs
 
     private static bool Identity_Connected(AgentConfig config) => Auth.Identity.Peek(config)?.Connected == true;
 
-    private static async Task<int> MachinesAsync(RemoteRequests requests, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> MachinesAsync(RemoteClient client, TextWriter stdout, TextWriter stderr)
     {
-        var answer = await requests.AskAsync("machines", HttpMethod.Get, "api/agent/machines", null, RemoteRequests.ReadWait);
-        if (!answer.Ok) return await Failed(stderr, answer.Error!);
-        foreach (var m in answer.Json!.Value.Deserialize<List<MachineView>>(ApiClient.Json) ?? []) await stdout.WriteLineAsync(MachineTools.Line(m));
+        var listed = await client.MachinesAsync();
+        if (!listed.Ok) return await Failed(stderr, listed.Error!);
+        foreach (var m in listed.Value!) await stdout.WriteLineAsync(MachineTools.Line(m));
         return 0;
     }
 
-    private static async Task<int> DetailAsync(RemoteRequests requests, string[] args, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> DetailAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
         if (args.Length < 2) return await Usage(stderr, "cm-agent machine <host name or agent id>");
-        var target = await Targets.ResolveAsync(requests, args[1]);
+        var target = await Targets.ResolveAsync(client.Requests, args[1]);
         if (target.Error is { } error) return await Say(stderr, error);
-        var answer = await requests.AskAsync("machine", HttpMethod.Get, $"api/agent/machines/{target.AgentId}/detail", null, RemoteRequests.ReadWait);
-        if (!answer.Ok) return await Failed(stderr, answer.Error!);
-        await stdout.WriteLineAsync(MachineDetailText.Render(answer.Json!.Value.Deserialize<MachineDetail>(ApiClient.Json)!));
+        var outcome = await client.DetailAsync(target.AgentId!.Value);
+        if (!outcome.Ok) return await Failed(stderr, outcome.Error!);
+        await stdout.WriteLineAsync(MachineDetailText.Render(outcome.Value!));
         return 0;
     }
 
@@ -115,19 +117,19 @@ public static class RemoteVerbs
         return 0;
     }
 
-    private static async Task<int> JobsAsync(RemoteRequests requests, string[] args, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> JobsAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
-        var query = "";
+        Guid? target = null;
         if (args.Length > 1 && !args[1].StartsWith("--", StringComparison.Ordinal))
         {
-            var target = await Targets.ResolveAsync(requests, args[1]);
-            if (target.Error is { } error) return await Say(stderr, error);
-            query = $"?target={target.AgentId}";
+            var resolved = await Targets.ResolveAsync(client.Requests, args[1]);
+            if (resolved.Error is { } error) return await Say(stderr, error);
+            target = resolved.AgentId;
         }
 
-        var answer = await requests.AskAsync("jobs", HttpMethod.Get, $"api/agent/jobs{query}", null, RemoteRequests.ReadWait);
-        if (!answer.Ok) return await Failed(stderr, answer.Error!);
-        foreach (var j in answer.Json!.Value.Deserialize<List<JobView>>(ApiClient.Json) ?? [])
+        var jobs = await client.JobsAsync(target);
+        if (!jobs.Ok) return await Failed(stderr, jobs.Error!);
+        foreach (var j in jobs.Value!)
         {
             await stdout.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"{j.Id} \"{j.Name}\" on agent {j.TargetAgentId}: {j.Status}, [{string.Join(", ", j.Argv)}] in {j.Cwd}, timeout {j.TimeoutSeconds}s"));
         }
@@ -135,24 +137,24 @@ public static class RemoteVerbs
         return 0;
     }
 
-    private static async Task<int> JobRunAsync(RemoteRequests requests, string[] args, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> JobRunAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
         if (args.Length < 2 || !Guid.TryParse(args[1], out var id)) return await Usage(stderr, "cm-agent job-run <job id> [--reason <why>]");
-        var list = await requests.AskAsync("jobs", HttpMethod.Get, "api/agent/jobs", null, RemoteRequests.ReadWait);
+        var list = await client.JobsAsync();
         if (!list.Ok) return await Failed(stderr, list.Error!);
-        var job = (list.Json!.Value.Deserialize<List<JobView>>(ApiClient.Json) ?? []).FirstOrDefault(j => j.Id == id);
+        var job = list.Value!.FirstOrDefault(j => j.Id == id);
         if (job is null) return await Say(stderr, $"No job {id} in this workspace.");
         if (job.Status != JobStatuses.Active) return await Say(stderr, $"Job {id} is {job.Status}; only an approved job runs.");
         var clientKey = Guid.NewGuid().ToString();
         var create = new RunCreate(clientKey, job.TargetAgentId, RunModes.Argv, job.Argv, null, job.Cwd, job.TimeoutSeconds, Option(args, "--reason") ?? "started from the command line", null, job.Id);
-        return await SubmitRunAsync(requests, create, clientKey, stdout, stderr);
+        return await SubmitRunAsync(client, create, stdout, stderr);
     }
 
-    private static async Task<int> StartRunAsync(RemoteRequests requests, string[] args, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> StartRunAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
         const string usage = "cm-agent run --machine <x> [--timeout <s>] [--reason <why>] [--project <key>] [--kind test|build|deploy|other] (--script <file> --interpreter sh|bash|python|powershell [--arg <value>]... | --argv <exe> [args...])";
         if (Option(args, "--machine") is not { } machine) return await Usage(stderr, usage);
-        var target = await Targets.ResolveAsync(requests, machine);
+        var target = await Targets.ResolveAsync(client.Requests, machine);
         if (target.Error is { } error) return await Say(stderr, error);
         var timeout = int.TryParse(Option(args, "--timeout"), out var t) ? Math.Clamp(t, 1, 3600) : 120;
         var clientKey = Guid.NewGuid().ToString();
@@ -176,116 +178,84 @@ public static class RemoteVerbs
             return await Usage(stderr, usage);
         }
 
-        return await SubmitRunAsync(requests, create, clientKey, stdout, stderr);
+        return await SubmitRunAsync(client, create, stdout, stderr);
     }
 
-    private static async Task<int> SubmitRunAsync(RemoteRequests requests, RunCreate create, string clientKey, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> SubmitRunAsync(RemoteClient client, RunCreate create, TextWriter stdout, TextWriter stderr)
     {
-        var answer = await requests.AskAsync(RemoteRelay.RunKind, HttpMethod.Post, "api/agent/runs", create, RemoteRequests.ReadWait, clientKey);
-        if (answer.Error == RemoteAnswer.Pending)
+        var outcome = await client.CreateRunAsync(create);
+        if (outcome.Pending)
         {
-            await stdout.WriteLineAsync($"Queued as request {clientKey}. Read it with: cm-agent result {clientKey}");
+            await stdout.WriteLineAsync($"Queued as request {create.ClientKey}. Read it with: cm-agent result {create.ClientKey}");
             return 0;
         }
 
-        if (!answer.Ok) return await Failed(stderr, answer.Error!);
-        var run = answer.Json!.Value.Deserialize<RunCreated>(ApiClient.Json)!;
+        if (!outcome.Ok) return await Failed(stderr, outcome.Error!);
+        var run = outcome.Value!;
         await stdout.WriteLineAsync($"Run {run.Id}: {run.Status}.{(run.Status == RunStatuses.PendingApproval ? " Its owner approves it on the web (until " + run.ExpiresAt.ToString("u", CultureInfo.InvariantCulture) + ")." : "")} Read it with: cm-agent result {run.Id} --wait 30");
         return 0;
     }
 
-    private static async Task<int> AskAsync(RemoteRequests requests, string[] args, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> AskAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
         if (Option(args, "--machine") is not { } machine || args.Skip(1).LastOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal) && a != machine) is not { Length: > 0 } question)
         {
             return await Usage(stderr, "cm-agent ask --machine <x> \"<question>\"");
         }
 
-        var target = await Targets.ResolveAsync(requests, machine);
+        var target = await Targets.ResolveAsync(client.Requests, machine);
         if (target.Error is { } error) return await Say(stderr, error);
         var clientKey = Guid.NewGuid().ToString();
-        var answer = await requests.AskAsync(AskTools.AskKind, HttpMethod.Post, "api/agent/asks", new AskCreate(clientKey, target.AgentId!.Value, TextMask.Mask(question)), RemoteRequests.ReadWait, clientKey);
-        if (answer.Error == RemoteAnswer.Pending)
+        var outcome = await client.CreateAskAsync(new AskCreate(clientKey, target.AgentId!.Value, TextMask.Mask(question)));
+        if (outcome.Pending)
         {
             await stdout.WriteLineAsync($"Queued as request {clientKey}. Read it with: cm-agent result {clientKey} --wait 30");
             return 0;
         }
 
-        if (!answer.Ok) return await Failed(stderr, answer.Error!);
-        var ask = answer.Json!.Value.Deserialize<AskCreated>(ApiClient.Json)!;
-        await stdout.WriteLineAsync($"Ask {ask.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. Read the answer with: cm-agent result {ask.Id} --wait 30");
+        if (!outcome.Ok) return await Failed(stderr, outcome.Error!);
+        await stdout.WriteLineAsync($"Ask {outcome.Value!.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. Read the answer with: cm-agent result {outcome.Value.Id} --wait 30");
         return 0;
     }
 
-    /// <summary>A run or an ask: the local rows say which; an id the daemon does not know yet is asked of the API as an ask first.</summary>
-    private static async Task<int> ResultAsync(RemoteRequests requests, AgentConfig config, TimeProvider clock, string[] args, TextWriter stdout, TextWriter stderr)
+    /// <summary>A run or an ask: the local rows say which (a key or an id this machine followed); anything else is looked up as an ask first and read as a run otherwise.</summary>
+    private static async Task<int> ResultAsync(RemoteClient client, AgentConfig config, string[] args, TextWriter stdout, TextWriter stderr)
     {
         if (args.Length < 2 || !Guid.TryParse(args[1], out var id)) return await Usage(stderr, "cm-agent result <run or ask id> [--wait <seconds>] [--offset <chars>]");
         var wait = int.TryParse(Option(args, "--wait"), out var w) ? Math.Clamp(w, 0, AgentConfig.RemoteWaitMaxSeconds) : 0;
         var offset = int.TryParse(Option(args, "--offset"), out var o) ? Math.Max(0, o) : 0;
         string? kind;
-        using (var store = new LocalStore(config.DatabasePath)) kind = store.Followed(id.ToString()) is not null ? RemoteRelay.RunKind : store.Request(id.ToString())?.Kind;
-        if (kind == AskTools.AskKind) return await AskResultAsync(requests, clock, id, wait, offset, stdout, stderr);
-        if (kind == RemoteRelay.RunKind) return await RunResultAsync(requests, config, clock, id, wait, offset, stdout, stderr);
-        var probe = await requests.AskAsync(AskTools.AskKind + "-result", HttpMethod.Get, $"api/agent/asks/{id}", null, RemoteRequests.ReadWait);
-        return probe.Ok ? await AskResultAsync(requests, clock, id, wait, offset, stdout, stderr) : await RunResultAsync(requests, config, clock, id, wait, offset, stdout, stderr);
-    }
-
-    private static async Task<int> AskResultAsync(RemoteRequests requests, TimeProvider clock, Guid id, int wait, int offset, TextWriter stdout, TextWriter stderr)
-    {
-        var until = clock.GetUtcNow().AddSeconds(wait);
-        AskView? view;
-        while (true)
+        using (var store = new LocalStore(config.DatabasePath))
         {
-            var answer = await requests.AskAsync(AskTools.AskKind + "-result", HttpMethod.Get, $"api/agent/asks/{id}", null, RemoteRequests.ReadWait);
-            if (!answer.Ok) return await Failed(stderr, answer.Error!);
-            view = answer.Json!.Value.Deserialize<AskView>(ApiClient.Json);
-            if (view is null || AskStatuses.Final.Contains(view.Status) || clock.GetUtcNow() >= until) break;
-            await Task.Delay(TimeSpan.FromSeconds(2), clock);
+            kind = store.Followed(id.ToString()) is not null ? RemoteRelay.RunKind : store.AskOut(id.ToString()) is not null ? RemoteRelay.AskKind : store.Request(id.ToString())?.Kind;
         }
 
-        if (view is null) return await Say(stderr, $"No ask {id}.");
+        // An id this machine never followed is looked up as an ask (and followed from here on); a key or run it followed is read as what it is.
+        return kind is RemoteRelay.AskKind or null ? await AskResultAsync(client, id, wait, offset, stdout, stderr) : await RunResultAsync(client, id, wait, offset, stdout, stderr);
+    }
+
+    private static async Task<int> AskResultAsync(RemoteClient client, Guid typed, int wait, int offset, TextWriter stdout, TextWriter stderr)
+    {
+        var id = await client.AskIdAsync(typed.ToString());
+        if (id is null) return await Say(stderr, $"Ask {typed} was not created.");
+        var view = await client.WaitAskAsync(id.Value, wait);
+        if (view is null) return await Say(stderr, $"Ask {id} is not known to this agent yet; try again shortly.");
         await stdout.WriteLineAsync($"Ask {id} to {RemoteEnvelope.Label(view.TargetHostname)}: {view.Status}");
         if (view.Answer is { } text) await stdout.WriteLineAsync(text[Math.Min(offset, text.Length)..]);
         return view.Status is AskStatuses.Queued or AskStatuses.Delivered or AskStatuses.Answered ? 0 : 1;
     }
 
-    private static async Task<int> RunResultAsync(RemoteRequests requests, AgentConfig config, TimeProvider clock, Guid id, int wait, int offset, TextWriter stdout, TextWriter stderr)
+    private static async Task<int> RunResultAsync(RemoteClient client, Guid typed, int wait, int offset, TextWriter stdout, TextWriter stderr)
     {
-        var key = id.ToString();
-        using (var store = new LocalStore(config.DatabasePath))
-        {
-            if (store.Followed(key) is null && store.Request(key) is { Kind: RemoteRelay.RunKind })
-            {
-                var created = await requests.WaitAsync(key, RemoteRequests.ReadWait);
-                if (!created.Ok || created.Json?.Deserialize<RunCreated>(ApiClient.Json) is not { } c) return await Say(stderr, $"Run {id} was not created.");
-                key = c.Id.ToString();
-            }
-        }
-
-        var until = clock.GetUtcNow().AddSeconds(wait);
-        FollowedRun? run;
-        while (true)
-        {
-            using (var store = new LocalStore(config.DatabasePath))
-            {
-                run = store.Followed(key);
-                if (run is not null && !run.Done && run.Status != RunStatuses.PendingApproval) store.RunChanged(key);
-            }
-
-            if ((run is not null && run.Done) || clock.GetUtcNow() >= until) break;
-            await Task.Delay(TimeSpan.FromSeconds(1), clock);
-        }
-
-        if (run is null) return await Say(stderr, $"Run {id} is not known to this agent yet; try again shortly.");
-        var view = run.View is { } v ? JsonSerializer.Deserialize<RunView>(v, ApiClient.Json) : null;
+        var key = await client.RunIdAsync(typed.ToString());
+        if (key is null) return await Say(stderr, $"Run {typed} was not created.");
+        if (await client.ReadRunAsync(key, wait) is not { } snapshot) return await Say(stderr, $"Run {typed} is not known to this agent yet; try again shortly.");
+        var (run, view) = (snapshot.Run, snapshot.View);
         await stdout.WriteLineAsync(view is null ? $"Run {key}: {run.Status}"
             : string.Create(CultureInfo.InvariantCulture, $"Run {key} on {RemoteEnvelope.Label(view.TargetHostname)}: {view.Status}{(view.ExitCode is { } x ? $", exit code {x}" : "")}{(view.Error is { } e ? $", error {RemoteEnvelope.Code(e)}" : "")}"));
-        using var s = new LocalStore(config.DatabasePath);
-        var stored = s.RunOutput(key).ToList();
-        if (run.Done && ScriptResult.Completeness(view, stored) is { } completeness) await stdout.WriteLineAsync(completeness);
+        if (snapshot.Completeness is { } completeness) await stdout.WriteLineAsync(completeness);
         var text = new StringBuilder();
-        foreach (var c in stored)
+        foreach (var c in snapshot.Chunks)
         {
             if (c.Gap) text.Append(RemoteTools.GapMarker);
             text.Append(c.Body);
