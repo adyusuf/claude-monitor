@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentAsksView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentAsksView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
@@ -85,6 +85,11 @@ export const api = {
   approveJob: (jobId: string, code?: string) => request<void>("POST", `/jobs/${jobId}/approve`, { code }),
   denyJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/deny`),
   retireJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/retire`),
+  schedules: (agentId: string) => request<ScheduleView[]>("GET", `/agents/${agentId}/schedules`),
+  createSchedule: (body: ScheduleCreate) => request<ScheduleView>("POST", "/schedules", body),
+  pauseSchedule: (id: string) => request<void>("POST", `/schedules/${id}/pause`),
+  resumeSchedule: (id: string, code?: string) => request<void>("POST", `/schedules/${id}/resume`, { code }),
+  endSchedule: (id: string) => request<void>("POST", `/schedules/${id}/end`),
   remoteSettings: (id: string) => request<RemoteSettings>("GET", `/workspaces/${id}/remote-settings`),
   saveRemoteSettings: (id: string, settings: RemoteSettings) => request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, settings),
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),

@@ -83,6 +83,9 @@ public sealed class RemoteRun
     public string? ScriptFilesJson { get; set; }
     public string? ScriptStdin { get; set; }
 
+    /// <summary>The schedule whose tick created this run (ADR-0010 §3); null for a run somebody asked for.</summary>
+    public Guid? ScheduleId { get; set; }
+
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public IReadOnlyList<ClaudeMonitor.Contracts.ScriptFile>? ScriptFiles
     {
@@ -137,6 +140,30 @@ public sealed class MachineGrant
     public Guid? RevokedBy { get; set; }
     public int UseCount { get; set; }
     public DateTimeOffset? LastUsedAt { get; set; }
+}
+
+/// <summary>An approved job run on a schedule by the API (ADR-0010 §3): the owner of the job's target created it, and it fires ordinary runs the job approves.</summary>
+public sealed class JobSchedule
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid WorkspaceId { get; set; }
+    public Guid JobId { get; set; }
+    public Guid TargetAgentId { get; set; }
+    public Guid OwnerUserId { get; set; }
+    public string Kind { get; set; } = ScheduleKinds.Interval;
+    public int? IntervalMinutes { get; set; }
+    public int? DailyAtMinutes { get; set; }
+    public string Status { get; set; } = ScheduleStatuses.Active;
+    public string? PauseReason { get; set; }
+    public DateTimeOffset NextRunAt { get; set; }
+    public DateTimeOffset? LastRunAt { get; set; }
+
+    /// <summary>The run of the last tick, and whether its outcome was counted yet (a schedule fires no new run while the last is open).</summary>
+    public Guid? LastRunId { get; set; }
+    public bool LastRunSettled { get; set; } = true;
+    public int FailuresInARow { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public sealed class MachineJob

@@ -48,6 +48,11 @@ export const en = {
     grant_conflict: "A grant for that template already exists.", invalid_reason: "That reason is too long.", not_member: "That person is not a member of this workspace.",
     invalid_machine_role: "Pick an environment and a function from the lists.",
     totp_required: "This machine is production or a database: you need two-step sign-in to allow this here.",
+    invalid_schedule: "A schedule repeats every 15 minutes to 7 days, or once a day at a time of day (UTC).",
+    schedules_disabled: "Schedules are switched off in this workspace. An admin turns them on in the remote work settings.",
+    schedule_strict: "A production or database machine takes no schedules: nothing runs there without a person.",
+    schedule_placeholder: "A job with a placeholder in its command needs an approval for each run, so it cannot run on a schedule.",
+    schedule_limit: "This machine already has the most schedules it can have (5).",
     role_changed: "The machine's role changed since this card was made. Look at the run again.",
     role_not_set: "No admin has set this machine's environment yet.",
     interpreter_missing: "The machine has not reported a trusted interpreter for this script.",
@@ -173,6 +178,16 @@ export const en = {
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: enRemote,
+  schedules: {
+    title: "Schedules", none: "No schedules.", enabled: "Allow schedules",
+    enabledHint: "Lets an owner run an approved job again and again by itself, on a machine that is not production or a database. Off by default; switching it off stops every tick.",
+    every: "every {n} minutes", daily: "every day at {time} UTC", next: "Next run", last: "Last run", failures: "Failed in a row", why: "Why it stopped",
+    status: { active: "Running by itself", paused: "Paused", ended: "Ended" },
+    reason: { owner: "The owner stopped it", failures: "Three runs in a row failed", strict: "The machine became production or a database", exec_level: "The machine no longer allows commands", job_retired: "The job was retired", disabled: "Schedules were switched off", target_gone: "The machine or its owner is gone" },
+    pause: "Pause", resume: "Start again", end: "End", create: "Start the schedule", job: "Job", kind: "Repeats", kindInterval: "Every some minutes", kindDaily: "Once a day", minutes: "Minutes between runs (15 to 10080)", timeUtc: "Time of day (UTC, HH:MM)",
+    newHint: "A schedule runs an approved job by itself. It stops after three failed runs in a row, never overlaps its own last run, and you can stop it here at any time.",
+    noJobs: "A schedule needs an active job without a placeholder in its command.",
+  },
   notFound: { title: "Page not found", home: "Go to sessions" },
 };
 

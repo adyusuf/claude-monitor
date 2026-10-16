@@ -9,6 +9,7 @@ import { debounce, useLive } from "../lib/live";
 import { AlertList } from "./AlertList";
 import { GrantList } from "./GrantList";
 import { JobList } from "./JobList";
+import { ScheduleList } from "./ScheduleList";
 import { ToolList } from "./MachineBadges";
 import { MachineMetrics } from "./MachineMetrics";
 import { NoteEditor, TagsEditor } from "./MachineFacts";
@@ -108,6 +109,7 @@ export function MachinePage() {
         <GrantList grants={data.grants} agentId={agentId} canCreate={data.owned} onChanged={() => void reload()} />
       </Card>
       <Card title={t("remote.jobs")}><JobList jobs={data.jobs} onChanged={() => void reload()} /></Card>
+      <Card title={t("schedules.title")}><ScheduleList schedules={data.schedules} jobs={data.jobs} canCreate={data.owned} onChanged={() => void reload()} /></Card>
     </div>
   );
 }

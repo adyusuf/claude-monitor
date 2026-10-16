@@ -216,4 +216,26 @@ export interface WebJobView {
   canRetire: boolean;
 }
 
-export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number; scriptOutputMaxBytes?: number }
+export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number; scriptOutputMaxBytes?: number; remoteSchedulesEnabled?: boolean }
+
+/** ADR-0010 §3: an approved job run on a schedule by the API. */
+export interface ScheduleView {
+  id: string;
+  jobId: string;
+  jobName: string;
+  targetAgentId: string;
+  kind: "interval" | "daily" | string;
+  intervalMinutes: number | null;
+  dailyAtMinutes: number | null;
+  status: "active" | "paused" | "ended" | string;
+  pauseReason: string | null;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  failuresInARow: number;
+  ownerUserId: string;
+  isOwner: boolean;
+  createdAt: string;
+}
+
+export interface ScheduleCreate { jobId: string; kind: "interval" | "daily"; intervalMinutes?: number; dailyAtMinutes?: number; code?: string }

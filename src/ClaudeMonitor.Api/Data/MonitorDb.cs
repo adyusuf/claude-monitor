@@ -33,6 +33,7 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<MachineGrant> MachineGrants => Set<MachineGrant>();
     public DbSet<MachineJob> MachineJobs => Set<MachineJob>();
+    public DbSet<JobSchedule> JobSchedules => Set<JobSchedule>();
     public DbSet<MachineMetric> MachineMetrics => Set<MachineMetric>();
     public DbSet<MachineAlert> MachineAlerts => Set<MachineAlert>();
     public DbSet<RemoteRun> RemoteRuns => Set<RemoteRun>();

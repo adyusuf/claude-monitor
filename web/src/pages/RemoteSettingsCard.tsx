@@ -72,6 +72,13 @@ export function RemoteSettingsCard({ ws, canEdit }: { ws: string; canEdit: boole
             onChange={(e) => set({ remoteRunsEnabled: e.target.checked })} />
           <span>{t("remote.enabled")}<span className="field-hint">{t("remote.enabledHint")}</span></span>
         </label>
+        {form.remoteSchedulesEnabled !== undefined ? (
+          <label className="check">
+            <input type="checkbox" role="switch" checked={form.remoteSchedulesEnabled} disabled={!canEdit}
+              onChange={(e) => set({ remoteSchedulesEnabled: e.target.checked })} />
+            <span>{t("schedules.enabled")}<span className="field-hint">{t("schedules.enabledHint")}</span></span>
+          </label>
+        ) : null}
         <div className="settings-numbers">
           {num("alertCpuPct", t("remote.alertCpu"))}
           {num("alertMemoryPct", t("remote.alertMemory"))}

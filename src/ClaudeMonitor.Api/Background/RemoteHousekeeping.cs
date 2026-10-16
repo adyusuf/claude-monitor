@@ -31,6 +31,7 @@ public static class RemoteHousekeeping
         await ExpireAsksAsync(db, config, broker, now, ct);
         await db.MachineGrants.Where(g => (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested) && g.ExpiresAt <= now)
             .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Expired), ct);
+        await JobSchedules.FireDueAsync(db, config, broker, now, ct);
         await OfflineAsync(db, config, broker, now, ct);
         await RetentionAsync(db, config, now, ct);
     }

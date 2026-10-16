@@ -34,6 +34,7 @@ public static class Startup
         services.AddScoped<ClaudeMonitor.Api.Remote.AskReports>();
         services.AddScoped<ClaudeMonitor.Api.Remote.GrantService>();
         services.AddScoped<ClaudeMonitor.Api.Remote.JobService>();
+        services.AddScoped<ClaudeMonitor.Api.Remote.ScheduleService>();
         if (config.BackgroundJobs)
         {
             services.AddHostedService<Housekeeper>();
@@ -126,6 +127,7 @@ public static class Startup
         GrantEndpoints.Map(api);
         AgentJobEndpoints.Map(api);
         JobEndpoints.Map(api);
+        ScheduleEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (files is not null)
         {

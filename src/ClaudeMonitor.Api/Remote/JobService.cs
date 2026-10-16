@@ -145,6 +145,7 @@ public sealed class JobService(MonitorDb db, ApiConfig config, TimeProvider cloc
         job.Status = JobStatuses.Retired;
         Changed(job);
         await CancelByJobAsync(db, broker, id, now, ct);
+        await JobSchedules.EndForJobAsync(db, id, ScheduleReasons.JobRetired, now, ct); // a retired job fires nothing more
         return Results.NoContent();
     }
 

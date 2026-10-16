@@ -7,10 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace ClaudeMonitor.Api.Endpoints;
 
 public sealed record RemoteSettings(bool RemoteRunsEnabled, int AlertCpuPct, int AlertMemoryPct, int AlertDiskPct, int AlertSustainSeconds,
-    long ScriptOutputMaxBytes = 8 * 1024 * 1024);
+    long ScriptOutputMaxBytes = 8 * 1024 * 1024, bool RemoteSchedulesEnabled = false);
 
 public sealed record RemoteSettingsRequest(bool? RemoteRunsEnabled, int? AlertCpuPct, int? AlertMemoryPct, int? AlertDiskPct,
-    int? AlertSustainSeconds, long? ScriptOutputMaxBytes = null);
+    int? AlertSustainSeconds, long? ScriptOutputMaxBytes = null, bool? RemoteSchedulesEnabled = null);
 
 /// <summary>
 /// The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; an admin changes. Turning the
@@ -51,6 +51,7 @@ public static class RemoteSettingsEndpoints
         var before = View(s);
         var turnedOff = s.RemoteRunsEnabled && req.RemoteRunsEnabled == false;
         s.RemoteRunsEnabled = req.RemoteRunsEnabled ?? s.RemoteRunsEnabled;
+        s.RemoteSchedulesEnabled = req.RemoteSchedulesEnabled ?? s.RemoteSchedulesEnabled;
         s.AlertCpuPct = req.AlertCpuPct ?? s.AlertCpuPct;
         s.AlertMemoryPct = req.AlertMemoryPct ?? s.AlertMemoryPct;
         s.AlertDiskPct = req.AlertDiskPct ?? s.AlertDiskPct;
@@ -69,5 +70,5 @@ public static class RemoteSettingsEndpoints
     }
 
     private static RemoteSettings View(WorkspaceSettings s) =>
-        new(s.RemoteRunsEnabled, s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds, s.ScriptOutputMaxBytes);
+        new(s.RemoteRunsEnabled, s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds, s.ScriptOutputMaxBytes, s.RemoteSchedulesEnabled);
 }

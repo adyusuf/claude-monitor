@@ -33,6 +33,7 @@ internal static class MonitorDbModelRemote
             e.Property(x => x.AlertDiskPct).HasDefaultValue(90);
             e.Property(x => x.AlertSustainSeconds).HasDefaultValue(300);
             e.Property(x => x.RemoteRunsEnabled).HasDefaultValue(false);
+            e.Property(x => x.RemoteSchedulesEnabled).HasDefaultValue(false);
             e.ToTable(t => t.HasCheckConstraint("ck_workspace_settings_alerts",
                 "alert_cpu_pct BETWEEN 1 AND 100 AND alert_memory_pct BETWEEN 1 AND 100 AND alert_disk_pct BETWEEN 1 AND 100 "
                 + "AND alert_sustain_seconds BETWEEN 60 AND 86400"));
@@ -146,6 +147,28 @@ internal static class MonitorDbModelRemote
         Fk<MachineJob, User>(b, x => x.ProposedByUserId);
         Fk<MachineJob, User>(b, x => x.DecidedBy);
         Fk<RemoteRun, MachineJob>(b, x => x.JobId);
+        b.Entity<JobSchedule>(e =>
+        {
+            e.HasIndex(x => x.NextRunAt).HasFilter("status = 'active'");
+            e.HasIndex(x => x.JobId);
+            e.HasIndex(x => x.TargetAgentId);
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.Property(x => x.Status).HasMaxLength(16).HasDefaultValue(ScheduleStatuses.Active);
+            e.Property(x => x.PauseReason).HasMaxLength(32);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_job_schedules_status", In("status", ScheduleStatuses.All));
+                t.HasCheckConstraint("ck_job_schedules_kind", In("kind", ScheduleKinds.All));
+                t.HasCheckConstraint("ck_job_schedules_shape",
+                    "(kind = 'interval' AND interval_minutes BETWEEN 15 AND 10080 AND daily_at_minutes IS NULL) OR (kind = 'daily' AND daily_at_minutes BETWEEN 0 AND 1439 AND interval_minutes IS NULL)");
+                t.HasCheckConstraint("ck_job_schedules_failures", "failures_in_a_row >= 0");
+            });
+        });
+        Fk<JobSchedule, Workspace>(b, x => x.WorkspaceId);
+        Fk<JobSchedule, MachineJob>(b, x => x.JobId);
+        Fk<JobSchedule, Agent>(b, x => x.TargetAgentId);
+        Fk<JobSchedule, User>(b, x => x.OwnerUserId);
+        Fk<RemoteRun, JobSchedule>(b, x => x.ScheduleId);
     }
 
     private static void Fk<TChild, TParent>(ModelBuilder b, System.Linq.Expressions.Expression<Func<TChild, object?>> key)

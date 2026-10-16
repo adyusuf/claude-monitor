@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
-import type { AlertView, MachineDetail, MachineView, MetricSample, WebGrantView, WebJobView, WebRunView } from "../api/types";
+import type { AlertView, MachineDetail, MachineView, MetricSample, ScheduleView, WebGrantView, WebJobView, WebRunView } from "../api/types";
 import { config } from "../config";
 
 export interface MachineData {
@@ -16,6 +16,7 @@ export interface MachineData {
   runs: WebRunView[];
   grants: WebGrantView[];
   jobs: WebJobView[];
+  schedules: ScheduleView[];
   hasMoreRuns: boolean;
   error: unknown;
   /** Reads everything again (a live message, or a decision just made). */
@@ -41,16 +42,18 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const [runs, setRuns] = useState<WebRunView[]>([]);
   const [grants, setGrants] = useState<WebGrantView[]>([]);
   const [jobs, setJobs] = useState<WebJobView[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleView[]>([]);
   const [hasMoreRuns, setHasMoreRuns] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const pagedOlder = useRef(false);
 
   const reload = useCallback(async () => {
     try {
-      const [machines, agents, alertRows, runRows, grantRows, jobRows, detailRow] = await Promise.all([
+      const [machines, agents, alertRows, runRows, grantRows, jobRows, detailRow, scheduleRows] = await Promise.all([
         api.machines(ws), api.agents(ws), api.alerts(ws, agentId, showResolved),
         api.runs(ws, { agent: agentId, limit: config.runPageSize }), api.grants(agentId), api.jobs(agentId),
         api.machineDetail(agentId).catch(() => null), // an older API has no detail: the page shows what the list gives
+        api.schedules(agentId).catch(() => [] as ScheduleView[]), // an older API has no schedules
       ]);
       setMachine(machines.find((m) => m.agentId === agentId) ?? null);
       setDetail(detailRow);
@@ -60,6 +63,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       if (!pagedOlder.current) setHasMoreRuns(runRows.length >= config.runPageSize);
       setGrants(grantRows);
       setJobs(jobRows);
+      setSchedules(scheduleRows);
       setError(null);
     } catch (e) {
       setError(e);
@@ -99,5 +103,5 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     return () => clearInterval(timer);
   }, [loadMetrics]);
 
-  return { machine, detail, loaded, owned, metrics, alerts, runs, grants, jobs, hasMoreRuns, error, reload, moreRuns };
+  return { machine, detail, loaded, owned, metrics, alerts, runs, grants, jobs, schedules, hasMoreRuns, error, reload, moreRuns };
 }

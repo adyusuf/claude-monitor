@@ -188,6 +188,11 @@ public static class RemoteErrors
 
     public const string InvalidScript = "invalid_script";
     public const string InvalidFiles = "invalid_files";
+    public const string InvalidSchedule = "invalid_schedule";
+    public const string SchedulesDisabled = "schedules_disabled";
+    public const string ScheduleStrict = "schedule_strict";
+    public const string SchedulePlaceholder = "schedule_placeholder";
+    public const string ScheduleLimit = "schedule_limit";
     public const string FilesUnsupported = "files_unsupported";
     public const string InvalidInterpreter = "invalid_interpreter";
 

@@ -648,6 +648,115 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.JobSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("DailyAtMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("daily_at_minutes");
+
+                    b.Property<int>("FailuresInARow")
+                        .HasColumnType("integer")
+                        .HasColumnName("failures_in_arow");
+
+                    b.Property<int?>("IntervalMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval_minutes");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_run_at");
+
+                    b.Property<Guid?>("LastRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_run_id");
+
+                    b.Property<bool>("LastRunSettled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("last_run_settled");
+
+                    b.Property<DateTimeOffset>("NextRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_run_at");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<string>("PauseReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("pause_reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("active")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TargetAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_agent_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_job_schedules");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_job_schedules_job_id");
+
+                    b.HasIndex("NextRunAt")
+                        .HasDatabaseName("ix_job_schedules_next_run_at")
+                        .HasFilter("status = 'active'");
+
+                    b.HasIndex("OwnerUserId")
+                        .HasDatabaseName("ix_job_schedules_owner_user_id");
+
+                    b.HasIndex("TargetAgentId")
+                        .HasDatabaseName("ix_job_schedules_target_agent_id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("ix_job_schedules_workspace_id");
+
+                    b.ToTable("job_schedules", t =>
+                        {
+                            t.HasCheckConstraint("ck_job_schedules_failures", "failures_in_a_row >= 0");
+
+                            t.HasCheckConstraint("ck_job_schedules_kind", "kind IN ('interval', 'daily')");
+
+                            t.HasCheckConstraint("ck_job_schedules_shape", "(kind = 'interval' AND interval_minutes BETWEEN 15 AND 10080 AND daily_at_minutes IS NULL) OR (kind = 'daily' AND daily_at_minutes BETWEEN 0 AND 1439 AND interval_minutes IS NULL)");
+
+                            t.HasCheckConstraint("ck_job_schedules_status", "status IN ('active', 'paused', 'ended')");
+                        });
+                });
+
             modelBuilder.Entity("ClaudeMonitor.Api.Data.LoginSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1562,6 +1671,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("resolved_exe");
 
+                    b.Property<Guid?>("ScheduleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("schedule_id");
+
                     b.PrimitiveCollection<List<string>>("ScriptArgs")
                         .HasColumnType("text[]")
                         .HasColumnName("script_args");
@@ -1653,6 +1766,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.HasIndex("RequesterUserId")
                         .HasDatabaseName("ix_remote_runs_requester_user_id");
+
+                    b.HasIndex("ScheduleId")
+                        .HasDatabaseName("ix_remote_runs_schedule_id");
 
                     b.HasIndex("RequesterAgentId", "ClientKey")
                         .IsUnique()
@@ -2433,6 +2549,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("remote_runs_enabled");
 
+                    b.Property<bool>("RemoteSchedulesEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("remote_schedules_enabled");
+
                     b.Property<int>("RetentionDays")
                         .HasColumnType("integer")
                         .HasColumnName("retention_days");
@@ -2578,6 +2700,37 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_harness_sessions_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.JobSchedule", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.MachineJob", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_job_schedules_machine_jobs_job_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_job_schedules_users_owner_user_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("TargetAgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_job_schedules_agents_target_agent_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_job_schedules_workspaces_workspace_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.LoginSession", b =>
@@ -2852,6 +3005,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_remote_runs_users_requester_user_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.JobSchedule", null)
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_remote_runs_job_schedules_schedule_id");
 
                     b.HasOne("ClaudeMonitor.Api.Data.Agent", null)
                         .WithMany()
