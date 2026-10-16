@@ -1,9 +1,11 @@
 # ADR-0008: Machine roles and facts, script runs with a complete result, Claude presence, help across machines, a standalone agent
 
-**Status:** Proposal (16/10/2026), planned in mode C (product-manager, analyst, architect, qa; the qa pass sent it back
-once, its findings are folded in). The maintainer answered the planning questions the same day (§9); what is still
-theirs to decide is marked **open** there. Nothing is built. The facts about today's code were checked on `origin/dev`
-at `4702c16`, which already contains [ADR-0007](adr-0007-plugin-distribution-and-inbox-push.md).
+**Status:** Implemented on 16/10/2026 in phases 0 to 4 (branches `feature/machine-awareness-splits`, `feature/machine-facts`), **not yet
+verified**: the tests of phases 1b to 4 are written and have not been run, no gate has run on them, and nothing here was measured on a host
+(§11 lists exactly what is unverified). Planned in mode C (product-manager, analyst, architect, qa; the qa pass sent it back once, its findings
+are folded in). The maintainer answered the planning questions on 16/10/2026 (§9); the mobile app (§9.18) and the TOTP rule for shell and argv
+runs (§9.13) are deferred by the maintainer. The facts about today's code were checked on `origin/dev` at `4702c16`, which already contains
+[ADR-0007](adr-0007-plugin-distribution-and-inbox-push.md).
 **Extends:** [ADR-0005](adr-0005-remote-work.md) (remote runs, grants, jobs, the four fail-closed keys, the executor),
 ADR-0007 (the plugin, the inbox push into a session). Data model: [`data-model.md`](data-model.md) §3 and §3b grow as in §4.
 **Asked for (16/10/2026):** (1) every Claude Code session with the plugin knows the workspace's machines and which one is a
@@ -468,3 +470,27 @@ the service home, the `systemd --user` unit and its start limit; the macOS servi
   signed approvals, a separate run account.
 - Multi-file scripts, stdin, a persistent session on the target, per-role allow-lists or timeouts.
 - Which transport took an ask (inbox or hooks) is not yet shown on the web, the same gap ADR-0007 §9 lists for commands.
+
+## 11. What was built, how it differs from the plan, and what is unverified (16/10/2026)
+
+**Built.** Phase 0 (splits), 1 (roles, presence, tool inventory, the machines block), 1b (tags, note, listening services, projects, run `project` and
+`kind`, the parsed test summary, `monitor_machine`, retention, export, deletion), 2 (script runs, strict-target two-step code, the role re-check at delivery,
+the output cap and the completeness verdict, `monitor_run_script`), 3 (asks, `monitor_ask`, `monitor_ask_result`, `monitor_answer`) and 4 (`install --standalone`,
+the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is deferred by the maintainer.
+
+**Differences from the plan, each on purpose.**
+- Shell and argv approvals on strict targets still need no code (§9.13 deferred), so the script rule is only as strong as the weakest run mode there.
+- Listening-service process names are shown on Linux only (from `/proc`, for the agent account's own processes); macOS and Windows show the port without a name.
+- Project facts are reported for admin-listed folders; a folder a session visits is known to the API from the session's project key (key, name, branch) but its
+  commit and tag are not read for it.
+- The requester logic was not moved into a `Requests/` folder: the CLI verbs use `RemoteRequests`, `Targets` and the contracts where they are (a cosmetic move that would
+  have touched every MCP test); there is no `asks_out` table: `monitor_ask_result` asks the API each time. The local table of received asks is `asks_in`.
+- The Windows autostart is the same program with its PE subsystem set to GUI (`PeSubsystem`), made by the installer, because the release zip carries one binary; a
+  `CmWindowless=true` build exists as the alternative. The macOS autostart runs the executable inside an application bundle.
+- The agent's `--exec` for a standalone agent is the existing interactive one.
+
+**Unverified (to do before anything is promoted).** Every test written for phases 1b to 4 (agent, API, web) has not been run, and the gate has not run on this
+branch; the migrations `MachineFacts`, `ScriptRuns` and `MachineAsks` were generated and their new CHECK expressions checked only for the tag count on a throwaway
+PostgreSQL; the phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
+gate, interpreter paths and `-File` under a policy); on Linux the `/proc` service names and `systemd --user`; the macOS launchd bootstrap of the LaunchAgent and the
+application bundle; and a real Claude Code session receiving an ask end to end.

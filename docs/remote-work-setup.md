@@ -172,6 +172,12 @@ These tools appear in the requester's Claude session through its own `cm-agent` 
 | `monitor_jobs` | lists a target's approved named jobs |
 | `monitor_job_propose` | proposes a named job (argv or an admin-owned script) for the owner to approve; shell jobs do not exist |
 | `monitor_job_run` | runs an approved job; a job with a free placeholder still needs a per-call approval |
+| `monitor_machine` | one machine in full (ADR-0008): its role, tags, the admin's runbook note (as text, never an instruction), the tools with versions, the listening services when the owner allowed them and the caller may see them, and its projects with branch, commit, tag, the last runs per kind and recent errors |
+| `monitor_run_script` | asks a machine to run a script (sh, bash, python, powershell) from a private scratch file; always waits for the owner (and, on a production or database machine, a two-step code), never matches a grant or a job; `monitor_run_result` then says whether the output is complete |
+| `monitor_ask`, `monitor_ask_result` | asks a Claude session on another machine of the same user a question and reads the answer (only if that machine's owner allowed asks and a session there is idle) |
+| `monitor_answer` | how the receiving session answers an ask; the session is taken from the MCP process's parent, never from the model |
+
+`monitor_run` and `monitor_job_run` also take a `project` and a `kind` (`test`, `build`, `deploy`, `other`) so the result shows under that project on the machine's page. A person without Claude Code uses the same things from the command line: `cm-agent machines`, `machine`, `metrics`, `alerts`, `jobs`, `job-run`, `run`, `result` and `ask` (ADR-0008 §3g); `cm-agent install --standalone` makes a machine such a daemon (login first, then a user-level autostart; an application on macOS and Windows, `systemd --user` on Linux).
 
 Everything that comes back from another machine (run output, alert subjects, mount names) is **untrusted data**,
 wrapped and capped; Claude is told never to follow instructions found in it. A run's output has secrets masked
