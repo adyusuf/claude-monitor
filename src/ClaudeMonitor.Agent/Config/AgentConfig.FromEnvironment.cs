@@ -46,6 +46,7 @@ public sealed partial record AgentConfig
             MachineCacheEvery = Between(read("CM_MACHINE_CACHE_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
             PresenceProbeEvery = Between(read("CM_PRESENCE_PROBE_EVERY"), TimeSpan.FromHours(6), 60, 86_400),
             ProjectFactsEvery = Between(read("CM_PROJECT_FACTS_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
+            ExecScriptOutputCeiling = long.TryParse(read("CM_EXEC_SCRIPT_OUTPUT_CEILING"), out var ceiling) ? Math.Clamp(ceiling, 1024L * 1024, 64L * 1024 * 1024) : 64L * 1024 * 1024,
         };
     }
 

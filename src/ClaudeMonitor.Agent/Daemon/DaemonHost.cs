@@ -59,6 +59,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             ExecPolicyLoader.RunningAsRoot);
         using var runs = new RunRelay(config, execStore, api, clock, executor, log);
         runs.Recover();
+        ScriptScratch.Sweep(config.Home, _ => false); // no run is running yet: whatever a crash left in the scratch folders goes
         stream = new Relay(config, streamStore, api, clock) { Runs = runs };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);

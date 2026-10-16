@@ -44,6 +44,9 @@ public sealed partial record AgentConfig
     /// <summary>A run that prints more than this in total is killed (output_limit).</summary>
     public long RunReadCap { get; init; } = 64L * 1024 * 1024;
 
+    /// <summary>CM_EXEC_SCRIPT_OUTPUT_CEILING: the most output of a script run this agent keeps, whatever the workspace allows (1 to 64 MiB).</summary>
+    public long ExecScriptOutputCeiling { get; init; } = 64L * 1024 * 1024;
+
     /// <summary>The most one output chunk carries to the API (the API refuses more than 64 KB).</summary>
     public int RunChunkBytes { get; init; } = 32 * 1024;
 

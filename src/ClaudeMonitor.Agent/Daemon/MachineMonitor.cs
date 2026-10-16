@@ -59,7 +59,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var (claude, tools) = Facts();
         var (services, projects) = Extras(policy);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
-            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, [], services, projects);
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools), services, projects);
         var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
@@ -69,6 +69,10 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     /// The listening services (only while the owner opted in, which the settings pass remembered) and the facts of the listed project folders,
     /// read again every <see cref="AgentConfig.ProjectFactsEvery"/> or at once when the opt-in changes.
     /// </summary>
+    /// <summary>What this agent says it can do beyond runs (ADR-0008 §3e): scripts, when the level is shell without a ceiling and a trusted interpreter exists.</summary>
+    private static List<string> Capabilities(string level, IReadOnlyList<ToolInfo> tools) =>
+        level == ExecLevels.Shell && ToolInventory.Interpreters(tools).Count > 0 ? [AgentCapabilities.Script] : [];
+
     private (IReadOnlyList<ServiceInfo>? Services, IReadOnlyList<ProjectFact>? Projects) Extras(ExecPolicy policy)
     {
         var now = clock.GetUtcNow();

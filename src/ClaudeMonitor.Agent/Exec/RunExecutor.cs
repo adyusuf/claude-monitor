@@ -23,9 +23,12 @@ public static class RunFailures
 
 /// <summary>The one final answer on a run. Duration is on the monotonic clock; BytesRead is raw output including what was dropped.</summary>
 public sealed record RunResult(string Status, int? ExitCode, string? Error, bool OutputTruncated, string? ResolvedExe, long BytesRead,
-    TimeSpan Duration)
+    TimeSpan Duration, long BytesDropped = 0, int Chunks = 0)
 {
-    public RunStatusUpdate ToUpdate(DateTimeOffset at) => new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at);
+    /// <summary>The final status. A script run also says what it read, dropped and sent, so the server can say what is missing (ADR-0008 §3d).</summary>
+    public RunStatusUpdate ToUpdate(DateTimeOffset at, bool withOutput = false) => withOutput
+        ? new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, BytesRead, BytesDropped, Chunks)
+        : new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at);
 }
 
 /// <summary>
@@ -42,6 +45,9 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
     private static readonly TimeSpan MinTrackEvery = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan MaxTrackEvery = TimeSpan.FromSeconds(5);
     private const int LogValueMax = 200;
+    private const long ScriptDefaultCap = 8L * 1024 * 1024;
+    private const long ScriptMinCap = 1024L * 1024;
+    private const long ScriptTailBytes = 256L * 1024;
     private const string None = "none";
 
     // zero keeps the tracker off; otherwise bounded so that a mistake cannot make it spin or never look
@@ -59,6 +65,8 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
         public const string OutputLimit = "output_limit";
         public const string Straggler = "straggler";
     }
+
+    private static string? ScriptOutputKey(RunMessage run) => run.Mode == RunModes.Script ? run.ScriptInterpreter : null;
 
     public async Task<RunResult> ExecuteAsync(RunMessage run, Func<RunOutputChunk, Task> onChunk, Func<RunStatusUpdate, Task> onStatus,
         CancellationToken cancel)
@@ -104,17 +112,22 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
         {
             RunModes.Argv => argv0 is not null && decision.ResolvedExe is not null,
             RunModes.Shell => !string.IsNullOrEmpty(run.ShellCommand),
+            RunModes.Script => !string.IsNullOrEmpty(run.ScriptBody) && decision.ResolvedExe is not null,
             _ => false,
         };
         if (!runnable) return await RefuseAsync(run, RunFailures.BadRun, decision.ResolvedExe, began, onStatus);
 
         var timeout = TimeSpan.FromSeconds(Math.Clamp(run.TimeoutSeconds, 1, (int)config.ExecTimeoutMax.TotalSeconds));
-        log.Write($"run start id={run.Id} grant={GrantOf(run)} mode={run.Mode} exe={LogSafe(argv0 ?? run.Mode)} timeout_s={(int)timeout.TotalSeconds}");
+        // The script text is never logged: only the interpreter name (ADR-0008 §3d).
+        log.Write($"run start id={run.Id} grant={GrantOf(run)} mode={run.Mode} exe={LogSafe(ScriptOutputKey(run) ?? argv0 ?? run.Mode)} timeout_s={(int)timeout.TotalSeconds}");
+
+        using var scratch = run.Mode == RunModes.Script ? TryScratch(run) : null;
+        if (run.Mode == RunModes.Script && scratch is null) return await FinishAsync(run, RunStatuses.Failed, null, RunFailures.SpawnFailed, decision.ResolvedExe, began, onStatus, None, null);
 
         IRunProcess process;
         try
         {
-            process = Start(run, decision, argv0, timeout);
+            process = Start(run, decision, argv0, timeout, scratch);
         }
         catch (Exception e) when (e is Win32Exception or IOException or ArgumentException or InvalidOperationException
             or UnauthorizedAccessException or PlatformNotSupportedException)
@@ -130,10 +143,30 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
         }
     }
 
-    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0, TimeSpan timeout)
+    private ScriptScratch? TryScratch(RunMessage run)
     {
-        var env = RunEnvironment.Build(config.Home);
+        try
+        {
+            return ScriptScratch.Create(config.Home, run.Id, run.ScriptInterpreter!, run.ScriptBody!);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            log.Write($"run {run.Id}: scratch folder failed ({e.GetType().Name})");
+            return null;
+        }
+    }
+
+    private IRunProcess Start(RunMessage run, ExecDecision decision, string? argv0, TimeSpan timeout, ScriptScratch? scratch)
+    {
         var limits = RunLimits.For(config, timeout);
+        if (run.Mode == RunModes.Script)
+        {
+            // The same argv start path as an argv run, so the ulimit launcher, the process group kill, the descendant tracker and the Job Object apply.
+            return ProcessTree.Start(decision.ResolvedExe!, scratch!.Arguments(run.ScriptInterpreter!, run.ScriptArgs), scratch.Folder, scratch.Environment(config.Home),
+                Path.GetFileName(decision.ResolvedExe!), limits, TrackEvery, Note(run));
+        }
+
+        var env = RunEnvironment.Build(config.Home);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
         if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, config.Home, env, decision.ResolvedExe, limits, TrackEvery, Note(run));
         // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).

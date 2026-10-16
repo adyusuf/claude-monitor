@@ -32,14 +32,16 @@ public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
         [Description("shell mode: the shell text (runs with /bin/sh -c or cmd /c on the target).")] string? shell = null,
         [Description("Working directory for argv mode (absolute); a grant fixes it.")] string? cwd = null,
         [Description("Timeout in seconds, 1-3600 (default 120).")] int timeoutSeconds = 120,
-        [Description("This session's id, so the owner sees which session asked.")] string? sessionId = null)
+        [Description("This session's id, so the owner sees which session asked.")] string? sessionId = null,
+        [Description("The project this run belongs to (its key from monitor_machine), so the result shows under it.")] string? project = null,
+        [Description("test, build, deploy or other, for the project's history.")] string? kind = null)
     {
         if ((argv is { Length: > 0 }) == (shell is { Length: > 0 })) return "Give either argv or shell, not both.";
         var target = await Targets.ResolveAsync(requests, machine);
         if (target.Error is { } error) return error;
         var clientKey = Guid.NewGuid().ToString();
         var create = new RunCreate(clientKey, target.AgentId!.Value, argv is { Length: > 0 } ? RunModes.Argv : RunModes.Shell,
-            argv, shell, cwd, Math.Clamp(timeoutSeconds, 1, 3600), reason, sessionId);
+            argv, shell, cwd, Math.Clamp(timeoutSeconds, 1, 3600), reason, sessionId, ProjectKey: project, Kind: kind);
         var answer = await requests.AskAsync(RemoteRelay.RunKind, HttpMethod.Post, "api/agent/runs", create, RemoteRequests.ReadWait, clientKey);
         if (answer.Error == RemoteAnswer.Pending)
         {
@@ -85,7 +87,9 @@ public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
                 $"Run {id} on {RemoteEnvelope.Label(view.TargetHostname)}: {view.Status}{(view.ExitCode is { } x ? $", exit code {x}" : "")}{(view.Error is { } e ? $", error {RemoteEnvelope.Code(e)}" : "")}{(view.OutputTruncated ? ", output truncated" : "")}.");
         if (!run.Done) head += run.Status == RunStatuses.PendingApproval ? " Waiting for the owner's approval." : " Not finished yet.";
         using var s = new LocalStore(config.DatabasePath);
-        var text = Text(s.RunOutput(id));
+        var stored = s.RunOutput(id).ToList();
+        if (run.Done && ScriptResult.Completeness(view, stored) is { } completeness) head += " " + completeness;
+        var text = Text(stored);
         if (text.Length == 0) return head + " No output" + (run.Done ? "." : " yet.");
         var start = Math.Clamp(offset, 0, text.Length);
         var take = Math.Min(Math.Clamp(maxChars, 1, OutputCharsMax), text.Length - start);

@@ -33,7 +33,8 @@ public static class ExecGuard
     private const string WindowsShell = "cmd.exe";
     private const string WindowsSystemFallback = @"C:\Windows\System32";
 
-    public static ExecDecision Check(RunMessage run, ExecPolicy policy, string os, string agentHome)
+    public static ExecDecision Check(RunMessage run, ExecPolicy policy, string os, string agentHome, Func<string, string?>? toolPath = null,
+        Func<string, bool>? trusted = null)
     {
         if (run is null || policy is null || !policy.Allows(run.Mode))
         {
@@ -54,6 +55,8 @@ public static class ExecGuard
         {
             RunModes.Shell => CheckShell(run, os),
             RunModes.Argv => CheckArgv(run, policy, os, agentHome),
+            RunModes.Script => CheckScript(run, policy, os, toolPath ?? (name => ToolInventory.RealPath(name, os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))),
+                trusted ?? (real => ExecPaths.IsTrustedExecutable(real, os))),
             _ => ExecDecision.Refuse(ExecErrors.ExecLevel),
         };
     }
@@ -72,6 +75,29 @@ public static class ExecGuard
         }
 
         return run.Cwd is not null ? ExecDecision.Refuse(ExecErrors.ShellCwd) : new ExecDecision(true, null, ShellPath(os));
+    }
+
+    /// <summary>
+    /// A script run (ADR-0008 §3c): the target checks again what the API checked. No grant, no argv, no shell text, no working directory; a
+    /// known interpreter and a body within the limits; a target whose own claim is strict refuses a script not approved with a two-step code
+    /// (this catches an API bug, not a compromised API); and the interpreter is the trusted tool the inventory reports, resolved to its real
+    /// path. The returned executable is that interpreter; the executor writes the script and starts it as an argv run.
+    /// </summary>
+    private static ExecDecision CheckScript(RunMessage run, ExecPolicy policy, string os, Func<string, string?> toolPath, Func<string, bool> trusted)
+    {
+        if (run.Grant is not null || run.GrantId is not null) return ExecDecision.Refuse(ExecErrors.GrantMismatch);
+        if (run.Argv is not null || run.ShellCommand is not null) return ExecDecision.Refuse(ExecErrors.Malformed);
+        if (run.Cwd is not null) return ExecDecision.Refuse(ExecErrors.ShellCwd);
+        if (!ScriptInterpreters.All.Contains(run.ScriptInterpreter ?? "")) return ExecDecision.Refuse(ExecErrors.Malformed);
+        if (run.ScriptBody is not { Length: > 0 } body || body.Length > ScriptInterpreters.BodyCeiling || body.Contains('\0')) return ExecDecision.Refuse(ExecErrors.Malformed);
+        if (run.ScriptArgs is { } args && (args.Count > ScriptInterpreters.ArgsMax || args.Any(a => a is null || a.Length > ScriptInterpreters.ArgChars || a.Contains('\0')))) return ExecDecision.Refuse(ExecErrors.Malformed);
+        if (MachineRoles.IsStrict(policy.ClaimedEnvironment, policy.ClaimedFunction) && !run.ApprovedWithTotp) return ExecDecision.Refuse(RemoteErrors.TotpRequired);
+        foreach (var name in ScriptInterpreters.Tools(run.ScriptInterpreter))
+        {
+            if (toolPath(name) is { Length: > 0 } real && trusted(real)) return new ExecDecision(true, null, real);
+        }
+
+        return ExecDecision.Refuse(RemoteErrors.InterpreterMissing);
     }
 
     private static string ShellPath(string os)

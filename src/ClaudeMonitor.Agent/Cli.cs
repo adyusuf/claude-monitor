@@ -137,7 +137,7 @@ public static partial class Cli
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
             o.ServerInstructions = ChannelEnvelopes.Instructions;
         });
-        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<GrantTools>();
+        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<ScriptTools>().WithTools<GrantTools>();
         if (config.ChannelPushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }
