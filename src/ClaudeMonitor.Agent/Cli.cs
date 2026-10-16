@@ -23,11 +23,11 @@ public static class Cli
 {
     public const string Usage = """
         cm-agent login --server <url>   connect this machine (shows a code to approve on the web)
-        cm-agent install [--stop-wait <seconds>] [--push on|off|inbox|channel]
+        cm-agent install [--stop-wait <seconds>] [--push off|inbox|channel]
                                         register the Claude Code plugin (hooks + MCP) that starts the agent;
                                         --stop-wait: how long a finished turn waits for a prompt from the web (0-590, default 0)
-                                        --push: deliver web messages into an idle session (default off). on = inbox: the daemon writes to
-                                        the session's own socket, no start-up flag; channel = the older Claude Code channel (ADR-0003)
+                                        --push: deliver web messages into an idle session (default off). inbox: the daemon writes to the
+                                        session's own socket, no start-up flag (ADR-0007); channel (also "on"): a Claude Code channel (ADR-0003)
         cm-agent install --exec off|argv|shell
                                         whether approved remote runs may execute on this machine (default off)
         cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
@@ -37,7 +37,7 @@ public static class Cli
         cm-agent restart                hand the running daemon over to this binary
         cm-agent status                 connection and queue
         cm-agent update [--check]       install the newest signed agent build from the server (--check: only look)
-        cm-agent config [auto-update off|check|on] [claude-update on|off]
+        cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
                                         whether the agent looks for / installs agent updates by itself, and whether it may
                                         update Claude Code when every session is idle (both default off; the workspace must allow too)
         cm-agent claude-update cancel   stop a Claude Code update that is counting down
@@ -173,7 +173,7 @@ public static class Cli
     }
 
     /// <summary>"cm-agent restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
-    public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout)
+    public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout, Update.IDaemonControl? control = null)
     {
         if (!Identity.Load(config).Connected)
         {
@@ -181,7 +181,7 @@ public static class Cli
             return 0;
         }
 
-        var daemon = new Update.DaemonControl(config, log, clock);
+        var daemon = control ?? new Update.DaemonControl(config, log, clock);
         if (daemon.IsRunning() && !await daemon.StopAsync(config.UpdateStopWait, CancellationToken.None) && !daemon.Kill())
         {
             await stdout.WriteLineAsync("The daemon did not stop; it keeps running its older version until it ends.");

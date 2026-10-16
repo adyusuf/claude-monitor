@@ -77,7 +77,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         await Task.WhenAll(
             Loop("claude-update", config.UpdatePollEvery, claudeUpdates.RunAsync, api, revoked),
             StopRequestAsync(revoked),
-            PluginWatchAsync(revoked, PluginWatch.DataExists(config)),
+            PluginWatch.RunAsync(config, log, revoked, PluginWatch.DataExists(config)),
             Loop("update", config.UpdatePollEvery, updates.RunAsync, api, revoked),
             Loop("flush", config.FlushEvery, async ct =>
             {
@@ -145,23 +145,6 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             }
 
             await Wait(config.StopPollEvery, cts.Token);
-        }
-    }
-
-    /// <summary>Ends the daemon when the Claude Code plugin that started it is uninstalled or switched off (ADR-0007). Its events stay in the local database for the next daemon.</summary>
-    private async Task PluginWatchAsync(CancellationTokenSource cts, bool dataExisted)
-    {
-        if (config.PluginDataDir is null && config.PluginId is null) return; // not started by the plugin: nothing to watch
-        while (!cts.IsCancellationRequested)
-        {
-            await Wait(config.PluginWatchEvery, cts.Token);
-            if (cts.IsCancellationRequested) return;
-            if (PluginWatch.Gone(config, dataExisted) is { } why)
-            {
-                log.Write($"stopping: {why}");
-                await cts.CancelAsync();
-                return;
-            }
         }
     }
 
@@ -279,6 +262,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 RedirectStandardError = true,
             };
             info.ArgumentList.Add("daemon");
+            Scrub(info);
             using var child = Process.Start(info);
             return child is not null;
         }
@@ -287,6 +271,17 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             log.Write($"could not start the daemon: {e.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// The daemon outlives the session whose hook started it, and reads every session's socket and key from the database: it must not also carry
+    /// the starting session's own in its environment.
+    /// </summary>
+    public static void Scrub(ProcessStartInfo info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        info.Environment.Remove("CLAUDE_CODE_MESSAGING_TOKEN");
+        info.Environment.Remove("CLAUDE_CODE_MESSAGING_SOCKET");
     }
 
     /// <summary>Leaves the process group of whoever started this process, so that its end does not end us.</summary>

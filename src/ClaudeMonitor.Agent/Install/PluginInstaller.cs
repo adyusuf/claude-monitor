@@ -64,7 +64,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
             ? $"Push is ON through a channel. Start Claude Code with:  claude {ChannelFlag}  (a channel is a research preview; the agent cannot enable it for you)."
             : config.InboxPushEnabled
                 ? "Push is ON through each session's inbox: a web message starts a turn in an idle session, with no start-up flag (ADR-0007)."
-                : "Web messages reach a session at its next prompt (cm-agent install --push on delivers them into an idle session).");
+                : "Web messages reach a session at its next prompt (cm-agent install --push inbox delivers them into an idle session).");
         return 0;
     }
 

@@ -84,6 +84,13 @@ public static class MarketplacePlugin
                 ["description"] = "The https address of your Claude Monitor server: the address you open in the browser.",
                 ["required"] = true,
             },
+            ["push"] = new JsonObject
+            {
+                ["type"] = "string",
+                ["title"] = "Push web messages into idle sessions",
+                ["description"] = "Type inbox to start a turn in an idle session when a message is sent from the web. Leave empty: a message then arrives at the session's next prompt.",
+                ["required"] = false,
+            },
         },
     };
 

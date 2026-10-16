@@ -35,7 +35,7 @@ public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimePr
         }
 
         config.EnsureHome();
-        if (ShownCode() is { } shown)
+        if (ShownCode(uri.Host) is { } shown)
         {
             await Show(shown);
             return 0;
@@ -51,7 +51,7 @@ public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimePr
         var deadline = clock.GetUtcNow() + config.ConnectWait;
         while (clock.GetUtcNow() < deadline)
         {
-            if (ShownCode() is { } code)
+            if (ShownCode(uri.Host) is { } code)
             {
                 await Show(code);
                 return 0;
@@ -64,13 +64,19 @@ public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimePr
         return 1;
     }
 
-    /// <summary>The login line with the code, when one was written recently enough to still be good.</summary>
-    private string? ShownCode()
+    /// <summary>
+    /// The login line with the code, when it is still good: written recently, for this server, and followed by nothing but retries. Anything else after it
+    /// (approved, denied, expired, a failure) means that login is over and its code is dead.
+    /// </summary>
+    private string? ShownCode(string host)
     {
         try
         {
             if (!File.Exists(config.ConnectLogPath) || clock.GetUtcNow() - File.GetLastWriteTimeUtc(config.ConnectLogPath) > config.ConnectReuse) return null;
-            return File.ReadAllLines(config.ConnectLogPath).FirstOrDefault(l => l.Contains(CodeMarker, StringComparison.Ordinal));
+            var lines = File.ReadAllLines(config.ConnectLogPath);
+            var at = Array.FindLastIndex(lines, l => l.Contains(CodeMarker, StringComparison.Ordinal));
+            if (at < 0 || !lines[at].Contains(host, StringComparison.OrdinalIgnoreCase)) return null;
+            return lines.Skip(at + 1).All(l => l.Length == 0 || l.Contains("trying again", StringComparison.Ordinal)) ? lines[at] : null;
         }
         catch (IOException)
         {

@@ -15,7 +15,7 @@ public sealed class InboxWireTests : IDisposable
 {
     private const string Token = "aaaa-bbbb-test";
     private static readonly DateTimeOffset Start = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero);
-    private readonly TempHome home = new(c => c with { PushEnabled = true, MessagingSocket = "/tmp/cc-socks/9.sock", MessagingToken = Token });
+    private readonly TempHome home = new(c => c with { PushEnabled = true, PushTransport = PushTransports.Inbox, MessagingSocket = "/tmp/cc-socks/9.sock", MessagingToken = Token });
     private readonly ManualClock clock = new(Start);
     private readonly LocalStore store;
 
@@ -137,26 +137,107 @@ public sealed class InboxWireTests : IDisposable
     // ---- settings, status and install -----------------------------------------------------------------------------------
 
     [Fact]
-    public void Push_on_means_the_inbox_the_channel_is_asked_for_by_name_and_the_environment_wins()
+    public void Push_on_still_means_the_channel_the_inbox_is_asked_for_by_name_and_the_environment_wins()
     {
         AgentConfig Env(string? push) => AgentConfig.FromEnvironment(k => k switch { "CM_AGENT_HOME" => home.Dir, "CM_PUSH" => push, _ => null });
-        Assert.Equal((true, PushTransports.Inbox), (Env("on").PushEnabled, Env("on").PushTransport));
-        Assert.Equal((true, PushTransports.Inbox), (Env("inbox").PushEnabled, Env("inbox").PushTransport));
+        Assert.Equal((true, PushTransports.Channel), (Env("on").PushEnabled, Env("on").PushTransport)); // what it meant before the inbox existed
         Assert.Equal((true, PushTransports.Channel), (Env("channel").PushEnabled, Env("channel").PushTransport));
+        Assert.Equal((true, PushTransports.Inbox), (Env("inbox").PushEnabled, Env("inbox").PushTransport));
         Assert.False(Env("off").PushEnabled);
         Assert.False(Env(null).PushEnabled);
         var socket = AgentConfig.FromEnvironment(k => k switch { "CLAUDE_CODE_MESSAGING_SOCKET" => "/tmp/cc-socks/1.sock", "CLAUDE_CODE_MESSAGING_TOKEN" => "t", _ => null });
-        Assert.Equal(("/tmp/cc-socks/1.sock", "t"), (socket.MessagingSocket, socket.MessagingToken));
+        Assert.Equal(("/tmp/cc-socks/1.sock", "t"), (socket.MessagingSocket, socket.MessagingToken?.Value));
         Assert.Null(AgentConfig.FromEnvironment(_ => null).MessagingSocket);
 
         var plain = AgentConfig.FromEnvironment(k => k == "CM_AGENT_HOME" ? home.Dir : null);
-        SavedSettings.SavePush(plain, true, PushTransports.Channel);
-        Assert.Equal(PushTransports.Channel, SavedSettings.Apply(plain).PushTransport);
-        SavedSettings.SavePush(plain, true); // a later --push on keeps nothing of the old choice unless it is named: the saved one stays
-        Assert.Equal(PushTransports.Channel, SavedSettings.Apply(plain).PushTransport);
         SavedSettings.SavePush(plain, true, PushTransports.Inbox);
         Assert.Equal(PushTransports.Inbox, SavedSettings.Apply(plain).PushTransport);
-        Assert.Equal(PushTransports.Inbox, PushTransports.Normalize("anything else"));
+        SavedSettings.SavePush(plain, true); // no transport named: the saved one stays
+        Assert.Equal(PushTransports.Inbox, SavedSettings.Apply(plain).PushTransport);
+        SavedSettings.SavePush(plain, true, PushTransports.Channel);
+        Assert.Equal(PushTransports.Channel, SavedSettings.Apply(plain).PushTransport);
+        Assert.Equal(PushTransports.Channel, PushTransports.Normalize("anything else"));
+    }
+
+    [Fact]
+    public void An_agent_json_saved_before_the_inbox_existed_keeps_pushing_through_the_channel()
+    {
+        var plain = AgentConfig.FromEnvironment(k => k == "CM_AGENT_HOME" ? home.Dir : null);
+        File.WriteAllText(plain.IdentityPath, "{\"machineKey\":\"" + new string('a', 24) + "\",\"push\":true}"); // the file an older agent wrote
+        var applied = SavedSettings.Apply(plain);
+        Assert.Equal((true, PushTransports.Channel), (applied.PushEnabled, applied.PushTransport));
+        Assert.False(applied.InboxPushEnabled);
+        Assert.True(applied.ChannelPushEnabled);
+    }
+
+    [Fact]
+    public async Task Config_push_saves_the_choice_without_installing_anything()
+    {
+        var plain = AgentConfig.FromEnvironment(k => k == "CM_AGENT_HOME" ? home.Dir : null);
+        async Task<(int, string)> Config(params string[] a)
+        {
+            var o = new StringWriter();
+            return (await Cli.RunAsync(["config", .. a], plain, new StringReader(""), o, new StringWriter(), TimeProvider.System), o.ToString());
+        }
+
+        Assert.Contains("on through the inbox", (await Config("push", "inbox")).Item2, StringComparison.Ordinal);
+        Assert.True(SavedSettings.Apply(plain).InboxPushEnabled);
+        Assert.Contains("on through the channel", (await Config("push", "on")).Item2, StringComparison.Ordinal);
+        Assert.True(SavedSettings.Apply(plain).ChannelPushEnabled);
+        Assert.Contains("push: off", (await Config("push", "off")).Item2, StringComparison.Ordinal);
+        Assert.False(SavedSettings.Apply(plain).PushEnabled);
+        Assert.Equal(2, (await Config("push", "maybe")).Item1);
+        Assert.False(Directory.Exists(plain.PluginDir)); // nothing was registered with Claude Code
+    }
+
+    [Fact]
+    public void The_session_key_cannot_reach_a_log_through_the_configuration_and_the_daemon_does_not_inherit_it()
+    {
+        var text = home.Config.ToString();
+        Assert.DoesNotContain(Token, text, StringComparison.Ordinal);
+        Assert.Contains("[secret]", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(Token, $"{home.Config.MessagingToken}", StringComparison.Ordinal);
+
+        var info = new System.Diagnostics.ProcessStartInfo("x");
+        info.Environment["CLAUDE_CODE_MESSAGING_TOKEN"] = Token;
+        info.Environment["CLAUDE_CODE_MESSAGING_SOCKET"] = "/tmp/cc-socks/9.sock";
+        info.Environment["PATH_KEPT"] = "yes";
+        Daemon.DaemonHost.Scrub(info);
+        Assert.False(info.Environment.ContainsKey("CLAUDE_CODE_MESSAGING_TOKEN"));
+        Assert.False(info.Environment.ContainsKey("CLAUDE_CODE_MESSAGING_SOCKET"));
+        Assert.Equal("yes", info.Environment["PATH_KEPT"]);
+    }
+
+    [Fact]
+    public async Task A_socket_that_is_a_symlink_is_not_written_to()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var real = SocketPath();
+        var link = SocketPath();
+        using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        listener.Bind(new UnixDomainSocketEndPoint(real));
+        listener.Listen(1);
+        File.CreateSymbolicLink(link, real);
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => new SocketInboxTransport().SendAsync(link, ["x"], TimeSpan.FromSeconds(1), CancellationToken.None));
+            Assert.True(SocketInboxTransport.IsOurs(real));
+            Assert.False(SocketInboxTransport.IsOurs(link));
+        }
+        finally
+        {
+            File.Delete(link);
+            File.Delete(real);
+        }
+    }
+
+    [Fact]
+    public async Task A_plugin_started_agent_takes_no_stop_wait_because_the_plugins_hook_timeouts_are_fixed()
+    {
+        var plugin = home.Config with { PluginId = "monitor-agent@monitor-agent-releases", StopWait = TimeSpan.FromSeconds(60) };
+        Assert.Equal(TimeSpan.Zero, SavedSettings.Apply(plugin).StopWait);
+        Assert.Equal(TimeSpan.FromSeconds(60), SavedSettings.Apply(home.Config with { StopWait = TimeSpan.FromSeconds(60) }).StopWait);
+        await Task.CompletedTask;
     }
 
     [Fact]
@@ -165,7 +246,7 @@ public sealed class InboxWireTests : IDisposable
         var plain = AgentConfig.FromEnvironment(k => k == "CM_AGENT_HOME" ? home.Dir : null) with { PushSettingsEvery = TimeSpan.FromSeconds(5) };
         var live = new LiveSettings(plain, clock);
         Assert.False(live.Current().PushEnabled);
-        SavedSettings.SavePush(plain, true);
+        SavedSettings.SavePush(plain, true, PushTransports.Inbox);
         Assert.False(live.Current().PushEnabled); // not read again yet
         clock.Advance(TimeSpan.FromSeconds(6));
         Assert.True(live.Current().InboxPushEnabled);
@@ -190,7 +271,7 @@ public sealed class InboxWireTests : IDisposable
     }
 
     [Fact]
-    public void Install_push_on_uses_the_inbox_and_adds_no_channel_to_the_plugin()
+    public void Install_push_inbox_uses_the_inbox_and_adds_no_channel_to_the_plugin()
     {
         var source = Path.Combine(home.Dir, "cm-agent-src");
         File.WriteAllText(source, "binary");
@@ -202,7 +283,7 @@ public sealed class InboxWireTests : IDisposable
         }
 
         string Manifest() => File.ReadAllText(Path.Combine(plain.PluginDir, "monitor-agent", ".claude-plugin", "plugin.json"));
-        var on = Install("--push", "on");
+        var on = Install("--push", "inbox");
         Assert.Contains("through each session's inbox", on.Out, StringComparison.Ordinal);
         Assert.DoesNotContain("--dangerously-load-development-channels", on.Out, StringComparison.Ordinal);
         Assert.DoesNotContain("channels", Manifest(), StringComparison.Ordinal);
@@ -210,5 +291,8 @@ public sealed class InboxWireTests : IDisposable
         Assert.Contains("channels", Manifest(), StringComparison.Ordinal);
         Assert.Equal(0, Install("--push", "inbox").Code);
         Assert.DoesNotContain("channels", Manifest(), StringComparison.Ordinal);
+        var legacy = Install("--push", "on"); // "on" has always meant the channel
+        Assert.Contains("through a channel", legacy.Out, StringComparison.Ordinal);
+        Assert.Contains("channels", Manifest(), StringComparison.Ordinal);
     }
 }

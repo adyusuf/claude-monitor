@@ -40,7 +40,7 @@ def native_machine():
 
 ARCH = {'arm64': 'arm64', 'aarch64': 'arm64', 'x86_64': 'x64', 'amd64': 'x64'}.get(native_machine())
 FILE = f'cm-agent-{OS}-{ARCH}.zip'
-FAKE = '#!/bin/sh\ncase "$1" in\n  version) echo "{version}" ;;\n  restart) echo restarted >> "$(dirname "$0")/restarts" ;;\n  *) echo "args: $*"; echo "BIN=$CM_BINARY ID=$CM_PLUGIN_ID SERVER=$CM_SERVER" ;;\nesac\n'
+FAKE = '#!/bin/sh\ncase "$1" in\n  version) echo "{version}" ;;\n  restart) echo "restarted id=$CM_PLUGIN_ID bin=$CM_BINARY" >> "$(dirname "$0")/restarts" ;;\n  *) echo "args: $*"; echo "BIN=$CM_BINARY ID=$CM_PLUGIN_ID SERVER=$CM_SERVER" ;;\nesac\n'
 
 
 def zip_of(version):
@@ -130,6 +130,24 @@ class PluginScripts(unittest.TestCase):
         self.assertIn('args: hook PreToolUse', result.stdout)
         self.assertIn(f'BIN={self.bin} ID=monitor-agent@monitor-agent-releases SERVER=https://monitor.invalid', result.stdout)
 
+    def test_run_finds_the_server_in_the_option_the_mcp_environment_or_the_kept_file_in_that_order(self):
+        self.install_fake('0.3.0')
+        os.makedirs(self.data, exist_ok=True)
+        with open(os.path.join(self.data, 'server.txt'), 'w') as f:
+            f.write('https://kept.invalid\n')
+        self.assertIn('SERVER=https://kept.invalid', self.run_script(RUN, 'status').stdout)  # a Bash tool has neither of the others
+        self.assertIn('SERVER=https://mcp.invalid', self.run_script(RUN, 'mcp', CM_SERVER='https://mcp.invalid').stdout)
+        self.assertIn('SERVER=https://option.invalid', self.run_script(RUN, 'hook', 'Stop', server='https://option.invalid', CM_SERVER='https://mcp.invalid').stdout)
+
+    def test_run_turns_push_on_only_for_the_inbox_option(self):
+        self.install_fake('0.3.0')
+        for option, expected in (('inbox', 'PUSH=inbox'), ('', 'PUSH=')):
+            with open(self.bin, 'w') as f:
+                f.write('#!/bin/sh\necho "PUSH=$CM_PUSH"\n')
+            result = self.run_script(RUN, 'x', CLAUDE_PLUGIN_OPTION_PUSH=option)
+            self.assertEqual(result.stdout.strip(), expected)
+        self.assertEqual(self.run_script(RUN, 'x', CLAUDE_PLUGIN_OPTION_PUSH='channel').stdout.strip(), 'PUSH=')  # an option cannot ask for anything else
+
     # ---- ensure.sh ----
 
     def test_a_missing_binary_is_downloaded_checked_installed_and_the_daemon_handed_over(self):
@@ -147,6 +165,8 @@ class PluginScripts(unittest.TestCase):
         while time.time() < end and not (os.path.exists(restarts) and not os.path.exists(os.path.join(self.data, 'install.lock'))):
             time.sleep(0.1)
         self.assertTrue(os.path.exists(restarts), 'the daemon was not handed over to the new binary')
+        # The restarted daemon must know it belongs to the plugin, or it would never notice the plugin being switched off.
+        self.assertIn(f'id=monitor-agent@monitor-agent-releases bin={self.bin}', open(restarts).read())
         self.assertFalse(os.path.exists(os.path.join(self.data, 'install.lock')))
 
     def test_a_download_that_does_not_match_the_pin_is_refused_and_nothing_is_installed(self):
@@ -193,11 +213,61 @@ class PluginScripts(unittest.TestCase):
     def test_a_hostile_file_name_in_the_pins_is_refused(self):
         server = Server({})
         self.addCleanup(server.close)
-        with open(os.path.join(self.root, 'agent-release.txt'), 'w') as f:
-            f.write(f'0.3.0\n{OS}-{ARCH} {"a" * 64} ../../etc/passwd\n')
-        self.run_script(ENSURE, server=server.url)
-        self.assertIn('is not a build file name', open(self.log).read())
+        for name in ('../../etc/passwd', 'cm-agent-../../x-y.zip', f'cm-agent-{OS}-{ARCH}.zip/../x'):
+            with open(os.path.join(self.root, 'agent-release.txt'), 'w') as f:
+                f.write(f'0.3.0\n{OS}-{ARCH} {"a" * 64} {name}\n')
+            self.run_script(ENSURE, server=server.url)
+            self.assertIn('is not a build file name', open(self.log).read(), name)
         self.assertEqual(server.requests, [])
+
+    def test_a_server_address_that_only_starts_like_a_local_one_is_refused(self):
+        self.pins('0.3.0')
+        for address in ('http://localhost.attacker.example', 'http://127.0.0.1.attacker.example', 'http://localhost@attacker.example',
+                        'http://localhostx:80', 'http://attacker.example', 'ftp://monitor.invalid', 'https://a b', "https://x'y", 'https://x$(id)'):
+            result = self.run_script(ENSURE, server=address)
+            self.assertIn('set the server address', json.loads(result.stdout)['systemMessage'], address)
+            self.assertFalse(os.path.exists(os.path.join(self.data, 'server.txt')), address)
+        for address in ('http://localhost', 'http://localhost:5080', 'http://127.0.0.1:9872/', 'https://monitor.invalid', 'https://monitor.invalid/base'):
+            self.run_script(ENSURE, server=address)
+            self.assertEqual(open(os.path.join(self.data, 'server.txt')).read().strip(), address.rstrip('/'))
+
+    def test_a_failed_install_is_not_retried_at_every_session_start_and_a_new_pinned_version_is(self):
+        server = Server({f'/downloads/{FILE}': zip_of('9.9.9')})
+        self.addCleanup(server.close)
+        self.pins('0.3.0', archive=zip_of('0.3.0'))
+        self.run_script(ENSURE, server=server.url)
+        self.assertTrue(self.wait_for('does not match the pinned SHA-256'))
+        end = time.time() + 10
+        while time.time() < end and os.path.exists(os.path.join(self.data, 'install.lock')):
+            time.sleep(0.1)
+        before = len(server.requests)
+        again = self.run_script(ENSURE, server=server.url)
+        self.assertIn('the last install of version 0.3.0 failed', json.loads(again.stdout)['systemMessage'])
+        self.assertEqual(len(server.requests), before)  # nothing downloaded the second time
+        self.pins('0.3.1', archive=zip_of('0.3.1'))  # a new version is a new chance
+        self.run_script(ENSURE, server=server.url)
+        end = time.time() + 10
+        while time.time() < end and len(server.requests) == before:
+            time.sleep(0.1)
+        self.assertGreater(len(server.requests), before)
+
+    def test_any_of_the_pinned_builds_of_a_version_is_accepted(self):
+        server = Server({f'/downloads/{FILE}': zip_of('0.3.0')})
+        self.addCleanup(server.close)
+        real = hashlib.sha256(zip_of('0.3.0')).hexdigest()
+        with open(os.path.join(self.root, 'agent-release.txt'), 'w') as f:
+            f.write(f'0.3.0\n{OS}-{ARCH} {"0" * 64} {FILE}\n{OS}-{ARCH} {real} {FILE}\n')  # the test build and the prod build of the same version
+        self.run_script(ENSURE, server=server.url)
+        self.assertTrue(self.wait_for('installed version 0.3.0'))
+
+    def test_a_long_install_log_is_cut_to_its_last_lines(self):
+        os.makedirs(self.data, exist_ok=True)
+        with open(self.log, 'w') as f:
+            f.write(''.join(f'line {i} ' + 'x' * 100 + '\n' for i in range(3000)))
+        self.run_script(ENSURE, server='https://monitor.invalid')
+        lines = open(self.log).read().splitlines()
+        self.assertLess(len(lines), 400)
+        self.assertTrue(any('line 2999' in l for l in lines))
 
     def test_the_old_local_plugin_still_enabled_is_pointed_out(self):
         os.makedirs(os.path.join(self.tmp, 'claude'))
@@ -220,10 +290,22 @@ class Pins(unittest.TestCase):
     def test_only_well_formed_build_lines_become_pins_in_a_stable_order(self):
         found = pins_module.pins(self.SUMS)
         self.assertEqual(sorted(found), ['macos-arm64', 'windows-x64'])
-        text = pins_module.render('1.2.3', found)
+        text = pins_module.render('1.2.3', pins_module.merge('1.2.3', found, ''))
         self.assertEqual(text.splitlines()[0], '1.2.3')
         self.assertEqual(text.splitlines()[1], 'macos-arm64 ' + 'a' * 64 + ' cm-agent-macos-arm64.zip')
         self.assertEqual(text.splitlines()[2], 'windows-x64 ' + 'b' * 64 + ' cm-agent-windows-x64.zip')
+
+    def test_the_builds_of_one_version_accumulate_and_a_new_version_starts_over(self):
+        test_build = pins_module.pins('1' * 64 + '  cm-agent-linux-x64.zip\n')
+        prod_build = pins_module.pins('2' * 64 + '  cm-agent-linux-x64.zip\n')
+        first = pins_module.render('1.2.3', pins_module.merge('1.2.3', test_build, ''))
+        both = pins_module.render('1.2.3', pins_module.merge('1.2.3', prod_build, first))
+        self.assertEqual(both.splitlines(), ['1.2.3', 'linux-x64 ' + '1' * 64 + ' cm-agent-linux-x64.zip', 'linux-x64 ' + '2' * 64 + ' cm-agent-linux-x64.zip'])
+        again = pins_module.render('1.2.3', pins_module.merge('1.2.3', prod_build, both))
+        self.assertEqual(again, both)  # writing the same build twice changes nothing
+        newer = pins_module.render('1.3.0', pins_module.merge('1.3.0', prod_build, both))
+        self.assertEqual(newer.splitlines(), ['1.3.0', 'linux-x64 ' + '2' * 64 + ' cm-agent-linux-x64.zip'])
+        self.assertEqual(pins_module.existing('not a version\nx y z\n'), (None, {}))
 
     def test_a_bad_version_or_a_missing_sums_file_is_refused(self):
         with tempfile.TemporaryDirectory() as empty:

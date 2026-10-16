@@ -4,25 +4,6 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Config;
 
-public static class PushScopes
-{
-    public const string Session = "session";
-    public const string Machine = "machine";
-}
-
-/// <summary>How a prompt from the web reaches a session when push is on (ADR-0007): the session's inbox socket, or the older Claude Code channel (ADR-0003).</summary>
-public static class PushTransports
-{
-    public const string Inbox = "inbox";
-    public const string Channel = "channel";
-
-    /// <summary>The transport a value names; anything else (and "on") is the inbox, which needs no start-up flag.</summary>
-    public static string Normalize(string? value) => value == Channel ? Channel : Inbox;
-
-    /// <summary>True for the values that switch push on: on, inbox, channel.</summary>
-    public static bool Enables(string? value) => value is "on" or Inbox or Channel;
-}
-
 /// <summary>
 /// The agent's ONE configuration module (global #2): the only place that reads the environment or holds a path,
 /// URL, interval or limit. Every other file takes an <see cref="AgentConfig"/>. Every variable is in .env.example.
@@ -264,7 +245,7 @@ public sealed partial record AgentConfig
             PluginId = read("CM_PLUGIN_ID") is { Length: > 0 } pluginId ? pluginId : null,
             PluginDataDir = read("CLAUDE_PLUGIN_DATA") is { Length: > 0 } pluginData ? pluginData : null,
             MessagingSocket = read("CLAUDE_CODE_MESSAGING_SOCKET") is { Length: > 0 } socket ? socket : null,
-            MessagingToken = read("CLAUDE_CODE_MESSAGING_TOKEN") is { Length: > 0 } token ? token : null,
+            MessagingToken = read("CLAUDE_CODE_MESSAGING_TOKEN") is { Length: > 0 } token ? new SecretText(token) : null,
             ClaudeUpdateEnabled = read("CM_CLAUDE_UPDATE") == "on",
             ClaudeUpdateFromEnvironment = read("CM_CLAUDE_UPDATE") is { Length: > 0 },
             ClaudeConfigDir = read("CLAUDE_CONFIG_DIR") is { Length: > 0 } claudeDir ? claudeDir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude"),

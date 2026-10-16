@@ -60,7 +60,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             return;
         }
 
-        if (Push.SocketInboxTransport.IsEndpoint(config.MessagingSocket)) store.SaveInbox(session, config.MessagingSocket!, config.MessagingToken, now);
+        if (Push.SocketInboxTransport.IsEndpoint(config.MessagingSocket)) store.SaveInbox(session, config.MessagingSocket!, config.MessagingToken?.Value, now);
     }
 
     private void Record(string hookEvent, string session, JsonObject payload, ProjectInfo? project, DateTimeOffset now) =>

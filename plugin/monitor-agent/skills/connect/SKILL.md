@@ -14,7 +14,7 @@ CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" sh "${CLAUDE_PLUGIN_ROOT}/scripts/run
 2. Start the login. It prints a web address and a short code and returns at once; the login finishes in the background when the code is approved:
 
 ```bash
-CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" sh "${CLAUDE_PLUGIN_ROOT}/scripts/run.sh" connect --server "${user_config.server}"
+CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" sh "${CLAUDE_PLUGIN_ROOT}/scripts/run.sh" connect
 ```
 
-Show the user the address and the code exactly as printed and ask them to approve it on that page while signed in. Never ask for, type or repeat a password or a token: the approval happens in the browser. When the user says they approved it, run `/monitor-agent:status` to confirm.
+If it says the server is missing, the plugin has not been through a session start yet (or its server option is empty): ask the user for the https address of their Claude Monitor server and run the same command with `connect --server '<address>'`, the address in single quotes. Show the user the address and the code exactly as printed and ask them to approve it on that page while signed in. Never ask for, type or repeat a password or a token: the approval happens in the browser. When the user says they approved it, run `/monitor-agent:status` to confirm.

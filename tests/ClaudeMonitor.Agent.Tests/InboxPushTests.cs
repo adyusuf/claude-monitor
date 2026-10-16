@@ -11,7 +11,7 @@ public sealed class InboxPushTests : IDisposable
 {
     private const string Token = "aaaa-bbbb-test";
     private static readonly DateTimeOffset Start = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero);
-    private readonly TempHome home = new(c => c with { PushEnabled = true });
+    private readonly TempHome home = new(c => c with { PushEnabled = true, PushTransport = PushTransports.Inbox });
     private readonly ManualClock clock = new(Start);
     private readonly LocalStore store;
     private readonly FakeInbox transport = new();
@@ -180,15 +180,32 @@ public sealed class InboxPushTests : IDisposable
     }
 
     [Fact]
-    public async Task A_push_the_session_never_showed_goes_back_to_the_hooks_after_the_wait()
+    public async Task A_push_the_session_never_showed_is_not_pushed_again_and_goes_back_to_the_hooks_after_the_wait()
+    {
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start); // the write succeeded, so the inbox stays known
+        Queue("c-1", "s-1", minutes: 120); // lives longer than the three waits below
+        await Pump().PumpAsync(CancellationToken.None);
+        Assert.Single(transport.Sent);
+        for (var i = 0; i < 3; i++)
+        {
+            clock.Advance(home.Config.InboxConfirmWait + TimeSpan.FromSeconds(1));
+            await Pump().PumpAsync(CancellationToken.None);
+        }
+
+        Assert.Single(transport.Sent); // exactly one copy reached the session, however long the prompt lives
+        Assert.Equal("c-1", store.TakeCommand("s-1", CommandKinds.Prompt, clock.GetUtcNow())!.Id); // and the hooks can still deliver it
+    }
+
+    [Fact]
+    public async Task A_push_waits_for_the_inbox_confirmation_time_not_the_channels_before_it_is_given_up()
     {
         store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);
         Queue("c-1", "s-1");
         await Pump().PumpAsync(CancellationToken.None);
-        clock.Advance(home.Config.PushConfirmWait + TimeSpan.FromSeconds(1));
-        store.DropInbox("s-1"); // the session refused the message and the inbox is gone: only the hooks can deliver now
+        clock.Advance(home.Config.PushConfirmWait + TimeSpan.FromSeconds(1)); // a long tool call: the session reads it later
         await Pump().PumpAsync(CancellationToken.None);
-        Assert.Equal("c-1", store.TakeCommand("s-1", CommandKinds.Prompt, clock.GetUtcNow())!.Id);
+        Assert.Null(store.TakeCommand("s-1", CommandKinds.Prompt, clock.GetUtcNow())); // still pushed, not offered to a hook as well
+        Assert.Equal("c-1", Assert.Single(store.UnconfirmedPushes()).Id);
     }
 
     [Fact]
@@ -196,11 +213,12 @@ public sealed class InboxPushTests : IDisposable
     {
         store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);
         Queue("c-1", "s-1");
-        transport.Fail = new OperationCanceledException();
+        transport.Fail = new IOException("the connection ended because the daemon is stopping"); // a type the pump would otherwise treat as a dead socket
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
-        await Assert.ThrowsAsync<OperationCanceledException>(() => Pump().PumpAsync(cts.Token));
-        Assert.NotNull(store.InboxOf("s-1"));
+        await Assert.ThrowsAsync<IOException>(() => Pump().PumpAsync(cts.Token));
+        Assert.NotNull(store.InboxOf("s-1")); // the session's inbox is not forgotten because the daemon was stopped
+        Assert.Null(store.Get(LocalStore.InboxErrorKey));
     }
 
     // ---- the saved socket --------------------------------------------------------------------------------------------
@@ -216,5 +234,17 @@ public sealed class InboxPushTests : IDisposable
         Assert.Equal(["s-1"], store.Inboxes().Select(i => i.Session));
         store.DropInbox("s-1");
         Assert.Empty(store.Inboxes());
+    }
+
+    [Fact]
+    public void A_hook_that_repeats_what_is_known_writes_nothing_until_the_row_is_an_hour_old()
+    {
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start.AddMinutes(30));
+        Assert.Equal(Start, store.InboxOf("s-1")!.SeenAt); // the same socket and key, seen again: not rewritten
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start.AddMinutes(61));
+        Assert.Equal(Start.AddMinutes(61), store.InboxOf("s-1")!.SeenAt); // but the age is refreshed hourly
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", "another-key", Start.AddMinutes(62));
+        Assert.Equal("another-key", store.InboxOf("s-1")!.Token); // a changed key is written at once
     }
 }

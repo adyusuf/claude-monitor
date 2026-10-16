@@ -145,6 +145,58 @@ public sealed class PluginFilesTests : IDisposable
         Assert.Single(starter.Started);
     }
 
+    [Theory]
+    [InlineData("Connected. This machine now reports to Claude Monitor.")]
+    [InlineData("The request was denied on the web.")]
+    [InlineData("The code expired. Run cm-agent login again.")]
+    [InlineData("The server did not answer (HttpRequestException). Check the address and the connection, then run cm-agent login again.")]
+    public async Task A_code_whose_login_has_ended_is_not_shown_again_and_a_new_login_starts(string outcome)
+    {
+        File.WriteAllText(home.Config.ConnectLogPath, "Open https://monitor.invalid/device and enter the code DEAD-0001\n" + outcome + "\n");
+        var starter = new FakeStarter(home.Config, "Open https://monitor.invalid/device and enter the code NEWC-0002\n");
+        var output = new StringWriter();
+        Assert.Equal(0, await Connect(starter, output));
+        Assert.Single(starter.Started);
+        Assert.Contains("NEWC-0002", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("DEAD-0001", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_code_still_being_polled_is_shown_again_but_only_for_the_same_server()
+    {
+        File.WriteAllText(home.Config.ConnectLogPath,
+            "Open https://monitor.invalid/device and enter the code WAIT-0003\nThe server did not answer (X); trying again in 10 s.\n");
+        var same = new FakeStarter(home.Config, null);
+        var output = new StringWriter();
+        Assert.Equal(0, await Connect(same, output));
+        Assert.Empty(same.Started);
+        Assert.Contains("WAIT-0003", output.ToString(), StringComparison.Ordinal);
+
+        var other = new FakeStarter(home.Config, "Open https://other.invalid/device and enter the code OTHR-0004\n");
+        var shown = new StringWriter();
+        Assert.Equal(0, await Connect(other, shown, "https://other.invalid")); // another server: its own login
+        Assert.Single(other.Started);
+        Assert.Contains("OTHR-0004", shown.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Restart_stops_a_running_daemon_and_starts_one_from_this_binary_and_says_when_it_cannot()
+    {
+        new Identity("0123456789abcdef0123", "https://monitor.invalid", Guid.NewGuid(), Guid.NewGuid()).Save(home.Config);
+        var daemon = new FakeDaemon(home.Config, TimeProvider.System);
+        var output = new StringWriter();
+        var log = new Daemon.AgentLog(home.Config, TimeProvider.System);
+        Assert.Equal(0, await Cli.RestartAsync(home.Config, log, TimeProvider.System, output, daemon));
+        Assert.Equal(1, daemon.Starts);
+        Assert.Contains("restarted", output.ToString(), StringComparison.Ordinal);
+
+        var stuck = new FakeDaemon(home.Config, TimeProvider.System) { StopResult = false, KillResult = false };
+        var refused = new StringWriter();
+        Assert.Equal(1, await Cli.RestartAsync(home.Config, log, TimeProvider.System, refused, stuck));
+        Assert.Equal(0, stuck.Starts);
+        Assert.Contains("did not stop", refused.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Connect_says_what_to_do_when_the_login_cannot_start_or_shows_nothing_and_refuses_a_bad_server()
     {

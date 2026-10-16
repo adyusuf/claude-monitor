@@ -23,6 +23,8 @@ public static class SavedSettings
 
         if (!config.ClaudeUpdateFromEnvironment && saved?.ClaudeUpdate is { } claude) config = config with { ClaudeUpdateEnabled = claude };
         if (!config.AutoUpdateFromEnvironment && saved?.AutoUpdate is { } update) config = config with { AutoUpdate = UpdateModes.Normalize(update) };
+        // The plugin's hooks have fixed timeouts (15 s for the Stop hook): a wait longer than that would be cut off, and a prompt taken just before could be lost.
+        if (config.PluginId is not null) config = config with { StopWait = TimeSpan.Zero };
         return !config.PushFromEnvironment && saved?.Push is { } push
             ? config with { PushEnabled = push, PushTransport = PushTransports.Normalize(saved.PushTransport) }
             : config;

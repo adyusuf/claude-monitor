@@ -29,8 +29,32 @@ def pins(sums_text):
     return found
 
 
-def render(version, found):
-    return version + '\n' + ''.join(f'{key} {digest} {name}\n' for key, (digest, name) in sorted(found.items()))
+def existing(text):
+    """(version, {key: {(digest, file)}}) of an earlier pins file; (None, {}) when there is none."""
+    lines = text.splitlines()
+    if not lines or not VERSION.match(lines[0].strip()):
+        return None, {}
+    kept = {}
+    for line in lines[1:]:
+        parts = line.split()
+        if len(parts) == 3 and HEX.match(parts[1]):
+            kept.setdefault(parts[0], set()).add((parts[1], parts[2]))
+    return lines[0].strip(), kept
+
+
+def merge(version, found, earlier_text):
+    """The digests of this build, plus those already pinned for the same version: each environment (test, prod) builds its own zips, and a plugin
+    that travels from one branch to the next must accept the build of each. A new version starts a new list."""
+    old_version, kept = existing(earlier_text)
+    merged = {key: {pair} for key, pair in found.items()}
+    if old_version == version:
+        for key, pairs in kept.items():
+            merged.setdefault(key, set()).update(pairs)
+    return merged
+
+
+def render(version, merged):
+    return version + '\n' + ''.join(f'{key} {digest} {name}\n' for key in sorted(merged) for digest, name in sorted(merged[key]))
 
 
 def main(argv):
@@ -47,8 +71,12 @@ def main(argv):
         print(f'no cm-agent zip in {sums}', file=sys.stderr)
         return 2
     target = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'plugin', 'monitor-agent', 'agent-release.txt')
+    try:
+        earlier = open(target, encoding='utf-8').read()
+    except OSError:
+        earlier = ''
     with open(target, 'w', encoding='utf-8', newline='\n') as handle:
-        handle.write(render(argv[2], found))
+        handle.write(render(argv[2], merge(argv[2], found, earlier)))
     print(f'{len(found)} pins for version {argv[2]} written to {target}')
     return 0
 

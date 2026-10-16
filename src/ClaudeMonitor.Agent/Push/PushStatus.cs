@@ -68,7 +68,7 @@ public static class PushStatus
 
     private static string Push(AgentConfig config, LocalStore store, DateTimeOffset now, string? session)
     {
-        if (!config.PushEnabled) return "Push into the session: off (cm-agent install --push on); web messages arrive at the next prompt.";
+        if (!config.PushEnabled) return "Push into the session: off (cm-agent install --push inbox); web messages arrive at the next prompt.";
         if (config.InboxPushEnabled) return Inbox(store, now, session);
         var (queued, _) = store.WaitingCommands(now);
         var unconfirmed = store.UnconfirmedPushes().Count;

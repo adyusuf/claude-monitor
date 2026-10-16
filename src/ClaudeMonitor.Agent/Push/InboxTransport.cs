@@ -25,10 +25,30 @@ public sealed class SocketInboxTransport : IInboxTransport
         && (endpoint.StartsWith(PipePrefix, StringComparison.OrdinalIgnoreCase) ? OperatingSystem.IsWindows() && endpoint.Length > PipePrefix.Length
             : !OperatingSystem.IsWindows() && Path.IsPathRooted(endpoint));
 
+    /// <summary>
+    /// A socket path is only written to when it is not a symlink and belongs to this user: a stale <c>/tmp/cc-socks/&lt;pid&gt;.sock</c> that another local
+    /// user recreated would otherwise receive the session's key and the prompt. Ownership that cannot be read counts as ours (the permission bits still apply).
+    /// </summary>
+    internal static bool IsOurs(string path)
+    {
+        try
+        {
+            if (new FileInfo(path).LinkTarget is not null) return false;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        if (OperatingSystem.IsWindows()) return true; // a path is not what is connected to there
+        return Auth.UnixFiles.OwnerUid(path) is not { } owner || Auth.UnixFiles.Euid() is not { } me || owner == me;
+    }
+
     public async Task SendAsync(string endpoint, IReadOnlyList<string> lines, TimeSpan connectTimeout, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(lines);
         if (!IsEndpoint(endpoint)) throw new InvalidOperationException("not an inbox endpoint");
+        if (!endpoint.StartsWith(PipePrefix, StringComparison.OrdinalIgnoreCase) && !IsOurs(endpoint)) throw new InvalidOperationException("the socket is not this user's own");
         var bytes = Encoding.UTF8.GetBytes(string.Concat(lines.Select(l => l + "\n")));
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(connectTimeout);

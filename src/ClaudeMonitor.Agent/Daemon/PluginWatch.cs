@@ -20,6 +20,33 @@ public static class PluginWatch
         return null;
     }
 
+    /// <summary>Ends the daemon (through <paramref name="cts"/>) when its plugin is uninstalled or switched off. Its events stay in the local database for the next daemon.</summary>
+    public static async Task RunAsync(AgentConfig config, AgentLog log, CancellationTokenSource cts, bool dataExisted)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(log);
+        ArgumentNullException.ThrowIfNull(cts);
+        if (config.PluginDataDir is null && config.PluginId is null) return; // not started by the plugin: nothing to watch
+        while (!cts.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(config.PluginWatchEvery, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (Gone(config, dataExisted) is { } why)
+            {
+                log.Write($"stopping: {why}");
+                await cts.CancelAsync();
+                return;
+            }
+        }
+    }
+
     public static bool DataExists(AgentConfig config) => config.PluginDataDir is { } data && Directory.Exists(data);
 
     /// <summary>True when the user's settings say <c>enabledPlugins[id]</c> is exactly false.</summary>

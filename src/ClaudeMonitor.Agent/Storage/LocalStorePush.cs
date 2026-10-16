@@ -36,7 +36,7 @@ public sealed partial class LocalStore
         var taken = new List<LocalCommand>();
         using (var cmd = Command($"""
                    SELECT id, session, body, expires_at FROM commands
-                   WHERE kind = $k AND state = 'queued'{(session is null ? "" : " AND session = $s")} ORDER BY rowid
+                   WHERE kind = $k AND state = 'queued' AND push_tried IS NULL{(session is null ? "" : " AND session = $s")} ORDER BY rowid
                    """, tx, ("$k", kind), ("$s", session)))
         using (var r = cmd.ExecuteReader())
         {
@@ -92,7 +92,13 @@ public sealed partial class LocalStore
     public int RequeueStalePushes(DateTimeOffset now, TimeSpan wait)
     {
         var stale = UnconfirmedPushes().Where(p => now - p.PushedAt >= wait).ToList();
-        foreach (var p in stale) PushFailed(p.Id);
+        foreach (var p in stale)
+        {
+            // It reached the session's door and was never seen: pushing it again would put another copy there (or another dialog) every wait.
+            Exec("UPDATE commands SET push_tried = 1 WHERE id = $i", ("$i", p.Id));
+            PushFailed(p.Id);
+        }
+
         return stale.Count;
     }
 

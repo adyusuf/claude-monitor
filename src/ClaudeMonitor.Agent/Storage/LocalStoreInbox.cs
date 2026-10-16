@@ -12,12 +12,16 @@ public sealed partial class LocalStore
     public const string InboxErrorKey = "inbox.last_error";
     public const string InboxErrorAtKey = "inbox.last_error_at";
 
-    /// <summary>A hook says: this session listens on that socket. The latest hook of a session wins (a resumed session binds a new socket).</summary>
+    /// <summary>
+    /// A hook says: this session listens on that socket. The latest hook of a session wins (a resumed session binds a new socket). A hook that
+    /// says what is already known writes nothing, except once an hour to show the session is alive: this runs on every tool call.
+    /// </summary>
     public void SaveInbox(string session, string endpoint, string? token, DateTimeOffset now) =>
         Exec("""
             INSERT INTO session_inboxes (session, endpoint, token, seen_at) VALUES ($s, $e, $k, $t)
             ON CONFLICT(session) DO UPDATE SET endpoint = excluded.endpoint, token = excluded.token, seen_at = excluded.seen_at
-            """, ("$s", session), ("$e", endpoint), ("$k", token), ("$t", Iso(now)));
+            WHERE session_inboxes.endpoint IS NOT excluded.endpoint OR session_inboxes.token IS NOT excluded.token OR session_inboxes.seen_at < $c
+            """, ("$s", session), ("$e", endpoint), ("$k", token), ("$t", Iso(now)), ("$c", Iso(now - TimeSpan.FromHours(1))));
 
     public SessionInbox? InboxOf(string session)
     {

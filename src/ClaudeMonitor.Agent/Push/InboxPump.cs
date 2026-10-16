@@ -14,8 +14,11 @@ namespace ClaudeMonitor.Agent.Push;
 /// </summary>
 public sealed class InboxPump(Func<AgentConfig> settings, LocalStore store, IInboxTransport transport, TimeProvider clock)
 {
-    /// <summary>Inboxes no hook has refreshed for this long are forgotten (a session that crashed without a SessionEnd).</summary>
-    public static readonly TimeSpan InboxLifetime = TimeSpan.FromDays(1);
+    /// <summary>
+    /// Inboxes no hook has refreshed for this long are forgotten (a session that crashed without a SessionEnd). Long: an idle session left open for days
+    /// is the case this push is for, and a dead socket is dropped at its first failed write anyway.
+    /// </summary>
+    public static readonly TimeSpan InboxLifetime = TimeSpan.FromDays(30);
 
     /// <summary>Pushes what is waiting. Returns the number of prompts written.</summary>
     public async Task<int> PumpAsync(CancellationToken ct)
@@ -23,7 +26,7 @@ public sealed class InboxPump(Func<AgentConfig> settings, LocalStore store, IInb
         var config = settings();
         if (!config.InboxPushEnabled) return 0;
         var now = clock.GetUtcNow();
-        store.RequeueStalePushes(now, config.PushConfirmWait); // a prompt the session never showed goes back to the hooks
+        store.RequeueStalePushes(now, config.InboxConfirmWait); // a prompt the session never showed goes back to the hooks
         store.PruneInboxes(now - InboxLifetime);
         var pushed = 0;
         foreach (var inbox in store.Inboxes())
