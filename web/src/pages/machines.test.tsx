@@ -30,7 +30,7 @@ describe("the machines list", () => {
     renderAt("/w/w1/machines", route);
     const row = (await screen.findByRole("link", { name: "laptop-1" })).closest("tr")!;
     const cells = within(row).getAllByRole("cell").map(text);
-    expect(cells.slice(0, 8)).toEqual(["laptop-1 linux x64", "Diğer Kişi", "Runs: commands Service", "42%", "25%", "93%", "2", "0.4.0"]);
+    expect(cells.slice(0, 9)).toEqual(["laptop-1 linux x64", "Diğer Kişi", "not set unknown (older agent)", "Runs: commands Service", "42%", "25%", "93%", "2", "0.4.0"]);
     expect(within(row).getByRole("img", { name: "Online" })).toBeInTheDocument();
     expect(within(row).getByText("2")).toHaveClass("status-failed");
     await userEvent.click(within(row).getByRole("link", { name: "laptop-1" }));
@@ -46,7 +46,7 @@ describe("the machines list", () => {
     renderAt("/w/w1/machines", route);
     const row = (await screen.findByRole("link", { name: "laptop-1" })).closest("tr")!;
     const cells = within(row).getAllByRole("cell").map(text);
-    expect(cells.slice(2, 7)).toEqual(["Runs: shell", "–", "–", "–", "0"]);
+    expect(cells.slice(3, 8)).toEqual(["Runs: shell", "–", "–", "–", "0"]);
     expect(within(row).getByText("0")).not.toHaveClass("status-failed");
     expect(within(row).getByRole("img", { name: "Offline" })).toBeInTheDocument();
   });
@@ -57,7 +57,7 @@ describe("the machines list", () => {
     const name = await screen.findByText("laptop-1");
     expect(screen.queryByRole("link", { name: "laptop-1" })).toBeNull();
     const cells = within(name.closest("tr")!).getAllByRole("cell").map(text);
-    expect(cells.slice(2, 7)).toEqual(["", "", "", "", ""]);
+    expect(cells.slice(2, 8)).toEqual(["", "", "", "", "", ""]);
     expect(screen.queryByRole("img", { name: "Online" })).toBeNull();
   });
 

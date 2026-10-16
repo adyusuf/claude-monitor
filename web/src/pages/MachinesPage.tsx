@@ -8,6 +8,7 @@ import { Button, Card, Empty, Field, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime, percent } from "../lib/format";
 import { debounce, useLive } from "../lib/live";
+import { ClaudeBadge, RoleBadge } from "./MachineBadges";
 import { ExecBadge, maxDiskPct, memoryPct, OnlineDot, ServiceBadge } from "./MachineBits";
 
 /** One machine: the agent's facts, and (when the API reports remote work) its exec level, load and open alerts. */
@@ -23,6 +24,7 @@ function MachineRow({ ws, agent: a, view: v, canRevoke, onRevoke }: {
         <span className="muted small">{a.os} {a.arch}</span>
       </td>
       <td>{a.userName}</td>
+      <td>{v ? <><RoleBadge view={v} /> <ClaudeBadge view={v} /></> : null}</td>
       <td>{v ? <><ExecBadge level={v.execLevel} /> <ServiceBadge serviceMode={v.serviceMode} /></> : null}</td>
       <td>{v ? percent(v.latest?.cpuPct) : ""}</td>
       <td>{v ? percent(memoryPct(v.latest)) : ""}</td>
@@ -73,7 +75,7 @@ export function MachinesPage() {
   }, [load]);
   const reload = useMemo(() => debounce(() => void load()), [load]);
   useLive(ws, (m) => {
-    if (m.event === "alert" || m.event === "run" || m.event === "session") reload();
+    if (m.event === "alert" || m.event === "run" || m.event === "session" || m.event === "machine") reload();
   });
 
   const revoke = async (id: string) => {
@@ -99,7 +101,7 @@ export function MachinesPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>{t("sessions.host")}</th><th>{t("machines.user")}</th><th>{t("remote.remote")}</th><th>{t("remote.cpu")}</th>
+                  <th>{t("sessions.host")}</th><th>{t("machines.user")}</th><th>{t("machines.role.title")}</th><th>{t("remote.remote")}</th><th>{t("remote.cpu")}</th>
                   <th>{t("remote.memory")}</th><th>{t("remote.disk")}</th><th>{t("remote.alerts")}</th><th>{t("machines.version")}</th>
                   <th>{t("machines.lastSeen")}</th><th />
                 </tr>

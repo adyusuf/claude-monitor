@@ -9,14 +9,16 @@ import { debounce, useLive } from "../lib/live";
 import { AlertList } from "./AlertList";
 import { GrantList } from "./GrantList";
 import { JobList } from "./JobList";
+import { ToolList } from "./MachineBadges";
 import { MachineMetrics } from "./MachineMetrics";
+import { MachineRoleEditor } from "./MachineRoleEditor";
 import { ExecBadge, OnlineDot, ServiceBadge } from "./MachineBits";
 import { RunApproval } from "./RunApproval";
 import { RunList } from "./RunList";
 import { useMachineData } from "./useMachineData";
 
 /** The live events that change what this page shows. */
-const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job"];
+const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "machine"];
 
 /** One machine: its load, its alerts, the runs waiting for the owner, the run history, grants and jobs (ADR-0005). */
 export function MachinePage() {
@@ -27,6 +29,8 @@ export function MachinePage() {
   const [showResolved, setShowResolved] = useState(false);
   const [version, setVersion] = useState(0);
   const data = useMachineData(ws, agentId, me?.id, showResolved);
+  const role = me?.workspaces.find((w) => w.id === ws)?.role;
+  const isAdmin = role === "owner" || role === "admin";
   const { reload } = data;
 
   const refresh = useMemo(() => debounce(() => {
@@ -65,6 +69,8 @@ export function MachinePage() {
       </header>
       {data.error ? <Notice kind="error">{errorText(data.error)}</Notice> : null}
       {m.execLevel === "off" ? <Notice>{t("remote.execOffNote")}</Notice> : null}
+      <Card title={t("machines.role.title")}><MachineRoleEditor agentId={agentId} view={m} canEdit={isAdmin} onChanged={() => void reload()} /></Card>
+      <Card title={t("machines.tools.title")}><ToolList view={m} /></Card>
 
       {waiting.length > 0 ? (
         <section className="stack" aria-label={t("remote.waiting")}>

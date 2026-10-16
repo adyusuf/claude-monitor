@@ -1,8 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentRow, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineView, Me, Member, MetricSample,
-  Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView,
-  WorkspaceInfo,
+  AgentRoleInput, AgentRoleView, AgentRow, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
@@ -60,6 +58,8 @@ export const api = {
   revokeAgent: (agentId: string) => request<void>("POST", `/agents/${agentId}/revoke`),
   moveAgent: (agentId: string, workspaceId: string) => request<void>("PATCH", `/agents/${agentId}`, { workspaceId }),
   machines: (id: string) => request<MachineView[]>("GET", `/workspaces/${id}/machines`),
+  agentRole: (agentId: string) => request<AgentRoleView>("GET", `/agents/${agentId}/role`),
+  setAgentRole: (agentId: string, input: AgentRoleInput) => request<AgentRoleView>("PUT", `/agents/${agentId}/role`, input),
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>
     request<AlertView[]>("GET", `/workspaces/${id}/alerts${q({ agent, resolved: includeResolved ? "true" : "false" })}`),

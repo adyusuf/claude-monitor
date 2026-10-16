@@ -1,4 +1,5 @@
 import type { Dictionary } from "./en";
+import { trMachines } from "./tr.machines";
 import { trRemote } from "./tr.remote";
 
 // Turkish: the same keys as en.ts (the type makes a missing key a build error).
@@ -46,6 +47,7 @@ export const tr: Dictionary = {
     target_cannot_run: "Bu makine şu an bunu çalıştıramaz (düzeyi kapalı ya da bağlantısı kopuk).", target_busy: "Bu makine başka çalıştırmalarla meşgul.",
     bad_template: "Bu komut şablonu bu makine için geçerli değil: program tam yol olmalı ve bazı programlara hiçbir zaman izin verilemez.",
     grant_conflict: "Bu şablon için bir izin zaten var.", invalid_reason: "Bu gerekçe çok uzun.", not_member: "Bu kişi çalışma alanının üyesi değil.",
+    invalid_machine_role: "Listelerden bir ortam ve bir işlev seçin.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
   time: { now: "şimdi", m: "dk", h: "sa", d: "g" },
@@ -104,13 +106,7 @@ export const tr: Dictionary = {
     toolCalls: "Araç çağrısı: {n}", otherEvents: "Diğer olay: {n}", emptyFilter: "Bu filtreyle gösterilecek bir şey yok.",
     status: { queued: "Bekliyor", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal" },
   },
-  machines: {
-    title: "Makineler", empty: "Henüz bağlı makine yok.", connect: "Makine bağla", revoke: "Bağlantıyı kes",
-    revokeConfirm: "Bu makinenin bağlantısı kesilsin mi? Ajanı raporlamayı bırakır.", revoked: "Bağlantı kesildi", lastSeen: "Son görülme",
-    version: "Ajan", user: "Kullanıcı", moveTo: "Çalışma alanına taşı", enrolled: "Bağlandı",
-    updateAvailable: "Güncelleme var: {version}",
-    updateHint: "Makinede \"cm-agent update\" çalıştırın ya da kendini güncellemesine izin verin (çalışma alanı izin veriyorsa: cm-agent config auto-update on).",
-  },
+  machines: trMachines,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
     approve: "Bu makineyi bağla", deny: "Bu ben değilim", approved: "Tamam. Makine bağlandı; bu sayfayı kapatabilirsiniz.",

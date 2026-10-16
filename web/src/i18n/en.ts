@@ -1,3 +1,4 @@
+import { enMachines } from "./en.machines";
 import { enRemote } from "./en.remote";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
@@ -45,6 +46,7 @@ export const en = {
     target_cannot_run: "This machine cannot run that now (its level is off, or it is disconnected).", target_busy: "This machine is busy with other runs.",
     bad_template: "That command template is not valid for this machine: the program must be a full path, and some programs can never be granted.",
     grant_conflict: "A grant for that template already exists.", invalid_reason: "That reason is too long.", not_member: "That person is not a member of this workspace.",
+    invalid_machine_role: "Pick an environment and a function from the lists.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", m: "m", h: "h", d: "d" },
@@ -103,13 +105,7 @@ export const en = {
     toolCalls: "Tool calls: {n}", otherEvents: "Other events: {n}", emptyFilter: "Nothing to show with this filter.",
     status: { queued: "Waiting", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
   },
-  machines: {
-    title: "Machines", empty: "No machine is connected yet.", connect: "Connect a machine", revoke: "Disconnect",
-    revokeConfirm: "Disconnect this machine? Its agent stops reporting.", revoked: "Disconnected", lastSeen: "Last seen",
-    version: "Agent", user: "User", moveTo: "Move to workspace", enrolled: "Connected",
-    updateAvailable: "Update available: {version}",
-    updateHint: "Run \"cm-agent update\" on the machine, or let it update itself (cm-agent config auto-update on, if the workspace allows it).",
-  },
+  machines: enMachines,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
     approve: "Connect this machine", deny: "This is not me", approved: "Done. The machine is connected; you can close this page.",
