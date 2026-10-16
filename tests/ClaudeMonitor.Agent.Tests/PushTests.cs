@@ -52,7 +52,7 @@ public sealed class PushTests : IDisposable
     [Fact]
     public void The_session_is_told_to_show_the_message_on_one_line_in_both_transports()
     {
-        Assert.Contains("Begin your reply with one line that shows the message, in the form: Web:", ChannelEnvelopes.Instructions, StringComparison.Ordinal);
+        Assert.Contains("Begin your reply with one line that shows the message, in the form: 💬", ChannelEnvelopes.Instructions, StringComparison.Ordinal);
         Assert.Contains(ChannelEnvelopes.ShowRule, ChannelEnvelopes.InboxNotice, StringComparison.Ordinal);
         Assert.Contains("origin=\"web\"", ChannelEnvelopes.Instructions, StringComparison.Ordinal);
     }

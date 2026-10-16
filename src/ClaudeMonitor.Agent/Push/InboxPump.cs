@@ -31,12 +31,16 @@ public sealed class InboxPump(Func<AgentConfig> settings, LocalStore store, IInb
         var pushed = 0;
         foreach (var inbox in store.Inboxes())
         {
-            var prompts = store.TakePromptsForPush(inbox.Session, CommandKinds.Prompt, now, CommandTransports.Inbox);
+            var brief = config.InboxShortEnabled;
+            var prompts = store.TakePromptsForPush(inbox.Session, CommandKinds.Prompt, now, CommandTransports.Inbox, brief ? InboxFormats.Brief : null);
             for (var i = 0; i < prompts.Count; i++)
             {
                 try
                 {
-                    var content = ChannelEnvelopes.BuildInbox(prompts[i], config.PushContentMax, now);
+                    // An id that cannot stand inside the notice (the server only makes GUIDs) gets the whole text instead, and counts as read.
+                    var notice = brief && ChannelEnvelopes.IsSafeId(prompts[i].Id);
+                    if (brief && !notice) store.MarkRead(prompts[i].Id, now);
+                    var content = notice ? ChannelEnvelopes.BuildInboxShort(prompts[i]) : ChannelEnvelopes.BuildInbox(prompts[i], config.PushContentMax, now);
                     await transport.SendAsync(inbox.Endpoint, InboxLines.For(prompts[i], inbox.Token, content), config.InboxConnectTimeout, ct);
                     store.Set(PushStatus.LastPushKey, prompts[i].Id);
                     store.Set(PushStatus.LastPushAtKey, now.ToString("O", CultureInfo.InvariantCulture));

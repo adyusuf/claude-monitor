@@ -153,11 +153,12 @@ public static partial class Cli
         builder.Services.AddSingleton(clock);
         var mcp = builder.Services.AddMcpServer(o =>
         {
-            if (!config.ChannelPushEnabled) return; // off, or through the inbox: the server is exactly what it was before the push existed
+            if (config.InboxShortEnabled) o.ServerInstructions = ChannelEnvelopes.InboxInstructions; // the one-line notice needs the rule for reading it
+            if (!config.ChannelPushEnabled) return; // off, or through the inbox: no channel
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
             o.ServerInstructions = ChannelEnvelopes.Instructions;
         });
-        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<ScriptTools>().WithTools<AskTools>().WithTools<GrantTools>();
+        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<ScriptTools>().WithTools<AskTools>().WithTools<GrantTools>().WithTools<InboxTools>();
         if (config.ChannelPushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }

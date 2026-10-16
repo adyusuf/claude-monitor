@@ -48,6 +48,9 @@ public sealed partial class LocalStore : IDisposable
         AddColumnIfMissing("commands", "push_tried", "INTEGER"); // a database made before a given-up push was remembered
         AddColumnIfMissing("pushes", "reported", "INTEGER"); // a database made before the web was told about a push
         AddColumnIfMissing("commands", "transport", "TEXT"); // a database made before the way a command reached its session was kept
+        AddColumnIfMissing("commands", "format", "TEXT"); // a database made before the inbox could get a one-line notice (ADR-0007 A2)
+        AddColumnIfMissing("commands", "read_at", "TEXT");
+        AddColumnIfMissing("commands", "reads", "INTEGER");
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
         CreateRemoteTables();
         CreateClaudeTables();

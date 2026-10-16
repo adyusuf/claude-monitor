@@ -11,7 +11,7 @@ public sealed class InboxPushTests : IDisposable
 {
     private const string Token = "aaaa-bbbb-test";
     private static readonly DateTimeOffset Start = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero);
-    private readonly TempHome home = new(c => c with { PushEnabled = true, PushTransport = PushTransports.Inbox });
+    private readonly TempHome home = new(c => c with { PushEnabled = true, PushTransport = PushTransports.Inbox, InboxFormat = InboxFormats.Full }); // the whole-text format; the short one is in InboxShortTests
     private readonly ManualClock clock = new(Start);
     private readonly LocalStore store;
     private readonly FakeInbox transport = new();

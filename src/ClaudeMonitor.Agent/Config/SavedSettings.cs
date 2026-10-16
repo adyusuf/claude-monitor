@@ -26,6 +26,7 @@ public static class SavedSettings
         // The plugin's hooks have fixed timeouts: a wait longer than its Stop hook's would be cut off, and a prompt taken just before could be lost.
         // The wrapper of a plugin version with the long Stop timeout says how long a wait fits; an older one says nothing, and the wait is zero.
         if (config.PluginId is not null && config.StopWait > config.PluginStopWaitMax) config = config with { StopWait = config.PluginStopWaitMax };
+        if (!config.InboxFormatFromEnvironment && saved?.InboxFormat is { } format) config = config with { InboxFormat = InboxFormats.Normalize(format) };
         return !config.PushFromEnvironment && saved?.Push is { } push
             ? config with { PushEnabled = push, PushTransport = PushTransports.Normalize(saved.PushTransport) }
             : config;
@@ -59,6 +60,15 @@ public static class SavedSettings
         var chosen = PushTransports.Normalize(transport ?? identity.PushTransport);
         (identity with { Push = on, PushTransport = chosen }).Save(config);
         return config with { PushEnabled = on, PushTransport = chosen };
+    }
+
+    /// <summary>Saves what the inbox gets (full text or the one-line notice, ADR-0007 A2) and returns the configuration that uses it.</summary>
+    public static AgentConfig SaveInboxFormat(AgentConfig config, string format)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (!InboxFormats.IsValid(format)) throw new ArgumentOutOfRangeException(nameof(format));
+        (Identity.Load(config) with { InboxFormat = format }).Save(config);
+        return config with { InboxFormat = format };
     }
 
     /// <summary>
