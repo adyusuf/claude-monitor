@@ -129,7 +129,7 @@ public sealed class PluginWatchTests : IDisposable
     {
         var path = Path.Combine(claudeDir, "plugins", "installed_plugins.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        foreach (var text in new[] { "{ not json", "[]", """{"version":3,"plugins":{}}""", """{"plugins":{}}""", """{"version":2}""", "{\"version\":2,\"plugins\":{\"" + Id + "\":\"yes\"}}", "{\"version\":2,\"plugins\":{\"" + Id + "\":[5]}}"})
+        foreach (var text in new[] { "{ not json", "[]", """{"version":3,"plugins":{}}""", """{"plugins":{}}""", """{"version":2}""", "{\"version\":2,\"plugins\":{\"" + Id + "\":\"yes\"}}", "{\"version\":2,\"plugins\":{\"" + Id + "\":[5]}}" })
         {
             File.WriteAllText(path, text);
             Assert.Null(PluginWatch.Gone(home.Config, true)); // not gone: the daemon stays up
