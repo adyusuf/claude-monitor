@@ -108,7 +108,8 @@ public sealed class MachineRolesTests
 
     [Theory]
     [InlineData(null, null, "not set", "not set")]
-    [InlineData(null, App, "not set", "not set")]
+    [InlineData(null, App, "application machine, environment not set", "not set/application")]
+    [InlineData(null, Db, "database server, environment not set", "not set/database")]
     [InlineData("test", "development", "test machine", "test/development")]
     [InlineData("test", "application", "test server", "test/application")]
     [InlineData("test", "web", "test server", "test/web")]
