@@ -23,17 +23,21 @@ public static class Cli
 {
     public const string Usage = """
         cm-agent login --server <url>   connect this machine (shows a code to approve on the web)
-        cm-agent install [--stop-wait <seconds>] [--push on|off]
+        cm-agent install [--stop-wait <seconds>] [--push off|inbox|channel]
                                         register the Claude Code plugin (hooks + MCP) that starts the agent;
                                         --stop-wait: how long a finished turn waits for a prompt from the web (0-590, default 0)
-                                        --push: deliver web messages into an idle session as a Claude Code channel (default off)
+                                        --push: deliver web messages into an idle session (default off). inbox: the daemon writes to the
+                                        session's own socket, no start-up flag (ADR-0007); channel (also "on"): a Claude Code channel (ADR-0003)
         cm-agent install --exec off|argv|shell
                                         whether approved remote runs may execute on this machine (default off)
         cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root]
         cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005)
+        cm-agent connect [--server <url>]
+                                        like login, from inside Claude Code: prints the code and returns; the login finishes in the background
+        cm-agent restart                hand the running daemon over to this binary
         cm-agent status                 connection and queue
         cm-agent update [--check]       install the newest signed agent build from the server (--check: only look)
-        cm-agent config [auto-update off|check|on] [claude-update on|off]
+        cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
                                         whether the agent looks for / installs agent updates by itself, and whether it may
                                         update Claude Code when every session is idle (both default off; the workspace must allow too)
         cm-agent claude-update cancel   stop a Claude Code update that is counting down
@@ -64,9 +68,21 @@ public static class Cli
 
             case "login":
                 var server = Option(args, "--server");
-                var code = await new Login(config, stdout, clock).RunAsync(server, null, CancellationToken.None);
-                if (code == 0) DaemonHost.EnsureRunning(config, log);
-                return code;
+                if (Array.IndexOf(args, "--detach") >= 0) DaemonHost.Detach(); // started by `connect`: outlive the session that asked
+                await using (var file = Option(args, "--output") is { } target ? new StreamWriter(target) { AutoFlush = true } : null)
+                {
+                    var code = await new Login(config, file ?? stdout, clock).RunAsync(server, null, CancellationToken.None);
+                    if (code == 0) DaemonHost.EnsureRunning(config, log);
+                    return code;
+                }
+
+            case "restart":
+                return await RestartAsync(config, log, clock, stdout);
+            case "connect":
+                return await new ConnectCommand(config, stdout, clock, new DetachedProcess()).RunAsync(Option(args, "--server"), Environment.ProcessPath!, CancellationToken.None);
+            case "plugin-files" when args.Length > 1:
+                stdout.WriteLine($"{MarketplacePlugin.WriteTo(args[1], AgentConfig.Version)} files written under {args[1]}");
+                return 0;
             case "logout":
                 return await new Login(config, stdout, clock).LogoutAsync();
             case "install" when Array.IndexOf(args, ServiceCommands.ExecOption) >= 0:
@@ -115,13 +131,13 @@ public static class Cli
         if (Array.IndexOf(args, "--push") >= 0)
         {
             var value = Option(args, "--push");
-            if (value is not ("on" or "off"))
+            if (value != "off" && !PushTransports.Enables(value))
             {
-                stderr.WriteLine($"--push takes on or off, not \"{value}\".");
+                stderr.WriteLine($"--push takes on, off, inbox or channel, not \"{value}\".");
                 return 2;
             }
 
-            config = SavedSettings.SavePush(config, value == "on");
+            config = SavedSettings.SavePush(config, value != "off", value == "off" ? null : PushTransports.Normalize(value));
         }
 
         return new PluginInstaller(config, stdout, run).Install(sourceBinary);
@@ -153,6 +169,26 @@ public static class Cli
             log.Write($"hook {hookEvent} failed: {e.GetType().Name} {e.Message}");
         }
 
+        return 0;
+    }
+
+    /// <summary>"cm-agent restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
+    public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout, Update.IDaemonControl? control = null)
+    {
+        if (!Identity.Load(config).Connected)
+        {
+            await stdout.WriteLineAsync("Not connected: there is no daemon to restart.");
+            return 0;
+        }
+
+        var daemon = control ?? new Update.DaemonControl(config, log, clock);
+        if (daemon.IsRunning() && !await daemon.StopAsync(config.UpdateStopWait, CancellationToken.None) && !daemon.Kill())
+        {
+            await stdout.WriteLineAsync("The daemon did not stop; it keeps running its older version until it ends.");
+            return 1;
+        }
+
+        await stdout.WriteLineAsync(daemon.Start(config.BinaryPath) ? "The daemon was restarted." : "The daemon could not be started.");
         return 0;
     }
 
@@ -196,12 +232,12 @@ public static class Cli
         builder.Services.AddSingleton(clock);
         var mcp = builder.Services.AddMcpServer(o =>
         {
-            if (!config.PushEnabled) return; // off: the server is exactly what it was before the push existed
+            if (!config.ChannelPushEnabled) return; // off, or through the inbox: the server is exactly what it was before the push existed
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
             o.ServerInstructions = ChannelEnvelopes.Instructions;
         });
         mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<GrantTools>();
-        if (config.PushEnabled) builder.Services.AddHostedService<ChannelHost>();
+        if (config.ChannelPushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }
 }

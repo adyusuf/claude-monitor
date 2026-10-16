@@ -2,6 +2,7 @@ import { Link, Navigate, useSearchParams } from "react-router";
 import { api, providerUrl } from "../api/endpoints";
 import { useSession } from "../auth/session";
 import { Card, CopyText, Notice } from "../components/ui";
+import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { AccountDataCards } from "./AccountData";
 import { MfaCard } from "./Mfa";
@@ -77,6 +78,17 @@ export function DownloadPage() {
     <div className="page narrow">
       <h1>{t("download.title")}</h1>
       <p className="lead">{t("download.intro")}</p>
+      {config.pluginMarketplace && (
+        <Card title={t("download.pluginTitle")}>
+          <p>{t("download.pluginIntro")}</p>
+          <p className="muted">1. {t("download.plugin1")}</p>
+          <CopyText text={`claude plugin install monitor-agent --marketplace ${config.pluginMarketplace}`} />
+          <CopyText text={origin} />
+          <p className="muted">2. {t("download.plugin2")}</p>
+          <CopyText text="/monitor-agent:connect" />
+        </Card>
+      )}
+      {config.pluginMarketplace && <p className="muted">{t("download.orManual")}</p>}
       <Card title={`1. ${t("download.step1")}`}>
         <ul className="downloads">
           {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`/downloads/${f.file}`}>{f.os} · {f.label}</a></li>)}

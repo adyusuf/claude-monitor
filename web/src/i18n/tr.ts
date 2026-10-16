@@ -154,6 +154,11 @@ export const tr: Dictionary = {
     step2: "Bu çalışma alanına bağlayın (bir kod çıkar; açılan sayfada onaylayın):",
     step3: "Claude Code'a tanıtın. Bundan sonra Claude Code onu her oturumla başlatır:",
     macos: "macOS", windows: "Windows", linux: "Linux", notAvailable: "Bu sistem için henüz yayımlanmadı.",
+    pluginTitle: "Claude Code eklentisi olarak kurun (önerilen)",
+    pluginIntro: "Eklenti ajanı indirir, doğrular, bu çalışma alanına bağlar ve eklentiyi kaldırdığınızda durdurur. Elle indirecek bir şey yok.",
+    plugin1: "Eklentiyi kurun. Claude Code sunucu adresini sorar, adres şudur:",
+    plugin2: "Sonra Claude Code içinde bu makineyi bağlayın (bir kod çıkar; açılan sayfada onaylayın):",
+    orManual: "Ya da ajanı elle kurun:",
   },
   common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
   remote: {

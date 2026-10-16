@@ -23,7 +23,11 @@ public static class SavedSettings
 
         if (!config.ClaudeUpdateFromEnvironment && saved?.ClaudeUpdate is { } claude) config = config with { ClaudeUpdateEnabled = claude };
         if (!config.AutoUpdateFromEnvironment && saved?.AutoUpdate is { } update) config = config with { AutoUpdate = UpdateModes.Normalize(update) };
-        return !config.PushFromEnvironment && saved?.Push is { } push ? config with { PushEnabled = push } : config;
+        // The plugin's hooks have fixed timeouts (15 s for the Stop hook): a wait longer than that would be cut off, and a prompt taken just before could be lost.
+        if (config.PluginId is not null) config = config with { StopWait = TimeSpan.Zero };
+        return !config.PushFromEnvironment && saved?.Push is { } push
+            ? config with { PushEnabled = push, PushTransport = PushTransports.Normalize(saved.PushTransport) }
+            : config;
     }
 
     /// <summary>Saves whether this machine lets the agent update Claude Code (ADR-0006) and returns the configuration that uses it.</summary>
@@ -43,12 +47,17 @@ public static class SavedSettings
         return config with { AutoUpdate = mode };
     }
 
-    /// <summary>Saves whether prompts from the web are pushed into an idle session (ADR-0003) and returns the configuration that uses it.</summary>
-    public static AgentConfig SavePush(AgentConfig config, bool on)
+    /// <summary>
+    /// Saves whether prompts from the web are pushed into an idle session (ADR-0003, ADR-0007) and through which transport (null keeps
+    /// the saved one, the inbox when none), and returns the configuration that uses it.
+    /// </summary>
+    public static AgentConfig SavePush(AgentConfig config, bool on, string? transport = null)
     {
         ArgumentNullException.ThrowIfNull(config);
-        (Identity.Load(config) with { Push = on }).Save(config);
-        return config with { PushEnabled = on };
+        var identity = Identity.Load(config);
+        var chosen = PushTransports.Normalize(transport ?? identity.PushTransport);
+        (identity with { Push = on, PushTransport = chosen }).Save(config);
+        return config with { PushEnabled = on, PushTransport = chosen };
     }
 
     /// <summary>Saves the stop wait (0 to <see cref="AgentConfig.WaitMaxSeconds"/>) and returns the configuration that uses it.</summary>

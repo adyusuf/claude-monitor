@@ -60,9 +60,11 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         output.WriteLine(config.StopWait > TimeSpan.Zero
             ? $"A finished turn waits up to {(int)config.StopWait.TotalSeconds} s for a prompt from the web."
             : "A finished turn does not wait for the web (cm-agent install --stop-wait <seconds> changes that).");
-        output.WriteLine(config.PushEnabled
-            ? $"Push is ON. Start Claude Code with:  claude {ChannelFlag}  (a channel is a research preview; the agent cannot enable it for you)."
-            : "Web messages reach a session at its next prompt (cm-agent install --push on delivers them into an idle session).");
+        output.WriteLine(config.ChannelPushEnabled
+            ? $"Push is ON through a channel. Start Claude Code with:  claude {ChannelFlag}  (a channel is a research preview; the agent cannot enable it for you)."
+            : config.InboxPushEnabled
+                ? "Push is ON through each session's inbox: a web message starts a turn in an idle session, with no start-up flag (ADR-0007)."
+                : "Web messages reach a session at its next prompt (cm-agent install --push inbox delivers them into an idle session).");
         return 0;
     }
 
@@ -100,7 +102,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
             ["author"] = new JsonObject { ["name"] = "Claude Monitor" },
         };
         // Push on: the MCP server is also a channel (ADR-0003). Without the entry (the default) the plugin is what it was.
-        if (config.PushEnabled) manifest["channels"] = new JsonArray(new JsonObject { ["server"] = McpServerName, ["displayName"] = "Claude Monitor" });
+        if (config.ChannelPushEnabled) manifest["channels"] = new JsonArray(new JsonObject { ["server"] = McpServerName, ["displayName"] = "Claude Monitor" });
         Write(Path.Combine(plugin, ".claude-plugin", "plugin.json"), manifest);
         var hooks = new JsonObject();
         foreach (var (name, isAsync, timeout) in Hooks)

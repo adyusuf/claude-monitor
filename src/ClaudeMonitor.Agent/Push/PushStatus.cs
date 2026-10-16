@@ -68,13 +68,26 @@ public static class PushStatus
 
     private static string Push(AgentConfig config, LocalStore store, DateTimeOffset now, string? session)
     {
-        if (!config.PushEnabled) return "Push into the session: off (cm-agent install --push on); web messages arrive at the next prompt.";
+        if (!config.PushEnabled) return "Push into the session: off (cm-agent install --push inbox); web messages arrive at the next prompt.";
+        if (config.InboxPushEnabled) return Inbox(store, now, session);
         var (queued, _) = store.WaitingCommands(now);
         var unconfirmed = store.UnconfirmedPushes().Count;
         var scope = config.PushScope == PushScopes.Machine ? "every session on this machine" : $"this session ({session ?? "not bound yet"})";
         var last = store.Get(LastPushKey) is { Length: > 0 } id ? $"last pushed {id} at {Clock(Time(store.Get(LastPushAtKey)))}" : "nothing pushed yet";
         return $"Push into the session: on for {scope}; {last}; {unconfirmed} pushed but not yet seen in the transcript; " +
                $"{store.PushedTotal()} confirmed; {queued} waiting for a hook.";
+    }
+
+    /// <summary>The inbox transport (ADR-0007): whether this session's socket is known, what was pushed and what the last failure was. No content, no key.</summary>
+    private static string Inbox(LocalStore store, DateTimeOffset now, string? session)
+    {
+        var (queued, _) = store.WaitingCommands(now);
+        var known = session is not null && store.InboxOf(session) is not null;
+        var where = session is null ? "this session is not bound yet" : known ? "this session's inbox is known" : "this session's inbox is not known yet (a hook has not run since push was switched on)";
+        var last = store.Get(LastPushKey) is { Length: > 0 } id ? $"last pushed {id} at {Clock(Time(store.Get(LastPushAtKey)))}" : "nothing pushed yet";
+        var failure = store.Get(LocalStore.InboxErrorKey) is { Length: > 0 } error ? $" Last inbox failure: {error} at {Clock(Time(store.Get(LocalStore.InboxErrorAtKey)))}." : "";
+        return $"Push into the session: on through the inbox socket; {where}; {last}; {store.UnconfirmedPushes().Count} pushed but not yet seen in the transcript; " +
+               $"{store.PushedTotal()} confirmed; {queued} waiting for a hook.{failure}";
     }
 
     private static DateTimeOffset? Time(string? iso) =>

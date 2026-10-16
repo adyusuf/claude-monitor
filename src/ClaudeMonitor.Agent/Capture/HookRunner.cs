@@ -30,6 +30,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
         var project = ProjectInfo.Resolve(payload["cwd"]?.GetValue<string>());
         Record(hookEvent, session, payload, project, now);
         if (Push.ParentProcess.Id() is > 0 and var claude) store.BindSession(session, claude, now); // which Claude Code process runs it (ADR-0003)
+        SyncInbox(hookEvent, session, now);
         store.ClaudeConfigDirSeen(config.ClaudeConfigDir, now); // the session's CLAUDE_CONFIG_DIR: the Claude updater watches its sessions too (ADR-0006)
         if (payload["transcript_path"]?.GetValue<string>() is { Length: > 0 } transcript)
         {
@@ -45,6 +46,21 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             "PermissionRequest" => await PermissionAsync(session, payload, ct),
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// Remembers where this session listens (ADR-0007): the socket and key Claude Code exported to the hook. Only while push through the
+    /// inbox is on, so the key is not kept for nothing; the row goes with the session, or when push is switched off.
+    /// </summary>
+    private void SyncInbox(string hookEvent, string session, DateTimeOffset now)
+    {
+        if (hookEvent == "SessionEnd" || !config.InboxPushEnabled)
+        {
+            store.DropInbox(session);
+            return;
+        }
+
+        if (Push.SocketInboxTransport.IsEndpoint(config.MessagingSocket)) store.SaveInbox(session, config.MessagingSocket!, config.MessagingToken?.Value, now);
     }
 
     private void Record(string hookEvent, string session, JsonObject payload, ProjectInfo? project, DateTimeOffset now) =>

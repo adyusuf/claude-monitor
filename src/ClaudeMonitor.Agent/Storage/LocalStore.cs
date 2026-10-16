@@ -41,8 +41,10 @@ public sealed partial class LocalStore : IDisposable
                 PRIMARY KEY (session, message_id));
             CREATE TABLE IF NOT EXISTS session_bindings (session TEXT PRIMARY KEY, parent_pid INTEGER NOT NULL, seen_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS pushes (command_id TEXT PRIMARY KEY, pushed_at TEXT NOT NULL, confirmed_at TEXT);
+            CREATE TABLE IF NOT EXISTS session_inboxes (session TEXT PRIMARY KEY, endpoint TEXT NOT NULL, token TEXT, seen_at TEXT NOT NULL);
             """);
         AddColumnIfMissing("commands", "taken_at", "TEXT"); // a database made before the hook's hand-over time was kept
+        AddColumnIfMissing("commands", "push_tried", "INTEGER"); // a database made before a given-up push was remembered
         AddColumnIfMissing("permissions", "answers", "TEXT"); // a database made before the question answers existed
         CreateRemoteTables();
         CreateClaudeTables();

@@ -89,7 +89,14 @@ public static class UpdateCommand
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off]");
+        if (args.Length == 3 && args[1] == "push" && (args[2] == "off" || PushTransports.Enables(args[2])))
+        {
+            SavedSettings.SavePush(config, args[2] != "off", args[2] == "off" ? null : PushTransports.Normalize(args[2]));
+            await stdout.WriteLineAsync(args[2] == "off" ? "push: off (web messages arrive at the next prompt)" : $"push: on through the {PushTransports.Normalize(args[2])}");
+            return 0;
+        }
+
+        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]");
         return 2;
     }
 
