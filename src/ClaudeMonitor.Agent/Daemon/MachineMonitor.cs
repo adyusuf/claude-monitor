@@ -18,7 +18,7 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// know these calls (404) switches the reports off until the daemon restarts.
 /// </summary>
 public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, IMetricsSource source,
-    Func<ExecPolicy>? policySource = null)
+    Func<ExecPolicy>? policySource = null, Func<(ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)>? factsSource = null)
 {
     public const string ThresholdsKey = "settings.alert_thresholds";
     public const string RemoteRunsKey = "settings.remote_runs";
@@ -28,18 +28,52 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private readonly List<MetricSample> samples = [];
     private readonly List<AlertReport> alerts = [];
     private bool unsupported;
+    private string? lastSent;
+    private (ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)? facts;
+    private DateTimeOffset factsAt;
 
-    /// <summary>The exec level this agent allows now: the admin-owned file in service mode, agent.json otherwise.</summary>
-    public ExecPolicy Policy() => policySource?.Invoke() ?? ExecPolicyLoader.Load(config, Identity.Peek(config)?.ExecLevel);
+    /// <summary>The exec level this agent allows now: the admin-owned file in service mode, agent.json otherwise (with the role claim, ADR-0008).</summary>
+    public ExecPolicy Policy()
+    {
+        if (policySource is not null) return policySource();
+        var saved = Identity.Peek(config);
+        return ExecPolicyLoader.Load(config, saved?.ExecLevel, saved?.ClaimedEnvironment, saved?.ClaimedFunction);
+    }
 
+    /// <summary>
+    /// Sends the profile when it differs from the last one the API took (the facts change rarely, the session counts often): the
+    /// exec level, the role claim, Claude presence, the tool inventory and the capabilities (none yet; the field tells a new agent from
+    /// an old one). The inventory and the Claude version are probed again every <see cref="AgentConfig.PresenceProbeEvery"/>.
+    /// </summary>
     public async Task ProfileAsync(CancellationToken ct)
     {
         if (unsupported) return;
         var policy = Policy();
         var level = ExecPolicyLoader.RunningAsRoot() ? ExecLevels.Off
             : policy.Level == ExecLevels.Shell && policy.HasCeiling ? ExecLevels.Argv : policy.Level;
-        await Guard(() => api.ProfileAsync(new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription,
-            Environment.UserName, config.ExecMaxConcurrent), ct));
+        var (claude, tools) = Facts();
+        var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, []);
+        var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default } }, ApiClient.Json);
+        if (json == lastSent) return;
+        if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
+    }
+
+    private (ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools) Facts()
+    {
+        var now = clock.GetUtcNow();
+        if (facts is { } cached && now - factsAt < config.PresenceProbeEvery && now >= factsAt)
+        {
+            // the sessions change often and cost one folder read; the inventory and the version are kept for the probe interval
+            var (live, idle) = PresenceProbe.Sessions(config, store, now);
+            return (cached.Claude is { } c ? c with { SessionsLive = live, SessionsIdle = idle, SeenAt = now } : null, cached.Tools);
+        }
+
+        var fresh = factsSource?.Invoke() ?? (PresenceProbe.Probe(config, store, real => ToolInventory.FirstLine(new Update.SystemProcessRunner().Run(real, ["--version"], config.ToolVersionTimeout).Output), now),
+            ToolInventory.Live(config, AgentConfig.Os));
+        facts = fresh;
+        factsAt = now;
+        return fresh;
     }
 
     public async Task SampleAsync(CancellationToken ct)

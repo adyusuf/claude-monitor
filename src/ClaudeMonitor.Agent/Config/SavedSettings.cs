@@ -60,6 +60,18 @@ public static class SavedSettings
         return config with { PushEnabled = on, PushTransport = chosen };
     }
 
+    /// <summary>
+    /// Saves what this machine says about itself (ADR-0008 §3a, `cm-agent config role`): an environment and a function from the closed
+    /// sets, or null to say nothing. The claim only ever tightens the role an admin set; it never sets one.
+    /// </summary>
+    public static void SaveRole(AgentConfig config, string? environment, string? function)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (!MachineRoles.IsEnvironment(environment)) throw new ArgumentOutOfRangeException(nameof(environment));
+        if (!MachineRoles.IsFunction(function)) throw new ArgumentOutOfRangeException(nameof(function));
+        (Identity.Load(config) with { ClaimedEnvironment = environment, ClaimedFunction = function }).Save(config);
+    }
+
     /// <summary>Saves the stop wait (0 to <see cref="AgentConfig.WaitMaxSeconds"/>) and returns the configuration that uses it.</summary>
     public static AgentConfig SaveStopWait(AgentConfig config, int seconds)
     {

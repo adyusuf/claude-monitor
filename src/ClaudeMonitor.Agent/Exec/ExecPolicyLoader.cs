@@ -21,14 +21,15 @@ public static class ExecPolicyLoader
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    public static ExecPolicy Load(AgentConfig config, string? identityExecLevel)
+    public static ExecPolicy Load(AgentConfig config, string? identityExecLevel, string? claimedEnvironment = null, string? claimedFunction = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!config.ServiceMode)
         {
+            // An interactive agent's claim (ADR-0008 §3a, `cm-agent config role`) rides with its level; the claim only ever tightens.
             return identityExecLevel is not null && ExecLevels.All.Contains(identityExecLevel)
-                ? new ExecPolicy(identityExecLevel, [], [])
-                : ExecPolicy.Off;
+                ? new ExecPolicy(identityExecLevel, [], [], Claim(claimedEnvironment, MachineEnvironments.All), Claim(claimedFunction, MachineFunctions.All))
+                : ExecPolicy.Off with { ClaimedEnvironment = Claim(claimedEnvironment, MachineEnvironments.All), ClaimedFunction = Claim(claimedFunction, MachineFunctions.All) };
         }
 
         return ReadServiceFile(config.ExecConfigPath);
@@ -44,7 +45,12 @@ public static class ExecPolicyLoader
             if (file?.Level is not { } level || !ExecLevels.All.Contains(level)) return ExecPolicy.Off;
             var executables = file.AllowedExecutables ?? [];
             var roots = file.AllowedRoots ?? [];
-            return AllAbsolute(executables) && AllAbsolute(roots) ? new ExecPolicy(level, executables, roots) : ExecPolicy.Off;
+            // The claim in the same admin-owned file (ADR-0008 §3a): an unknown value is no claim.
+            var claimEnv = Claim(file.Environment, MachineEnvironments.All);
+            var claimFn = Claim(file.Function, MachineFunctions.All);
+            return AllAbsolute(executables) && AllAbsolute(roots)
+                ? new ExecPolicy(level, executables, roots, claimEnv, claimFn)
+                : ExecPolicy.Off with { ClaimedEnvironment = claimEnv, ClaimedFunction = claimFn };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -66,7 +72,10 @@ public static class ExecPolicyLoader
             if (file?.Level is not { } level || !ExecLevels.All.Contains(level)) return null;
             var executables = file.AllowedExecutables ?? [];
             var roots = file.AllowedRoots ?? [];
-            return AllAbsolute(executables) && AllAbsolute(roots) ? new ExecPolicy(level, executables, roots) : null;
+            // The claim rides with the ceiling (ADR-0008 §3a): a reinstall must not erase what an admin wrote.
+            return AllAbsolute(executables) && AllAbsolute(roots)
+                ? new ExecPolicy(level, executables, roots, Claim(file.Environment, MachineEnvironments.All), Claim(file.Function, MachineFunctions.All))
+                : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -92,7 +101,7 @@ public static class ExecPolicyLoader
         var moved = false;
         try
         {
-            var file = new ExecFile(policy.Level, [.. policy.AllowedExecutables], [.. policy.AllowedRoots]);
+            var file = new ExecFile(policy.Level, [.. policy.AllowedExecutables], [.. policy.AllowedRoots], policy.ClaimedEnvironment, policy.ClaimedFunction);
             File.WriteAllText(temp, JsonSerializer.Serialize(file, Json));
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, SavedFileMode);
             File.Move(temp, path, overwrite: true);
@@ -167,5 +176,10 @@ public static class ExecPolicyLoader
         }
     }
 
-    private sealed record ExecFile(string? Level, List<string>? AllowedExecutables, List<string>? AllowedRoots);
+    /// <summary>A value from the closed set, or null (no claim).</summary>
+    private static string? Claim(string? value, IReadOnlyList<string> set) => value is not null && set.Contains(value) ? value : null;
+
+    private sealed record ExecFile(string? Level, List<string>? AllowedExecutables, List<string>? AllowedRoots,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Environment = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Function = null);
 }

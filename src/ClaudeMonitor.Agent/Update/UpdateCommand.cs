@@ -96,7 +96,22 @@ public static class UpdateCommand
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]");
+        if (args.Length == 4 && args[1] == "role")
+        {
+            var environment = args[2] == "none" ? null : args[2];
+            var function = args[3] == "none" ? null : args[3];
+            if (!MachineRoles.IsEnvironment(environment) || !MachineRoles.IsFunction(function))
+            {
+                await stderr.WriteLineAsync($"role takes an environment ({string.Join('|', MachineEnvironments.All)}|none) and a function ({string.Join('|', MachineFunctions.All)}|none).");
+                return 2;
+            }
+
+            SavedSettings.SaveRole(config, environment, function);
+            await stdout.WriteLineAsync($"role claim: {MachineRoles.Code(environment, function)} (an admin sets the role on the web; a claim only makes it stricter)");
+            return 0;
+        }
+
+        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [role <environment|none> <function|none>]");
         return 2;
     }
 

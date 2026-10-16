@@ -11,6 +11,8 @@ public sealed partial record AgentConfig
         legacyHome ??= LegacyHome;
         static TimeSpan Seconds(string? value, TimeSpan fallback, int max) =>
             int.TryParse(value, out var s) && s >= 0 ? TimeSpan.FromSeconds(Math.Min(s, max)) : fallback;
+        static TimeSpan Between(string? value, TimeSpan fallback, int min, int max) =>
+            int.TryParse(value, out var s) ? TimeSpan.FromSeconds(Math.Clamp(s, min, max)) : fallback;
 
         var explicitHome = read("CM_AGENT_HOME") is { Length: > 0 };
         return new AgentConfig
@@ -40,6 +42,9 @@ public sealed partial record AgentConfig
             AutoUpdateFromEnvironment = read("CM_AUTO_UPDATE") is { Length: > 0 },
             PushScope = read("CM_PUSH_SCOPE") == PushScopes.Machine ? PushScopes.Machine : PushScopes.Session,
             ServiceMode = read("CM_SERVICE") == "1",
+            MachinesContextEnabled = read("CM_MACHINES_CONTEXT") != "off",
+            MachineCacheEvery = Between(read("CM_MACHINE_CACHE_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
+            PresenceProbeEvery = Between(read("CM_PRESENCE_PROBE_EVERY"), TimeSpan.FromHours(6), 60, 86_400),
         };
     }
 

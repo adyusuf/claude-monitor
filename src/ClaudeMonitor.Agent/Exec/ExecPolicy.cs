@@ -7,7 +7,8 @@ namespace ClaudeMonitor.Agent.Exec;
 /// ceiling. Empty ceiling lists mean "no extra limit"; the level alone still applies. Unknown or unreadable means
 /// <see cref="Off"/>.
 /// </summary>
-public sealed record ExecPolicy(string Level, IReadOnlyList<string> AllowedExecutables, IReadOnlyList<string> AllowedRoots)
+public sealed record ExecPolicy(string Level, IReadOnlyList<string> AllowedExecutables, IReadOnlyList<string> AllowedRoots,
+    string? ClaimedEnvironment = null, string? ClaimedFunction = null)
 {
     public static readonly ExecPolicy Off = new(ExecLevels.Off, [], []);
 
