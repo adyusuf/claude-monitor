@@ -53,6 +53,8 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var metricsStore = new LocalStore(config.DatabasePath);
         var remote = new RemoteRelay(config, remoteStore, api, clock);
         var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os));
+        using var machinesStore = new LocalStore(config.DatabasePath);
+        var machines = new MachineCache(config, machinesStore, api, clock);
         var executor = new RunExecutor(config, clock, log, run => ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
             ExecPolicyLoader.RunningAsRoot);
         using var runs = new RunRelay(config, execStore, api, clock, executor, log);
@@ -96,6 +98,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             Loop("remote", config.RemotePollEvery, remote.RunOnceAsync, api, revoked),
             Loop("runs", config.FlushEvery, runs.ReportAsync, api, revoked),
             Loop("metrics", config.MetricsEvery, monitor.SampleAsync, api, revoked),
+            Loop("machines", config.MachineCacheEvery, machines.RefreshAsync, api, revoked),
             StreamAsync(api, stream, revoked));
         if (api.Disconnected)
         {

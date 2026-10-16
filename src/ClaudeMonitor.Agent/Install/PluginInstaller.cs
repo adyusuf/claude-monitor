@@ -12,20 +12,24 @@ namespace ClaudeMonitor.Agent.Install;
 /// </summary>
 public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<string, string[], int>? run = null)
 {
-    /// <summary>The hooks: observational ones run asynchronously, the ones that can carry an answer synchronously.</summary>
-    public static readonly (string Event, bool Async, int Timeout)[] Hooks =
+    /// <summary>
+    /// The hooks: observational ones run asynchronously, the ones that can carry an answer synchronously. An event may have more than one
+    /// entry: SessionStart also runs the synchronous `--context` entry that hands the session the machines block (ADR-0008 §3b).
+    /// </summary>
+    public static readonly (string Event, bool Async, int Timeout, string? Args)[] Hooks =
     [
-        ("SessionStart", true, 10),
-        ("UserPromptSubmit", false, 10),
-        ("PreToolUse", false, 10),
-        ("PostToolUse", true, 10),
-        ("PostToolUseFailure", true, 10),
-        ("PermissionRequest", false, 0),
-        ("Notification", true, 10),
-        ("Stop", false, 0),
-        ("SubagentStart", true, 10),
-        ("SubagentStop", true, 10),
-        ("SessionEnd", false, 5),
+        ("SessionStart", true, 10, null),
+        ("SessionStart", false, 5, Capture.SessionContext.ContextOption),
+        ("UserPromptSubmit", false, 10, null),
+        ("PreToolUse", false, 10, null),
+        ("PostToolUse", true, 10, null),
+        ("PostToolUseFailure", true, 10, null),
+        ("PermissionRequest", false, 0, null),
+        ("Notification", true, 10, null),
+        ("Stop", false, 0, null),
+        ("SubagentStart", true, 10, null),
+        ("SubagentStop", true, 10, null),
+        ("SessionEnd", false, 5, null),
     ];
 
     public const string McpServerName = "claude-monitor";
@@ -105,19 +109,22 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         if (config.ChannelPushEnabled) manifest["channels"] = new JsonArray(new JsonObject { ["server"] = McpServerName, ["displayName"] = "Claude Monitor" });
         Write(Path.Combine(plugin, ".claude-plugin", "plugin.json"), manifest);
         var hooks = new JsonObject();
-        foreach (var (name, isAsync, timeout) in Hooks)
+        foreach (var (name, isAsync, timeout, extra) in Hooks)
         {
+            var args = new JsonArray("hook", name);
+            if (extra is not null) args.Add(extra);
             var handler = new JsonObject
             {
                 ["type"] = "command",
                 ["command"] = BinaryPath,
-                ["args"] = new JsonArray("hook", name),
+                ["args"] = args,
                 ["timeout"] = timeout > 0 ? timeout : name == "PermissionRequest"
                     ? (int)config.PermissionWait.TotalSeconds + 15
                     : (int)config.StopWait.TotalSeconds + 15,
             };
             if (isAsync) handler["async"] = true;
-            hooks[name] = new JsonArray(new JsonObject { ["hooks"] = new JsonArray(handler) });
+            if (hooks[name] is JsonArray existing) existing[0]!["hooks"]!.AsArray().Add(handler);
+            else hooks[name] = new JsonArray(new JsonObject { ["hooks"] = new JsonArray(handler) });
         }
 
         Write(Path.Combine(plugin, "hooks", "hooks.json"), new JsonObject { ["hooks"] = hooks });

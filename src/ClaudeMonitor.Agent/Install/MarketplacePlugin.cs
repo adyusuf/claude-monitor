@@ -97,12 +97,18 @@ public static class MarketplacePlugin
     private static JsonObject Hooks()
     {
         var hooks = new JsonObject();
-        foreach (var (name, isAsync, declared) in PluginInstaller.Hooks)
+        foreach (var (name, isAsync, declared, extra) in PluginInstaller.Hooks)
         {
-            var group = new JsonArray();
-            if (name == "SessionStart") group.Add(Handler($"sh \"{Bootstrap}\"", 10, isAsync: false)); // installs the binary on the first session
-            group.Add(Handler($"sh \"{Wrapper}\" hook {name}", Timeout(name, declared), isAsync));
-            hooks[name] = new JsonArray(new JsonObject { ["hooks"] = group });
+            if (hooks[name] is not JsonArray entries)
+            {
+                var group = new JsonArray();
+                if (name == "SessionStart") group.Add(Handler($"sh \"{Bootstrap}\"", 10, isAsync: false)); // installs the binary on the first session
+                entries = new JsonArray(new JsonObject { ["hooks"] = group });
+                hooks[name] = entries;
+            }
+
+            var command = $"sh \"{Wrapper}\" hook {name}" + (extra is null ? "" : " " + extra);
+            entries[0]!["hooks"]!.AsArray().Add(Handler(command, Timeout(name, declared), isAsync));
         }
 
         return hooks;

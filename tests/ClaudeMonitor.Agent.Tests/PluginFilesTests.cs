@@ -39,19 +39,21 @@ public sealed class PluginFilesTests : IDisposable
     public void Every_hook_the_local_install_registers_is_in_the_plugin_with_the_same_timing_and_goes_through_the_wrapper()
     {
         var hooks = JsonNode.Parse(MarketplacePlugin.Render("1.0.0")[$"{MarketplacePlugin.PluginFolder}/hooks/hooks.json"])!["hooks"]!.AsObject();
-        Assert.Equal(PluginInstaller.Hooks.Select(h => h.Event).Order(), hooks.Select(p => p.Key).Order());
-        foreach (var (name, isAsync, timeout) in PluginInstaller.Hooks)
+        Assert.Equal(PluginInstaller.Hooks.Select(h => h.Event).Distinct().Order(), hooks.Select(p => p.Key).Order());
+        foreach (var (name, isAsync, timeout, extra) in PluginInstaller.Hooks)
         {
             var handlers = hooks[name]![0]!["hooks"]!.AsArray();
-            var hook = handlers.Last()!;
-            Assert.Equal($"sh \"${{CLAUDE_PLUGIN_ROOT}}/scripts/run.sh\" hook {name}", hook["command"]!.GetValue<string>());
+            var command = $"sh \"${{CLAUDE_PLUGIN_ROOT}}/scripts/run.sh\" hook {name}" + (extra is null ? "" : " " + extra);
+            var hook = Assert.Single(handlers, h => h!["command"]!.GetValue<string>() == command)!;
             Assert.Equal(MarketplacePlugin.Timeout(name, timeout), hook["timeout"]!.GetValue<int>());
             Assert.Equal(isAsync, hook["async"]?.GetValue<bool>() ?? false);
         }
 
         var start = hooks["SessionStart"]![0]!["hooks"]!.AsArray();
-        Assert.Equal(2, start.Count);
+        Assert.Equal(3, start.Count); // the bootstrap, the recording hook, the machines block (ADR-0008)
         Assert.Contains("ensure.sh", start[0]!["command"]!.GetValue<string>(), StringComparison.Ordinal); // the bootstrap comes first
+        Assert.EndsWith("hook SessionStart --context", start[2]!["command"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Null(start[2]!["async"]); // synchronous: the block must be there before the first prompt
         Assert.Equal((135, 15), (MarketplacePlugin.Timeout("PermissionRequest", 0), MarketplacePlugin.Timeout("Stop", 0)));
     }
 

@@ -40,6 +40,9 @@ public static partial class Cli
         cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
                                         whether the agent looks for / installs agent updates by itself, and whether it may
                                         update Claude Code when every session is idle (both default off; the workspace must allow too)
+        cm-agent config role <environment|none> <function|none>
+                                        what this machine says it is (dev|test|stage|preprod|production|other; development|application|web|
+                                        database|ci|storage|other); an admin sets the role on the web, a claim only makes it stricter (ADR-0008)
         cm-agent claude-update cancel   stop a Claude Code update that is counting down
         cm-agent logout | uninstall | version
         (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
@@ -57,6 +60,8 @@ public static partial class Cli
         config = SavedSettings.Apply(config);
         switch (args.FirstOrDefault())
         {
+            case "hook" when args.Length > 2 && args[1] == SessionContext.HookEvent && args[2] == SessionContext.ContextOption:
+                return await SessionContext.RunAsync(config, stdout, stderr, clock); // the machines block, no network, exit 0 (ADR-0008)
             case "hook" when args.Length > 1:
                 return await HookAsync(args[1], config, stdin, stdout, stderr, clock, log);
             case "mcp":
