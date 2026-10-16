@@ -6,7 +6,7 @@ import { en } from "../i18n/en";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
-import { agent, count } from "./machinesFixture";
+import { agent, count, settle } from "./machinesFixture";
 
 beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
@@ -42,6 +42,7 @@ describe("the role editor on the machine page", () => {
     open();
     expect(await environment()).toHaveValue("test");
     expect(fn()).toHaveValue("web");
+    await settle(calls);
     const before = count(calls, "/workspaces/w1/machines");
     await userEvent.selectOptions(await environment(), "production");
     await userEvent.selectOptions(fn(), "database");
