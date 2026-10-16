@@ -14,7 +14,11 @@ public sealed record WebRunView(Guid Id, Guid TargetAgentId, string TargetHostna
     string RequesterHostname, string RequesterUser, Guid? RequesterSessionId, bool Visible, string Mode, IReadOnlyList<string>? Argv,
     string? ShellCommand, string? Cwd, int TimeoutSeconds, string? Reason, string Status, int? ExitCode, string? Error,
     long OutputBytes, bool OutputTruncated, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, DateTimeOffset? EndedAt,
-    Guid? GrantId, Guid? JobId, bool CanDecide, bool SelfApproval, string? Hash, bool Interpreter, bool RecentOutput);
+    Guid? GrantId, Guid? JobId, bool CanDecide, bool SelfApproval, string? Hash, bool Interpreter, bool RecentOutput,
+    string? ProjectKey = null, string? Kind = null, string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null,
+    string? InterpreterPath = null, string? TargetEnvironment = null, string? TargetFunction = null, bool Strict = false, bool NeedsCode = false,
+    long? OutputCap = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, long? OutputRefusedBytes = null, int? OutputMissingFromSeq = null,
+    int? OutputChunks = null, bool? OutputComplete = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null);
 
 public static class RunQueries
 {
@@ -36,7 +40,8 @@ public static class RunQueries
         ArgumentNullException.ThrowIfNull(r);
         return new RunView(r.Id, r.TargetAgentId, hostname, r.Mode, r.Argv, r.ShellCommand, r.Cwd, r.TimeoutSeconds, r.Status,
             r.ExitCode, r.Error, r.OutputBytes, r.OutputTruncated, r.CreatedAt, r.ExpiresAt, r.EndedAt, r.GrantId, r.JobId,
-            r.ProjectKey, r.Kind, r.TestsPassed, r.TestsFailed, r.TestsSkipped);
+            r.ProjectKey, r.Kind, r.TestsPassed, r.TestsFailed, r.TestsSkipped, r.ScriptInterpreter, r.ScriptBody, r.ScriptArgs, r.TargetEnvironment,
+            r.TargetFunction, r.OutputCap, r.OutputReadBytes, r.OutputDroppedBytes, r.OutputRefusedBytes, r.OutputMissingFromSeq, r.OutputChunks, r.OutputComplete);
     }
 
     public static async Task<RunOutputPage> OutputAsync(MonitorDb db, Guid runId, int after, int limit, bool done, CancellationToken ct)
@@ -47,6 +52,18 @@ public static class RunQueries
             .Select(o => new RunOutputChunk(o.Seq, o.Stream, o.Body, o.GapBefore)).ToListAsync(ct);
         return new RunOutputPage(chunks, chunks.Count > 0 ? chunks[^1].Seq : after, done && chunks.Count < limit);
     }
+
+    /// <summary>The home-relative path of the trusted tool that would run this script's interpreter, for the approval card.</summary>
+    private static string? ScriptPath(string? interpretersJson, string? interpreter)
+    {
+        var tools = ScriptInterpreters.Tools(interpreter);
+        return MachineFacts.Tools(interpretersJson, forView: false)?.FirstOrDefault(t => t.Trusted && tools.Contains(t.Name))?.Path;
+    }
+
+    /// <summary>True for a script whose target is strict now (production or database, set or claimed): it needs the approver's two-step code.</summary>
+    private static bool StrictNow(RemoteRun r, string? roleEnvironment, string? roleFunction, string? claimedEnvironment, string? claimedFunction) =>
+        r.Mode == RunModes.Script && MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(roleEnvironment, claimedEnvironment),
+            MachineRoles.EffectiveFunction(roleFunction, claimedFunction));
 
     /// <summary>Runs of a workspace for the web, newest first, key-paged; optionally one target agent's.</summary>
     public static async Task<List<WebRunView>> ForWebAsync(MonitorDb db, ApiConfig config, Guid workspaceId, Guid userId,
@@ -65,7 +82,7 @@ public static class RunQueries
                                 && (runId == null || r.Id == runId)
                                 && (before == null || r.CreatedAt < before)
                           orderby r.CreatedAt descending, r.Id descending
-                          select new { r, Target = tm.Hostname, TargetOs = tm.Os, TargetUser = tu.DisplayName, Requester = rm.Hostname, RequesterUser = ru.DisplayName })
+                          select new { r, Target = tm.Hostname, TargetOs = tm.Os, TargetUser = tu.DisplayName, Requester = rm.Hostname, RequesterUser = ru.DisplayName, ta.Interpreters, ta.RoleEnvironment, ta.RoleFunction, ta.ClaimedEnvironment, ta.ClaimedFunction })
             .Take(limit).ToListAsync(ct);
         var requesters = rows.Where(x => x.r.Status == RunStatuses.PendingApproval).Select(x => x.r.RequesterAgentId).Distinct().ToList();
         var since = now - RecentOutputWindow;
@@ -83,8 +100,17 @@ public static class RunQueries
                 r.OutputTruncated, r.CreatedAt, r.ExpiresAt, r.EndedAt, r.GrantId, r.JobId,
                 CanDecide: pending && r.TargetUserId == userId, SelfApproval: r.TargetUserId == r.RequesterUserId,
                 Hash: pending && r.TargetUserId == userId ? RunCreator.RunHash(r) : null,
-                Interpreter: r.Mode == RunModes.Shell || (r.Argv is { Count: > 0 } argv && GrantMatcher.IsInterpreter(argv[0], x.TargetOs)),
-                RecentOutput: pending && readRecently.Contains(r.RequesterAgentId));
+                Interpreter: r.Mode is RunModes.Shell or RunModes.Script || (r.Argv is { Count: > 0 } argv && GrantMatcher.IsInterpreter(argv[0], x.TargetOs)),
+                RecentOutput: pending && readRecently.Contains(r.RequesterAgentId),
+                ProjectKey: visible ? r.ProjectKey : null, Kind: r.Kind,
+                ScriptInterpreter: r.ScriptInterpreter, ScriptBody: visible ? r.ScriptBody : null, ScriptArgs: visible ? r.ScriptArgs : null,
+                InterpreterPath: r.Mode == RunModes.Script && visible ? ScriptPath(x.Interpreters, r.ScriptInterpreter) : null,
+                TargetEnvironment: r.TargetEnvironment, TargetFunction: r.TargetFunction,
+                Strict: StrictNow(r, x.RoleEnvironment, x.RoleFunction, x.ClaimedEnvironment, x.ClaimedFunction),
+                NeedsCode: pending && StrictNow(r, x.RoleEnvironment, x.RoleFunction, x.ClaimedEnvironment, x.ClaimedFunction),
+                OutputCap: r.OutputCap, OutputReadBytes: r.OutputReadBytes, OutputDroppedBytes: r.OutputDroppedBytes, OutputRefusedBytes: r.OutputRefusedBytes,
+                OutputMissingFromSeq: r.OutputMissingFromSeq, OutputChunks: r.OutputChunks, OutputComplete: r.OutputComplete,
+                TestsPassed: r.TestsPassed, TestsFailed: r.TestsFailed, TestsSkipped: r.TestsSkipped);
         }).ToList();
     }
 }

@@ -54,6 +54,7 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
                     Audit.Add(db, http, clock, AuditActions.RunFinished, run.WorkspaceId, agentId: agentId, targetType: "run",
                         targetId: id, detail: new { status = req.Status, exitCode = req.ExitCode });
                     await db.SaveChangesAsync(ct);
+                    if (run.Mode == RunModes.Script) await StoreOutputAccountAsync(id, req, ct);
                     if (run.Kind == RunKinds.Test) await StoreTestCountsAsync(id, ct);
                 }
 
@@ -65,6 +66,25 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
         RunNotices.Changed(broker, run);
         return Results.NoContent();
     }
+
+    /// <summary>
+    /// What the target says it read, dropped and sent (ADR-0008 §3d), and the verdict: complete only when nothing was dropped on the target,
+    /// nothing was refused here and the target did not stop reading at its limit.
+    /// </summary>
+    private async Task StoreOutputAccountAsync(Guid id, RunStatusUpdate req, CancellationToken ct)
+    {
+        var dropped = req.OutputDroppedBytes ?? 0;
+        var truncated = req.OutputTruncated;
+        await db.RemoteRuns.Where(r => r.Id == id).ExecuteUpdateAsync(s => s.SetProperty(r => r.OutputReadBytes, req.OutputReadBytes)
+            .SetProperty(r => r.OutputDroppedBytes, req.OutputDroppedBytes).SetProperty(r => r.OutputChunks, req.OutputChunks)
+            .SetProperty(r => r.OutputComplete, r => (r.OutputRefusedBytes ?? 0) == 0 && dropped == 0 && !truncated), ct);
+    }
+
+    /// <summary>A script run refuses every chunk after the first one over its cap, so what is missing is one range from <paramref name="seq"/> on.</summary>
+    private async Task RefuseAsync(Guid id, int seq, int bytes, CancellationToken ct) =>
+        await db.RemoteRuns.Where(r => r.Id == id).ExecuteUpdateAsync(s => s.SetProperty(r => r.OutputTruncated, true)
+            .SetProperty(r => r.OutputMissingFromSeq, r => r.OutputMissingFromSeq == null || r.OutputMissingFromSeq > seq ? seq : r.OutputMissingFromSeq)
+            .SetProperty(r => r.OutputRefusedBytes, r => (r.OutputRefusedBytes ?? 0) + bytes), ct);
 
     /// <summary>The counts of a finished <c>test</c> run, read from the tail of its output; left empty when the tool is not recognised.</summary>
     private async Task StoreTestCountsAsync(Guid id, CancellationToken ct)
@@ -95,9 +115,18 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
         var run = await db.RemoteRuns.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id && r.TargetAgentId == agentId, ct);
         if (run is null) return Http.NotFound();
         var now = clock.GetUtcNow();
+        var script = run.Mode == RunModes.Script;
+        var limit = script ? run.OutputCap ?? config.RunOutputMax : config.RunOutputMax;
+        var refusing = script && run.OutputMissingFromSeq is not null;
         foreach (var c in chunks)
         {
             var bytes = System.Text.Encoding.UTF8.GetByteCount(c.Body);
+            if (refusing)
+            {
+                await RefuseAsync(id, c.Seq, bytes, ct);
+                continue;
+            }
+
             await using var tx = await db.Database.BeginTransactionAsync(ct);
             var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
@@ -112,7 +141,7 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
             }
 
             var counted = await db.RemoteRuns
-                .Where(r => r.Id == id && Live.Contains(r.Status) && r.OutputBytes + bytes <= config.RunOutputMax)
+                .Where(r => r.Id == id && Live.Contains(r.Status) && r.OutputBytes + bytes <= limit)
                 .ExecuteUpdateAsync(s => s.SetProperty(r => r.OutputBytes, r => r.OutputBytes + bytes), ct);
             if (counted == 1)
             {
@@ -121,6 +150,13 @@ public sealed class RunReports(MonitorDb db, ApiConfig config, TimeProvider cloc
             }
 
             await tx.RollbackAsync(ct);
+            if (script)
+            {
+                refusing = true;
+                await RefuseAsync(id, c.Seq, bytes, ct);
+                continue;
+            }
+
             await db.RemoteRuns.Where(r => r.Id == id).ExecuteUpdateAsync(s => s.SetProperty(r => r.OutputTruncated, true), ct);
         }
 

@@ -6,10 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Endpoints;
 
-public sealed record RemoteSettings(bool RemoteRunsEnabled, int AlertCpuPct, int AlertMemoryPct, int AlertDiskPct, int AlertSustainSeconds);
+public sealed record RemoteSettings(bool RemoteRunsEnabled, int AlertCpuPct, int AlertMemoryPct, int AlertDiskPct, int AlertSustainSeconds,
+    long ScriptOutputMaxBytes = 8 * 1024 * 1024);
 
 public sealed record RemoteSettingsRequest(bool? RemoteRunsEnabled, int? AlertCpuPct, int? AlertMemoryPct, int? AlertDiskPct,
-    int? AlertSustainSeconds);
+    int? AlertSustainSeconds, long? ScriptOutputMaxBytes = null);
 
 /// <summary>
 /// The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; an admin changes. Turning the
@@ -35,7 +36,7 @@ public static class RemoteSettingsEndpoints
     }
 
     private static async Task<IResult> Put(Guid id, RemoteSettingsRequest req, HttpContext http, MonitorDb db, TimeProvider clock,
-        Broker broker)
+        Broker broker, Config.ApiConfig config)
     {
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
@@ -45,6 +46,7 @@ public static class RemoteSettingsEndpoints
         }
 
         if (req.AlertSustainSeconds is < SustainMin or > SustainMax) return Http.Invalid("alertSustainSeconds", "out_of_range");
+        if (req.ScriptOutputMaxBytes is { } cap && (cap < config.ScriptOutputFloor || cap > config.ScriptOutputCeiling)) return Http.Invalid("scriptOutputMaxBytes", "out_of_range");
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
         var before = View(s);
         var turnedOff = s.RemoteRunsEnabled && req.RemoteRunsEnabled == false;
@@ -53,6 +55,7 @@ public static class RemoteSettingsEndpoints
         s.AlertMemoryPct = req.AlertMemoryPct ?? s.AlertMemoryPct;
         s.AlertDiskPct = req.AlertDiskPct ?? s.AlertDiskPct;
         s.AlertSustainSeconds = req.AlertSustainSeconds ?? s.AlertSustainSeconds;
+        s.ScriptOutputMaxBytes = req.ScriptOutputMaxBytes ?? s.ScriptOutputMaxBytes;
         s.UpdatedAt = clock.GetUtcNow();
         s.UpdatedBy = userId;
         Audit.Add(db, http, clock, AuditActions.RemoteSettingsChanged, id, userId, detail: new { before, after = View(s) });
@@ -62,5 +65,5 @@ public static class RemoteSettingsEndpoints
     }
 
     private static RemoteSettings View(WorkspaceSettings s) =>
-        new(s.RemoteRunsEnabled, s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds);
+        new(s.RemoteRunsEnabled, s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds, s.ScriptOutputMaxBytes);
 }

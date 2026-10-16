@@ -18,6 +18,8 @@ public static class RunRules
     public const string BadReason = "invalid_reason";
     public const string BadProject = "invalid_project";
     public const string BadKind = "invalid_kind";
+    public const string InvalidScript = RemoteErrors.InvalidScript;
+    public const string InvalidInterpreter = RemoteErrors.InvalidInterpreter;
     public const int ClientKeyMax = 100;
     public const int CwdMax = 1024;
 
@@ -26,6 +28,8 @@ public static class RunRules
         ArgumentNullException.ThrowIfNull(req);
         ArgumentNullException.ThrowIfNull(config);
         if (req.ClientKey is not { Length: >= 1 and <= ClientKeyMax } || HasControl(req.ClientKey)) return BadClientKey;
+        if (req.Mode == RunModes.Script) return CheckScript(req, config);
+        if (req.ScriptBody is not null || req.ScriptInterpreter is not null || req.ScriptArgs is not null) return BadCommand;
         var command = req.Mode switch
         {
             RunModes.Argv => req.ShellCommand is null && req.Argv is { Count: > 0 } argv && argv.Count <= config.RunArgvMax
@@ -46,6 +50,25 @@ public static class RunRules
         return null;
     }
 
+    /// <summary>
+    /// A script run (ADR-0008 §3c): a known interpreter, a body of 1 to <see cref="ApiConfig.RunScriptMax"/> characters without NUL, at most
+    /// <see cref="ScriptInterpreters.ArgsMax"/> arguments, no argv, no shell text and no working directory (the agent starts it in its scratch
+    /// folder). The usual timeout, reason, project and kind rules apply.
+    /// </summary>
+    private static string? CheckScript(RunCreate req, ApiConfig config)
+    {
+        if (!ScriptInterpreters.All.Contains(req.ScriptInterpreter ?? "")) return InvalidInterpreter;
+        var max = Math.Min(config.RunScriptMax, ScriptInterpreters.BodyCeiling);
+        if (req.ScriptBody is not { Length: >= 1 } body || body.Length > max || body.Contains('\0') || string.IsNullOrWhiteSpace(body)) return InvalidScript;
+        if (req.ScriptArgs is { } args && (args.Count > ScriptInterpreters.ArgsMax || args.Any(a => a is null || a.Length > ScriptInterpreters.ArgChars || a.Contains('\0')))) return InvalidScript;
+        if (req.Argv is not null || req.ShellCommand is not null) return BadCommand;
+        if (req.Cwd is not null) return BadCwd;
+        if (req.TimeoutSeconds is < 1 or > 3600) return BadTimeout;
+        if (req.Reason is { } reason && (reason.Length > config.RunReasonMax || reason.Contains('\0'))) return BadReason;
+        if (req.ProjectKey is { } project && (project.Length is < 1 or > RunKinds.ProjectKeyMax || HasControl(project))) return BadProject;
+        return req.Kind is { } kind && !RunKinds.All.Contains(kind) ? BadKind : null;
+    }
+
     /// <summary>An absolute path for the target's OS: "/..." on Unix, "C:\..." on Windows (no UNC, no device path).</summary>
     public static bool Absolute(string path, string os) => os switch
     {
@@ -61,7 +84,9 @@ public static class RunRules
         ArgumentNullException.ThrowIfNull(run);
         return req.TargetAgentId == run.TargetAgentId && req.Mode == run.Mode && req.ShellCommand == run.ShellCommand
                && req.Cwd == run.Cwd && req.TimeoutSeconds == run.TimeoutSeconds
-               && (req.Argv ?? []).SequenceEqual(run.Argv ?? []);
+               && (req.Argv ?? []).SequenceEqual(run.Argv ?? [])
+               && req.ScriptInterpreter == run.ScriptInterpreter && req.ScriptBody == run.ScriptBody
+               && (req.ScriptArgs ?? []).SequenceEqual(run.ScriptArgs ?? []);
     }
 
     private static bool HasControl(string value) => value.Any(char.IsControl);

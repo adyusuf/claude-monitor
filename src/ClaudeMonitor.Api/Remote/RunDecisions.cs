@@ -41,12 +41,29 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
         }
 
         var now = clock.GetUtcNow();
-        if (run.Mode == RunModes.Shell)
+        var withTotp = false;
+        if (run.Mode is RunModes.Shell or RunModes.Script)
         {
-            var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
-            if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, config, user, req.Code, now, ct))
+            // A script is approved against the role the card showed (ADR-0008 §3c): a role changed since then asks the owner to look again.
+            var strict = false;
+            if (run.Mode == RunModes.Script)
             {
-                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.MfaRequired);
+                var env = MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment);
+                var fn = MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction);
+                if (env != run.TargetEnvironment || fn != run.TargetFunction) return Conflict(RemoteErrors.RoleChanged);
+                strict = MachineRoles.IsStrict(env, fn);
+            }
+
+            var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
+            if (strict && user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
+            if (user.TotpEnabledAt is not null)
+            {
+                if (!await MfaEndpoints.CheckAsync(db, config, user, req.Code, now, ct))
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.MfaRequired);
+                }
+
+                withTotp = true;
             }
         }
 
@@ -54,14 +71,16 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
         var changed = await db.RemoteRuns
             .Where(r => r.Id == id && r.Status == RunStatuses.PendingApproval && r.ExpiresAt > now && r.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Approved).SetProperty(r => r.DecidedAt, now)
-                .SetProperty(r => r.DecidedBy, userId).SetProperty(r => r.ExpiresAt, startBy), ct);
+                .SetProperty(r => r.DecidedBy, userId).SetProperty(r => r.ExpiresAt, startBy)
+                .SetProperty(r => r.ApprovedWithTotp, withTotp), ct);
         if (changed != 1) return Conflict(RemoteErrors.NotPending);
         Audit.Add(db, http, clock, AuditActions.RunApproved, run.WorkspaceId, userId, targetType: "run", targetId: id,
-            detail: new { hash = req.Hash, mode = run.Mode });
+            detail: new { hash = req.Hash, mode = run.Mode, totp = withTotp });
         await db.SaveChangesAsync(ct);
         run.Status = RunStatuses.Approved;
         run.DecidedAt = now;
         run.ExpiresAt = startBy;
+        run.ApprovedWithTotp = withTotp;
         RunNotices.Changed(broker, run);
         await RunNotices.DeliverAsync(broker, db, run, ct);
         return Results.NoContent();

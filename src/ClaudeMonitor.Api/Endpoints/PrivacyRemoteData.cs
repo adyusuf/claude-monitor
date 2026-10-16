@@ -32,6 +32,9 @@ public static class PrivacyRemoteData
             w.WriteString("mode", r.Mode);
             PrivacyEndpoints.Write(w, "argv", r.Argv);
             w.WriteString("shellCommand", r.ShellCommand);
+            w.WriteString("scriptInterpreter", r.ScriptInterpreter);
+            w.WriteString("scriptBody", r.ScriptBody);
+            PrivacyEndpoints.Write(w, "scriptArgs", r.ScriptArgs);
             w.WriteString("cwd", r.Cwd);
             w.WriteString("status", r.Status);
             w.WriteString("projectKey", r.ProjectKey);
@@ -175,7 +178,8 @@ public static class PrivacyRemoteData
         await db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Argv, (List<string>?)null).SetProperty(r => r.ShellCommand, (string?)null)
                 .SetProperty(r => r.Cwd, (string?)null).SetProperty(r => r.Reason, (string?)null)
-                .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null).SetProperty(r => r.ProjectKey, (string?)null), ct);
+                .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null).SetProperty(r => r.ProjectKey, (string?)null).SetProperty(r => r.ScriptBody, (string?)null)
+                .SetProperty(r => r.ScriptArgs, (List<string>?)null), ct);
         // ADR-0008 §3a′: the user's machines' project rows and listening services are captured facts, and the project key of an emptied run goes too.
         await db.MachineProjects.Where(p => agentIds.Contains(p.AgentId)).ExecuteDeleteAsync(ct);
         await db.Agents.Where(a => agentIds.Contains(a.Id)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Services, (string?)null)

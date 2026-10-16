@@ -111,7 +111,7 @@ public static class AgentEndpoints
                              select new AgentCommandMessage(c.Id, c.SessionId, s.ExternalId, c.Kind, c.Body, c.ExpiresAt))
             .ToListAsync(http.RequestAborted);
         // "ready" first: the response headers go out with the first message, and an idle stream would otherwise look unconnected for 20 s.
-        var runs = await RunNotices.WaitingForAsync(db, agentId, now, http.RequestAborted);
+        var runs = await RunNotices.WaitingForAsync(db, agentId, now, http.RequestAborted, broker);
         var first = new[] { new StreamMessage(AgentStreamEvents.Ready, new { }) }
             .Concat(waiting.Select(c => new StreamMessage(AgentStreamEvents.Command, c)))
             .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)));
