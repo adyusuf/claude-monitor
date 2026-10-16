@@ -82,13 +82,15 @@ public sealed class AskWiringTests : IDisposable
         Assert.True(store.AskDeliveredTo(Id(1), "s-1", Start));
         var transcript = Path.Combine(home.Dir, "t.jsonl");
         Directory.CreateDirectory(home.Dir);
-        File.WriteAllText(transcript, JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = $"see {Id(1)} somewhere" } }) + "\n");
+        // Claude Code writes the wrapper's angle brackets as they are; the default encoder would write them as \u003C and hide the marker.
+        var raw = new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        File.WriteAllText(transcript, JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = $"see {Id(1)} somewhere" } }, raw) + "\n");
         store.TrackTranscript(new TranscriptCursor("s-1", HarnessKinds.ClaudeCode, transcript, 0, null, null, null), Start);
         var tailer = new TranscriptTailer(home.Config, store, clock);
         tailer.RunOnce();
         Assert.Equal(LocalStore.AskDelivered, store.AskIn(Id(1))!.State); // the bare id is not the wrapper
 
-        File.AppendAllText(transcript, JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = $"<<<claude-monitor-message id={Id(1)} origin=\"machine\" from=\"box\"\nq\nclaude-monitor-message>>>" } }) + "\n");
+        File.AppendAllText(transcript, JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = $"<<<claude-monitor-message id={Id(1)} origin=\"machine\" from=\"box\"\nq\nclaude-monitor-message>>>" } }, raw) + "\n");
         tailer.RunOnce();
         Assert.Equal(LocalStore.AskConfirmed, store.AskIn(Id(1))!.State);
     }

@@ -157,7 +157,13 @@ public sealed class AskRulesTests(ApiFactory api)
 
         for (var i = 0; i < 20; i++) Assert.Equal(HttpStatusCode.OK, (await AskKit.PostAsync(team.Asker, AskKit.Ask(team.TargetId, question: $"more {i}"))).StatusCode);
         await AssertRefusedAsync(await AskKit.PostAsync(team.Asker, AskKit.Ask(team.TargetId, question: "one too many")), (HttpStatusCode)429, AskErrors.Rate);
-        api.Clock.Advance(TimeSpan.FromHours(1) + TimeSpan.FromMinutes(1));
+        // The window slides: asks older than an hour no longer count (made old in the database; advancing the clock would also expire the agent's token).
+        await using (var db = api.Db())
+        {
+            var old = api.Clock.GetUtcNow().AddHours(-2);
+            await db.MachineAsks.Where(a => a.RequesterAgentId == team.AskerId).ExecuteUpdateAsync(s => s.SetProperty(a => a.CreatedAt, old));
+        }
+
         Assert.Equal(HttpStatusCode.OK, (await AskKit.PostAsync(team.Asker, AskKit.Ask(team.TargetId, question: "after the hour"))).StatusCode);
     }
 
@@ -202,7 +208,7 @@ public sealed class AskRulesTests(ApiFactory api)
         var open = await AskKit.CreateAsync(team.Asker, AskKit.Ask(team.TargetId));
         var other = await team.User.PostAsync("/api/workspaces", new { name = "Second" });
         var second = (await other.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("id").GetGuid();
-        Assert.Equal(HttpStatusCode.OK, (await team.User.SendAsync(HttpMethod.Patch, $"/api/agents/{team.TargetId}", new { workspaceId = second })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await team.User.SendAsync(HttpMethod.Patch, $"/api/agents/{team.TargetId}", new { workspaceId = second })).StatusCode);
 
         await using var db = api.Db();
         Assert.Equal(AskStatuses.Cancelled, (await db.MachineAsks.AsNoTracking().SingleAsync(a => a.Id == open.Id)).Status);

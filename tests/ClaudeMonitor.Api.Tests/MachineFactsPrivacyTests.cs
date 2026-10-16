@@ -20,10 +20,14 @@ public sealed class MachineFactsPrivacyTests(ApiFactory api)
     public async Task A_project_not_seen_for_the_retention_period_is_forgotten_and_a_recent_one_stays()
     {
         var team = await RemoteKit.TeamAsync(api);
-        await SendProfileAsync(team, Fact("old-project"));
-        api.Clock.Advance(TimeSpan.FromDays(60));
-        await SendProfileAsync(team, Fact("recent-project"));
-        api.Clock.Advance(TimeSpan.FromDays(40)); // old-project is 100 days old, recent-project 40; retention is 90
+        await SendProfileAsync(team, Fact("old-project"), Fact("recent-project"));
+        // Seen 100 and 40 days ago; retention is 90 (set in the database: advancing the clock would also expire the agent's token).
+        await using (var set = api.Db())
+        {
+            var now = api.Clock.GetUtcNow();
+            await set.MachineProjects.Where(p => p.ProjectKey == "old-project").ExecuteUpdateAsync(s => s.SetProperty(p => p.LastSeenAt, now.AddDays(-100)));
+            await set.MachineProjects.Where(p => p.ProjectKey == "recent-project").ExecuteUpdateAsync(s => s.SetProperty(p => p.LastSeenAt, now.AddDays(-40)));
+        }
 
         await RemoteKit.HousekeepAsync(api);
 

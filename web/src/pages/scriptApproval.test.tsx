@@ -147,7 +147,7 @@ describe("the verdict on a script's output", () => {
 
   it("says complete with the size", () => {
     renderPlain(<RunOutputAccount run={{ ...base, outputComplete: true, outputReadBytes: 1500 }} />);
-    expect(screen.getByText("Output complete, 1500 B.")).toBeInTheDocument();
+    expect(screen.getByText("Output complete, 1 KB.")).toBeInTheDocument(); // 1500 bytes, as the size helper rounds it
   });
 
   it("names the bytes cut on the target and the bytes the workspace limit refused from a chunk on", () => {

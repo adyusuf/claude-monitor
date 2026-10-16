@@ -1,11 +1,11 @@
 # ADR-0008: Machine roles and facts, script runs with a complete result, Claude presence, help across machines, a standalone agent
 
-**Status:** Implemented on 16/10/2026 in phases 0 to 4 (branches `feature/machine-awareness-splits`, `feature/machine-facts`), **not yet
-verified**: the tests of phases 1b to 4 are written and have not been run, no gate has run on them, and nothing here was measured on a host
-(§11 lists exactly what is unverified). Planned in mode C (product-manager, analyst, architect, qa; the qa pass sent it back once, its findings
-are folded in). The maintainer answered the planning questions on 16/10/2026 (§9); the mobile app (§9.18) and the TOTP rule for shell and argv
-runs (§9.13) are deferred by the maintainer. The facts about today's code were checked on `origin/dev` at `4702c16`, which already contains
-[ADR-0007](adr-0007-plugin-distribution-and-inbox-push.md).
+**Status:** Implemented on 16/10/2026 in phases 0 to 4 (branches `feature/machine-awareness-splits`, `feature/machine-facts`). The suites were run on
+16/10/2026 on macOS and are green (agent 1658, API 968 on PostgreSQL in Testcontainers, web 366 with 97 % lines, plugin scripts 106); **the merge gate has
+not run and nothing is promoted**, and nothing was measured on another host (§11 lists what is still unverified). Planned in mode C (product-manager, analyst,
+architect, qa; the qa pass sent it back once, its findings are folded in). The maintainer answered the planning questions on 16/10/2026 (§9); the mobile app
+(§9.18) and the TOTP rule for shell and argv runs (§9.13) are deferred by the maintainer. The facts about today's code were checked on `origin/dev` at `4702c16`,
+which already contains [ADR-0007](adr-0007-plugin-distribution-and-inbox-push.md).
 **Extends:** [ADR-0005](adr-0005-remote-work.md) (remote runs, grants, jobs, the four fail-closed keys, the executor),
 ADR-0007 (the plugin, the inbox push into a session). Data model: [`data-model.md`](data-model.md) §3 and §3b grow as in §4.
 **Asked for (16/10/2026):** (1) every Claude Code session with the plugin knows the workspace's machines and which one is a
@@ -489,8 +489,9 @@ the waiting standalone daemon, the CLI verbs). Phase 6 (the mobile ADR) is defer
   `CmWindowless=true` build exists as the alternative. The macOS autostart runs the executable inside an application bundle.
 - The agent's `--exec` for a standalone agent is the existing interactive one.
 
-**Unverified (to do before anything is promoted).** Every test written for phases 1b to 4 (agent, API, web) has not been run, and the gate has not run on this
-branch; the migrations `MachineFacts`, `ScriptRuns` and `MachineAsks` were generated and their new CHECK expressions checked only for the tag count on a throwaway
-PostgreSQL; the phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
-gate, interpreter paths and `-File` under a policy); on Linux the `/proc` service names and `systemd --user`; the macOS launchd bootstrap of the LaunchAgent and the
-application bundle; and a real Claude Code session receiving an ask end to end.
+**Unverified (to do before anything is promoted).** The merge gate (coverage per codebase, SAST, secret and dependency scans, backward-compatibility scan) has not run on
+this branch; the phase 1 "done when" check with a connected agent; on Windows everything (the PE patch, the logon task, named-pipe delivery of asks, the `permission_mode`
+gate, interpreter paths and `-File` under a policy, `schtasks`); on Linux the `/proc` service names and `systemd --user` (the tests run on macOS); the macOS launchd
+bootstrap of the LaunchAgent and the application bundle (the installer's tool calls are tested with a fake, not run); and a real Claude Code session receiving an ask
+end to end. Measured on macOS by the tests: the migrations apply and their CHECKs hold on PostgreSQL 18, real processes run a script from its scratch file with the fixed
+environment, a hostile repository configuration starts nothing, the output cap drops and reports bytes.

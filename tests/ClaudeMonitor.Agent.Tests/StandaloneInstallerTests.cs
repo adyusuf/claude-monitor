@@ -235,10 +235,11 @@ public sealed class StandaloneInstallerTests : IDisposable
     public async Task A_reinstall_replaces_the_files_and_the_loaded_launch_agent()
     {
         await Installer(OsKinds.MacOs).InstallAsync(Current, null);
+        var again = Installer(OsKinds.MacOs); // writes the downloaded binary; the newer one is written after it
         File.WriteAllText(Current, "newer binary");
         calls.Clear();
 
-        Assert.Equal(0, await Installer(OsKinds.MacOs).InstallAsync(Current, null));
+        Assert.Equal(0, await again.InstallAsync(Current, null));
 
         Assert.Equal("newer binary", File.ReadAllText(Layout(OsKinds.MacOs).AutostartBinary));
         Assert.True(Called("launchctl", "bootout", "gui/501/com.claudemonitor.agent.user")); // what was loaded is replaced

@@ -41,7 +41,7 @@ describe("the asks card on the machine page", () => {
     const calls = api({ "PUT /agents/a1/asks": { body: {} } });
     open();
     expect(await screen.findByText(en.machines.asks.off)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: en.machines.asks.turnOn }));
+    await userEvent.click(await screen.findByRole("button", { name: en.machines.asks.turnOn })); // the owner is known once the signed-in user has loaded
     expect(await screen.findByText(en.machines.asks.saved)).toBeInTheDocument();
     expect(puts(calls)[0]!.body).toEqual({ accept: true });
   });
@@ -61,7 +61,7 @@ describe("the asks card on the machine page", () => {
     const calls = api({ "PUT /agents/a1/asks": { body: {} } }, { acceptsAsks: true });
     open();
     expect(await screen.findByText(en.machines.asks.on)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: en.machines.asks.turnOff }));
+    await userEvent.click(await screen.findByRole("button", { name: en.machines.asks.turnOff }));
     await screen.findByText(en.machines.asks.saved);
     expect(puts(calls)[0]!.body).toEqual({ accept: false });
   });
@@ -85,7 +85,7 @@ describe("the asks card on the machine page", () => {
   it("shows someone who does not own the machine the state and no switch and no list", async () => {
     const calls = api({}, { acceptsAsks: true }, "u2");
     open();
-    expect(await screen.findByText(en.machines.asks.ownerOnly)).toBeInTheDocument();
+    expect((await screen.findAllByText(en.machines.asks.ownerOnly)).length).toBeGreaterThan(0); // the services card says the same sentence
     expect(screen.queryByRole("button", { name: en.machines.asks.turnOff })).toBeNull();
     expect(calls.filter((c) => c.path === "/agents/a1/asks")).toHaveLength(0);
   });

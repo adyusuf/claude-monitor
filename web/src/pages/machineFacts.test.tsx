@@ -143,7 +143,7 @@ describe("the listening services card", () => {
     const calls = api({ "PUT /agents/a1/services": { body: {} } });
     open();
     expect(await screen.findByText(en.machines.services.off)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: en.machines.services.turnOn }));
+    await userEvent.click(await screen.findByRole("button", { name: en.machines.services.turnOn })); // the owner is known once the signed-in user has loaded
     expect(await screen.findByText(en.machines.services.saved)).toBeInTheDocument();
     expect(puts(calls, "services")[0]!.body).toEqual({ share: true });
   });
@@ -164,14 +164,14 @@ describe("the listening services card", () => {
     open();
     expect(await screen.findByText("5432 postgres")).toBeInTheDocument();
     expect(screen.getByText("22")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: en.machines.services.turnOff })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: en.machines.services.turnOff })).toBeInTheDocument();
   });
 
   it("says the list exists but is hidden from someone who is neither owner nor admin", async () => {
     api({}, {}, asRole("viewer"), detail({ servicesShared: true, services: null }), "u2");
     open();
     expect(await screen.findByText(en.machines.services.hidden)).toBeInTheDocument();
-    expect(screen.getByText(en.machines.services.ownerOnly)).toBeInTheDocument();
+    expect(screen.getAllByText(en.machines.services.ownerOnly)).toHaveLength(2); // the services card and the asks card say the same sentence
     expect(screen.queryByRole("button", { name: en.machines.services.turnOff })).toBeNull();
   });
 
