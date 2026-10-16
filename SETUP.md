@@ -250,6 +250,18 @@ held to it). An empty or missing list adds no restriction of its own; the
 web grants and the agent's own checks (never a shell or interpreter in a grant, no `/etc`, `/home`, the agent's home)
 apply either way. A relative path makes the whole file invalid, hence `off`. The API can never raise this level.
 
+### Job schedules, signed approvals and a separate run account (ADR-0010)
+
+- **Schedules.** An admin turns on "Allow schedules" in the workspace's remote work settings (off by default). The owner of a machine then starts a schedule for an approved job without a placeholder in its command, on a machine that is not production or a
+  database: every 15 minutes to 7 days, or once a day at a UTC time. At most 5 per machine, never overlapping its own last run, no catch-up after downtime, paused after three failed runs in a row, stoppable on the machine's page at any time.
+- **Signed approvals.** Each owner makes a key on their account page (the browser makes it; its private half never leaves the browser) and registers it. On a machine that should trust it, the admin runs `cm-agent approvers add <public key> --name <name>`
+  (copy the key from the account page and compare the fingerprint it prints), then `cm-agent config approvals required`. From then on the machine runs only what a pinned key signed; it takes no job, grant or schedule (each run needs its own signature),
+  and it refuses everything until a key is pinned. `cm-agent approvers list|remove <fingerprint>` and `cm-agent status` show what is pinned. The file is `approvers.json` beside `exec.json` on a service (root-owned: the agent distrusts it otherwise) and in the
+  agent's home for an interactive one. Off by default; nothing changes for a machine that does not turn it on.
+- **A separate run account (Linux and macOS service agents).** `sudo cm-agent install --service --server <url> --exec argv --run-account [<name>]` (default `cm-run` on Linux, `_cmrun` on macOS) creates a non-login account, adds the service account to its
+  group, makes `<home>/run-work` (setgid, shared by the two accounts) and writes `/etc/sudoers.d/cm-agent-run` (checked with `visudo -cf` first) so that only the service account may start commands, and only as the run account. Remote runs then start as that account, with
+  `run-work` as their home and working directory. `uninstall --service` removes the sudoers file and keeps the accounts. Windows is refused. Not verified on a real host (ADR-0010 §5).
+
 ## Updating the agent
 
 Design, trust model and limits: [ADR-0004](docs/adr-0004-agent-self-update.md). **Off by default**: an agent never asks the server for an update

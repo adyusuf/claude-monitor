@@ -202,3 +202,9 @@ agents 1-n remote_runs (as requester and as target) 1-n remote_run_output; remot
 - **Archives too:** the day files already written past retention are rewritten without the user's sessions' events
   (a file left empty is deleted with its row), and their `event_archives` rows get the new count, size and SHA-256.
   Copies already taken off the server by the backups age out with the backups' own retention.
+
+**Job schedules, signed approvals and the run account (ADR-0010, migrations `JobSchedules` and `ApprovalKeys`).** `job_schedules` (`id`, `workspace_id`, `job_id`, `target_agent_id`, `owner_user_id`, `kind` (`interval`, `daily`), `interval_minutes` (15 to 10080) or
+`daily_at_minutes` (0 to 1439, UTC), `status` (`active`, `paused`, `ended`), `pause_reason`, `next_run_at`, `last_run_at`, `last_run_id`, `last_run_settled`, `failures_in_arow`, `created_at`, `updated_at`; CHECKs for the status, the kind and its
+shape; index on `next_run_at` where active). `remote_runs.schedule_id` names the schedule whose tick created a run. `workspace_settings.remote_schedules_enabled` (default false). `approval_keys` (`id`, `user_id`, `name`, `public_key` (base64 SPKI of an
+ECDSA P-256 key), `fingerprint` (SHA-256 of it, hex), `created_at`, `retired_at`; unique per user and fingerprint while live). `remote_runs.approval_key_id`, `approval_signature` and `approval_not_after` hold the owner's signature of a run;
+`agents.approvals_required` is what the agent reported (a target that only runs what a pinned key signed). The separate run account has no table: it is in the agent's admin-owned exec policy file (`runAccount`).

@@ -207,6 +207,12 @@ A service agent does not update itself: its binary is admin-owned, so the opt-in
 - **A bad upgrade:** install the previous version's zip the same way (step 7); migrations only add, so an older agent
   runs on a newer API.
 
+## 9. Schedules, signed approvals, files and a run account (ADR-0010)
+
+See `SETUP.md`, "Job schedules, signed approvals and a separate run account". In short: a script run may carry up to 8 small text files and a stdin text that the owner reads and approves with it; an admin switch (default off) lets owners put approved jobs on a
+schedule on machines that are not production or a database; a machine whose admin pinned owner keys runs only what such a key signed; a service agent can start runs as a second unprivileged account. The host checks nobody has run are in
+`docs/adr-0008-host-checks.md`; the ones for ADR-0010 (a real sudo run account, Windows and Linux) are listed in ADR-0010 §8.
+
 ## Residual risks (ADR-0005, "Consequences" and "Open")
 
 Read these before turning `shell` or a wide ceiling on:
