@@ -21,15 +21,16 @@ public static class ExecPolicyLoader
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    public static ExecPolicy Load(AgentConfig config, string? identityExecLevel, string? claimedEnvironment = null, string? claimedFunction = null)
+    public static ExecPolicy Load(AgentConfig config, string? identityExecLevel, string? claimedEnvironment = null, string? claimedFunction = null,
+        IReadOnlyList<string>? projectFolders = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!config.ServiceMode)
         {
             // An interactive agent's claim (ADR-0008 §3a, `cm-agent config role`) rides with its level; the claim only ever tightens.
             return identityExecLevel is not null && ExecLevels.All.Contains(identityExecLevel)
-                ? new ExecPolicy(identityExecLevel, [], [], Claim(claimedEnvironment, MachineEnvironments.All), Claim(claimedFunction, MachineFunctions.All))
-                : ExecPolicy.Off with { ClaimedEnvironment = Claim(claimedEnvironment, MachineEnvironments.All), ClaimedFunction = Claim(claimedFunction, MachineFunctions.All) };
+                ? new ExecPolicy(identityExecLevel, [], [], Claim(claimedEnvironment, MachineEnvironments.All), Claim(claimedFunction, MachineFunctions.All), projectFolders)
+                : ExecPolicy.Off with { ClaimedEnvironment = Claim(claimedEnvironment, MachineEnvironments.All), ClaimedFunction = Claim(claimedFunction, MachineFunctions.All), ProjectFolders = projectFolders };
         }
 
         return ReadServiceFile(config.ExecConfigPath);
@@ -48,9 +49,10 @@ public static class ExecPolicyLoader
             // The claim in the same admin-owned file (ADR-0008 §3a): an unknown value is no claim.
             var claimEnv = Claim(file.Environment, MachineEnvironments.All);
             var claimFn = Claim(file.Function, MachineFunctions.All);
+            var folders = Folders(file.Projects);
             return AllAbsolute(executables) && AllAbsolute(roots)
-                ? new ExecPolicy(level, executables, roots, claimEnv, claimFn)
-                : ExecPolicy.Off with { ClaimedEnvironment = claimEnv, ClaimedFunction = claimFn };
+                ? new ExecPolicy(level, executables, roots, claimEnv, claimFn, folders)
+                : ExecPolicy.Off with { ClaimedEnvironment = claimEnv, ClaimedFunction = claimFn, ProjectFolders = folders };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -74,7 +76,7 @@ public static class ExecPolicyLoader
             var roots = file.AllowedRoots ?? [];
             // The claim rides with the ceiling (ADR-0008 §3a): a reinstall must not erase what an admin wrote.
             return AllAbsolute(executables) && AllAbsolute(roots)
-                ? new ExecPolicy(level, executables, roots, Claim(file.Environment, MachineEnvironments.All), Claim(file.Function, MachineFunctions.All))
+                ? new ExecPolicy(level, executables, roots, Claim(file.Environment, MachineEnvironments.All), Claim(file.Function, MachineFunctions.All), Folders(file.Projects))
                 : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
@@ -101,7 +103,8 @@ public static class ExecPolicyLoader
         var moved = false;
         try
         {
-            var file = new ExecFile(policy.Level, [.. policy.AllowedExecutables], [.. policy.AllowedRoots], policy.ClaimedEnvironment, policy.ClaimedFunction);
+            var file = new ExecFile(policy.Level, [.. policy.AllowedExecutables], [.. policy.AllowedRoots], policy.ClaimedEnvironment, policy.ClaimedFunction,
+                policy.ProjectFolders is { Count: > 0 } folders ? [.. folders] : null);
             File.WriteAllText(temp, JsonSerializer.Serialize(file, Json));
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, SavedFileMode);
             File.Move(temp, path, overwrite: true);
@@ -179,7 +182,12 @@ public static class ExecPolicyLoader
     /// <summary>A value from the closed set, or null (no claim).</summary>
     private static string? Claim(string? value, IReadOnlyList<string> set) => value is not null && set.Contains(value) ? value : null;
 
+    /// <summary>The admin-listed project folders (ADR-0008 §3a′): absolute paths only, at most <see cref="ProjectFolderList.Max"/>.</summary>
+    private static List<string>? Folders(List<string>? listed) =>
+        listed is { Count: > 0 } ? [.. listed.Where(ProjectFolderList.IsAbsolute).Distinct(StringComparer.Ordinal).Take(ProjectFolderList.Max)] : null;
+
     private sealed record ExecFile(string? Level, List<string>? AllowedExecutables, List<string>? AllowedRoots,
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Environment = null,
-        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Function = null);
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Function = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] List<string>? Projects = null);
 }

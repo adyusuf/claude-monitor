@@ -111,7 +111,52 @@ public static class UpdateCommand
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [role <environment|none> <function|none>]");
+        if (args.Length >= 2 && args[1] == "projects")
+        {
+            return await ProjectsAsync(args, config, stdout, stderr);
+        }
+
+        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [role <environment|none> <function|none>] [projects add|remove|list [<folder>]]");
+        return 2;
+    }
+
+    /// <summary>
+    /// `cm-agent config projects add|remove|list [folder]` (ADR-0008 §3a′): the project folders this machine reports facts about when no session
+    /// visits them. A service agent reads its list from the admin-owned policy file instead; this verb is for an interactive or standalone agent.
+    /// </summary>
+    private static async Task<int> ProjectsAsync(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr)
+    {
+        if (config.ServiceMode)
+        {
+            await stderr.WriteLineAsync("a service agent reads its project folders from the policy file an administrator owns (\"projects\").");
+            return 2;
+        }
+
+        if (args.Length == 3 && args[2] == "list")
+        {
+            foreach (var folder in ProjectFolderList.Saved(config)) await stdout.WriteLineAsync(folder);
+            return 0;
+        }
+
+        if (args.Length == 4 && args[2] == "add")
+        {
+            if (ProjectFolderList.Add(config, args[3]))
+            {
+                await stdout.WriteLineAsync("project folder listed (its key, branch and commit are reported; the path stays on this machine)");
+                return 0;
+            }
+
+            await stderr.WriteLineAsync($"not listed: give the absolute path of an existing folder that is not listed yet (at most {ProjectFolderList.Max}).");
+            return 2;
+        }
+
+        if (args.Length == 4 && args[2] == "remove")
+        {
+            await (ProjectFolderList.Remove(config, args[3]) ? stdout.WriteLineAsync("project folder removed") : stderr.WriteLineAsync("that folder was not listed"));
+            return 0;
+        }
+
+        await stderr.WriteLineAsync("usage: cm-agent config projects add <folder> | remove <folder> | list");
         return 2;
     }
 

@@ -78,7 +78,7 @@ public sealed record CommandStatusUpdate(string Status, string? Result, DateTime
 
 /// <summary>What the agent must know of its workspace's settings before it captures anything. AgentUpdate is the most the workspace lets an agent do about updating itself; ClaudeUpdate whether it may update Claude Code on the machine (ADR-0006).</summary>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, string AgentUpdate = UpdateModes.Off,
-    bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false);
+    bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false, bool ShareServices = false);
 
 public static class AgentStreamEvents
 {

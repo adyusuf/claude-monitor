@@ -92,8 +92,9 @@ public static class AgentEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
+        var share = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => a.ShareServices).FirstOrDefaultAsync(http.RequestAborted);
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
-            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate));
+            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, share));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>

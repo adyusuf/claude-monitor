@@ -68,6 +68,7 @@ public static class MachineContext
         b.Append(" online=").Append(m.Online ? "yes" : "no");
         b.Append(" exec=").Append(RemoteEnvelope.Code(m.ExecLevel));
         b.Append(" claude=").Append(Claude(m));
+        b.Append(Tags(m));
         if (m.Tools is { Count: > 0 } tools)
         {
             b.Append(" tools=").Append(string.Join(',', tools.Take(NamesMax).Select(t => RemoteEnvelope.Label(t.Name))));
@@ -79,6 +80,15 @@ public static class MachineContext
         }
 
         return b.Length > LineMax ? b.ToString(0, LineMax) : b.ToString();
+    }
+
+    /// <summary>" tags=project=shop,region=eu" (at most five, labels only: a tag is admin-typed text), or nothing.</summary>
+    public static string Tags(MachineView m)
+    {
+        ArgumentNullException.ThrowIfNull(m);
+        return m.Tags is { Count: > 0 } tags
+            ? " tags=" + string.Join(',', tags.OrderBy(t => t.Key, StringComparer.Ordinal).Take(5).Select(t => RemoteEnvelope.Label(t.Key) + "=" + RemoteEnvelope.Label(t.Value)))
+            : "";
     }
 
     /// <summary>"unknown" for an agent that reported nothing (older), "none", or "native 2.1.300 idle=1".</summary>

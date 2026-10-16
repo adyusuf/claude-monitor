@@ -18,10 +18,12 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// know these calls (404) switches the reports off until the daemon restarts.
 /// </summary>
 public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, IMetricsSource source,
-    Func<ExecPolicy>? policySource = null, Func<(ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)>? factsSource = null)
+    Func<ExecPolicy>? policySource = null, Func<(ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)>? factsSource = null,
+    Func<IReadOnlyList<ServiceInfo>>? servicesSource = null, Func<IReadOnlyList<ProjectFact>>? projectsSource = null)
 {
     public const string ThresholdsKey = "settings.alert_thresholds";
     public const string RemoteRunsKey = "settings.remote_runs";
+    public const string ShareServicesKey = "settings.share_services";
     public const int KeepSamples = 60;
     private static readonly AlertThresholds Defaults = new(90, 90, 90, 300);
     private readonly AlertEvaluator evaluator = new(Defaults);
@@ -32,13 +34,15 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private (ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)? facts;
     private DateTimeOffset factsAt;
     private string factsStamp = "";
+    private (IReadOnlyList<ServiceInfo>? Services, IReadOnlyList<ProjectFact>? Projects, bool Share)? extras;
+    private DateTimeOffset extrasAt;
 
     /// <summary>The exec level this agent allows now: the admin-owned file in service mode, agent.json otherwise (with the role claim, ADR-0008).</summary>
     public ExecPolicy Policy()
     {
         if (policySource is not null) return policySource();
         var saved = Identity.Peek(config);
-        return ExecPolicyLoader.Load(config, saved?.ExecLevel, saved?.ClaimedEnvironment, saved?.ClaimedFunction);
+        return ExecPolicyLoader.Load(config, saved?.ExecLevel, saved?.ClaimedEnvironment, saved?.ClaimedFunction, saved?.ProjectFolders);
     }
 
     /// <summary>
@@ -53,11 +57,28 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var level = ExecPolicyLoader.RunningAsRoot() ? ExecLevels.Off
             : policy.Level == ExecLevels.Shell && policy.HasCeiling ? ExecLevels.Argv : policy.Level;
         var (claude, tools) = Facts();
+        var (services, projects) = Extras(policy);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
-            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, []);
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, [], services, projects);
         var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
+    }
+
+    /// <summary>
+    /// The listening services (only while the owner opted in, which the settings pass remembered) and the facts of the listed project folders,
+    /// read again every <see cref="AgentConfig.ProjectFactsEvery"/> or at once when the opt-in changes.
+    /// </summary>
+    private (IReadOnlyList<ServiceInfo>? Services, IReadOnlyList<ProjectFact>? Projects) Extras(ExecPolicy policy)
+    {
+        var now = clock.GetUtcNow();
+        var share = store.Get(ShareServicesKey) == "true";
+        if (extras is { } cached && cached.Share == share && now - extrasAt < config.ProjectFactsEvery && now >= extrasAt) return (cached.Services, cached.Projects);
+        var services = share ? servicesSource?.Invoke() ?? ListeningServices.Live() : null;
+        var read = projectsSource?.Invoke() ?? new ProjectFacts(config).Read(policy.ProjectFolders);
+        extras = (services, read.Count > 0 ? read : null, share);
+        extrasAt = now;
+        return (extras.Value.Services, extras.Value.Projects);
     }
 
     private (ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools) Facts()
@@ -107,7 +128,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     public static List<(string Key, string Value)> Entries(AgentSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false")];
+        List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false"), (ShareServicesKey, settings.ShareServices ? "true" : "false")];
         if (settings.Alerts is { } a)
         {
             entries.Add((ThresholdsKey, string.Join(',', new[] { a.CpuPct, a.MemoryPct, a.DiskPct, a.SustainSeconds }

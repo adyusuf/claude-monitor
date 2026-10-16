@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Exec;
 /// <see cref="Off"/>.
 /// </summary>
 public sealed record ExecPolicy(string Level, IReadOnlyList<string> AllowedExecutables, IReadOnlyList<string> AllowedRoots,
-    string? ClaimedEnvironment = null, string? ClaimedFunction = null)
+    string? ClaimedEnvironment = null, string? ClaimedFunction = null, IReadOnlyList<string>? ProjectFolders = null)
 {
     public static readonly ExecPolicy Off = new(ExecLevels.Off, [], []);
 

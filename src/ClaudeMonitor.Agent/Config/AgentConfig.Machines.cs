@@ -20,6 +20,9 @@ public sealed partial record AgentConfig
     /// <summary>CM_PRESENCE_PROBE_EVERY: how often the tool inventory and the Claude version are probed again (1 min to 1 day); a changed binary is probed sooner.</summary>
     public TimeSpan PresenceProbeEvery { get; init; } = TimeSpan.FromHours(6);
 
+    /// <summary>CM_PROJECT_FACTS_EVERY: how often the listed project folders' .git facts and, when the owner opted in, the listening services are read again (30 s to 1 h).</summary>
+    public TimeSpan ProjectFactsEvery { get; init; } = TimeSpan.FromMinutes(5);
+
     /// <summary>How long a tool's --version may take before the probe gives up on it.</summary>
     public TimeSpan ToolVersionTimeout { get; init; } = TimeSpan.FromSeconds(5);
 

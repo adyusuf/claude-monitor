@@ -40,6 +40,7 @@ public static partial class Cli
         cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
                                         whether the agent looks for / installs agent updates by itself, and whether it may
                                         update Claude Code when every session is idle (both default off; the workspace must allow too)
+        cm-agent config projects add|remove|list [<folder>]  the project folders this machine reports facts about (ADR-0008)
         cm-agent config role <environment|none> <function|none>
                                         what this machine says it is (dev|test|stage|preprod|production|other; development|application|web|
                                         database|ci|storage|other); an admin sets the role on the web, a claim only makes it stricter (ADR-0008)
