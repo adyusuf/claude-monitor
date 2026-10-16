@@ -45,7 +45,7 @@ put() { # <key> <file> <content-type> <cache-control>
   echo "uploaded $1"
 }
 upload() { # <folder> <cache-control>
-  local file type
+  local file
   for file in "$dir"/cm-agent-*.zip; do put "$1/$(basename "$file")" "$file" application/zip "$2"; done
   put "$1/SHA256SUMS" "$dir/SHA256SUMS" text/plain "$2"
   put "$1/manifest.json" "$dir/manifest.json" application/json "$2"
