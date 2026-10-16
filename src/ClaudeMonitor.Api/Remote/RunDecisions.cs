@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Remote;
 
-public sealed record RunApproval(string? Hash, string? Code);
+public sealed record RunApproval(string? Hash, string? Code, string? KeyId = null, string? Signature = null);
 
 public sealed record RunDenial(string? Reason);
 
@@ -65,12 +65,35 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
             }
         }
 
+        // A signed approval (ADR-0010 §4): the owner's browser signed this exact run; the API checks it against the owner's registered key as well, but the target
+        // trusts only the key its own admin pinned. A target that requires signatures refuses an approval without one.
+        string? signedKey = null, signature = null;
+        DateTimeOffset? signedNotAfter = null;
+        if (req.Signature is { Length: > 0 } sig)
+        {
+            var registered = await db.ApprovalKeys.AsNoTracking()
+                .Where(k => k.UserId == userId && k.Fingerprint == req.KeyId && k.RetiredAt == null).Select(k => k.PublicKey).FirstOrDefaultAsync(ct);
+            var key = ApprovalSigning.FromBase64(registered);
+            var bytes = ApprovalSigning.FromBase64(sig);
+            if (key is null || bytes is null || !ApprovalSigning.Verify(key, ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt), bytes))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ApprovalErrors.Invalid);
+            }
+
+            (signedKey, signature, signedNotAfter) = (req.KeyId, sig, run.ExpiresAt);
+        }
+        else if (target.ApprovalsRequired)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ApprovalErrors.Required);
+        }
+
         var startBy = RunNotices.StartBy(config, now);
         var changed = await db.RemoteRuns
             .Where(r => r.Id == id && r.Status == RunStatuses.PendingApproval && r.ExpiresAt > now && r.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Approved).SetProperty(r => r.DecidedAt, now)
                 .SetProperty(r => r.DecidedBy, userId).SetProperty(r => r.ExpiresAt, startBy)
-                .SetProperty(r => r.ApprovedWithTotp, withTotp), ct);
+                .SetProperty(r => r.ApprovedWithTotp, withTotp).SetProperty(r => r.ApprovalKeyId, signedKey).SetProperty(r => r.ApprovalSignature, signature)
+                .SetProperty(r => r.ApprovalNotAfter, signedNotAfter), ct);
         if (changed != 1) return Conflict(RemoteErrors.NotPending);
         Audit.Add(db, http, clock, AuditActions.RunApproved, run.WorkspaceId, userId, targetType: "run", targetId: id,
             detail: new { hash = req.Hash, mode = run.Mode, totp = withTotp });
@@ -79,6 +102,7 @@ public sealed class RunDecisions(MonitorDb db, ApiConfig config, TimeProvider cl
         run.DecidedAt = now;
         run.ExpiresAt = startBy;
         run.ApprovedWithTotp = withTotp;
+        (run.ApprovalKeyId, run.ApprovalSignature, run.ApprovalNotAfter) = (signedKey, signature, signedNotAfter);
         RunNotices.Changed(broker, run);
         await RunNotices.DeliverAsync(broker, db, run, ct);
         return Results.NoContent();

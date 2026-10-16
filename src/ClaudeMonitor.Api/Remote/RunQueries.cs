@@ -19,7 +19,7 @@ public sealed record WebRunView(Guid Id, Guid TargetAgentId, string TargetHostna
     string? InterpreterPath = null, string? TargetEnvironment = null, string? TargetFunction = null, bool Strict = false, bool NeedsCode = false,
     long? OutputCap = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, long? OutputRefusedBytes = null, int? OutputMissingFromSeq = null,
     int? OutputChunks = null, bool? OutputComplete = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null,
-    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null, bool ApprovalsRequired = false, string? ApprovalKeyId = null);
 
 public static class RunQueries
 {
@@ -82,7 +82,7 @@ public static class RunQueries
                                 && (runId == null || r.Id == runId)
                                 && (before == null || r.CreatedAt < before)
                           orderby r.CreatedAt descending, r.Id descending
-                          select new { r, Target = tm.Hostname, TargetOs = tm.Os, TargetUser = tu.DisplayName, Requester = rm.Hostname, RequesterUser = ru.DisplayName, ta.Interpreters, ta.RoleEnvironment, ta.RoleFunction, ta.ClaimedEnvironment, ta.ClaimedFunction })
+                          select new { r, Target = tm.Hostname, TargetOs = tm.Os, TargetUser = tu.DisplayName, Requester = rm.Hostname, RequesterUser = ru.DisplayName, ta.Interpreters, ta.RoleEnvironment, ta.RoleFunction, ta.ClaimedEnvironment, ta.ClaimedFunction, ta.ApprovalsRequired })
             .Take(limit).ToListAsync(ct);
         var requesters = rows.Where(x => x.r.Status == RunStatuses.PendingApproval).Select(x => x.r.RequesterAgentId).Distinct().ToList();
         var since = now - RecentOutputWindow;
@@ -111,7 +111,7 @@ public static class RunQueries
                 OutputCap: r.OutputCap, OutputReadBytes: r.OutputReadBytes, OutputDroppedBytes: r.OutputDroppedBytes, OutputRefusedBytes: r.OutputRefusedBytes,
                 OutputMissingFromSeq: r.OutputMissingFromSeq, OutputChunks: r.OutputChunks, OutputComplete: r.OutputComplete,
                 TestsPassed: r.TestsPassed, TestsFailed: r.TestsFailed, TestsSkipped: r.TestsSkipped,
-                ScriptFiles: visible ? r.ScriptFiles : null, ScriptStdin: visible ? r.ScriptStdin : null);
+                ScriptFiles: visible ? r.ScriptFiles : null, ScriptStdin: visible ? r.ScriptStdin : null, ApprovalsRequired: x.ApprovalsRequired, ApprovalKeyId: r.ApprovalKeyId);
         }).ToList();
     }
 }

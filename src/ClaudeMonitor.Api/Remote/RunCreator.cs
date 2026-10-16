@@ -84,7 +84,8 @@ public sealed class RunCreator(MonitorDb db, ApiConfig config, TimeProvider cloc
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (await LockAsync(workspaceId, userId, target.a.Id, target.a.UserId, req.Mode, ct) is { } refused) return refused;
-        var approvedBy = await ApproveByJobAsync(req, run, now, ct) ?? await ApproveByGrantAsync(run, target.Os, now, ct);
+        // A target that requires signed approvals takes no job or grant: each run waits for a signature of its own (ADR-0010 §4).
+        var approvedBy = target.a.ApprovalsRequired ? null : await ApproveByJobAsync(req, run, now, ct) ?? await ApproveByGrantAsync(run, target.Os, now, ct);
         if (approvedBy is null
             && await db.RemoteRuns.CountAsync(r => r.TargetAgentId == run.TargetAgentId && r.Status == RunStatuses.PendingApproval, ct)
                >= config.RunPendingMaxPerTarget)

@@ -138,7 +138,7 @@ public static class ExecPolicyLoader
     private static bool AllAbsolute(IEnumerable<string> paths) => paths.All(p => !string.IsNullOrEmpty(p) && Path.IsPathFullyQualified(p));
 
     /// <summary>The file must not be changeable by the account that obeys it.</summary>
-    private static bool IsAdminOwned(string path)
+    internal static bool IsAdminOwned(string path)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (directory is null || IsLink(path) || IsLink(directory)) return false;

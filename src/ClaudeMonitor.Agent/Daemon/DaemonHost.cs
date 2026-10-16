@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using ClaudeMonitor.Agent.Approvals;
 using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Config;
@@ -57,7 +58,8 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os));
         using var machinesStore = new LocalStore(config.DatabasePath);
         var machines = new MachineCache(config, machinesStore, api, clock);
-        var executor = new RunExecutor(config, clock, log, run => ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
+        var executor = new RunExecutor(config, clock, log,
+            run => ApprovalVerifier.Refusal(config, run, clock.GetUtcNow()) is { } refused ? ExecDecision.Refuse(refused) : ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
             ExecPolicyLoader.RunningAsRoot);
         using var runs = new RunRelay(config, execStore, api, clock, executor, log);
         runs.Recover();

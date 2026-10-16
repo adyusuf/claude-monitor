@@ -169,6 +169,19 @@ internal static class MonitorDbModelRemote
         Fk<JobSchedule, Agent>(b, x => x.TargetAgentId);
         Fk<JobSchedule, User>(b, x => x.OwnerUserId);
         Fk<RemoteRun, JobSchedule>(b, x => x.ScheduleId);
+        b.Entity<ApprovalKey>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.Fingerprint }).IsUnique().HasFilter("retired_at IS NULL");
+            e.Property(x => x.Name).HasMaxLength(64);
+            e.Property(x => x.PublicKey).HasMaxLength(256);
+            e.Property(x => x.Fingerprint).HasMaxLength(64);
+        });
+        Fk<ApprovalKey, User>(b, x => x.UserId);
+        b.Entity<RemoteRun>(e =>
+        {
+            e.Property(x => x.ApprovalKeyId).HasMaxLength(64);
+            e.Property(x => x.ApprovalSignature).HasMaxLength(256);
+        });
     }
 
     private static void Fk<TChild, TParent>(ModelBuilder b, System.Linq.Expressions.Expression<Func<TChild, object?>> key)

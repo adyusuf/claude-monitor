@@ -30,6 +30,9 @@ public static class ScheduleReasons
     public const string JobRetired = "job_retired";
     public const string Disabled = "disabled";
     public const string TargetGone = "target_gone";
+
+    /// <summary>The machine requires signed approvals: nothing runs there without a person signing it, so nothing runs on a schedule.</summary>
+    public const string Approvals = "approvals";
 }
 
 /// <summary>The limits of a schedule, one definition for the web and the API.</summary>

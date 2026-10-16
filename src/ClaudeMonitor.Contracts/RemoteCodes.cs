@@ -193,6 +193,9 @@ public static class RemoteErrors
     public const string ScheduleStrict = "schedule_strict";
     public const string SchedulePlaceholder = "schedule_placeholder";
     public const string ScheduleLimit = "schedule_limit";
+    public const string ScheduleApprovals = "schedule_approvals";
+    public const string ApprovalKeyLimit = "approval_key_limit";
+    public const string InvalidApprovalKey = "invalid_approval_key";
     public const string FilesUnsupported = "files_unsupported";
     public const string InvalidInterpreter = "invalid_interpreter";
 

@@ -56,6 +56,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("admin_note_set_by");
 
+                    b.Property<bool>("ApprovalsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("approvals_required");
+
                     b.PrimitiveCollection<string[]>("Capabilities")
                         .HasColumnType("text[]")
                         .HasColumnName("capabilities");
@@ -344,6 +348,54 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_agent_tokens_kind", "kind IN ('access', 'refresh')");
                         });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.ApprovalKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("public_key");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval_keys");
+
+                    b.HasIndex("UserId", "Fingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_approval_keys_user_id_fingerprint")
+                        .HasFilter("retired_at IS NULL");
+
+                    b.ToTable("approval_keys");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.AuditEvent", b =>
@@ -1548,6 +1600,20 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ApprovalKeyId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("approval_key_id");
+
+                    b.Property<DateTimeOffset?>("ApprovalNotAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approval_not_after");
+
+                    b.Property<string>("ApprovalSignature")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("approval_signature");
+
                     b.Property<bool>("ApprovedWithTotp")
                         .HasColumnType("boolean")
                         .HasColumnName("approved_with_totp");
@@ -2670,6 +2736,16 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_agent_tokens_agents_agent_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.ApprovalKey", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_keys_users_user_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.EventArchive", b =>

@@ -48,6 +48,10 @@ export const en = {
     grant_conflict: "A grant for that template already exists.", invalid_reason: "That reason is too long.", not_member: "That person is not a member of this workspace.",
     invalid_machine_role: "Pick an environment and a function from the lists.",
     totp_required: "This machine is production or a database: you need two-step sign-in to allow this here.",
+    approval_required: "This machine only runs what a pinned key signed. Make a key on your account page and allow again.",
+    approval_invalid: "The signature does not match this run or this key is not registered. Make a key on your account page.",
+    invalid_approval_key: "That is not an ECDSA P-256 public key.", approval_key_limit: "You already have the most keys you can have (10). Retire one first.", approval_key_exists: "That key is already registered.",
+    schedule_approvals: "A machine that requires signed approvals takes no schedules: every run there needs a signature.",
     invalid_schedule: "A schedule repeats every 15 minutes to 7 days, or once a day at a time of day (UTC).",
     schedules_disabled: "Schedules are switched off in this workspace. An admin turns them on in the remote work settings.",
     schedule_strict: "A production or database machine takes no schedules: nothing runs there without a person.",
@@ -181,6 +185,12 @@ export const en = {
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: enRemote,
+  approvals: {
+    title: "Approval keys", intro: "A key made in this browser signs the runs you allow. A machine whose admin pinned the key and switched on signed approvals runs nothing that was not signed with it, so even a compromised server cannot start a run in your name. The private half never leaves this browser.",
+    thisBrowser: "This browser", registered: "registered", notRegistered: "not registered yet", defaultName: "This browser", name: "A name for this key", make: "Make a key and register it", register: "Register this key",
+    registeredKeys: "Registered keys", retire: "Retire", pinHint: "On a machine that should trust this key, an admin pins it (compare the fingerprint first), then switches on signed approvals (cm-agent config approvals required):",
+    runNeedsKey: "This machine only runs what a pinned key signed: allowing signs this run with the key of this browser.", needKey: "This machine requires a signed approval, and this browser has no key. Make one on your account page first.",
+  },
   schedules: {
     title: "Schedules", none: "No schedules.", enabled: "Allow schedules",
     enabledHint: "Lets an owner run an approved job again and again by itself, on a machine that is not production or a database. Off by default; switching it off stops every tick.",

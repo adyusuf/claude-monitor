@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/endpoints";
+import { approvalKeys, payloadFor } from "../lib/approvalKey";
 import type { WebRunView } from "../api/types";
 import { Button, Card, Notice } from "../components/ui";
 import { config } from "../config";
@@ -25,6 +26,7 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
   const [denyError, setDenyError] = useState<string | null>(null);
+  const [signProblem, setSignProblem] = useState<string | null>(null);
   const gate = useCodeGate("mfa_required", "remote.codeHintRun", run.needsCode === true);
   const left = countdown(run.expiresAt, now);
 
@@ -37,7 +39,17 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
   const allow = async () => {
     if (!run.hash) return;
     const hash = run.hash;
-    if (await gate.attempt((code) => api.approveRun(run.id, hash, code))) onChanged();
+    setSignProblem(null);
+    // A signed approval (ADR-0010 §4): this browser's key signs the exact run; a machine that requires it refuses an approval without one.
+    let proof: { keyId: string; signature: string } | null = null;
+    try {
+      proof = await approvalKeys.sign(payloadFor("run", run.id, run.targetAgentId, hash, run.expiresAt));
+    } catch {
+      proof = null;
+    }
+
+    if (run.approvalsRequired && !proof) return setSignProblem(t("approvals.needKey"));
+    if (await gate.attempt((code) => api.approveRun(run.id, hash, code, proof ?? undefined))) onChanged();
   };
 
   const deny = async () => {
@@ -59,6 +71,8 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
       {run.recentOutput ? <div className="notice notice-warn" role="alert">{t("remote.recentOutput")}</div> : null}
       <RunFacts run={run} ws={ws} onScriptEnd={() => setRead(true)} />
       {gate.field}
+      {run.approvalsRequired ? <p className="muted small">{t("approvals.runNeedsKey")}</p> : null}
+      {signProblem ? <Notice kind="error">{signProblem}</Notice> : null}
       {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}
       {denyError ? <Notice kind="error">{denyError}</Notice> : null}
       {denying ? (

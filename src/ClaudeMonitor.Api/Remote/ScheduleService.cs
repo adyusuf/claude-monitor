@@ -36,6 +36,7 @@ public sealed class ScheduleService(MonitorDb db, ApiConfig config, TimeProvider
             return RemoteChecks.Conflict(RemoteErrors.ScheduleStrict);
         }
 
+        if (target.ApprovalsRequired) return RemoteChecks.Conflict(RemoteErrors.ScheduleApprovals);
         if (await db.JobSchedules.CountAsync(s => s.TargetAgentId == target.Id && s.Status != ScheduleStatuses.Ended, ct) >= ScheduleLimits.PerTargetMax)
         {
             return RemoteChecks.Conflict(RemoteErrors.ScheduleLimit);
@@ -98,6 +99,8 @@ public sealed class ScheduleService(MonitorDb db, ApiConfig config, TimeProvider
         {
             return RemoteChecks.Conflict(RemoteErrors.ScheduleStrict);
         }
+
+        if (target.ApprovalsRequired) return RemoteChecks.Conflict(RemoteErrors.ScheduleApprovals);
 
         if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, target, req?.Code) is { } refused) return refused;
         var next = ScheduleLimits.Next(schedule.Kind, schedule.IntervalMinutes, schedule.DailyAtMinutes, now);

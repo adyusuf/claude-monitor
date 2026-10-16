@@ -48,6 +48,10 @@ public static partial class Cli
         cm-agent config role <environment|none> <function|none>
                                         what this machine says it is (dev|test|stage|preprod|production|other; development|application|web|
                                         database|ci|storage|other); an admin sets the role on the web, a claim only makes it stricter (ADR-0008)
+        cm-agent approvers add <public key> [--name <n>] | remove <fingerprint> | list
+        cm-agent config approvals required|off
+                                        pin an owner's approval key (copy it from the web; compare the fingerprint) and require that every remote run is
+                                        signed by a pinned key; off by default. An admin runs these (the file is admin-owned on a service) (ADR-0010)
         cm-agent machines | machine <x> | metrics <x> | alerts [<x>] | jobs [<x>] | job-run <job id>
         cm-agent run --machine <x> (--script <file> --interpreter <i> [--arg <v>]... | --argv <exe> [args...]) [--timeout] [--reason] [--project] [--kind]
         cm-agent result <run or ask id> [--wait <seconds>] [--offset <chars>]
@@ -117,6 +121,8 @@ public static partial class Cli
                 return await ClaudeUpdateCommand.RunAsync(args, config, stdout, stderr, clock);
             case "config":
                 return await UpdateCommand.ConfigAsync(args, config, stdout, stderr);
+            case "approvers":
+                return await Approvals.ApproversCommand.RunAsync(args, config, stdout, stderr);
             case "status":
                 return await StatusAsync(config, stdout, clock);
             case "version":

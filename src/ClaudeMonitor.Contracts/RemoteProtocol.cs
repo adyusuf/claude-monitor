@@ -7,7 +7,7 @@ namespace ClaudeMonitor.Contracts;
 public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent,
     string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
     IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
-    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null);
+    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null);
 
 /// <summary>One listening TCP port (ADR-0008 §3a′): the port, the protocol (<c>tcp</c>) and the owning process name when the OS lets the agent see it.</summary>
 public sealed record ServiceInfo(int Port, string Proto, string? Process);
@@ -91,7 +91,8 @@ public sealed record GrantTemplate(IReadOnlyList<string> Argv, string Cwd, int M
 public sealed record RunMessage(Guid Id, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand, string? Cwd,
     int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null,
     string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, long? OutputCap = null, bool ApprovedWithTotp = false,
-    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null);
+    IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null,
+    string? ApprovalKeyId = null, string? ApprovalSignature = null, DateTimeOffset? ApprovalNotAfter = null, string? TargetEnvironment = null, string? TargetFunction = null);
 
 public sealed record RunCancelMessage(Guid Id);
 

@@ -83,6 +83,11 @@ public sealed class RemoteRun
     public string? ScriptFilesJson { get; set; }
     public string? ScriptStdin { get; set; }
 
+    /// <summary>The owner's signature of this run (ADR-0010 §4): the key's fingerprint, the signature (base64) and the expiry that was signed; all null for an approval without a key.</summary>
+    public string? ApprovalKeyId { get; set; }
+    public string? ApprovalSignature { get; set; }
+    public DateTimeOffset? ApprovalNotAfter { get; set; }
+
     /// <summary>The schedule whose tick created this run (ADR-0010 §3); null for a run somebody asked for.</summary>
     public Guid? ScheduleId { get; set; }
 
@@ -184,5 +189,17 @@ public sealed class MachineJob
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DecidedAt { get; set; }
     public Guid? DecidedBy { get; set; }
+    public DateTimeOffset? RetiredAt { get; set; }
+}
+
+/// <summary>The public half of an owner's approval key (ADR-0010 §4): the browser keeps the private half and never sends it.</summary>
+public sealed class ApprovalKey
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid UserId { get; set; }
+    public string Name { get; set; } = "";
+    public string PublicKey { get; set; } = "";
+    public string Fingerprint { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? RetiredAt { get; set; }
 }

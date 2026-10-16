@@ -5,6 +5,7 @@ import { Card, CopyText, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { AccountDataCards } from "./AccountData";
+import { ApprovalKeysCard } from "./ApprovalKeysCard";
 import { MfaCard } from "./Mfa";
 import { useTokenOnce } from "./AuthPages";
 
@@ -38,6 +39,7 @@ export function AccountPage() {
         </ul>
       </Card>
       <MfaCard />
+      <ApprovalKeysCard />
       <AccountDataCards />
     </div>
   );

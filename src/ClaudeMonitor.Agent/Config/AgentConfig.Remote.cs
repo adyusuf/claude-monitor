@@ -58,6 +58,11 @@ public sealed partial record AgentConfig
     /// <summary>How often the daemon sends queued remote requests and polls open runs it asked for (fallback to run_update).</summary>
     public TimeSpan RemotePollEvery { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// The signed-approval policy file (ADR-0010 §4): beside the exec policy of a service agent, in the home of an interactive one.
+    /// </summary>
+    public string ApproversPath => ServiceMode ? Path.Combine(Path.GetDirectoryName(ExecConfigPath) ?? Home, "approvers.json") : Path.Combine(Home, "approvers.json");
+
     /// <summary>How often the MCP process looks in the local database for an answer while a tool waits.</summary>
     public TimeSpan RemoteWaitPoll { get; init; } = TimeSpan.FromMilliseconds(250);
 

@@ -153,6 +153,9 @@ export interface WebRunView {
   /** ADR-0010: the text files a script run carries next to the script, and the text for its stdin. Absent on an older API. */
   scriptFiles?: { path: string; text: string }[] | null;
   scriptStdin?: string | null;
+  /** ADR-0010 §4: the target runs nothing that a pinned owner key did not sign; the card then needs this browser's key. */
+  approvalsRequired?: boolean;
+  approvalKeyId?: string | null;
   interpreterPath?: string | null;
   targetEnvironment?: string | null;
   targetFunction?: string | null;
@@ -243,3 +246,6 @@ export interface ScheduleView {
 }
 
 export interface ScheduleCreate { jobId: string; kind: "interval" | "daily"; intervalMinutes?: number; dailyAtMinutes?: number; code?: string }
+
+/** ADR-0010 §4: the public half of an approval key a person registered. */
+export interface ApprovalKeyView { id: string; name: string; fingerprint: string; publicKey: string; createdAt: string; retiredAt: string | null }

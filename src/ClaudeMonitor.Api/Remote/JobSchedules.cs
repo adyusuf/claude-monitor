@@ -79,6 +79,7 @@ public static class JobSchedules
             return;
         }
 
+        if (target.ApprovalsRequired) { await StopAsync(db, schedule, ScheduleStatuses.Paused, ScheduleReasons.Approvals, now, ct); return; }
         if (!ExecLevels.Allows(target.ExecLevel, RunModes.Argv)) { await StopAsync(db, schedule, ScheduleStatuses.Paused, ScheduleReasons.ExecLevel, now, ct); return; }
 
         var next = ScheduleLimits.Next(schedule.Kind, schedule.IntervalMinutes, schedule.DailyAtMinutes, now);

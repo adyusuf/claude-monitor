@@ -128,6 +128,7 @@ public static class Startup
         AgentJobEndpoints.Map(api);
         JobEndpoints.Map(api);
         ScheduleEndpoints.Map(api);
+        ApprovalKeyEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (files is not null)
         {

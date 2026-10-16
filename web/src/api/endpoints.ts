@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentAsksView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentAsksView, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
@@ -73,7 +73,11 @@ export const api = {
     request<WebRunView[]>("GET", `/workspaces/${id}/runs${q(opts)}`),
   run: (runId: string) => request<WebRunView>("GET", `/runs/${runId}`),
   runOutput: (runId: string, after: number, limit: number) => request<RunOutputPage>("GET", `/runs/${runId}/output${q({ after, limit })}`),
-  approveRun: (runId: string, hash: string, code?: string) => request<void>("POST", `/runs/${runId}/approve`, { hash, code }),
+  approveRun: (runId: string, hash: string, code?: string, proof?: { keyId: string; signature: string }) =>
+    request<void>("POST", `/runs/${runId}/approve`, { hash, code, keyId: proof?.keyId, signature: proof?.signature }),
+  approvalKeys: () => request<ApprovalKeyView[]>("GET", "/me/approval-keys"),
+  registerApprovalKey: (name: string, publicKey: string, code?: string) => request<ApprovalKeyView>("POST", "/me/approval-keys", { name, publicKey, code }),
+  retireApprovalKey: (id: string) => request<void>("POST", `/me/approval-keys/${id}/retire`),
   denyRun: (runId: string, reason?: string) => request<void>("POST", `/runs/${runId}/deny`, { reason }),
   cancelRun: (runId: string) => request<void>("POST", `/runs/${runId}/cancel`),
   grants: (agentId: string) => request<WebGrantView[]>("GET", `/agents/${agentId}/grants`),

@@ -49,6 +49,10 @@ export const tr: Dictionary = {
     grant_conflict: "Bu şablon için bir izin zaten var.", invalid_reason: "Bu gerekçe çok uzun.", not_member: "Bu kişi çalışma alanının üyesi değil.",
     invalid_machine_role: "Listelerden bir ortam ve bir işlev seçin.",
     totp_required: "Bu makine canlı ya da veritabanı: burada buna izin vermek için iki adımlı giriş gerekir.",
+    approval_required: "Bu makine yalnızca sabitlenmiş bir anahtarın imzaladığını çalıştırır. Hesap sayfanızda bir anahtar üretin ve yeniden izin verin.",
+    approval_invalid: "İmza bu çalıştırmayla ya da bu anahtarla uyuşmuyor ya da anahtar kayıtlı değil. Hesap sayfanızda bir anahtar üretin.",
+    invalid_approval_key: "Bu bir ECDSA P-256 açık anahtarı değil.", approval_key_limit: "Sahip olabileceğiniz en fazla anahtara (10) sahipsiniz. Önce birini emekli edin.", approval_key_exists: "Bu anahtar zaten kayıtlı.",
+    schedule_approvals: "İmzalı onay isteyen bir makineye zamanlama konmaz: orada her çalıştırma bir imza ister.",
     invalid_schedule: "Bir zamanlama 15 dakika ile 7 gün arasında tekrar eder ya da günde bir kez (UTC) belirli bir saatte çalışır.",
     schedules_disabled: "Bu çalışma alanında zamanlamalar kapalı. Bir yönetici uzak çalışma ayarlarından açar.",
     schedule_strict: "Canlı ya da veritabanı makinelerine zamanlama konmaz: orada kimse yokken hiçbir şey çalışmaz.",
@@ -182,6 +186,12 @@ export const tr: Dictionary = {
   },
   common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
   remote: trRemote,
+  approvals: {
+    title: "Onay anahtarları", intro: "Bu tarayıcıda üretilen bir anahtar, izin verdiğiniz çalıştırmaları imzalar. Yöneticisi anahtarı sabitlemiş ve imzalı onayı açmış bir makine, bu anahtarla imzalanmamış hiçbir şeyi çalıştırmaz; ele geçirilmiş bir sunucu bile sizin adınıza çalıştırma başlatamaz. Özel yarı bu tarayıcıdan hiç çıkmaz.",
+    thisBrowser: "Bu tarayıcı", registered: "kayıtlı", notRegistered: "henüz kayıtlı değil", defaultName: "Bu tarayıcı", name: "Bu anahtar için bir ad", make: "Anahtar üret ve kaydet", register: "Bu anahtarı kaydet",
+    registeredKeys: "Kayıtlı anahtarlar", retire: "Emekli et", pinHint: "Bu anahtara güvenecek bir makinede yönetici onu sabitler (önce parmak izini karşılaştırın), sonra imzalı onayı açar (cm-agent config approvals required):",
+    runNeedsKey: "Bu makine yalnızca sabitlenmiş bir anahtarın imzaladığını çalıştırır: izin vermek bu çalıştırmayı bu tarayıcının anahtarıyla imzalar.", needKey: "Bu makine imzalı onay ister, bu tarayıcıda ise anahtar yok. Önce hesap sayfanızda bir tane üretin.",
+  },
   schedules: {
     title: "Zamanlamalar", none: "Zamanlama yok.", enabled: "Zamanlamalara izin ver",
     enabledHint: "Bir sahibin onaylı bir işi, canlı ya da veritabanı olmayan bir makinede kendi kendine tekrar tekrar çalıştırmasına izin verir. Varsayılan kapalı; kapatmak tüm tikleri durdurur.",

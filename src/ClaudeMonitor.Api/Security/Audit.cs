@@ -53,6 +53,8 @@ public static class AuditActions
     public const string JobApproved = "remote.job_approved";
     public const string JobDenied = "remote.job_denied";
     public const string JobRetired = "remote.job_retired";
+    public const string ApprovalKeyRegistered = "remote.approval_key_registered";
+    public const string ApprovalKeyRetired = "remote.approval_key_retired";
     public const string ScheduleCreated = "remote.schedule_created";
     public const string SchedulePaused = "remote.schedule_paused";
     public const string ScheduleResumed = "remote.schedule_resumed";

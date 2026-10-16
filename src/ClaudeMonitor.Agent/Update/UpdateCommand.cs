@@ -1,4 +1,5 @@
 using System.Globalization;
+using ClaudeMonitor.Agent.Approvals;
 using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Daemon;
@@ -111,12 +112,21 @@ public static class UpdateCommand
             return 0;
         }
 
+        if (args.Length == 3 && args[1] == "approvals" && args[2] is "required" or "off")
+        {
+            ApproversStore.SetRequired(config, args[2] == "required");
+            var policy = ApproversStore.Load(config);
+            await stdout.WriteLineAsync($"signed approvals: {args[2]} ({policy.Keys.Count} key(s) pinned)"
+                + (args[2] == "required" && policy.Keys.Count == 0 ? "; NOTHING can run until a key is pinned (cm-agent approvers add)" : ""));
+            return 0;
+        }
+
         if (args.Length >= 2 && args[1] == "projects")
         {
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [role <environment|none> <function|none>] [projects add|remove|list [<folder>]]");
+        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
         return 2;
     }
 
