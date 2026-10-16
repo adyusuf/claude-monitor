@@ -396,7 +396,8 @@ are not reaped promptly, so the pid must be checked alive); `version` is the rea
 hooks stored (`session_inboxes`, user-only database, the key never uploaded or logged). A failed write returns the prompt to the hooks, forgets the
 inbox until a hook says where the session listens, and records the exception type name: no retry loop. The transcript tailer confirms the push as
 before, by the wrapper text (`<<<claude-monitor-message id=…`), which the inbox text keeps; it does not need the `uuid` §8.7 suggested (the `uuid` is
-still sent). `cm-agent install --push on|inbox|channel|off`; `on` means the inbox; the saved choice is `agent.json` `pushTransport`.
+still sent). `cm-agent install --push inbox|channel|off` and `cm-agent config push ...`; **`on` and a push saved before the inbox existed still mean the channel** (backward
+compatibility, global #4); the saved choice is `agent.json` `pushTransport`.
 
 **Phase 2 (plugin).** `.claude-plugin/marketplace.json` and `plugin/monitor-agent/` (manifest, hooks and MCP file rendered by `cm-agent plugin-files .` from
 `PluginInstaller.Hooks`, a test fails on drift; `scripts/run.sh`, `scripts/ensure.sh`, three skills, `agent-release.txt`; `claude plugin validate` passes
@@ -406,10 +407,11 @@ for both). `cm-agent connect` (device login in a detached child, returns with th
 
 | §3 said | Built | Why |
 |---|---|---|
-| push default **on** once measured | stays **off**; `--push on` and the plugin's option turn it on | the project rule is that push is opt-in (ADR-0003); the owner's decision to reverse it, not mine |
+| push default **on** once measured | stays **off**; `--push inbox`, `cm-agent config push inbox` and the plugin's *push* option turn it on | the project rule is that push is opt-in (ADR-0003); the owner's decision to reverse it, not mine |
 | binary in `${CLAUDE_PLUGIN_DATA}/bin`, `BinaryPath` recorded in the agent home | the wrapper sets `CM_BINARY`; `AgentConfig.BinaryPath` honours it | self-update (ADR-0004) and the daemon respawn then act on the plugin's copy with no change |
 | `agent-release.json`, a `cm-agent ensure` verb | `agent-release.txt` (version, then `<os>-<arch> <sha256> <zip>`), no `ensure` verb | the bootstrap runs before any binary exists, so it must be shell, and shell cannot read JSON without a tool; nothing was left for an `ensure` verb to do |
 | the daemon watches `installed_plugins.json` | it watches the plugin's data directory (deleted on uninstall, documented) and `enabledPlugins` (settings, documented) | the registry file is internal; both signals used are in the docs |
+| the daemon flushes the outbox once when it stops | it only stops; events stay in the local database and go up when a daemon next runs | a stop is also the answer to a revoked login, where a flush would fail; nothing is lost |
 | the old local plugin is removed by `ensure` | `/monitor-agent:connect` runs `cm-agent uninstall` (the existing verb); the bootstrap warns while it is enabled | removing another plugin is the person's call, made by invoking the skill |
 
 **Verified:** 1352 agent tests (the push, hook, socket, plugin-watch, connect and drift tests among them), the plugin scripts against a loopback server
@@ -424,4 +426,24 @@ the plugin installed from a real marketplace; a published build (the pins file i
 - **Serving the plugin from the server itself** (a marketplace `archive` source on the site's own `/downloads`, no GitHub coordinates in the web build) would make
   `VITE_PLUGIN_MARKETPLACE` unnecessary; it needs a deploy step that writes `marketplace.json` with the site's address and the zip's hash.
 - Hold expiry, the terminal approval dialog and `bypassPermissions` without the key were measured or reasoned in §8 only for macOS.
+
+### 9.1 Found by the independent QA pass (16/10/2026) and fixed
+
+| Finding | Fix |
+|---|---|
+| a prompt the session never showed was requeued and pushed again every wait, and the hooks never got it (reproduced: 4 sends instead of 1) | `commands.push_tried`: a push given up on is not offered to a transport again, only to the hooks; the inbox waits 10 minutes (`InboxConfirmWait`) before giving up, so a long tool call does not duplicate it. The same fix applies to the channel path, which had the same loop |
+| `on` and a saved push silently changed from the channel to the inbox | they keep meaning the channel; only `inbox` is the inbox |
+| the restarted daemon after an upgrade did not know its plugin, so a switched-off plugin was never noticed | the bootstrap passes the plugin id to the restart; tested |
+| `connect` showed the code of a login that had ended | a code is reused only while nothing but retries follows it in the log, and only for the same server |
+| a plugin-only user had no way to turn push on | the plugin's *push* option (`inbox`), and `cm-agent config push` |
+| a refused download was retried (up to 250 MB) at every session start; pins of one environment broke another's | a failed version is not retried for 6 hours; a version's pins list one digest per environment's build and `write_plugin_pins.py` accumulates them |
+| `http://localhost.<host>` passed the loopback check; a file name with `../` passed the name check; the connect skill put the server into a shell string | exact patterns, tested with hostile values; the bootstrap keeps the validated server in the data directory and the skill no longer passes it |
+| a Linux or Windows machine without `unzip` could not install; Windows could not replace a running binary | `unzip`, PowerShell `Expand-Archive`, `bsdtar`, `python3 -m zipfile`, a clear message otherwise; the old file is renamed aside on Windows (not run there) |
+| an idle session lost its inbox after a day | 30 days, and a dead socket is dropped at its first failed write |
+| the session key could reach a log through the configuration's text form; the daemon inherited the starting session's key | `SecretText` hides it; the daemon's environment is scrubbed; a socket that is a symlink or not the user's own is not written to |
+| a stop wait saved for the agent was cut off by the plugin's fixed hook timeout | a plugin-started agent takes no stop wait |
+| two files over 300 lines | split |
+
+**Open after the QA pass:** Windows (the named-pipe branch has no test anywhere, `sh` for the MCP server must be on the Windows PATH, the detached login may not outlive a job
+object); a plugin disabled only at project or local scope is not noticed.
 

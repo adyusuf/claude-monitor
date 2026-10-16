@@ -103,23 +103,26 @@ are doing, `/monitor-agent:disconnect` signs the machine out. The first session 
 not there yet); the transcript is read later, so nothing of it is lost. **Uninstalling or disabling the plugin stops the daemon within
 30 s**: Claude Code runs nothing at uninstall, so the daemon watches for its data directory to disappear and for a `false` in
 `enabledPlugins`. The agent home, the login and the credential store stay: installing the plugin again continues from them.
-`claude plugin uninstall --keep-data` keeps the binary too. The old local plugin (`cm-agent install`, `monitor-agent-local`) reports
+`claude plugin uninstall --keep-data` keeps the data directory, so the daemon does not see that uninstall (it still stops at a user-level disable, or when the
+machine restarts). A plugin switched off only in a project's settings is not seen either. The old local plugin (`cm-agent install`, `monitor-agent-local`) reports
 every event a second time if it stays enabled: `/monitor-agent:connect` removes it, and the bootstrap says so while it is there.
 
 A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
 `dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). Limits: `--stop-wait`
-cannot be changed for the plugin's hooks (their timeouts are fixed at the defaults); the plugin has no channel entry (push through the
+is ignored for a plugin-started agent (the plugin's hook timeouts are fixed at the defaults); the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
 
 ### Pushing web messages into an idle session (opt-in)
 
-Off by default. `cm-agent install --push on` makes a prompt sent from the web start a turn in an idle session within about a
-second, **with no start-up flag**: every Claude Code session (terminal, desktop app, VS Code) has an *inbox socket*, its hooks learn
+Off by default. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
+sent from the web start a turn in an idle session within about a second, **with no start-up flag**: every Claude Code session (terminal, desktop app, VS Code) has an *inbox socket*, its hooks learn
 where it is (`CLAUDE_CODE_MESSAGING_SOCKET`), and the daemon writes the prompt there (ADR-0007). The text is wrapped, labelled as
 coming from the web and capped; the session is told to treat it as data and to ask you before any request with side effects. A
 session that refuses messages (`crossSessionInbound: refuse`) or has none is not an error: the prompt goes back to the hooks.
 `cm-agent status` shows `Push into the session: on through the inbox socket`, whether this session's inbox is known and the last
-failure. The older **channel** (`--push channel`, below) stays for anyone who had it.
+failure. The older **channel** (`--push on`, also `--push channel`, below) stays exactly as it was: `on`, `CM_PUSH=on` and a push saved before the
+inbox existed all still mean the channel. A prompt written to a session that never shows it in the transcript is **not written again**: after
+10 minutes (`InboxConfirmWait`) it is left to the hooks.
 
 ### Pushing through a Claude Code channel (`--push channel`)
 

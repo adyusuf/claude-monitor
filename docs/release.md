@@ -82,7 +82,7 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   anything else, so a plugin published before its pins names no build and installs nothing. Order: build -> commit the pins -> promote; the zips must be in the
   environment's `/downloads` before the plugin version that pins them is published. Set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
   (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `cm-agent plugin-files .` and commit the result (a test fails otherwise).
-  `--push on` now pushes through the session's inbox (no start-up flag); the old channel is `--push channel`.
+  `--push inbox` pushes through the session's inbox (no start-up flag); `--push on` and `--push channel` are the old channel, unchanged.
 
 ## Rollback
 
