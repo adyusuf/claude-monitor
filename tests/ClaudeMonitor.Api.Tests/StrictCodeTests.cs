@@ -207,4 +207,30 @@ public sealed class StrictCodeTests(ApiFactory api)
         await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync($"/api/jobs/{id}/approve", new { }), HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
         Assert.Equal(HttpStatusCode.NoContent, (await team.Owner.PostAsync($"/api/jobs/{id}/approve", new { code = RemoteKit.TotpNow(api, secret) })).StatusCode);
     }
+
+    [Fact]
+    public async Task An_owner_giving_a_grant_directly_on_a_strict_target_needs_a_valid_code_and_without_two_step_sign_in_cannot()
+    {
+        var team = await StrictTeamAsync(api);
+        var ask = RemoteKit.GrantAsk(team.TargetId);
+        var body = new { template = ask.Template.ToArray(), cwd = ask.Cwd, maxTimeoutSeconds = 60, days = 7, granteeUserId = team.Admin.Id };
+        await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync($"/api/agents/{team.TargetId}/grants", body), HttpStatusCode.Forbidden, RemoteErrors.TotpRequired);
+
+        var secret = await RemoteKit.EnableTotpAsync(api, team.Owner);
+        await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync($"/api/agents/{team.TargetId}/grants", body), HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
+        await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync($"/api/agents/{team.TargetId}/grants", new { body.template, body.cwd, body.maxTimeoutSeconds, body.days, body.granteeUserId, code = "000000" }),
+            HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
+        var created = await team.Owner.PostAsync($"/api/agents/{team.TargetId}/grants",
+            new { body.template, body.cwd, body.maxTimeoutSeconds, body.days, body.granteeUserId, code = RemoteKit.TotpNow(api, secret) });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_owner_giving_a_grant_directly_on_a_target_that_is_not_strict_still_needs_only_a_recent_sign_in()
+    {
+        var team = await ScriptKit.TeamAsync(api, "test", "application", ExecLevels.Argv);
+        var ask = RemoteKit.GrantAsk(team.TargetId);
+        var body = new { template = ask.Template.ToArray(), cwd = ask.Cwd, maxTimeoutSeconds = 60, days = 7, granteeUserId = team.Admin.Id };
+        Assert.Equal(HttpStatusCode.OK, (await team.Owner.PostAsync($"/api/agents/{team.TargetId}/grants", body)).StatusCode);
+    }
 }

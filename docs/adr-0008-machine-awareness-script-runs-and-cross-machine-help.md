@@ -472,7 +472,7 @@ the service home, the `systemd --user` unit and its start limit; the macOS servi
 - The ADR-0005 open items other than 13 stay open: schedules for jobs, shipping files or bundles to a target, end-to-end
   signed approvals, a separate run account.
 - Multi-file scripts, stdin, a persistent session on the target, per-role allow-lists or timeouts.
-- Which transport took an ask (inbox or hooks) is not yet shown on the web, the same gap ADR-0007 §9 lists for commands.
+- There is no transport to show for an ask: it is always written into a session's inbox (a hook cannot start a turn in an idle session, and an ask is only offered to an idle one), so the transport label of ADR-0007 §9 has nothing to add to it.
 
 ## 11. What was built, how it differs from the plan, and what is unverified (16/10/2026)
 
