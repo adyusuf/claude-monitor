@@ -85,6 +85,17 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `cm-agent plugin-files .` and commit the result (a test fails otherwise).
   `--push inbox` pushes through the session's inbox (no start-up flag); `--push on` and `--push channel` are the old channel, unchanged.
 
+## Download host
+
+The agent builds can be published on a download host instead of each server's own `/downloads`: an R2 bucket behind a public domain (the domain is a deployment value, never in the repository).
+
+- **Publish:** `AGENT_UPDATE_CHANNEL=<channel> bash scripts/build-agent.sh`, then `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <channel>` (wrangler, the maintainer's own login). It checks `SHA256SUMS` and that the manifest is signed for that channel,
+  uploads the files to `daemons/<version>/<channel>/` (kept, cached for good) and then to `daemons/<channel>/` (`no-cache`), and the manifest last.
+- **Point a server at it:** `MONITOR_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>` in that server's `monitor.env` (test: `.../daemons/test`, prod: `.../daemons/prod`). The API reads `manifest.json` from there once a minute, keeps the last good copy when the host is down, and
+  offers `<url>/<file>`. `/downloads/<file>` on the server answers 302 to the host when the server does not hold the file itself, so the web's "Get the agent" page, old links and the plugin's bootstrap keep working. Unset, nothing changes.
+- **Trust:** the address is not what makes a build trusted; the agent still verifies the signed SHA-256 against its built-in channel key. It will fetch from the server's own `/downloads/` or from an https address on a public host name (default port, no credentials or query, a plain file name, no redirect); anything else is refused (`bad_url`).
+- Channels stay apart by folder: a test agent carries the test key and only the `test` manifest is signed for it. Never point the prod server at `daemons/test`.
+
 ## Rollback
 
 - **A change on `dev` or `test`:** a revert commit through the gate, like any other change. Nothing is ever

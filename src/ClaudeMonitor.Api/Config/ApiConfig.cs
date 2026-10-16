@@ -21,6 +21,13 @@ public sealed record ApiConfig
     public const string DownloadsFolder = ClaudeMonitor.Contracts.UpdatePaths.DownloadsFolder;
 
     public string? DownloadsDir => WebRoot is { Length: > 0 } root ? Path.Combine(Path.GetFullPath(root), DownloadsFolder) : null;
+
+    /// <summary>
+    /// Where the agent builds and the signed manifest.json are published instead of this server's own /downloads (MONITOR_DOWNLOADS_URL,
+    /// an https address such as a public object-storage domain, one folder per channel). Null: this server serves them.
+    /// </summary>
+    public string? DownloadsUrl { get; init; }
+
     public required string Commit { get; init; }
     public required Version MinimumAgentVersion { get; init; }
 
@@ -184,6 +191,7 @@ public sealed record ApiConfig
             Google = Client("MONITOR_GOOGLE"),
             ArchiveDir = Required("MONITOR_ARCHIVE_DIR", Path.Combine(Path.GetTempPath(), "claude-monitor-archive")),
             WebRoot = env["MONITOR_WEB_ROOT"],
+            DownloadsUrl = DownloadsBase(env["MONITOR_DOWNLOADS_URL"]),
             Commit = env["MONITOR_COMMIT"] is { Length: > 0 } c ? c : "dev",
             MfaKey = Key32(Required("MONITOR_MFA_KEY", "ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyLWJ5dGU")),
             MinimumAgentVersion = Version.Parse(env["MONITOR_MIN_AGENT_VERSION"] is { Length: > 0 } m ? m : "0.1.0"),
@@ -194,6 +202,11 @@ public sealed record ApiConfig
             AuthRequestsPerMinute = int.TryParse(env["MONITOR_AUTH_RATE_PER_MINUTE"], out var rate) && rate > 0 ? rate : 20,
         };
     }
+
+    private static string? DownloadsBase(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null
+        : UpdateUrls.TryParseBase(value, out var b) ? b
+        : throw new InvalidOperationException("MONITOR_DOWNLOADS_URL must be an https address with a host name, without credentials, query or fragment (see .env.example)");
 
     private static byte[] Key32(string base64Url)
     {

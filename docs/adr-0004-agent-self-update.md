@@ -108,6 +108,13 @@ as `index.html`, so a download could not be verified. `/downloads` is now its ow
 Updating Claude Code itself (the harness the agent reports on) is **not part of this ADR**. It affects sessions that are running, which an agent update does
 not, and is tracked separately.
 
+### Amendment (16/10/2026): a download host
+
+`MONITOR_DOWNLOADS_URL` moves the builds and `manifest.json` to an https download host (an R2 bucket behind a public domain). The API reads the manifest there (every minute, last good copy kept) and offers `<url>/<file>`;
+`/downloads/<file>` on the server redirects there. The agent used to accept only its own server's `/downloads/`; it now also accepts an https address on a public DNS name (default port, no credentials, query or
+fragment, a plain file name, no redirect, no IP literal or local name). The address was never the trust anchor: the build is installed only if its SHA-256 equals the signed one and the signature verifies against the channel
+key built into the agent. A compromised API could at most make an agent download a file that is then refused. `scripts/publish_agent_downloads.sh` publishes a build; `docs/release.md`, "Download host".
+
 ## Consequences
 
 - With everything at its default nothing changes: no update call, no new behaviour. A person can run `cm-agent update --check` and `cm-agent update` at any time.

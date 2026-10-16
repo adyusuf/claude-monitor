@@ -76,8 +76,9 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
 
         if (entry is not JsonObject obj) return false;
         var now = clock.GetUtcNow();
-        // The wrapper's own text, not the bare id: `monitor_status` also prints ids, and that must not confirm a push.
-        foreach (var pushed in pending.Where(p => line.Contains($"{ChannelEnvelopes.Open} id={p}", StringComparison.Ordinal)).ToList())
+        // The wrapper's own text, not the bare id: `monitor_status` also prints ids, and that must not confirm a push. An inbox message or an ask opens
+        // with the fence; a channel message is the <channel> tag whose message_id attribute holds the id (quoted, or escaped inside the JSON line).
+        foreach (var pushed in pending.Where(p => ChannelEnvelopes.AppearsIn(line, p)).ToList())
         {
             if (store.ConfirmPush(pushed, now) || store.ConfirmAsk(pushed, now)) pending.Remove(pushed);
         }
