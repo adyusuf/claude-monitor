@@ -76,7 +76,8 @@ internal static class MonitorDbModelRemote
                 t.HasCheckConstraint("ck_remote_runs_mode", In("mode", RunModes.All));
                 t.HasCheckConstraint("ck_remote_runs_status", In("status", RunStatuses.All));
                 t.HasCheckConstraint("ck_remote_runs_mode_shape",
-                    "(mode = 'argv' AND shell_command IS NULL) OR (mode = 'shell' AND argv IS NULL)");
+                    "(mode = 'argv' AND shell_command IS NULL AND script_body IS NULL) OR (mode = 'shell' AND argv IS NULL AND script_body IS NULL) "
+                    + "OR (mode = 'script' AND argv IS NULL AND shell_command IS NULL AND cwd IS NULL)");
                 t.HasCheckConstraint("ck_remote_runs_timeout", "timeout_seconds BETWEEN 1 AND 3600");
                 t.HasCheckConstraint("ck_remote_runs_client_key", "char_length(client_key) BETWEEN 1 AND 100");
             });

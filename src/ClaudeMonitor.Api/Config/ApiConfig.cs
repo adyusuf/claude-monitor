@@ -1,3 +1,4 @@
+using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Api.Config;
 
 /// <summary>
@@ -63,6 +64,12 @@ public sealed record ApiConfig
     public long RunOutputMax { get; init; } = 1024 * 1024;
     public int RunChunkMax { get; init; } = 64 * 1024;
     public int RunTextMax { get; init; } = 8192;
+
+    /// <summary>The longest script body (ADR-0008 §3c); RunTextMax keeps applying to argv elements and shell text. At most <see cref="ScriptInterpreters.BodyCeiling"/>.</summary>
+    public int RunScriptMax { get; init; } = ScriptInterpreters.BodyMax;
+    public long ScriptOutputFloor { get; init; } = 1024 * 1024;
+    public long ScriptOutputDefault { get; init; } = 8 * 1024 * 1024;
+    public long ScriptOutputCeiling { get; init; } = 64 * 1024 * 1024;
     public int RunArgvMax { get; init; } = 64;
     public int RunReasonMax { get; init; } = 500;
 

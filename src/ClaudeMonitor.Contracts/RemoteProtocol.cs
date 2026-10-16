@@ -62,14 +62,17 @@ public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Ki
 /// </summary>
 public sealed record RunCreate(string ClientKey, Guid TargetAgentId, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand,
     string? Cwd, int TimeoutSeconds, string? Reason, string? SessionExternalId = null, Guid? JobId = null,
-    string? ProjectKey = null, string? Kind = null);
+    string? ProjectKey = null, string? Kind = null, string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null);
 
 public sealed record RunCreated(Guid Id, string Status, Guid? GrantId, DateTimeOffset ExpiresAt);
 
 public sealed record RunView(Guid Id, Guid TargetAgentId, string TargetHostname, string Mode, IReadOnlyList<string>? Argv,
     string? ShellCommand, string? Cwd, int TimeoutSeconds, string Status, int? ExitCode, string? Error, long OutputBytes,
     bool OutputTruncated, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, DateTimeOffset? EndedAt, Guid? GrantId, Guid? JobId,
-    string? ProjectKey = null, string? Kind = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null);
+    string? ProjectKey = null, string? Kind = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null,
+    string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, string? TargetEnvironment = null,
+    string? TargetFunction = null, long? OutputCap = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, long? OutputRefusedBytes = null,
+    int? OutputMissingFromSeq = null, int? OutputChunks = null, bool? OutputComplete = null);
 
 /// <summary>One piece of a run's output, numbered from 0 by the target. GapBefore marks output cut out before it.</summary>
 public sealed record RunOutputChunk(int Seq, string Stream, string Body, bool GapBefore = false);
@@ -84,7 +87,8 @@ public sealed record GrantTemplate(IReadOnlyList<string> Argv, string Cwd, int M
 /// (server clock; null from an older API), so a target that refuses a run for an off switch knows whether its last settings read is older.
 /// </summary>
 public sealed record RunMessage(Guid Id, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand, string? Cwd,
-    int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null);
+    int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null,
+    string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, long? OutputCap = null, bool ApprovedWithTotp = false);
 
 public sealed record RunCancelMessage(Guid Id);
 
@@ -93,7 +97,7 @@ public sealed record RunUpdateMessage(Guid Id, string Status);
 
 /// <summary>The target's report on a run. At is when it happened on the target.</summary>
 public sealed record RunStatusUpdate(string Status, int? ExitCode = null, string? Error = null, bool OutputTruncated = false,
-    string? ResolvedExe = null, DateTimeOffset? At = null);
+    string? ResolvedExe = null, DateTimeOffset? At = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, int? OutputChunks = null);
 
 public sealed record GrantRequest(Guid TargetAgentId, IReadOnlyList<string> Template, string Cwd, int MaxTimeoutSeconds, int Days,
     string? Reason);

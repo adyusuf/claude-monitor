@@ -73,6 +73,21 @@ public sealed class RemoteRun
     public int? TestsPassed { get; set; }
     public int? TestsFailed { get; set; }
     public int? TestsSkipped { get; set; }
+
+    // ADR-0008 §3c, §3d: a script run's text, the role the approval card showed, the output cap frozen at creation and what was read, dropped and refused.
+    public string? ScriptInterpreter { get; set; }
+    public string? ScriptBody { get; set; }
+    public List<string>? ScriptArgs { get; set; }
+    public string? TargetEnvironment { get; set; }
+    public string? TargetFunction { get; set; }
+    public bool ApprovedWithTotp { get; set; }
+    public long? OutputCap { get; set; }
+    public long? OutputReadBytes { get; set; }
+    public long? OutputDroppedBytes { get; set; }
+    public long? OutputRefusedBytes { get; set; }
+    public int? OutputMissingFromSeq { get; set; }
+    public int? OutputChunks { get; set; }
+    public bool? OutputComplete { get; set; }
 }
 
 public sealed class RemoteRunOutput

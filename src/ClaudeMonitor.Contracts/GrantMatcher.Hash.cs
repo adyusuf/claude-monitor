@@ -32,6 +32,25 @@ public static partial class GrantMatcher
         return Convert.ToHexStringLower(SHA256.HashData(buffer.ToArray()));
     }
 
+    /// <summary>
+    /// The hash a script run's approval binds to: the interpreter, the exact script text, the arguments, the timeout, the target and the target's
+    /// role as the card showed it. The argv and shell hash above does not change.
+    /// </summary>
+    public static string ScriptHash(string interpreter, string body, IReadOnlyList<string>? args, int timeoutSeconds, Guid targetAgentId,
+        string? targetEnvironment, string? targetFunction)
+    {
+        using var buffer = new MemoryStream();
+        Put(buffer, ScriptHashTag);
+        Put(buffer, targetAgentId.ToString("D"));
+        Put(buffer, interpreter);
+        Put(buffer, body);
+        PutList(buffer, args);
+        PutInt(buffer, timeoutSeconds);
+        Put(buffer, targetEnvironment);
+        Put(buffer, targetFunction);
+        return Convert.ToHexStringLower(SHA256.HashData(buffer.ToArray()));
+    }
+
     // Every field is "present flag, byte length, bytes", so null and empty differ and no two splits give the same bytes.
     private static void Put(Stream stream, string? value)
     {

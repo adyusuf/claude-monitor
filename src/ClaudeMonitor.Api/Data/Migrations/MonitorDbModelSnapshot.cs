@@ -1286,6 +1286,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("ApprovedWithTotp")
+                        .HasColumnType("boolean")
+                        .HasColumnName("approved_with_totp");
+
                     b.PrimitiveCollection<List<string>>("Argv")
                         .HasColumnType("text[]")
                         .HasColumnName("argv");
@@ -1353,6 +1357,34 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("output_bytes");
 
+                    b.Property<long?>("OutputCap")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_cap");
+
+                    b.Property<int?>("OutputChunks")
+                        .HasColumnType("integer")
+                        .HasColumnName("output_chunks");
+
+                    b.Property<bool?>("OutputComplete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("output_complete");
+
+                    b.Property<long?>("OutputDroppedBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_dropped_bytes");
+
+                    b.Property<int?>("OutputMissingFromSeq")
+                        .HasColumnType("integer")
+                        .HasColumnName("output_missing_from_seq");
+
+                    b.Property<long?>("OutputReadBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_read_bytes");
+
+                    b.Property<long?>("OutputRefusedBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_refused_bytes");
+
                     b.Property<bool>("OutputTruncated")
                         .HasColumnType("boolean")
                         .HasColumnName("output_truncated");
@@ -1382,6 +1414,19 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("resolved_exe");
 
+                    b.PrimitiveCollection<List<string>>("ScriptArgs")
+                        .HasColumnType("text[]")
+                        .HasColumnName("script_args");
+
+                    b.Property<string>("ScriptBody")
+                        .HasColumnType("text")
+                        .HasColumnName("script_body");
+
+                    b.Property<string>("ScriptInterpreter")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("script_interpreter");
+
                     b.Property<string>("ShellCommand")
                         .HasColumnType("text")
                         .HasColumnName("shell_command");
@@ -1400,6 +1445,16 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<Guid>("TargetAgentId")
                         .HasColumnType("uuid")
                         .HasColumnName("target_agent_id");
+
+                    b.Property<string>("TargetEnvironment")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("target_environment");
+
+                    b.Property<string>("TargetFunction")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("target_function");
 
                     b.Property<Guid>("TargetUserId")
                         .HasColumnType("uuid")
@@ -1474,11 +1529,17 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_remote_runs_kind", "kind IS NULL OR kind IN ('test', 'build', 'deploy', 'other')");
 
-                            t.HasCheckConstraint("ck_remote_runs_mode", "mode IN ('argv', 'shell')");
+                            t.HasCheckConstraint("ck_remote_runs_mode", "mode IN ('argv', 'shell', 'script')");
 
-                            t.HasCheckConstraint("ck_remote_runs_mode_shape", "(mode = 'argv' AND shell_command IS NULL) OR (mode = 'shell' AND argv IS NULL)");
+                            t.HasCheckConstraint("ck_remote_runs_mode_shape", "(mode = 'argv' AND shell_command IS NULL AND script_body IS NULL) OR (mode = 'shell' AND argv IS NULL AND script_body IS NULL) OR (mode = 'script' AND argv IS NULL AND shell_command IS NULL AND cwd IS NULL)");
+
+                            t.HasCheckConstraint("ck_remote_runs_output_cap", "output_cap IS NULL OR output_cap BETWEEN 1048576 AND 67108864");
+
+                            t.HasCheckConstraint("ck_remote_runs_script_interpreter", "script_interpreter IS NULL OR script_interpreter IN ('sh', 'bash', 'powershell', 'python')");
 
                             t.HasCheckConstraint("ck_remote_runs_status", "status IN ('pending_approval', 'approved', 'delivered', 'running', 'succeeded', 'failed', 'timed_out', 'denied', 'expired', 'cancelled')");
+
+                            t.HasCheckConstraint("ck_remote_runs_target_role", "(target_environment IS NULL OR target_environment IN ('dev', 'test', 'stage', 'preprod', 'production', 'other')) AND (target_function IS NULL OR target_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other'))");
 
                             t.HasCheckConstraint("ck_remote_runs_tests", "(tests_passed IS NULL OR tests_passed >= 0) AND (tests_failed IS NULL OR tests_failed >= 0) AND (tests_skipped IS NULL OR tests_skipped >= 0)");
 
@@ -2218,6 +2279,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("retention_days");
 
+                    b.Property<long>("ScriptOutputMaxBytes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(8388608L)
+                        .HasColumnName("script_output_max_bytes");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2236,6 +2303,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
                             t.HasCheckConstraint("ck_workspace_settings_alerts", "alert_cpu_pct BETWEEN 1 AND 100 AND alert_memory_pct BETWEEN 1 AND 100 AND alert_disk_pct BETWEEN 1 AND 100 AND alert_sustain_seconds BETWEEN 60 AND 86400");
 
                             t.HasCheckConstraint("ck_workspace_settings_retention", "retention_days BETWEEN 1 AND 3650");
+
+                            t.HasCheckConstraint("ck_workspace_settings_script_output", "script_output_max_bytes BETWEEN 1048576 AND 67108864");
                         });
                 });
 

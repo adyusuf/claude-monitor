@@ -32,6 +32,7 @@ public static partial class GrantMatcher
     public const int MaxTimeoutSecondsLimit = 3600;
 
     private const string RunHashTag = "run1";
+    private const string ScriptHashTag = "script1";
     private const string GrantHashTag = "grant1";
 
     /// <summary>Null when the template is valid, else a <see cref="GrantErrors"/> code.</summary>
