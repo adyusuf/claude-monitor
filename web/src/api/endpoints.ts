@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentRoleInput, AgentRoleView, AgentRow, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
@@ -60,6 +60,10 @@ export const api = {
   machines: (id: string) => request<MachineView[]>("GET", `/workspaces/${id}/machines`),
   agentRole: (agentId: string) => request<AgentRoleView>("GET", `/agents/${agentId}/role`),
   setAgentRole: (agentId: string, input: AgentRoleInput) => request<AgentRoleView>("PUT", `/agents/${agentId}/role`, input),
+  machineDetail: (agentId: string) => request<MachineDetail>("GET", `/agents/${agentId}/detail`),
+  setAgentTags: (agentId: string, tags: Record<string, string>) => request<{ agentId: string; tags: Record<string, string> }>("PUT", `/agents/${agentId}/tags`, { tags }),
+  setAgentNote: (agentId: string, note: string | null) => request<{ agentId: string; note: string | null }>("PUT", `/agents/${agentId}/note`, { note }),
+  setAgentServices: (agentId: string, share: boolean, code?: string) => request<AgentServicesView>("PUT", `/agents/${agentId}/services`, { share, code }),
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>
     request<AlertView[]>("GET", `/workspaces/${id}/alerts${q({ agent, resolved: includeResolved ? "true" : "false" })}`),

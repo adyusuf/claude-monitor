@@ -11,7 +11,10 @@ import { GrantList } from "./GrantList";
 import { JobList } from "./JobList";
 import { ToolList } from "./MachineBadges";
 import { MachineMetrics } from "./MachineMetrics";
+import { NoteEditor, TagsEditor } from "./MachineFacts";
+import { MachineProjects } from "./MachineProjects";
 import { MachineRoleEditor } from "./MachineRoleEditor";
+import { MachineServices } from "./MachineServices";
 import { ExecBadge, OnlineDot, ServiceBadge } from "./MachineBits";
 import { RunApproval } from "./RunApproval";
 import { RunList } from "./RunList";
@@ -70,7 +73,15 @@ export function MachinePage() {
       {data.error ? <Notice kind="error">{errorText(data.error)}</Notice> : null}
       {m.execLevel === "off" ? <Notice>{t("remote.execOffNote")}</Notice> : null}
       <Card title={t("machines.role.title")}><MachineRoleEditor agentId={agentId} view={m} canEdit={isAdmin} onChanged={() => void reload()} /></Card>
+      <Card title={t("machines.tags.title")}><TagsEditor agentId={agentId} tags={m.tags} canEdit={isAdmin} onChanged={() => void reload()} /></Card>
+      <Card title={t("machines.note.title")}><NoteEditor agentId={agentId} note={data.detail?.note} canEdit={isAdmin} onChanged={() => void reload()} /></Card>
       <Card title={t("machines.tools.title")}><ToolList view={m} /></Card>
+      {data.detail ? (
+        <>
+          <Card title={t("machines.services.title")}><MachineServices agentId={agentId} detail={data.detail} owned={data.owned} onChanged={() => void reload()} /></Card>
+          <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} /></Card>
+        </>
+      ) : null}
 
       {waiting.length > 0 ? (
         <section className="stack" aria-label={t("remote.waiting")}>

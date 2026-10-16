@@ -43,6 +43,13 @@ function kindText(kind: string, t: (key: "machines.claude.kind.npm" | "machines.
   }
 }
 
+/** The admin's tags as small chips; nothing when there are none (an older API omits them). */
+export function TagChips({ view: m }: { view: MachineView }) {
+  const entries = Object.entries(m.tags ?? {});
+  if (entries.length === 0) return null;
+  return <>{entries.sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => <span key={k} className="badge">{k}={v}</span>)} </>;
+}
+
 /** The tool inventory as "name version" chips; an untrusted tool is marked, and an agent that reported nothing says so. */
 export function ToolList({ view: m }: { view: MachineView }) {
   const { t } = useI18n();

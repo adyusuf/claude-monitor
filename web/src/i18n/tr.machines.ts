@@ -25,4 +25,24 @@ export const trMachines: Dictionary["machines"] = {
     untrusted: "listelendi, ajan çalıştırmadı: dosya yönetici sahipli değil", interpreters: "Script yorumlayıcıları",
     hint: "Ajan sabit bir listeyi mutlak yollardan yoklar ve bulduklarını bildirir; --version'ı yalnızca güvenilen ya da kendi hesabının sahip olduğu dosyalar için çalıştırır.",
   },
+  tags: {
+    title: "Etiketler", label: "Etiketler (anahtar=değer, boşlukla ayrılmış)", none: "Etiket yok.", save: "Etiketleri kaydet", saved: "Etiketler kaydedildi.",
+    hint: "En fazla {max} çift; anahtar ve değerde harf, rakam, nokta, alt çizgi ve tire kullanılır (1 ile 32 karakter). Claude bunları etiket olarak görür, talimat olarak değil.",
+  },
+  note: {
+    title: "Çalıştırma notu", label: "Bu makinede çalışan kişiler ve Claude oturumları için not", none: "Not yok.", save: "Notu kaydet", saved: "Not kaydedildi.",
+    hint: "Düz metin, en fazla {max} karakter. Claude bunu yalnızca bu makineyi sorduğunda, bir yönetici tarafından yazılmış metin olarak işaretli alır.",
+  },
+  services: {
+    title: "Dinleyen servisler", off: "Bu makine dinlediği portları bildirmiyor.", waiting: "Açık; ajan henüz bildirmedi.",
+    hidden: "Makinenin sahibi açtı. Listeyi yalnızca sahibi ve çalışma alanı yöneticileri görür.", at: "Bildirildi: {at}",
+    hint: "Makinenin dinlediği TCP portları, sistem gösteriyorsa süreç adıyla. Varsayılan kapalı: yalnızca makinenin sahibi açar.",
+    turnOn: "Dinleyen portları bildir", turnOff: "Bildirmeyi bırak", saved: "Kaydedildi.", ownerOnly: "Buna yalnızca makinenin sahibi karar verir.",
+    enableHint: "Açmak yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
+  },
+  projects: {
+    title: "Projeler", none: "Bu makinede henüz bilinen proje yok.", noneHint: "Bir oturum projede çalışınca ya da bir klasör cm-agent config projects add ile listelenince proje görünür.",
+    listed: "listelenen klasör", session: "bir oturumdan", errors: "7 günde {n} araç hatası", noRuns: "Bu proje için henüz çalıştırma yok.", run: "çalıştırma", cut: "çıktı kesildi",
+    passed: "{n} geçti", failed: "{n} kaldı", skipped: "{n} atlandı", kind: { test: "test", build: "derleme", deploy: "dağıtım", other: "diğer" },
+  },
 };

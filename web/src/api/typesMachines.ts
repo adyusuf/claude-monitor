@@ -34,6 +34,8 @@ export interface MachineView {
   tools?: ToolInfo[] | null;
   capabilities?: string[] | null;
   presenceAt?: string | null;
+  /** The admin's key=value tags (ADR-0008 §3a′); an older API omits them. */
+  tags?: Record<string, string> | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
@@ -54,3 +56,21 @@ export interface AlertView {
   openedAt: string;
   resolvedAt: string | null;
 }
+
+/** One listening TCP port; the process name is empty when the OS did not show the owner to the agent. */
+export interface ServiceInfo { port: number; proto: string; process: string | null }
+/** One run of a project on a machine (ADR-0008 §3a′); the counts are null when the test tool was not recognised. */
+export interface ProjectRunSummary {
+  kind: string | null; status: string; exitCode: number | null; at: string; outputTruncated: boolean;
+  testsPassed: number | null; testsFailed: number | null; testsSkipped: number | null;
+}
+export interface MachineProjectView {
+  key: string; name: string; branch: string | null; headSha: string | null; tag: string | null; lastSeenAt: string;
+  source: "session" | "listed"; lastRuns: ProjectRunSummary[]; recentErrors: number;
+}
+/** Everything about one machine: the list entry, the admin's note, the services the caller may see, and the projects. */
+export interface MachineDetail {
+  machine: MachineView; note: string | null; noteSetAt: string | null; servicesShared: boolean;
+  services: ServiceInfo[] | null; servicesAt: string | null; projects: MachineProjectView[];
+}
+export interface AgentServicesView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }

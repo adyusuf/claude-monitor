@@ -23,4 +23,24 @@ export const enMachines = {
     untrusted: "listed, not run by the agent: the file is not admin-owned", interpreters: "Script interpreters",
     hint: "The agent probes a fixed list by absolute path and reports what it finds; it runs --version only for trusted or self-owned binaries.",
   },
+  tags: {
+    title: "Tags", label: "Tags (key=value, separated by spaces)", none: "No tags.", save: "Save tags", saved: "Tags saved.",
+    hint: "At most {max} pairs; keys and values use letters, digits, dot, underscore and dash (1 to 32 characters). Claude sees them as labels, never as instructions.",
+  },
+  note: {
+    title: "Runbook note", label: "Note for the people and the Claude sessions that work on this machine", none: "No note.", save: "Save note", saved: "Note saved.",
+    hint: "Plain text, at most {max} characters. Claude receives it only when it asks about this machine, marked as text written by an admin.",
+  },
+  services: {
+    title: "Listening services", off: "This machine does not report its listening ports.", waiting: "Switched on; the agent has not reported yet.",
+    hidden: "Switched on by the machine's owner. Only the owner and workspace admins see the list.", at: "Reported {at}",
+    hint: "The TCP ports the machine listens on, with the process name where the system shows it. Off by default: only the machine's owner turns it on.",
+    turnOn: "Report listening ports", turnOff: "Stop reporting", saved: "Saved.", ownerOnly: "Only the machine's owner decides this.",
+    enableHint: "Turning this on needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
+  },
+  projects: {
+    title: "Projects", none: "No project is known on this machine yet.", noneHint: "A project appears when a session works in it, or when a folder is listed with cm-agent config projects add.",
+    listed: "listed folder", session: "from a session", errors: "{n} tool errors in 7 days", noRuns: "No run for this project yet.", run: "run", cut: "output cut",
+    passed: "{n} passed", failed: "{n} failed", skipped: "{n} skipped", kind: { test: "test", build: "build", deploy: "deploy", other: "other" },
+  },
 };
