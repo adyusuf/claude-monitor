@@ -17,4 +17,4 @@ The maintainer's global rules apply; these are this repository's own.
 - **Tests never touch a real database, account or harness configuration.**
 - **Public repository.** No real project, company or personal names or addresses in code, tests,
   docs or commit messages; no secrets.
-- **Gate:** `bash scripts/merge-gate.sh <dev|test|prod>` before every promotion. Coverage ≥ 80% per codebase (#29).
+- **Gate:** CI owns the full gate (`gate-core.sh dev` on every push); locally only `scripts/quick-check.sh`, a first look. `scripts/ci-status.sh` reads CI's verdict, `scripts/waived-gates.sh` lists waived gates; asking before each merge and the `Gate-Waived:` record are global rule #34. Coverage ≥ 80% per codebase (#29).

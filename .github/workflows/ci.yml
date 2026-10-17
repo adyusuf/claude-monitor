@@ -2,6 +2,7 @@
 # scripts/merge-gate.conf — never a second set of rules in this file (rule #19).
 # .NET 10 for the API and the agent, Node 22 for the web app (ADR-0002). The e2e suite runs at the test -> prod gate.
 # Locally: bash scripts/merge-gate.sh dev
+# A local scripts/quick-check.sh is only a first look; the full gate is here.
 name: CI
 
 on:
