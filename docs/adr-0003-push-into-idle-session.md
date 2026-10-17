@@ -1,6 +1,6 @@
 # ADR-0003: Pushing web messages into an idle session
 
-**Status:** Accepted (05/10/2026). Since 16/10/2026 the first `cm-agent install` turns the push on, through the channel (`--push inbox` is the other transport, ADR-0007); `--push off` stays off. Extends [ADR-0002](adr-0002-agent-platform.md), "Commands from the web".
+**Status:** Accepted (05/10/2026). Since 17/10/2026 the first `cm-agent install` turns the push on, through the inbox (ADR-0007; `--push channel` is the other transport); `--push off` stays off. (16/10/2026 it was the channel; the desktop app cannot pass the channel flag, so messages arrived only at the next prompt.) Extends [ADR-0002](adr-0002-agent-platform.md), "Commands from the web".
 **Decider:** the maintainer asked for it; the mechanism was chosen from what the Claude Code plugin API supports.
 
 ## Context

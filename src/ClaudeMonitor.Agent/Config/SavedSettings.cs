@@ -7,7 +7,7 @@ namespace ClaudeMonitor.Agent.Config;
 /// The settings a person can change after the fact without editing the environment of every hook process: how long the
 /// Stop hook waits for a prompt from the web (`cm-agent install --stop-wait`) and whether prompts are pushed into an idle
 /// session (`--push`). They are kept in agent.json beside the identity. CM_STOP_WAIT and CM_PUSH, when set, win (tests and
-/// one-off overrides); the defaults stay 0 and off, except that the first `cm-agent install` saves the channel push as on.
+/// one-off overrides); the defaults stay 0 and off, except that the first `cm-agent install` saves the inbox push as on.
 /// </summary>
 public static class SavedSettings
 {
