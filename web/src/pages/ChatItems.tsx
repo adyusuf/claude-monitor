@@ -3,6 +3,7 @@ import { useI18n } from "../i18n";
 import { time } from "../lib/format";
 import { Markdown } from "../lib/markdown";
 import type { ChatItem, Question, ToolResult } from "../lib/transcript";
+import { toolCounts, toolState, type ToolItem, type ToolRun } from "../lib/toolRuns";
 import { config } from "../config";
 
 /** Output longer than this is cut on the page (the event itself is whole); the rest opens with "Show all". */
@@ -18,9 +19,9 @@ function Output({ result }: { result: ToolResult }) {
   );
 }
 
-function ToolCall({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
+function ToolCall({ item }: { item: ToolItem }) {
   const { t } = useI18n();
-  const state = item.result === null ? (item.settled ? "unknown" : "pending") : item.result.isError ? "error" : "done";
+  const state = toolState(item);
   return (
     <details className={`chat-tool chat-tool-${state}`}>
       <summary>
@@ -38,7 +39,34 @@ function ToolCall({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
   );
 }
 
-/** What Claude asked, with the options it offered; the one chosen is marked once the question was answered. */
+/**
+ * A run of tool calls closed to how many there were and of which tools, so a long stretch of work takes one line; open, it lists
+ * each call (which opens to its input and output). Nothing is cut: names and summaries wrap.
+ */
+function ToolRunCard({ tools }: { tools: ToolItem[] }) {
+  const { t } = useI18n();
+  const states = tools.map(toolState);
+  const failed = states.filter((s) => s === "error").length;
+  const state = failed > 0 ? "error" : states.includes("pending") ? "pending" : "done";
+  return (
+    <details className={`chat-tool chat-tool-run chat-tool-${state}`}>
+      <summary>
+        <span className="chat-tool-dot" aria-hidden />
+        <strong className="chat-tool-name">{t("chat.toolRun", { n: tools.length })}</strong>
+        <span className="chat-tool-kinds">
+          {toolCounts(tools).map((c) => <span key={c.name} className="chat-tool-kind">{c.name} ×{c.count}</span>)}
+        </span>
+        <span className="chat-tool-state">{failed > 0 ? t("chat.toolRunFailed", { n: failed }) : t(`chat.tool_${state}`)}</span>
+      </summary>
+      <div className="chat-tool-list">{tools.map((tool) => <ToolCall key={tool.key} item={tool} />)}</div>
+    </details>
+  );
+}
+
+/**
+ * What Claude asked, closed to the question and the answer given; open, every option it offered, the one chosen marked. A question
+ * not yet answered says so where the answer would be.
+ */
 function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "question" }> }) {
   const { t } = useI18n();
   const answered = item.answers !== null;
@@ -47,25 +75,31 @@ function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "question" }> 
     return a !== undefined && (a === label || a.split(", ").includes(label));
   };
   return (
-    <div className="chat-question">
+    <details className="chat-question">
+      <summary>
+        {item.questions.map((q) => {
+          const answer = item.answers?.[q.question];
+          return (
+            <span key={q.question} className="chat-q-line">
+              {q.header ? <span className="badge">{q.header}</span> : null}
+              <span className="chat-q-text">{q.question}</span>
+              {answer !== undefined ? <span className="chat-answer">{t("chat.answer")}: {answer}</span> : null}
+            </span>
+          );
+        })}
+        {!answered ? <span className="muted small chat-q-line">{item.result ? item.result.text : t("chat.waitingAnswer")}</span> : null}
+      </summary>
       {item.questions.map((q) => (
-        <div key={q.question} className="chat-q">
-          {q.header ? <span className="badge">{q.header}</span> : null}
-          <p className="chat-q-text">{q.question}</p>
-          <ul className="chat-options" aria-label={t("chat.options")}>
-            {q.options.map((o) => (
-              <li key={o.label} className={chosen(q, o.label) ? "chat-option chat-option-chosen" : "chat-option"}>
-                <span className="chat-option-label">{chosen(q, o.label) ? "✓ " : ""}{o.label}</span>
-                {o.description ? <span className="muted small">{o.description}</span> : null}
-              </li>
-            ))}
-          </ul>
-          {answered && item.answers![q.question] !== undefined && !q.options.some((o) => chosen(q, o.label))
-            ? <p className="chat-answer">{t("chat.answer")}: {item.answers![q.question]}</p> : null}
-        </div>
+        <ul key={q.question} className="chat-options" aria-label={`${t("chat.options")}: ${q.question}`}>
+          {q.options.map((o) => (
+            <li key={o.label} className={chosen(q, o.label) ? "chat-option chat-option-chosen" : "chat-option"}>
+              <span className="chat-option-label">{chosen(q, o.label) ? "✓ " : ""}{o.label}</span>
+              {o.description ? <span className="muted small">{o.description}</span> : null}
+            </li>
+          ))}
+        </ul>
       ))}
-      {!answered ? <p className="muted small">{item.result ? item.result.text : t("chat.waitingAnswer")}</p> : null}
-    </div>
+    </details>
   );
 }
 
@@ -128,6 +162,11 @@ function NextStepCard({ item, reply }: { item: Extract<ChatItem, { kind: "nextst
       {!item.answered && sent === null && reply === null ? <p className="muted small">{t("chat.nextStepWaiting")}</p> : null}
     </div>
   );
+}
+
+/** A run of tool calls as one line of the conversation. */
+export function ToolRunLine({ run }: { run: ToolRun }) {
+  return <li className="chat-row" data-kind="toolrun"><ToolRunCard tools={run.tools} /></li>;
 }
 
 export function ChatLine({ item, reply = null }: { item: ChatItem; reply?: Reply | null }) {

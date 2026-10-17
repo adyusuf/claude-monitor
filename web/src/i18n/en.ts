@@ -79,7 +79,7 @@ export const en = {
     emptyHint: "Install the agent on a machine and start Claude Code: its sessions appear here live.",
     project: "Project", host: "Machine", owner: "Owner", cost: "Cost", lastActivity: "Last activity",
     untitled: "Untitled session", more: "Load more", live: "Live", permissionsWaiting: "{n} waiting for an answer",
-    unmeasured: "cannot be measured",
+    unmeasured: "cannot be measured", noBranch: "No branch reported",
   },
   session: {
     back: "All sessions", tasks: "Tasks", noTasks: "No tasks.", subagents: "Subagents", noSubagents: "No subagents.",
@@ -104,6 +104,7 @@ export const en = {
     note_notification: "Claude is waiting for you:", note_subagent_start: "Subagent started:", note_subagent_stop: "Subagent finished:",
     otherAnswer: "Or type another answer", sendAnswers: "Send answers", approvePlan: "Approve the plan", rejectPlan: "Send back with the note above",
     showAll: "Show all", showLess: "Show less",
+    toolRun: "{n} tool calls", toolRunFailed: "{n} failed",
     nextStepWaiting: "Waiting for the person at this session", nextStepAnswered: "Answered",
     replyPlaceholder: "Or type an answer", replySend: "Send", replySent: "Sent to the session: {text}",
     replyFailed: "The answer was not sent. Try again.",
