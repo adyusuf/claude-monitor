@@ -94,6 +94,9 @@ public sealed partial class EventProjector(MonitorDb db, ApiConfig config)
             case PlanTool or WrapUpTool:
                 await PlanToolAsync(s, tool, input, at, ct);
                 break;
+            case "Agent" or "Task":
+                await SubagentToolAsync(s, p, input, at, ct);
+                break;
             case "TodoWrite" when input.TryGetProperty("todos", out var todos) && todos.ValueKind == JsonValueKind.Array:
                 // TodoWrite sends the whole list: what is no longer in it is gone.
                 var keep = new HashSet<string>(StringComparer.Ordinal);
