@@ -226,6 +226,9 @@ shell targets; that is recorded under "Open" below.
   the API keeps 7 days. Thresholds (default 90 % each, sustained 5 minutes) live in the workspace settings; the agent
   opens and resolves alerts with hysteresis, one open alert per agent, kind and subject. The API also opens an
   **`offline`** alert when a service-mode agent misses its reports (maintainer, 06/10/2026).
+- Disks are the machine's fixed, real file systems. On a Mac the volumes macOS mounts for itself are not counted (17/10/2026: an iOS Simulator
+  runtime image, always nearly full, read 97 % on a half-empty Mac and raised a disk alert; the Recovery volume), nor the system volume `/` when the
+  Data volume is there (they are one APFS container and report the same numbers).
 - The agent **never acts** on an alert; Claude reads them with `monitor_alerts` and decides what to ask for.
 
 ### Service mode, Linux and credentials (amends ADR-0002)
