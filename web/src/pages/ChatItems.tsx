@@ -80,7 +80,57 @@ function PlanCard({ item }: { item: Extract<ChatItem, { kind: "plan" }> }) {
   );
 }
 
-export function ChatLine({ item }: { item: ChatItem }) {
+/** Sends an answer to the session as a message from the web; the card shows what was sent until the session's own line replaces it. */
+export type Reply = (text: string) => Promise<void>;
+
+/**
+ * The desktop app's "next step" box, which only the app's own window can answer: the question with its buttons, here
+ * answerable by whoever may command the session. An answer is a message from the web, the same as a click in the app sends.
+ */
+function NextStepCard({ item, reply }: { item: Extract<ChatItem, { kind: "nextstep" }>; reply: Reply | null }) {
+  const { t } = useI18n();
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const open = !item.answered && sent === null && reply !== null;
+  const send = async (message: string) => {
+    if (!reply || !message.trim()) return;
+    setError(false);
+    try {
+      await reply(message.trim());
+      setSent(message.trim());
+    } catch {
+      setError(true);
+    }
+  };
+  return (
+    <div className="chat-nextstep">
+      {item.recap ? <p className="muted small">{item.recap}</p> : null}
+      <p className="chat-q-text"><strong>{item.ask}</strong></p>
+      {open ? (
+        <>
+          <div className="prompt-options" role="group" aria-label={item.ask}>
+            {item.actions.map((a) => (
+              <button key={a.label} type="button" className="prompt-option" title={a.message} onClick={() => void send(a.message)}>
+                <span className="chat-option-label">{a.label}</span>
+              </button>
+            ))}
+          </div>
+          <form className="chat-reply" onSubmit={(e) => { e.preventDefault(); void send(text); }}>
+            <input className="input" placeholder={t("chat.replyPlaceholder")} maxLength={config.answerMax} value={text} onChange={(e) => setText(e.target.value)} />
+            <button type="submit" className="btn" disabled={!text.trim()}>{t("chat.replySend")}</button>
+          </form>
+          {error ? <p className="error" role="alert">{t("chat.replyFailed")}</p> : null}
+        </>
+      ) : null}
+      {sent !== null && !item.answered ? <p className="muted small">{t("chat.replySent", { text: sent })}</p> : null}
+      {item.answered ? <p className="muted small">{t("chat.nextStepAnswered")}</p> : null}
+      {!item.answered && sent === null && reply === null ? <p className="muted small">{t("chat.nextStepWaiting")}</p> : null}
+    </div>
+  );
+}
+
+export function ChatLine({ item, reply = null }: { item: ChatItem; reply?: Reply | null }) {
   const { t } = useI18n();
   switch (item.kind) {
     case "user":
@@ -107,6 +157,8 @@ export function ChatLine({ item }: { item: ChatItem }) {
       return <li className="chat-row" data-kind="question"><QuestionCard item={item} /></li>;
     case "plan":
       return <li className="chat-row" data-kind="plan"><PlanCard item={item} /></li>;
+    case "nextstep":
+      return <li className="chat-row" data-kind="nextstep"><NextStepCard item={item} reply={reply} /></li>;
     case "shortened":
       return <li className="chat-row chat-shortened" data-kind="shortened"><span className="badge">{t("session.truncated")}</span> <code>{item.text.slice(0, 200)}</code></li>;
     case "note":
