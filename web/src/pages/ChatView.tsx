@@ -5,9 +5,10 @@ import type { CommandRow, EventRow } from "../api/types";
 import { Button, Card, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useI18n } from "../i18n";
+import { groupToolRuns, isRun } from "../lib/toolRuns";
 import { buildChat, type ChatItem } from "../lib/transcript";
 import { useNow } from "../lib/useNow";
-import { ChatLine } from "./ChatItems";
+import { ChatLine, ToolRunLine } from "./ChatItems";
 import { isPending, PendingCommand } from "./PendingCommand";
 
 /** Events newest first, merged by id; older ones the page holds stay. */
@@ -150,7 +151,7 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
     await api.sendCommand(sessionId, "prompt", text);
     onReplied?.();
   }, [sessionId, onReplied]);
-  const entries = useMemo(() => withCommands(items, commands, now), [items, commands, now]);
+  const entries = useMemo(() => groupToolRuns(withCommands(items, commands, now)), [items, commands, now]);
 
   return (
     <Card title={t("session.events")} className="chat-card">
@@ -159,9 +160,11 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
           {next ? <div className="more"><Button variant="ghost" busy={loadingOlder} onClick={() => void older()}>{t("session.olderEvents")}</Button></div> : null}
           {entries.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : (
             <ol className="chat">
-              {entries.map((e) => e.command
-                ? <PendingCommand key={e.key} command={e.command} now={now} canCancel={canCancel} onCancel={(id) => onCancel?.(id)} />
-                : <ChatLine key={e.key} item={e.item!} reply={canReply && e.key === lastOpen ? reply : null} />)}
+              {entries.map((e) => isRun(e)
+                ? <ToolRunLine key={e.key} run={e} />
+                : e.command
+                  ? <PendingCommand key={e.key} command={e.command} now={now} canCancel={canCancel} onCancel={(id) => onCancel?.(id)} />
+                  : <ChatLine key={e.key} item={e.item!} reply={canReply && e.key === lastOpen ? reply : null} />)}
             </ol>
           )}
         </div>
