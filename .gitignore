@@ -28,4 +28,6 @@ coverage-report/
 web/dist/
 web/coverage/
 out/
+# wrangler's local cache (it holds the Cloudflare account id and name): never committed
+.wrangler/
 web/tsconfig.tsbuildinfo

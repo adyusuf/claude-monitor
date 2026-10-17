@@ -46,6 +46,7 @@ public static class MachineReports
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(config);
         var stored = 0;
+        (DateTimeOffset At, string[] Mounts)? latest = null; // the newest sample that lists every disk, for the alerts of disks that are gone
         foreach (var s in (report?.Samples ?? []).Take(config.MetricsReportMax))
         {
             if (s is null || s.SampledAt > now + config.ClockSkewMax || s.SampledAt < now - config.ClockSkewMax - config.MetricsReportWindow
@@ -54,9 +55,16 @@ public static class MachineReports
                 continue;
             }
 
-            var disks = JsonSerializer.Serialize((s.Disks ?? []).Take(config.MetricsDisksMax)
+            var kept = (s.Disks ?? []).Take(config.MetricsDisksMax)
                 .Where(d => d is not null && d.TotalBytes > 0 && d.UsedBytes >= 0)
-                .Select(d => new { mount = Clean(d.Mount ?? "", SubjectMax), usedBytes = d.UsedBytes, totalBytes = d.TotalBytes }));
+                .Select(d => new { mount = Clean(d.Mount ?? "", SubjectMax), usedBytes = d.UsedBytes, totalBytes = d.TotalBytes }).ToList();
+            var disks = JsonSerializer.Serialize(kept);
+            // A sample that lists some disks and was not cut at the cap lists them all; one with none (the agent could not read them) says nothing.
+            if (kept.Count > 0 && (s.Disks?.Count ?? 0) < config.MetricsDisksMax && (latest is null || s.SampledAt > latest.Value.At))
+            {
+                latest = (s.SampledAt, [.. kept.Select(d => d.mount)]);
+            }
+
             var cpu = (float)Math.Clamp(s.CpuPct, 0, 100);
             stored += await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
@@ -64,6 +72,15 @@ public static class MachineReports
                 VALUES ({agentId}, {s.SampledAt}, {workspaceId}, {now}, {cpu}, {s.MemUsedBytes}, {s.MemTotalBytes}, {disks}::jsonb)
                 ON CONFLICT (agent_id, sampled_at) DO NOTHING
                 """, ct);
+        }
+
+        // A disk that is no longer reported (a volume the agent now leaves out, a drive taken away) cannot be sampled below its threshold again, and the
+        // agent that opened its alert may have restarted and forgotten it: the alert ends here. One updated after the sample is newer than it and stays.
+        if (latest is { } last)
+        {
+            await db.MachineAlerts.Where(a => a.AgentId == agentId && a.Kind == AlertKinds.Disk && a.State == AlertStates.Open && a.UpdatedAt < last.At
+                    && !last.Mounts.Contains(a.Subject))
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, AlertStates.Resolved).SetProperty(a => a.ResolvedAt, now).SetProperty(a => a.UpdatedAt, now), ct);
         }
 
         return stored;
