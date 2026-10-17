@@ -6,7 +6,8 @@ import { Card, Notice, Spinner, StatusPill } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { count, dateTime, usd } from "../lib/format";
 import { debounce, useLive } from "../lib/live";
-import { CommandsCard, PermissionsCard } from "./SessionControls";
+import { CommandsCard, Composer, PermissionsCard } from "./SessionControls";
+import { useCommandRows } from "./useCommandRows";
 import { ChatCard } from "./ChatView";
 import { EventsCard } from "./SessionEvents";
 
@@ -19,6 +20,7 @@ export function SessionPage() {
   const [error, setError] = useState<unknown>(null);
   const [version, setVersion] = useState(0);
   const [view, setView] = useState<"chat" | "raw">("chat");
+  const { rows, reload: reloadRows } = useCommandRows(id, version);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +46,7 @@ export function SessionPage() {
   if (error && !detail) return <div className="page"><Notice kind="error">{errorText(error)}</Notice></div>;
   if (!detail) return <Spinner />;
   const s = detail.session;
+  const sender = { sessionId: id, canCommand: detail.canCommand, ended: s.status === "ended", lastEventAt: s.lastEventAt, pushTransport: s.pushTransport, reloadRows, onChange: reload };
 
   return (
     <div className="page">
@@ -73,12 +76,17 @@ export function SessionPage() {
             ))}
           </div>
           {view === "chat"
-            ? <ChatCard sessionId={id} version={version} footer={<PermissionsCard inline sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />} />
+            ? <ChatCard sessionId={id} version={version} canReply={detail.canCommand} onReplied={reload} commands={rows} canCancel={detail.canCommand}
+              onCancel={(commandId) => { void api.cancelCommand(commandId).then(reloadRows).catch(() => reloadRows()); }}
+              footer={<>
+                <PermissionsCard inline sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
+                <Composer {...sender} />
+              </>} />
             : <>
               <EventsCard sessionId={id} owner={{ ownerId: s.ownerId, ownerName: s.ownerName }} version={version} />
               <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
             </>}
-          <CommandsCard sessionId={id} canCommand={detail.canCommand} ended={s.status === "ended"} lastEventAt={s.lastEventAt} pushTransport={s.pushTransport} version={version} onChange={reload} />
+          <CommandsCard {...sender} rows={rows} withComposer={view === "raw"} />
         </div>
         <div className="col side">
           <Card title={t("session.tasks")}>

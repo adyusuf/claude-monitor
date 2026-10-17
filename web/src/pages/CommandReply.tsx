@@ -3,6 +3,7 @@ import { api } from "../api/endpoints";
 import type { CommandRow } from "../api/types";
 import { config } from "../config";
 import { useI18n } from "../i18n";
+import { Markdown } from "../lib/markdown";
 
 /** Where a command stands once it was handed to the session: not a stored status, a view over the recorded events. */
 export type ReplyState = "waiting" | "answered" | "unrecorded";
@@ -57,7 +58,7 @@ export function CommandReply({ command: c, sessionId, ended, now }: { command: C
       <span className={`reply-state reply-${state}`}>{t(`commandReply.${state}` as never)}</span>
       {state === "answered" ? (
         <>
-          <blockquote>{shown}</blockquote>
+          <blockquote><Markdown text={shown} /></blockquote>
           <button type="button" className="link" disabled={busy} onClick={() => void toggle()}>
             {busy ? t("commandReply.loading") : open ? t("commandReply.less") : t("commandReply.more")}
           </button>
