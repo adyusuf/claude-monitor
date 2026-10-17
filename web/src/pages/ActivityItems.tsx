@@ -33,9 +33,9 @@ function Truncated({ item }: { item: TimelineItem }) {
   return item.event?.truncated ? <span className="badge">{t("session.truncated")}</span> : null;
 }
 
-/** A line that opens its payload when pressed; a command has no payload and is plain text. */
+/** A line that opens when pressed: an event shows its payload, a command its whole text. */
 function Pressable({ item, open, onToggle, className, children }: Pick<LineProps, "item" | "open" | "onToggle"> & { className: string; children: ReactNode }) {
-  if (!item.event) return <div className={className}>{children}</div>;
+  if (!item.event && !item.command) return <div className={className}>{children}</div>;
   return (
     <button type="button" className={className} onClick={() => onToggle(item.key)} aria-expanded={open}>
       {children}
@@ -43,7 +43,7 @@ function Pressable({ item, open, onToggle, className, children }: Pick<LineProps
   );
 }
 
-/** A message that entered the session: sent from the web (a command) or typed in the harness. */
+/** A message that entered the session: sent from the web (a command) or typed in the harness. Closed to a short preview; pressed, the whole text and the payload. */
 export function InputLine({ item, who, open, onToggle }: LineProps) {
   const { t, dict } = useI18n();
   const monitor = item.cls === ActivityClass.MonitorInput;
@@ -55,7 +55,7 @@ export function InputLine({ item, who, open, onToggle }: LineProps) {
     : t("activity.typedBy", { name: who.ownerName });
   const statuses: Record<string, string> = dict.activity.status;
   return (
-    <li className={`act act-input act-${item.cls}${item.pending ? " act-pending" : ""}`}>
+    <li className={`act act-input act-${item.cls}${item.pending ? " act-pending" : ""}${open ? " act-open" : ""}`}>
       <div className="act-head">
         <span className="act-icon" aria-hidden>{monitor ? ICON.monitor : ICON.human}</span>
         <span className="act-label">{label}</span>
@@ -64,7 +64,7 @@ export function InputLine({ item, who, open, onToggle }: LineProps) {
         <Truncated item={item} />
         <span className="act-time">{moment(item)}</span>
       </div>
-      <Pressable item={item} open={open} onToggle={onToggle} className="act-text">
+      <Pressable item={item} open={open} onToggle={onToggle} className={open ? "act-text" : "act-text act-preview"}>
         {stop ? <><span aria-hidden>■ </span>{t("activity.stopRequest")}</> : item.text}
       </Pressable>
       {item.withHuman ? <div className="act-note">{t("activity.deliveredWith")}</div> : null}
@@ -91,7 +91,7 @@ export function AssistantLine({ item, open, onToggle }: Omit<LineProps, "who">) 
 /** A tool call or a background event: one soft line. */
 export function QuietLine({ item, open, onToggle }: Omit<LineProps, "who">) {
   return (
-    <li className="act act-quiet">
+    <li className={open ? "act act-quiet act-open" : "act act-quiet"}>
       <Pressable item={item} open={open} onToggle={onToggle} className="act-quiet-line">
         <span className="act-time">{moment(item)}</span>
         <span className="act-kind">{item.event ? kindLabel(item.event.kind) : ""}</span>
@@ -105,7 +105,7 @@ export function QuietLine({ item, open, onToggle }: Omit<LineProps, "who">) {
 
 /** A run of quiet lines folded into one, closed until pressed. */
 export function GroupLine({ row, open, onToggle, children }: {
-  row: Extract<Row, { kind: "group" }>; open: boolean; onToggle: (key: string) => void; children: ReactNode;
+  row: Extract<Row, { kind: "group" }>; open: boolean; onToggle: (row: Extract<Row, { kind: "group" }>) => void; children: ReactNode;
 }) {
   const { t } = useI18n();
   const parts = [
@@ -114,7 +114,7 @@ export function GroupLine({ row, open, onToggle, children }: {
   ].filter(Boolean);
   return (
     <li className="act act-group">
-      <button type="button" className="act-group-toggle" onClick={() => onToggle(row.key)} aria-expanded={open}>
+      <button type="button" className="act-group-toggle" onClick={() => onToggle(row)} aria-expanded={open}>
         <span aria-hidden>{open ? "▾" : "▸"}</span> {parts.join(" · ")}
       </button>
       {open ? <ol className="act-list">{children}</ol> : null}
