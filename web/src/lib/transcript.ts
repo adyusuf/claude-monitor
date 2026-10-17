@@ -5,6 +5,8 @@ import type { EventRow } from "../api/types";
 
 export interface QuestionOption { label: string; description: string }
 export interface Question { question: string; header: string; multiSelect: boolean; options: QuestionOption[] }
+/** One button of the desktop app's "next step" box: its label, and the message the app sends when it is clicked. */
+export interface NextStepAction { label: string; message: string }
 /** A tool's output; `shortened` is a result the agent cut for size, so only the fact that it came back is known. */
 export interface ToolResult { text: string; isError: boolean; shortened?: boolean }
 
@@ -16,6 +18,7 @@ export type ChatItem =
   | (Base & { kind: "tool"; id: string; name: string; summary: string; input: Record<string, unknown>; result: ToolResult | null; settled: boolean })
   | (Base & { kind: "question"; id: string; questions: Question[]; answers: Record<string, string> | null; result: ToolResult | null })
   | (Base & { kind: "plan"; id: string; plan: string; result: ToolResult | null })
+  | (Base & { kind: "nextstep"; id: string; recap: string; ask: string; actions: NextStepAction[]; answered: boolean })
   | (Base & { kind: "shortened"; text: string })
   | (Base & { kind: "note"; tone: "notification" | "subagent_start" | "subagent_stop"; text: string });
 
@@ -29,6 +32,26 @@ function resultText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content.map((b) => (isObj(b) ? str(b.text) : "")).filter(Boolean).join("\n");
+}
+
+/** The tool the desktop app gives a session for its "next step" box: a recap and, when the user must decide, one question with buttons. */
+export const NEXT_STEP_TOOL = "mcp__ccd_turn__wrap_up";
+const ASK_MAX = 300;
+const ACTION_MAX = 500;
+const ACTIONS_MAX = 4;
+
+/**
+ * The question of a next-step box, or null when the call only recaps (no `ask`): that stays an ordinary tool call. Text is cut to a
+ * size a card can hold; an action without a message answers with its label, as the app's own button does.
+ */
+export function nextStepOf(input: Obj): { recap: string; ask: string; actions: NextStepAction[] } | null {
+  const ask = str(input.ask).trim().slice(0, ASK_MAX);
+  if (!ask) return null;
+  const actions = (Array.isArray(input.actions) ? input.actions : []).filter(isObj).slice(0, ACTIONS_MAX).flatMap((a) => {
+    const label = str(a.label).trim();
+    return label ? [{ label: label.slice(0, 60), message: (str(a.message).trim() || label).slice(0, ACTION_MAX) }] : [];
+  });
+  return { recap: str(input.recap).trim().slice(0, ASK_MAX * 2), ask, actions };
 }
 
 /** A one-line description of a tool call, from the field each tool is known by. */
@@ -192,6 +215,14 @@ export function buildChat(events: EventRow[]): ChatItem[] {
     else if (item.kind !== "note") spoken = true; // a note (the user is wanted, a subagent started) says the call is still going
   }
 
+  // A next-step question is answered once the user said anything after it (a click in the app, a message from the web, a typed line).
+  let said = false;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i]!;
+    if (item.kind === "user") said = true;
+    else if (item.kind === "nextstep") item.answered = said;
+  }
+
   return items;
 }
 
@@ -199,5 +230,7 @@ function toolItem(key: string, at: string, id: string, name: string, input: Obj,
   const result = found ? { text: found.text, isError: found.isError, ...(found.shortened ? { shortened: true } : {}) } : null;
   if (name === "AskUserQuestion") return { kind: "question", key, at, id, questions: questionsOf(input), answers: found?.answers ?? null, result };
   if (name === "ExitPlanMode") return { kind: "plan", key, at, id, plan: str(input.plan), result };
+  const next = name === NEXT_STEP_TOOL ? nextStepOf(input) : null;
+  if (next) return { kind: "nextstep", key, at, id, ...next, answered: false };
   return { kind: "tool", key, at, id, name, summary: toolSummary(name, input), input, result, settled: false };
 }

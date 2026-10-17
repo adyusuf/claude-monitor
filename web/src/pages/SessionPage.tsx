@@ -73,7 +73,7 @@ export function SessionPage() {
             ))}
           </div>
           {view === "chat"
-            ? <ChatCard sessionId={id} version={version} footer={<PermissionsCard inline sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />} />
+            ? <ChatCard sessionId={id} version={version} canReply={detail.canCommand} onReplied={reload} footer={<PermissionsCard inline sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />} />
             : <>
               <EventsCard sessionId={id} owner={{ ownerId: s.ownerId, ownerName: s.ownerName }} version={version} />
               <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
