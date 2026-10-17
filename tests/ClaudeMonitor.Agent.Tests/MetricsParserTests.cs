@@ -113,6 +113,43 @@ public sealed class MetricsParserTests
     [InlineData("/System/Volumes/Update/mnt1")]
     public void Mac_system_volumes_other_than_data_are_not_reported(string mount) => Assert.False(DiskMetrics.IsReportable(mount, "apfs"));
 
+    [Theory]
+    [InlineData("/Library/Developer/CoreSimulator/Volumes/iOS_23F77")] // an iOS Simulator runtime: a read-only image that is full by design
+    [InlineData("/Library/Developer/CoreSimulator/Volumes/iOS_23F77/")]
+    [InlineData("/Library/Developer/CoreSimulator")]
+    [InlineData("/Volumes/Recovery")]
+    [InlineData("/Volumes/Recovery/")]
+    public void The_volumes_macos_mounts_for_itself_are_not_reported(string mount) => Assert.False(DiskMetrics.IsReportable(mount, "apfs"));
+
+    [Theory]
+    [InlineData("/Volumes/Recovery 2")] // a whole path part, not a prefix of the text
+    [InlineData("/Volumes/Backup")]
+    [InlineData("/Library/Developer/CoreSimulatorX")]
+    [InlineData("/Library/Developer")]
+    public void A_volume_that_only_looks_like_one_of_them_is_still_reported(string mount) => Assert.True(DiskMetrics.IsReportable(mount, "apfs"));
+
+    [Fact]
+    public void On_a_mac_the_system_volume_is_dropped_when_the_data_volume_reports_the_same_container()
+    {
+        var root = new DiskSample("/", 800, 926);
+        var data = new DiskSample("/System/Volumes/Data", 799, 926);
+        var backup = new DiskSample("/Volumes/Backup", 10, 100);
+
+        Assert.Equal([data, backup], DiskMetrics.Collapse([(root, "apfs"), (data, "apfs"), (backup, "apfs")]));
+        Assert.Equal([data, backup], DiskMetrics.Collapse([(root, "APFS"), (data, "APFS"), (backup, "apfs")])); // the format's case does not matter
+    }
+
+    [Fact]
+    public void Without_a_data_volume_or_on_another_file_system_the_root_stays()
+    {
+        var root = new DiskSample("/", 800, 926);
+        var data = new DiskSample("/System/Volumes/Data", 799, 926);
+
+        Assert.Equal([root], DiskMetrics.Collapse([(root, "apfs")])); // an older macOS: "/" is the data
+        Assert.Equal([root, data], DiskMetrics.Collapse([(root, "ext4"), (data, "apfs")])); // only an APFS root is a repeat
+        Assert.Empty(DiskMetrics.Collapse([]));
+    }
+
     [Fact]
     public void A_mount_name_loses_control_characters_and_is_cut_to_200_characters()
     {

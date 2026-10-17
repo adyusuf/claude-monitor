@@ -20,9 +20,16 @@ public static class DiskMetrics
         "proc", "sysfs", "tmpfs", "devtmpfs", "overlay", "squashfs", "autofs", "devfs", "nsfs",
     };
 
+    // Volumes macOS mounts that are not the user's storage: an iOS Simulator runtime is a read-only disk image that is full by design (it showed 97 %
+    // on a half-empty Mac), and the Recovery volume only repeats the numbers of the container it lives in.
+    private static readonly string[] HiddenFolders = ["/Library/Developer/CoreSimulator", "/Volumes/Recovery"];
+
+    private const string ApfsFormat = "apfs";
+    private const string RootMount = "/";
+
     public static IReadOnlyList<DiskSample> Read()
     {
-        var disks = new List<DiskSample>();
+        var disks = new List<(DiskSample Disk, string Format)>();
         IEnumerable<DriveInfo> drives;
         try
         {
@@ -30,7 +37,7 @@ public static class DiskMetrics
         }
         catch (Exception e) when (MetricFailure.IsExpected(e))
         {
-            return disks; // no drive list: the sample goes out without disks
+            return []; // no drive list: the sample goes out without disks
         }
 
         foreach (var drive in drives)
@@ -39,10 +46,20 @@ public static class DiskMetrics
             if (ReadDrive(drive) is { } disk) disks.Add(disk);
         }
 
-        return disks;
+        return Collapse(disks);
     }
 
-    private static DiskSample? ReadDrive(DriveInfo drive)
+    /// <summary>
+    /// On a Mac the system volume ("/") and the Data volume share one APFS container, so both report the same numbers: when the Data volume is
+    /// there, "/" is its repeat and is left out. Any other disk is kept.
+    /// </summary>
+    internal static IReadOnlyList<DiskSample> Collapse(IReadOnlyList<(DiskSample Disk, string Format)> disks)
+    {
+        var shared = disks.Any(d => d.Disk.Mount.TrimEnd('/') == MacDataVolume);
+        return [.. disks.Where(d => !(shared && d.Disk.Mount == RootMount && d.Format.Equals(ApfsFormat, StringComparison.OrdinalIgnoreCase))).Select(d => d.Disk)];
+    }
+
+    private static (DiskSample Disk, string Format)? ReadDrive(DriveInfo drive)
     {
         try
         {
@@ -51,7 +68,7 @@ public static class DiskMetrics
             if (mount.Length == 0 || !IsReportable(drive.Name, drive.DriveFormat)) return null;
             var total = drive.TotalSize;
             var free = drive.TotalFreeSpace;
-            return total > 0 ? new DiskSample(mount, Math.Clamp(total - free, 0, total), total) : null;
+            return total > 0 ? (new DiskSample(mount, Math.Clamp(total - free, 0, total), total), drive.DriveFormat) : null;
         }
         catch (Exception e) when (MetricFailure.IsExpected(e))
         {
@@ -59,11 +76,19 @@ public static class DiskMetrics
         }
     }
 
-    /// <summary>False for pseudo file systems (by format) and for macOS system volumes other than Data (by mount).</summary>
+    /// <summary>False for pseudo file systems (by format), for macOS system volumes other than Data and for the volumes macOS mounts for itself (by mount).</summary>
     public static bool IsReportable(string mount, string format)
     {
         if (PseudoFileSystems.Contains(format) || format.StartsWith(CgroupPrefix, StringComparison.OrdinalIgnoreCase)) return false;
+        if (HiddenFolders.Any(folder => IsUnder(mount, folder))) return false;
         return !mount.StartsWith(MacVolumes, StringComparison.Ordinal) || mount.TrimEnd('/') == MacDataVolume;
+    }
+
+    /// <summary>True when the mount is the folder or inside it (a whole path part: "/Volumes/Recovery 2" is not under "/Volumes/Recovery").</summary>
+    private static bool IsUnder(string mount, string folder)
+    {
+        var clean = mount.TrimEnd('/');
+        return clean == folder || clean.StartsWith(folder + "/", StringComparison.Ordinal);
     }
 
     /// <summary>Control characters removed, then cut to <see cref="MaxMountChars"/>: a mount name is host-controlled text.</summary>
