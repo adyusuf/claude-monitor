@@ -80,7 +80,7 @@ export const tr: Dictionary = {
     emptyHint: "Bir makineye ajanı kurun ve Claude Code'u başlatın: oturumları burada canlı görünür.",
     project: "Proje", host: "Makine", owner: "Sahibi", cost: "Maliyet", lastActivity: "Son etkinlik",
     untitled: "Başlıksız oturum", more: "Daha fazla", live: "Canlı", permissionsWaiting: "{n} yanıt bekliyor",
-    unmeasured: "ölçülemiyor",
+    unmeasured: "ölçülemiyor", noBranch: "Dal bildirilmedi",
   },
   session: {
     back: "Tüm oturumlar", tasks: "Görevler", noTasks: "Görev yok.", subagents: "Alt ajanlar", noSubagents: "Alt ajan yok.",
@@ -105,6 +105,7 @@ export const tr: Dictionary = {
     note_notification: "Claude sizi bekliyor:", note_subagent_start: "Alt ajan başladı:", note_subagent_stop: "Alt ajan bitti:",
     otherAnswer: "Ya da başka bir yanıt yazın", sendAnswers: "Yanıtları gönder", approvePlan: "Planı onayla", rejectPlan: "Yukarıdaki notla geri gönder",
     showAll: "Tümünü göster", showLess: "Azalt",
+    toolRun: "{n} araç çağrısı", toolRunFailed: "{n} başarısız",
     nextStepWaiting: "Oturumun başındaki kişi bekleniyor", nextStepAnswered: "Cevaplandı",
     replyPlaceholder: "Ya da bir cevap yazın", replySend: "Gönder", replySent: "Oturuma gönderildi: {text}",
     replyFailed: "Cevap gönderilemedi. Tekrar deneyin.",
