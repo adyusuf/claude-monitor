@@ -60,9 +60,10 @@ public static partial class Cli
 
         if (Array.IndexOf(args, "--push") < 0 && !config.PushFromEnvironment && Identity.Peek(config)?.Push is null)
         {
-            // The first install turns the push on, through the channel (the maintainer's decision, 16/10/2026; --push inbox picks the inbox instead): a
-            // prompt sent from the web reaches an idle session. Once anything is saved (--push off, config push off, or an earlier install) it is kept as chosen.
-            config = SavedSettings.SavePush(config, true, PushTransports.Channel);
+            // The first install turns the push on, through the inbox (the maintainer, 17/10/2026): it needs no start-up flag, so it works in the desktop app
+            // and VS Code too, where a channel is never loaded and the message only arrives at the next prompt. --push channel picks the channel instead.
+            // Once anything is saved (--push off, config push off, or an earlier install) it is kept as chosen.
+            config = SavedSettings.SavePush(config, true, PushTransports.Inbox);
         }
 
         return new PluginInstaller(config, stdout, run).Install(sourceBinary);
