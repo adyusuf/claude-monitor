@@ -73,7 +73,7 @@ export const en = {
     invalid_project: "The project key is 1 to 200 characters without control characters.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
-  time: { now: "now", m: "m", h: "h", d: "d" },
+  time: { now: "now", s: "s", m: "m", h: "h", d: "d" },
   sessions: {
     title: "Sessions", search: "Search titles and projects", all: "All", empty: "No sessions yet.",
     emptyHint: "Install the agent on a machine and start Claude Code: its sessions appear here live.",
@@ -83,6 +83,7 @@ export const en = {
   },
   session: {
     back: "All sessions", tasks: "Tasks", noTasks: "No tasks.", subagents: "Subagents", noSubagents: "No subagents.",
+    subagentRunning: "running", subagentStarted: "Started", subagentEnded: "Ended", subagentDuration: "Duration",
     usage: "Usage and cost", model: "Model", input: "Input", output: "Output", cacheRead: "Cache read", cacheWrite: "Cache write",
     events: "Activity", noEvents: "No activity recorded.", olderEvents: "Older activity", truncated: "shortened",
     started: "Started", branch: "Branch", show: "Show", hide: "Hide",

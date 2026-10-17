@@ -21,6 +21,21 @@ export function time(iso: string | null | undefined): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+/** "05/10/2026 10:04:09": a moment to the second. */
+export function dateTimeSeconds(iso: string | null | undefined): string {
+  return iso ? `${date(iso)} ${time(iso)}` : "";
+}
+
+/** "42s", "3m 07s", "1h 05m 09s": how long something took, from milliseconds. Translated units come from the caller. */
+export function duration(milliseconds: number, units: { s: string; m: string; h: string }): string {
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
+  const seconds = total % 60;
+  const minutes = Math.floor(total / 60) % 60;
+  const hours = Math.floor(total / 3600);
+  if (hours > 0) return `${hours}${units.h} ${pad(minutes)}${units.m} ${pad(seconds)}${units.s}`;
+  return minutes > 0 ? `${minutes}${units.m} ${pad(seconds)}${units.s}` : `${seconds}${units.s}`;
+}
+
 /** "now", "5m", "3h", "2d": a short age; beyond a week, the date. Translated units come from the caller. */
 export function age(iso: string, now: number, units: { now: string; m: string; h: string; d: string }): string {
   const seconds = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));

@@ -5,6 +5,7 @@ import { Markdown } from "../lib/markdown";
 import type { ChatItem, Question, ToolResult } from "../lib/transcript";
 import { toolCounts, toolState, type ToolItem, type ToolRun } from "../lib/toolRuns";
 import { config } from "../config";
+import { useFold } from "./fold";
 
 /** Output longer than this is cut on the page (the event itself is whole); the rest opens with "Show all". */
 function Output({ result }: { result: ToolResult }) {
@@ -22,8 +23,9 @@ function Output({ result }: { result: ToolResult }) {
 function ToolCall({ item }: { item: ToolItem }) {
   const { t } = useI18n();
   const state = toolState(item);
+  const fold = useFold([item.key]);
   return (
-    <details className={`chat-tool chat-tool-${state}`}>
+    <details className={`chat-tool chat-tool-${state}`} {...fold}>
       <summary>
         <span className="chat-tool-dot" aria-hidden />
         <strong className="chat-tool-name">{item.name}</strong>
@@ -48,8 +50,9 @@ function ToolRunCard({ tools }: { tools: ToolItem[] }) {
   const states = tools.map(toolState);
   const failed = states.filter((s) => s === "error").length;
   const state = failed > 0 ? "error" : states.includes("pending") ? "pending" : "done";
+  const fold = useFold(tools.map((tool) => `run:${tool.key}`)); // open while any of its calls is: it stays open as calls join it
   return (
-    <details className={`chat-tool chat-tool-run chat-tool-${state}`}>
+    <details className={`chat-tool chat-tool-run chat-tool-${state}`} {...fold}>
       <summary>
         <span className="chat-tool-dot" aria-hidden />
         <strong className="chat-tool-name">{t("chat.toolRun", { n: tools.length })}</strong>
@@ -74,8 +77,9 @@ function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "question" }> 
     const a = item.answers?.[q.question];
     return a !== undefined && (a === label || a.split(", ").includes(label));
   };
+  const fold = useFold([item.key]);
   return (
-    <details className="chat-question">
+    <details className="chat-question" {...fold}>
       <summary>
         {item.questions.map((q) => {
           const answer = item.answers?.[q.question];
@@ -164,6 +168,12 @@ function NextStepCard({ item, reply }: { item: Extract<ChatItem, { kind: "nextst
   );
 }
 
+function Thinking({ item }: { item: Extract<ChatItem, { kind: "thinking" }> }) {
+  const { t } = useI18n();
+  const fold = useFold([item.key]);
+  return <details {...fold}><summary>{t("chat.thinking")}</summary><Markdown text={item.text} /></details>;
+}
+
 /** A run of tool calls as one line of the conversation. */
 export function ToolRunLine({ run }: { run: ToolRun }) {
   return <li className="chat-row" data-kind="toolrun"><ToolRunCard tools={run.tools} /></li>;
@@ -185,11 +195,7 @@ export function ChatLine({ item, reply = null }: { item: ChatItem; reply?: Reply
     case "assistant":
       return <li className="chat-row chat-assistant" data-kind="assistant"><Markdown text={item.text} /></li>;
     case "thinking":
-      return (
-        <li className="chat-row chat-thinking" data-kind="thinking">
-          <details><summary>{t("chat.thinking")}</summary><Markdown text={item.text} /></details>
-        </li>
-      );
+      return <li className="chat-row chat-thinking" data-kind="thinking"><Thinking item={item} /></li>;
     case "tool":
       return <li className="chat-row" data-kind="tool"><ToolCall item={item} /></li>;
     case "question":

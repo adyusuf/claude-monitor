@@ -5,11 +5,12 @@ import type { SessionDetail } from "../api/types";
 import { Card, Notice, Spinner, StatusPill } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { count, dateTime, usd } from "../lib/format";
-import { debounce, useLive } from "../lib/live";
+import { debounce, isCatchUp, useLive } from "../lib/live";
 import { CommandsCard, Composer, PermissionsCard } from "./SessionControls";
 import { useCommandRows } from "./useCommandRows";
 import { ChatCard } from "./ChatView";
 import { EventsCard } from "./SessionEvents";
+import { SubagentsCard } from "./SubagentsCard";
 
 /** One session: what it is doing, what it cost, what waits for a person, and its activity. */
 export function SessionPage() {
@@ -40,7 +41,7 @@ export function SessionPage() {
     setVersion((v) => v + 1);
   }), [load]);
   useLive(ws, (m) => {
-    if (!m.sessionId || m.sessionId === id) reload();
+    if (!m.sessionId || m.sessionId === id || isCatchUp(m)) reload();
   });
 
   if (error && !detail) return <div className="page"><Notice kind="error">{errorText(error)}</Notice></div>;
@@ -101,18 +102,7 @@ export function SessionPage() {
               </ul>
             )}
           </Card>
-          <Card title={t("session.subagents")}>
-            {detail.subagents.length === 0 ? <p className="muted">{t("session.noSubagents")}</p> : (
-              <ul className="plain">
-                {detail.subagents.map((r) => (
-                  <li key={r.id}>
-                    <strong>{r.agentType}</strong> <span className="muted">{r.status === "running" ? "…" : "✓"} {dateTime(r.startedAt)}</span>
-                    {r.description ? <div className="muted small">{r.description}</div> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+          <SubagentsCard rows={detail.subagents} />
           <Card title={t("session.usage")}>
             <table className="table compact">
               <thead><tr><th>{t("session.model")}</th><th>{t("session.input")}</th><th>{t("session.output")}</th><th>{t("session.cacheRead")}</th><th>{t("sessions.cost")}</th></tr></thead>

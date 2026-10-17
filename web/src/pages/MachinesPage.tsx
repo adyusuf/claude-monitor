@@ -7,7 +7,7 @@ import { useSession } from "../auth/session";
 import { Button, Card, Empty, Field, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime, percent } from "../lib/format";
-import { debounce, useLive } from "../lib/live";
+import { debounce, isCatchUp, useLive } from "../lib/live";
 import { ClaudeBadge, RoleBadge, TagChips } from "./MachineBadges";
 import { ExecBadge, maxDiskPct, memoryPct, OnlineDot, ServiceBadge } from "./MachineBits";
 
@@ -75,7 +75,7 @@ export function MachinesPage() {
   }, [load]);
   const reload = useMemo(() => debounce(() => void load()), [load]);
   useLive(ws, (m) => {
-    if (m.event === "alert" || m.event === "run" || m.event === "session" || m.event === "machine") reload();
+    if (m.event === "alert" || m.event === "run" || m.event === "session" || m.event === "machine" || isCatchUp(m)) reload();
   });
 
   const revoke = async (id: string) => {
