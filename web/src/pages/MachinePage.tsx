@@ -5,7 +5,7 @@ import { Card, Empty, Notice, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
-import { debounce, useLive } from "../lib/live";
+import { debounce, isCatchUp, useLive } from "../lib/live";
 import { AlertList } from "./AlertList";
 import { GrantList } from "./GrantList";
 import { JobList } from "./JobList";
@@ -43,7 +43,7 @@ export function MachinePage() {
     setVersion((v) => v + 1);
   }), [reload]);
   useLive(ws, (m) => {
-    if (REMOTE_EVENTS.includes(m.event)) refresh();
+    if (REMOTE_EVENTS.includes(m.event) || isCatchUp(m)) refresh();
   });
 
   if (!data.loaded) return <Spinner />;

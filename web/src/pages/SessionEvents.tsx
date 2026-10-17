@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/endpoints";
-import type { CommandRow, EventRow } from "../api/types";
+import type { CommandRow } from "../api/types";
 import { Button, Card } from "../components/ui";
 import { config } from "../config";
 import { useI18n } from "../i18n";
 import { ActivityClass } from "../lib/activity";
-import { ACTIVITY_FILTERS, ActivityFilter, type ActivityFilterName, buildTimeline, filterItems, groupRows, isFilter, type TimelineItem } from "../lib/timeline";
+import { isOpen, type OpenKeys, withOpen } from "../lib/fold";
+import { ACTIVITY_FILTERS, ActivityFilter, type ActivityFilterName, buildTimeline, filterItems, groupRows, isFilter, type Row, type TimelineItem } from "../lib/timeline";
 import { AssistantLine, GroupLine, InputLine, QuietLine, type Who } from "./ActivityItems";
+import { useEventFeed } from "./useEventFeed";
 
 function storedFilter(): ActivityFilterName {
   try {
@@ -32,40 +34,23 @@ function rememberFilter(filter: ActivityFilterName) {
  */
 export function EventsCard({ sessionId, owner, version }: { sessionId: string; owner: Who; version: number }) {
   const { t } = useI18n();
-  const [rows, setRows] = useState<EventRow[]>([]);
+  const { held: rows, next, older } = useEventFeed(sessionId, version, { pageSize: config.eventPageSize, refreshSize: config.eventPageSize });
   const [commands, setCommands] = useState<CommandRow[]>([]);
-  const [next, setNext] = useState<string | null>(null);
   const [filter, setFilter] = useState<ActivityFilterName>(storedFilter);
-  const [open, setOpen] = useState<string | null>(null);
-  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
-
-  const load = useCallback(async () => {
-    const page = await api.events(sessionId, { limit: config.eventPageSize });
-    setRows(page.items);
-    setNext(page.next);
-  }, [sessionId]);
+  const [opened, setOpened] = useState<OpenKeys>(new Set());
 
   useEffect(() => {
-    load().catch(() => setRows([]));
     api.commands(sessionId).then(setCommands).catch(() => setCommands([]));
-  }, [load, sessionId, version]);
-
-  const older = async () => {
-    const page = await api.events(sessionId, { before: next, limit: config.eventPageSize });
-    setRows((r) => [...r, ...page.items]);
-    setNext(page.next);
-  };
+  }, [sessionId, version]);
 
   const choose = (f: ActivityFilterName) => {
     setFilter(f);
     rememberFilter(f);
   };
-  const toggle = (key: string) => setOpen((k) => (k === key ? null : key));
-  const toggleGroup = (key: string) => setOpenGroups((g) => {
-    const copy = new Set(g);
-    if (!copy.delete(key)) copy.add(key);
-    return copy;
-  });
+  // Lines stay open as the reader left them whatever arrives: a line by its key, a group while any line in it is open (see lib/fold).
+  const toggle = (key: string) => setOpened((o) => withOpen(o, [key], !o.has(key)));
+  const groupKeys = (row: Extract<Row, { kind: "group" }>) => row.items.map((i) => `g:${i.key}`);
+  const toggleGroup = (row: Extract<Row, { kind: "group" }>) => setOpened((o) => withOpen(o, groupKeys(row), !isOpen(o, groupKeys(row))));
 
   const timeline = useMemo(() => buildTimeline(rows, commands, next !== null), [rows, commands, next]);
   const visible = useMemo(() => filterItems(timeline.items, filter), [timeline, filter]);
@@ -73,7 +58,7 @@ export function EventsCard({ sessionId, owner, version }: { sessionId: string; o
   const grouped = useMemo(() => groupRows(visible), [visible]);
 
   const line = (item: TimelineItem) => {
-    const common = { item, open: open === item.key, onToggle: toggle };
+    const common = { item, open: opened.has(item.key), onToggle: toggle };
     switch (item.cls) {
       case ActivityClass.MonitorInput:
       case ActivityClass.HumanInput:
@@ -104,7 +89,7 @@ export function EventsCard({ sessionId, owner, version }: { sessionId: string; o
       {empty ? <p className="muted">{t("session.noEvents")}</p> : grouped.length === 0 && pinned.length === 0 ? <p className="muted">{t("activity.emptyFilter")}</p> : (
         <ol className="act-list">
           {grouped.map((row) => row.kind === "item" ? line(row.item) : (
-            <GroupLine key={row.key} row={row} open={openGroups.has(row.key)} onToggle={toggleGroup}>
+            <GroupLine key={row.key} row={row} open={isOpen(opened, groupKeys(row))} onToggle={toggleGroup}>
               {row.items.map(line)}
             </GroupLine>
           ))}

@@ -74,7 +74,7 @@ export const tr: Dictionary = {
     invalid_project: "Proje anahtarı 1 ile 200 karakter olmalı, denetim karakteri içermemeli.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
-  time: { now: "şimdi", m: "dk", h: "sa", d: "g" },
+  time: { now: "şimdi", s: "sn", m: "dk", h: "sa", d: "g" },
   sessions: {
     title: "Oturumlar", search: "Başlık ve projelerde ara", all: "Tümü", empty: "Henüz oturum yok.",
     emptyHint: "Bir makineye ajanı kurun ve Claude Code'u başlatın: oturumları burada canlı görünür.",
@@ -84,6 +84,7 @@ export const tr: Dictionary = {
   },
   session: {
     back: "Tüm oturumlar", tasks: "Görevler", noTasks: "Görev yok.", subagents: "Alt ajanlar", noSubagents: "Alt ajan yok.",
+    subagentRunning: "çalışıyor", subagentStarted: "Başladı", subagentEnded: "Bitti", subagentDuration: "Süre",
     usage: "Kullanım ve maliyet", model: "Model", input: "Girdi", output: "Çıktı", cacheRead: "Önbellek okuma", cacheWrite: "Önbellek yazma",
     events: "Etkinlik", noEvents: "Kayıtlı etkinlik yok.", olderEvents: "Daha eski etkinlik", truncated: "kısaltıldı",
     started: "Başladı", branch: "Dal", show: "Göster", hide: "Gizle",
