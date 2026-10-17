@@ -202,6 +202,10 @@ textarea.input { resize: vertical; }
 .chat-user { align-self: flex-end; max-width: 85%; display: flex; justify-content: flex-end; }
 .chat-bubble { background: var(--accent-soft); border-radius: var(--radius); padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-bubble p { margin: 0; }
+.chat-pending .chat-bubble { background: transparent; border: 1px dashed var(--accent); }
+.chat-pending-expired .chat-bubble, .chat-pending-failed .chat-bubble, .chat-pending-cancelled .chat-bubble { border-color: var(--border); opacity: 0.75; }
+.chat-pending-state { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; white-space: normal; }
+.composer { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
 .chat-time { display: block; margin-top: 2px; font: 11px var(--mono); color: var(--muted); }
 .chat-command-name { color: var(--accent); font-weight: 700; margin-right: 6px; }
 .chat-assistant { overflow-wrap: anywhere; }
