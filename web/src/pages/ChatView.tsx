@@ -20,7 +20,7 @@ const merge = (held: EventRow[], fresh: EventRow[]): EventRow[] => {
  * rest up. Only the newest page is read at first; scrolling up reads the older ones, so a long session costs what is
  * looked at. A page scrolled up stays where it is when something new arrives.
  */
-export function ChatCard({ sessionId, version, footer }: { sessionId: string; version: number; footer?: ReactNode }) {
+export function ChatCard({ sessionId, version, footer, canReply = false, onReplied }: { sessionId: string; version: number; footer?: ReactNode; canReply?: boolean; onReplied?: () => void }) {
   const { t } = useI18n();
   const [held, setHeld] = useState<EventRow[]>([]); // newest first
   const [next, setNext] = useState<string | null>(null);
@@ -119,13 +119,19 @@ export function ChatCard({ sessionId, version, footer }: { sessionId: string; ve
   };
 
   const items = useMemo(() => buildChat([...held].reverse()), [held]);
+  // Only the newest open question can be answered, and only by whoever may command the session; the message goes out like any prompt from the web.
+  const lastOpen = items.findLast((i) => i.kind === "nextstep" && !i.answered)?.key;
+  const reply = useCallback(async (text: string) => {
+    await api.sendCommand(sessionId, "prompt", text);
+    onReplied?.();
+  }, [sessionId, onReplied]);
 
   return (
     <Card title={t("session.events")} className="chat-card">
       {!loaded ? <Spinner /> : (
         <div className="chat-scroll" ref={box} onScroll={onScroll} tabIndex={0} aria-label={t("chat.label")}>
           {next ? <div className="more"><Button variant="ghost" busy={loadingOlder} onClick={() => void older()}>{t("session.olderEvents")}</Button></div> : null}
-          {items.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : <ol className="chat">{items.map((item) => <ChatLine key={item.key} item={item} />)}</ol>}
+          {items.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : <ol className="chat">{items.map((item) => <ChatLine key={item.key} item={item} reply={canReply && item.key === lastOpen ? reply : null} />)}</ol>}
         </div>
       )}
       {footer}

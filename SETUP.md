@@ -139,6 +139,12 @@ inbox existed all still mean the channel. A prompt written to a session that nev
 **A short notice instead of the whole text (ADR-0007, A2), the default.** The inbox gets one line, `📩 claude-monitor web message <id> ...`,
 that holds nothing the web wrote. `cm-agent config push-format full` (or `cm-agent install --push-format full`, or `CM_INBOX_FORMAT=full`) brings back the whole text. The session reads the message with the `monitor_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `cm-agent status` as "not read yet". The text of an applied message is forgotten after 7 days.
 
+### Answering a session's question from the web
+
+A question a session puts to you can be answered on the session's page, in the conversation. Claude's own question tool (`AskUserQuestion`) and plan approval were already answerable there (the answer goes in through the permission hook).
+The Claude desktop app's "next step" box (its `wrap_up` call: a recap and one question with buttons) is the app's own window and reaches nothing else, so the page now shows it as a card in the conversation: the question, its buttons and a box to type an answer.
+Anyone who may command the session can answer the newest open question; the answer is sent as an ordinary message from the web (the same as a click in the app sends), by the transport the machine uses (`cm-agent status`). The card closes when the session hears from the user after it. A recap without a question stays an ordinary tool call. Nothing is added to the agent: the card is built from the transcript the agent already reports.
+
 ### Pushing through a Claude Code channel (`--push channel`)
 
 `cm-agent install --push channel` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
