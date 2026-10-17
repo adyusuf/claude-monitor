@@ -10,10 +10,8 @@ export function isIdle(lastEventAt: string, now: number): boolean {
   return Number.isFinite(last) && now - last > config.idleSessionMinutes * 60_000;
 }
 
-/** One command sent from the web: what it is, where it stands, and WHY it waits or lapsed. */
-export function CommandItem({ command: c, sessionId, ended, now, canCancel, onCancel }: {
-  command: CommandRow; sessionId: string; ended: boolean; now: number; canCancel: boolean; onCancel: (id: string) => void;
-}) {
+/** Where a command stands and WHY it waits or lapsed: the line under it, the way it reached the session once applied, the time left. */
+export function useCommandState(c: CommandRow, now: number) {
   const { t, dict } = useI18n();
   const left = c.status === "queued" || c.status === "delivered" ? remaining(c.expiresAt, now, dict.time) : null;
   const pushedHow = c.status === "delivered" && c.transport ? (dict.commandTransport as Record<string, string>)[c.transport] : undefined;
@@ -22,14 +20,23 @@ export function CommandItem({ command: c, sessionId, ended, now, canCancel, onCa
       : c.status === "expired" ? t(c.deliveredAt ? "commandHint.expiredIdle" : "commandHint.expiredUnreached")
         : null;
   const how = c.status === "applied" && c.transport ? (dict.commandTransport as Record<string, string>)[c.transport] : undefined; // an unknown way is not shown
+  return { hint: hint ? `${hint}${left ? ` · ${t("session.expiresIn", { time: left })}` : ""}` : null, how: how ? t("commandTransport.via", { how }) : null };
+}
+
+/** One command sent from the web: what it is, where it stands, and WHY it waits or lapsed. */
+export function CommandItem({ command: c, sessionId, ended, now, canCancel, onCancel }: {
+  command: CommandRow; sessionId: string; ended: boolean; now: number; canCancel: boolean; onCancel: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const { hint, how } = useCommandState(c, now);
   return (
     <li>
       <span className={`badge status-${c.status}`}>{t(`commandStatus.${c.status}` as never)}</span>
       <span>{c.kind === "stop" ? t("session.stop") : c.body}</span>
       <span className="muted small">{dateTime(c.createdAt)}</span>
       {canCancel && c.status === "queued" ? <button type="button" className="link" onClick={() => onCancel(c.id)}>{t("session.cancel")}</button> : null}
-      {how ? <div className="muted small command-hint">{t("commandTransport.via", { how })}</div> : null}
-      {hint ? <div className="muted small command-hint">{hint}{left ? ` · ${t("session.expiresIn", { time: left })}` : ""}</div> : null}
+      {how ? <div className="muted small command-hint">{how}</div> : null}
+      {hint ? <div className="muted small command-hint">{hint}</div> : null}
       <CommandReply command={c} sessionId={sessionId} ended={ended} now={now} />
     </li>
   );

@@ -145,6 +145,11 @@ A question a session puts to you can be answered on the session's page, in the c
 The Claude desktop app's "next step" box (its `wrap_up` call: a recap and one question with buttons) is the app's own window and reaches nothing else, so the page now shows it as a card in the conversation: the question, its buttons and a box to type an answer.
 Anyone who may command the session can answer the newest open question; the answer is sent as an ordinary message from the web (the same as a click in the app sends), by the transport the machine uses (`cm-agent status`). The card closes when the session hears from the user after it. A recap without a question stays an ordinary tool call. Nothing is added to the agent: the card is built from the transcript the agent already reports.
 
+### What the session page shows
+
+The conversation formats Markdown in everything it shows (Claude's replies and thoughts, what was typed, the next-step question): headings, **bold**, *italic*, links (http, https and mailto only), nested and task lists, quotes, tables and fenced code with its language. A message sent from the web appears in the conversation at once, with where it stands (queued, delivered or pushed, expired, cancelled; the same words as the history below) and a cancel button, until the session shows it as its own line; the box to type in sits under the conversation.
+The side boxes follow what the machine reports: **Tasks** from `TodoWrite`, `TaskCreate` / `TaskUpdate` and the desktop app's own `update_plan` (the steps are `plan-0`, `plan-1`, ... and `wrap_up` checks off the running one); **Subagents** from the SubagentStart / SubagentStop hooks and, when those do not arrive, from the `Agent` (older: `Task`) call itself. Sessions recorded before this change keep the boxes they had; new events fill them.
+
 ### Pushing through a Claude Code channel (`--push channel`)
 
 `cm-agent install --push channel` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
