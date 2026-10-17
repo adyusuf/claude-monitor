@@ -37,7 +37,7 @@ public sealed class PlanTaskTests(ApiFactory api)
     public async Task A_plan_sent_whole_becomes_the_task_list_in_step_order()
     {
         var (user, agent, s) = await StartAsync("plan-whole");
-        await Accepted(agent,TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("Read the code", "in_progress"), Item("Write it", "pending"), Item("Test it", "pending") } }), T(0)));
+        await Accepted(agent, TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("Read the code", "in_progress"), Item("Write it", "pending"), Item("Test it", "pending") } }), T(0)));
 
         Assert.Equal([("plan-0", "Read the code", "in_progress"), ("plan-1", "Write it", "pending"), ("plan-2", "Test it", "pending")], await TasksAsync(user));
     }
@@ -51,7 +51,7 @@ public sealed class PlanTaskTests(ApiFactory api)
             TestAgent.Hook(s, "PostToolUse", Plan(new { advance = true }), T(1)));
         Assert.Equal(["completed", "in_progress", "pending", "pending"], (await TasksAsync(user)).Select(t => t.Status));
 
-        await Accepted(agent,TestAgent.Hook(s, "PostToolUse", Plan(new { done = new[] { 2 }, start = 4 }), T(2)));
+        await Accepted(agent, TestAgent.Hook(s, "PostToolUse", Plan(new { done = new[] { 2 }, start = 4 }), T(2)));
 
         Assert.Equal(["completed", "completed", "pending", "in_progress"], (await TasksAsync(user)).Select(t => t.Status));
     }
@@ -60,11 +60,11 @@ public sealed class PlanTaskTests(ApiFactory api)
     public async Task A_shorter_list_drops_the_steps_past_its_end_and_a_longer_one_adds_them()
     {
         var (user, agent, s) = await StartAsync("plan-resize");
-        await Accepted(agent,TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("A", "completed"), Item("B", "in_progress"), Item("C", "pending") } }), T(0)));
-        await Accepted(agent,TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("A", "completed"), Item("B2", "in_progress") } }), T(1)));
+        await Accepted(agent, TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("A", "completed"), Item("B", "in_progress"), Item("C", "pending") } }), T(0)));
+        await Accepted(agent, TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("A", "completed"), Item("B2", "in_progress") } }), T(1)));
         Assert.Equal([("plan-0", "A", "completed"), ("plan-1", "B2", "in_progress")], await TasksAsync(user));
 
-        await Accepted(agent,TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("A", "completed"), Item("B2", "completed"), Item("C2", "in_progress"), Item("D", "pending") } }), T(2)));
+        await Accepted(agent, TestAgent.Hook(s, "PostToolUse", Plan(new { items = new[] { Item("A", "completed"), Item("B2", "completed"), Item("C2", "in_progress"), Item("D", "pending") } }), T(2)));
 
         Assert.Equal(["A", "B2", "C2", "D"], (await TasksAsync(user)).Select(t => t.Subject));
     }
@@ -109,7 +109,7 @@ public sealed class PlanTaskTests(ApiFactory api)
     {
         var (user, agent, s) = await StartAsync("plan-limits");
         var many = Enumerable.Range(0, 15).Select(i => Item($"S{i}", i == 0 ? "bogus" : "pending")).ToArray();
-        await Accepted(agent,TestAgent.Hook(s, "PostToolUse", Plan(new { items = many }), T(0)));
+        await Accepted(agent, TestAgent.Hook(s, "PostToolUse", Plan(new { items = many }), T(0)));
 
         var tasks = await TasksAsync(user);
         Assert.Equal(EventProjector.PlanItemsMax, tasks.Count);
