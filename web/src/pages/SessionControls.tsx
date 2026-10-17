@@ -69,19 +69,19 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
 }
 
 /** Send a prompt or a stop to the session, and what was sent before. */
-export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, pushTransport, version, onChange }: Props & { canCommand: boolean; ended: boolean; lastEventAt: string; pushTransport?: string | null }) {
+interface Sender { sessionId: string; canCommand: boolean; ended: boolean; lastEventAt: string; pushTransport?: string | null; reloadRows: () => unknown; onChange: () => void }
+
+/**
+ * The box under the conversation where a message (or a stop) is typed for the session. What happens to a message after it is sent is
+ * shown in the conversation itself, where it will appear once the session has it.
+ */
+export function Composer({ sessionId, canCommand, ended, lastEventAt, pushTransport, reloadRows, onChange }: Sender) {
   const { t } = useI18n();
   const now = useNow(config.clockTickMs);
   const errorText = useErrorText();
-  const [rows, setRows] = useState<CommandRow[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
-
-  const load = useCallback(() => api.commands(sessionId).then(setRows).catch(() => setRows([])), [sessionId]);
-  useEffect(() => {
-    void load();
-  }, [load, version]);
 
   const send = async (kind: "prompt" | "stop") => {
     if (kind === "prompt" && !text.trim()) return setNotice({ kind: "error", text: t("errors.invalid_body") });
@@ -91,7 +91,7 @@ export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, pushTr
       await api.sendCommand(sessionId, kind, kind === "prompt" ? text : undefined);
       setText("");
       setNotice({ kind: "success", text: t("session.sent") });
-      await load();
+      await reloadRows();
       onChange();
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
@@ -100,17 +100,8 @@ export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, pushTr
     }
   };
 
-  const cancel = async (id: string) => {
-    try {
-      await api.cancelCommand(id);
-      await load();
-    } catch (e) {
-      setNotice({ kind: "error", text: errorText(e) });
-    }
-  };
-
   return (
-    <Card title={t("session.commands")}>
+    <div className="composer">
       {notice ? <Notice kind={notice.kind}>{notice.text}</Notice> : null}
       {canCommand && !ended ? (
         <div className="compose">
@@ -123,10 +114,34 @@ export function CommandsCard({ sessionId, canCommand, ended, lastEventAt, pushTr
           </div>
         </div>
       ) : <p className="muted">{ended ? t("errors.session_ended") : t("session.onlyOwner")}</p>}
+    </div>
+  );
+}
+
+/** Every command sent to the session with where it stands; the composer is here too unless the conversation carries it. */
+export function CommandsCard({ rows, withComposer, ...sender }: Sender & { rows: CommandRow[]; withComposer: boolean }) {
+  const { t } = useI18n();
+  const now = useNow(config.clockTickMs);
+  const errorText = useErrorText();
+  const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+
+  const cancel = async (id: string) => {
+    try {
+      await api.cancelCommand(id);
+      await sender.reloadRows();
+    } catch (e) {
+      setNotice({ kind: "error", text: errorText(e) });
+    }
+  };
+
+  return (
+    <Card title={t("session.commands")}>
+      {notice ? <Notice kind={notice.kind}>{notice.text}</Notice> : null}
+      {withComposer ? <Composer {...sender} /> : null}
       <h3 className="sub">{t("session.history")}</h3>
       {rows.length === 0 ? <p className="muted">{t("session.noCommands")}</p> : (
         <ul className="plain commands">
-          {rows.map((c) => <CommandItem key={c.id} command={c} sessionId={sessionId} ended={ended} now={now} canCancel={canCommand} onCancel={(id) => void cancel(id)} />)}
+          {rows.map((c) => <CommandItem key={c.id} command={c} sessionId={sender.sessionId} ended={sender.ended} now={now} canCancel={sender.canCommand} onCancel={(id) => void cancel(id)} />)}
         </ul>
       )}
     </Card>

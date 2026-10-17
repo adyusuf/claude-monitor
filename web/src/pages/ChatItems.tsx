@@ -105,8 +105,8 @@ function NextStepCard({ item, reply }: { item: Extract<ChatItem, { kind: "nextst
   };
   return (
     <div className="chat-nextstep">
-      {item.recap ? <p className="muted small">{item.recap}</p> : null}
-      <p className="chat-q-text"><strong>{item.ask}</strong></p>
+      {item.recap ? <div className="muted small"><Markdown text={item.recap} /></div> : null}
+      <div className="chat-q-text"><Markdown text={item.ask} /></div>
       {open ? (
         <>
           <div className="prompt-options" role="group" aria-label={item.ask}>
@@ -138,7 +138,7 @@ export function ChatLine({ item, reply = null }: { item: ChatItem; reply?: Reply
         <li className="chat-row chat-user" data-kind="user">
           <div className="chat-bubble">
             {item.command ? <code className="chat-command-name">{item.command}</code> : null}
-            {item.text ? <p>{item.text}</p> : null}
+            {item.text ? <Markdown text={item.text} /> : null}
             <time className="chat-time" dateTime={item.at}>{time(item.at)}</time>
           </div>
         </li>
@@ -148,7 +148,7 @@ export function ChatLine({ item, reply = null }: { item: ChatItem; reply?: Reply
     case "thinking":
       return (
         <li className="chat-row chat-thinking" data-kind="thinking">
-          <details><summary>{t("chat.thinking")}</summary><p>{item.text}</p></details>
+          <details><summary>{t("chat.thinking")}</summary><Markdown text={item.text} /></details>
         </li>
       );
     case "tool":

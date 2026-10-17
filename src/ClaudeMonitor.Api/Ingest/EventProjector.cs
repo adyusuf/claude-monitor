@@ -12,7 +12,7 @@ namespace ClaudeMonitor.Api.Ingest;
 /// itself is stored as is; this only keeps the summaries current. Shapes follow Claude Code's hook payloads and
 /// transcript entries; a payload that does not have the expected shape changes nothing (never an invented value).
 /// </summary>
-public sealed class EventProjector(MonitorDb db, ApiConfig config)
+public sealed partial class EventProjector(MonitorDb db, ApiConfig config)
 {
     public const int TitleMax = 80;
     public const int SubjectMax = 300;
@@ -88,8 +88,15 @@ public sealed class EventProjector(MonitorDb db, ApiConfig config)
         if (Str(p, "agent_id") is not null) return; // a subagent's own list is not the session's
         var input = p.TryGetProperty("tool_input", out var i) && i.ValueKind == JsonValueKind.Object ? i : default;
         if (input.ValueKind != JsonValueKind.Object) return;
-        switch (Str(p, "tool_name"))
+        var tool = Str(p, "tool_name");
+        switch (tool)
         {
+            case PlanTool or WrapUpTool:
+                await PlanToolAsync(s, tool, input, at, ct);
+                break;
+            case "Agent" or "Task":
+                await SubagentToolAsync(s, p, input, at, ct);
+                break;
             case "TodoWrite" when input.TryGetProperty("todos", out var todos) && todos.ValueKind == JsonValueKind.Array:
                 // TodoWrite sends the whole list: what is no longer in it is gone.
                 var keep = new HashSet<string>(StringComparer.Ordinal);
