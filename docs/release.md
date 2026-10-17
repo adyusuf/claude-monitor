@@ -2,10 +2,35 @@
 
 ## Promotion
 
-`dev` -> `test` -> `prod`, each a `--no-ff` merge after `scripts/merge-gate.sh <target>` is green; CI runs the
-same gate on every push (`.github/workflows/ci.yml`). The `test` -> `prod` gate also needs the full e2e suite
-green (global #33); until the web app and its suite exist (ADR-0002, phase 3) that step reports "skipped" and
-the prod gate is not green. Every prod promotion is tagged, so a rollback target has a name:
+`dev` -> `test` -> `prod`, each a `--no-ff` merge. **The owner of the full gate is CI**: `.github/workflows/ci.yml` runs
+`scripts/gate-core.sh dev` on every push to `dev`, `test` and `prod` (free minutes, public repository), so a promotion
+waits for CI to be green on the commit being promoted, not for a second local run:
+
+```bash
+bash scripts/quick-check.sh --tests        # locally, before the merge: format, build, shellcheck, secret scan, script tests,
+                                           # and only the test projects the change reaches. A first look, not the gate.
+bash scripts/ci-status.sh dev              # the merge is allowed when CI is green for dev's tip (exit 0); 3 = still running,
+bash scripts/ci-status.sh test             # 4 = it never ran, 1 = red, 5 = gh could not answer: none of those is a pass
+bash scripts/ci-status.sh test <sha> --workflow e2e   # the optional e2e workflow, if one ran
+```
+
+**Before every merge the maintainer is asked** (global rule): "Will CI and e2e run for this merge?", two separate answers,
+and nothing is merged before they come. A "yes" for CI means waiting for it to be green (on `dev` before `test`, on `test`
+before `prod`). A "no" is recorded, never silent: the merge commit message carries a line naming only what was skipped,
+
+```
+Gate-Waived: ci, e2e (neden: <the maintainer's words>)
+```
+
+and nothing is waived without that question and that line. `bash scripts/waived-gates.sh origin/prod origin/test` lists
+the lines in a range (exit 1 when there are any, "no record" otherwise). **Before preparing a prod merge, run it for
+`origin/prod origin/test` (and again for `origin/test origin/dev` if the promotion spans both) and tell the maintainer
+which commits ran without which gate; the prod merge waits for their answer.** The prod push stays the maintainer's.
+Coverage >= 80 % per codebase (global #29) is part of CI's gate and is never waived by any of this.
+
+The `test` -> `prod` gate (`scripts/merge-gate.sh prod`) also needs the full e2e suite green (global #33)
+only when `GATE_RUN_E2E=1`; otherwise it warns that e2e was not run. Every prod promotion is tagged, so a rollback
+target has a name:
 
 ```bash
 git tag -a prod-DD-MM-YYYY -m "<one line: what shipped>" <sha> && git push origin prod-DD-MM-YYYY
