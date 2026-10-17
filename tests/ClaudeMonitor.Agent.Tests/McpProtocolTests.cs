@@ -65,7 +65,7 @@ public sealed class McpProtocolTests : IDisposable
 
             var list = await CallAsync(p, 2, "tools/list", new { });
             var names = list["result"]!["tools"]!.AsArray().Select(t => t!["name"]!.GetValue<string>()).Order().ToList();
-            Assert.Equal(["monitor_alerts", "monitor_answer", "monitor_ask", "monitor_ask_result", "monitor_grants", "monitor_job_propose", "monitor_job_run", "monitor_jobs",
+            Assert.Equal(["monitor_alerts", "monitor_answer", "monitor_ask", "monitor_ask_result", "monitor_grants", "monitor_inbox_read", "monitor_job_propose", "monitor_job_run", "monitor_jobs",
                 "monitor_machine", "monitor_machines", "monitor_metrics", "monitor_note", "monitor_request_grant", "monitor_run", "monitor_run_cancel", "monitor_run_result",
                 "monitor_run_script", "monitor_status"], names);
 

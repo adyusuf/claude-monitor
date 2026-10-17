@@ -50,6 +50,41 @@ public static class UpdatePaths
     public const string DownloadsFolder = "downloads";
 }
 
+/// <summary>
+/// Where the agent builds may be fetched from when they are not on the API's own server (ADR-0004 amendment: a download host such as a
+/// public object-storage domain). The API checks the configured base, the agent checks every offered address with the same rules. The
+/// address is not the trust anchor (the signed manifest is: the agent verifies the SHA-256 and the signature), these rules only keep an
+/// offer from pointing the agent at a private or odd destination.
+/// </summary>
+public static class UpdateUrls
+{
+    /// <summary>A plain file name, as the manifest and the checksum list use: it becomes the last part of an address.</summary>
+    public static bool IsPlainFile(string? name) =>
+        !string.IsNullOrEmpty(name) && name.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '-' or '_') && !name.StartsWith('.');
+
+    /// <summary>The download host's base address (MONITOR_DOWNLOADS_URL): https, a DNS name, no credentials, query or fragment. The trailing slash is dropped.</summary>
+    public static bool TryParseBase(string? value, out string baseUrl)
+    {
+        baseUrl = "";
+        if (string.IsNullOrWhiteSpace(value) || !Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) || !IsPublicHttps(uri) || uri.Query.Length > 0 || uri.Fragment.Length > 0)
+        {
+            return false;
+        }
+
+        baseUrl = uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
+        return true;
+    }
+
+    /// <summary>An offered file address outside the agent's own server: https on the default port, a DNS name, no credentials, query or fragment, ending in a plain file name.</summary>
+    public static bool IsExternalFile(Uri url) =>
+        IsPublicHttps(url) && url.Query.Length == 0 && url.Fragment.Length == 0 && IsPlainFile(url.Segments[^1]);
+
+    private static bool IsPublicHttps(Uri uri) =>
+        uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && uri.UserInfo.Length == 0 && uri.HostNameType == UriHostNameType.Dns
+        && uri.Host.Contains('.') && !uri.Host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)
+        && !uri.Host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase) && !uri.Host.EndsWith(".internal", StringComparison.OrdinalIgnoreCase);
+}
+
 /// <summary>The signed statement about one build, and its check.</summary>
 public static class UpdateManifest
 {

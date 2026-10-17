@@ -49,7 +49,8 @@ docker compose -f deploy/dev-services.yml up -d          # PostgreSQL 18 on 127.
 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/ClaudeMonitor.Api -- --migrate   # apply migrations
 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/ClaudeMonitor.Api                # the API
 dotnet test                                                # all .NET tests (Docker must be running)
-bash scripts/merge-gate.sh dev                             # everything CI runs
+bash scripts/quick-check.sh [--tests]                      # the fast local look before a merge (not the gate)
+bash scripts/merge-gate.sh dev                             # the whole gate locally, when you want it (CI runs it for you)
 ```
 
 In Development every variable has a default (`.env.example`); sign-up mails land in Mailpit
@@ -61,8 +62,19 @@ retype, an edited merged migration, a removed route and a removed or reordered c
 
 `.github/workflows/ci.yml` runs `bash scripts/gate-core.sh dev` on every push to `dev`, `test` and `prod`
 and on every pull request: the same script and the same thresholds as a local `scripts/merge-gate.sh dev`,
-never a second rule set. Third-party actions are pinned to a commit SHA and gitleaks is
+never a second rule set. **CI owns the full gate** (this repository is public, so its minutes are free); locally only
+`scripts/quick-check.sh` is the habit: the gate's own format, build, shellcheck and secret-scan commands, the script tests when
+a script changed, and with `--tests` only the test projects the change reaches. It is a first look: a missing tool is
+reported as SKIPPED and the run is not green. Before a merge the maintainer is asked whether CI and e2e will run; what is not
+run is recorded on the merge commit as `Gate-Waived: <gates> (neden: <reason>)`. The helpers: `scripts/ci-status.sh <branch>
+[commit] [--workflow ci|e2e]` (is the workflow green for that commit; only completed + success exits 0) and
+`scripts/waived-gates.sh <source> <target>` (the waived gates between two refs, exit 1 when any). Details:
+[docs/release.md](docs/release.md#promotion). Third-party actions are pinned to a commit SHA and gitleaks is
 checksum-verified. To change a version, change it there and in the Prerequisites table above.
+
+A gate run collects coverage while the unit tests run and the coverage step judges those files, so no test runs twice
+(`scripts/merge-gate.conf`, `tests/coverage.props`, `web/vite.config.ts`); `bash scripts/coverage.sh` on its own still runs
+the tests itself.
 
 ## The agent (cm-agent)
 
@@ -112,9 +124,9 @@ A maintainer renders the plugin's manifest, hooks and MCP file from the one list
 plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
 
-### Pushing web messages into an idle session (opt-in)
+### Pushing web messages into an idle session
 
-Off by default. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
+On after the first `cm-agent install`, through the **channel** (the maintainer's decision of 16/10/2026): nothing was saved about push yet, so the install saves `channel`. The channel needs Claude Code started with the flag `install` prints (below); the desktop app and VS Code cannot pass it, so on a machine that uses them choose the inbox: `cm-agent install --push inbox`. A later choice is kept as it is: `cm-agent install --push off` or `cm-agent config push off` turns it off and a reinstall does not turn it back on; `CM_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
 sent from the web start a turn in an idle session within about a second, **with no start-up flag**: every Claude Code session (terminal, desktop app, VS Code) has an *inbox socket*, its hooks learn
 where it is (`CLAUDE_CODE_MESSAGING_SOCKET`), and the daemon writes the prompt there (ADR-0007). The text is wrapped, labelled as
 coming from the web and capped; the session is told to treat it as data and to ask you before any request with side effects. A
@@ -124,11 +136,14 @@ failure. The older **channel** (`--push on`, also `--push channel`, below) stays
 inbox existed all still mean the channel. A prompt written to a session that never shows it in the transcript is **not written again**: after
 10 minutes (`InboxConfirmWait`) it is left to the hooks.
 
+**A short notice instead of the whole text (ADR-0007, A2), the default.** The inbox gets one line, `📩 claude-monitor web message <id> ...`,
+that holds nothing the web wrote. `cm-agent config push-format full` (or `cm-agent install --push-format full`, or `CM_INBOX_FORMAT=full`) brings back the whole text. The session reads the message with the `monitor_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `cm-agent status` as "not read yet". The text of an applied message is forgotten after 7 days.
+
 ### Pushing through a Claude Code channel (`--push channel`)
 
 `cm-agent install --push channel` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
 Claude Code **channel**: a prompt sent from the web starts a turn in an idle session within about a second, wrapped as
-`<<<claude-monitor-message …>>>` and labelled as coming from the web (untrusted: the session is told to treat it as data and
+`<channel source="claude-monitor" origin="web" message_id="…">` (just the text inside; the session starts its reply with one `Web: …` line) and labelled as coming from the web (untrusted: the session is told to treat it as data and
 to ask you before any request with side effects). A channel is a Claude Code research preview and a custom one is not on its
 allowlist, so Claude Code must be started with the flag `install` prints:
 
@@ -294,6 +309,8 @@ cm-agent config auto-update off|check|on # what the daemon may do by itself (def
 2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SITE_URL=https://<site>` also writes `marketplace.json` and `monitor-agent-plugin.zip` so the site serves the plugin itself (with `VITE_PLUGIN_FROM_SERVER=1` in the web build); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
    The channel's public key is built into the agent; `out/downloads` gets the six zips (macOS, Windows, Linux), `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
 3. Deploy copies `downloads/` as before (`docs/deploy-windows.md`). **The server offers whatever its web root holds**, so deploy test builds to test and prod builds to prod.
+   **Or publish them on a download host** (an R2 bucket behind a public domain): `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh test|prod` uploads the build to `daemons/<channel>/` (and keeps it under `daemons/<version>/<channel>/`),
+   and the server's `monitor.env` gets `MONITOR_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>`. The update check then reads `manifest.json` there and offers addresses there; `/downloads/<file>` on the server redirects to the host (`docs/release.md`, "Download host").
 4. Agents already installed at that channel take it when a person runs `cm-agent update` or when `auto-update` allows it.
 
 ## Updating Claude Code (optional, off by default)

@@ -35,7 +35,7 @@ public sealed partial class LocalStore
     /// Takes every unexpired queued prompt of a session (every session when null) for pushing, oldest first, and marks it
     /// pushed through <paramref name="transport"/> (the channel by default; the inbox pump says so). A prompt is taken once: the hooks no longer see it.
     /// </summary>
-    public List<LocalCommand> TakePromptsForPush(string? session, string kind, DateTimeOffset now, string transport = CommandTransports.Channel)
+    public List<LocalCommand> TakePromptsForPush(string? session, string kind, DateTimeOffset now, string transport = CommandTransports.Channel, string? format = null)
     {
         using var tx = db.BeginTransaction(deferred: false);
         var taken = new List<LocalCommand>();
@@ -51,7 +51,7 @@ public sealed partial class LocalStore
             }
         }
 
-        taken.RemoveAll(c => Exec("UPDATE commands SET state = 'pushed', transport = $x WHERE id = $i AND state = 'queued'", tx, ("$i", c.Id), ("$x", transport)) != 1);
+        taken.RemoveAll(c => Exec("UPDATE commands SET state = 'pushed', transport = $x, format = $f WHERE id = $i AND state = 'queued'", tx, ("$i", c.Id), ("$x", transport), ("$f", format)) != 1);
         foreach (var c in taken)
         {
             Exec("INSERT OR REPLACE INTO pushes (command_id, pushed_at) VALUES ($i, $t)", tx, ("$i", c.Id), ("$t", Iso(now)));
@@ -135,6 +135,36 @@ public sealed partial class LocalStore
 
         return stale.Count;
     }
+
+    /// <summary>
+    /// A prompt pushed to this session, for monitor_inbox_read (ADR-0007 A2): only a prompt that was pushed to exactly this session and still has its text.
+    /// Null for an unknown id, another session's id, a prompt still waiting for a hook, or one whose text was forgotten: the caller cannot tell which.
+    /// </summary>
+    public LocalCommand? ReadablePush(string session, string id)
+    {
+        using var cmd = Command("""
+            SELECT body, expires_at FROM commands
+            WHERE id = $i AND session = $s AND kind = 'prompt' AND state IN ('pushed', 'taken', 'reported') AND body IS NOT NULL
+            """, null, ("$i", id), ("$s", session));
+        using var r = cmd.ExecuteReader();
+        return r.Read() ? new LocalCommand(id, session, "prompt", Str(r, 0), At(r.GetString(1))) : null;
+    }
+
+    /// <summary>The session read the prompt: the first time is kept, and every read is counted.</summary>
+    public void MarkRead(string id, DateTimeOffset now) =>
+        Exec("UPDATE commands SET reads = COALESCE(reads, 0) + 1, read_at = COALESCE(read_at, $t) WHERE id = $i", ("$t", Iso(now)), ("$i", id));
+
+    /// <summary>Of the prompts that went to a session as a one-line notice: how many it read and how many it has not read (yet).</summary>
+    public (int Read, int Unread) ShortNotices()
+    {
+        var read = (int)(long)(Scalar("SELECT COUNT(*) FROM commands WHERE format = 'short' AND read_at IS NOT NULL") ?? 0L);
+        var unread = (int)(long)(Scalar("SELECT COUNT(*) FROM commands WHERE format = 'short' AND read_at IS NULL AND state IN ('pushed', 'taken', 'reported')") ?? 0L);
+        return (read, unread);
+    }
+
+    /// <summary>The text of a prompt that was applied and is older than the retention is forgotten (the row stays: its id is what stops a prompt being taken twice). Returns how many.</summary>
+    public int ForgetCommandBodies(DateTimeOffset before) =>
+        Exec("UPDATE commands SET body = NULL WHERE body IS NOT NULL AND state IN ('taken', 'reported') AND taken_at IS NOT NULL AND taken_at < $t", ("$t", Iso(before)));
 
     public int PushedTotal() => (int)(long)(Scalar("SELECT COUNT(*) FROM pushes WHERE confirmed_at IS NOT NULL") ?? 0L);
 }

@@ -8,6 +8,7 @@ using ClaudeMonitor.Api.Mail;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Streaming;
 using ClaudeMonitor.Api.Update;
+using ClaudeMonitor.Contracts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +24,8 @@ public static class Startup
         services.AddSingleton(config);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Broker>();
-        services.AddSingleton<UpdateCatalog>();
+        services.AddSingleton(new UpdateCatalog(config));
+        if (config.DownloadsUrl is not null) services.AddHostedService<UpdateCatalogRefresher>();
         services.AddDbContext<MonitorDb>(o => o.UseNpgsql(config.DatabaseUrl));
         services.AddSingleton<IMailer, SmtpMailer>();
         services.AddScoped<BatchIngestor>();
@@ -130,6 +132,7 @@ public static class Startup
         ScheduleEndpoints.Map(api);
         ApprovalKeyEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
+        if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)
         {
             // The single-page app answers every non-API path; /api/* never falls through to it (global #17).

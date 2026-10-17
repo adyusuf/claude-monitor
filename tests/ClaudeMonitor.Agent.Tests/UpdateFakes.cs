@@ -126,13 +126,16 @@ public sealed class DownloadHost(FakeApi api) : HttpMessageHandler
     /// <summary>When set, the response claims to come from this address (what a followed redirect looks like).</summary>
     public Uri? RedirectedTo { get; set; }
 
+    /// <summary>A download host other than the server (MONITOR_DOWNLOADS_URL): requests to this host name are downloads whatever their path.</summary>
+    public string? ExternalHost { get; set; }
+
     /// <summary>When true the body carries no length, so only counting the bytes can stop an oversized download.</summary>
     public bool UnknownLength { get; set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         var path = request.RequestUri!.AbsolutePath;
-        if (!path.StartsWith("/downloads/", StringComparison.Ordinal))
+        if (!path.StartsWith("/downloads/", StringComparison.Ordinal) && !(ExternalHost is not null && request.RequestUri.Host == ExternalHost))
         {
             Queries.Enqueue(request.RequestUri.Query);
             return await inner.SendAsync(request, ct);

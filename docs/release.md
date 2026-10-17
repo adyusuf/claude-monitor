@@ -2,10 +2,35 @@
 
 ## Promotion
 
-`dev` -> `test` -> `prod`, each a `--no-ff` merge after `scripts/merge-gate.sh <target>` is green; CI runs the
-same gate on every push (`.github/workflows/ci.yml`). The `test` -> `prod` gate also needs the full e2e suite
-green (global #33); until the web app and its suite exist (ADR-0002, phase 3) that step reports "skipped" and
-the prod gate is not green. Every prod promotion is tagged, so a rollback target has a name:
+`dev` -> `test` -> `prod`, each a `--no-ff` merge. **The owner of the full gate is CI**: `.github/workflows/ci.yml` runs
+`scripts/gate-core.sh dev` on every push to `dev`, `test` and `prod` (free minutes, public repository), so a promotion
+waits for CI to be green on the commit being promoted, not for a second local run:
+
+```bash
+bash scripts/quick-check.sh --tests        # locally, before the merge: format, build, shellcheck, secret scan, script tests,
+                                           # and only the test projects the change reaches. A first look, not the gate.
+bash scripts/ci-status.sh dev              # the merge is allowed when CI is green for dev's tip (exit 0); 3 = still running,
+bash scripts/ci-status.sh test             # 4 = it never ran, 1 = red, 5 = gh could not answer: none of those is a pass
+bash scripts/ci-status.sh test <sha> --workflow e2e   # the optional e2e workflow, if one ran
+```
+
+**Before every merge the maintainer is asked** (global rule): "Will CI and e2e run for this merge?", two separate answers,
+and nothing is merged before they come. A "yes" for CI means waiting for it to be green (on `dev` before `test`, on `test`
+before `prod`). A "no" is recorded, never silent: the merge commit message carries a line naming only what was skipped,
+
+```
+Gate-Waived: ci, e2e (neden: <the maintainer's words>)
+```
+
+and nothing is waived without that question and that line. `bash scripts/waived-gates.sh origin/prod origin/test` lists
+the lines in a range (exit 1 when there are any, "no record" otherwise). **Before preparing a prod merge, run it for
+`origin/prod origin/test` (and again for `origin/test origin/dev` if the promotion spans both) and tell the maintainer
+which commits ran without which gate; the prod merge waits for their answer.** The prod push stays the maintainer's.
+Coverage >= 80 % per codebase (global #29) is part of CI's gate and is never waived by any of this.
+
+The `test` -> `prod` gate (`scripts/merge-gate.sh prod`) also needs the full e2e suite green (global #33)
+only when `GATE_RUN_E2E=1`; otherwise it warns that e2e was not run. Every prod promotion is tagged, so a rollback
+target has a name:
 
 ```bash
 git tag -a prod-DD-MM-YYYY -m "<one line: what shipped>" <sha> && git push origin prod-DD-MM-YYYY
@@ -84,6 +109,17 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   environment's `/downloads` before the plugin version that pins them is published. To serve the plugin from the environment's own site instead of the repository, set `AGENT_SITE_URL=https://<site>` for `build-agent.sh` (it writes `marketplace.json` and `monitor-agent-plugin.zip` into `/downloads`, ADR-0007 section 9.2) and `VITE_PLUGIN_FROM_SERVER=1` for the web build. Otherwise set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
   (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `cm-agent plugin-files .` and commit the result (a test fails otherwise).
   `--push inbox` pushes through the session's inbox (no start-up flag); `--push on` and `--push channel` are the old channel, unchanged.
+
+## Download host
+
+The agent builds can be published on a download host instead of each server's own `/downloads`: an R2 bucket behind a public domain (the domain is a deployment value, never in the repository).
+
+- **Publish:** `AGENT_UPDATE_CHANNEL=<channel> bash scripts/build-agent.sh`, then `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <channel>` (wrangler, the maintainer's own login). It checks `SHA256SUMS` and that the manifest is signed for that channel,
+  uploads the files to `daemons/<version>/<channel>/` (kept, cached for good) and then to `daemons/<channel>/` (`no-cache`), and the manifest last.
+- **Point a server at it:** `MONITOR_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>` in that server's `monitor.env` (test: `.../daemons/test`, prod: `.../daemons/prod`). The API reads `manifest.json` from there once a minute, keeps the last good copy when the host is down, and
+  offers `<url>/<file>`. `/downloads/<file>` on the server answers 302 to the host when the server does not hold the file itself, so the web's "Get the agent" page, old links and the plugin's bootstrap keep working. Unset, nothing changes.
+- **Trust:** the address is not what makes a build trusted; the agent still verifies the signed SHA-256 against its built-in channel key. It will fetch from the server's own `/downloads/` or from an https address on a public host name (default port, no credentials or query, a plain file name, no redirect); anything else is refused (`bad_url`).
+- Channels stay apart by folder: a test agent carries the test key and only the `test` manifest is signed for it. Never point the prod server at `daemons/test`.
 
 ## Rollback
 

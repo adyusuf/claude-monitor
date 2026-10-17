@@ -15,7 +15,7 @@ namespace ClaudeMonitor.Agent;
 /// <summary>The commands a person runs by hand: install, restart and status.</summary>
 public static partial class Cli
 {
-    /// <summary>"cm-agent install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it.</summary>
+    /// <summary>"cm-agent install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it. The first install, with no push choice saved yet, turns the inbox push on.</summary>
     public static int Install(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr, string sourceBinary,
         Func<string, string[], int>? run = null)
     {
@@ -44,6 +44,25 @@ public static partial class Cli
             }
 
             config = SavedSettings.SavePush(config, value != "off", value == "off" ? null : PushTransports.Normalize(value));
+        }
+
+        if (Array.IndexOf(args, "--push-format") >= 0)
+        {
+            var format = Option(args, "--push-format");
+            if (!InboxFormats.IsValid(format))
+            {
+                stderr.WriteLine($"--push-format takes full or short, not \"{format}\".");
+                return 2;
+            }
+
+            config = SavedSettings.SaveInboxFormat(config, format!);
+        }
+
+        if (Array.IndexOf(args, "--push") < 0 && !config.PushFromEnvironment && Identity.Peek(config)?.Push is null)
+        {
+            // The first install turns the push on, through the channel (the maintainer's decision, 16/10/2026; --push inbox picks the inbox instead): a
+            // prompt sent from the web reaches an idle session. Once anything is saved (--push off, config push off, or an earlier install) it is kept as chosen.
+            config = SavedSettings.SavePush(config, true, PushTransports.Channel);
         }
 
         return new PluginInstaller(config, stdout, run).Install(sourceBinary);
