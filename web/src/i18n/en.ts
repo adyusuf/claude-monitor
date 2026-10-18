@@ -105,7 +105,7 @@ export const en = {
     note_notification: "Claude is waiting for you:", note_subagent_start: "Subagent started:", note_subagent_stop: "Subagent finished:",
     otherAnswer: "Or type another answer", sendAnswers: "Send answers", approvePlan: "Approve the plan", rejectPlan: "Send back with the note above",
     showAll: "Show all", showLess: "Show less",
-    toolRun: "{n} tool calls", toolRunFailed: "{n} failed",
+    toolRun: "{n} tool calls", toolRunOne: "1 tool call", toolRunFailed: "{n} failed",
     nextStepWaiting: "Waiting for the person at this session", nextStepAnswered: "Answered",
     replyPlaceholder: "Or type an answer", replySend: "Send", replySent: "Sent to the session: {text}",
     replyFailed: "The answer was not sent. Try again.",

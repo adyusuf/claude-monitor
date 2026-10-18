@@ -33,12 +33,14 @@ describe("the conversation on the session page", () => {
     expect(await screen.findByText("npm test")).toBeInTheDocument();
     expect(calls.find((c) => c.path.startsWith("/sessions/s1/events"))!.path).toContain("kind=transcript");
     const order = () => [...document.querySelectorAll(".chat-row")].map((r) => (r as HTMLElement).dataset.kind);
-    expect(order()).toEqual(["assistant", "tool"]);
+    expect(order()).toEqual(["assistant", "toolrun"]);
+    expect(screen.getByText("1 tool call")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("1 tool call"));
     await userEvent.click(screen.getByText("npm test"));
     expect(screen.getByText("42 passed")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Older activity" }));
-    await waitFor(() => expect(order()).toEqual(["user", "user", "assistant", "tool"]));
+    await waitFor(() => expect(order()).toEqual(["user", "user", "assistant", "toolrun"]));
     expect(screen.getByText("oldest question")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Older activity" })).toBeNull();
 
@@ -118,11 +120,12 @@ describe("the conversation: long output, plans, notes, catching up and scrolling
     ], next: null }));
     renderAt("/w/w1/sessions/s1", route);
     expect(await screen.findByText("let me think")).toBeInTheDocument();
-    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getAllByText("running")).toHaveLength(2); // the last call, alone in its run, and the call inside it
     expect(screen.getByText("no output")).toBeInTheDocument();
     expect(screen.getByText("Claude is waiting for you:", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Waiting for approval")).toBeInTheDocument();
     expect(screen.getByText("do it")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("2 tool calls")); // the run holding "old" and "yes"
     await userEvent.click(screen.getByText("yes"));
     const pre = () => document.querySelector(".chat-output pre")!.textContent!.length;
     expect(pre()).toBeLessThan(4100);
