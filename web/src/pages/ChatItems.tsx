@@ -55,7 +55,7 @@ function ToolRunCard({ tools }: { tools: ToolItem[] }) {
     <details className={`chat-tool chat-tool-run chat-tool-${state}`} {...fold}>
       <summary>
         <span className="chat-tool-dot" aria-hidden />
-        <strong className="chat-tool-name">{t("chat.toolRun", { n: tools.length })}</strong>
+        <strong className="chat-tool-name">{tools.length === 1 ? t("chat.toolRunOne") : t("chat.toolRun", { n: tools.length })}</strong>
         <span className="chat-tool-kinds">
           {toolCounts(tools).map((c) => <span key={c.name} className="chat-tool-kind">{c.name} ×{c.count}</span>)}
         </span>

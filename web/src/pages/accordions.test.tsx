@@ -73,7 +73,7 @@ describe("runs of tool calls in the conversation", () => {
     expect(within(run as HTMLElement).getAllByText("running").length).toBeGreaterThan(0);
   });
 
-  it("splits runs at a message and leaves a single call as the call it is", async () => {
+  it("splits runs at a message, and a single call is a run of one call", async () => {
     open([
       call(1, "a", "Bash", { command: "one" }), back(2, "a", "ok"),
       call(3, "b", "Read", { file_path: "/x" }), back(4, "b", "ok"),
@@ -82,8 +82,13 @@ describe("runs of tool calls in the conversation", () => {
     ]);
     renderAt("/w/w1/sessions/s1", route);
     expect(await screen.findByText("In between.")).toBeInTheDocument();
-    expect(kinds()).toEqual(["toolrun", "assistant", "tool"]);
+    expect(kinds()).toEqual(["toolrun", "assistant", "toolrun"]);
     expect(screen.getByText("2 tool calls")).toBeInTheDocument();
+    const single = screen.getByText("1 tool call").closest("details")!;
+    expect(single.open).toBe(false);
+    expect(within(single).getByText("Bash ×1")).toBeInTheDocument();
+    await userEvent.click(within(single).getByText("1 tool call"));
+    expect(within(single).getByText("three")).toBeVisible();
   });
 });
 

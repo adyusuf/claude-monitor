@@ -8,9 +8,9 @@ const line = (item: ChatItem, at = 0) => ({ key: item.key, at, item });
 const said = (n: number): ChatItem => ({ kind: "assistant", key: `a${n}`, at: "2026-10-05T10:00:00Z", text: "hi" });
 
 describe("grouping tool calls into runs", () => {
-  it("joins two or more calls in a row into one run keyed by the first call, and leaves a lone call alone", () => {
+  it("joins calls in a row into one run keyed by the first call, and a lone call is a run of one", () => {
     const out = groupToolRuns([line(said(1)), line(tool(1)), line(tool(2)), line(tool(3)), line(said(2)), line(tool(4))]);
-    expect(out.map((e) => (isRun(e) ? `run:${e.tools.length}` : e.key))).toEqual(["a1", "run:3", "a2", "t4"]);
+    expect(out.map((e) => (isRun(e) ? `run:${e.tools.length}` : e.key))).toEqual(["a1", "run:3", "a2", "run:1"]);
     const run = out[1]!;
     expect(isRun(run) && run.key).toBe("run:t1");
   });
