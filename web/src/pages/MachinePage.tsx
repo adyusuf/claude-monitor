@@ -13,6 +13,7 @@ import { ScheduleList } from "./ScheduleList";
 import { ToolList } from "./MachineBadges";
 import { MachineMetrics } from "./MachineMetrics";
 import { NoteEditor, TagsEditor } from "./MachineFacts";
+import { MachineActions } from "./MachineActions";
 import { MachineAsks } from "./MachineAsks";
 import { MachineProjects } from "./MachineProjects";
 import { MachineRoleEditor } from "./MachineRoleEditor";
@@ -23,7 +24,7 @@ import { RunList } from "./RunList";
 import { useMachineData } from "./useMachineData";
 
 /** The live events that change what this page shows. */
-const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "machine"];
+const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "machine", "action"];
 
 /** One machine: its load, its alerts, the runs waiting for the owner, the run history, grants and jobs (ADR-0005). */
 export function MachinePage() {
@@ -81,6 +82,9 @@ export function MachinePage() {
       {data.detail ? (
         <>
           <Card title={t("machines.services.title")}><MachineServices agentId={agentId} detail={data.detail} owned={data.owned} onChanged={() => void reload()} /></Card>
+          <Card title={t("machines.actions.title")}>
+            <MachineActions agentId={agentId} view={m} owned={data.owned} agentVersion={data.agentVersion} version={version} onChanged={() => void reload()} />
+          </Card>
           <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
           <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} /></Card>
         </>

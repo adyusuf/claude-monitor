@@ -257,6 +257,47 @@ shell targets; that is recorded under "Open" below.
   so the opt-in self-update of [ADR-0004](adr-0004-agent-self-update.md) (which replaces the binary in the agent's own
   home) cannot replace it. The API refuses an agent below a minimum version as a target.
 
+### Agent actions from the web (amends this ADR, 18/10/2026)
+
+**Why.** The web could approve, deny or cancel a run but start nothing, and a machine at exec level `off` (the default)
+cannot be reached by a run at all. So the owner who could not tell where to type `cm-agent restart` (or whether the agent
+was current) had no way to ask from the page they were already on. This adds a few **fixed agent actions**; it is not a way
+to run commands.
+
+- **A closed set, no command text.** `restart`, `update_check`, `update`, `status` (`AgentActionKinds`, with a `default`
+  branch everywhere it is switched on). The request carries the kind and nothing else: no argument, path or text from the
+  web reaches the agent, and an unknown kind is refused by the API and ignored by an agent that does not know it.
+  The daemon performs the kind with its own code: `status` is the text `cm-agent status` prints (ids, times, error type
+  names; no secrets, paths of the user's projects or captured content); `update_check` is the updater's check; `update`
+  starts the same detached `cm-agent update` the daemon's automatic update starts (it stops and replaces this daemon);
+  `restart` starts a detached `cm-agent restart`. Both detached starts end the daemon that took the action, so the daemon
+  **reports the action first** and the outcome line says "started"; the new daemon's version shows on the machine page
+  from its next heartbeat.
+- **Keys.** No exec level is needed (these are the agent's own verbs, not a command of the requester's choosing), and the
+  workspace's `remote_runs_enabled` switch does not apply. What does apply, fail-closed:
+  1. **Membership** of the active workspace, at create, at delivery and at report (as for runs).
+  2. **Only the machine's owner** (the target agent's user) may request an action for it; an admin who is not the owner
+     sees the buttons disabled and the API answers 403. There is no requester other than the owner.
+  3. **Re-authentication** for `restart` and `update` (a sign-in within `ReauthWindow`, or a valid two-step code); on a
+     **strict** target (production or database role) a fresh two-step code is always needed and no two-step sign-in means
+     no action (`totp_required`), the same gate as a grant approval (`RemoteChecks.ApprovalGateAsync`). `status` and
+     `update_check` change nothing and ask for neither.
+  4. The workspace's update setting is **not** a veto: an explicit update is the person's own decision (the CLI rule of
+     ADR-0004). An agent that cannot update itself (a service agent, ADR-0005 service mode) reports `failed` with the
+     updater's own refusal code.
+- **Path.** `POST /api/agents/{id}/actions` (and `GET` for the owner's last ten) creates a row (`agent_actions`: kind, status `queued → delivered →
+  succeeded | failed`, or `expired`; requester, a delivered action gets a fresh 10 minutes to finish in; requester, times; result text capped at 2000 characters). The API
+  sends it to the agent on its own stream (`action` event) and replays unfinished ones when the stream opens, exactly as
+  commands and runs. The agent reports through `POST /api/agent/actions/{id}/status`; every transition is a
+  compare-and-set, a final status never changes, a report from another agent is a 404. A queued action expires after 10
+  minutes (an offline machine does not restart "later" by surprise) and a second request of the same kind while one is
+  open returns the open one instead of queueing another.
+- **The result is data.** It is plain text, capped, shown on the machine page as text (never as HTML), kept with the
+  action for the run retention period, and the action is audited (kind, agent, requester; never the result).
+- **Contracts.** Additive only (global #4): a new table, new stream event, new records at the end of the agent
+  protocol. An old agent ignores the `action` event; an action nobody takes expires, and the page says the agent needs
+  the newer version to take it.
+
 ### Backward compatibility
 
 Old agents never report an exec level, so they are never targets; a new agent on an old API gets 404 and switches

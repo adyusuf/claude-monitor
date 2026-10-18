@@ -7,7 +7,7 @@ export interface LiveMessage { event: string; sessionId?: string; id?: string; s
 /** The events the page itself makes up when the stream was away or the tab came back: whatever the page shows may have changed. */
 export const isCatchUp = (m: LiveMessage): boolean => m.event === "reconnected" || m.event === "resume";
 
-const EVENTS = ["session", "command", "permission", "run", "alert", "grant", "job", "machine"] as const;
+const EVENTS = ["session", "command", "permission", "run", "alert", "grant", "job", "machine", "action"] as const;
 
 /**
  * The workspace's live stream (server-sent events). Calls onMessage for every change; the page re-reads what it

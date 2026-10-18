@@ -106,6 +106,8 @@ public static class PrivacyRemoteData
             .ToListAsync(ct));
         PrivacyEndpoints.Write(w, "asks", await db.MachineAsks.AsNoTracking().Where(a => a.RequesterUserId == userId).OrderBy(a => a.CreatedAt)
             .Select(a => new { a.Id, a.RequesterAgentId, a.TargetAgentId, a.Question, a.Status, a.Answer, a.AnswerTruncated, a.Error, a.CreatedAt, a.DeliveredAt, a.AnsweredAt }).ToListAsync(ct));
+        PrivacyEndpoints.Write(w, "agentActions", await db.AgentActions.AsNoTracking().Where(a => a.RequestedBy == userId).OrderBy(a => a.CreatedAt)
+            .Select(a => new { a.Id, a.AgentId, a.Kind, a.Status, a.Result, a.CreatedAt, a.FinishedAt }).ToListAsync(ct));
         PrivacyEndpoints.Write(w, "machineProjects", await db.MachineProjects.AsNoTracking().Where(p => agentIds.Contains(p.AgentId)).OrderBy(p => p.AgentId).ThenBy(p => p.ProjectKey)
             .Select(p => new { p.AgentId, p.ProjectKey, p.Name, p.Branch, p.HeadSha, p.Tag, p.LastSeenAt, p.Source }).ToListAsync(ct));
         w.WriteStartArray("metrics");
@@ -188,6 +190,8 @@ public static class PrivacyRemoteData
         await AskReports.CancelOpenAsync(db, broker, now, a => a.RequesterUserId == userId || a.TargetUserId == userId, ct, after);
         await db.MachineAsks.Where(a => a.RequesterUserId == userId || a.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.Question, (string?)null).SetProperty(a => a.Answer, (string?)null), ct);
+        // ADR-0005 (agent actions): the result text of an action can name the machine's folders; it is emptied (the rows stay for the audit).
+        await db.AgentActions.Where(a => a.RequestedBy == userId || agentIds.Contains(a.AgentId)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Result, (string?)null), ct);
         // ADR-0008 §3a′: the user's machines' project rows and listening services are captured facts, and the project key of an emptied run goes too.
         await db.MachineProjects.Where(p => agentIds.Contains(p.AgentId)).ExecuteDeleteAsync(ct);
         await db.Agents.Where(a => agentIds.Contains(a.Id)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Services, (string?)null)

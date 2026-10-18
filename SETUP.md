@@ -297,6 +297,10 @@ apply either way. A relative path makes the whole file invalid, hence `off`. The
   group, makes `<home>/run-work` (setgid, shared by the two accounts) and writes `/etc/sudoers.d/cm-agent-run` (checked with `visudo -cf` first) so that only the service account may start commands, and only as the run account. Remote runs then start as that account, with
   `run-work` as their home and working directory. `uninstall --service` removes the sudoers file and keeps the accounts. Windows is refused. Not verified on a real host (ADR-0010 §5).
 
+## Two-step sign-in (authenticator app)
+
+Some actions ask for a 6-digit code from an authenticator app (allowing asks, restart and update of an agent, grant and job approvals; always on a production or database machine). The web has a step-by-step page for setting the app up at `/two-step` (sidebar: **Authenticator app**; every code field links to it): install any authenticator app on a phone, press **Set up**, scan the QR code (or type the setup key shown under it), enter the first code, and keep the recovery codes. The QR code is drawn in the browser by `qrcode-generator` 2.0.4 (MIT, no dependencies); the setup key is never sent to another host.
+
 ## Updating the agent
 
 Design, trust model and limits: [ADR-0004](docs/adr-0004-agent-self-update.md). **Off by default**: an agent never asks the server for an update
@@ -319,6 +323,7 @@ cm-agent config auto-update off|check|on # what the daemon may do by itself (def
 - **Replacement:** the new binary is staged as `cm-agent.new`, the old one is kept as `cm-agent.prev` (one version back), the daemon is stopped through a `daemon.stop`
   file and started again from the new binary. If it does not report its version and get an answer from the API within 90 s, the previous binary is put back automatically.
 - **MCP processes** (one per Claude Code session) keep running the old version until their session ends; they are not killed. Hooks use the new binary at once.
+- **From the web** (agent 0.5.0 and later, [ADR-0005](docs/adr-0005-remote-work.md) "Agent actions from the web"): the machine page has an **Agent actions** card with four buttons for the machine's owner: **Status** (what `cm-agent status` prints), **Check for update**, **Update** (the same as `cm-agent update`) and **Restart** (the same as `cm-agent restart`). It is a fixed set, not a way to run commands: it needs no exec level and no workspace switch. Restart and Update ask for a recent sign-in (a fresh two-step code on a production or database machine). An action the agent has not taken within 10 minutes is dropped; an agent older than 0.5.0 ignores it, so update that one by hand once. A service agent cannot replace its own binary, so Update there reports the refusal and an administrator upgrades it.
 - **The standards repository's `install.py`** may run `cm-agent update` instead of rebuilding when an agent is already installed (it only needs the exit code); that is a
   choice of that script, nothing here depends on it.
 

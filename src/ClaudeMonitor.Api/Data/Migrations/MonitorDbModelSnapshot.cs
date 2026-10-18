@@ -265,6 +265,83 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.AgentAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agent_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("text")
+                        .HasColumnName("result");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("queued")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent_actions");
+
+                    b.HasIndex("RequestedBy")
+                        .HasDatabaseName("ix_agent_actions_requested_by");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("ix_agent_actions_workspace_id");
+
+                    b.HasIndex("AgentId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_agent_actions_agent_id_kind")
+                        .HasFilter("status IN ('queued', 'delivered')");
+
+                    b.HasIndex("AgentId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_agent_actions_agent_id_created_at_id");
+
+                    b.ToTable("agent_actions", t =>
+                        {
+                            t.HasCheckConstraint("ck_agent_actions_kind", "kind IN ('restart', 'update_check', 'update', 'status')");
+
+                            t.HasCheckConstraint("ck_agent_actions_status", "status IN ('queued', 'delivered', 'succeeded', 'failed', 'expired')");
+                        });
+                });
+
             modelBuilder.Entity("ClaudeMonitor.Api.Data.AgentBatch", b =>
                 {
                     b.Property<Guid>("AgentId")
@@ -2716,6 +2793,30 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_agents_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.AgentAction", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_actions_agents_agent_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_actions_users_requested_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_actions_workspaces_workspace_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.AgentBatch", b =>

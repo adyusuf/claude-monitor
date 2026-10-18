@@ -1,4 +1,5 @@
 import { enMachines } from "./en.machines";
+import { enTwoStep } from "./en.twoStep";
 import { enRemote } from "./en.remote";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
@@ -138,6 +139,7 @@ export const en = {
     status: { queued: "Waiting", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
   },
   machines: enMachines,
+  twoStep: enTwoStep,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
     approve: "Connect this machine", deny: "This is not me", approved: "Done. The machine is connected; you can close this page.",
@@ -169,8 +171,7 @@ export const en = {
     data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
     deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",
     mfa: "Two-step sign-in", mfaOn: "On: every sign-in also asks for a code from your authenticator app.",
-    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
-    mfaScan: "Add this key to your authenticator app (or open the link on the device that has it), then enter the code it shows:",
+    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
     mfaOpen: "Open in authenticator", mfaEnable: "Turn on", mfaRecovery: "Recovery codes. Keep them somewhere safe: each signs in once without the app. They are shown only now.",
     mfaDisable: "Turn off", mfaDisabled: "Two-step sign-in is off.",
     deleteConfirm: "Type {word} to confirm", deleteButton: "Delete my account", deleted: "Your account is deleted.",

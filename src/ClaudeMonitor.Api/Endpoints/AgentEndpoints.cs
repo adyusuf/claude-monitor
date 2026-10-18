@@ -113,10 +113,12 @@ public static class AgentEndpoints
         // "ready" first: the response headers go out with the first message, and an idle stream would otherwise look unconnected for 20 s.
         var runs = await RunNotices.WaitingForAsync(db, agentId, now, http.RequestAborted, broker);
         var asks = await AskQueries.WaitingForAsync(db, agentId, now, http.RequestAborted);
+        var actions = await AgentActions.WaitingForAsync(db, agentId, now, http.RequestAborted);
         var first = new[] { new StreamMessage(AgentStreamEvents.Ready, new { }) }
             .Concat(waiting.Select(c => new StreamMessage(AgentStreamEvents.Command, c)))
             .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)))
-            .Concat(asks.Select(a => new StreamMessage(AgentStreamEvents.Ask, a)));
+            .Concat(asks.Select(a => new StreamMessage(AgentStreamEvents.Ask, a)))
+            .Concat(actions.Select(a => new StreamMessage(AgentStreamEvents.Action, a)));
         return Sse.Stream(subscription, first, http.RequestAborted);
     }
 

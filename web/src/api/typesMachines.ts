@@ -84,3 +84,11 @@ export interface AskView {
   error: string | null; createdAt: string; expiresAt: string; deliveredAt: string | null; answeredAt: string | null;
 }
 export interface AgentAsksView { agentId: string; accept: boolean; setAt: string | null; setBy: string | null }
+
+export type AgentActionKind = "restart" | "update_check" | "update" | "status";
+export type AgentActionStatus = "queued" | "delivered" | "succeeded" | "failed" | "expired";
+/** One fixed action its owner asked of a machine's agent (ADR-0005); the result is plain text the agent wrote, never markup. */
+export interface AgentActionView {
+  id: string; agentId: string; kind: AgentActionKind; status: AgentActionStatus; result: string | null;
+  createdAt: string; expiresAt: string; finishedAt: string | null;
+}
