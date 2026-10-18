@@ -1,5 +1,6 @@
 import type { Dictionary } from "./en";
 import { trMachines } from "./tr.machines";
+import { trTwoStep } from "./tr.twoStep";
 import { trRemote } from "./tr.remote";
 
 // Turkish: the same keys as en.ts (the type makes a missing key a build error).
@@ -139,6 +140,7 @@ export const tr: Dictionary = {
     status: { queued: "Bekliyor", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal" },
   },
   machines: trMachines,
+  twoStep: trTwoStep,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
     approve: "Bu makineyi bağla", deny: "Bu ben değilim", approved: "Tamam. Makine bağlandı; bu sayfayı kapatabilirsiniz.",
@@ -170,8 +172,7 @@ export const tr: Dictionary = {
     data: "Verileriniz", exportHint: "Sizinle ve oturumlarınızla ilgili her şey, tek bir JSON dosyası olarak.", export: "Verilerimi indir",
     deleteTitle: "Hesabı sil", deleteHint: "Adınız, adresiniz, giriş yöntemleriniz ve makinelerinizin yakaladığı her şey silinir; makinelerinizin bağlantısı kesilir. Geri alınamaz.",
     mfa: "İki adımlı giriş", mfaOn: "Açık: her girişte doğrulama uygulamanızdan bir kod da istenir.",
-    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
-    mfaScan: "Bu anahtarı doğrulama uygulamanıza ekleyin (ya da bağlantıyı uygulamanın olduğu cihazda açın), sonra gösterdiği kodu girin:",
+    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
     mfaOpen: "Doğrulama uygulamasında aç", mfaEnable: "Aç", mfaRecovery: "Kurtarma kodları. Güvenli bir yerde saklayın: her biri uygulama olmadan bir kez giriş yapar. Yalnızca şimdi gösteriliyor.",
     mfaDisable: "Kapat", mfaDisabled: "İki adımlı giriş kapalı.",
     deleteConfirm: "Onaylamak için {word} yazın", deleteButton: "Hesabımı sil", deleted: "Hesabınız silindi.",

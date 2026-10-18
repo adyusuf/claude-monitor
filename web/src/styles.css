@@ -121,7 +121,7 @@ textarea.input { resize: vertical; }
 .pill-ended { color: var(--muted); }
 .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
-.badge.ok, .badge.status-applied { background: var(--ok-soft); color: var(--ok); }
+.badge.ok, .badge.status-applied, .badge.status-succeeded { background: var(--ok-soft); color: var(--ok); }
 .badge.status-queued, .badge.status-delivered { background: var(--warn-soft); color: var(--warn); }
 .badge.status-failed, .badge.status-expired { background: var(--danger-soft); color: var(--danger); }
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
@@ -349,3 +349,6 @@ button.act-text { cursor: pointer; }
 .chat-notice-fields > div { display: grid; grid-template-columns: minmax(80px, max-content) 1fr; gap: 10px; }
 .chat-notice-fields dt { font-weight: 600; }
 .chat-notice-fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); }
+.action-result { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); font-size: 12px; }
+.qr { width: 220px; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); }
+.who-link { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; margin-bottom: 8px; }

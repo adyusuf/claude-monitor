@@ -124,6 +124,7 @@ public static class Startup
         RemoteSettingsEndpoints.Map(api);
         AgentRoleEndpoints.Map(api);
         AgentFactsEndpoints.Map(api);
+        AgentActionEndpoints.Map(api);
         AskEndpoints.Map(api);
         AgentGrantEndpoints.Map(api);
         GrantEndpoints.Map(api);

@@ -65,7 +65,15 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         runs.Recover();
         ScriptScratch.Sweep(config.Home, _ => false); // no run is running yet: whatever a crash left in the scratch folders goes
         if (monitor.Policy().RunAccount is not null) ScriptScratch.SweepFolder(RunAccount.WorkFolder(config.Home), _ => false, onlyRunFolders: true);
-        stream = new Relay(config, streamStore, api, clock) { Runs = runs };
+        var actions = new ActionRelay(api, log, async () =>
+            {
+                await using var text = new StringWriter();
+                await Cli.StatusAsync(config, text, clock);
+                return text.ToString();
+            },
+            ct => new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock).CheckAsync(ct),
+            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode);
+        stream = new Relay(config, streamStore, api, clock) { Runs = runs, Actions = actions };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
         updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
