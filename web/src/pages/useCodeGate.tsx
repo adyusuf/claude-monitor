@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { Field } from "../components/ui";
 import { useErrorText, useI18n, type Key } from "../i18n";
@@ -50,8 +51,11 @@ export function useCodeGate(needCode: "mfa_required" | "reauth_required", hint: 
 
   const showing = asking || force;
   const field = showing ? (
-    <Field label={t("remote.codeLabel")} hint={t(hint)} value={code} inputMode="numeric" autoComplete="one-time-code" autoFocus
-      onChange={(e) => setCode(e.target.value)} />
+    <>
+      <Field label={t("remote.codeLabel")} hint={t(hint)} value={code} inputMode="numeric" autoComplete="one-time-code" autoFocus
+        onChange={(e) => setCode(e.target.value)} />
+      <p className="small"><Link to="/two-step">{t("twoStep.help")}</Link></p>
+    </>
   ) : null;
   return { attempt, busy, error, field, ready: !showing || code.trim() !== "" };
 }

@@ -6,6 +6,7 @@ import { useI18n } from "./i18n";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./pages/AccountPages";
 import { ForgotPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./pages/AuthPages";
 import { DevicePage, MachinesPage } from "./pages/MachinesPage";
+import { TwoStepPage } from "./pages/TwoStepPage";
 import { MachinePage } from "./pages/MachinePage";
 import { MembersPage } from "./pages/MembersPage";
 import { MfaPage } from "./pages/Mfa";
@@ -38,6 +39,7 @@ export function App() {
         <Route index element={<Home />} />
         <Route path="/settings" element={<AccountPage />} />
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/two-step" element={<TwoStepPage />} />
         <Route path="/device" element={<DevicePage />} />
         <Route path="/download" element={<DownloadPage />} />
         <Route path="/invitations/accept" element={<AcceptInvitationPage />} />

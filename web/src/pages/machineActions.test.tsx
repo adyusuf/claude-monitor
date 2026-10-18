@@ -183,6 +183,13 @@ describe("the agent actions card on the machine page", () => {
     expect(await button("restart")).toBeDisabled();
   });
 
+  it("links the code field to the authenticator guide", async () => {
+    api({}, { view: { effectiveEnvironment: "production" } });
+    open();
+    await screen.findByLabelText(en.remote.codeLabel);
+    expect(screen.getByRole("link", { name: en.twoStep.help })).toHaveAttribute("href", "/two-step");
+  });
+
   it("treats a database machine as strict too", async () => {
     api({}, { view: { effectiveFunction: "database" } });
     open();

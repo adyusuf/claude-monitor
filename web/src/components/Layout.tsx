@@ -76,6 +76,10 @@ export function Layout() {
           </nav>
         ) : null}
         <div className="sidebar-foot">
+          <NavLink to="/two-step" className="who-link" onClick={() => setMenuOpen(false)}>
+            <span aria-hidden>🔐</span> {t("twoStep.nav")}
+            {me && !me.mfaEnabled ? <span className="badge warn">{t("twoStep.navOff")}</span> : null}
+          </NavLink>
           <NavLink to="/account" className="who" onClick={() => setMenuOpen(false)}>
             <span className="avatar" aria-hidden>{(me?.displayName ?? "?").slice(0, 1).toUpperCase()}</span>
             <span className="who-name">{me?.displayName}</span>

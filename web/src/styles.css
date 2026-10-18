@@ -350,3 +350,5 @@ button.act-text { cursor: pointer; }
 .chat-notice-fields dt { font-weight: 600; }
 .chat-notice-fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); }
 .action-result { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); font-size: 12px; }
+.qr { width: 220px; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); }
+.who-link { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; margin-bottom: 8px; }
