@@ -340,3 +340,12 @@ button.act-text { cursor: pointer; }
 .subagent-times dt { font-weight: 600; }
 .subagent-times dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
 .subagent-running { border-left: 3px solid var(--warn); padding-left: 8px; }
+.chat-notice { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); font-size: 12.5px; color: var(--muted); }
+.chat-notice > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 10px; cursor: pointer; list-style: none; }
+.chat-notice > summary::-webkit-details-marker { display: none; }
+.chat-notice-status { font-weight: 600; }
+.chat-notice-summary { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.chat-notice-fields { margin: 0; padding: 0 10px 8px; display: grid; gap: 4px; }
+.chat-notice-fields > div { display: grid; grid-template-columns: minmax(80px, max-content) 1fr; gap: 10px; }
+.chat-notice-fields dt { font-weight: 600; }
+.chat-notice-fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); }
