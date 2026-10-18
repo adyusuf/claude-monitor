@@ -41,6 +41,7 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<RemoteRunOutput> RemoteRunOutput => Set<RemoteRunOutput>();
     public DbSet<MachineProject> MachineProjects => Set<MachineProject>();
     public DbSet<MachineAsk> MachineAsks => Set<MachineAsk>();
+    public DbSet<AgentAction> AgentActions => Set<AgentAction>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

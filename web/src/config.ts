@@ -17,6 +17,8 @@ export const config = {
   chatLoadMorePx: 200,
   /** A tool's output longer than this shows cut, with "Show all". */
   chatOutputChars: 4000,
+  /** The first agent version that takes the fixed actions of the machine page (restart, update check, update, status). */
+  actionsMinAgentVersion: "0.5.0",
   passwordMin: 10,
   nameMax: 100,
   promptMax: 10_000,

@@ -40,6 +40,16 @@ export const trMachines: Dictionary["machines"] = {
     turnOn: "Dinleyen portları bildir", turnOff: "Bildirmeyi bırak", saved: "Kaydedildi.", ownerOnly: "Buna yalnızca makinenin sahibi karar verir.",
     enableHint: "Açmak yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
   },
+  actions: {
+    title: "Ajan işlemleri", hint: "Bu makinenin ajanından birkaç sabit işten birini yapmasını isteyin. Yazılacak komut yok: her düğme ajanın zaten bildiği tek bir işlemdir. Sonuç aşağıda görünür.",
+    ownerOnly: "Bunları yalnızca makinenin sahibi isteyebilir.", offline: "Makine çevrimdışı: işlem 10 dakika bekler, ajan o zamana kadar almazsa düşer.",
+    oldAgent: "Bu ajan {min} sürümünden eski ve bu istekleri yok sayar. Makinede \"cm-agent update\" ile güncelleyin; sonra düğmeler çalışır.",
+    enableHint: "Yeniden başlatma ve güncelleme yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
+    strictHint: "Bu makine canlı ya da veritabanı: yeniden başlatma ve güncelleme her seferinde doğrulama uygulamasından yeni bir kod ister.",
+    sent: "İstendi: {action}. Ajanın cevabı aşağıda.", none: "Henüz istenen işlem yok.",
+    kind: { status: "Durum", update_check: "Güncelleme var mı?", update: "Güncelle", restart: "Yeniden başlat" },
+    status: { queued: "ajanı bekliyor", delivered: "ajanda", succeeded: "tamam", failed: "başarısız", expired: "zamanında alınmadı" },
+  },
   asks: {
     title: "Diğer makinelerinizden sorular", hint: "Sizin başka bir makinenizdeki bir Claude oturumu, buradaki boşta bir Claude oturumuna soru sorabilir (canlı ya da veritabanı makinesine değil; bir yönetici bu makinenin ortamını belirlemişse). Cevap metin olarak döner. Varsayılan kapalı: yalnızca bu makinenin sahibi açar.",
     off: "Bu makine soru kabul etmiyor.", on: "Bu makine diğer makinelerinizden gelen soruları kabul ediyor.", turnOn: "Sorulara izin ver", turnOff: "Sorulara izin vermeyi bırak", saved: "Kaydedildi.",

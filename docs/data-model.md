@@ -106,6 +106,12 @@ past their end; the audit rows name an ask by id only. Every transition is a com
 and a delivered one after 15 without an answer, and member removal, an agent move or revoke, the opt-in turning off and the workspace switch turning off
 cancel the open ones.
 
+**Agent actions (ADR-0005 amendment, migration `AgentActions`).** New table `agent_actions`: `id`, `workspace_id`, `agent_id` (FK agents), `requested_by` (FK users, the machine's owner),
+`kind` (`restart`, `update_check`, `update`, `status`; CHECK), `status` (`queued`, `delivered`, `succeeded`, `failed`, `expired`; CHECK, default `queued`), `result` (the agent's text, ≤ 2000;
+it can name the machine's folders, so it is exported to its requester and emptied on account deletion), `created_at`, `expires_at` (created + 10 minutes), `delivered_at`, `finished_at`;
+UNIQUE (`agent_id`, `kind`) WHERE status IN ('queued', 'delivered') (one open action of a kind per agent) and an index on (`agent_id`, `created_at` DESC, `id` DESC). Every transition is a
+compare-and-set (`queued → delivered → succeeded | failed`; an open action past `expires_at` becomes `expired`); finished rows are deleted after `retention_days` by the housekeeping loop.
+
 - **Transitions are compare-and-set** (`UPDATE … WHERE status = <expected>`); a run, its audit row and a grant's
   use count change in one transaction; the API publishes to the stream after commit.
 - **Output** is masked by the target, at most 1 MB per run (checked atomically with the chunk insert), never logged,

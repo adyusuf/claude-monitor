@@ -11,6 +11,8 @@ export interface MachineData {
   loaded: boolean;
   /** True when the signed-in user owns this machine's agent (only the owner gives grants). */
   owned: boolean;
+  /** The version the machine's agent reports; null while unread. */
+  agentVersion: string | null;
   metrics: MetricSample[];
   alerts: AlertView[];
   runs: WebRunView[];
@@ -37,6 +39,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const [detail, setDetail] = useState<MachineDetail | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [owned, setOwned] = useState(false);
+  const [agentVersion, setAgentVersion] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<MetricSample[]>([]);
   const [alerts, setAlerts] = useState<AlertView[]>([]);
   const [runs, setRuns] = useState<WebRunView[]>([]);
@@ -58,6 +61,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       setMachine(machines.find((m) => m.agentId === agentId) ?? null);
       setDetail(detailRow);
       setOwned(agents.some((a) => a.id === agentId && a.userId === userId));
+      setAgentVersion(agents.find((a) => a.id === agentId)?.version ?? null);
       setAlerts(alertRows);
       setRuns((previous) => mergeRuns(runRows, previous));
       if (!pagedOlder.current) setHasMoreRuns(runRows.length >= config.runPageSize);
@@ -103,5 +107,5 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     return () => clearInterval(timer);
   }, [loadMetrics]);
 
-  return { machine, detail, loaded, owned, metrics, alerts, runs, grants, jobs, schedules, hasMoreRuns, error, reload, moreRuns };
+  return { machine, detail, loaded, owned, agentVersion, metrics, alerts, runs, grants, jobs, schedules, hasMoreRuns, error, reload, moreRuns };
 }

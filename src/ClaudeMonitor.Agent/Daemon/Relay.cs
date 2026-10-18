@@ -20,6 +20,9 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     /// <summary>Executes runs sent to this agent (ADR-0005); null where the relay only uploads.</summary>
     public RunRelay? Runs { get; init; }
 
+    /// <summary>Performs the fixed actions its owner asked for on the web (ADR-0005); null where the relay only uploads.</summary>
+    public ActionRelay? Actions { get; init; }
+
     /// <summary>When the API last answered a heartbeat (ISO-8601 UTC): the hooks wait for the web only if it is recent.</summary>
     public const string LastContactKey = "relay.last_contact";
 
@@ -245,6 +248,9 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 return true;
             case AgentStreamEvents.RunUpdate:
                 store.RunChanged(data.Deserialize<RunUpdateMessage>(ApiClient.Json)!.Id.ToString());
+                return true;
+            case AgentStreamEvents.Action:
+                Actions?.Accept(data.Deserialize<AgentActionMessage>(ApiClient.Json)!, ct);
                 return true;
             case AgentStreamEvents.Ask:
                 store.SaveAskIn(data.Deserialize<AskMessage>(ApiClient.Json)!, clock.GetUtcNow());
