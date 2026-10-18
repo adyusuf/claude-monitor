@@ -12,15 +12,14 @@ export interface ToolRun { key: string; at: number; tools: ToolItem[] }
 export const isRun = <E extends { key: string }>(e: E | ToolRun): e is ToolRun => "tools" in e;
 
 /**
- * Runs of two or more tool calls in a row become one {@link ToolRun}; a lone call, and every other line, stays as it is.
+ * Tool calls in a row become one {@link ToolRun}, a lone call too (it reads "1 tool call" and opens to the call); every other line stays as it is.
  * Anything between two calls (a message, a question, a command sent from the web) ends the run.
  */
 export function groupToolRuns<E extends { key: string; at: number; item?: ChatItem }>(entries: E[]): (E | ToolRun)[] {
   const out: (E | ToolRun)[] = [];
   let run: { entry: E; tool: ToolItem }[] = [];
   const flush = () => {
-    if (run.length === 1) out.push(run[0]!.entry);
-    else if (run.length > 1) out.push({ key: `run:${run[0]!.entry.key}`, at: run[0]!.entry.at, tools: run.map((r) => r.tool) });
+    if (run.length > 0) out.push({ key: `run:${run[0]!.entry.key}`, at: run[0]!.entry.at, tools: run.map((r) => r.tool) });
     run = [];
   };
   for (const entry of entries) {
