@@ -2,6 +2,8 @@
 // what was asked, what Claude said, what it ran and what came back, the questions it put with their options.
 // Pure functions, no React: the page feeds them the events it has loaded, oldest first.
 import type { EventRow } from "../api/types";
+import { isSystemText } from "./activity";
+import { type Notice, parseNotice } from "./notice";
 
 export interface QuestionOption { label: string; description: string }
 export interface Question { question: string; header: string; multiSelect: boolean; options: QuestionOption[] }
@@ -13,6 +15,7 @@ export interface ToolResult { text: string; isError: boolean; shortened?: boolea
 interface Base { key: string; at: string }
 export type ChatItem =
   | (Base & { kind: "user"; text: string; command: string | null })
+  | (Base & { kind: "notice"; notice: Notice })
   | (Base & { kind: "assistant"; text: string })
   | (Base & { kind: "thinking"; text: string })
   | (Base & { kind: "tool"; id: string; name: string; summary: string; input: Record<string, unknown>; result: ToolResult | null; settled: boolean })
@@ -125,6 +128,9 @@ function fromWeb(p: Obj): string | null {
   return text.slice(at + WEB_HEADER.length).split("\n").map((l) => l.replace(/^\s*-\s?/, "")).join("\n").trim() || null;
 }
 
+/** A message pushed from the web arrives wrapped in a channel tag: it is the user speaking, not a notice from the harness. */
+const CHANNEL = /^\s*<channel[\s>]/;
+
 const STOP_FEEDBACK = "Stop hook feedback:";
 
 /** A prompt sent from the web at the end of a turn reaches Claude as a Stop hook's reason, which the transcript keeps as a meta user line. */
@@ -194,7 +200,9 @@ export function buildChat(events: EventRow[]): ChatItem[] {
       const texts = typeof content === "string" ? [content] : Array.isArray(content) ? content.filter(isObj).filter((b) => b.type === "text").map((b) => str(b.text)) : [];
       texts.forEach((raw, i) => {
         const said = userText(raw);
-        if (said) items.push({ kind: "user", key: `${e.id}:${i}`, at, ...said });
+        const notice = said && said.command === null && !CHANNEL.test(said.text) && isSystemText(said.text) ? parseNotice(said.text) : null;
+        if (notice) items.push({ kind: "notice", key: `${e.id}:${i}`, at, notice });
+        else if (said) items.push({ kind: "user", key: `${e.id}:${i}`, at, ...said });
       });
     } else if (p.type === "assistant" && Array.isArray(content)) {
       content.filter(isObj).forEach((b, i) => {
@@ -212,7 +220,7 @@ export function buildChat(events: EventRow[]): ChatItem[] {
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i]!;
     if (item.kind === "tool") item.settled = spoken;
-    else if (item.kind !== "note") spoken = true; // a note (the user is wanted, a subagent started) says the call is still going
+    else if (item.kind !== "note" && item.kind !== "notice") spoken = true; // a note (the user is wanted, a subagent started) or a notice from the harness says the call is still going
   }
 
   // A next-step question is answered once the user said anything after it (a click in the app, a message from the web, a typed line).

@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import type { SessionRow } from "../api/types";
 import { StatusPill } from "../components/ui";
 import { useI18n } from "../i18n";
 import { age, dateTime, usd } from "../lib/format";
-import { groupSessions } from "../lib/sessionGroups";
+import { groupSessions, type MachineGroup, type MachineOrder, orderOf } from "../lib/sessionGroups";
 
 function SessionRowLink({ ws, s, now }: { ws: string; s: SessionRow; now: number }) {
   const { t, dict } = useI18n();
@@ -29,13 +30,28 @@ function SessionRowLink({ ws, s, now }: { ws: string; s: SessionRow; now: number
   );
 }
 
-/** Sessions under their machine and, within it, their branch; the most recently active machine, branch and session come first. */
+/**
+ * Sessions under their machine and, within it, their branch. The machines stay where they are (by name); inside a machine the most recently
+ * active branch and session come first. While the pointer (or the keyboard focus) is on a machine's card its order is kept as it was when
+ * the pointer arrived: the data in it goes on updating, but no row moves under the reader until they leave.
+ */
 export function SessionList({ ws, rows, now }: { ws: string; rows: SessionRow[]; now: number }) {
   const { t } = useI18n();
+  const [frozen, setFrozen] = useState<Readonly<Record<string, MachineOrder>>>({});
+  const machines = groupSessions(rows, frozen);
+  const freeze = (machine: MachineGroup) => setFrozen((f) => (f[machine.hostname] ? f : { ...f, [machine.hostname]: orderOf(machine) }));
+  const release = (hostname: string) => setFrozen((f) => {
+    if (!f[hostname]) return f;
+    const rest = { ...f };
+    delete rest[hostname];
+    return rest;
+  });
   return (
     <div className="session-groups">
-      {groupSessions(rows).map((machine) => (
-        <section key={machine.hostname} className="session-machine" aria-label={machine.hostname}>
+      {machines.map((machine) => (
+        <section key={machine.hostname} className="session-machine" aria-label={machine.hostname}
+          onMouseEnter={() => freeze(machine)} onMouseLeave={() => release(machine.hostname)}
+          onFocus={() => freeze(machine)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) release(machine.hostname); }}>
           <h2 className="session-machine-name"><span aria-hidden>⌂</span> {machine.hostname} <span className="badge">{machine.count}</span></h2>
           {machine.branches.map((group) => (
             <div key={group.branch ?? ""} className="session-branch">

@@ -3,6 +3,7 @@ import { useI18n } from "../i18n";
 import { time } from "../lib/format";
 import { Markdown } from "../lib/markdown";
 import type { ChatItem, Question, ToolResult } from "../lib/transcript";
+import { noticeLine, fieldLabel } from "../lib/notice";
 import { toolCounts, toolState, type ToolItem, type ToolRun } from "../lib/toolRuns";
 import { config } from "../config";
 import { useFold } from "./fold";
@@ -168,6 +169,24 @@ function NextStepCard({ item, reply }: { item: Extract<ChatItem, { kind: "nextst
   );
 }
 
+/** Text the harness wrote into the session (a finished background task, ...): one closed line, and opened the fields as plain text. */
+function NoticeCard({ item }: { item: Extract<ChatItem, { kind: "notice" }> }) {
+  const fold = useFold([item.key]);
+  const line = noticeLine(item.notice);
+  return (
+    <details className="chat-notice" {...fold}>
+      <summary>
+        <span className="badge">{line.label}</span>
+        {line.status ? <span className="chat-notice-status">{line.status}</span> : null}
+        <span className="chat-notice-summary">{line.summary}</span>
+      </summary>
+      <dl className="chat-notice-fields">
+        {item.notice.fields.map((f, i) => <div key={`${f.name}:${i}`}><dt>{fieldLabel(f.name)}</dt><dd>{f.value}</dd></div>)}
+      </dl>
+    </details>
+  );
+}
+
 function Thinking({ item }: { item: Extract<ChatItem, { kind: "thinking" }> }) {
   const { t } = useI18n();
   const fold = useFold([item.key]);
@@ -192,6 +211,8 @@ export function ChatLine({ item, reply = null }: { item: ChatItem; reply?: Reply
           </div>
         </li>
       );
+    case "notice":
+      return <li className="chat-row" data-kind="notice"><NoticeCard item={item} /></li>;
     case "assistant":
       return <li className="chat-row chat-assistant" data-kind="assistant"><Markdown text={item.text} /></li>;
     case "thinking":
