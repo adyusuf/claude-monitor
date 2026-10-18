@@ -285,8 +285,8 @@ to run commands.
   4. The workspace's update setting is **not** a veto: an explicit update is the person's own decision (the CLI rule of
      ADR-0004). An agent that cannot update itself (a service agent, ADR-0005 service mode) reports `failed` with the
      updater's own refusal code.
-- **Path.** `POST /api/machines/{agentId}/actions` creates a row (`agent_actions`: kind, status `queued → delivered →
-  succeeded | failed`, or `expired` / `cancelled`; requester, times; result text capped at 2000 characters). The API
+- **Path.** `POST /api/agents/{id}/actions` (and `GET` for the owner's last ten) creates a row (`agent_actions`: kind, status `queued → delivered →
+  succeeded | failed`, or `expired`; requester, a delivered action gets a fresh 10 minutes to finish in; requester, times; result text capped at 2000 characters). The API
   sends it to the agent on its own stream (`action` event) and replays unfinished ones when the stream opens, exactly as
   commands and runs. The agent reports through `POST /api/agent/actions/{id}/status`; every transition is a
   compare-and-set, a final status never changes, a report from another agent is a 404. A queued action expires after 10

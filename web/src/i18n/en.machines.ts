@@ -38,6 +38,16 @@ export const enMachines = {
     turnOn: "Report listening ports", turnOff: "Stop reporting", saved: "Saved.", ownerOnly: "Only the machine's owner decides this.",
     enableHint: "Turning this on needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
   },
+  actions: {
+    title: "Agent actions", hint: "Ask this machine's agent to do one of a few fixed things. There is no command to type: each button is one action the agent already knows. The result is shown below.",
+    ownerOnly: "Only the machine's owner can ask for these.", offline: "The machine is offline: an action waits for 10 minutes and is dropped if the agent has not taken it by then.",
+    oldAgent: "This agent is older than {min} and ignores these requests. Update it on the machine with \"cm-agent update\"; after that the buttons work.",
+    enableHint: "Restart and update need a recent sign-in: enter a code from your authenticator app, or sign in again.",
+    strictHint: "This machine is production or a database: restart and update always need a fresh code from your authenticator app.",
+    sent: "Asked: {action}. The agent answers below.", none: "No action asked yet.",
+    kind: { status: "Status", update_check: "Check for update", update: "Update", restart: "Restart" },
+    status: { queued: "waiting for the agent", delivered: "the agent has it", succeeded: "done", failed: "failed", expired: "not taken in time" },
+  },
   asks: {
     title: "Asks from your other machines", hint: "A Claude session on another machine of yours can ask a question of an idle Claude session here (not a production or database machine, and only if an admin has set this machine's environment). The answer comes back as text. Off by default: only this machine's owner turns it on.",
     off: "This machine takes no asks.", on: "This machine takes asks from your other machines.", turnOn: "Allow asks", turnOff: "Stop allowing asks", saved: "Saved.",

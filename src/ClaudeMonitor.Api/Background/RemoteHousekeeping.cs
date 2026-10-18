@@ -148,6 +148,12 @@ public static class RemoteHousekeeping
                              select a.Id).Take(Batch).ToListAsync(ct);
         if (oldAsks.Count > 0) await db.MachineAsks.Where(a => oldAsks.Contains(a.Id)).ExecuteDeleteAsync(ct);
 
+        var oldActions = await (from a in db.AgentActions.AsNoTracking()
+                                join s in db.WorkspaceSettings.AsNoTracking() on a.WorkspaceId equals s.WorkspaceId
+                                where a.FinishedAt != null && a.FinishedAt < now.AddDays(-s.RetentionDays)
+                                select a.Id).Take(Batch).ToListAsync(ct);
+        if (oldActions.Count > 0) await db.AgentActions.Where(a => oldActions.Contains(a.Id)).ExecuteDeleteAsync(ct);
+
         var alerts = await (from x in db.MachineAlerts.AsNoTracking()
                             join s in db.WorkspaceSettings.AsNoTracking() on x.WorkspaceId equals s.WorkspaceId
                             where x.State == AlertStates.Resolved && x.ResolvedAt < now.AddDays(-s.RetentionDays)

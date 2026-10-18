@@ -81,7 +81,10 @@ public sealed class DaemonControl(AgentConfig config, AgentLog log, TimeProvider
     }
 
     /// <summary>Starts "cm-agent update --auto" detached from this process (the daemon is about to be stopped by it).</summary>
-    public static bool SpawnAutoUpdate(AgentConfig config, AgentLog log)
+    public static bool SpawnAutoUpdate(AgentConfig config, AgentLog log) => Spawn(config, log, UpdateCommand.Verb, UpdateCommand.AutoFlag);
+
+    /// <summary>Starts "cm-agent &lt;args&gt;" detached from this process: an action asked for on the web (restart, update) ends this daemon and starts the next.</summary>
+    public static bool Spawn(AgentConfig config, AgentLog log, params string[] args)
     {
         try
         {
@@ -93,14 +96,13 @@ public sealed class DaemonControl(AgentConfig config, AgentLog log, TimeProvider
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
-            info.ArgumentList.Add(UpdateCommand.Verb);
-            info.ArgumentList.Add(UpdateCommand.AutoFlag);
+            foreach (var arg in args) info.ArgumentList.Add(arg);
             using var child = Process.Start(info);
             return child is not null;
         }
         catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
         {
-            log.Write($"could not start the update: {e.Message}");
+            log.Write($"could not start {(args.FirstOrDefault() == UpdateCommand.Verb ? "the update" : $"cm-agent {args.FirstOrDefault()}")}: {e.Message}");
             return false;
         }
     }

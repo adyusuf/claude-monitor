@@ -103,4 +103,7 @@ public static class AgentStreamEvents
 
     /// <summary>One of this agent's own requested runs changed.</summary>
     public const string RunUpdate = "run_update";
+
+    /// <summary>A fixed action its owner asked for on the web (ADR-0005).</summary>
+    public const string Action = "action";
 }
