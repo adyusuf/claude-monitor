@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../api/endpoints";
-import type { CommandRow, EventRow } from "../api/types";
+import type { CommandRow } from "../api/types";
 import { Button, Card, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useI18n } from "../i18n";
+import { groupToolRuns, isRun } from "../lib/toolRuns";
 import { buildChat, type ChatItem } from "../lib/transcript";
 import { useNow } from "../lib/useNow";
-import { ChatLine } from "./ChatItems";
+import { ChatLine, ToolRunLine } from "./ChatItems";
+import { FoldProvider } from "./fold";
 import { isPending, PendingCommand } from "./PendingCommand";
-
-/** Events newest first, merged by id; older ones the page holds stay. */
-const merge = (held: EventRow[], fresh: EventRow[]): EventRow[] => {
-  const byId = new Map(held.map((e) => [e.id, e]));
-  for (const e of fresh) byId.set(e.id, e);
-  return [...byId.values()].sort((a, b) => b.id - a.id);
-};
+import { useEventFeed } from "./useEventFeed";
 
 /**
  * The session as Claude's own screen shows it: oldest at the top, the newest at the bottom, a new message pushing the
@@ -47,10 +43,7 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
 }) {
   const { t } = useI18n();
   const now = useNow(config.clockTickMs);
-  const [held, setHeld] = useState<EventRow[]>([]); // newest first
-  const [next, setNext] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [loadingOlder, setLoadingOlder] = useState(false);
+  const { held, next, loaded, loadingOlder, older } = useEventFeed(sessionId, version, { kind: config.chatKinds, pageSize: config.chatPageSize, refreshSize: config.chatRefreshSize });
   const [unseen, setUnseen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
@@ -58,55 +51,13 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
   const newest = useRef<number | null>(null);
   const first = held[0]?.id ?? null;
 
-  const refresh = useCallback(async (initial: boolean) => {
-    const known = initial ? null : newest.current;
-    const size = initial ? config.chatPageSize : config.chatRefreshSize;
-    let page = await api.events(sessionId, { kind: config.chatKinds, limit: size });
-    let fetched = page.items;
-    // More arrived than one page holds: read back until it meets what the page already has.
-    for (let i = 0; known !== null && page.next && fetched.length > 0 && fetched[fetched.length - 1]!.id > known && i < config.chatCatchUpPages; i++) {
-      page = await api.events(sessionId, { kind: config.chatKinds, before: page.next, limit: size });
-      fetched = [...fetched, ...page.items];
-    }
-    const gap = known !== null && page.next !== null && fetched.length > 0 && fetched[fetched.length - 1]!.id > known;
-    if (initial || gap) {
-      setHeld(fetched);
-      setNext(page.next);
-    } else {
-      setHeld((h) => merge(h, fetched));
-    }
-    setLoaded(true);
-  }, [sessionId]);
-
   useEffect(() => {
     newest.current = null;
     atBottom.current = true;
-    setHeld([]);
-    setNext(null);
     setUnseen(false);
-    setLoaded(false);
-    refresh(true).catch(() => setLoaded(true));
-  }, [refresh]);
+  }, [sessionId]);
 
-  const seen = useRef(version);
-  useEffect(() => {
-    if (seen.current === version) return;
-    seen.current = version;
-    refresh(false).catch(() => undefined);
-  }, [version, refresh]);
-
-  const older = useCallback(async () => {
-    if (!next || loadingOlder) return;
-    setLoadingOlder(true);
-    try {
-      const page = await api.events(sessionId, { kind: config.chatKinds, before: next, limit: config.chatPageSize });
-      anchor.current = box.current?.scrollHeight ?? null;
-      setHeld((h) => merge(h, page.items));
-      setNext(page.next);
-    } finally {
-      setLoadingOlder(false);
-    }
-  }, [next, loadingOlder, sessionId]);
+  const readOlder = useCallback(() => older(() => { anchor.current = box.current?.scrollHeight ?? null; }), [older]);
 
   // After the list changes: keep the reader's place when older events went on top, follow the end when the reader is
   // there, and otherwise say that something new came.
@@ -126,15 +77,15 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
   // A short list that does not fill the box has nothing to scroll: read the next older page until it does.
   useEffect(() => {
     const el = box.current;
-    if (loaded && next && !loadingOlder && el && el.clientHeight > 0 && el.scrollHeight <= el.clientHeight) void older();
-  }, [loaded, next, loadingOlder, held, older]);
+    if (loaded && next && !loadingOlder && el && el.clientHeight > 0 && el.scrollHeight <= el.clientHeight) void readOlder();
+  }, [loaded, next, loadingOlder, held, readOlder]);
 
   const onScroll = () => {
     const el = box.current;
     if (!el) return;
     atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < config.chatStickPx;
     if (atBottom.current) setUnseen(false);
-    if (el.scrollTop < config.chatLoadMorePx) void older();
+    if (el.scrollTop < config.chatLoadMorePx) void readOlder();
   };
 
   const toEnd = () => {
@@ -150,24 +101,28 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
     await api.sendCommand(sessionId, "prompt", text);
     onReplied?.();
   }, [sessionId, onReplied]);
-  const entries = useMemo(() => withCommands(items, commands, now), [items, commands, now]);
+  const entries = useMemo(() => groupToolRuns(withCommands(items, commands, now)), [items, commands, now]);
 
   return (
-    <Card title={t("session.events")} className="chat-card">
-      {!loaded ? <Spinner /> : (
-        <div className="chat-scroll" ref={box} onScroll={onScroll} tabIndex={0} aria-label={t("chat.label")}>
-          {next ? <div className="more"><Button variant="ghost" busy={loadingOlder} onClick={() => void older()}>{t("session.olderEvents")}</Button></div> : null}
-          {entries.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : (
-            <ol className="chat">
-              {entries.map((e) => e.command
-                ? <PendingCommand key={e.key} command={e.command} now={now} canCancel={canCancel} onCancel={(id) => onCancel?.(id)} />
-                : <ChatLine key={e.key} item={e.item!} reply={canReply && e.key === lastOpen ? reply : null} />)}
-            </ol>
-          )}
-        </div>
-      )}
-      {footer}
-      {unseen ? <button type="button" className="chat-new" onClick={toEnd}>{t("chat.newBelow")} ↓</button> : null}
-    </Card>
+    <FoldProvider>
+      <Card title={t("session.events")} className="chat-card">
+        {!loaded ? <Spinner /> : (
+          <div className="chat-scroll" ref={box} onScroll={onScroll} tabIndex={0} aria-label={t("chat.label")}>
+            {next ? <div className="more"><Button variant="ghost" busy={loadingOlder} onClick={() => void readOlder()}>{t("session.olderEvents")}</Button></div> : null}
+            {entries.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : (
+              <ol className="chat">
+                {entries.map((e) => isRun(e)
+                  ? <ToolRunLine key={e.key} run={e} />
+                  : e.command
+                    ? <PendingCommand key={e.key} command={e.command} now={now} canCancel={canCancel} onCancel={(id) => onCancel?.(id)} />
+                    : <ChatLine key={e.key} item={e.item!} reply={canReply && e.key === lastOpen ? reply : null} />)}
+              </ol>
+            )}
+          </div>
+        )}
+        {footer}
+        {unseen ? <button type="button" className="chat-new" onClick={toEnd}>{t("chat.newBelow")} ↓</button> : null}
+      </Card>
+    </FoldProvider>
   );
 }

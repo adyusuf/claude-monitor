@@ -25,6 +25,9 @@ export const config = {
   answerMax: 500,
   liveReconnectMs: 3_000,
   liveDebounceMs: 400,
+  /** The server pings a live stream every 20 s: one that has said nothing for this long is dropped and opened again, checked this often. */
+  liveStaleMs: 70_000,
+  liveWatchMs: 10_000,
   /** A session whose last event is older than this is "idle": a command waits until a turn ends or someone types in it. */
   idleSessionMinutes: 5,
   /** An applied command with no answer yet is "waiting for a reply" for this long, then "no reply recorded". */
