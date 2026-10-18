@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { api } from "../api/endpoints";
 import { safeNext, useSession } from "../auth/session";
 import { AuthFrame } from "../components/Layout";
+import { QrCode } from "../components/QrCode";
 import { Button, Card, CopyText, Field, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 
@@ -48,7 +49,7 @@ export function MfaPage() {
 }
 
 /** Account page: turn two-step sign-in on (key, first code, recovery codes) or off (a code). */
-export function MfaCard() {
+export function MfaCard({ guide = true }: { guide?: boolean } = {}) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { me, refresh } = useSession();
@@ -99,7 +100,9 @@ export function MfaCard() {
             await refresh();
           });
         }}>
-          <p className="muted">{t("account.mfaScan")}</p>
+          <p>{t("twoStep.scan")}</p>
+          <QrCode text={setup.uri} label={t("twoStep.qrLabel")} />
+          <p className="muted">{t("twoStep.manual")}</p>
           <CopyText text={setup.secret} />
           <a href={setup.uri}>{t("account.mfaOpen")}</a>
           <Field label={t("auth.mfaCode")} value={code} inputMode="numeric" autoComplete="one-time-code" onChange={(e) => setCode(e.target.value)} />
@@ -108,6 +111,7 @@ export function MfaCard() {
       ) : (
         <div className="stack">
           <p className="muted">{t("account.mfaOff")}</p>
+          {guide ? <p><Link to="/two-step">{t("twoStep.guide")}</Link></p> : null}
           <div><Button variant="ghost" onClick={() => void run(async () => setSetup(await api.mfaSetup()))}>{t("account.mfaSetup")}</Button></div>
         </div>
       )}

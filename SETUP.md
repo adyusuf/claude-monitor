@@ -297,6 +297,10 @@ apply either way. A relative path makes the whole file invalid, hence `off`. The
   group, makes `<home>/run-work` (setgid, shared by the two accounts) and writes `/etc/sudoers.d/cm-agent-run` (checked with `visudo -cf` first) so that only the service account may start commands, and only as the run account. Remote runs then start as that account, with
   `run-work` as their home and working directory. `uninstall --service` removes the sudoers file and keeps the accounts. Windows is refused. Not verified on a real host (ADR-0010 §5).
 
+## Two-step sign-in (authenticator app)
+
+Some actions ask for a 6-digit code from an authenticator app (allowing asks, restart and update of an agent, grant and job approvals; always on a production or database machine). The web has a step-by-step page for setting the app up at `/two-step` (sidebar: **Authenticator app**; every code field links to it): install any authenticator app on a phone, press **Set up**, scan the QR code (or type the setup key shown under it), enter the first code, and keep the recovery codes. The QR code is drawn in the browser by `qrcode-generator` 2.0.4 (MIT, no dependencies); the setup key is never sent to another host.
+
 ## Updating the agent
 
 Design, trust model and limits: [ADR-0004](docs/adr-0004-agent-self-update.md). **Off by default**: an agent never asks the server for an update
