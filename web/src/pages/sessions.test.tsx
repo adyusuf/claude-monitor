@@ -118,6 +118,7 @@ describe("one session", () => {
       "POST /commands/c1/cancel": { status: 204 },
     });
     renderAt("/w/w1/sessions/s1", sessionsRoute);
+    await userEvent.click(await screen.findByRole("button", { name: "Raw events" })); // the history of what was sent is in the raw view; the conversation carries those messages itself
     const history = (await screen.findByRole("heading", { name: "Send to this session" })).closest("section")!;
     expect(await within(history).findByText("earlier")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -152,6 +153,7 @@ describe("one session", () => {
       },
     });
     renderAt("/w/w1/sessions/s1", sessionsRoute);
+    await userEvent.click(await screen.findByRole("button", { name: "Raw events" })); // the history of what was sent is in the raw view; the conversation carries those messages itself
     expect(await screen.findByText("waiting for the agent on the machine to pick it up · expires in 24m")).toBeInTheDocument();
     expect(screen.getByText("reached the agent, waiting for the session's next step · expires in 1h 35m")).toBeInTheDocument();
     const history = screen.getByRole("heading", { name: "Send to this session" }).closest("section")!;
@@ -175,6 +177,7 @@ describe("one session", () => {
       "GET /sessions/s1/commands": () => ({ body: [answered ? { ...applied, replyEventId: 9, replyText: "All 12 tests pass.", replyMore: false } : applied] }),
     });
     renderAt("/w/w1/sessions/s1", sessionsRoute);
+    await userEvent.click(await screen.findByRole("button", { name: "Raw events" })); // the history of what was sent is in the raw view; the conversation carries those messages itself
     expect(await screen.findByText("Waiting for Claude's reply")).toBeInTheDocument();
     answered = true;
     act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));

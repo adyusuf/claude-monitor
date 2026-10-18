@@ -134,3 +134,19 @@ describe("questions in the conversation", () => {
     expect(card.open).toBe(false);
   });
 });
+
+describe("the conversation view", () => {
+  beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("has the prompt box under the conversation and no separate \"Send to this session\" card, which only the raw events view keeps", async () => {
+    open([said(1, "Hello.")]);
+    renderAt("/w/w1/sessions/s1", route);
+    expect(await screen.findByPlaceholderText(/A message for Claude/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Send to this session" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Raw events" }));
+    expect(await screen.findByRole("heading", { name: "Send to this session" })).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText(/A message for Claude/)).toHaveLength(1);
+  });
+});
