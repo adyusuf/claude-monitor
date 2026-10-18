@@ -87,7 +87,7 @@ export function SessionPage() {
               <EventsCard sessionId={id} owner={{ ownerId: s.ownerId, ownerName: s.ownerName }} version={version} />
               <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
             </>}
-          <CommandsCard {...sender} rows={rows} withComposer={view === "raw"} />
+          {view === "raw" ? <CommandsCard {...sender} rows={rows} withComposer /> : null}
         </div>
         <div className="col side">
           <Card title={t("session.tasks")}>
