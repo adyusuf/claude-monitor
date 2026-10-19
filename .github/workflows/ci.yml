@@ -6,13 +6,16 @@
 name: CI
 
 on:
-  push:
-    branches: [dev, test, prod]
-  pull_request:
+  # CI is switched off for now on every branch (maintainer, 19/10/2026): it runs only when started by hand. To switch it back on, restore
+  # `push: branches: [dev, test, prod]` and `pull_request:` here, and the `push: branches: [test]` and `schedule` triggers in e2e.yml.
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  # Avalonia's build package may send anonymous build telemetry; the tray app (ADR-0012) builds in this gate.
+  AVALONIA_TELEMETRY_OPTOUT: "1"
 
 concurrency:
   group: ci-${{ github.ref }}

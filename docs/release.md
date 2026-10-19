@@ -58,7 +58,7 @@ manifest the deploy copies to the web root's `/downloads`:
 With `AGENT_UPDATE_CHANNEL` set, `scripts/sign_manifest.py` signs an update entry for every one of these six zips, so
 an interactive agent on any of the three systems can update itself. A service agent cannot (below).
 
-Every zip holds the one single-file `cm-agent` (`cm-agent.exe` on Windows), published uncompressed: never switch
+Every zip holds the one single-file `aipod` (`cm-agent.exe` on Windows), published uncompressed: never switch
 `EnableCompressionInSingleFile` on (it crashes the daemon on macOS, see the csproj). The published-agent smoke test
 (`scripts/agent_smoke.py`) runs the binary of the host it runs on: the macOS build on a Mac, the Linux build on a
 Linux host. The Windows and Linux builds are only smoke-tested on a host of their own OS.
@@ -84,7 +84,7 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   agent's check with 400 (`invalid_os`), which the agent records as `unreachable` and installs nothing.
 
 - **Linux agent and service mode** (`feature/remote-work`, ADR-0005): `cm-agent-linux-x64.zip` and
-  `cm-agent-linux-arm64.zip` join the downloads (and the web's "Get the agent" page); `cm-agent install --service`
+  `cm-agent-linux-arm64.zip` join the downloads (and the web's "Get the agent" page); `aipod install --service`
   registers a boot service on Linux, macOS and Windows Server. Old agents keep working but never report an exec level,
   so they are never a target of remote work. The API needs the usual deploy to test, then prod, **before** the agents:
   a new agent on an old API gets 404 and switches the feature off.
@@ -92,22 +92,22 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
 - **Windows agent home moved** (`fix/agent-home-outside-appdata`): the default is now `%USERPROFILE%\.claude-monitor`,
   not `%LOCALAPPDATA%\ClaudeMonitor` (the Claude desktop app's MSIX packaging redirects AppData, ADR-0002). On first
   start the new agent copies `agent.json`; nothing else moves, and events not yet uploaded are lost. **Installs made
-  before this release keep using the old binary and folder until `cm-agent install` is run again** (SETUP.md, "The
-  agent"). `cm-agent status` now prints `home:`. A new agent version also needs a deploy to test, then prod
+  before this release keep using the old binary and folder until `aipod install` is run again** (SETUP.md, "The
+  agent"). `aipod status` now prints `home:`. A new agent version also needs a deploy to test, then prod
   (`docs/deploy-windows.md`).
 
 - **Commands from the web, honest status** (`fix/idle-session-commands`): the web now says what a waiting command waits
   for, how long is left, and why an expired one lapsed, and warns above the prompt box when a session is idle (a prompt
-  is applied only when something is typed or a turn ends). The agent gains `cm-agent install --stop-wait <seconds>`
-  (0-590, default 0; re-run `install` to rewrite the hooks) and `cm-agent status` prints `commands waiting` and
+  is applied only when something is typed or a turn ends). The agent gains `aipod install --stop-wait <seconds>`
+  (0-590, default 0; re-run `install` to rewrite the hooks) and `aipod status` prints `commands waiting` and
   `stop wait`. No API change. Web and agent both need the usual deploy to test, then prod.
 
 - **Claude Code plugin** (`feature/inbox-push`, ADR-0007): `bash scripts/build-agent.sh` now also writes `plugin/monitor-agent/agent-release.txt`
   (the version and the SHA-256 of every zip; the digests of one version accumulate across environments, `scripts/write_plugin_pins.py <dir> <version> --replace` starts over).
   **Commit that file with the release**: the plugin's bootstrap installs exactly the zips it pins and refuses
   anything else, so a plugin published before its pins names no build and installs nothing. Order: build -> commit the pins -> promote; the zips must be in the
-  environment's `/downloads` before the plugin version that pins them is published. To serve the plugin from the environment's own site instead of the repository, set `AGENT_SITE_URL=https://<site>` for `build-agent.sh` (it writes `marketplace.json` and `monitor-agent-plugin.zip` into `/downloads`, ADR-0007 section 9.2) and `VITE_PLUGIN_FROM_SERVER=1` for the web build. Otherwise set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
-  (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `cm-agent plugin-files .` and commit the result (a test fails otherwise).
+  environment's `/downloads` before the plugin version that pins them is published. To serve the plugin from the environment's own site instead of the repository, set `AGENT_SITE_URL=https://<site>` for `build-agent.sh` (it writes `aipod-marketplace.json` + `aipod-plugin.zip` and the old pair `marketplace.json` + `monitor-agent-plugin.zip` into `/downloads`, ADR-0007 section 9.2 and ADR-0013 section 1; the pins file is written for both plugin folders) and `VITE_PLUGIN_FROM_SERVER=1` for the web build. **Order (ADR-0013 section 1): publish the `/downloads` that hold `aipod-marketplace.json` and `aipod-plugin.zip` before the web build with `VITE_PLUGIN_FROM_SERVER=1` goes out, because the "Get the agent" page now shows the `aipod` commands (the git marketplace path still shows the old plugin: that catalog lists only it).** Otherwise set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
+  (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `aipod plugin-files .` and commit the result (a test fails otherwise).
   `--push inbox` pushes through the session's inbox (no start-up flag); `--push on` and `--push channel` are the old channel, unchanged.
 
 ## Download host
@@ -134,3 +134,10 @@ The agent builds can be published on a download host instead of each server's ow
 
 There is no feature flag yet. A switch ships as a configuration value read by the tier's one configuration
 module (global #2).
+
+## CI, gates and test runs paused (maintainer, 19/10/2026)
+
+First dev and test, then everything: `.github/workflows/ci.yml` and `e2e.yml` now start only by hand (`workflow_dispatch`; the nightly e2e run is gone too).
+`.claude/adyusuf.json` sets `run_before_push` (`unit`, `e2e`) to no for dev, test and prod, so merges carry `Gate-Waived:` trailers (global rule #34) and the report before a prod merge
+lists them; no session runs `scripts/quick-check.sh` or the test suites while it stands. Coverage (#29) is not met by this: it is only not measured. To turn it back on: restore the triggers
+(see the comments in both workflow files) and run `adyusuf_config.py unset --project` for the keys in `.claude/adyusuf.json`.

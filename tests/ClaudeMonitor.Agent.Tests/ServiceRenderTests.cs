@@ -134,7 +134,7 @@ public sealed class ServiceRenderTests
     [Fact]
     public void The_service_is_created_under_the_virtual_account_with_a_quoted_binary_path_and_a_delayed_start()
     {
-        Assert.Equal(["create", "cm-agent", "binPath=", "\"C:\\Program Files\\ClaudeMonitor\\cm-agent.exe\" daemon", "obj=", @"NT SERVICE\cm-agent", "start=", "delayed-auto"],
+        Assert.Equal(["create", "cm-agent", "binPath=", "\"C:\\Program Files\\ClaudeMonitor\\cm-agent.exe\" daemon", "obj=", @"NT SERVICE\cm-agent", "start=", "delayed-auto", "DisplayName=", "aipod agent"],
             WindowsServiceSetup.Create(Windows));
         Assert.Equal(["failure", "cm-agent", "reset=", "86400", "actions=", "restart/10000/restart/60000//"], WindowsServiceSetup.Failure());
         Assert.Equal(["sidtype", "cm-agent", "unrestricted"], WindowsServiceSetup.SidType());

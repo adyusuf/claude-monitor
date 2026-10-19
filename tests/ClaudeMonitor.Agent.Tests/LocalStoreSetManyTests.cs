@@ -51,10 +51,10 @@ public sealed class LocalStoreSetManyTests : IDisposable
     }
 
     [Fact]
-    public void The_remembered_settings_are_the_two_switches_and_the_thresholds_only_when_there_are_some()
+    public void The_remembered_settings_are_the_switches_and_the_thresholds_only_when_there_are_some()
     {
-        Assert.Equal([(MachineMonitor.RemoteRunsKey, "false"), (MachineMonitor.ShareServicesKey, "false")], MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid())));
-        Assert.Equal([(MachineMonitor.RemoteRunsKey, "true"), (MachineMonitor.ShareServicesKey, "true"), (MachineMonitor.ThresholdsKey, "80,81,82,83")],
-            MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid(), RemoteRuns: true, Alerts: new AlertThresholds(80, 81, 82, 83), ShareServices: true)));
+        Assert.Equal([(MachineMonitor.RemoteRunsKey, "false"), (MachineMonitor.ShareServicesKey, "false"), (MachineMonitor.ShareInventoryKey, "false")], MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid())));
+        Assert.Equal([(MachineMonitor.RemoteRunsKey, "true"), (MachineMonitor.ShareServicesKey, "true"), (MachineMonitor.ShareInventoryKey, "true"), (MachineMonitor.ThresholdsKey, "80,81,82,83")],
+            MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid(), RemoteRuns: true, Alerts: new AlertThresholds(80, 81, 82, 83), ShareServices: true, ShareInventory: true)));
     }
 }

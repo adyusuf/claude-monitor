@@ -17,6 +17,16 @@ export class ApiError extends Error {
   }
 }
 
+/** The language the person picked in the menu (before any is picked: none, and the browser's own header is sent). */
+function chosenLanguage(): string | null {
+  try {
+    const saved = localStorage.getItem(config.languageKey);
+    return saved && /^[a-z]{2}$/.test(saved) ? saved : null;
+  } catch {
+    return null; // storage unavailable
+  }
+}
+
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /** One call to the API on our own origin. Cookies go along; changes carry the CSRF header the API demands. */
@@ -24,6 +34,8 @@ export async function request<T>(method: Method, path: string, body?: unknown): 
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (method !== "GET") headers[config.csrfHeader] = "1";
+  const language = chosenLanguage();
+  if (language) headers["Accept-Language"] = language; // the language picked in the menu, so the mails the API sends come in it
   const response = await fetch(config.apiBase + path, {
     method,
     headers,

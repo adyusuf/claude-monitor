@@ -38,6 +38,14 @@ export interface MachineView {
   tags?: Record<string, string> | null;
   /** Whether the machine's owner lets their other machines ask a Claude session here (ADR-0008 §3f). */
   acceptsAsks?: boolean | null;
+  /** Whether the machine's owner lets Claude be started and stopped on it from the web (ADR-0014). */
+  acceptsClaudeControl?: boolean | null;
+  /** What the daemon may start by itself (ADR-0014 P3): "off" or "on_message"; null or absent is off. */
+  claudeAutoMode?: ClaudeAutoMode | null;
+  /** The plugin the agent runs under, as name@marketplace (ADR-0013); absent for an older agent or one that is not a plugin. */
+  pluginId?: string | null;
+  /** The project the mode "always" keeps a session running in (ADR-0014 P3). */
+  claudeAutoProject?: string | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
@@ -69,12 +77,32 @@ export interface ProjectRunSummary {
 export interface MachineProjectView {
   key: string; name: string; branch: string | null; headSha: string | null; tag: string | null; lastSeenAt: string;
   source: "session" | "listed"; lastRuns: ProjectRunSummary[]; recentErrors: number;
+  /** A test command was set at the machine for this project (ADR-0011 §7a); the command and its folder are sent to the machine's owner only. */
+  hasTest?: boolean; testArgv?: string[] | null; testCwd?: string | null;
+  /** What Claude Code's own trust record says about the folder (ADR-0014 P2): null when the agent could not read it, or is older. */
+  trusted?: boolean | null;
 }
 /** Everything about one machine: the list entry, the admin's note, the services the caller may see, and the projects. */
 export interface MachineDetail {
   machine: MachineView; note: string | null; noteSetAt: string | null; servicesShared: boolean;
   services: ServiceInfo[] | null; servicesAt: string | null; projects: MachineProjectView[];
+  /** What Claude Code has on the machine (ADR-0011 §7a, step E); sent to the machine's owner and to admins only, null for everyone else and for an older agent. */
+  inventory?: ClaudeInventory | null;
+  /** The machine owner has switched the inventory on; while it is off the agent reads and sends nothing. */
+  inventoryShared?: boolean;
 }
+export interface InventorySession { name: string | null; projectKey: string | null; kind: string | null; status: string | null; startedAt: string | null }
+export interface InventoryPlugin { id: string; version: string | null; enabled: boolean; scope: string | null }
+export interface InventorySetting { projectKey: string; mode: string | null; modeModel: string | null; gates: Record<string, boolean> | null }
+/** One usage window of Claude Code: use in per cent (a spend limit may pass 100) and when the window resets. */
+export interface ClaudeLimitWindow { usedPercentage: number; resetsAt: string | null }
+/** The limits Claude Code last gave to `aipod statusline` (ADR-0011 §7a): they exist only for claude.ai Pro and Max logins and after a session has answered once; seenAt is when. */
+export interface ClaudeLimits { fiveHour: ClaudeLimitWindow | null; sevenDay: ClaudeLimitWindow | null; spend: ClaudeLimitWindow | null; seenAt: string }
+export interface ClaudeInventory {
+  sessions: InventorySession[] | null; plugins: InventoryPlugin[] | null; skills: string[] | null; settings: InventorySetting[] | null; at: string;
+  limits?: ClaudeLimits | null;
+}
+export interface AgentInventoryView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }
 export interface AgentServicesView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }
 
 export type AskStatus = "queued" | "delivered" | "answered" | "no_idle_session" | "not_accepting" | "no_answer" | "expired" | "cancelled";
@@ -85,10 +113,18 @@ export interface AskView {
 }
 export interface AgentAsksView { agentId: string; accept: boolean; setAt: string | null; setBy: string | null }
 
-export type AgentActionKind = "restart" | "update_check" | "update" | "status";
+export type AgentActionKind = "restart" | "update_check" | "update" | "status" | "claude_start" | "claude_stop"
+  | "plugin_enable" | "plugin_disable" | "plugin_update" | "plugin_install" | "project_setting";
+export type ClaudePermissionMode = "manual" | "plan" | "acceptEdits";
+export type ClaudeAutoMode = "off" | "on_message" | "always";
+export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null; autoMode?: ClaudeAutoMode | null; autoProject?: string | null }
 export type AgentActionStatus = "queued" | "delivered" | "succeeded" | "failed" | "expired";
 /** One fixed action its owner asked of a machine's agent (ADR-0005); the result is plain text the agent wrote, never markup. */
 export interface AgentActionView {
   id: string; agentId: string; kind: AgentActionKind; status: AgentActionStatus; result: string | null;
   createdAt: string; expiresAt: string; finishedAt: string | null;
+  /** Claude control (ADR-0014): the project and mode of a start, the short id of the session a start returned or a stop names. */
+  projectKey?: string | null; permissionMode?: ClaudePermissionMode | null; sessionRef?: string | null;
+  /** A remote write (ADR-0011 §7a): the plugin id or the setting name, and the setting's value. */
+  target?: string | null; value?: string | null;
 }

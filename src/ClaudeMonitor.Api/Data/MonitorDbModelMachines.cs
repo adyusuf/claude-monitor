@@ -16,10 +16,12 @@ internal static class MonitorDbModelMachines
             e.Property(x => x.Tools).HasColumnType("jsonb");
             e.Property(x => x.Tags).HasColumnType("jsonb");
             e.Property(x => x.Services).HasColumnType("jsonb");
+            e.Property(x => x.ClaudeInventory).HasColumnType("jsonb");
             e.Property(x => x.AdminNote).HasMaxLength(MachineTags.NoteMax);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.TagsSetBy).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.AdminNoteSetBy).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.ShareServicesSetBy).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.ShareInventorySetBy).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.RoleSetBy).OnDelete(DeleteBehavior.Restrict);
             e.ToTable(t =>
             {

@@ -179,7 +179,7 @@ public sealed class ClaudeKit : IDisposable
     public string LogText => File.Exists(Config.LogPath) ? File.ReadAllText(Config.LogPath) : "";
     public DateTimeOffset Now => Clock.GetUtcNow();
 
-    /// <summary>This machine's consent (saved the way `cm-agent config claude-update` saves it) and the workspace's answer (as the daemon stores it).</summary>
+    /// <summary>This machine's consent (saved the way `aipod config claude-update` saves it) and the workspace's answer (as the daemon stores it).</summary>
     public void Consent(bool machine, string? workspace)
     {
         SavedSettings.SaveClaudeUpdate(Config, machine);

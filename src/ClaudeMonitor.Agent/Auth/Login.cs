@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Auth;
 
 /// <summary>
-/// "cm-agent login --server &lt;url&gt;": connects this machine with the device flow (RFC 8628). The person approves the
+/// "aipod login --server &lt;url&gt;": connects this machine with the device flow (RFC 8628). The person approves the
 /// shown code on the web while signed in; the agent never sees a password.
 /// </summary>
 public sealed class Login(AgentConfig config, TextWriter output, TimeProvider clock, Func<string, bool>? openBrowser = null,
@@ -22,7 +22,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
     {
         if (os == AgentConfig.Unsupported)
         {
-            await output.WriteLineAsync("cm-agent runs on macOS, Windows and Linux.");
+            await output.WriteLineAsync(Strings.T(Msg.LoginUnsupported));
             return 2;
         }
 
@@ -30,7 +30,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         var server = (serverArg ?? config.ServerOverride ?? identity.Server)?.TrimEnd('/');
         if (server is null || !Uri.TryCreate(server, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && !uri.IsLoopback))
         {
-            await output.WriteLineAsync("Give the server: cm-agent login --server https://<your Claude Monitor address> (https, or http on localhost).");
+            await output.WriteLineAsync(Strings.T(Msg.LoginGiveServer));
             return 2;
         }
 
@@ -44,7 +44,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         }
         catch (Exception e) when (Transient(e, ct))
         {
-            await output.WriteLineAsync($"The server did not answer ({Describe(e)}). Check the address and the connection, then run cm-agent login again.");
+            await output.WriteLineAsync(Strings.T(Msg.LoginNoAnswer, Describe(e)));
             return 1;
         }
         catch (ApiException e) when (e.Status < HttpStatusCode.InternalServerError)
@@ -53,7 +53,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
             return 1;
         }
 
-        await output.WriteLineAsync($"Open {code.VerificationUri} and enter the code {code.UserCode}");
+        await output.WriteLineAsync(Strings.T(Msg.LoginOpen, code.VerificationUri, code.UserCode));
         (openBrowser ?? OpenBrowser)($"{code.VerificationUri}?code={code.UserCode}");
 
         var interval = TimeSpan.FromSeconds(code.IntervalSeconds);
@@ -72,7 +72,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                 // RFC 8628 §3.5: a connection failure is no answer; keep polling until the code expires, backing off.
                 failure = e;
                 interval = Backoff(interval);
-                await output.WriteLineAsync($"The server did not answer ({Describe(e)}); trying again in {interval.TotalSeconds:0} s.");
+                await output.WriteLineAsync(Strings.T(Msg.LoginRetry, Describe(e), interval.TotalSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture)));
                 continue;
             }
             catch (ApiException e) when (e.Status < HttpStatusCode.InternalServerError)
@@ -89,7 +89,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                 ForgetWorkspaceSettings();
                 api.SaveTokens(tokens);
                 (identity with { Server = server, AgentId = tokens.AgentId, WorkspaceId = tokens.WorkspaceId }).Save(config);
-                await output.WriteLineAsync("Connected. This machine now reports to Claude Monitor.");
+                await output.WriteLineAsync(Strings.T(Msg.LoginConnected));
                 return 0;
             }
 
@@ -101,20 +101,16 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                 case DeviceTokenErrors.Pending:
                     break;
                 case DeviceTokenErrors.Denied:
-                    await output.WriteLineAsync("The request was denied on the web.");
+                    await output.WriteLineAsync(Strings.T(Msg.LoginDenied));
                     return 1;
                 default:
                     // After a lost answer the code may have been used for tokens that never arrived; it cannot be reused.
-                    await output.WriteLineAsync(unanswered
-                        ? "The code expired, or it was used for an answer that did not arrive. Run cm-agent login again."
-                        : "The code expired. Run cm-agent login again.");
+                    await output.WriteLineAsync(Strings.T(unanswered ? Msg.LoginExpiredLost : Msg.LoginExpired));
                     return 1;
             }
         }
 
-        await output.WriteLineAsync(failure is null
-            ? "The code expired. Run cm-agent login again."
-            : $"The code expired while the server did not answer ({Describe(failure)}). Check the connection, then run cm-agent login again.");
+        await output.WriteLineAsync(failure is null ? Strings.T(Msg.LoginExpired) : Strings.T(Msg.LoginExpiredNoAnswer, Describe(failure)));
         return 1;
     }
 
@@ -125,17 +121,15 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         e is HttpRequestException or IOException or OperationCanceledException or ApiException { Status: >= HttpStatusCode.InternalServerError };
 
     private static string Describe(Exception e) =>
-        e is ApiException api ? $"it answered {(int)api.Status}" : $"{e.GetType().Name}: {e.Message.ReplaceLineEndings(" ")}";
+        e is ApiException api ? Strings.T(Msg.LoginItAnswered, (int)api.Status) : $"{e.GetType().Name}: {e.Message.ReplaceLineEndings(" ")}";
 
     /// <summary>An answer that polling again cannot change. One line from the status alone: the body may be a proxy's
     /// page and is never printed.</summary>
     private static string Refused(ApiException e, string server) => e.Status switch
     {
-        HttpStatusCode.UpgradeRequired =>
-            $"The server no longer accepts this cm-agent ({AgentConfig.Version}). Upgrade the agent, then run cm-agent login again.",
-        HttpStatusCode.TooManyRequests =>
-            "The server is limiting requests from this network. Wait a minute, then run cm-agent login again.",
-        _ => $"{server} answered {(int)e.Status}; it does not look like a Claude Monitor server. Check the address, then run cm-agent login again.",
+        HttpStatusCode.UpgradeRequired => Strings.T(Msg.LoginRefusedUpgrade, AgentConfig.Version),
+        HttpStatusCode.TooManyRequests => Strings.T(Msg.LoginRefusedLimit),
+        _ => Strings.T(Msg.LoginRefusedOther, server, (int)e.Status),
     };
 
     private TimeSpan Backoff(TimeSpan interval) =>
@@ -143,7 +137,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         : interval + config.LoginBackoffStep > config.LoginPollMax ? config.LoginPollMax
         : interval + config.LoginBackoffStep;
 
-    /// <summary>"cm-agent logout": forgets the tokens here; the web shows the machine until it is revoked there.</summary>
+    /// <summary>"aipod logout": forgets the tokens here; the web shows the machine until it is revoked there.</summary>
     public async Task<int> LogoutAsync()
     {
         var store = Credentials.For(config);
@@ -152,7 +146,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         var identity = Identity.Load(config);
         (identity with { AgentId = null, WorkspaceId = null }).Save(config);
         ForgetWorkspaceSettings();
-        await output.WriteLineAsync("Signed out on this machine. Revoke it on the web (Machines) to remove it there too.");
+        await output.WriteLineAsync(Strings.T(Msg.LogoutDone));
         return 0;
     }
 

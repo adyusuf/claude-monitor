@@ -5,7 +5,7 @@ using ClaudeMonitor.Agent.Storage;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>`cm-agent claude-update cancel`, `cm-agent config claude-update on|off` and the lines `cm-agent status` shows, driven through Cli.</summary>
+/// <summary>`aipod claude-update cancel`, `aipod config claude-update on|off` and the lines `aipod status` shows, driven through Cli.</summary>
 public sealed class ClaudeCommandTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 6, 14, 30, 0, TimeSpan.Zero);
@@ -78,7 +78,7 @@ public sealed class ClaudeCommandTests : IDisposable
         State(new ClaudeUpdateState(CountdownUntil: Iso(Now.AddMinutes(3))));
         var (code, output, error) = await Cli_(args);
         Assert.Equal(2, code);
-        Assert.Contains("usage: cm-agent claude-update cancel", error, StringComparison.Ordinal);
+        Assert.Contains("usage: aipod claude-update cancel", error, StringComparison.Ordinal);
         Assert.Equal("", output);
         Assert.False(File.Exists(home.Config.ClaudeCancelPath));
     }
@@ -108,7 +108,7 @@ public sealed class ClaudeCommandTests : IDisposable
     {
         var (code, output, error) = await Cli_(args);
         Assert.Equal(2, code);
-        Assert.Contains("usage: cm-agent config [auto-update off|check|on] [claude-update on|off]", error, StringComparison.Ordinal);
+        Assert.Contains("usage: aipod config [auto-update off|check|on] [claude-update on|off]", error, StringComparison.Ordinal);
         Assert.Equal("", output);
         Assert.Null(Identity.Peek(home.Config)?.ClaudeUpdate);
     }
@@ -127,7 +127,7 @@ public sealed class ClaudeCommandTests : IDisposable
     public async Task The_usage_text_lists_the_new_verb_and_setting()
     {
         var usage = (await Cli_()).Out;
-        Assert.Contains("cm-agent claude-update cancel", usage, StringComparison.Ordinal);
+        Assert.Contains("aipod claude-update cancel", usage, StringComparison.Ordinal);
         Assert.Contains("[claude-update on|off]", usage, StringComparison.Ordinal);
     }
 
@@ -172,7 +172,7 @@ public sealed class ClaudeCommandTests : IDisposable
         var until = Now.AddMinutes(4);
         State(new ClaudeUpdateState(CountdownUntil: Iso(until)));
         var lines = await StatusLines();
-        Assert.Contains($"Claude Code will be updated at {Local(until, "HH:mm")} (cancel: cm-agent claude-update cancel)", lines);
+        Assert.Contains($"Claude Code will be updated at {Local(until, "HH:mm")} (cancel: aipod claude-update cancel)", lines);
 
         State(new ClaudeUpdateState(CountdownUntil: Iso(Now.AddMinutes(-1))));
         Assert.DoesNotContain(await StatusLines(), l => l.Contains("will be updated", StringComparison.Ordinal));

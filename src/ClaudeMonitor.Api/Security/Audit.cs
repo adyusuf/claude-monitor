@@ -32,8 +32,10 @@ public static class AuditActions
     public const string AgentTagsChanged = "agent.tags_changed";
     public const string AgentNoteChanged = "agent.note_changed";
     public const string AgentServicesChanged = "agent.services_changed";
+    public const string AgentInventoryChanged = "agent.inventory_changed";
     public const string AgentAsksChanged = "agent.asks_changed";
     public const string AgentActionRequested = "agent.action_requested";
+    public const string AgentClaudeControlChanged = "agent.claude_control_changed";
     public const string AskCreated = "ask.created";
     public const string AskAnswered = "ask.answered";
     public const string AskCancelled = "ask.cancelled";
@@ -61,6 +63,33 @@ public static class AuditActions
     public const string ScheduleResumed = "remote.schedule_resumed";
     public const string ScheduleEnded = "remote.schedule_ended";
     public const string RemoteSettingsChanged = "remote.settings_changed";
+    public const string ProjectCreated = "project.created";
+    public const string ProjectUpdated = "project.updated";
+    public const string ProjectArchived = "project.archived";
+    public const string ProjectRestored = "project.restored";
+    public const string ProjectMemberChanged = "project.member_changed";
+    public const string ProjectMemberRemoved = "project.member_removed";
+    public const string ApplicationCreated = "application.created";
+    public const string ApplicationUpdated = "application.updated";
+    public const string ApplicationArchived = "application.archived";
+    public const string ApplicationRestored = "application.restored";
+    public const string ComponentChanged = "application.component_changed";
+    public const string ReleaseChanged = "application.release_changed";
+    public const string IssueCreated = "issue.created";
+    public const string IssueUpdated = "issue.updated";
+    public const string IssueArchived = "issue.archived";
+    public const string IssueRestored = "issue.restored";
+    public const string IssueMoved = "issue.moved";
+    public const string IssueLinkChanged = "issue.link_changed";
+    public const string IssueTestCaseChanged = "issue.test_case_changed";
+    public const string IssueCodeLinkChanged = "issue.code_link_changed";
+    public const string IssueRunLinkChanged = "issue.run_link_changed";
+    public const string SprintCreated = "sprint.created";
+    public const string SprintUpdated = "sprint.updated";
+    public const string SprintStarted = "sprint.started";
+    public const string SprintClosed = "sprint.closed";
+    public const string SprintArchived = "sprint.archived";
+    public const string SprintIssuesChanged = "sprint.issues_changed";
 }
 
 public static class Audit

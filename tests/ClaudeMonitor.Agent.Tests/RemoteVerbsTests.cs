@@ -25,7 +25,7 @@ public sealed class RemoteVerbsTests : IDisposable
     {
         connected = false;
         Assert.Equal(1, await RunAsync("machines"));
-        Assert.Contains("cm-agent login --server", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("aipod login --server", stderr.ToString(), StringComparison.Ordinal);
         Assert.Equal(0, woke);
     }
 
@@ -79,7 +79,7 @@ public sealed class RemoteVerbsTests : IDisposable
         Assert.Equal(["/usr/bin/dotnet", "test", "--no-build"], body.Argv);
         Assert.Contains($"Run {created.Id}: pending_approval", stdout.ToString(), StringComparison.Ordinal);
         Assert.Contains("approves it on the web", stdout.ToString(), StringComparison.Ordinal);
-        Assert.Contains($"cm-agent result {created.Id}", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains($"aipod result {created.Id}", stdout.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class RemoteVerbsTests : IDisposable
         var body = JsonSerializer.Deserialize<AskCreate>(Assert.Single(daemon.OfKind("ask")).Body!, ApiClient.Json)!;
         Assert.DoesNotContain(token, body.Question, StringComparison.Ordinal);
         Assert.Contains("[masked:github_token]", body.Question, StringComparison.Ordinal);
-        Assert.Contains($"cm-agent result {created.Id}", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains($"aipod result {created.Id}", stdout.ToString(), StringComparison.Ordinal);
     }
 
     private void SeedAsk(AskView view)

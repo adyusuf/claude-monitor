@@ -44,12 +44,18 @@ public sealed class AskPumpTests : IDisposable
 
     private static string AskId(int n) => $"0198f1c2-7a55-7d3a-9b1e-2f6c3a4d5e{n:00}";
 
+    private bool apiDown;
+
     private AskPump Pump(AgentConfig? config = null) => new(() => config ?? home.Config, store, transport,
         (id, update, _) =>
         {
+            if (apiDown) throw new HttpRequestException("the API cannot be reached");
             reported.Add((id, update));
             return Task.CompletedTask;
         }, () => strict, clock, _ => idle);
+
+    /// <summary>What was reported besides the one-time "received".</summary>
+    private List<(string Id, AskStatusUpdate Update)> Outcomes() => [.. reported.Where(r => r.Update.Status != AskStatuses.Received)];
 
     private void Ask(int n, string question = "what branch is the build on?", string? project = null, string from = "build-box") =>
         store.SaveAskIn(new AskMessage(Guid.Parse(AskId(n)), question, from, project, Start.AddMinutes(2)), Start);
@@ -80,13 +86,29 @@ public sealed class AskPumpTests : IDisposable
         Assert.Contains($"<<<claude-monitor-message id={AskId(1)} origin=\"machine\" from=\"build-box\">>>"[..^3], content, StringComparison.Ordinal);
         Assert.Contains("monitor_answer", content, StringComparison.Ordinal);
         Assert.Contains("what branch is the build on?", content, StringComparison.Ordinal);
-        var report = Assert.Single(reported);
+        Assert.Equal([AskStatuses.Received, AskStatuses.Delivered], reported.Select(r => r.Update.Status)); // held first, then written to the session
+        var report = Assert.Single(Outcomes());
         Assert.Equal((AskId(1), AskStatuses.Delivered, "s-1"), (report.Id, report.Update.Status, report.Update.SessionExternalId));
         Assert.Equal((LocalStore.AskDelivered, "s-1"), (store.AskIn(AskId(1))!.State, store.AskIn(AskId(1))!.Session));
+        Assert.Equal(1, store.Count(PushStatus.OutCountKey)); // the tray's green light
     }
 
     [Fact]
-    public async Task A_busy_session_is_not_written_to_and_without_any_idle_session_the_ask_ends_at_once_with_its_text_deleted()
+    public async Task The_ask_names_the_answer_tool_of_the_session_it_is_written_to()
+    {
+        Session("s-new", 100);
+        store.SaveInbox("s-new", "/tmp/s-new.sock", Token, Start.AddSeconds(100), tools: "aipod");
+        Ask(1);
+
+        await Pump().PumpAsync(CancellationToken.None);
+
+        var content = JsonDocument.Parse(Assert.Single(Assert.Single(transport.Sent).Lines)).RootElement.GetProperty("message").GetProperty("content").GetString()!;
+        Assert.Contains("the aipod_answer tool", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("monitor_answer", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_busy_session_is_not_written_to_and_without_any_idle_session_the_ask_is_kept_queued_with_its_text()
     {
         Session("s-busy", 100, isIdle: false);
         Ask(1, "SECRET-QUESTION-TEXT");
@@ -94,9 +116,9 @@ public sealed class AskPumpTests : IDisposable
         await Pump().PumpAsync(CancellationToken.None);
 
         Assert.Empty(transport.Sent);
-        Assert.Equal(AskStatuses.NoIdleSession, Assert.Single(reported).Update.Status);
+        Assert.Equal(AskStatuses.Received, Assert.Single(reported).Update.Status); // the requester hears that this machine holds it; nothing says "no idle session"
         var stored = store.AskIn(AskId(1))!;
-        Assert.Equal((LocalStore.AskClosed, ""), (stored.State, stored.Question));
+        Assert.Equal((LocalStore.AskQueued, "SECRET-QUESTION-TEXT"), (stored.State, stored.Question));
     }
 
     [Fact]
@@ -107,7 +129,8 @@ public sealed class AskPumpTests : IDisposable
         Ask(1);
         await Pump().PumpAsync(CancellationToken.None);
         Assert.Empty(transport.Sent);
-        Assert.Equal(AskStatuses.NoIdleSession, Assert.Single(reported).Update.Status);
+        Assert.Equal(LocalStore.AskQueued, store.AskIn(AskId(1))!.State); // kept for a session that is bound and idle
+        Assert.Empty(Outcomes());
     }
 
     [Fact]
@@ -124,7 +147,7 @@ public sealed class AskPumpTests : IDisposable
     }
 
     [Fact]
-    public async Task A_failed_write_tries_the_next_session_at_most_twice_forgets_the_dead_inbox_and_then_gives_up()
+    public async Task A_failed_write_tries_the_next_session_at_most_twice_forgets_the_dead_inbox_and_keeps_the_ask_queued()
     {
         Session("s-1", 100);
         Session("s-2", 200);
@@ -136,7 +159,8 @@ public sealed class AskPumpTests : IDisposable
         await Pump().PumpAsync(CancellationToken.None);
 
         Assert.Empty(transport.Sent); // s-3 and s-2 failed; s-1 was a third attempt and is not tried
-        Assert.Equal(AskStatuses.NoIdleSession, Assert.Single(reported).Update.Status);
+        Assert.Empty(Outcomes());
+        Assert.Equal(LocalStore.AskQueued, store.AskIn(AskId(1))!.State);
         Assert.Null(store.InboxOf("s-3"));
         Assert.Null(store.InboxOf("s-2"));
         Assert.NotNull(store.InboxOf("s-1"));
@@ -152,7 +176,7 @@ public sealed class AskPumpTests : IDisposable
         Ask(1);
         await Pump().PumpAsync(CancellationToken.None);
         Assert.Equal("/tmp/s-1.sock", Assert.Single(transport.Sent).Endpoint);
-        Assert.Equal(AskStatuses.Delivered, Assert.Single(reported).Update.Status);
+        Assert.Equal(AskStatuses.Delivered, Assert.Single(Outcomes()).Update.Status);
     }
 
     [Theory]
@@ -174,7 +198,7 @@ public sealed class AskPumpTests : IDisposable
         await Pump(config).PumpAsync(CancellationToken.None);
 
         Assert.Empty(transport.Sent);
-        Assert.Equal(AskStatuses.NotAccepting, Assert.Single(reported).Update.Status);
+        Assert.Equal(AskStatuses.NotAccepting, Assert.Single(reported).Update.Status); // refused at once, and not "received" first
         Assert.Equal(LocalStore.AskClosed, store.AskIn(AskId(1))!.State);
     }
 
@@ -227,6 +251,68 @@ public sealed class AskPumpTests : IDisposable
         await Pump().PumpAsync(CancellationToken.None);
         var log = File.Exists(home.Config.LogPath) ? File.ReadAllText(home.Config.LogPath) : "";
         Assert.DoesNotContain("SECRET-QUESTION-TEXT", log, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_ask_that_arrives_with_no_session_is_kept_across_a_daemon_restart_and_written_once_to_the_session_that_opens_later()
+    {
+        Ask(1, "what branch is the build on?");
+        await Pump().PumpAsync(CancellationToken.None);
+        Assert.Empty(transport.Sent);
+
+        store.Dispose(); // the daemon stops; the next one opens the same database
+        using var reopened = new LocalStore(home.Config.DatabasePath);
+        Assert.Equal(LocalStore.AskQueued, reopened.AskIn(AskId(1))!.State);
+
+        clock.Advance(TimeSpan.FromSeconds(30));
+        reopened.SaveAskIn(new AskMessage(Guid.Parse(AskId(1)), "what branch is the build on?", "build-box", null, Start.AddMinutes(2)), clock.GetUtcNow()); // the API replays it on connect
+        reopened.SaveInbox("s-late", "/tmp/s-late.sock", Token, clock.GetUtcNow()); // a session opens: its hooks bind it and store its socket
+        reopened.BindSession("s-late", 400, clock.GetUtcNow());
+        idle.Add(400);
+        var pump = new AskPump(() => home.Config, reopened, transport, (id, update, _) =>
+        {
+            reported.Add((id, update));
+            return Task.CompletedTask;
+        }, () => strict, clock, _ => idle);
+
+        Assert.Equal(1, await pump.PumpAsync(CancellationToken.None));
+        Assert.Equal(0, await pump.PumpAsync(CancellationToken.None)); // not again
+        clock.Advance(TimeSpan.FromSeconds(10));
+        Assert.Equal(0, await pump.PumpAsync(CancellationToken.None));
+
+        Assert.Equal("/tmp/s-late.sock", Assert.Single(transport.Sent).Endpoint);
+        Assert.Equal(1, reported.Count(r => r.Update.Status == AskStatuses.Delivered));
+        Assert.Equal(1, reported.Count(r => r.Update.Status == AskStatuses.Received)); // told once, before the restart
+        Assert.Equal((LocalStore.AskDelivered, "s-late"), (reopened.AskIn(AskId(1))!.State, reopened.AskIn(AskId(1))!.Session));
+    }
+
+    [Fact]
+    public async Task The_requester_is_told_the_ask_is_held_once_and_a_report_that_did_not_get_through_is_repeated()
+    {
+        Ask(1);
+        apiDown = true;
+        await Pump().PumpAsync(CancellationToken.None);
+        Assert.Empty(reported);
+        Assert.Single(store.AsksToAcknowledge(clock.GetUtcNow()));
+
+        apiDown = false;
+        await Pump().PumpAsync(CancellationToken.None);
+        await Pump().PumpAsync(CancellationToken.None);
+
+        var told = Assert.Single(reported);
+        Assert.Equal((AskId(1), AskStatuses.Received), (told.Id, told.Update.Status));
+        Assert.Empty(store.AsksToAcknowledge(clock.GetUtcNow()));
+    }
+
+    [Fact]
+    public async Task A_held_ask_whose_time_runs_out_is_closed_with_its_text_deleted_and_no_idle_session_is_never_reported()
+    {
+        Ask(1, "SECRET-QUESTION-TEXT");
+        await Pump().PumpAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromMinutes(3));
+        await Pump().PumpAsync(CancellationToken.None);
+        Assert.Empty(Outcomes());
+        Assert.Equal(("", LocalStore.AskClosed), (store.AskIn(AskId(1))!.Question, store.AskIn(AskId(1))!.State));
     }
 
     [Fact]

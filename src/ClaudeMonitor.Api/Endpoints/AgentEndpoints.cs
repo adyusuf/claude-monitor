@@ -50,7 +50,7 @@ public static class AgentEndpoints
     private static async Task<IResult> Refresh(RefreshRequest req, HttpContext http, MonitorDb db, ApiConfig config,
         TimeProvider clock, Broker broker)
     {
-        var (outcome, tokens, agentId) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, clock.GetUtcNow(), http.RequestAborted);
+        var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, clock.GetUtcNow(), http.RequestAborted);
         if (outcome == AgentTokens.RefreshOutcome.Reused)
         {
             Audit.Add(db, http, clock, AuditActions.RefreshReuse, agentId: agentId);
@@ -60,7 +60,8 @@ public static class AgentEndpoints
         await db.SaveChangesAsync(http.RequestAborted);
         return outcome == AgentTokens.RefreshOutcome.Issued
             ? Results.Ok(tokens)
-            : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_refresh_token");
+            : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_refresh_token",
+                extensions: new Dictionary<string, object?> { ["reason"] = reason });
     }
 
     private static async Task<IResult> Batch(EventBatch batch, HttpContext http, BatchIngestor ingestor)
@@ -92,9 +93,12 @@ public static class AgentEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
-        var share = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => a.ShareServices).FirstOrDefaultAsync(http.RequestAborted);
+        var mine = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => new { a.ShareServices, a.AcceptsClaudeControl, a.ClaudeAutoMode, a.ClaudeAutoProject, a.ShareInventory }).FirstOrDefaultAsync(http.RequestAborted);
+        // The automatic Claude start (ADR-0014 P3) is only ever told to an agent whose owner has the switch on AND the workspace allows remote work: anything else reads as off.
+        var auto = s.RemoteRunsEnabled && mine is { AcceptsClaudeControl: true, ClaudeAutoMode: ClaudeAutoModes.OnMessage or ClaudeAutoModes.Always } ? mine.ClaudeAutoMode! : ClaudeAutoModes.Off;
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
-            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, share));
+            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, mine?.ShareServices ?? false, auto, auto == ClaudeAutoModes.Always ? mine!.ClaudeAutoProject : null,
+            mine?.ShareInventory ?? false));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>

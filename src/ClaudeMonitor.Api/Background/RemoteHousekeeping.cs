@@ -37,7 +37,7 @@ public static class RemoteHousekeeping
     }
 
     /// <summary>
-    /// An ask nobody took in time expires (it is never queued for later), and a delivered one nobody answered becomes <c>no_answer</c> after the
+    /// An ask nobody took in time (the target's daemon holds it until a session is idle) expires, and a delivered one nobody answered becomes <c>no_answer</c> after the
     /// answer wait (ADR-0008 §3f); the requester's stream hears it. Each change is a compare-and-set, so an answer that arrived first stays.
     /// </summary>
     private static async Task ExpireAsksAsync(MonitorDb db, ApiConfig config, Broker broker, DateTimeOffset now, CancellationToken ct)
@@ -127,6 +127,7 @@ public static class RemoteHousekeeping
             // The runs are locked before their output is deleted: account deletion takes a run's row, then its output, and
             // output first here would meet it from the other side (40P01); the global order is runs, then output.
             await RemoteLocks.RunsAsync(db, r => old.Contains(r.Id), ct);
+            await db.IssueRuns.Where(l => old.Contains(l.RunId)).ExecuteDeleteAsync(ct); // a link to an issue goes with its run (ADR-0011 §6)
             await db.RemoteRunOutput.Where(o => old.Contains(o.RunId)).ExecuteDeleteAsync(ct);
             await db.RemoteRuns.Where(r => old.Contains(r.Id)).ExecuteDeleteAsync(ct);
             await tx.CommitAsync(ct);

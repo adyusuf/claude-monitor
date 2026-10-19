@@ -94,7 +94,7 @@ public sealed class MachineTools(AgentConfig config, TimeProvider clock)
 
     internal static string Failure(string error) => error switch
     {
-        RemoteAnswer.Pending => "The local agent has not answered yet (is the daemon running and connected? see monitor_status). Try again shortly.",
+        RemoteAnswer.Pending => $"The local agent has not answered yet (is the daemon running and connected? see {McpToolNames.Name("status")}). Try again shortly.",
         Daemon.RemoteRelay.Unavailable => "This Claude Monitor server does not support remote work yet.",
         RemoteErrors.Disabled => "Remote runs are switched off for this workspace (an admin turns them on in the workspace settings).",
         _ => $"Refused: {RemoteEnvelope.Code(error)}.",

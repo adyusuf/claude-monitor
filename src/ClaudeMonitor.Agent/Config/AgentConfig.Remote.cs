@@ -12,8 +12,38 @@ public sealed partial record AgentConfig
     /// </summary>
     public bool ServiceMode { get; init; }
 
+    /// <summary>The most Claude sessions this agent keeps running that were started from the web (ADR-0014).</summary>
+    public int ClaudeWorkersMax { get; init; } = 3;
+
+    /// <summary>How often the daemon looks for an ask that no session can take (the automatic mode, ADR-0014 P3).</summary>
+    public TimeSpan ClaudeAutoEvery { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>How often the automatic mode asks Claude Code which sessions it started still run.</summary>
+    public TimeSpan ClaudeAutoReconcileEvery { get; init; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>An ask must have found no idle session for this long before the automatic mode starts one (a session that just finished its turn is given time to go idle).</summary>
+    public TimeSpan ClaudeAutoWait { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The most sessions the automatic mode starts by itself in an hour, for the whole machine.</summary>
+    public int ClaudeAutoStartsPerHour { get; init; } = 3;
+
+    /// <summary>How long a project is left alone after the automatic mode could not start a session in it.</summary>
+    public TimeSpan ClaudeAutoBackoff { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The longest first prompt of a web start the agent hands to `claude` (the API caps what a person may type at ClaudeFirstPromptMax; the extra room is for the characters wrapping adds, and anything longer is cut with a marker).</summary>
+    public int ClaudeFirstPromptMax { get; init; } = AgentActionKinds.ClaudeFirstPromptMax + 200;
+
+    /// <summary>The usage limits Claude Code last gave to `aipod statusline` (ADR-0011 §7a), in the user-only home.</summary>
+    public string ClaudeLimitsPath => Path.Combine(Home, "claude-limits.json");
+
+    /// <summary>How often the daemon reads what Claude Code has on the machine (sessions, plugins, skills, project settings; ADR-0011 §7a step E) to put it in its profile.</summary>
+    public TimeSpan ClaudeInventoryEvery { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>The sessions this agent started from the web and has not stopped (ids and folders, in the user-only home).</summary>
+    public string ClaudeWorkersPath => Path.Combine(Home, "claude-workers.json");
+
     /// <summary>The admin-owned exec policy of a service agent: level and optional ceiling (ADR-0005, "Four fail-closed keys").</summary>
-    public string ExecConfigPath { get; init; } = DefaultExecConfigPath(Os);
+    public string ExecConfigPath { get; init; } = ResolveExecConfigPath(Os, File.Exists);
 
     /// <summary>Remote runs executing at once on this target; one more is refused as busy.</summary>
     public int ExecMaxConcurrent { get; init; } = 2;
@@ -68,6 +98,22 @@ public sealed partial record AgentConfig
 
     /// <summary>The longest an MCP tool waits for a run before answering with its current status.</summary>
     public const int RemoteWaitMaxSeconds = 50;
+
+    /// <summary>Linux /etc/aipod; macOS /Library/Application Support/aipod; Windows %ProgramFiles%\aipod: where a service made since the rename (ADR-0013, tier 2) keeps its policy.</summary>
+    public static string AipodExecConfigPath(string os) => os switch
+    {
+        OsKinds.Windows => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "aipod", "exec.json"),
+        OsKinds.MacOs => "/Library/Application Support/aipod/exec.json",
+        _ => "/etc/aipod/exec.json",
+    };
+
+    /// <summary>The aipod path when a policy is there, else the old one: an agent of a migrated service reads the new place first, one that was never migrated keeps reading the old (ADR-0013, tier 2).</summary>
+    public static string ResolveExecConfigPath(string os, Func<string, bool> fileExists)
+    {
+        ArgumentNullException.ThrowIfNull(fileExists);
+        var fresh = AipodExecConfigPath(os);
+        return fileExists(fresh) ? fresh : DefaultExecConfigPath(os);
+    }
 
     /// <summary>Linux /etc/cm-agent; macOS /Library/Application Support/ClaudeMonitor; Windows %ProgramFiles%\ClaudeMonitor — all admin-owned.</summary>
     public static string DefaultExecConfigPath(string os) => os switch

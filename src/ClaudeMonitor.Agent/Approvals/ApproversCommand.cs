@@ -1,7 +1,7 @@
 namespace ClaudeMonitor.Agent.Approvals;
 
 /// <summary>
-/// <c>cm-agent approvers add &lt;public key&gt; [--name n] | remove &lt;fingerprint&gt; | list</c> (ADR-0010 §4): the admin of a machine pins the owner keys it will trust.
+/// <c>aipod approvers add &lt;public key&gt; [--name n] | remove &lt;fingerprint&gt; | list</c> (ADR-0010 §4): the admin of a machine pins the owner keys it will trust.
 /// The key and its fingerprint come from the web's account page; the admin compares the fingerprint printed here with the one on the page. The agent's own account
 /// cannot write the file on a service machine, so these verbs run as the admin.
 /// </summary>
@@ -22,7 +22,7 @@ public static class ApproversCommand
                 await stdout.WriteLineAsync($"pinned {id}");
                 await stdout.WriteLineAsync("Compare this fingerprint with the one the web shows for the key before you rely on it.");
                 var policy = ApproversStore.Load(config);
-                await stdout.WriteLineAsync(policy.Required ? "Signed approvals are required here." : "Signed approvals are not required yet: cm-agent config approvals required");
+                await stdout.WriteLineAsync(policy.Required ? "Signed approvals are required here." : "Signed approvals are not required yet: aipod config approvals required");
                 return 0;
             }
 
@@ -57,7 +57,7 @@ public static class ApproversCommand
             return 1;
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent approvers add <public key> [--name <name>] | remove <fingerprint> | list");
+        await stderr.WriteLineAsync("usage: aipod approvers add <public key> [--name <name>] | remove <fingerprint> | list");
         return 2;
     }
 

@@ -47,7 +47,7 @@ public sealed record ApiConfig
 
     /// <summary>How fresh a sign-in must be to delete an account that has neither a password nor two-step sign-in.</summary>
     public TimeSpan ReauthWindow { get; init; } = TimeSpan.FromMinutes(10);
-    public const string MfaIssuer = "Claude Monitor";
+    public const string MfaIssuer = "Podium";
 
     public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);
     public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromHours(24);
@@ -81,7 +81,8 @@ public sealed record ApiConfig
     // Asks across machines (ADR-0008 §3f).
     public int AskQuestionMax { get; init; } = 8000;
     public int AskAnswerMax { get; init; } = 100_000;
-    public TimeSpan AskQueuedLifetime { get; init; } = TimeSpan.FromMinutes(2);
+    // An ask the target's daemon holds waits this long for an idle Claude session there (it used to be 2 minutes, when it was refused at once without one).
+    public TimeSpan AskQueuedLifetime { get; init; } = TimeSpan.FromMinutes(30);
     public TimeSpan AskAnswerWait { get; init; } = TimeSpan.FromMinutes(15);
     public TimeSpan AskDepthWindow { get; init; } = TimeSpan.FromMinutes(15);
     public int AskPerSessionPer10Min { get; init; } = 5;

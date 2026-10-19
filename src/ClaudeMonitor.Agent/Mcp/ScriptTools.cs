@@ -43,18 +43,18 @@ public sealed class ScriptTools(AgentConfig config, TimeProvider clock)
         var outcome = await client.CreateRunAsync(create);
         if (outcome.Pending)
         {
-            return $"Queued on this machine as request {clientKey}; the agent sends it as soon as it can. Call monitor_run_result with runId {clientKey}.";
+            return $"Queued on this machine as request {clientKey}; the agent sends it as soon as it can. Call {McpToolNames.Name("run_result")} with runId {clientKey}.";
         }
 
         if (!outcome.Ok) return Refusal(outcome.Error!);
         var run = outcome.Value!;
-        return $"Script run {run.Id} on {RemoteEnvelope.Label(target.Hostname)} waits for its owner's approval on the web (until {run.ExpiresAt:O}). Call monitor_run_result with runId {run.Id} to follow it.";
+        return $"Script run {run.Id} on {RemoteEnvelope.Label(target.Hostname)} waits for its owner's approval on the web (until {run.ExpiresAt:O}). Call {McpToolNames.Name("run_result")} with runId {run.Id} to follow it.";
     }
 
     private static string Refusal(string error) => error switch
     {
         RemoteErrors.RoleNotSet => "Refused: no admin has set this machine's environment yet (role_not_set); a script needs it. Ask an admin to set the role on the Claude Monitor web.",
-        RemoteErrors.InterpreterMissing => "Refused: this machine has not reported a trusted tool for that interpreter (interpreter_missing). See monitor_machine for the interpreters it has.",
+        RemoteErrors.InterpreterMissing => $"Refused: this machine has not reported a trusted tool for that interpreter (interpreter_missing). See {McpToolNames.Name("machine")} for the interpreters it has.",
         RemoteErrors.InvalidScript => "Refused: the script is empty, longer than 32768 characters, or has too many or too long arguments (invalid_script).",
         RemoteErrors.InvalidFiles => "Refused: the files or the stdin are not acceptable: at most 8 text files of 64 KiB (256 KiB together) at relative paths of letters, digits, dot, underscore and dash (at most 4 levels, none starting with a dot, not named script or tmp), and a stdin of at most 65536 characters without NUL (invalid_files).",
         RemoteErrors.FilesUnsupported => "Refused: this machine's agent does not run scripts with files or stdin yet (files_unsupported). Update its agent, or send the script alone.",

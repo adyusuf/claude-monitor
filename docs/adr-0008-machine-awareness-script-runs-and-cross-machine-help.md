@@ -261,7 +261,8 @@ That reading is a change to the request's wording and is flagged here for the ma
   write succeeded, with the session; a failed write tries the next idle session, at most twice, then
   `no_idle_session`. Push off, no idle session, or an own claim that is strict → `not_accepting`. A delivered ask not
   confirmed in the transcript within **2 minutes** (`AskConfirmWait`, separate from ADR-0007's prompt confirm wait)
-  moves to `not_accepting` by compare-and-set. Nothing is queued for later.
+  moves to `not_accepting` by compare-and-set. *(Amended 19/10/2026: a machine with no idle session no longer ends the ask at
+  once, see the amendment at the end.)*
 - **The question** is masked on A before upload (the workspace setting, as captured content), stored in
   `machine_asks.question`, never logged by the agent or the API; audit rows name an ask by id. **The answer** comes
   back only through `monitor_answer(askId, text)` from the session that received the ask (the session is taken from
@@ -505,3 +506,19 @@ gate, interpreter paths and `-File` under a policy, `schtasks`); on Linux the `/
 bootstrap of the LaunchAgent and the application bundle (the installer's tool calls are tested with a fake, not run); and a real Claude Code session receiving an ask
 end to end. Measured on macOS by the tests: the migrations apply and their CHECKs hold on PostgreSQL 18, real processes run a script from its scratch file with the fixed
 environment, a hostile repository configuration starts nothing, the output cap drops and reports bytes.
+
+## Amendment 19/10/2026: an ask is held until a session takes it
+
+- **Held, not refused.** When the target daemon accepts asks but no session is idle (none open, all busy, or the first two
+  writes failed), the ask stays `queued` in `asks_in` (it survives a daemon restart) and is tried again on every pass, so the
+  next session that opens and goes idle receives it. `no_idle_session` is no longer reported for this case (the status stays
+  in the set for older agents). `not_accepting` (push off, asks off here, strict claim) is still reported at once.
+- **Time.** `AskQueuedLifetime` goes from 2 to **30 minutes**; the housekeeping expires a still-queued ask then (`expired`).
+  The answer wait (15 minutes after delivery) is unchanged.
+- **"Received".** The daemon tells the API once per ask that it holds it (`POST /api/agent/asks/{id}/status` with status
+  `received`, repeated until heard). `received` is a report, not a state: the API stores `machine_asks.received_at` (migration
+  `AskReceivedAt`, nullable, additive), the status stays `queued`, and `AskView` gains `receivedAt`. `monitor_ask_result` then
+  says "received by the other machine; waiting there for an idle Claude session".
+- **Not covered.** A message for a machine with no session at all still needs a session to exist: web prompts are addressed
+  to a session id (ADR-0002), so a web message to an idle machine with nothing open is a separate design (a machine-addressed
+  message: new endpoint, table and web screen).

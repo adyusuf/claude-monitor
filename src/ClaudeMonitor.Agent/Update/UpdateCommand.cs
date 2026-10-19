@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Update;
 
 /// <summary>
-/// "cm-agent update [--check]" and "cm-agent config [auto-update off|check|on]", and the lines `cm-agent status` adds.
+/// "aipod update [--check]" and "aipod config [auto-update off|check|on]", and the lines `aipod status` adds.
 /// An explicit update is the person's own decision and ignores the automatic setting; only the daemon's own rounds obey it.
 /// </summary>
 public static class UpdateCommand
@@ -31,14 +31,14 @@ public static class UpdateCommand
         var unknown = args.Skip(1).FirstOrDefault(a => a != "--check" && a != AutoFlag);
         if (unknown is not null || (checkOnly && auto))
         {
-            await stderr.WriteLineAsync("usage: cm-agent update [--check]");
+            await stderr.WriteLineAsync(Strings.T(Msg.UpdateUsage));
             return 2;
         }
 
         var identity = Identity.Load(config);
         if (!identity.Connected)
         {
-            await stderr.WriteLineAsync("not connected (cm-agent login --server <url>): the update comes from the server the agent is connected to");
+            await stderr.WriteLineAsync(Strings.T(Msg.UpdateNotConnected));
             return 1;
         }
 
@@ -49,19 +49,19 @@ public static class UpdateCommand
         var check = await updater.CheckAsync(CancellationToken.None);
         if (check.Offer is null)
         {
-            await (check.Refused ? stderr : stdout).WriteLineAsync(check.Refused ? $"update refused: {check.Code}: {check.Message}" : $"{check.Message} ({AgentConfig.Version})");
+            await (check.Refused ? stderr : stdout).WriteLineAsync(check.Refused ? Strings.T(Msg.UpdateRefused, check.Code, check.Message) : Strings.T(Msg.UpdateCurrent, check.Message, AgentConfig.Version));
             return check.Refused ? 1 : 0;
         }
 
-        if (check.BelowMinimum) await stdout.WriteLineAsync($"this version ({AgentConfig.Version}) is below the server's minimum supported version {check.Offer.MinSupported}");
+        if (check.BelowMinimum) await stdout.WriteLineAsync(Strings.T(Msg.UpdateBelowMinimum, AgentConfig.Version, check.Offer.MinSupported));
         if (checkOnly)
         {
-            await stdout.WriteLineAsync($"update available: {check.Offer.Version} (running {AgentConfig.Version}); install it with: cm-agent update");
+            await stdout.WriteLineAsync(Strings.T(Msg.UpdateAvailable, check.Offer.Version, AgentConfig.Version));
             return 0;
         }
 
         var result = await updater.ApplyAsync(check.Offer, CancellationToken.None);
-        await (result.Succeeded ? stdout : stderr).WriteLineAsync(result.Succeeded ? $"updated: {result.Message}" : $"update {result.Code}: {result.Message}");
+        await (result.Succeeded ? stdout : stderr).WriteLineAsync(result.Succeeded ? Strings.T(Msg.UpdateDone, result.Message) : Strings.T(Msg.UpdateFailed, result.Code, result.Message));
         return result.Succeeded ? 0 : 1;
     }
 
@@ -72,37 +72,35 @@ public static class UpdateCommand
         ArgumentNullException.ThrowIfNull(stderr);
         if (args.Length == 1)
         {
-            await stdout.WriteLineAsync($"auto-update: {config.AutoUpdate}");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigAutoUpdate, config.AutoUpdate));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "claude-update" && args[2] is "on" or "off")
         {
             SavedSettings.SaveClaudeUpdate(config, args[2] == "on");
-            await stdout.WriteLineAsync($"claude-update: {args[2]} on this machine (the workspace must allow it too)");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigClaudeUpdate, args[2]));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "auto-update" && UpdateModes.IsValid(args[2]))
         {
             SavedSettings.SaveAutoUpdate(config, args[2]);
-            await stdout.WriteLineAsync($"auto-update: {args[2]}");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigAutoUpdate, args[2]));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "push" && (args[2] == "off" || PushTransports.Enables(args[2])))
         {
             SavedSettings.SavePush(config, args[2] != "off", args[2] == "off" ? null : PushTransports.Normalize(args[2]));
-            await stdout.WriteLineAsync(args[2] == "off" ? "push: off (web messages arrive at the next prompt)" : $"push: on through the {PushTransports.Normalize(args[2])}");
+            await stdout.WriteLineAsync(args[2] == "off" ? Strings.T(Msg.ConfigPushOff) : Strings.T(Msg.ConfigPushOn, PushTransports.Normalize(args[2])));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "push-format" && InboxFormats.IsValid(args[2]))
         {
             SavedSettings.SaveInboxFormat(config, args[2]);
-            await stdout.WriteLineAsync(args[2] == InboxFormats.Brief
-                ? "push-format: short (the inbox gets a one-line notice; the session reads the message with monitor_inbox_read)"
-                : "push-format: full (the inbox gets the whole message)");
+            await stdout.WriteLineAsync(Strings.T(args[2] == InboxFormats.Brief ? Msg.ConfigPushFormatShort : Msg.ConfigPushFormatFull));
             return 0;
         }
 
@@ -112,12 +110,12 @@ public static class UpdateCommand
             var function = args[3] == "none" ? null : args[3];
             if (!MachineRoles.IsEnvironment(environment) || !MachineRoles.IsFunction(function))
             {
-                await stderr.WriteLineAsync($"role takes an environment ({string.Join('|', MachineEnvironments.All)}|none) and a function ({string.Join('|', MachineFunctions.All)}|none).");
+                await stderr.WriteLineAsync(Strings.T(Msg.ConfigRoleUsage, string.Join('|', MachineEnvironments.All), string.Join('|', MachineFunctions.All)));
                 return 2;
             }
 
             SavedSettings.SaveRole(config, environment, function);
-            await stdout.WriteLineAsync($"role claim: {MachineRoles.Code(environment, function)} (an admin sets the role on the web; a claim only makes it stricter)");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigRoleClaim, MachineRoles.Code(environment, function)));
             return 0;
         }
 
@@ -125,9 +123,14 @@ public static class UpdateCommand
         {
             ApproversStore.SetRequired(config, args[2] == "required");
             var policy = ApproversStore.Load(config);
-            await stdout.WriteLineAsync($"signed approvals: {args[2]} ({policy.Keys.Count} key(s) pinned)"
-                + (args[2] == "required" && policy.Keys.Count == 0 ? "; NOTHING can run until a key is pinned (cm-agent approvers add)" : ""));
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigApprovals, args[2], policy.Keys.Count)
+                + (args[2] == "required" && policy.Keys.Count == 0 ? Strings.T(Msg.ConfigApprovalsNothing) : ""));
             return 0;
+        }
+
+        if (args.Length >= 2 && args[1] == "claude-statusline")
+        {
+            return await StatusLine.StatusLineSetup.RunAsync(args, config, stdout, stderr);
         }
 
         if (args.Length >= 2 && args[1] == "projects")
@@ -135,19 +138,19 @@ public static class UpdateCommand
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
+        await stderr.WriteLineAsync(Strings.T(Msg.ConfigUsage));
         return 2;
     }
 
     /// <summary>
-    /// `cm-agent config projects add|remove|list [folder]` (ADR-0008 §3a′): the project folders this machine reports facts about when no session
+    /// `aipod config projects add|remove|list [folder]` (ADR-0008 §3a′): the project folders this machine reports facts about when no session
     /// visits them. A service agent reads its list from the admin-owned policy file instead; this verb is for an interactive or standalone agent.
     /// </summary>
     private static async Task<int> ProjectsAsync(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr)
     {
         if (config.ServiceMode)
         {
-            await stderr.WriteLineAsync("a service agent reads its project folders from the policy file an administrator owns (\"projects\").");
+            await stderr.WriteLineAsync(Strings.T(Msg.ProjectsService));
             return 2;
         }
 
@@ -161,43 +164,70 @@ public static class UpdateCommand
         {
             if (ProjectFolderList.Add(config, args[3]))
             {
-                await stdout.WriteLineAsync("project folder listed (its key, branch and commit are reported; the path stays on this machine)");
+                await stdout.WriteLineAsync(Strings.T(Msg.ProjectsListed));
                 return 0;
             }
 
-            await stderr.WriteLineAsync($"not listed: give the absolute path of an existing folder that is not listed yet (at most {ProjectFolderList.Max}).");
+            await stderr.WriteLineAsync(Strings.T(Msg.ProjectsNotListed, ProjectFolderList.Max));
             return 2;
         }
 
         if (args.Length == 4 && args[2] == "remove")
         {
-            await (ProjectFolderList.Remove(config, args[3]) ? stdout.WriteLineAsync("project folder removed") : stderr.WriteLineAsync("that folder was not listed"));
+            await (ProjectFolderList.Remove(config, args[3]) ? stdout.WriteLineAsync(Strings.T(Msg.ProjectsRemoved)) : stderr.WriteLineAsync(Strings.T(Msg.ProjectsNotInList)));
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config projects add <folder> | remove <folder> | list");
+        if (args.Length >= 4 && args[2] == "test")
+        {
+            return await ProjectTestAsync(args, config, stdout, stderr);
+        }
+
+        await stderr.WriteLineAsync(Strings.T(Msg.ProjectsUsage));
         return 2;
     }
 
-    /// <summary>The lines `cm-agent status` shows about updating: the mode on each side, the last verdict, and a rolled-back build.</summary>
+    /// <summary>
+    /// `aipod config projects test &lt;folder&gt; -- &lt;program&gt; [args...]` sets the test command of a project folder, `--clear` removes it (ADR-0011 §7a). The command is
+    /// an argv list, never a shell line; it is reported with the folder so the owner can start it from Podium, and each run still waits for the owner's approval.
+    /// </summary>
+    private static async Task<int> ProjectTestAsync(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr)
+    {
+        if (args.Length == 5 && args[4] == "--clear")
+        {
+            await (ProjectTestCommands.Clear(config, args[3]) ? stdout.WriteLineAsync("test command removed") : stderr.WriteLineAsync("that folder had no test command"));
+            return 0;
+        }
+
+        if (args.Length >= 6 && args[4] == "--" && ProjectTestCommands.Set(config, args[3], args[5..]))
+        {
+            await stdout.WriteLineAsync("test command set (it is reported with this folder's path; each run from Podium still waits for your approval)");
+            return 0;
+        }
+
+        await stderr.WriteLineAsync($"not set: give the absolute path of an existing folder, then -- and the program (an absolute path) with its arguments (at most {ProjectTestCommands.MaxElements} elements of {ProjectTestCommands.MaxElementLength} characters, no control characters).");
+        return 2;
+    }
+
+    /// <summary>The lines `aipod status` shows about updating: the mode on each side, the last verdict, and a rolled-back build.</summary>
     public static IEnumerable<string> Describe(AgentConfig config, LocalStore store)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(store);
         var answer = Daemon.WorkspaceSettings.Get(config, store, UpdatePolicy.WorkspaceKey);
         var workspace = answer is null ? Daemon.WorkspaceSettings.Unread : UpdateModes.Normalize(answer);
-        yield return $"auto-update: {UpdatePolicy.Effective(config, store)} (this machine: {config.AutoUpdate}, workspace: {workspace})";
+        yield return Strings.T(Msg.UpAuto, UpdatePolicy.Effective(config, store), config.AutoUpdate, workspace);
         var state = UpdateState.Load(config);
-        if (state.Phase == UpdateState.PendingHealth) yield return $"update: {state.From} -> {state.To} is being checked";
-        if (state.Available is { } available) yield return $"update available: {available} (cm-agent update)";
+        if (state.Phase == UpdateState.PendingHealth) yield return Strings.T(Msg.UpChecking, state.From, state.To);
+        if (state.Available is { } available) yield return Strings.T(Msg.UpAvailable, available);
         if (state.Result is { } result && result != UpdateCodes.Available)
         {
             var at = DateTimeOffset.TryParse(state.CheckedAt ?? state.InstalledAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var when)
                 ? when.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)
                 : "?";
-            yield return $"last update check: {result} ({state.Detail}) {at}";
+            yield return Strings.T(Msg.UpLastCheck, result, state.Detail, at);
         }
 
-        if (state.BlockedVersion is { } blocked) yield return $"update {blocked} was rolled back and is not retried by itself";
+        if (state.BlockedVersion is { } blocked) yield return Strings.T(Msg.UpRolledBack, blocked);
     }
 }

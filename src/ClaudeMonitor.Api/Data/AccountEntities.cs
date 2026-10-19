@@ -63,6 +63,9 @@ public sealed class User
     public int FailedSignIns { get; set; }
     public DateTimeOffset? LockedUntil { get; set; }
 
+    /// <summary>The language the person picked or registered in (en, tr or de; ADR-0014 Part A): the mails to them follow it. NULL until one is known; then the Accept-Language header decides.</summary>
+    public string? Language { get; set; }
+
     /// <summary>The TOTP secret, sealed (SecretBox); set while being set up, kept once enabled.</summary>
     public string? TotpSecret { get; set; }
     public DateTimeOffset? TotpEnabledAt { get; set; }

@@ -66,7 +66,7 @@ public sealed class DaemonControl(AgentConfig config, AgentLog log, TimeProvider
         try
         {
             using var process = Process.GetProcessById(int.Parse(File.ReadAllText(config.PidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture));
-            if (!process.ProcessName.StartsWith("cm-agent", StringComparison.Ordinal)) return false;
+            if (!Config.Brand.IsOurProcess(process.ProcessName)) return false;
             log.Write($"killing the daemon (pid {process.Id}): it did not stop when asked");
             process.Kill(entireProcessTree: true);
             process.WaitForExit(config.UpdateStopWait);
@@ -80,10 +80,10 @@ public sealed class DaemonControl(AgentConfig config, AgentLog log, TimeProvider
         return !IsRunning();
     }
 
-    /// <summary>Starts "cm-agent update --auto" detached from this process (the daemon is about to be stopped by it).</summary>
+    /// <summary>Starts "aipod update --auto" detached from this process (the daemon is about to be stopped by it).</summary>
     public static bool SpawnAutoUpdate(AgentConfig config, AgentLog log) => Spawn(config, log, UpdateCommand.Verb, UpdateCommand.AutoFlag);
 
-    /// <summary>Starts "cm-agent &lt;args&gt;" detached from this process: an action asked for on the web (restart, update) ends this daemon and starts the next.</summary>
+    /// <summary>Starts "aipod &lt;args&gt;" detached from this process: an action asked for on the web (restart, update) ends this daemon and starts the next.</summary>
     public static bool Spawn(AgentConfig config, AgentLog log, params string[] args)
     {
         try
@@ -102,7 +102,7 @@ public sealed class DaemonControl(AgentConfig config, AgentLog log, TimeProvider
         }
         catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
         {
-            log.Write($"could not start {(args.FirstOrDefault() == UpdateCommand.Verb ? "the update" : $"cm-agent {args.FirstOrDefault()}")}: {e.Message}");
+            log.Write($"could not start {(args.FirstOrDefault() == UpdateCommand.Verb ? "the update" : $"aipod {args.FirstOrDefault()}")}: {e.Message}");
             return false;
         }
     }

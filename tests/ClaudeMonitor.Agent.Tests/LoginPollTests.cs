@@ -149,8 +149,8 @@ public sealed class LoginPollTests : IDisposable
     private const string Body = """{"title":"body-that-must-not-be-printed"}""";
 
     [Theory]
-    [InlineData(HttpStatusCode.UpgradeRequired, "Upgrade the agent, then run cm-agent login again.")]
-    [InlineData(HttpStatusCode.TooManyRequests, "Wait a minute, then run cm-agent login again.")]
+    [InlineData(HttpStatusCode.UpgradeRequired, "Upgrade the agent, then run aipod login again.")]
+    [InlineData(HttpStatusCode.TooManyRequests, "Wait a minute, then run aipod login again.")]
     [InlineData(HttpStatusCode.NotFound, "https://m.invalid answered 404; it does not look like a Claude Monitor server.")]
     [InlineData(HttpStatusCode.Forbidden, "https://m.invalid answered 403; it does not look like a Claude Monitor server.")]
     public async Task A_refused_device_code_request_says_why_in_one_line_and_exits(HttpStatusCode status, string expected)
@@ -170,7 +170,7 @@ public sealed class LoginPollTests : IDisposable
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, "https://m.invalid answered 403; it does not look like a Claude Monitor server.")]
     [InlineData(HttpStatusCode.NotFound, "https://m.invalid answered 404; it does not look like a Claude Monitor server.")]
-    [InlineData(HttpStatusCode.TooManyRequests, "Wait a minute, then run cm-agent login again.")]
+    [InlineData(HttpStatusCode.TooManyRequests, "Wait a minute, then run aipod login again.")]
     public async Task A_refused_poll_says_why_and_stops_polling(HttpStatusCode status, string expected)
     {
         var api = new Scripted(Code(), (_, _) => Task.FromResult(Answer(status, Body)));

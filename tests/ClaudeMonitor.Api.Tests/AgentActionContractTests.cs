@@ -8,9 +8,10 @@ namespace ClaudeMonitor.Api.Tests;
 public sealed class AgentActionContractTests
 {
     [Fact]
-    public void The_kinds_are_the_four_the_agent_and_the_web_already_speak_and_in_this_order()
+    public void The_kinds_are_the_four_the_agent_and_the_web_already_speak_in_this_order_then_the_two_for_Claude_then_the_five_remote_writes()
     {
-        Assert.Equal(new[] { "restart", "update_check", "update", "status" }, AgentActionKinds.All.ToArray());
+        Assert.Equal(new[] { "restart", "update_check", "update", "status", "claude_start", "claude_stop", "plugin_enable", "plugin_disable", "plugin_update", "plugin_install", "project_setting" }, AgentActionKinds.All.ToArray());
+        Assert.Equal(("claude_start", "claude_stop"), (AgentActionKinds.ClaudeStart, AgentActionKinds.ClaudeStop));
         Assert.Equal(("restart", "update_check", "update", "status"),
             (AgentActionKinds.Restart, AgentActionKinds.UpdateCheck, AgentActionKinds.Update, AgentActionKinds.Status));
     }
@@ -47,6 +48,39 @@ public sealed class AgentActionContractTests
     public void The_error_codes_the_web_reads_keep_their_wire_values()
     {
         Assert.Equal(("invalid_kind", "owner_only"), (AgentActionErrors.InvalidKind, AgentActionErrors.OwnerOnly));
+    }
+
+    [Fact]
+    public void The_new_error_codes_of_a_remote_start_keep_their_wire_values()
+    {
+        Assert.Equal(("invalid_first_prompt", "claude_folder_not_trusted", "claude_start_pending"),
+            (AgentActionErrors.InvalidFirstPrompt, AgentActionErrors.FolderNotTrusted, AgentActionErrors.ClaudeStartPending));
+    }
+
+    [Theory]
+    [InlineData("fix the test", true)]
+    [InlineData("line one\nline two\ttabbed\r\n", true)]
+    [InlineData("", false)]
+    [InlineData("   \n\t ", false)]
+    [InlineData("bad\u0000text", false)]
+    [InlineData("escape \u001b[31m", false)]
+    [InlineData(null, false)]
+    public void A_first_prompt_is_text_with_letters_in_it_and_no_control_characters_but_new_lines_and_tabs(string? text, bool expected) =>
+        Assert.Equal(expected, AgentActionKinds.IsFirstPrompt(text));
+
+    [Fact]
+    public void A_first_prompt_is_at_most_2000_characters()
+    {
+        Assert.True(AgentActionKinds.IsFirstPrompt(new string('x', 2000)));
+        Assert.False(AgentActionKinds.IsFirstPrompt(new string('x', 2001)));
+        Assert.Equal(2000, AgentActionKinds.ClaudeFirstPromptMax);
+    }
+
+    [Fact]
+    public void The_automatic_modes_are_off_on_message_and_always_and_their_error_codes_keep_their_wire_values()
+    {
+        Assert.Equal(["off", "on_message", "always"], ClaudeAutoModes.All);
+        Assert.Equal(("invalid_auto_mode", "invalid_auto_project"), (AgentActionErrors.InvalidAutoMode, AgentActionErrors.InvalidAutoProject));
     }
 
     [Fact]

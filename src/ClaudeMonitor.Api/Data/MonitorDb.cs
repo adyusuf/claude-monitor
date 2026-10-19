@@ -20,7 +20,7 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<AgentToken> AgentTokens => Set<AgentToken>();
     public DbSet<DeviceAuthorization> DeviceAuthorizations => Set<DeviceAuthorization>();
     public DbSet<HarnessKind> HarnessKinds => Set<HarnessKind>();
-    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<Repo> Repos => Set<Repo>();
     public DbSet<HarnessSession> HarnessSessions => Set<HarnessSession>();
     public DbSet<SessionTask> SessionTasks => Set<SessionTask>();
     public DbSet<SubagentRun> SubagentRuns => Set<SubagentRun>();
@@ -42,6 +42,18 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<MachineProject> MachineProjects => Set<MachineProject>();
     public DbSet<MachineAsk> MachineAsks => Set<MachineAsk>();
     public DbSet<AgentAction> AgentActions => Set<AgentAction>();
+    public DbSet<ManagedProject> Projects => Set<ManagedProject>();
+    public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+    public DbSet<ManagedApplication> Applications => Set<ManagedApplication>();
+    public DbSet<ApplicationComponent> ApplicationComponents => Set<ApplicationComponent>();
+    public DbSet<ApplicationRelease> ApplicationReleases => Set<ApplicationRelease>();
+    public DbSet<Issue> Issues => Set<Issue>();
+    public DbSet<IssueLink> IssueLinks => Set<IssueLink>();
+    public DbSet<IssueTestCase> IssueTestCases => Set<IssueTestCase>();
+    public DbSet<IssueCodeLink> IssueCodeLinks => Set<IssueCodeLink>();
+    public DbSet<IssueRun> IssueRuns => Set<IssueRun>();
+    public DbSet<Sprint> Sprints => Set<Sprint>();
+    public DbSet<SprintMember> SprintMembers => Set<SprintMember>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

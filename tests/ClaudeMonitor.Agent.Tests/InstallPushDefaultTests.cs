@@ -3,7 +3,7 @@ using ClaudeMonitor.Agent.Config;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>The first `cm-agent install` turns the inbox push on (it needs no start-up flag); a choice made afterwards (off, channel) is never overridden by a later install.</summary>
+/// <summary>The first `aipod install` turns the inbox push on (it needs no start-up flag); a choice made afterwards (off, channel) is never overridden by a later install.</summary>
 public sealed class InstallPushDefaultTests : IDisposable
 {
     private readonly TempHome home = new();

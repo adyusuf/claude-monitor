@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Push;
 /// <summary>
 /// The agent's own account of the path a message takes (ADR-0003): the event outbox, the stream from the web and the
 /// push into the session. The daemon and the MCP process write these keys into the local database; `monitor_status` and
-/// `cm-agent status` read them. Only ids, counts, times and exception type names: never message content.
+/// `aipod status` read them. Only ids, counts, times and exception type names: never message content.
 /// </summary>
 public static class PushStatus
 {
@@ -17,6 +17,11 @@ public static class PushStatus
     public const string StreamFailuresKey = "stream.failures";
     public const string StreamErrorKey = "stream.last_error";
     public const string StreamCommandKey = "stream.last_command_id";
+
+    /// <summary>Counters the tray's two lights watch (orange: a message arrived here; green: a message left or reached a session).</summary>
+    public const string InCountKey = "leds.in";
+
+    public const string OutCountKey = "leds.out";
     public const string StreamCommandAtKey = "stream.last_command_at";
     public const string UploadAtKey = "relay.last_upload_at";
     public const string UploadErrorKey = "relay.last_error";
@@ -27,7 +32,7 @@ public static class PushStatus
     public const string Connected = "connected";
     public const string Reconnecting = "reconnecting";
 
-    /// <summary>The lines `monitor_status` appends after its original sentence, and `cm-agent status` prints.</summary>
+    /// <summary>The lines `monitor_status` appends after its original sentence, and `aipod status` prints.</summary>
     public static IReadOnlyList<string> Describe(AgentConfig config, LocalStore store, DateTimeOffset now, string? session, bool daemonRunning)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -36,14 +41,19 @@ public static class PushStatus
         var waiting = store.OutboxCount();
         var oldest = store.OutboxOldest();
         var upload = Time(store.Get(UploadAtKey));
-        lines.Add($"Events queued locally: {waiting}" + (oldest is { } o ? $" (oldest {Age(now - o)})" : "") + "; last upload " +
-                  (upload is { } u ? Age(now - u) + " ago" : "never") + ".");
+        lines.Add(Strings.T(Msg.StEventsQueued, waiting, oldest is { } o ? Strings.T(Msg.StOldest, Age(now - o)) : "",
+            upload is { } u ? Strings.T(Msg.StAgo, Age(now - u)) : Strings.T(Msg.StNever)));
         if (store.Get(UploadErrorKey) is { Length: > 0 } uploadError)
         {
-            lines.Add($"Last upload failure: {uploadError} at {Clock(Time(store.Get(UploadErrorAtKey)))}.");
+            lines.Add(Strings.T(Msg.StUploadFailure, uploadError, Clock(Time(store.Get(UploadErrorAtKey)))));
         }
 
-        lines.Add(daemonRunning ? Stream(store, now) : "Web stream: the agent daemon is not running.");
+        if (store.Get(Auth.AuthRefusal.ReasonKey) is { Length: > 0 } refused && Auth.Identity.Peek(config)?.Connected != true)
+        {
+            lines.Add(Strings.T(Msg.StConnection, Auth.AuthRefusal.Describe(refused), Clock(Time(store.Get(Auth.AuthRefusal.AtKey)))));
+        }
+
+        lines.Add(daemonRunning ? Stream(store, now) : Strings.T(Msg.StDaemonDown));
         lines.Add(Push(config, store, now, session));
         return lines;
     }
@@ -57,25 +67,24 @@ public static class PushStatus
 
     private static string Stream(LocalStore store, DateTimeOffset now)
     {
-        var last = store.Get(StreamCommandKey) is { Length: > 0 } id ? $"; last message id {id} ({Age(now - (Time(store.Get(StreamCommandAtKey)) ?? now))} ago)" : "; no message received yet";
+        var last = store.Get(StreamCommandKey) is { Length: > 0 } id ? Strings.T(Msg.StLastMessage, id, Age(now - (Time(store.Get(StreamCommandAtKey)) ?? now))) : Strings.T(Msg.StNoMessage);
         return store.Get(StreamStateKey) switch
         {
-            Connected => $"Web stream: connected since {Clock(Time(store.Get(StreamStateAtKey)))}{last}.",
-            Reconnecting => $"Web stream: reconnecting (failure {store.Get(StreamFailuresKey)}: {store.Get(StreamErrorKey)}){last}.",
-            _ => $"Web stream: not opened yet{last}.",
+            Connected => Strings.T(Msg.StStreamConnected, Clock(Time(store.Get(StreamStateAtKey))), last),
+            Reconnecting => Strings.T(Msg.StStreamReconnecting, store.Get(StreamFailuresKey), store.Get(StreamErrorKey), last),
+            _ => Strings.T(Msg.StStreamNotOpen, last),
         };
     }
 
     private static string Push(AgentConfig config, LocalStore store, DateTimeOffset now, string? session)
     {
-        if (!config.PushEnabled) return "Push into the session: off (cm-agent install --push inbox); web messages arrive at the next prompt.";
+        if (!config.PushEnabled) return Strings.T(Msg.StPushOff);
         if (config.InboxPushEnabled) return Inbox(store, now, session);
         var (queued, _) = store.WaitingCommands(now);
         var unconfirmed = store.UnconfirmedPushes().Count;
-        var scope = config.PushScope == PushScopes.Machine ? "every session on this machine" : $"this session ({session ?? "not bound yet"})";
-        var last = store.Get(LastPushKey) is { Length: > 0 } id ? $"last pushed {id} at {Clock(Time(store.Get(LastPushAtKey)))}" : "nothing pushed yet";
-        return $"Push into the session: on for {scope}; {last}; {unconfirmed} pushed but not yet seen in the transcript; " +
-               $"{store.PushedTotal()} confirmed; {queued} waiting for a hook.";
+        var scope = config.PushScope == PushScopes.Machine ? Strings.T(Msg.StScopeMachine) : Strings.T(Msg.StScopeSession, session ?? Strings.T(Msg.StNotBound));
+        var last = store.Get(LastPushKey) is { Length: > 0 } id ? Strings.T(Msg.StLastPushed, id, Clock(Time(store.Get(LastPushAtKey)))) : Strings.T(Msg.StNothingPushed);
+        return Strings.T(Msg.StPushOn, scope, last, unconfirmed, store.PushedTotal(), queued);
     }
 
     /// <summary>The inbox transport (ADR-0007): whether this session's socket is known, what was pushed and what the last failure was. No content, no key.</summary>
@@ -83,13 +92,12 @@ public static class PushStatus
     {
         var (queued, _) = store.WaitingCommands(now);
         var known = session is not null && store.InboxOf(session) is not null;
-        var where = session is null ? "this session is not bound yet" : known ? "this session's inbox is known" : "this session's inbox is not known yet (a hook has not run since push was switched on)";
-        var last = store.Get(LastPushKey) is { Length: > 0 } id ? $"last pushed {id} at {Clock(Time(store.Get(LastPushAtKey)))}" : "nothing pushed yet";
-        var failure = store.Get(LocalStore.InboxErrorKey) is { Length: > 0 } error ? $" Last inbox failure: {error} at {Clock(Time(store.Get(LocalStore.InboxErrorAtKey)))}." : "";
+        var where = Strings.T(session is null ? Msg.StInboxNotBound : known ? Msg.StInboxKnown : Msg.StInboxUnknown);
+        var last = store.Get(LastPushKey) is { Length: > 0 } id ? Strings.T(Msg.StLastPushed, id, Clock(Time(store.Get(LastPushAtKey)))) : Strings.T(Msg.StNothingPushed);
+        var failure = store.Get(LocalStore.InboxErrorKey) is { Length: > 0 } error ? Strings.T(Msg.StInboxFailure, error, Clock(Time(store.Get(LocalStore.InboxErrorAtKey)))) : "";
         var (read, unread) = store.ShortNotices();
-        var notices = read + unread > 0 ? $" One-line notices: {read} read, {unread} not read yet." : "";
-        return $"Push into the session: on through the inbox socket; {where}; {last}; {store.UnconfirmedPushes().Count} pushed but not yet seen in the transcript; " +
-               $"{store.PushedTotal()} confirmed; {queued} waiting for a hook.{notices}{failure}";
+        var notices = read + unread > 0 ? Strings.T(Msg.StNotices, read, unread) : "";
+        return Strings.T(Msg.StInboxLine, where, last, store.UnconfirmedPushes().Count, store.PushedTotal(), queued, notices, failure);
     }
 
     private static DateTimeOffset? Time(string? iso) =>
@@ -98,5 +106,5 @@ public static class PushStatus
     private static string Clock(DateTimeOffset? t) => t is { } v ? v.UtcDateTime.ToString("HH:mm:ss'Z'", CultureInfo.InvariantCulture) : "?";
 
     private static string Age(TimeSpan span) =>
-        span < TimeSpan.Zero ? "0 s" : span.TotalSeconds < 120 ? $"{(int)span.TotalSeconds} s" : span.TotalMinutes < 120 ? $"{(int)span.TotalMinutes} min" : $"{(int)span.TotalHours} h";
+        span < TimeSpan.Zero ? Strings.T(Msg.TrayAgeSeconds, 0) : span.TotalSeconds < 120 ? Strings.T(Msg.TrayAgeSeconds, (int)span.TotalSeconds) : span.TotalMinutes < 120 ? Strings.T(Msg.TrayAgeMinutes, (int)span.TotalMinutes) : Strings.T(Msg.StAgeHours, (int)span.TotalHours);
 }

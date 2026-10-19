@@ -118,6 +118,7 @@ if [ -z "$(git ls-files --cached --others --exclude-standard '*.csproj')" ]; the
 else
   dotnet_codebase "API" tests/ClaudeMonitor.Api.Tests
   dotnet_codebase "agent" tests/ClaudeMonitor.Agent.Tests
+  dotnet_codebase "tray" tests/Aipod.Tray.Tests
 fi
 
 echo "▶ web (threshold ${min}%)"

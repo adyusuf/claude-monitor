@@ -108,7 +108,7 @@ public sealed class GrantTools(AgentConfig config, TimeProvider clock)
         [Description("Why now, shown on the web.")] string reason,
         [Description("This session's id.")] string? sessionId = null)
     {
-        if (!Guid.TryParse(jobId, out var id)) return "Give the job id from monitor_jobs.";
+        if (!Guid.TryParse(jobId, out var id)) return $"Give the job id from {McpToolNames.Name("jobs")}.";
         var list = await requests.AskAsync("jobs", HttpMethod.Get, "api/agent/jobs", null, RemoteRequests.ReadWait);
         if (!list.Ok) return MachineTools.Failure(list.Error!);
         var job = (list.Json!.Value.Deserialize<List<JobView>>(ApiClient.Json) ?? []).FirstOrDefault(j => j.Id == id);
@@ -117,10 +117,10 @@ public sealed class GrantTools(AgentConfig config, TimeProvider clock)
         var clientKey = Guid.NewGuid().ToString();
         var create = new RunCreate(clientKey, job.TargetAgentId, RunModes.Argv, job.Argv, null, job.Cwd, job.TimeoutSeconds, reason, sessionId, job.Id);
         var outcome = await client.CreateRunAsync(create);
-        if (outcome.Pending) return $"Queued as request {clientKey}. Call monitor_run_result with runId {clientKey}.";
+        if (outcome.Pending) return $"Queued as request {clientKey}. Call {McpToolNames.Name("run_result")} with runId {clientKey}.";
         if (!outcome.Ok) return MachineTools.Failure(outcome.Error!);
         var run = outcome.Value!;
-        return $"Job \"{job.Name}\" started as run {run.Id}: {run.Status}. Call monitor_run_result with runId {run.Id}.";
+        return $"Job \"{job.Name}\" started as run {run.Id}: {run.Status}. Call {McpToolNames.Name("run_result")} with runId {run.Id}.";
     }
 
     private async Task<(string Query, string? Error)> FilterAsync(string? machine)

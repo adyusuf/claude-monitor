@@ -18,6 +18,11 @@ PluginScriptsCase, OS, ARCH, FILE, RUN, ENSURE, Server, zip_of = (support.Plugin
 
 @unittest.skipUnless(OS and ARCH, 'the scripts run on macOS and Linux here')
 class EnsureScript(PluginScriptsCase):
+    def setUp(self):
+        super().setUp()
+        os.makedirs(self.data)  # the bridge's one-time notice (ADR-0013) has been said: these cases are about the install
+        open(os.path.join(self.data, 'bridge.said'), 'w').close()
+
     def test_a_missing_binary_is_downloaded_checked_installed_and_the_daemon_handed_over(self):
         server = Server({f'/downloads/{FILE}': zip_of('0.3.0')})
         self.addCleanup(server.close)

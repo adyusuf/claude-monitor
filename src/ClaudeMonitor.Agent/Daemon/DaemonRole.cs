@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// "cm-agent daemon": started by a hook or the MCP server, or by the OS as a boot service (ADR-0005). It stops on Ctrl+C,
+/// "aipod daemon": started by a hook or the MCP server, or by the OS as a boot service (ADR-0005). It stops on Ctrl+C,
 /// SIGTERM (systemd, launchd) or the Windows service manager's stop. A service that is not connected logs in by itself:
 /// the device code goes to its log and to login-code.txt in its home, for an admin to read and approve on the web.
 /// </summary>
@@ -65,10 +65,10 @@ public static class DaemonRole
         }
 
         // A standalone daemon (ADR-0008 §3g) that is not connected does not exit with 1, as it would under a supervisor that restarts it in a loop: it logs
-        // once, re-reads its identity every poll and starts when `cm-agent login` has saved one.
+        // once, re-reads its identity every poll and starts when `aipod login` has saved one.
         if (config.Standalone && !Identity.Load(config).Connected)
         {
-            log.Write("standalone agent not connected: run `cm-agent login --server <url>`; waiting for the login");
+            log.Write("standalone agent not connected: run `aipod login --server <url>`; waiting for the login");
             while (!stop.IsCancellationRequested && !Identity.Load(config).Connected)
             {
                 try

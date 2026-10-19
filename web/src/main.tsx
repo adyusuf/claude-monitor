@@ -6,6 +6,7 @@ import { SessionProvider } from "./auth/session";
 import { I18nProvider } from "./i18n";
 import "./styles.css";
 import "./remote.css";
+import "./projects.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

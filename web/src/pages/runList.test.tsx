@@ -16,6 +16,9 @@ function list(runs: WebRunView[], over: { hasMore?: boolean; onMore?: () => void
   return { onChanged, onMore };
 }
 
+/** The buttons that open a row's details (a finished row also has an Issues button with the same aria-expanded). */
+const toggles = () => Array.from(document.querySelectorAll<HTMLElement>(".run-toggle"));
+
 describe("run status chips", () => {
   const cases: [RunStatus | string, string, string][] = [
     ["pending_approval", en.remote.status.pending_approval, "open"], ["approved", en.remote.status.approved, "open"],
@@ -84,7 +87,7 @@ describe("the run list", () => {
 
   it("expands to the full facts, exit code and error, collapses again", async () => {
     list([run({ status: "failed", argv: ["/bin/false"], exitCode: 3, error: "boom", canDecide: false })]);
-    const toggle = screen.getByRole("button", { expanded: false });
+    const toggle = toggles()[0]!;
     expect(screen.queryByText(en.remote.cwd)).toBeNull();
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -97,7 +100,7 @@ describe("the run list", () => {
 
   it("shows exit code 0 (zero is a real value) and nothing when there is none", async () => {
     list([run({ id: "r1", status: "succeeded", exitCode: 0, canDecide: false }), run({ id: "r2", status: "running", exitCode: null, canDecide: false })]);
-    for (const b of screen.getAllByRole("button", { expanded: false })) await userEvent.click(b);
+    for (const b of toggles()) await userEvent.click(b);
     expect(screen.getAllByText(/^Exit code:/)).toHaveLength(1);
     expect(screen.getByText("Exit code: 0")).toBeInTheDocument();
   });
@@ -105,7 +108,7 @@ describe("the run list", () => {
   it("loads no output for a run that produced none", async () => {
     const calls = mockApi({});
     list([run({ outputBytes: 0, status: "succeeded" })]);
-    await userEvent.click(screen.getByRole("button", { expanded: false }));
+    await userEvent.click(toggles()[0]!);
     expect(calls).toHaveLength(0);
   });
 
@@ -200,7 +203,7 @@ describe("run output", () => {
   it("is loaded by expanding a visible run that has output", async () => {
     const calls = mockApi({ "GET /runs/r1/output": { body: page([{ seq: 0, body: "from the run" }], 1, true) } });
     list([run({ status: "succeeded", outputBytes: 12, outputTruncated: true, canDecide: false })]);
-    await userEvent.click(screen.getByRole("button", { expanded: false }));
+    await userEvent.click(toggles()[0]!);
     await waitFor(() => expect(screen.getByLabelText(en.remote.output)).toHaveTextContent("from the run"));
     expect(screen.getByText(en.remote.outputTruncated)).toBeInTheDocument();
     expect(calls).toHaveLength(1);

@@ -1,0 +1,16 @@
+{
+  "run_before_push": {
+    "dev": {
+      "e2e": false,
+      "unit": false
+    },
+    "prod": {
+      "e2e": false,
+      "unit": false
+    },
+    "test": {
+      "e2e": false,
+      "unit": false
+    }
+  }
+}

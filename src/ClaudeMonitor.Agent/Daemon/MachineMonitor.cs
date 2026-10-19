@@ -20,11 +20,13 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// </summary>
 public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, IMetricsSource source,
     Func<ExecPolicy>? policySource = null, Func<(ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)>? factsSource = null,
-    Func<IReadOnlyList<ServiceInfo>>? servicesSource = null, Func<IReadOnlyList<ProjectFact>>? projectsSource = null)
+    Func<IReadOnlyList<ServiceInfo>>? servicesSource = null, Func<IReadOnlyList<ProjectFact>>? projectsSource = null,
+    ClaudeInventoryReader? inventoryReader = null)
 {
     public const string ThresholdsKey = "settings.alert_thresholds";
     public const string RemoteRunsKey = "settings.remote_runs";
     public const string ShareServicesKey = "settings.share_services";
+    public const string ShareInventoryKey = "settings.share_inventory";
     public const int KeepSamples = 60;
     /// <summary>A folder a session worked in is read for its commit and tag for this long after the last visit (ADR-0008 §3a′).</summary>
     public static readonly TimeSpan VisitedFor = TimeSpan.FromDays(30);
@@ -39,6 +41,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private string factsStamp = "";
     private (IReadOnlyList<ServiceInfo>? Services, IReadOnlyList<ProjectFact>? Projects, bool Share)? extras;
     private DateTimeOffset extrasAt;
+    private ClaudeInventory? inventory;
+    private DateTimeOffset inventoryAt;
 
     /// <summary>The exec level this agent allows now: the admin-owned file in service mode, agent.json otherwise (with the role claim, ADR-0008).</summary>
     public ExecPolicy Policy()
@@ -61,11 +65,40 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
             : policy.Level == ExecLevels.Shell && policy.HasCeiling ? ExecLevels.Argv : policy.Level;
         var (claude, tools) = Facts();
         var (services, projects) = Extras(policy);
+        var inventory = await InventoryAsync(policy, ct);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
-            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required);
-        var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default } }, ApiClient.Json);
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required,
+            PluginIds.IsValid(config.PluginId) ? config.PluginId : null, inventory);
+        var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default }, Inventory = inventory is null ? null : inventory with { At = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
+    }
+
+    /// <summary>What Claude Code has here (sessions, plugins, skills, project settings), read again at most every <see cref="AgentConfig.ClaudeInventoryEvery"/>, and only while the machine owner's switch is on; null when it is off, no reader was given (tests) or it failed.</summary>
+    private async Task<ClaudeInventory?> InventoryAsync(ExecPolicy policy, CancellationToken ct)
+    {
+        if (inventoryReader is null) return null;
+        if (store.Get(ShareInventoryKey) != "true")
+        {
+            inventory = null; // the owner has not switched it on (or switched it off): nothing is read and nothing is sent
+            return null;
+        }
+
+        var now = clock.GetUtcNow();
+        if (inventory is { } cached && now - inventoryAt < config.ClaudeInventoryEvery && now >= inventoryAt) return cached;
+        try
+        {
+            var dirs = ClaudeUpdate.ClaudeSessions.ConfigDirs(config, store, now, TimeSpan.FromDays(1));
+            var folders = (policy.ProjectFolders ?? []).Concat(store.VisitedFolders(now - VisitedFor)).Distinct(StringComparer.Ordinal).Take(ProjectFolderList.Max * 2).ToList();
+            inventory = await inventoryReader.ReadAsync(dirs, folders, now, ct);
+        }
+        catch (Exception e) when (!ct.IsCancellationRequested && e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            inventory = null; // not reported this time; the next pass tries again
+        }
+
+        inventoryAt = now;
+        return inventory;
     }
 
     /// <summary>The push transport this machine has on now (the saved setting, read fresh), or null when push is off: the web words its idle-session warning by it.</summary>
@@ -100,7 +133,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         if (extras is { } cached && cached.Share == share && now - extrasAt < config.ProjectFactsEvery && now >= extrasAt) return (cached.Services, cached.Projects);
         store.ForgetFolders(now - 2 * VisitedFor);
         var services = share ? servicesSource?.Invoke() ?? ListeningServices.Live() : null;
-        var read = projectsSource?.Invoke() ?? new ProjectFacts(config).Read(policy.ProjectFolders, store.VisitedFolders(now - VisitedFor));
+        var read = projectsSource?.Invoke() ?? new ProjectFacts(config).Read(policy.ProjectFolders, store.VisitedFolders(now - VisitedFor), ProjectTestCommands.Saved(config));
         extras = (services, read.Count > 0 ? read : null, share);
         extrasAt = now;
         return (extras.Value.Services, extras.Value.Projects);
@@ -153,7 +186,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     public static List<(string Key, string Value)> Entries(AgentSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false"), (ShareServicesKey, settings.ShareServices ? "true" : "false")];
+        List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false"), (ShareServicesKey, settings.ShareServices ? "true" : "false"),
+            (ShareInventoryKey, settings.ShareInventory ? "true" : "false")];
         if (settings.Alerts is { } a)
         {
             entries.Add((ThresholdsKey, string.Join(',', new[] { a.CpuPct, a.MemoryPct, a.DiskPct, a.SustainSeconds }

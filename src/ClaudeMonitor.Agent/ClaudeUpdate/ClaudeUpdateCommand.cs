@@ -4,7 +4,7 @@ using ClaudeMonitor.Agent.Storage;
 
 namespace ClaudeMonitor.Agent.ClaudeUpdate;
 
-/// <summary>"cm-agent claude-update cancel", "cm-agent config claude-update on|off", and the lines `cm-agent status` adds.</summary>
+/// <summary>"aipod claude-update cancel", "aipod config claude-update on|off", and the lines `aipod status` adds.</summary>
 public static class ClaudeUpdateCommand
 {
     public const string Verb = "claude-update";
@@ -18,7 +18,7 @@ public static class ClaudeUpdateCommand
         ArgumentNullException.ThrowIfNull(clock);
         if (args.Length != 2 || args[1] != "cancel")
         {
-            await stderr.WriteLineAsync("usage: cm-agent claude-update cancel");
+            await stderr.WriteLineAsync(Strings.T(Msg.ClaudeUpdateUsage));
             return 2;
         }
 
@@ -26,15 +26,17 @@ public static class ClaudeUpdateCommand
                       && until > clock.GetUtcNow();
         if (!waiting)
         {
-            await stdout.WriteLineAsync("no Claude Code update is waiting to start");
+            await stdout.WriteLineAsync(Strings.T(Msg.ClaudeUpdateNone));
             return 0;
         }
 
         config.EnsureHome();
         await File.WriteAllTextAsync(config.ClaudeCancelPath, clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture));
-        await stdout.WriteLineAsync($"the Claude Code update is cancelled; it is not tried again for {config.ClaudeSnooze.TotalHours:0} h");
+        await stdout.WriteLineAsync(Strings.T(Msg.ClaudeUpdateCancelled, config.ClaudeSnooze.TotalHours.ToString("0", System.Globalization.CultureInfo.InvariantCulture)));
         return 0;
     }
+
+    private static string OnOff(bool on) => Strings.T(on ? Msg.CuOn : Msg.CuOff);
 
     public static IEnumerable<string> Describe(AgentConfig config, LocalStore store, TimeProvider clock)
     {
@@ -44,12 +46,12 @@ public static class ClaudeUpdateCommand
         var machine = Config.SavedSettings.Apply(config).ClaudeUpdateEnabled;
         var answer = Daemon.WorkspaceSettings.Get(config, store, ClaudePolicy.WorkspaceKey);
         var workspace = answer == "true";
-        yield return $"claude-update: {(machine && workspace ? "on" : "off")} (this machine: {(machine ? "on" : "off")}, workspace: {(answer is null ? Daemon.WorkspaceSettings.Unread : workspace ? "on" : "off")})";
+        yield return Strings.T(Msg.CuLine, OnOff(machine && workspace), OnOff(machine), answer is null ? Daemon.WorkspaceSettings.Unread : OnOff(workspace));
         if (!machine && !workspace) yield break;
         var state = ClaudeUpdateState.Load(config);
         if (DateTimeOffset.TryParse(state.CountdownUntil, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var until) && until > clock.GetUtcNow())
         {
-            yield return $"Claude Code will be updated at {until.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)} (cancel: cm-agent claude-update cancel)";
+            yield return Strings.T(Msg.CuWill, until.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture));
         }
 
         if (state.Result is { } result)
@@ -57,12 +59,12 @@ public static class ClaudeUpdateCommand
             var at = DateTimeOffset.TryParse(state.CheckedAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var when)
                 ? when.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)
                 : "?";
-            yield return $"last Claude Code update: {result} ({state.Detail}) {at}";
+            yield return Strings.T(Msg.CuLast, result, state.Detail, at);
         }
 
         if (state.Failures >= config.ClaudeFailuresBeforeBackoff)
         {
-            yield return $"Claude Code update failed {state.Failures} times in a row: it is tried only every {config.ClaudeUpdateEvery.TotalHours:0} h until it works";
+            yield return Strings.T(Msg.CuFailing, state.Failures, config.ClaudeUpdateEvery.TotalHours);
         }
     }
 }

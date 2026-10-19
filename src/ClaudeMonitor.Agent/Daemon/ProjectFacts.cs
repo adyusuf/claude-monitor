@@ -21,7 +21,7 @@ public sealed class ProjectFacts(AgentConfig config, ICredentialStore? credentia
     /// <summary>
     /// The facts of the listed folders (source <c>listed</c>) and of the folders sessions worked in (<c>session</c>); a project in both is reported as listed.
     /// </summary>
-    public IReadOnlyList<ProjectFact> Read(IReadOnlyList<string>? folders, IReadOnlyList<string>? visited = null)
+    public IReadOnlyList<ProjectFact> Read(IReadOnlyList<string>? folders, IReadOnlyList<string>? visited = null, IReadOnlyDictionary<string, List<string>>? tests = null)
     {
         if ((folders is not { Count: > 0 } && visited is not { Count: > 0 }) || Key() is not { } key) return [];
         var facts = new List<ProjectFact>();
@@ -31,7 +31,9 @@ public sealed class ProjectFacts(AgentConfig config, ICredentialStore? credentia
             {
                 if (!Directory.Exists(folder) || ProjectInfo.Resolve(folder) is not { } info || facts.Any(f => f.Key == info.Key)) continue;
                 var git = GitFacts.Read(folder);
-                facts.Add(new ProjectFact(info.Key, info.Name, Hmac(key, Path.GetFullPath(folder)), git?.Branch ?? info.Branch, git?.HeadSha, git?.Tag, source));
+                var test = tests is not null && tests.TryGetValue(ProjectTestCommands.Normalize(folder), out var argv) && ProjectTestCommands.IsValid(argv) ? argv : null;
+                facts.Add(new ProjectFact(info.Key, info.Name, Hmac(key, Path.GetFullPath(folder)), git?.Branch ?? info.Branch, git?.HeadSha, git?.Tag, source, ClaudeTrust.IsTrusted(config, folder),
+                    test, test is null ? null : ProjectTestCommands.Normalize(folder)));
             }
         }
 

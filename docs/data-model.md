@@ -98,11 +98,11 @@ Both columns are cleared by account deletion and included in the export.
 `accepts_asks_set_at` and `accepts_asks_set_by` (FK users). New table `machine_asks`: `id`, `workspace_id`, `requester_agent_id`, `requester_user_id`,
 `requester_session_id` (FK sessions), `target_agent_id`, `target_user_id`, `target_session` (the Claude session that received it), `client_key`,
 `project_key`, `question` (1-8000; NULL once emptied), `status` (`queued`, `delivered`, `answered`, `no_idle_session`, `not_accepting`, `no_answer`,
-`expired`, `cancelled`; CHECK), `answer` (≤ 100 000; NULL once emptied), `answer_truncated`, `error`, `created_at`, `expires_at`, `delivered_at`,
+`expired`, `cancelled`; CHECK), `answer` (≤ 100 000; NULL once emptied), `answer_truncated`, `error`, `created_at`, `expires_at`, `received_at` (migration `AskReceivedAt`: when the target daemon said it holds the ask; the status stays `queued`), `delivered_at`,
 `answered_at`, `ended_at`; CHECKs `requester_user_id = target_user_id` and `requester_agent_id <> target_agent_id`; UNIQUE (`requester_agent_id`,
 `client_key`); indexes on (`target_agent_id`, `status`) WHERE open, (`requester_agent_id`, `created_at`) and (`workspace_id`, `created_at` DESC). The
 question and the answer are personal data like a command: exported (`asks`), emptied on account deletion and the rows deleted after `retention_days`
-past their end; the audit rows name an ask by id only. Every transition is a compare-and-set; the housekeeping loop expires a queued ask after 2 minutes
+past their end; the audit rows name an ask by id only. Every transition is a compare-and-set; the housekeeping loop expires a queued ask after 30 minutes (2 before 19/10/2026)
 and a delivered one after 15 without an answer, and member removal, an agent move or revoke, the opt-in turning off and the workspace switch turning off
 cancel the open ones.
 
@@ -125,8 +125,8 @@ compare-and-set (`queued → delivered → succeeded | failed`; an open action p
 | Table | Columns | Keys and indexes |
 |---|---|---|
 | `harness_kinds` | `code` (`claude_code`, `codex_cli`, `gemini_cli`, `cursor`, ...), `display_name`, `added_at` | PK `code` |
-| `projects` | `id`, `workspace_id`, `key` (normalised git remote, or a hash of the folder name when there is none), `display_name`, `display_name_search`, `created_at` | UNIQUE (`workspace_id`, `key`) |
-| `harness_sessions` | `id`, `workspace_id`, `agent_id`, `project_id`, `harness_kind`, `external_id`, `title`, `title_search`, `model`, `git_branch`, `status` (`active`, `idle`, `waiting`, `ended`), `started_at`, `last_event_at`, `ended_at` | UNIQUE (`agent_id`, `harness_kind`, `external_id`); (`workspace_id`, `last_event_at` DESC, `id` DESC); (`project_id`, `last_event_at` DESC) |
+| `repos` | `id`, `workspace_id`, `key` (normalised git remote, or a hash of the folder name when there is none), `display_name`, `display_name_search`, `created_at` | UNIQUE (`workspace_id`, `key`) |
+| `harness_sessions` | `id`, `workspace_id`, `agent_id`, `repo_id`, `harness_kind`, `external_id`, `title`, `title_search`, `model`, `git_branch`, `status` (`active`, `idle`, `waiting`, `ended`), `started_at`, `last_event_at`, `ended_at` | UNIQUE (`agent_id`, `harness_kind`, `external_id`); (`workspace_id`, `last_event_at` DESC, `id` DESC); (`project_id`, `last_event_at` DESC) |
 | `session_tasks` | `id`, `session_id`, `external_id`, `subject`, `subject_search`, `status` (`pending`, `in_progress`, `completed`, `deleted`), `created_at`, `updated_at` | UNIQUE (`session_id`, `external_id`) |
 | `subagent_runs` | `id`, `session_id`, `external_id`, `agent_type`, `description`, `status` (`running`, `finished`, `failed`), `started_at`, `ended_at` | UNIQUE (`session_id`, `external_id`) |
 | `session_usage` | `session_id`, `model`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_usd` `numeric(12,6)` (null when the model has no known price), `updated_at` | PK (`session_id`, `model`) |
@@ -186,12 +186,47 @@ content, passwords or tokens.
 users 1-n workspace_members n-1 workspaces 1-1 workspace_settings
 users 1-n user_logins, user_tokens, login_sessions
 workspaces 1-n machines 1-n agents n-1 users          agents 1-n agent_tokens, agent_batches
-workspaces 1-n projects 1-n harness_sessions n-1 agents
+workspaces 1-n repos 1-n harness_sessions n-1 agents
+workspaces 1-n projects 1-n applications 1-n application_components, application_releases      projects 1-n project_members n-1 users
 harness_sessions 1-n session_events, session_tasks, subagent_runs, session_usage, session_commands, permission_requests
 workspaces 1-n event_archives
 agents 1-n machine_metrics, machine_alerts, machine_grants, machine_jobs
 agents 1-n remote_runs (as requester and as target) 1-n remote_run_output; remote_runs n-1 machine_grants, machine_jobs
 ```
+
+## 7. Managed projects and applications ([ADR-0011](adr-0011-project-management.md))
+
+The table of work folders that sessions report was called `projects` until migration `RenameProjectsToRepos`; it is `repos` now (rows and ids kept,
+`harness_sessions.project_id` became `repo_id`), the one rename the additive-only rule allowed (maintainer, 19/10/2026). `projects` is now the managed
+business entity. The JSON the agent and the web exchange (`projectId`, `projectName`, `projectKey`) did not change.
+
+| Table | Columns | Keys and indexes |
+|---|---|---|
+| `projects` | `id`, `workspace_id`, `name`, `name_search`, `purpose`, `owner_user_id` (FK users), `sponsor` (free text), `stakeholders` `jsonb` (`[{name, role}]`, at most 50; CHECK), `budget_amount` `numeric(14,2)`, `budget_currency` (both or neither; CHECK), `start_date`, `end_date` (`date`; end not before start; CHECK), `item_types` `text[]` (a non-empty subset of `epic`, `story`, `task`, `bug`, `spike`; CHECK), `priority_scale` (`p0_p3`, `moscow`, `high_medium_low`, `one_to_five`), `estimation_unit` (`story_points`, `hours`, `days`, `t_shirt`), `sprint_length_days` (1-42, default 14), `definition_of_ready`, `definition_of_done` (`text[]`, at most 30 each), `status` (`active`, `archived`), `created_by`, `updated_by`, `created_at`, `updated_at` | UNIQUE (`workspace_id`, `name_search`) WHERE `status = 'active'`; (`workspace_id`, `created_at` DESC, `id` DESC); (`owner_user_id`) |
+| `project_members` | `project_id`, `user_id`, `role` (`manager`, `contributor`, `reviewer`, `viewer`), `added_by`, `added_at` | PK (`project_id`, `user_id`); (`user_id`) |
+| `applications` | `id`, `workspace_id`, `project_id`, `name`, `name_search`, `description`, `kind` (`web`, `mobile`, `api`, `other`), `repo_url` (https, ssh or git link, no password), `environments` `jsonb` (`[{name, url}]`, names from `dev`, `test`, `prod`, at most 3), `tech_stack` `text[]` (at most 30), `versioning_scheme` (`semver`, `calver`, `none`), `tech_owner_user_id`, `non_functional_targets` `jsonb` (`[{kind, target}]`, at most 20), `status`, `created_by`, `updated_by`, `created_at`, `updated_at` | UNIQUE (`project_id`, `name_search`) WHERE `status = 'active'`; (`project_id`, `created_at` DESC, `id` DESC); (`workspace_id`); (`tech_owner_user_id`) |
+| `application_components` | `id`, `workspace_id`, `application_id`, `name`, `name_search`, `kind` (`component`, `module`), `status` (`active`, `archived`), `created_at` | UNIQUE (`application_id`, `name_search`) WHERE `status = 'active'`; (`workspace_id`) |
+| `application_releases` | `id`, `workspace_id`, `application_id`, `name`, `name_search`, `planned_date`, `status` (`planned`, `released`, `cancelled`), `created_at` | UNIQUE (`application_id`, `name_search`) WHERE `status <> 'cancelled'`; (`workspace_id`) |
+| `issues` | `id`, `workspace_id`, `project_id`, `application_id`, `number` (per project, never reused), `title`, `title_search`, `type` (`epic`, `story`, `task`, `bug`, `spike`; the API also checks the project's enabled types), `priority` (a value of the project's scale), `estimate` (text: a number or `xs`-`xl`, by the project's unit), `status` (`backlog`, `ready`, `in_progress`, `in_review`, `done`, `cancelled`), `assignee_user_id`, `parent_id` (an epic of the project), `component_id`, `release_id`, `description`, `acceptance_criteria` `jsonb` (`[{given, when, then}]`, at most 30), `technical_design`, bug-only `bug_environment`, `repro_steps`, `expected_result`, `actual_result`, `severity` (`critical`, `major`, `minor`, `trivial`; CHECK `ck_issues_bug_fields`), `position` (`double precision`, the backlog order), `archived_at`, `created_by`, `updated_by`, `created_at`, `updated_at` | UNIQUE (`project_id`, `number`); (`project_id`, `position`, `id`); (`project_id`, `status`); one index per reference column |
+| `issue_links` | `id`, `workspace_id`, `project_id`, `blocker_issue_id`, `blocked_issue_id`, `created_by`, `created_at` | UNIQUE (`blocker_issue_id`, `blocked_issue_id`); CHECK the two differ |
+| `issue_test_cases` | `id`, `workspace_id`, `issue_id`, `title`, `steps`, `expected`, `result` (`not_run`, `passed`, `failed`, `blocked`), `result_note`, `result_by`, `result_at`, `created_at` | (`issue_id`, `created_at`, `id`) |
+| `issue_code_links` | `id`, `workspace_id`, `issue_id`, `kind` (`pr`, `commit`), `url` (https), `title`, `source` (`manual`; `auto` is reserved for the agent), `created_by`, `created_at` | UNIQUE (`issue_id`, `url`) |
+| `sprints` | `id`, `workspace_id`, `project_id`, `application_id` (null for a project-wide sprint; never changes), `number` (per project, never reused), `name`, `goal`, `start_date`, `end_date` (`date`; end not before start; CHECK), `capacity` `numeric(10,2)` (in the project's estimation unit), `status` (`planned`, `active`, `closed`), `release_id`, `started_at`, `closed_at`, `archived_at`, `created_by`, `updated_by`, `created_at`, `updated_at` | UNIQUE (`project_id`, `number`); UNIQUE (`project_id`) WHERE active AND `application_id IS NULL`; UNIQUE (`application_id`) WHERE active AND `application_id IS NOT NULL` (one active sprint per scope) |
+| `sprint_members` | `sprint_id`, `user_id`, `added_at` | PK (`sprint_id`, `user_id`); (`user_id`) |
+
+`issues` gains `sprint_id` (null while the issue is in the backlog; an issue is in at most one sprint; index). The counts and the committed and done sums of a sprint are read from its issues each time, never stored. Closing a sprint moves its unfinished issues to a planned sprint of the same scope, or to the backlog where `in_progress` and `in_review` become `ready`. A planned sprint is deleted by archiving it (its issues return to the backlog); a closed sprint is read-only.
+| `issue_runs` | `issue_id`, `run_id`, `linked_by`, `linked_at` | PK (`issue_id`, `run_id`); (`run_id`) |
+
+An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a link, removed outright, and shows the run's outcome counts, never its command or output.
+
+- **Nothing is deleted:** a project, an application, a component and an issue are archived, a release is cancelled (one that went out stays), and a name
+  is free again once its holder is archived. A `project_members` row, an `issue_links` row, a test case and a code link are removed outright (they are links, not records).
+- **Rights** are computed in the API (`ProjectAccess`) from the workspace role and the project role; the workspace membership check comes
+  first, so a person who left the workspace loses every project at once. A workspace `viewer` never changes anything.
+- **Caps stand in for paging** on the small lists: 100 active applications per project, 200 components and 200 releases per application, 50 links, 100 test cases and 50 code links per issue.
+- **Issue numbers and positions** are given under a row lock on the project (`SELECT … FOR UPDATE`), so parallel creates get distinct numbers; a move writes the middle of its neighbours and spaces the whole project again when the gap is gone.
+- **Audit** rows (`project.*`, `application.*`) name a row by id and carry no typed text. Account export and deletion for these tables are
+  not decided yet (ADR-0011 §5): the rows keep the deleted user's id and hold no personal fields of their own.
 
 ## Your data: export and account deletion
 
@@ -214,3 +249,25 @@ agents 1-n remote_runs (as requester and as target) 1-n remote_run_output; remot
 shape; index on `next_run_at` where active). `remote_runs.schedule_id` names the schedule whose tick created a run. `workspace_settings.remote_schedules_enabled` (default false). `approval_keys` (`id`, `user_id`, `name`, `public_key` (base64 SPKI of an
 ECDSA P-256 key), `fingerprint` (SHA-256 of it, hex), `created_at`, `retired_at`; unique per user and fingerprint while live). `remote_runs.approval_key_id`, `approval_signature` and `approval_not_after` hold the owner's signature of a run;
 `agents.approvals_required` is what the agent reported (a target that only runs what a pinned key signed). The separate run account has no table: it is in the agent's admin-owned exec policy file (`runAccount`).
+
+**Claude control (ADR-0014, migration `ClaudeControl`).** `agents` gains `accepts_claude_control` (boolean, default false: the machine owner's switch for starting Claude from the web), `accepts_claude_control_set_at` and `accepts_claude_control_set_by` (FK users, indexed); it is reset when the machine moves workspace. `agent_actions` gains `project_key`, `permission_mode` and `session_ref` (all nullable text: the project and mode of a `claude_start`, the 8-character short session id a successful start returned or a `claude_stop` names), and `ck_agent_actions_kind` now allows `claude_start` and `claude_stop`. Nothing is removed or retyped.
+
+**Test command of a project (ADR-0011 §7a, migration `ProjectTestCommand`).** `machine_projects` gains `test_argv` (a text array, 1 to 32 elements of at most 512 characters) and `test_cwd` (text, at most 1024): the test command the person at the machine set for the folder and the folder it runs in, reported by the agent with the project's facts and cleared by a report that has none. Podium sends them to the machine's owner only (the others get `hasTest`); a command older than a day is not offered or started. Both stay NULL for a project without one. Additive.
+
+**What Claude Code has on a machine (ADR-0011 §7a step E, migration `ClaudeInventory`).** `agents` gains `claude_inventory` (jsonb, nullable) and `claude_inventory_at`: one document the agent sends with every profile (sessions with name, project key, kind, status and start; plugins with id, version, enabled and scope; skill folder names; and, per project folder, the adyusuf working mode, model and yes/no gates), replaced each time and NULL when the agent sends none. The API re-checks it (lists capped at 50 sessions, 100 plugins, 300 skills, 50 projects with 40 gates each; ids, kinds, models and gate names must fit a closed shape; a mode is one letter A to E; text is cut and stripped of control characters). `MachineDetail.inventory` is sent to the machine's owner and to admins; everyone else gets null. It carries no install path, no skill text and no free text from project files. Additive.
+
+**Owner's switch for the Claude inventory (ADR-0011 §7a step E, migration `InventorySwitch`).** `agents` gains `share_inventory` (boolean, default false), `share_inventory_set_at` and `share_inventory_set_by` (FK users, indexed). While it is false the API stores no inventory and the agent is told not to read it (`AgentSettings.ShareInventory`); turning it off sets `claude_inventory` and `claude_inventory_at` to NULL; a workspace move and the account deletion reset all of it. `MachineDetail.inventoryShared` tells the page the state. Additive.
+
+**Remote writes (ADR-0011 §7a, migration `ConfigActions`).** `agent_actions` gains `target` and `value` (nullable text): for a plugin action the plugin id (`name@marketplace`), for `project_setting` the setting name (`mode`, `mode_model` or one of twelve gate names) and its value (a mode letter A to E, one of four model words, or `true` / `false`); `project_key` carries the project of a setting. `ck_agent_actions_kind` now also allows `plugin_enable`, `plugin_disable`, `plugin_update`, `plugin_install` and `project_setting`. The shapes are closed (`ClaudeConfigRules` in the contracts) and the API refuses anything else; an audit row keeps kind, target and value. Nothing is removed or retyped.
+
+**Usage limits in the inventory (ADR-0011 §7a, no migration).** The inventory document in `agents.claude_inventory` gains `limits`: the five-hour and seven-day windows (and, behind a Claude apps gateway, the spend limit) as Claude Code last gave them to a status line command, each a use in per cent (0 to 1000) and a reset time, with the time they were seen. The API re-checks them (percentages clamped, a reset time more than a day behind or forty days ahead dropped, a seen time in the future replaced by now) and stores nothing when no window is usable. Like the rest of the inventory it exists only while the owner's switch is on.
+**Claude control, P2 (ADR-0014, migration `ClaudeNewSession`).** `agent_actions` gains `first_prompt` (nullable text: the optional first prompt of a `claude_start`, at most 2000 characters; it is set to NULL the moment the agent takes the action, when the action expires, or when the owner's switch ends it, is never part of a view or an audit row, and is never read back for display). `machine_projects` gains `claude_trusted` (nullable boolean: what Claude Code's own trust record said about the folder when the agent last reported it; NULL means unknown or an older agent, and a start is refused only for a known `false`). Nothing is removed or retyped.
+
+**Claude control, P3 (ADR-0014, migration `ClaudeAutoMode`).** `agents` gains `claude_auto_mode` (nullable text, closed list by the check `ck_agents_claude_auto_mode`: `off` or `on_message`; NULL is off): what the daemon may start by itself for an ask nobody could take. It is set only by the machine's owner, only while their switch is on and the machine passes the same gate as a start, goes back to NULL when the switch is turned off or the machine moves workspace, and is told to the agent (`AgentSettings.ClaudeAutoMode`) only while the workspace's remote-work switch is on too. Nothing is removed or retyped.
+
+
+**Plugin id (ADR-0013, migration `PluginId`).** `agents` gains `plugin_id` (nullable, at most 130 characters): the plugin the agent runs under as `name@marketplace`, as its last profile said; anything that is not that shape is stored as NULL. Nothing is removed or retyped.
+
+**Claude control, always (ADR-0014, migration `ClaudeAlways`).** `agents` gains `claude_auto_project` (nullable, at most 200 characters): the project key the automatic mode `always` keeps a session running in; set with the mode, NULL for every other mode, when the switch is turned off and when the machine moves workspace. `ck_agents_claude_auto_mode` now allows `always` too.
+
+**Account language (ADR-0014 Part A, migration `UserLanguage`).** `users` gains `language` (nullable, two characters, `ck_users_language` allows only `en`, `tr`, `de`): the language the person registered in or picked in the menu. Mails to them follow it (a verification mail, a reset, an invitation to an existing account); NULL means the `Accept-Language` header decides, as before. Set by `PUT /api/me/language`; `GET /api/me` returns it. Nothing is removed or retyped.

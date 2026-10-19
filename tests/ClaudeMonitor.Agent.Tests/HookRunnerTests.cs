@@ -234,7 +234,7 @@ public sealed partial class HookRunnerTests : IDisposable
         Assert.Null(await Run(at, "PermissionRequest", new { session_id = "s1", tool_name = "Bash" }));
         Assert.True(at.Elapsed >= home.Config.PermissionWait, "an access token alone still waits");
 
-        credentials.Delete(Credentials.Access); // as `cm-agent logout` leaves it
+        credentials.Delete(Credentials.Access); // as `aipod logout` leaves it
         at = new VirtualClock(Start);
         Assert.Null(await Run(at, "PermissionRequest", new { session_id = "s2", tool_name = "Bash" }));
         Assert.Equal(TimeSpan.Zero, at.Elapsed);

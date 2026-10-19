@@ -304,4 +304,24 @@ describe("the agent actions card on the machine page", () => {
     expect(count(calls, "/agents/a1/actions")).toBeGreaterThan(before);
     expect(screen.queryByText(en.machines.actions.status.queued)).toBeNull();
   });
+
+  it("shows every member the daemon's version, how it runs, what it may run and when it last spoke, and the owner the actions below", async () => {
+    api({}, { view: { execLevel: "argv", serviceMode: true }, userId: "someone-else", version: "0.6.1" });
+    open();
+    await screen.findByText(en.machines.actions.ownerOnly);
+    expect(screen.getByText(en.machines.actions.version)).toBeInTheDocument();
+    expect(screen.getByText("0.6.1")).toBeInTheDocument();
+    expect(screen.getByText(en.machines.actions.pod)).toBeInTheDocument();
+    expect(screen.getByText(en.machines.actions.podServer)).toBeInTheDocument();
+    expect(screen.getByText(en.machines.actions.exec)).toBeInTheDocument();
+    expect(screen.getByText(en.machines.actions.lastSeen)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.machines.actions.kind.update })).toBeNull();
+  });
+
+  it("says desktop when the agent does not run as a service and unknown when the version is not known", async () => {
+    api({}, { view: { serviceMode: false }, version: "" });
+    open();
+    expect(await screen.findByText(en.machines.actions.podDesktop)).toBeInTheDocument();
+    expect(screen.getByText(en.machines.actions.versionUnknown)).toBeInTheDocument();
+  });
 });

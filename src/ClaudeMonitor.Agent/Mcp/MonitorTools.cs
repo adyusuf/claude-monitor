@@ -25,7 +25,8 @@ public sealed class MonitorTools(AgentConfig config, TimeProvider clock)
     {
         var identity = Identity.Load(config);
         using var store = new LocalStore(config.DatabasePath);
-        if (!identity.Connected) return "Not connected. The user can run: cm-agent login --server <address>";
+        if (!identity.Connected) return "Not connected. The user can run: aipod login --server <address>";
+        using var english = Strings.Scope("en"); // what the model reads stays English whatever the person's language is
         var session = new PushPump(config, store, clock, ParentProcess.Id(), Environment.GetEnvironmentVariable("CLAUDE_CODE_SESSION_ID")).Session();
         // The first sentence is what callers have always read; the lines after it are the new account of the path (ADR-0003).
         return $"Connected to {identity.Server} (workspace {identity.WorkspaceId}). Events waiting to be sent: {store.OutboxCount()}. " +

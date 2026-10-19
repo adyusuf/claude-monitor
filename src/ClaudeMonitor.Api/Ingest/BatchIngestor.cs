@@ -131,7 +131,7 @@ public sealed class BatchIngestor(MonitorDb db, ApiConfig config, Broker broker,
 
         if (e.ProjectKey is { Length: > 0 } projectKey)
         {
-            session.ProjectId = await ProjectAsync(workspaceId, projectKey, e.ProjectName ?? projectKey, ct);
+            session.RepoId = await RepoAsync(workspaceId, projectKey, e.ProjectName ?? projectKey, ct);
             await MachineProjects.SeenInSessionAsync(db, agentId, workspaceId, projectKey, e.ProjectName ?? projectKey, e.GitBranch, e.OccurredAt, ct);
         }
 
@@ -140,14 +140,14 @@ public sealed class BatchIngestor(MonitorDb db, ApiConfig config, Broker broker,
         return session;
     }
 
-    private async Task<Guid> ProjectAsync(Guid workspaceId, string key, string name, CancellationToken ct)
+    private async Task<Guid> RepoAsync(Guid workspaceId, string key, string name, CancellationToken ct)
     {
-        var project = db.Projects.Local.FirstOrDefault(p => p.WorkspaceId == workspaceId && p.Key == key)
-                      ?? await db.Projects.FirstOrDefaultAsync(p => p.WorkspaceId == workspaceId && p.Key == key, ct);
-        if (project is null)
+        var repo = db.Repos.Local.FirstOrDefault(p => p.WorkspaceId == workspaceId && p.Key == key)
+                      ?? await db.Repos.FirstOrDefaultAsync(p => p.WorkspaceId == workspaceId && p.Key == key, ct);
+        if (repo is null)
         {
             var display = name.Length > 200 ? name[..200] : name;
-            project = new Project
+            repo = new Repo
             {
                 WorkspaceId = workspaceId,
                 Key = key,
@@ -155,9 +155,9 @@ public sealed class BatchIngestor(MonitorDb db, ApiConfig config, Broker broker,
                 DisplayNameSearch = SearchText.Normalize(display),
                 CreatedAt = clock.GetUtcNow(),
             };
-            db.Projects.Add(project);
+            db.Repos.Add(repo);
         }
 
-        return project.Id;
+        return repo.Id;
     }
 }

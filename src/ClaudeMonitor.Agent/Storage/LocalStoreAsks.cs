@@ -9,7 +9,7 @@ public sealed record AskIn(string Id, string FromLabel, string Question, string?
 /// <summary>
 /// The asks the daemon received from another machine and carries to an idle session. The question is text another machine's Claude wrote: it stays in
 /// this user-only database, is never logged and is deleted once the ask ends. The states are local: queued (received), delivered (written to a
-/// session's inbox), confirmed (it showed in the session's transcript) and closed.
+/// session's inbox), confirmed (it showed in the session's transcript) and closed. A queued ask is kept (it survives a restart) until an idle session takes it or its time runs out.
 /// </summary>
 public sealed partial class LocalStore
 {
@@ -18,10 +18,14 @@ public sealed partial class LocalStore
     public const string AskConfirmed = "confirmed";
     public const string AskClosed = "closed";
 
-    private void CreateAskTables() => Exec("""
-        CREATE TABLE IF NOT EXISTS asks_in (id TEXT PRIMARY KEY, from_label TEXT NOT NULL, question TEXT NOT NULL, project TEXT, not_after TEXT NOT NULL,
-            state TEXT NOT NULL, session TEXT, delivered_at TEXT, confirmed_at TEXT, created_at TEXT NOT NULL);
-        """);
+    private void CreateAskTables()
+    {
+        Exec("""
+            CREATE TABLE IF NOT EXISTS asks_in (id TEXT PRIMARY KEY, from_label TEXT NOT NULL, question TEXT NOT NULL, project TEXT, not_after TEXT NOT NULL,
+                state TEXT NOT NULL, session TEXT, delivered_at TEXT, confirmed_at TEXT, created_at TEXT NOT NULL);
+            """);
+        AddColumnIfMissing("asks_in", "received_reported", "INTEGER"); // a database made before the requester was told the daemon holds its ask
+    }
 
     /// <summary>A received ask; one already known is left as it is (the API replays the queued ones on every connection).</summary>
     public bool SaveAskIn(AskMessage ask, DateTimeOffset now) =>
@@ -29,6 +33,12 @@ public sealed partial class LocalStore
             INSERT OR IGNORE INTO asks_in (id, from_label, question, project, not_after, state, created_at)
             VALUES ($i, $f, $q, $p, $n, 'queued', $t)
             """, ("$i", ask.Id.ToString()), ("$f", ask.FromLabel), ("$q", ask.Question), ("$p", ask.ProjectKey), ("$n", Iso(ask.NotAfter)), ("$t", Iso(now))) == 1;
+
+    /// <summary>Queued asks whose requester has not been told yet that this daemon holds them, oldest first.</summary>
+    public List<AskIn> AsksToAcknowledge(DateTimeOffset now) =>
+        Asks("WHERE state = 'queued' AND received_reported IS NULL AND not_after > $n ORDER BY created_at", ("$n", Iso(now)));
+
+    public void MarkAskAcknowledged(string id) => Exec("UPDATE asks_in SET received_reported = 1 WHERE id = $i", ("$i", id));
 
     public List<AskIn> QueuedAsks(DateTimeOffset now) => Asks("WHERE state = 'queued' AND not_after > $n ORDER BY created_at", ("$n", Iso(now)));
 

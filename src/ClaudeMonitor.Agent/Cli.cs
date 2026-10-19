@@ -22,63 +22,81 @@ namespace ClaudeMonitor.Agent;
 public static partial class Cli
 {
     public const string Usage = """
-        cm-agent login --server <url>   connect this machine (shows a code to approve on the web)
-        cm-agent install [--stop-wait <seconds>] [--push off|inbox|channel]
+        aipod login --server <url>   connect this machine (shows a code to approve on the web)
+        aipod install [--stop-wait <seconds>] [--push off|inbox|channel]
                                         register the Claude Code plugin (hooks + MCP) that starts the agent;
                                         --stop-wait: how long a finished turn waits for a prompt from the web (0-590, default 0)
                                         --push: deliver web messages into an idle session (default off). inbox: the daemon writes to the
                                         session's own socket, no start-up flag (ADR-0007); channel (also "on"): a Claude Code channel (ADR-0003)
-        cm-agent install --exec off|argv|shell
+        aipod install --exec off|argv|shell
                                         whether approved remote runs may execute on this machine (default off)
-        cm-agent install --standalone [--server <url>] [--exec off|argv|shell]
-        cm-agent uninstall --standalone
+        aipod install --standalone [--server <url>] [--exec off|argv|shell]
+        aipod uninstall --standalone
                                         this machine as a daemon without Claude Code: it logs in first, then starts when you log in
                                         (an application on macOS and Windows, systemd --user on Linux), in your own account (ADR-0008)
-        cm-agent install --service --server <url> [--exec off|argv|shell] [--allow-root] [--run-account [<name>]]
-        cm-agent uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005); --run-account makes remote runs start
+        aipod install --service --server <url> [--exec off|argv|shell] [--allow-root] [--run-account [<name>]]
+        aipod uninstall --service    (admin) a boot service under its own account, for servers (ADR-0005); --run-account makes remote runs start
                                         as a second unprivileged account (Linux and macOS, through sudo; ADR-0010)
-        cm-agent connect [--server <url>]
+        aipod connect [--server <url>]
                                         like login, from inside Claude Code: prints the code and returns; the login finishes in the background
-        cm-agent restart                hand the running daemon over to this binary
-        cm-agent status                 connection and queue
-        cm-agent update [--check]       install the newest signed agent build from the server (--check: only look)
-        cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
+        aipod service migrate [--dry-run | --undo | --finish [--now]]
+                                        (admin) move a boot service to the aipod names (cm-agent, _cmagent, com.claudemonitor.agent become aipod, _aipod, aipod.agent), keeping the old one disabled for
+                                        7 days; --undo goes back, --finish removes the old service, account, folders and policy (ADR-0013, tier 2)
+        aipod restart                hand the running daemon over to this binary
+        aipod migrate-home [--dry-run]
+                                        move the old home folder to the aipod folder and leave a link at the old path (macOS, Linux; ADR-0013);
+                                        never done by itself, refuses when unsure
+        aipod status                 connection and queue
+        aipod update [--check]       install the newest signed agent build from the server (--check: only look)
+        aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
                                         whether the agent looks for / installs agent updates by itself, and whether it may
                                         update Claude Code when every session is idle (both default off; the workspace must allow too)
-        cm-agent config projects add|remove|list [<folder>]  the project folders this machine reports facts about (ADR-0008)
-        cm-agent config role <environment|none> <function|none>
+        aipod config projects add|remove|list [<folder>]  the project folders this machine reports facts about (ADR-0008)
+        aipod config role <environment|none> <function|none>
                                         what this machine says it is (dev|test|stage|preprod|production|other; development|application|web|
                                         database|ci|storage|other); an admin sets the role on the web, a claim only makes it stricter (ADR-0008)
-        cm-agent approvers add <public key> [--name <n>] | remove <fingerprint> | list
-        cm-agent config approvals required|off
+        aipod approvers add <public key> [--name <n>] | remove <fingerprint> | list
+        aipod config approvals required|off
                                         pin an owner's approval key (copy it from the web; compare the fingerprint) and require that every remote run is
                                         signed by a pinned key; off by default. An admin runs these (the file is admin-owned on a service) (ADR-0010)
-        cm-agent machines | machine <x> | metrics <x> | alerts [<x>] | jobs [<x>] | job-run <job id>
-        cm-agent run --machine <x> (--script <file> --interpreter <i> [--arg <v>]... | --argv <exe> [args...]) [--timeout] [--reason] [--project] [--kind]
-        cm-agent result <run or ask id> [--wait <seconds>] [--offset <chars>]
-        cm-agent ask --machine <x> "<question>"
+        aipod machines | machine <x> | metrics <x> | alerts [<x>] | jobs [<x>] | job-run <job id>
+        aipod run --machine <x> (--script <file> --interpreter <i> [--arg <v>]... | --argv <exe> [args...]) [--timeout] [--reason] [--project] [--kind]
+        aipod result <run or ask id> [--wait <seconds>] [--offset <chars>]
+        aipod ask --machine <x> "<question>"
                                         reach the other machines of the workspace from here, without the web (an approval is still the owner's, on the web; ADR-0008)
-        cm-agent claude-update cancel   stop a Claude Code update that is counting down
-        cm-agent logout | uninstall | version
-        (cm-agent hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
+        aipod claude-update cancel   stop a Claude Code update that is counting down
+        aipod logout | uninstall | version
+        (aipod hook <Event> | mcp | daemon are started by Claude Code and the agent itself)
         """;
 
     public static async Task<int> RunAsync(string[] args, AgentConfig config, TextReader stdin, TextWriter stdout, TextWriter stderr,
         TimeProvider clock)
     {
         ArgumentNullException.ThrowIfNull(args);
+        // The names of the tools for this run (before anything names one): --names, else AIPOD_TOOL_NAMES, else the old ones. Scoped to this call, so
+        // a test that runs the command line in this process does not change what a parallel test sees.
+        using var toolNames = McpToolNames.Scope(Option(args, "--names") is { } names ? McpToolNames.Parse(names) : config.ToolNamesMode);
         // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0005).
         if (args.FirstOrDefault() == "install" && ServiceCommands.IsService(args)) return ServiceCommands.Install(args, stdout, stderr);
         if (args.FirstOrDefault() == "uninstall" && ServiceCommands.IsService(args)) return ServiceCommands.Uninstall(stdout);
+        if (args.FirstOrDefault() == "service") return ServiceCommands.Service(args, stdout, stderr);
         if (args.FirstOrDefault() == "install" && StandaloneCommands.IsStandalone(args)) return await StandaloneCommands.InstallAsync(args, config, stdout, stderr, clock);
         if (args.FirstOrDefault() == "uninstall" && StandaloneCommands.IsStandalone(args)) return StandaloneCommands.Uninstall(config, stdout);
         var log = new AgentLog(config, clock);
+        if (args.FirstOrDefault() == HomeMove.Verb)
+        {
+            // Before HomeMigration and anything else that writes in the home: the folder is about to move.
+            var setup = new HomeMove.Setup(AgentConfig.Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Environment.GetEnvironmentVariable("AIPOD_AGENT_HOME") is { Length: > 0 } || Environment.GetEnvironmentVariable("CM_AGENT_HOME") is { Length: > 0 });
+            return await HomeMove.RunAsync(args, config, setup, new DaemonControl(config, log, clock), stdout, stderr);
+        }
+
         HomeMigration.Run(config, log);
         config = SavedSettings.Apply(config);
         switch (args.FirstOrDefault())
         {
             case "hook" when args.Length > 2 && args[1] == SessionContext.HookEvent && args[2] == SessionContext.ContextOption:
-                return await SessionContext.RunAsync(config, stdout, stderr, clock); // the machines block, no network, exit 0 (ADR-0008)
+                return await SessionContext.RunAsync(config, stdout, stderr, clock, stdin); // the machines block and the prompts waiting for this session, no network, exit 0 (ADR-0008)
             case "hook" when args.Length > 1:
                 return await HookAsync(args[1], config, stdin, stdout, stderr, clock, log);
             case "mcp":
@@ -126,11 +144,13 @@ public static partial class Cli
                 return await Approvals.ApproversCommand.RunAsync(args, config, stdout, stderr);
             case "status":
                 return await StatusAsync(config, stdout, clock);
+            case "statusline":
+                return await StatusLine.StatusLineCommand.RunAsync(config, stdin, stdout, stderr, clock); // Claude Code runs this; it never fails it
             case "version":
                 await stdout.WriteLineAsync(AgentConfig.Version);
                 return 0;
             default:
-                await stdout.WriteLineAsync(Usage);
+                await stdout.WriteLineAsync(Strings.T(Msg.Usage));
                 return args.Length == 0 ? 0 : 2;
         }
     }
@@ -153,12 +173,12 @@ public static partial class Cli
         builder.Services.AddSingleton(clock);
         var mcp = builder.Services.AddMcpServer(o =>
         {
-            if (config.InboxShortEnabled) o.ServerInstructions = ChannelEnvelopes.InboxInstructions; // the one-line notice needs the rule for reading it
+            if (config.InboxShortEnabled) o.ServerInstructions = McpToolNames.Text(ChannelEnvelopes.InboxInstructions); // the one-line notice needs the rule for reading it
             if (!config.ChannelPushEnabled) return; // off, or through the inbox: no channel
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
-            o.ServerInstructions = ChannelEnvelopes.Instructions;
+            o.ServerInstructions = McpToolNames.Text(ChannelEnvelopes.Instructions);
         });
-        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<ScriptTools>().WithTools<AskTools>().WithTools<GrantTools>().WithTools<InboxTools>();
+        mcp.WithStdioServerTransport().AddTools(config, clock, McpToolNames.Mode);
         if (config.ChannelPushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }

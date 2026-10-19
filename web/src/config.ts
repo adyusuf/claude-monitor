@@ -19,6 +19,10 @@ export const config = {
   chatOutputChars: 4000,
   /** The first agent version that takes the fixed actions of the machine page (restart, update check, update, status). */
   actionsMinAgentVersion: "0.5.0",
+  /** The first agent that starts and stops Claude from the web (ADR-0014); an older one ignores those actions. */
+  claudeMinAgentVersion: "0.6.0",
+  /** The longest first message of a Claude session started from the web (the API takes the same, ADR-0014). */
+  claudePromptMax: 2000,
   passwordMin: 10,
   nameMax: 100,
   promptMax: 10_000,

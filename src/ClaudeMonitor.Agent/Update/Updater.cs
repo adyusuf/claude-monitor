@@ -22,7 +22,7 @@ public sealed record UpdateResult(string Code, string Message, string? From = nu
 
 /// <summary>
 /// Self-update (ADR-0004). A build is taken only when ALL of these hold, and every refusal is recorded (agent.log and
-/// `cm-agent status`), never swallowed: the offer's signature verifies against the key built into this agent for this agent's
+/// `aipod status`), never swallowed: the offer's signature verifies against the key built into this agent for this agent's
 /// own channel, OS and CPU; its version is strictly higher than the running one; the download comes from the server's own
 /// origin; its SHA-256 equals the signed one; it is a zip of exactly one file that, started with `version`, reports the offered
 /// version; and on macOS it carries a valid code signature. Then the binary is replaced (keeping the previous one), the daemon
@@ -113,7 +113,7 @@ public sealed partial class Updater(AgentConfig config, ApiClient api, HttpClien
 
         using var guard = DaemonHost.TryLock(config.UpdateLockPath);
         if (guard is null) return Record(new(UpdateCodes.Busy, "another update is running"));
-        if (!File.Exists(config.BinaryPath)) return Record(new(UpdateCodes.NotInstalled, $"no installed binary at {config.BinaryPath} (run cm-agent install)"));
+        if (!File.Exists(config.BinaryPath)) return Record(new(UpdateCodes.NotInstalled, $"no installed binary at {config.BinaryPath} (run aipod install)"));
         var staged = BinarySwap.Staged(config.BinaryPath);
         try
         {

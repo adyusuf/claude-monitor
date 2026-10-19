@@ -52,7 +52,8 @@ public static class InvitationEndpoints
 
         var inviter = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, http.RequestAborted);
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
-        await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http), "invite", req.Email!.Trim(),
+        var inviteeLanguage = await db.Users.AsNoTracking().Where(u => u.EmailNormalized == invitation.EmailNormalized).Select(u => u.Language).FirstOrDefaultAsync(http.RequestAborted);
+        await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, inviteeLanguage), "invite", req.Email!.Trim(),
             Http.Link(config, "/invitations/accept", token), inviter.DisplayName, workspace.Name), http.RequestAborted);
         return Results.Created($"/api/workspaces/{id}/invitations/{invitation.Id}", new { invitation.Id });
     }

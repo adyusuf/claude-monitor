@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes plugin/monitor-agent/agent-release.txt from a build's SHA256SUMS (ADR-0007).
+"""Writes plugin/aipod/agent-release.txt and plugin/monitor-agent/agent-release.txt (the same pins: both plugins install the same builds) from a build's SHA256SUMS (ADR-0007).
 
     python3 scripts/write_plugin_pins.py <downloads-dir> <version> [--replace]
 
@@ -15,6 +15,7 @@ import sys
 NAME = re.compile(r'^cm-agent-(macos|windows|linux)-(arm64|x64)\.zip$')
 HEX = re.compile(r'^[0-9a-f]{64}$')
 VERSION = re.compile(r'^\d+\.\d+\.\d+$')
+PLUGIN_FOLDERS = ('aipod', 'monitor-agent')
 
 
 def pins(sums_text):
@@ -73,14 +74,16 @@ def main(argv):
     if not found:
         print(f'no cm-agent zip in {sums}', file=sys.stderr)
         return 2
-    target = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'plugin', 'monitor-agent', 'agent-release.txt')
-    try:
-        earlier = open(target, encoding='utf-8').read()
-    except OSError:
-        earlier = ''
-    with open(target, 'w', encoding='utf-8', newline='\n') as handle:
-        handle.write(render(argv[2], merge(argv[2], found, '' if replace else earlier)))
-    print(f'{len(found)} pins for version {argv[2]} written to {target}')
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    targets = [os.path.join(root, 'plugin', name, 'agent-release.txt') for name in PLUGIN_FOLDERS]
+    for target in targets:
+        try:
+            earlier = open(target, encoding='utf-8').read()
+        except OSError:
+            earlier = ''
+        with open(target, 'w', encoding='utf-8', newline='\n') as handle:
+            handle.write(render(argv[2], merge(argv[2], found, '' if replace else earlier)))
+    print(f'{len(found)} pins for version {argv[2]} written to ' + ' and '.join(targets))
     return 0
 
 

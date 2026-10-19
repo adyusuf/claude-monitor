@@ -8,13 +8,13 @@ namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
 /// The fixed actions its owner asked for on the web (ADR-0005, "Agent actions from the web"). An action is only a kind from a closed set and the
-/// daemon performs it with its own code, never with text from the web: <c>status</c> is what `cm-agent status` prints, <c>update_check</c> the
-/// updater's check, <c>update</c> and <c>restart</c> start the same detached `cm-agent` verb the person would type (it ends this daemon and starts
+/// daemon performs it with its own code, never with text from the web: <c>status</c> is what `aipod status` prints, <c>update_check</c> the
+/// updater's check, <c>update</c> and <c>restart</c> start the same detached `aipod` verb the person would type (it ends this daemon and starts
 /// the next). The API hands an action out once: the first report ("delivered") is a compare-and-set, so a replayed message is not performed twice.
 /// Because those two end this daemon, their outcome is reported BEFORE the verb starts and says "started". Nothing here throws into the stream.
 /// </summary>
 public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> status, Func<CancellationToken, Task<UpdateCheck>> check,
-    Func<string, bool> spawn, bool serviceMode = false)
+    Func<string, bool> spawn, bool serviceMode = false, ClaudeControl? claude = null, ClaudeConfigControl? claudeConfig = null)
 {
     private readonly ConcurrentDictionary<Guid, byte> taken = new();
 
@@ -32,10 +32,10 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
         try
         {
             if (!await api.ActionStatusAsync(action.Id, AgentActionStatuses.Delivered, null, ct)) return; // taken elsewhere, finished or expired
-            var (succeeded, text, then) = await DoAsync(action.Kind, ct);
+            var (succeeded, text, then, sessionRef) = await DoAsync(action, ct);
             try
             {
-                await api.ActionStatusAsync(action.Id, succeeded ? AgentActionStatuses.Succeeded : AgentActionStatuses.Failed, Cap(text), ct);
+                await api.ActionStatusAsync(action.Id, succeeded ? AgentActionStatuses.Succeeded : AgentActionStatuses.Failed, Cap(text), ct, sessionRef);
             }
             catch (Exception e) when (then is not null && e is HttpRequestException or TimeoutException or ApiException)
             {
@@ -43,7 +43,7 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
                 log.Write($"action {action.Kind} not reported: {e.GetType().Name}");
             }
 
-            if (then is not null && !spawn(then)) log.Write($"action {action.Kind}: cm-agent {then} could not be started");
+            if (then is not null && !spawn(then)) log.Write($"action {action.Kind}: aipod {then} could not be started");
         }
         catch (Exception e) when (e is HttpRequestException or TimeoutException or ApiException or OperationCanceledException)
         {
@@ -67,27 +67,44 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
         }
     }
 
-    /// <summary>What to do for a kind: whether it worked, the text to show, and the `cm-agent` verb to start once that is reported (null for none).</summary>
-    private async Task<(bool Succeeded, string Text, string? Then)> DoAsync(string kind, CancellationToken ct)
+    /// <summary>What to do for a kind: whether it worked, the text to show, and the `aipod` verb to start once that is reported (null for none).</summary>
+    private async Task<(bool Succeeded, string Text, string? Then, string? SessionRef)> DoAsync(AgentActionMessage action, CancellationToken ct)
     {
-        switch (kind)
+        switch (action.Kind)
         {
+            case AgentActionKinds.ClaudeStart when claude is not null:
+                var started = await claude.StartAsync(action.ProjectKey, action.PermissionMode, ct, action.FirstPrompt, action.Id);
+                return (started.Succeeded, started.Text, null, started.SessionRef);
+            case AgentActionKinds.ClaudeStop when claude is not null:
+                var stopped = await claude.StopAsync(action.SessionRef, ct);
+                return (stopped.Succeeded, stopped.Text, null, null);
+            case AgentActionKinds.ClaudeStart:
+            case AgentActionKinds.ClaudeStop:
+                return (false, "this agent cannot start or stop Claude here", null, null);
+            case AgentActionKinds.PluginEnable or AgentActionKinds.PluginDisable or AgentActionKinds.PluginUpdate or AgentActionKinds.PluginInstall when claudeConfig is not null:
+                var plugin = await claudeConfig.PluginAsync(action.Kind, action.Target, ct);
+                return (plugin.Succeeded, plugin.Text, null, null);
+            case AgentActionKinds.ProjectSetting when claudeConfig is not null:
+                var setting = claudeConfig.Setting(action.ProjectKey, action.Target, action.Value);
+                return (setting.Succeeded, setting.Text, null, null);
+            case AgentActionKinds.PluginEnable or AgentActionKinds.PluginDisable or AgentActionKinds.PluginUpdate or AgentActionKinds.PluginInstall or AgentActionKinds.ProjectSetting:
+                return (false, "this agent cannot change Claude's setup here", null, null);
             case AgentActionKinds.Status:
-                return (true, await status(), null);
+                return (true, await status(), null, null);
             case AgentActionKinds.UpdateCheck:
                 var seen = await check(ct);
-                return (!seen.Refused, Describe(seen), null);
+                return (!seen.Refused, Describe(seen), null, null);
             case AgentActionKinds.Update when serviceMode:
-                return (false, "this agent runs as a service: an administrator upgrades it (its binary is not writable by the service account)", null);
+                return (false, "this agent runs as a service: an administrator upgrades it (its binary is not writable by the service account)", null, null);
             case AgentActionKinds.Update:
                 var offer = await check(ct);
                 return offer.Offer is null
-                    ? (!offer.Refused, Describe(offer), null)
-                    : (true, $"updating to {offer.Offer.Version} (running {AgentConfig.Version}); the agent restarts and reports the new version", UpdateCommand.Verb);
+                    ? (!offer.Refused, Describe(offer), null, null)
+                    : (true, $"updating to {offer.Offer.Version} (running {AgentConfig.Version}); the agent restarts and reports the new version", UpdateCommand.Verb, null);
             case AgentActionKinds.Restart:
-                return (true, "restarting the agent", "restart");
+                return (true, "restarting the agent", "restart", null);
             default:
-                return (false, "unknown action", null);
+                return (false, "unknown action", null, null);
         }
     }
 
