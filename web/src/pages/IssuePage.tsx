@@ -11,6 +11,7 @@ import { IssueCodeLinks } from "./IssueCodeLinks";
 import { IssueDetails } from "./IssueDetails";
 import { IssueForm } from "./IssueForm";
 import { IssueLinks } from "./IssueLinks";
+import { IssueRuns } from "./IssueRuns";
 import { IssueTestCases } from "./IssueTestCases";
 import { StatusBadge } from "./IssueBits";
 
@@ -96,6 +97,7 @@ export function IssuePage() {
       <IssueLinks ws={ws} projectId={projectId} issueId={id} blocks={view.blocks} blockedBy={view.blockedBy} canWrite={writable} onChanged={load} />
       <IssueTestCases issueId={id} canWrite={writable} />
       <IssueCodeLinks issueId={id} canWrite={writable} />
+      <IssueRuns ws={ws} issueId={id} canWrite={writable} />
     </div>
   );
 }

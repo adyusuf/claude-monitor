@@ -88,6 +88,7 @@ export const de: Dictionary = {
     sprint_active: "Ein anderer Sprint dieses Bereichs ist bereits aktiv. Schließen Sie ihn zuerst ab.", dates_required: "Legen Sie Start- und Enddatum fest, bevor Sie den Sprint starten.",
     invalid_sprint: "Wählen Sie einen geplanten Sprint desselben Bereichs.", wrong_scope: "Dieser Sprint gehört zu einer Anwendung: Er nimmt nur deren Vorgänge auf.",
     closed: "Dieser Sprint ist abgeschlossen.", not_planned: "Nur ein geplanter Sprint kann gelöscht werden.",
+    invalid_run: "Wählen Sie einen Lauf dieses Arbeitsbereichs.",
   },
   status: { active: "Arbeitet", idle: "Untätig", waiting: "Braucht Sie", ended: "Beendet" },
   time: { now: "jetzt", s: "s", m: "min", h: "h", d: "T" },

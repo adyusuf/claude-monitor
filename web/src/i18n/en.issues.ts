@@ -30,4 +30,12 @@ export const enIssues = {
   codeLinks: "Pull requests and commits", noCodeLinks: "No pull requests or commits linked.", codeKind: "Kind", codeUrl: "Address (https)",
   codeTitle: "Title (optional)", addCodeLink: "Add", automatic: "Automatic",
   codeKinds: { pr: "Pull request", commit: "Commit" },
+  runs: "Test runs", noRuns: "No runs attached yet.", attachRun: "Attach a run", runToAttach: "Run to attach", attach: "Attach",
+  noRunsToAttach: "There are no recent finished runs to attach.", runTests: "{passed} passed, {failed} failed, {skipped} skipped",
+  runKinds: { test: "Test", build: "Build", deploy: "Deploy", other: "Other" }, runEnded: "Ended {when}", runNotEnded: "Not finished",
+  runDuplicate: "This run is already attached to this issue.",
+  runIssues: "Issues", runIssuesNone: "This run is not linked to an issue.", runLinkTo: "Link to an issue…", runProject: "Project", runLinkAction: "Link",
+  runCreateBug: "Create a bug", runBugTitle: "Title of the bug", runBugTitleTests: "Test run failed on {host}: {n} failed",
+  runBugTitleExit: "Run failed on {host}: exit code {code}", runNoBugProject: "No project of this workspace takes bugs.", runNoProjects: "There are no projects yet.",
+  runCreateAction: "Create the bug", runBugNote: "The bug carries only this title: the command and the output of the run are not copied.",
 };

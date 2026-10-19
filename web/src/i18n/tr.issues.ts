@@ -32,4 +32,12 @@ export const trIssues: Dictionary["issues"] = {
   codeLinks: "Çekme istekleri ve commit'ler", noCodeLinks: "Bağlı çekme isteği ya da commit yok.", codeKind: "Tür", codeUrl: "Adres (https)",
   codeTitle: "Başlık (isteğe bağlı)", addCodeLink: "Ekle", automatic: "Otomatik",
   codeKinds: { pr: "Çekme isteği", commit: "Commit" },
+  runs: "Test çalıştırmaları", noRuns: "Henüz eklenmiş çalıştırma yok.", attachRun: "Çalıştırma ekle", runToAttach: "Eklenecek çalıştırma", attach: "Ekle",
+  noRunsToAttach: "Eklenebilecek yeni, bitmiş çalıştırma yok.", runTests: "{passed} geçti, {failed} kaldı, {skipped} atlandı",
+  runKinds: { test: "Test", build: "Derleme", deploy: "Dağıtım", other: "Diğer" }, runEnded: "Bitiş: {when}", runNotEnded: "Bitmedi",
+  runDuplicate: "Bu çalıştırma bu işe zaten eklenmiş.",
+  runIssues: "İşler", runIssuesNone: "Bu çalıştırma hiçbir işe bağlı değil.", runLinkTo: "Bir işe bağla…", runProject: "Proje", runLinkAction: "Bağla",
+  runCreateBug: "Hata oluştur", runBugTitle: "Hatanın başlığı", runBugTitleTests: "{host} üzerinde test çalıştırması başarısız: {n} kaldı",
+  runBugTitleExit: "{host} üzerinde çalıştırma başarısız: çıkış kodu {code}", runNoBugProject: "Bu çalışma alanında hata türünü kullanan proje yok.", runNoProjects: "Henüz proje yok.",
+  runCreateAction: "Hatayı oluştur", runBugNote: "Hata yalnızca bu başlığı taşır: çalıştırmanın komutu ve çıktısı kopyalanmaz.",
 };

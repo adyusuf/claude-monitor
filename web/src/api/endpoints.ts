@@ -7,7 +7,8 @@ import type {
   ProjectSummary, ProjectView, ReleaseInput, ReleaseView,
 } from "./typesProjects";
 import type {
-  CodeLinkInput, CodeLinkView, IssueInput, IssueQuery, IssueStatus, IssueSummary, IssueView, LinkKind, TestCaseInput, TestCaseView, TestResult,
+  CodeLinkInput, CodeLinkView, IssueInput, IssueQuery, IssueRunView, IssueStatus, IssueSummary, IssueView, LinkKind, RunIssueView, TestCaseInput, TestCaseView,
+  TestResult,
 } from "./typesIssues";
 import type { SprintInput, SprintQuery, SprintSummary, SprintView } from "./typesSprints";
 
@@ -150,6 +151,10 @@ export const api = {
   codeLinks: (issueId: string) => request<CodeLinkView[]>("GET", `/issues/${issueId}/code-links`),
   addCodeLink: (issueId: string, input: CodeLinkInput) => request<CodeLinkView>("POST", `/issues/${issueId}/code-links`, input),
   deleteCodeLink: (id: string) => request<void>("DELETE", `/code-links/${id}`),
+  issueRuns: (issueId: string) => request<IssueRunView[]>("GET", `/issues/${issueId}/runs`),
+  linkIssueRun: (issueId: string, runId: string) => request<void>("POST", `/issues/${issueId}/runs`, { runId }),
+  unlinkIssueRun: (issueId: string, runId: string) => request<void>("DELETE", `/issues/${issueId}/runs/${runId}`),
+  runIssues: (runId: string) => request<RunIssueView[]>("GET", `/runs/${runId}/issues`),
   sprints: (projectId: string, opts: SprintQuery) => request<Page<SprintSummary>>("GET", `/projects/${projectId}/sprints${q(opts)}`),
   createSprint: (projectId: string, input: SprintInput) => request<SprintView>("POST", `/projects/${projectId}/sprints`, input),
   sprint: (id: string) => request<SprintView>("GET", `/sprints/${id}`),

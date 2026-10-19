@@ -81,5 +81,14 @@ internal static class MonitorDbModelIssues
             e.HasOne<Issue>().WithMany().HasForeignKey(x => x.IssueId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
         });
+
+        b.Entity<IssueRun>(e =>
+        {
+            e.HasKey(x => new { x.IssueId, x.RunId });
+            e.HasIndex(x => x.RunId);
+            e.HasOne<Issue>().WithMany().HasForeignKey(x => x.IssueId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<RemoteRun>().WithMany().HasForeignKey(x => x.RunId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.LinkedBy).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }

@@ -34,6 +34,9 @@ export const issueLimits = {
   noteMax: 2000,
   searchLimit: 20,
   epicLimit: 100,
+  /** The recent workspace runs an issue's picker reads, and the projects the run list's pickers read. */
+  runsLimit: 50,
+  projectsLimit: 50,
 } as const;
 
 /** True for an estimate the unit allows: a number of up to two decimals (0 to 9999.99), or a T-shirt size. */

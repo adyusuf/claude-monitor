@@ -1,6 +1,6 @@
 # ADR-0011: Project management in the web app
 
-**Status:** Phases 1 and 2 are on `dev` (19/10/2026); Phase 3 (§5) is being built. Later phases are a plan, not a decision.
+**Status:** Phases 1 to 3 are on `dev` (19/10/2026); Phase 4a (§6) is being built. Later phases are a plan, not a decision.
 **Extends:** [ADR-0002](adr-0002-agent-platform.md) (one API for every client), [data-model.md](data-model.md).
 **Asked for (19/10/2026):** after sign-in a user sees what is theirs: projects (with applications, backlog lists, sprints and issues), the
 machines and the tools and Claude sessions on them, the AI pods of the account, the user and system administration for admins, and
@@ -123,15 +123,29 @@ has one). Committed and done estimates are summed from the issues (numeric units
 | `POST /api/sprints/{id}/issues` (several ids), `DELETE /api/sprints/{id}/issues/{issueId}` | work |
 | `PUT /api/issues/{id}/status` (a quick status change), issue list filter `sprint=<id>`, `scope=backlog` now also means "in no sprint" | work / read |
 
-## 6. Later phases (a plan)
+## 6. Phase 4a: remote runs on issues
 
-3. **Machines:** the machine pages exist (ADR-0005, ADR-0008). Open: a per-tool panel on a machine (start, stop, update for the AI pod,
+A test run (or a build) that an agent ran on a machine (ADR-0005) can be attached to an issue, so "start the test, follow the result, fix what
+failed" stays in one place: `issue_runs` (issue, run, who linked, when). The link shows what ran where and how it ended (kind, status, exit code,
+the parsed passed, failed and skipped counts, host, dates); **never the command or the output**, which keep the rules of the run itself. A run
+must be in the issue's workspace; one pair is linked once; at most 50 runs per issue. The web offers it from the issue page ("attach a run") and
+from the run list ("link to an issue", and "create a bug" for a failed test run, which fills a title and links the run; no captured text goes into
+the issue). The rights are those of the issue (work on applications); reading follows the run list (any member). Calls: `GET`, `POST
+/api/issues/{id}/runs`, `DELETE /api/issues/{id}/runs/{runId}`, `GET /api/runs/{id}/issues`.
+
+**Not in this step (machines and Claude, agreed with the aipod work, ADR-0014 Part B):** starting and stopping Claude and opening sessions from the
+web are ADR-0014's; the limit view (5-hour, weekly), plugin and skill install, and per-session remote settings (working mode, branch policy, CI)
+need agent-side facts or commands that do not exist yet and are separate decisions.
+
+## 7. Later phases (a plan)
+
+3. **Machines and Claude:** the machine pages exist (ADR-0005, ADR-0008). Open: a per-tool panel on a machine (start, stop, update for the AI pod,
    Claude management: sessions, plugins, skills, limits), per-session settings (working mode, branch policy, CI), starting a test and
    following its result.
 4. **AI pods** of the account: needs its own decision first (what a pod is on the server side).
 5. **Administration** (users, system settings) and **profile** pages.
 
-## 7. Not decided here
+## 8. Not decided here
 
 Whether the `repos` rows should link to an application by its repository link; account export and deletion for the new tables (the rows
 keep the deleted user's id, like other records, and carry no personal fields of their own); attachments storage (mockups, screenshots, logs, screen recordings: needs a decision on where files live, so Phase 2 has none).

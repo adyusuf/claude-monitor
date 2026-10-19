@@ -1,4 +1,4 @@
-import type { CodeLinkView, IssueLinkView, IssueSummary, IssueView, TestCaseView } from "../api/typesIssues";
+import type { CodeLinkView, IssueLinkView, IssueRunView, IssueSummary, IssueView, RunIssueView, TestCaseView } from "../api/typesIssues";
 
 export const issueSummary = (over: Partial<IssueSummary> = {}): IssueSummary => ({
   id: "i1", projectId: "p1", applicationId: null, number: 1, title: "Pay with a card", type: "story", priority: "must", estimate: "5", status: "backlog",
@@ -35,3 +35,10 @@ export const testCase = (over: Partial<TestCaseView> = {}): TestCaseView => ({
 export const codeLink = (over: Partial<CodeLinkView> = {}): CodeLinkView => ({
   id: "c1", issueId: "i1", kind: "pr", url: "https://git.example.org/shop/pull/7", title: "Card payments", source: "manual", createdAt: "2026-02-04T10:00:00Z", ...over,
 });
+
+export const issueRun = (over: Partial<IssueRunView> = {}): IssueRunView => ({
+  runId: "r1", kind: "test", status: "failed", exitCode: 1, testsPassed: 40, testsFailed: 2, testsSkipped: 1, targetHostname: "build-box", projectKey: "shop",
+  createdAt: "2026-03-05T09:00:00Z", endedAt: "2026-03-05T09:05:00Z", linkedAt: "2026-03-05T10:00:00Z", ...over,
+});
+
+export const runIssue = (over: Partial<RunIssueView> = {}): RunIssueView => ({ issueId: "i1", projectId: "p1", number: 1, title: "Pay with a card", status: "backlog", ...over });
