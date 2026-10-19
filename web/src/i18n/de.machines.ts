@@ -47,7 +47,7 @@ export const deMachines: Dictionary["machines"] = {
     enableHint: "Neustart und Update erfordern eine aktuelle Anmeldung: Geben Sie einen Code aus Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
     strictHint: "Diese Maschine ist ein Produktions- oder Datenbankrechner: Neustart und Update brauchen immer einen frischen Code aus Ihrer Authenticator-App.",
     sent: "Angefordert: {action}. Der Agent antwortet unten.", none: "Noch keine Aktion angefordert.",
-    version: "Version", versionUnknown: "unbekannt", runs: "Läuft als", interactive: "interaktiv", exec: "Darf ausführen", lastSeen: "Zuletzt gehört",
+    version: "Version", versionUnknown: "unbekannt", pod: "AI-Pod", podServer: "Server (läuft als Dienst)", podDesktop: "Desktop (läuft in der Sitzung einer Person)", exec: "Darf ausführen", lastSeen: "Zuletzt gehört",
     kind: { status: "Status", update_check: "Auf Update prüfen", update: "Aktualisieren", restart: "Neu starten", claude_start: "Claude starten", claude_stop: "Claude stoppen" },
     status: { queued: "wartet auf den Agent", delivered: "der Agent hat sie", succeeded: "erledigt", failed: "fehlgeschlagen", expired: "nicht rechtzeitig übernommen" },
   },
@@ -61,6 +61,7 @@ export const deMachines: Dictionary["machines"] = {
   claudeControl: {
     title: "Claude Code",
     hint: "Starten und stoppen Sie Claude Code auf dieser Maschine von hier aus im Hintergrund. Nur der Eigentümer der Maschine, nur auf einer Entwicklungs- oder Testmaschine und nur, nachdem der Eigentümer es für diese Maschine eingeschaltet hat. Jede Sitzung ist eine eigene Hintergrundsitzung von Claude Code, in einem Projekt, das diese Maschine gemeldet hat, mit dem Claude-Konto und -Tarif des Eigentümers.",
+    cost: "Jede hier gestartete Sitzung, von Ihnen oder vom automatischen Start, läuft über den Claude-Plan von {name}, der Person, der der Agent dieser Maschine gehört, und zählt auf deren Limits.",
     off: "Das Starten von Claude über das Web ist auf dieser Maschine aus.", on: "Das Starten von Claude über das Web ist für diese Maschine an.",
     turnOn: "Starten von Claude über das Web erlauben", turnOff: "Nicht mehr erlauben", ownerOnly: "Nur der Eigentümer der Maschine kann Claude hier starten oder stoppen.",
     enableHint: "Das Einschalten erfordert eine aktuelle Anmeldung: Geben Sie einen Code aus Ihrer Authenticator-App ein oder melden Sie sich erneut an.",

@@ -47,7 +47,7 @@ export const trMachines: Dictionary["machines"] = {
     enableHint: "Yeniden başlatma ve güncelleme yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
     strictHint: "Bu makine canlı ya da veritabanı: yeniden başlatma ve güncelleme her seferinde doğrulama uygulamasından yeni bir kod ister.",
     sent: "İstendi: {action}. Ajanın cevabı aşağıda.", none: "Henüz istenen işlem yok.",
-    version: "Sürüm", versionUnknown: "bilinmiyor", runs: "Çalışma biçimi", interactive: "etkileşimli", exec: "Çalıştırabilir", lastSeen: "Son görülme",
+    version: "Sürüm", versionUnknown: "bilinmiyor", pod: "AI pod", podServer: "sunucu (hizmet olarak çalışır)", podDesktop: "masaüstü (bir kişinin oturumunda çalışır)", exec: "Çalıştırabilir", lastSeen: "Son görülme",
     kind: { status: "Durum", update_check: "Güncelleme var mı?", update: "Güncelle", restart: "Yeniden başlat", claude_start: "Claude'u başlat", claude_stop: "Claude'u durdur" },
     status: { queued: "ajanı bekliyor", delivered: "ajanda", succeeded: "tamam", failed: "başarısız", expired: "zamanında alınmadı" },
   },
@@ -61,6 +61,7 @@ export const trMachines: Dictionary["machines"] = {
   claudeControl: {
     title: "Claude Code",
     hint: "Bu makinede Claude Code'u buradan arka planda başlatın ve durdurun. Yalnızca makinenin sahibi, yalnızca geliştirme veya test makinesinde ve yalnızca sahibi bu makine için açtıktan sonra. Her oturum Claude Code'un kendi arka plan oturumudur; bu makinenin bildirdiği bir projede, sahibinin Claude hesabı ve planıyla çalışır.",
+    cost: "Burada başlatılan her oturum, sizin ya da otomatik başlatmanın başlattığı fark etmeksizin, bu makinenin ajanının sahibi {name} kişisinin Claude planıyla çalışır ve onun limitlerinden düşer.",
     off: "Bu makinede Claude'u web'den başlatma kapalı.", on: "Bu makinede Claude'u web'den başlatma açık.",
     turnOn: "Claude'u web'den başlatmaya izin ver", turnOff: "İzni kaldır", ownerOnly: "Claude'u burada yalnızca makinenin sahibi başlatıp durdurabilir.",
     enableHint: "Bunu açmak yakın zamanlı bir oturum açma ister: kimlik doğrulama uygulamanızdan bir kod girin ya da yeniden oturum açın.",

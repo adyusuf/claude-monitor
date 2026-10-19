@@ -98,6 +98,7 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   return (
     <div className="stack">
       <p className="muted small">{t("machines.claudeControl.hint")}</p>
+      <p className="small" role="note">{t("machines.claudeControl.cost", { name: view.userName })}</p>
       {!newEnough ? <Notice>{t("machines.claudeControl.oldAgent", { min: config.claudeMinAgentVersion })}</Notice> : null}
       {!allowed ? <Notice>{t("machines.claudeControl.notAllowed")}</Notice> : null}
       <p>{accepting ? t("machines.claudeControl.on") : t("machines.claudeControl.off")}</p>

@@ -45,7 +45,7 @@ export const enMachines = {
     enableHint: "Restart and update need a recent sign-in: enter a code from your authenticator app, or sign in again.",
     strictHint: "This machine is production or a database: restart and update always need a fresh code from your authenticator app.",
     sent: "Asked: {action}. The agent answers below.", none: "No action asked yet.",
-    version: "Version", versionUnknown: "unknown", runs: "Runs as", interactive: "interactive", exec: "May run", lastSeen: "Last heard",
+    version: "Version", versionUnknown: "unknown", pod: "AI pod", podServer: "server (runs as a service)", podDesktop: "desktop (runs in a person's session)", exec: "May run", lastSeen: "Last heard",
     kind: { status: "Status", update_check: "Check for update", update: "Update", restart: "Restart", claude_start: "Start Claude", claude_stop: "Stop Claude" },
     status: { queued: "waiting for the agent", delivered: "the agent has it", succeeded: "done", failed: "failed", expired: "not taken in time" },
   },
@@ -59,6 +59,7 @@ export const enMachines = {
   claudeControl: {
     title: "Claude Code",
     hint: "Start and stop Claude Code on this machine from here, in the background. Only the machine's owner, only on a development or test machine, and only after the owner switches it on for this machine. Each session is Claude Code's own background session, in a project this machine has reported, under the owner's Claude account and plan.",
+    cost: "Every session started here, by you or by the automatic start, runs on the Claude plan of {name}, the person this machine's agent belongs to, and counts against their limits.",
     off: "Starting Claude from the web is off on this machine.", on: "Starting Claude from the web is on for this machine.",
     turnOn: "Allow starting Claude from the web", turnOff: "Stop allowing it", ownerOnly: "Only the machine's owner can start or stop Claude here.",
     enableHint: "Turning this on needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
