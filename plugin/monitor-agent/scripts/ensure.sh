@@ -4,6 +4,7 @@
 #
 # Trust: the zip must match a SHA-256 pinned in agent-release.txt, which came with the plugin (from git over https). The server cannot
 # substitute a build. Later updates keep ADR-0004's signed manifest, which the agent verifies itself.
+# shellcheck disable=SC2016  # the single-quoted PowerShell command below uses $env:ZIP and $env:DEST, which the shell must not expand
 data="${CLAUDE_PLUGIN_DATA:-}"
 root="${CLAUDE_PLUGIN_ROOT:-}"
 { [ -n "$data" ] && [ -n "$root" ]; } || exit 0
@@ -13,8 +14,16 @@ server="${server%/}"
 msg=""
 mkdir -p "$data/bin" 2>/dev/null || exit 0
 
+# The bridge (ADR-0013 section 1): the aipod plugin replaces this one. Say so once; the rest goes on as before, and run.sh stays quiet when aipod is enabled.
+if [ ! -f "$data/bridge.said" ]; then
+  : > "$data/bridge.said" 2>/dev/null
+  msg="Claude Monitor is now called aipod and has a new plugin: add <your site>/downloads/aipod-marketplace.json with /plugin, install aipod, then run /aipod:connect. This plugin keeps working until you do."
+fi
+
 say() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$data/install.log"; }
 finish() { [ -n "$msg" ] && printf '{"systemMessage":"%s"}\n' "$msg"; exit 0; }
+# With aipod enabled this plugin does not install or restart anything: the aipod plugin owns the binary and the daemon.
+if grep -q '"aipod@aipod-releases": *true' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null; then msg=""; finish; fi
 # The log is for `status`: keep the last lines only.
 if [ -f "$data/install.log" ] && [ "$(wc -c < "$data/install.log")" -gt 200000 ]; then
   tail -n 200 "$data/install.log" > "$data/install.log.tmp" && mv -f "$data/install.log.tmp" "$data/install.log"

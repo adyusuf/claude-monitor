@@ -3,12 +3,14 @@
 
     python3 scripts/build_plugin_site.py <downloads-dir> --base-url https://<site>
 
-Two files land in the folder the deploy serves at /downloads:
-  monitor-agent-plugin.zip   plugin/monitor-agent, with its pins (agent-release.txt) as they are in the working tree; reproducible
-  marketplace.json           a URL catalog named monitor-agent-releases (the name the plugin's wrapper expects) whose one plugin is an
-                             "archive" source: <base-url>/downloads/monitor-agent-plugin.zip with its sha256, which Claude Code checks
+Four files land in the folder the deploy serves at /downloads (ADR-0013 section 1: both plugins, side by side, from the same agent builds):
+  aipod-plugin.zip           plugin/aipod, with its pins (agent-release.txt) as they are in the working tree; reproducible
+  aipod-marketplace.json     a URL catalog named aipod-releases (the name the plugin's wrapper expects) whose one plugin is an
+                             "archive" source: <base-url>/downloads/aipod-plugin.zip with its sha256, which Claude Code checks
+  monitor-agent-plugin.zip   plugin/monitor-agent (the bridge to aipod), the same way
+  marketplace.json           its catalog, named monitor-agent-releases: the file the machines already on the old plugin follow
 
-A person then runs `claude plugin marketplace add <base-url>/downloads/marketplace.json` and `claude plugin install monitor-agent@monitor-agent-releases`.
+A person then runs `claude plugin marketplace add <base-url>/downloads/aipod-marketplace.json` and `claude plugin install aipod@aipod-releases`.
 Claude Code refuses an archive over http or on a loopback, link-local or cloud-metadata host, so this refuses them too. The site's address is a
 deployment value: it is passed here, never kept in the repository. Exit 0 = written, 2 = refused.
 """
@@ -23,9 +25,11 @@ import sys
 import zipfile
 from urllib.parse import urlsplit
 
-NAME = 'monitor-agent-releases'
-PLUGIN = 'monitor-agent'
-ZIP = 'monitor-agent-plugin.zip'
+# (plugin folder and name, catalog name, zip, catalog file): the old plugin keeps the names it has had, so machines that follow its catalog keep working.
+PLUGINS = [
+    ('aipod', 'aipod-releases', 'aipod-plugin.zip', 'aipod-marketplace.json'),
+    ('monitor-agent', 'monitor-agent-releases', 'monitor-agent-plugin.zip', 'marketplace.json'),
+]
 FIXED_TIME = (2026, 1, 1, 0, 0, 0)  # the same files give the same zip, so the same sha256
 HOST = re.compile(r'^[A-Za-z0-9.-]+$')
 
@@ -84,15 +88,18 @@ def write_zip(folder, target):
     return digest.hexdigest()
 
 
-def catalog(base, sha256, description):
+def catalog(base, sha256, spec):
+    plugin, name, zip_name, _ = spec
     return {
-        'name': NAME,
-        'owner': {'name': 'Claude Monitor'},
-        'description': description,
+        'name': name,
+        'owner': {'name': 'aipod' if plugin == 'aipod' else 'Claude Monitor'},
+        'description': 'The aipod agent as a Claude Code plugin, served by this site.' if plugin == 'aipod'
+        else 'The old plugin of the aipod agent (a bridge: install the aipod plugin instead), served by this site.',
         'plugins': [{
-            'name': PLUGIN,
-            'source': {'source': 'archive', 'url': f'{base}/downloads/{ZIP}', 'sha256': sha256},
-            'description': 'Installs the Claude Monitor agent, connects it to your server and starts it with your Claude Code sessions.',
+            'name': plugin,
+            'source': {'source': 'archive', 'url': f'{base}/downloads/{zip_name}', 'sha256': sha256},
+            'description': 'Installs the aipod agent, connects it to your server and starts it with your Claude Code sessions.' if plugin == 'aipod'
+            else 'Replaced by the aipod plugin: install that one and run /aipod:connect.',
         }],
     }
 
@@ -101,20 +108,24 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('downloads')
     parser.add_argument('--base-url', required=True)
-    parser.add_argument('--plugin-dir', default=None)
+    parser.add_argument('--plugin-dir', default=None, help='build only the old plugin (monitor-agent) from this folder')
+    parser.add_argument('--aipod-dir', default=None, help='build the aipod plugin from this folder (with --plugin-dir: both)')
     args = parser.parse_args(argv)
     base = check_base(args.base_url)
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    folder = args.plugin_dir or os.path.join(root, 'plugin', PLUGIN)
-    if not os.path.isdir(folder):
-        refuse(f'plugin folder {folder} not found')
+    given = {'monitor-agent': args.plugin_dir, 'aipod': args.aipod_dir}
+    only_given = args.plugin_dir is not None or args.aipod_dir is not None
+    jobs = [(spec, given[spec[0]] or os.path.join(root, 'plugin', spec[0])) for spec in PLUGINS if not only_given or given[spec[0]]]
+    for _, folder in jobs:
+        if not os.path.isdir(folder):
+            refuse(f'plugin folder {folder} not found')
     os.makedirs(args.downloads, exist_ok=True)
-    sha256 = write_zip(folder, os.path.join(args.downloads, ZIP))
-    description = 'The Claude Monitor agent as a Claude Code plugin, served by this site.'
-    with open(os.path.join(args.downloads, 'marketplace.json'), 'w', encoding='utf-8') as handle:
-        json.dump(catalog(base, sha256, description), handle, indent=2)
-        handle.write('\n')
-    print(f'wrote {ZIP} (sha256 {sha256}) and marketplace.json for {base}')
+    for spec, folder in jobs:
+        sha256 = write_zip(folder, os.path.join(args.downloads, spec[2]))
+        with open(os.path.join(args.downloads, spec[3]), 'w', encoding='utf-8') as handle:
+            json.dump(catalog(base, sha256, spec), handle, indent=2)
+            handle.write('\n')
+        print(f'wrote {spec[2]} (sha256 {sha256}) and {spec[3]} for {base}')
     return 0
 
 

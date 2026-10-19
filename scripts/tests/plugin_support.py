@@ -19,6 +19,7 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.normpath(os.path.join(HERE, '..', '..', 'plugin', 'monitor-agent'))
+AIPOD = os.path.normpath(os.path.join(HERE, '..', '..', 'plugin', 'aipod'))
 RUN, ENSURE = os.path.join(PLUGIN, 'scripts', 'run.sh'), os.path.join(PLUGIN, 'scripts', 'ensure.sh')
 
 OS = {'Darwin': 'macos', 'Linux': 'linux'}.get(platform.system())
@@ -77,12 +78,14 @@ class Server:
 
 
 class PluginScriptsCase(unittest.TestCase):
+    plugin_folder = PLUGIN  # the aipod plugin's cases set AIPOD
+
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix='cm-plugin-test-')
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.data = os.path.join(self.tmp, 'data')
         self.root = os.path.join(self.tmp, 'root')
-        shutil.copytree(PLUGIN, self.root)
+        shutil.copytree(self.plugin_folder, self.root)
         self.bin = os.path.join(self.data, 'bin', 'cm-agent')
         self.log = os.path.join(self.data, 'install.log')
 

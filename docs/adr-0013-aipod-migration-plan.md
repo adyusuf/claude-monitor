@@ -1,7 +1,7 @@
 # ADR-0013 (proposed): moving the names left over from the rename to aipod
 
 Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1), step 2 (the tier 1 display names, section 4) and
-step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
+step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`) and step 4 (the `aipod` plugin and the bridge, section 1, "As built"); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
 designs, one item at a time, the four names ADR-0012 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
@@ -57,6 +57,20 @@ tokens live in the agent home and the OS credential store, which the plugin does
 both directions (the existing `test_plugin_run.py` / `test_plugin_ensure.py` patterns). **Needs a spike on a real Claude Code first** (about an
 hour): that a skill can run `claude plugin uninstall`, that two plugins with the same MCP server key do not collide, and how `userConfig` is
 carried. **Needs the maintainer:** the retire period (section 5), and whether the agent may report its plugin id.
+
+**As built (19/10/2026, step 4).** The spike ran on Claude Code 2.1.294 in a private config directory: two plugins that carry the same MCP server key install
+side by side and do not collide (the server is namespaced by plugin, `plugin:<name>:claude-monitor`, so the tools are `mcp__plugin_aipod_claude-monitor__*`);
+`claude plugin uninstall <id> --json` works from a shell, which is all a skill needs; `claude plugin configure <id> --values-stdin` saves a `userConfig` value;
+a plugin whose required option is unset starts no MCP server. Built: `plugin/aipod` (same hooks and MCP server, its own words, id `aipod@aipod-releases` in
+`run.sh`), the old plugin as the bridge, both rendered by `aipod plugin-files` so the drift test covers both, `scripts/build_plugin_site.py` writing
+`aipod-plugin.zip` + `aipod-marketplace.json` beside the old pair, and `write_plugin_pins.py` writing the same pins to both folders. Two details the text above left open:
+the plugin's version is the agent's version (the generator takes `AgentConfig.Version`), so "pre-bridge" is "up to 0.5.0": `aipod`'s `run.sh` stands down for
+hooks and the MCP server while `monitor-agent@monitor-agent-releases` is enabled at 0.5.0 or older (a version it cannot read means "go on", because the bridge is the likelier
+one), and the bridge stands down when `aipod@aipod-releases` is enabled; `status`, `connect` and `logout` are never held back. The bridge says once, at a session start, that aipod
+has a new plugin. `/aipod:connect` uninstalls the old plugin and names the new permission prefix. Not built: the retire period, the heartbeat column `agents.plugin_id`,
+reading the server from `agent.json` (Claude Code asks for it once more at the first install of `aipod`: the option is required), and the web's "Get the agent" page, which still shows the
+old plugin's commands (change it after the downloads that serve `aipod-marketplace.json` are live, or the command points at a file that is not there). The git marketplace
+(`.claude-plugin/marketplace.json`) still lists only the old plugin: one repository has one catalog, and its name is the old id.
 
 ## 2. The MCP tool names (`monitor_*`) and the server key (`claude-monitor`)
 

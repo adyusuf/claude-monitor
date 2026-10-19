@@ -119,7 +119,11 @@ not there yet); the transcript is read later, so nothing of it is lost. **Uninst
 unknown shape it falls back to the data directory and the settings alone). The old local plugin (`aipod install`, `monitor-agent-local`) reports
 every event a second time if it stays enabled: `/monitor-agent:connect` removes it, and the bootstrap says so while it is there.
 
-A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
+The plugin is now called `aipod` (ADR-0013 section 1): `claude plugin marketplace add <site>/downloads/aipod-marketplace.json`, `claude plugin install aipod@aipod-releases`,
+then `/aipod:connect` (which removes the old `monitor-agent` plugin; the skills are `/aipod:connect|status|disconnect`). The `monitor-agent` plugin stays as a bridge: it goes
+quiet once `aipod` is enabled, and `aipod` goes quiet while a pre-bridge (0.5.0 or older) `monitor-agent` is still enabled, so no event is reported twice. Everything above applies to either name.
+
+A maintainer renders the plugin's manifest, hooks and MCP file (for both plugins) from the one list of hooks in the agent with
 `dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
 plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
