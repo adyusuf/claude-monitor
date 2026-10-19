@@ -5,7 +5,7 @@ using ClaudeMonitor.Agent.Storage;
 namespace ClaudeMonitor.Agent.ClaudeUpdate;
 
 /// <summary>One live Claude Code session as its own file describes it. Status is "idle", "busy" or "waiting"; anything else is unknown.</summary>
-public sealed record ClaudeSession(int Pid, string? Status, DateTimeOffset? StatusAt);
+public sealed record ClaudeSession(int Pid, string? Status, DateTimeOffset? StatusAt, string? Name = null, string? Cwd = null, string? Kind = null, DateTimeOffset? StartedAt = null);
 
 public sealed record SessionsView(bool Readable, IReadOnlyList<ClaudeSession> Live, string Why);
 
@@ -119,7 +119,10 @@ public static class ClaudeSessions
                 }
             }
 
-            return new ClaudeSession(id, status, at);
+            string? Text(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            DateTimeOffset? started = root.TryGetProperty("startedAt", out var st) && st.ValueKind == JsonValueKind.Number && st.TryGetInt64(out var startMs) && startMs > 0
+                ? DateTimeOffset.FromUnixTimeMilliseconds(startMs) : null;
+            return new ClaudeSession(id, status, at, Text("name"), Text("cwd"), Text("kind"), started);
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException or ArgumentOutOfRangeException or InvalidOperationException)
         {

@@ -1,13 +1,16 @@
 import type { Dictionary } from "./en";
 import { trMachines } from "./tr.machines";
+import { trProjects } from "./tr.projects";
+import { trIssues } from "./tr.issues";
+import { trSprints } from "./tr.sprints";
 import { trTwoStep } from "./tr.twoStep";
 import { trRemote } from "./tr.remote";
 
 // Turkish: the same keys as en.ts (the type makes a missing key a build error).
 export const tr: Dictionary = {
-  app: { name: "Claude Monitor", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
+  app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
-    sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", settings: "Çalışma alanı ayarları",
+    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", settings: "Çalışma alanı ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
   },
@@ -72,7 +75,26 @@ export const tr: Dictionary = {
     invalid_tag: "Etiketler anahtar=değer çiftleridir: en fazla 10, harf, rakam, nokta, alt çizgi ve tire, her biri 1 ile 32 karakter.",
     invalid_note: "Not en fazla 2000 karakterdir ve denetim karakteri içeremez.",
     invalid_kind: "Bir tür seçin: test, build, deploy ya da other.",
+    claude_control_not_accepted: "Bu makinenin sahibi Claude'u web'den başlatmayı açmadı.", claude_control_environment: "Claude web'den yalnızca bir yöneticinin ayarladığı geliştirme ve test makinelerinde başlatılır.",
+    claude_control_service_mode: "Bir hizmet ajanı Claude'u başlatamaz.", claude_not_installed: "Bu makinede Claude Code bulunamadı.", invalid_permission_mode: "Listeden bir izin kipi seçin.",
+    invalid_session_ref: "Bu bir oturum kimliği değil.", claude_not_started_here: "Yalnızca buradan başlatılan bir oturum buradan durdurulabilir.",
     invalid_project: "Proje anahtarı 1 ile 200 karakter olmalı, denetim karakteri içermemeli.",
+    no_test_command: "Makine bu proje için test komutu bildirmiyor (ya da yakın zamanda bildirmedi). Makinede aipod config projects test ile tanımlayın.",
+    invalid_plugin: "Eklenti ad@pazaryeri biçiminde yazılır; yalnızca harf, rakam, nokta, alt çizgi ve tire kullanılır.", invalid_setting: "Listelerden bir ayar ve bir değer seçin.", action_busy: "Ajan bu türden başka bir değişiklikle meşgul. Bitmesini bekleyin.",
+    name_taken: "Bu ad burada zaten kullanılıyor. Başka bir ad seçin.", invalid_list: "Listeyi kontrol edin: bir girdi boş, çok uzun, tekrarlı ya da geçersiz, ya da çok fazla girdi var.",
+    amount_and_currency: "Bütçe tutarını ve para birimini birlikte verin ya da ikisini de boş bırakın.", invalid_currency: "Üç büyük harf kullanın, örneğin TRY.",
+    before_start: "Bitiş tarihi başlangıç tarihinden önce olamaz.", invalid_value: "Listeden bir değer seçin.", invalid_url: "Bu adrese burada izin verilmiyor. Depo için https, ssh ya da git, ortam için http ya da https adresi kullanın; parola olmasın.",
+    limit_reached: "Buraya sığabilecek en çok sayıya ulaşıldı.", archived: "Bu arşivlendi. Önce geri yükleyin.",
+    invalid_parent: "Üst iş, bu projenin bir epic'i olmalı.", invalid_application: "Bu projenin bir uygulamasını seçin.", invalid_component: "Seçilen uygulamanın bir bileşenini seçin.", invalid_release: "Seçilen uygulamanın bir sürümünü seçin.", bug_only: "Hata ayrıntılarını yalnızca bir hata taşıyabilir.", invalid_issue: "Bu projeden başka bir iş seçin.", self_link: "Bir iş kendisine bağlanamaz.", cycle: "Bu bağlantı, işlerin birbirini döngü içinde engellemesine yol açar.", duplicate_link: "Bu iki iş zaten bağlı.",
+    released: "Yayımlanmış bir sürüm iptal edilemez.", cancelled: "İptal edilmiş bir sürüm değiştirilemez.",
+    sprint_active: "Bu kapsamda başka bir sprint zaten aktif. Önce onu kapatın.", dates_required: "Sprinti başlatmadan önce başlangıç ve bitiş tarihlerini girin.",
+    invalid_sprint: "Aynı kapsamdan planlanmış bir sprint seçin.", wrong_scope: "Bu sprint bir uygulamaya ait: yalnızca o uygulamanın işlerini alır.",
+    closed: "Bu sprint kapandı.", not_planned: "Yalnızca planlanmış bir sprint silinebilir.",
+    invalid_run: "Bu çalışma alanından bir çalıştırma seçin.",
+    invalid_auto_mode: "Otomatik mod on_message ya da off olmalı.",
+    invalid_auto_project: "Bu makinenin bildirdiği ve Claude Code’un güvendiği bir proje seçin.",
+    invalid_first_prompt: "İlk istem 1 ile 2000 karakterlik metin olmalı.", claude_folder_not_trusted: "Claude Code bu klasöre henüz güvenmiyor: makinede orada bir kez Claude'u açıp güven sorusunu onaylayın.",
+    claude_start_pending: "Bu makinede başka bir başlatma hâlâ bekliyor: bitince yeniden deneyin.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
   time: { now: "şimdi", s: "sn", m: "dk", h: "sa", d: "g" },
@@ -132,7 +154,7 @@ export const tr: Dictionary = {
   },
   activity: {
     filterLabel: "Göster", all: "Tümü", inputs: "Girdiler", assistant: "Asistan", tools: "Araçlar",
-    monitorInput: "Claude Monitor (web)", humanInput: "İnsan (Claude Code)", assistantLabel: "Claude", stopRequest: "Durdurma isteği",
+    monitorInput: "Podium (web)", humanInput: "İnsan (Claude Code)", assistantLabel: "Claude", stopRequest: "Durdurma isteği",
     sentBy: "gönderen: {name}", typedBy: "yazan: {name}", someone: "bir üye",
     waiting: "Bekliyor", pendingTitle: "Uygulanmayı bekliyor",
     deliveredWith: "oturumda yazılan mesajla birlikte teslim edildi",
@@ -140,6 +162,9 @@ export const tr: Dictionary = {
     status: { queued: "Bekliyor", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal" },
   },
   machines: trMachines,
+  projects: trProjects,
+  issues: trIssues,
+  sprints: trSprints,
   twoStep: trTwoStep,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
@@ -163,8 +188,8 @@ export const tr: Dictionary = {
     agentUpdateCheck: "Yalnızca bak: ajanlar güncelleme olduğunu öğrenir",
     agentUpdateOn: "İzinli: ajanlar imzalı güncellemeleri kendiliğinden kurabilir",
     claudeUpdate: "Ajanların Claude Code'u güncellemesine izin ver",
-    claudeUpdateHint: "Yalnızca makinedeki her Claude oturumu boştayken, kişinin iptal edebileceği bir geri sayımdan sonra ve yalnızca Claude Code'un kendi güncelleme komutuyla. Her makinede ayrıca açılmalıdır (cm-agent config claude-update on). Çalışan oturumlar asla yeniden başlatılmaz.",
-    agentUpdateHint: "Bir ajanın kendi başına yapabileceği en fazla şey. Her makinede de açılmalıdır (cm-agent config auto-update); ikisinden düşük olan geçerlidir. Güncellemeler imzalıdır ve ajan tarafından doğrulanır.",
+    claudeUpdateHint: "Yalnızca makinedeki her Claude oturumu boştayken, kişinin iptal edebileceği bir geri sayımdan sonra ve yalnızca Claude Code'un kendi güncelleme komutuyla. Her makinede ayrıca açılmalıdır (aipod config claude-update on). Çalışan oturumlar asla yeniden başlatılmaz.",
+    agentUpdateHint: "Bir ajanın kendi başına yapabileceği en fazla şey. Her makinede de açılmalıdır (aipod config auto-update); ikisinden düşük olan geçerlidir. Güncellemeler imzalıdır ve ajan tarafından doğrulanır.",
   },
   account: {
     title: "Hesap", providers: "Giriş yöntemleri", linked: "Bağlı", link: "{provider} bağla", password: "Parola",
@@ -172,7 +197,8 @@ export const tr: Dictionary = {
     data: "Verileriniz", exportHint: "Sizinle ve oturumlarınızla ilgili her şey, tek bir JSON dosyası olarak.", export: "Verilerimi indir",
     deleteTitle: "Hesabı sil", deleteHint: "Adınız, adresiniz, giriş yöntemleriniz ve makinelerinizin yakaladığı her şey silinir; makinelerinizin bağlantısı kesilir. Geri alınamaz.",
     mfa: "İki adımlı giriş", mfaOn: "Açık: her girişte doğrulama uygulamanızdan bir kod da istenir.",
-    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
+    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
+
     mfaOpen: "Doğrulama uygulamasında aç", mfaEnable: "Aç", mfaRecovery: "Kurtarma kodları. Güvenli bir yerde saklayın: her biri uygulama olmadan bir kez giriş yapar. Yalnızca şimdi gösteriliyor.",
     mfaDisable: "Kapat", mfaDisabled: "İki adımlı giriş kapalı.",
     deleteConfirm: "Onaylamak için {word} yazın", deleteButton: "Hesabımı sil", deleted: "Hesabınız silindi.",
@@ -189,13 +215,14 @@ export const tr: Dictionary = {
     plugin1: "Eklentiyi kurun. Claude Code sunucu adresini sorar, adres şudur:",
     plugin2: "Sonra Claude Code içinde bu makineyi bağlayın (bir kod çıkar; açılan sayfada onaylayın):",
     orManual: "Ya da ajanı elle kurun:",
+    pluginOld: "Bu makinede eski monitor-agent eklentisi varsa: aipod'u kurun ve /aipod:connect çalıştırın; eskisini o kaldırır, bir olay iki kez bildirilmez.",
   },
   common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
   remote: trRemote,
   approvals: {
     title: "Onay anahtarları", intro: "Bu tarayıcıda üretilen bir anahtar, izin verdiğiniz çalıştırmaları imzalar. Yöneticisi anahtarı sabitlemiş ve imzalı onayı açmış bir makine, bu anahtarla imzalanmamış hiçbir şeyi çalıştırmaz; ele geçirilmiş bir sunucu bile sizin adınıza çalıştırma başlatamaz. Özel yarı bu tarayıcıdan hiç çıkmaz.",
     thisBrowser: "Bu tarayıcı", registered: "kayıtlı", notRegistered: "henüz kayıtlı değil", defaultName: "Bu tarayıcı", name: "Bu anahtar için bir ad", make: "Anahtar üret ve kaydet", register: "Bu anahtarı kaydet",
-    registeredKeys: "Kayıtlı anahtarlar", retire: "Emekli et", pinHint: "Bu anahtara güvenecek bir makinede yönetici onu sabitler (önce parmak izini karşılaştırın), sonra imzalı onayı açar (cm-agent config approvals required):",
+    registeredKeys: "Kayıtlı anahtarlar", retire: "Emekli et", pinHint: "Bu anahtara güvenecek bir makinede yönetici onu sabitler (önce parmak izini karşılaştırın), sonra imzalı onayı açar (aipod config approvals required):",
     runNeedsKey: "Bu makine yalnızca sabitlenmiş bir anahtarın imzaladığını çalıştırır: izin vermek bu çalıştırmayı bu tarayıcının anahtarıyla imzalar.", needKey: "Bu makine imzalı onay ister, bu tarayıcıda ise anahtar yok. Önce hesap sayfanızda bir tane üretin.",
   },
   schedules: {
@@ -208,5 +235,5 @@ export const tr: Dictionary = {
     newHint: "Bir zamanlama onaylı bir işi kendi kendine çalıştırır. Üst üste üç başarısız çalıştırmadan sonra durur, kendi son çalıştırmasıyla çakışmaz ve burada istediğiniz an durdurabilirsiniz.",
     noJobs: "Bir zamanlama için komutunda yer tutucu olmayan etkin bir iş gerekir.",
   },
-  notFound: { title: "Sayfa bulunamadı", home: "Oturumlara git" },
+  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" },
 };

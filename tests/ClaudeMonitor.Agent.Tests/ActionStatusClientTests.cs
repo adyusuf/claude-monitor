@@ -81,7 +81,7 @@ public sealed class ActionStatusClientTests : IDisposable
 
         Assert.False(DaemonControl.Spawn(fx.Home.Config, new AgentLog(fx.Home.Config, TimeProvider.System), "restart"));
 
-        Assert.Contains("could not start cm-agent restart:", File.ReadAllText(fx.Home.Config.LogPath), StringComparison.Ordinal);
+        Assert.Contains("could not start aipod restart:", File.ReadAllText(fx.Home.Config.LogPath), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class ActionStatusClientTests : IDisposable
 
         var written = File.ReadAllText(fx.Home.Config.LogPath);
         Assert.Contains("could not start the update:", written, StringComparison.Ordinal);
-        Assert.DoesNotContain("cm-agent update", written, StringComparison.Ordinal);
+        Assert.DoesNotContain("aipod update", written, StringComparison.Ordinal);
     }
 
     [Fact]

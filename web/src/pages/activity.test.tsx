@@ -5,6 +5,7 @@ import type { CommandRow, EventRow, SessionDetail, SessionRow } from "../api/typ
 import { config } from "../config";
 import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
+import { de } from "../i18n/de";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { SessionPage } from "./SessionPage";
 
@@ -63,7 +64,7 @@ describe("the activity list tells inputs from everything else", () => {
     const human = within(card).getByText("please fix the login").closest("li")!;
 
     expect(monitor).toHaveClass("act-monitor_input");
-    expect(within(monitor).getByText("Claude Monitor (web)")).toBeInTheDocument();
+    expect(within(monitor).getByText("Podium (web)")).toBeInTheDocument();
     expect(within(monitor).getByText("sent by Örnek Kişi")).toBeInTheDocument();
     expect(within(monitor).getByText("Applied")).toBeInTheDocument();
     expect(within(monitor).getByText("\u2601\uFE0E")).toBeInTheDocument();
@@ -262,9 +263,10 @@ describe("the dictionaries", () => {
   const keys = (o: unknown, prefix = ""): string[] =>
     Object.entries(o as Record<string, unknown>).flatMap(([k, v]) => typeof v === "object" && v !== null ? keys(v, `${prefix}${k}.`) : [`${prefix}${k}`]);
 
-  it("have the same keys in English and Turkish, and the activity strings are filled in", () => {
+  it("have the same keys in English, Turkish and German, and the activity strings are filled in", () => {
     expect(keys(tr).sort()).toEqual(keys(en).sort());
-    for (const dict of [en, tr]) {
+    expect(keys(de).sort()).toEqual(keys(en).sort());
+    for (const dict of [en, tr, de]) {
       for (const key of keys(dict.activity)) expect(key.length).toBeGreaterThan(0);
       for (const value of Object.values(dict.activity.status)) expect(value.trim()).not.toBe("");
     }

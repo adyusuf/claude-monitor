@@ -5,7 +5,7 @@ public sealed record FollowedAsk(string AskId, string Status, string? View, bool
 
 /// <summary>
 /// The asks this machine sent (ADR-0008 §3f, the requester's side; `asks_out`): the daemon follows each one until it ends, on the API's ask_update at once and
-/// otherwise every <c>RemotePollEvery</c>, and keeps what it read here, so `monitor_ask_result` and `cm-agent result` read the local database like they do for
+/// otherwise every <c>RemotePollEvery</c>, and keeps what it read here, so `monitor_ask_result` and `aipod result` read the local database like they do for
 /// runs and never call the API. The answer is untrusted text another Claude wrote: it stays in this user-only database and is deleted with the ask after the
 /// local retention.
 /// </summary>

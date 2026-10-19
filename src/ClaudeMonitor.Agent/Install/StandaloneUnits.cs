@@ -35,7 +35,7 @@ public static partial class StandaloneUnits
         List<string> lines =
         [
             "[Unit]",
-            "Description=Claude Monitor agent (standalone, this user)",
+            "Description=aipod agent (standalone, this user)",
             "After=network-online.target",
             "Wants=network-online.target",
             "StartLimitIntervalSec=600",
@@ -63,7 +63,7 @@ public static partial class StandaloneUnits
         b.AppendLine("""<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">""");
         b.AppendLine("""<plist version="1.0">""");
         b.AppendLine("<dict>");
-        b.AppendLine($"  <key>Label</key><string>{Esc(StandaloneLayout.Label)}</string>");
+        b.AppendLine($"  <key>Label</key><string>{Esc(l.Names.Label)}</string>");
         b.AppendLine("  <key>ProgramArguments</key>");
         b.AppendLine($"  <array><string>{Esc(l.AutostartBinary)}</string><string>daemon</string></array>");
         b.AppendLine("  <key>EnvironmentVariables</key>");
@@ -81,16 +81,18 @@ public static partial class StandaloneUnits
     }
 
     /// <summary>The bundle's Info.plist: an agent application with no Dock icon and no menu (LSUIElement).</summary>
-    public static string RenderInfoPlist(string version)
+    public static string RenderInfoPlist(string version, string bundleId = "com.claudemonitor.agent.app")
     {
         ArgumentException.ThrowIfNullOrEmpty(version);
+        ArgumentException.ThrowIfNullOrEmpty(bundleId);
         var b = new StringBuilder();
         b.AppendLine("""<?xml version="1.0" encoding="UTF-8"?>""");
         b.AppendLine("""<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">""");
         b.AppendLine("""<plist version="1.0">""");
         b.AppendLine("<dict>");
-        b.AppendLine("  <key>CFBundleIdentifier</key><string>com.claudemonitor.agent.app</string>");
-        b.AppendLine("  <key>CFBundleName</key><string>Claude Monitor Agent</string>");
+        b.AppendLine($"  <key>CFBundleIdentifier</key><string>{Esc(bundleId)}</string>");
+        b.AppendLine("  <key>CFBundleName</key><string>aipod</string>");
+        b.AppendLine("  <key>CFBundleDisplayName</key><string>aipod</string>");
         b.AppendLine("  <key>CFBundleExecutable</key><string>cm-agent</string>");
         b.AppendLine("  <key>CFBundlePackageType</key><string>APPL</string>");
         b.AppendLine($"  <key>CFBundleShortVersionString</key><string>{Esc(version)}</string>");
@@ -114,7 +116,7 @@ public static partial class StandaloneUnits
         var b = new StringBuilder();
         b.AppendLine("""<?xml version="1.0" encoding="UTF-16"?>""");
         b.AppendLine("""<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">""");
-        b.AppendLine("  <RegistrationInfo><Description>Claude Monitor agent (standalone, this user)</Description></RegistrationInfo>");
+        b.AppendLine("  <RegistrationInfo><Description>aipod agent (standalone, this user)</Description></RegistrationInfo>");
         b.AppendLine($"  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>{user}</UserId></LogonTrigger></Triggers>");
         b.AppendLine($"  <Principals><Principal id=\"Author\"><UserId>{user}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>");
         b.AppendLine("  <Settings>");

@@ -27,7 +27,7 @@ public static class ExecPolicyLoader
         ArgumentNullException.ThrowIfNull(config);
         if (!config.ServiceMode)
         {
-            // An interactive agent's claim (ADR-0008 §3a, `cm-agent config role`) rides with its level; the claim only ever tightens.
+            // An interactive agent's claim (ADR-0008 §3a, `aipod config role`) rides with its level; the claim only ever tightens.
             return identityExecLevel is not null && ExecLevels.All.Contains(identityExecLevel)
                 ? new ExecPolicy(identityExecLevel, [], [], Claim(claimedEnvironment, MachineEnvironments.All), Claim(claimedFunction, MachineFunctions.All), projectFolders)
                 : ExecPolicy.Off with { ClaimedEnvironment = Claim(claimedEnvironment, MachineEnvironments.All), ClaimedFunction = Claim(claimedFunction, MachineFunctions.All), ProjectFolders = projectFolders };
@@ -89,7 +89,7 @@ public static class ExecPolicyLoader
         }
     }
 
-    /// <summary>Written by an admin (`cm-agent install --service --exec`): temp file and atomic rename, readable by all, never by a link.</summary>
+    /// <summary>Written by an admin (`aipod install --service --exec`): temp file and atomic rename, readable by all, never by a link.</summary>
     public static void Save(string path, ExecPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(policy);
@@ -119,11 +119,11 @@ public static class ExecPolicyLoader
         }
     }
 
-    /// <summary>One line for `cm-agent status`: the level and how many entries each list has, never the paths.</summary>
+    /// <summary>One line for `aipod status`: the level and how many entries each list has, never the paths.</summary>
     public static string Describe(ExecPolicy p)
     {
         ArgumentNullException.ThrowIfNull(p);
-        return $"exec level {p.Level}, {p.AllowedExecutables.Count} allowed executables, {p.AllowedRoots.Count} allowed roots{(p.RunAccount is { } a ? $", runs as {a}" : "")}";
+        return Strings.T(Msg.ExDescribe, p.Level, p.AllowedExecutables.Count, p.AllowedRoots.Count, p.RunAccount is { } a ? Strings.T(Msg.ExRunsAs, a) : "");
     }
 
     /// <summary>True for root (Unix) or SYSTEM and administrators (Windows); the executor refuses to run then. Unknown counts as true.</summary>

@@ -65,6 +65,21 @@ public sealed class ProjectFactsTests : IDisposable
     }
 
     [Fact]
+    public void A_fact_says_what_claude_codes_own_record_thinks_of_the_folder_or_nothing_when_it_cannot_tell()
+    {
+        var folder = Repo("checkout");
+        Assert.Null(Assert.Single(new ProjectFacts(home.Config, credentials).Read([folder])).Trusted); // no record in this test's configuration folder
+
+        var record = ClaudeTrust.RecordPath(home.Config);
+        Directory.CreateDirectory(Path.GetDirectoryName(record)!);
+        File.WriteAllText(record, "{\"projects\":{}}");
+        Assert.False(Assert.Single(new ProjectFacts(home.Config, credentials).Read([folder])).Trusted);
+
+        File.WriteAllText(record, "{\"projects\":{" + System.Text.Json.JsonSerializer.Serialize(folder) + ":{\"hasTrustDialogAccepted\":true}}}");
+        Assert.True(Assert.Single(new ProjectFacts(home.Config, credentials).Read([folder])).Trusted);
+    }
+
+    [Fact]
     public void The_key_is_made_once_kept_in_the_credential_store_and_gives_the_same_hmac_next_time()
     {
         var folder = Repo("checkout");

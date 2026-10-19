@@ -3,7 +3,7 @@ using ClaudeMonitor.Agent.Config;
 
 namespace ClaudeMonitor.Agent.Update;
 
-/// <summary>Why an update did or did not happen, in the stable words `cm-agent status` and agent.log use.</summary>
+/// <summary>Why an update did or did not happen, in the stable words `aipod status` and agent.log use.</summary>
 public static class UpdateCodes
 {
     public const string UpToDate = "up-to-date";
@@ -31,7 +31,7 @@ public static class UpdateCodes
 
 /// <summary>
 /// What the updater remembers between runs (update-state.json in the home): the last check and its verdict, a build
-/// that was rolled back (never retried by itself), and the install in progress. Read by `cm-agent status`.
+/// that was rolled back (never retried by itself), and the install in progress. Read by `aipod status`.
 /// </summary>
 public sealed record UpdateState(string? CheckedAt = null, string? Result = null, string? Detail = null, string? Available = null,
     string? Phase = null, string? From = null, string? To = null, string? AttemptedAt = null, string? BlockedVersion = null,

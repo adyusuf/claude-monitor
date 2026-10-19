@@ -91,13 +91,37 @@ public sealed class Agent
     public string? Services { get; set; }
     public DateTimeOffset? ServicesAt { get; set; }
 
+    /// <summary>What Claude Code has on the machine (ADR-0011 §7a, step E): one JSON document, replaced by every profile; NULL when the agent does not report it.</summary>
+    public string? ClaudeInventory { get; set; }
+
+    /// <summary>The machine owner's switch for reporting what Claude Code has on the machine (ADR-0011 §7a, step E); off until they say so. Off: the agent does not read it and the API keeps none.</summary>
+    public bool ShareInventory { get; set; }
+    public DateTimeOffset? ShareInventorySetAt { get; set; }
+    public Guid? ShareInventorySetBy { get; set; }
+    public DateTimeOffset? ClaudeInventoryAt { get; set; }
+
     /// <summary>ADR-0008 §3f: the machine's owner lets another machine of the same user ask a question of a Claude session here; off until they say so.</summary>
     public bool AcceptsAsks { get; set; }
     public DateTimeOffset? AcceptsAsksSetAt { get; set; }
     public Guid? AcceptsAsksSetBy { get; set; }
 
+    /// <summary>ADR-0014: the machine's owner lets Claude be started and stopped on it from the web; off until they say so, and reset when the machine moves workspace.</summary>
+    public bool AcceptsClaudeControl { get; set; }
+
+    /// <summary>ADR-0014 P3: what the daemon may start by itself (<see cref="ClaudeAutoModes"/>); NULL is off. Reset with the switch when the machine moves workspace.</summary>
+    public string? ClaudeAutoMode { get; set; }
+
+    /// <summary>ADR-0014 P3: the project key the mode <c>always</c> keeps a session running in; NULL for every other mode.</summary>
+    public string? ClaudeAutoProject { get; set; }
+    public DateTimeOffset? AcceptsClaudeControlSetAt { get; set; }
+    public Guid? AcceptsClaudeControlSetBy { get; set; }
+
+
     /// <summary>The push transport the agent has on (<c>inbox</c> or <c>channel</c>), or null when it is off or the agent does not say.</summary>
     public string? PushTransport { get; set; }
+
+    /// <summary>ADR-0013: the plugin the agent runs under (<c>name@marketplace</c>), as it last reported it; NULL for an agent that is not a plugin or is older.</summary>
+    public string? PluginId { get; set; }
 
     /// <summary>ADR-0010 §4: the machine only runs what a pinned owner key signed; the agent reports it with its profile. False for an older agent.</summary>
     public bool ApprovalsRequired { get; set; }
@@ -150,6 +174,12 @@ public sealed class MachineProject
     public string? Tag { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
     public string Source { get; set; } = ProjectSources.Session;
+
+    /// <summary>The test command the person at the machine set for this folder and the folder path it runs in (ADR-0011 §7a); both NULL when there is none.</summary>
+    public List<string>? TestArgv { get; set; }
+    public string? TestCwd { get; set; }
+    /// <summary>ADR-0014 P2: whether Claude Code trusts the folder, as the agent read it (NULL: unknown). A remote start is refused for a folder known not to be trusted.</summary>
+    public bool? ClaudeTrusted { get; set; }
 }
 
 /// <summary>
@@ -176,6 +206,8 @@ public sealed class MachineAsk
     public string? Error { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
+    /// <summary>When the target's daemon said it holds the ask (it is still <c>queued</c> until a session takes it).</summary>
+    public DateTimeOffset? ReceivedAt { get; set; }
     public DateTimeOffset? DeliveredAt { get; set; }
     public DateTimeOffset? AnsweredAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }

@@ -7,13 +7,15 @@ namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
 /// The marketplace and plugin files the repository publishes (ADR-0007, part B): <c>.claude-plugin/marketplace.json</c> at the root and, under
-/// <c>plugin/monitor-agent</c>, the manifest, the hooks and the MCP server. They are rendered from <see cref="PluginInstaller.Hooks"/>, the one list of
+/// <c>plugin/monitor-agent</c> and <c>plugin/aipod</c> (ADR-0013 section 1: the old plugin, now the bridge, and its replacement), the manifest, the hooks and the MCP server. They are rendered from <see cref="PluginInstaller.Hooks"/>, the one list of
 /// hooks, and a test compares them with the committed files, so the two ways of installing cannot drift. The scripts, the skills and the release
 /// pins beside them are written by hand.
 /// </summary>
 public static class MarketplacePlugin
 {
     public const string PluginFolder = "plugin/monitor-agent";
+    public const string AipodFolder = "plugin/aipod";
+    public const string AipodPluginName = "aipod";
     public const string MarketplaceFile = ".claude-plugin/marketplace.json";
     public const string UserConfigServer = "server";
 
@@ -25,7 +27,7 @@ public static class MarketplacePlugin
 
     /// <summary>
     /// The timeout of a hook (the plugin's hooks are fixed): the permission wait of 120 s plus a margin, and for Stop the longest wait a person can set
-    /// (<see cref="AgentConfig.WaitMaxSeconds"/>) plus a margin, so `cm-agent install --stop-wait` works for a plugin-started agent too; a Stop hook waits only as long
+    /// (<see cref="AgentConfig.WaitMaxSeconds"/>) plus a margin, so `aipod install --stop-wait` works for a plugin-started agent too; a Stop hook waits only as long
     /// as the saved wait, zero by default.
     /// </summary>
     public static int Timeout(string hook, int declared) => declared > 0 ? declared : hook switch
@@ -39,15 +41,23 @@ public static class MarketplacePlugin
     public static IReadOnlyDictionary<string, string> Render(string version)
     {
         ArgumentException.ThrowIfNullOrEmpty(version);
-        var folder = PluginFolder;
-        return new Dictionary<string, string>
+        var files = new Dictionary<string, string> { [MarketplaceFile] = Text(Marketplace()) };
+        // Both plugins run the same hooks and the same MCP server through their own wrapper; only the name and the words differ.
+        foreach (var (folder, name, description, brand) in new[]
         {
-            [MarketplaceFile] = Text(Marketplace()),
-            [$"{folder}/.claude-plugin/plugin.json"] = Text(Manifest(version)),
-            [$"{folder}/hooks/hooks.json"] = Text(new JsonObject { ["hooks"] = Hooks() }),
-            [$"{folder}/.mcp.json"] = Text(Mcp()),
-        };
+            (PluginFolder, AgentConfig.PluginName, OldDescription, "Claude Monitor"),
+            (AipodFolder, AipodPluginName, "aipod agent: installs itself, connects to your server, reports sessions and delivers web messages.", "aipod"),
+        })
+        {
+            files[$"{folder}/.claude-plugin/plugin.json"] = Text(Manifest(name, version, description, brand, serverRequired: name != AipodPluginName));
+            files[$"{folder}/hooks/hooks.json"] = Text(new JsonObject { ["hooks"] = Hooks() });
+            files[$"{folder}/.mcp.json"] = Text(Mcp());
+        }
+
+        return files;
     }
+
+    private const string OldDescription = "Replaced by the aipod plugin (run /aipod:connect). Claude Monitor agent: installs itself, connects to your server, reports sessions and delivers web messages.";
 
     /// <summary>Writes the rendered files under <paramref name="root"/>. Returns how many.</summary>
     public static int WriteTo(string root, string version)
@@ -70,28 +80,36 @@ public static class MarketplacePlugin
         ["name"] = AgentConfig.ReleasesMarketplaceName,
         ["owner"] = new JsonObject { ["name"] = "Claude Monitor" },
         ["description"] = "The Claude Monitor agent as a Claude Code plugin: it installs, connects and stops the agent, which reports this machine's sessions and carries web messages back.",
-        ["plugins"] = new JsonArray(new JsonObject
-        {
-            ["name"] = AgentConfig.PluginName,
-            ["source"] = "./" + PluginFolder,
-            ["description"] = "Installs the Claude Monitor agent, connects it to your server and starts it with your Claude Code sessions.",
-        }),
+        ["plugins"] = new JsonArray(
+            new JsonObject
+            {
+                ["name"] = AgentConfig.PluginName,
+                ["source"] = "./" + PluginFolder,
+                ["description"] = "The old plugin of the aipod agent, kept as a bridge: install aipod instead.",
+            },
+            new JsonObject
+            {
+                ["name"] = AipodPluginName,
+                ["source"] = "./" + AipodFolder,
+                ["description"] = "Installs the aipod agent, connects it to your server and starts it with your Claude Code sessions.",
+            }),
     };
 
-    private static JsonObject Manifest(string version) => new()
+    /// <summary>The server option is required for the old plugin; the aipod one asks only when the agent has no server of its own to take (a machine that is already connected is not asked again).</summary>
+    private static JsonObject Manifest(string name, string version, string description, string brand, bool serverRequired) => new()
     {
-        ["name"] = AgentConfig.PluginName,
+        ["name"] = name,
         ["version"] = version,
-        ["description"] = "Claude Monitor agent: installs itself, connects to your server, reports sessions and delivers web messages.",
-        ["author"] = new JsonObject { ["name"] = "Claude Monitor" },
+        ["description"] = description,
+        ["author"] = new JsonObject { ["name"] = brand },
         ["userConfig"] = new JsonObject
         {
             [UserConfigServer] = new JsonObject
             {
                 ["type"] = "string",
                 ["title"] = "Server address",
-                ["description"] = "The https address of your Claude Monitor server: the address you open in the browser.",
-                ["required"] = true,
+                ["description"] = $"The https address of your {brand} server: the address you open in the browser.",
+                ["required"] = serverRequired,
             },
             ["push"] = new JsonObject
             {

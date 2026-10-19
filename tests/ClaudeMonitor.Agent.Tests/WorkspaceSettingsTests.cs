@@ -11,7 +11,7 @@ namespace ClaudeMonitor.Agent.Tests;
 
 /// <summary>
 /// The workspace's switches count only for the workspace in agent.json: a settings answer for another workspace (a pass
-/// still in flight while `cm-agent login` moved the machine) leaves every switch off until the new workspace answers.
+/// still in flight while `aipod login` moved the machine) leaves every switch off until the new workspace answers.
 /// </summary>
 public sealed class WorkspaceSettingsTests : IDisposable
 {
@@ -55,7 +55,7 @@ public sealed class WorkspaceSettingsTests : IDisposable
         var next = Guid.NewGuid();
         fx.Fake.On("GET /api/agent/settings", _ =>
         {
-            // `cm-agent login` to another workspace lands while the old workspace's answer is on its way
+            // `aipod login` to another workspace lands while the old workspace's answer is on its way
             (Identity.Load(fx.Home.Config) with { WorkspaceId = next }).Save(fx.Home.Config);
             return (HttpStatusCode.OK, System.Text.Json.JsonSerializer.Serialize(
                 new AgentSettings(true, 1000, current, UpdateModes.On, RemoteRuns: true, ClaudeUpdate: true), Net.ApiClient.Json));

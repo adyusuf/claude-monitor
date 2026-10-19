@@ -62,3 +62,8 @@ circle.spark-line { fill: var(--accent); stroke: none; }
 .script-lines li { display: grid; grid-template-columns: 3.2em 1fr; gap: 0.5em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .script-lines .ln { text-align: right; color: var(--muted, #888); user-select: none; }
 .run-output-account { margin: 0.5rem 0; }
+
+/* A usage meter (the limits on the machine page): a track and a fill, no motion. The fill turns amber from 90 per cent. */
+.meter { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.meter-fill { height: 100%; background: var(--accent); }
+.meter-fill.warn { background: var(--warn); }

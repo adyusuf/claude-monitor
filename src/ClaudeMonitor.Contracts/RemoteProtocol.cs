@@ -7,16 +7,31 @@ namespace ClaudeMonitor.Contracts;
 public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent,
     string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
     IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
-    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null);
+    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null, string? PluginId = null,
+    ClaudeInventory? Inventory = null);
+
+/// <summary>The Claude Code plugin a machine's agent runs under, as <c>name@marketplace</c> (ADR-0013): reported so the web can tell which machines are still on the old plugin before it is retired.</summary>
+public static class PluginIds
+{
+    public const int Max = 130;
+    public const string OldPluginPrefix = "monitor-agent@";
+
+    public static bool IsValid(string? id) => id is { Length: > 2 and <= Max } && System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-z0-9][a-z0-9._-]{0,63}@[a-z0-9][a-z0-9._-]{0,63}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(200));
+
+    public static bool IsOld(string? id) => id is not null && id.StartsWith(OldPluginPrefix, StringComparison.Ordinal);
+}
 
 /// <summary>One listening TCP port (ADR-0008 §3a′): the port, the protocol (<c>tcp</c>) and the owning process name when the OS lets the agent see it.</summary>
 public sealed record ServiceInfo(int Port, string Proto, string? Process);
 
 /// <summary>
 /// What the agent read from one project folder's <c>.git</c> files (ADR-0008 §3a′): the key and name, an HMAC of the folder path (never the path),
-/// the branch, the commit and the tag that points at it. Reported for admin-listed folders and for folders a session visited.
+/// the branch, the commit and the tag that points at it. Reported for admin-listed folders and for folders a session visited. When the person at the machine set
+/// a test command for the folder (ADR-0011 §7a), its argv and the folder path are reported too, so the owner can approve exactly what Podium starts.
 /// </summary>
-public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source);
+/// <summary>Trusted: what Claude Code's own trust record says about the folder (true, false), or null when the agent could not read it (an older agent too).</summary>
+public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source, bool? Trusted = null,
+    IReadOnlyList<string>? TestArgv = null, string? TestCwd = null);
 
 /// <summary>
 /// Claude Code on the agent's machine (ADR-0008 §3e): how it is installed (<see cref="ClaudeKinds"/>), where (home-relative, never
@@ -51,7 +66,7 @@ public sealed record MachineView(Guid AgentId, string Hostname, string Os, strin
     string? EffectiveEnvironment = null, string? EffectiveFunction = null, string? ClaudeKind = null, string? ClaudeVersion = null,
     int? ClaudeSessionsIdle = null, IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null,
     IReadOnlyList<string>? Capabilities = null, DateTimeOffset? PresenceAt = null,
-    IReadOnlyDictionary<string, string>? Tags = null, bool? AcceptsAsks = null);
+    IReadOnlyDictionary<string, string>? Tags = null, bool? AcceptsAsks = null, bool? AcceptsClaudeControl = null, string? ClaudeAutoMode = null, string? PluginId = null, string? ClaudeAutoProject = null);
 
 public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Kind, string Subject, string State,
     double ThresholdPct, double LastValue, double PeakValue, DateTimeOffset OpenedAt, DateTimeOffset? ResolvedAt);
@@ -121,11 +136,25 @@ public sealed record ProjectRunSummary(string? Kind, string Status, int? ExitCod
 
 /// <summary>A project on a machine: what the agent read from its folder, the last runs per kind and the tool failures sessions had in it recently.</summary>
 public sealed record MachineProjectView(string Key, string Name, string? Branch, string? HeadSha, string? Tag, DateTimeOffset LastSeenAt,
-    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors);
+    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors, bool? Trusted = null, bool HasTest = false, IReadOnlyList<string>? TestArgv = null, string? TestCwd = null);
 
 /// <summary>
 /// Everything about one machine (ADR-0008 §3a′): its list entry, the admin's note (untrusted text), the listening services when the caller may
 /// see them (the machine's owner and workspace admins; null otherwise, and when the owner has not opted in) and its projects.
 /// </summary>
 public sealed record MachineDetail(MachineView Machine, string? Note, DateTimeOffset? NoteSetAt, bool ServicesShared,
-    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects);
+    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects, ClaudeInventory? Inventory = null, bool InventoryShared = false);
+
+/// <summary>The limits of a project's test command (ADR-0011 §7a), shared by the agent that takes it and the API that stores it.</summary>
+public static class ProjectTestRules
+{
+    public const int MaxElements = 32;
+    public const int MaxElementLength = 512;
+    public const int CwdMax = 1024;
+
+    /// <summary>An argv list: 1 to 32 elements, the first not empty, none over 512 characters or with a control character.</summary>
+    public static bool IsValid(IReadOnlyList<string>? argv) =>
+        argv is { Count: >= 1 and <= MaxElements } && !string.IsNullOrEmpty(argv[0]) && argv.All(a => a is { Length: <= MaxElementLength } && !a.Any(char.IsControl));
+
+    public static bool IsValidCwd(string? cwd) => cwd is { Length: > 0 and <= CwdMax } && !cwd.Any(char.IsControl);
+}

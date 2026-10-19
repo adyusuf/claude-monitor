@@ -5,7 +5,7 @@ namespace ClaudeMonitor.Agent.Config;
 /// <summary>
 /// The project folders an admin or the machine's user listed for this machine (ADR-0008 §3a′), for machines without Claude Code or for
 /// folders no session visits. A service agent reads them from the admin-owned policy file; an interactive or standalone agent keeps them in
-/// agent.json (<c>cm-agent config projects add|remove|list</c>). Only absolute paths of existing folders are kept, at most <see cref="Max"/>.
+/// agent.json (<c>aipod config projects add|remove|list</c>). Only absolute paths of existing folders are kept, at most <see cref="Max"/>.
 /// </summary>
 public static class ProjectFolderList
 {

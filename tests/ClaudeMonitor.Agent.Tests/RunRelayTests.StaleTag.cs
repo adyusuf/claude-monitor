@@ -32,7 +32,7 @@ public sealed partial class RunRelayTests
         if (!ExecFixture.Unix) return;
         var timed = await ReadOffAsync(); // tagged W1, switch off
         var moved = Identity.Peek(fx.Home.Config)! with { WorkspaceId = Guid.NewGuid() };
-        moved.Save(fx.Home.Config); // `cm-agent login` moved the machine to W2
+        moved.Save(fx.Home.Config); // `aipod login` moved the machine to W2
         SettingsFor(remoteRuns: true);
         Assert.Null(WorkspaceSettings.Get(fx.Home.Config, fx.Store, MachineMonitor.RemoteRunsKey)); // W1's value reads as unread
         Assert.True(WorkspaceSettings.TagIsStale(fx.Home.Config, fx.Store));

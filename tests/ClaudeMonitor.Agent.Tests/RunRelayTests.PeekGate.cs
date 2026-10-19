@@ -52,7 +52,7 @@ public sealed partial class RunRelayTests
         var x = Task.Run(() => timed.SettingsAsync(CancellationToken.None));
         Assert.True(reading.Wait(TimeSpan.FromSeconds(10))); // X has peeked W1 and is held at its clock reading
         var moved = Identity.Peek(fx.Home.Config)! with { WorkspaceId = Guid.NewGuid() };
-        moved.Save(fx.Home.Config); // `cm-agent login` moved the machine to W2
+        moved.Save(fx.Home.Config); // `aipod login` moved the machine to W2
         var later = Task.Run(() => timed.SettingsAsync(CancellationToken.None));
 
         // A bounded wait for something that must NOT happen: while X holds the gate the later pass cannot begin, so its request never goes out.

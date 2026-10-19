@@ -6,7 +6,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>`cm-agent update`, `cm-agent config` and the update lines of `cm-agent status`, driven the way the command line drives them.</summary>
+/// <summary>`aipod update`, `aipod config` and the update lines of `aipod status`, driven the way the command line drives them.</summary>
 public sealed class UpdateCommandTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 5, 14, 30, 0, TimeSpan.Zero);
@@ -71,7 +71,7 @@ public sealed class UpdateCommandTests : IDisposable
     {
         var (code, output, error) = await Cli_(args);
         Assert.Equal(2, code);
-        Assert.Contains("usage: cm-agent config [auto-update off|check|on]", error, StringComparison.Ordinal);
+        Assert.Contains("usage: aipod config [auto-update off|check|on]", error, StringComparison.Ordinal);
         Assert.Equal("", output);
         Assert.Null(Auth.Identity.Peek(kit.Config)?.AutoUpdate);
     }
@@ -80,8 +80,8 @@ public sealed class UpdateCommandTests : IDisposable
     public async Task The_usage_text_lists_the_new_commands()
     {
         var usage = (await Cli_()).Out;
-        Assert.Contains("cm-agent update [--check]", usage, StringComparison.Ordinal);
-        Assert.Contains("cm-agent config [auto-update off|check|on]", usage, StringComparison.Ordinal);
+        Assert.Contains("aipod update [--check]", usage, StringComparison.Ordinal);
+        Assert.Contains("aipod config [auto-update off|check|on]", usage, StringComparison.Ordinal);
     }
 
     // ---- status ------------------------------------------------------------------------------------------------
@@ -128,7 +128,7 @@ public sealed class UpdateCommandTests : IDisposable
         Assert.Empty(kit.Host.Downloads);
         Assert.Empty(kit.Runner.Calls);
         Assert.Empty(kit.Daemon.Calls);
-        Assert.Contains($"update available: {offer.Version} (cm-agent update)", (await Cli_("status")).Out, StringComparison.Ordinal);
+        Assert.Contains($"update available: {offer.Version} (aipod update)", (await Cli_("status")).Out, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public sealed class UpdateCommandTests : IDisposable
         kit.Connect();
         var (code, _, error) = await Update_(args);
         Assert.Equal(2, code);
-        Assert.Contains("usage: cm-agent update [--check]", error, StringComparison.Ordinal);
+        Assert.Contains("usage: aipod update [--check]", error, StringComparison.Ordinal);
         Assert.Empty(kit.Api.Seen);
         Assert.Equal(2, (await Cli_(args)).Code);
     }

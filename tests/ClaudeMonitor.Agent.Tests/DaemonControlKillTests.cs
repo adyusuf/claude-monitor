@@ -6,7 +6,7 @@ namespace ClaudeMonitor.Agent.Tests;
 
 /// <summary>
 /// The real DaemonControl.Kill: it ends only the process the daemon wrote into daemon.pid, only while the daemon's lock is held
-/// and only when that process is still a cm-agent. Never anything else (a recycled process id must not take an unrelated program).
+/// and only when that process is still an aipod. Never anything else (a recycled process id must not take an unrelated program).
 /// </summary>
 public sealed class DaemonControlKillTests : IDisposable
 {
@@ -78,7 +78,7 @@ public sealed class DaemonControlKillTests : IDisposable
 
     /// <summary>
     /// A stand-in process (a link to `sleep` named cm-agent-hung; macOS kills a copy of a system binary at launch). Where the OS names a
-    /// process after the link (Linux) it IS a cm-agent and must be ended; where it names it after the file behind it (macOS) it is not
+    /// process after the link (Linux) it IS an aipod and must be ended; where it names it after the file behind it (macOS) it is not
     /// one and must be left alone. Either way the result is false here, because this test holds the daemon's lock itself.
     /// </summary>
     [Fact]
@@ -101,12 +101,12 @@ public sealed class DaemonControlKillTests : IDisposable
             Assert.False(released, "the lock is still held by this test, so Kill must not claim it is free");
             if (isCmAgent)
             {
-                Assert.True(child.WaitForExit(10_000), "a cm-agent process is ended");
+                Assert.True(child.WaitForExit(10_000), "an aipod process is ended");
                 Assert.Contains($"killing the daemon (pid {child.Id})", Log, StringComparison.Ordinal);
             }
             else
             {
-                Assert.False(child.HasExited, "a process that is not a cm-agent is left alone");
+                Assert.False(child.HasExited, "a process that is not an aipod is left alone");
                 Assert.DoesNotContain("killing", Log, StringComparison.Ordinal);
             }
 

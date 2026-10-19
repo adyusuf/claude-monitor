@@ -13,7 +13,7 @@ public sealed record ClaudeOutcome(string Code, string Detail);
 /// Updates Claude Code with its own command (`claude update`) and nothing else: the agent never downloads or replaces a Claude
 /// binary. It happens only when ALL of these hold: this machine and the workspace both allow it; the install is one that updates
 /// itself (npm or native CLI); every live session is idle and has been for a while; and a countdown, announced to the person,
-/// ran out without `cm-agent claude-update cancel`. Sessions are never ended or restarted: they keep running the version they
+/// ran out without `aipod claude-update cancel`. Sessions are never ended or restarted: they keep running the version they
 /// started with until they are restarted by their owner. Every attempt, its versions and its result go to agent.log and state.
 /// </summary>
 public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, IProcessRunner runner, IUserNotifier notifier, AgentLog log,
@@ -114,14 +114,14 @@ public sealed partial class ClaudeUpdater(AgentConfig config, LocalStore store, 
         var until = clock.GetUtcNow() + config.ClaudeCountdown;
         if (!ClaudeUpdateState.Change(config, s => s with { CountdownUntil = until.ToString("O", CultureInfo.InvariantCulture), Result = ClaudeCodes.Countdown, Detail = "Claude Code will be updated when the countdown ends" }, log))
         {
-            // `cm-agent claude-update cancel` reads the countdown from the file: one it cannot see must not run
+            // `aipod claude-update cancel` reads the countdown from the file: one it cannot see must not run
             return Record(ClaudeCodes.NotSaved, "the countdown could not be saved, so it could not be cancelled: nothing was run", next: config.UpdateRetryAfter);
         }
 
         var minutes = Math.Ceiling(config.ClaudeCountdown.TotalMinutes);
-        var text = $"Claude Code will be updated in {minutes:0} min. Cancel with: cm-agent claude-update cancel";
+        var text = $"Claude Code will be updated in {minutes:0} min. Cancel with: aipod claude-update cancel";
         log.Write($"claude update: {text} ({install.Detail}, {install.Path})");
-        if (!notifier.Notify(text)) log.Write("claude update: no desktop notification on this system; the log and `cm-agent status` carry the notice");
+        if (!notifier.Notify(text)) log.Write("claude update: no desktop notification on this system; the log and `aipod status` carry the notice");
         while (true)
         {
             // Checked once more at the very end too: a cancel, a busy session or a withdrawn consent in the last second counts.

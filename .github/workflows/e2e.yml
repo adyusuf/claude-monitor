@@ -6,12 +6,8 @@
 name: e2e
 
 on:
-  push:
-    branches:
-      - test
+  # The push to test and the nightly run are switched off for now (maintainer, 19/10/2026); start it by hand.
   workflow_dispatch:
-  schedule:
-    - cron: "17 3 * * *" # nightly, 03:17 UTC, on the default branch
 
 permissions:
   contents: read

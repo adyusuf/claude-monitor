@@ -76,7 +76,7 @@ A gate run collects coverage while the unit tests run and the coverage step judg
 (`scripts/merge-gate.conf`, `tests/coverage.props`, `web/vite.config.ts`); `bash scripts/coverage.sh` on its own still runs
 the tests itself.
 
-## The agent (cm-agent)
+## The agent (aipod)
 
 ```bash
 dotnet run --project src/ClaudeMonitor.Agent -- version                # from source
@@ -93,10 +93,10 @@ Keychain / Windows Credential Manager (service `claude-monitor-agent`); on Linux
 user-only (0600) `cred-*` files in the agent home. Its log is `agent.log` in the agent home.
 
 A prompt sent from the web enters a session only when something is typed in it or a turn ends; an idle session takes
-it at neither, so it stays "delivered" until it expires. `cm-agent install --stop-wait 120` makes a finished turn wait
+it at neither, so it stays "delivered" until it expires. `aipod install --stop-wait 120` makes a finished turn wait
 up to 120 s (0-590, default 0) for a prompt from the web and start a new turn from it; the value is saved in
 `agent.json` and the hooks are rewritten (hook timeout = wait + 15 s), so re-run `install` after changing it.
-`cm-agent status` prints `commands waiting: N (oldest expires HH:mm)` and `stop wait: N s`. Reasons for the default of 0:
+`aipod status` prints `commands waiting: N (oldest expires HH:mm)` and `stop wait: N s`. Reasons for the default of 0:
 ADR-0002, "Commands from the web".
 
 ### Installing as a Claude Code plugin (ADR-0007)
@@ -116,34 +116,38 @@ not there yet); the transcript is read later, so nothing of it is lost. **Uninst
 30 s**: Claude Code runs nothing at uninstall, so the daemon watches for its data directory to disappear, for the plugin to drop out of Claude Code's plugin list, and for a `false` in
 `enabledPlugins` where the plugin is installed (everywhere it is installed: a plugin switched off in one project's settings only does not stop it). The agent home, the login and the credential store stay: installing the plugin again continues from them.
 `claude plugin uninstall --keep-data` keeps the data directory, but the plugin leaves Claude Code's plugin list, which the daemon also reads (when that list has an
-unknown shape it falls back to the data directory and the settings alone). The old local plugin (`cm-agent install`, `monitor-agent-local`) reports
+unknown shape it falls back to the data directory and the settings alone). The old local plugin (`aipod install`, `monitor-agent-local`) reports
 every event a second time if it stays enabled: `/monitor-agent:connect` removes it, and the bootstrap says so while it is there.
 
-A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
+The plugin is now called `aipod` (ADR-0013 section 1): `claude plugin marketplace add <site>/downloads/aipod-marketplace.json`, `claude plugin install aipod@aipod-releases`,
+then `/aipod:connect` (which removes the old `monitor-agent` plugin; the skills are `/aipod:connect|status|disconnect`). The `monitor-agent` plugin stays as a bridge: it goes
+quiet once `aipod` is enabled, and `aipod` goes quiet while a pre-bridge (0.5.0 or older) `monitor-agent` is still enabled, so no event is reported twice. Everything above applies to either name.
+
+A maintainer renders the plugin's manifest, hooks and MCP file (for both plugins) from the one list of hooks in the agent with
 `dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
 plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
 
 ### Pushing web messages into an idle session
 
-On after the first `cm-agent install`, through the **inbox** (the maintainer's decision of 17/10/2026, after the channel proved late in the desktop app): nothing was saved about push yet, so the install saves `inbox`, which needs no start-up flag and works in the terminal, the desktop app and VS Code. The channel is the other choice (`cm-agent install --push channel`) and needs Claude Code started with the flag `install` prints (below); the desktop app and VS Code cannot pass it, so there a message sent through the channel only arrives at the next prompt. A machine that saved `channel` before (0.4.1) switches with `cm-agent config push inbox`. A later choice is kept as it is: `cm-agent install --push off` or `cm-agent config push off` turns it off and a reinstall does not turn it back on; `CM_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `cm-agent config push inbox` (or `cm-agent install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
+On after the first `aipod install`, through the **inbox** (the maintainer's decision of 17/10/2026, after the channel proved late in the desktop app): nothing was saved about push yet, so the install saves `inbox`, which needs no start-up flag and works in the terminal, the desktop app and VS Code. The channel is the other choice (`aipod install --push channel`) and needs Claude Code started with the flag `install` prints (below); the desktop app and VS Code cannot pass it, so there a message sent through the channel only arrives at the next prompt. A machine that saved `channel` before (0.4.1) switches with `aipod config push inbox`. A later choice is kept as it is: `aipod install --push off` or `aipod config push off` turns it off and a reinstall does not turn it back on; `CM_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `aipod config push inbox` (or `aipod install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
 sent from the web start a turn in an idle session within about a second, **with no start-up flag**: every Claude Code session (terminal, desktop app, VS Code) has an *inbox socket*, its hooks learn
 where it is (`CLAUDE_CODE_MESSAGING_SOCKET`), and the daemon writes the prompt there (ADR-0007). The text is wrapped, labelled as
 coming from the web and capped; the session is told to treat it as data and to ask you before any request with side effects. A
 session that refuses messages (`crossSessionInbound: refuse`) or has none is not an error: the prompt goes back to the hooks.
-`cm-agent status` shows `Push into the session: on through the inbox socket`, whether this session's inbox is known and the last
+`aipod status` shows `Push into the session: on through the inbox socket`, whether this session's inbox is known and the last
 failure. The older **channel** (`--push on`, also `--push channel`, below) stays exactly as it was: `on`, `CM_PUSH=on` and a push saved before the
 inbox existed all still mean the channel. A prompt written to a session that never shows it in the transcript is **not written again**: after
 10 minutes (`InboxConfirmWait`) it is left to the hooks.
 
 **A short notice instead of the whole text (ADR-0007, A2), the default.** The inbox gets one line, `📩 claude-monitor web message <id> ...`,
-that holds nothing the web wrote. `cm-agent config push-format full` (or `cm-agent install --push-format full`, or `CM_INBOX_FORMAT=full`) brings back the whole text. The session reads the message with the `monitor_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `cm-agent status` as "not read yet". The text of an applied message is forgotten after 7 days.
+that holds nothing the web wrote. `aipod config push-format full` (or `aipod install --push-format full`, or `CM_INBOX_FORMAT=full`) brings back the whole text. The session reads the message with the `monitor_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `aipod status` as "not read yet". The text of an applied message is forgotten after 7 days.
 
 ### Answering a session's question from the web
 
 A question a session puts to you can be answered on the session's page, in the conversation. Claude's own question tool (`AskUserQuestion`) and plan approval were already answerable there (the answer goes in through the permission hook).
 The Claude desktop app's "next step" box (its `wrap_up` call: a recap and one question with buttons) is the app's own window and reaches nothing else, so the page now shows it as a card in the conversation: the question, its buttons and a box to type an answer.
-Anyone who may command the session can answer the newest open question; the answer is sent as an ordinary message from the web (the same as a click in the app sends), by the transport the machine uses (`cm-agent status`). The card closes when the session hears from the user after it. A recap without a question stays an ordinary tool call. Nothing is added to the agent: the card is built from the transcript the agent already reports.
+Anyone who may command the session can answer the newest open question; the answer is sent as an ordinary message from the web (the same as a click in the app sends), by the transport the machine uses (`aipod status`). The card closes when the session hears from the user after it. A recap without a question stays an ordinary tool call. Nothing is added to the agent: the card is built from the transcript the agent already reports.
 
 ### What the session page shows
 
@@ -161,7 +165,7 @@ A hook reads and writes UTF-8 whatever the machine's console code page is (agent
 
 ### Pushing through a Claude Code channel (`--push channel`)
 
-`cm-agent install --push channel` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
+`aipod install --push channel` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
 Claude Code **channel**: a prompt sent from the web starts a turn in an idle session within about a second, wrapped as
 `<channel source="claude-monitor" origin="web" message_id="…">` (just the text inside; the session starts its reply with one `Web: …` line) and labelled as coming from the web (untrusted: the session is told to treat it as data and
 to ask you before any request with side effects). A channel is a Claude Code research preview and a custom one is not on its
@@ -174,28 +178,29 @@ claude --dangerously-load-development-channels plugin:monitor-agent@monitor-agen
 Without the flag (or where an organisation has channels off) nothing is lost: a pushed message that does not show up in the
 session transcript within 120 s goes back to the hooks and arrives at the next prompt, as before. `--push off` (or
 `CM_PUSH=off`) removes it. `CM_PUSH_SCOPE=machine` pushes every prompt of the machine instead of only this session's (single-session
-machines only). **No new token or secret:** the daemon uses the credential `cm-agent login` stored in the OS credential store; the MCP process
-never touches the network. Revoke it from the web's Machines page; rotation is `cm-agent logout` + `cm-agent login`. `monitor_status` and `cm-agent
+machines only). **No new token or secret:** the daemon uses the credential `aipod login` stored in the OS credential store; the MCP process
+never touches the network. Revoke it from the web's Machines page; rotation is `aipod logout` + `aipod login`. `monitor_status` and `cm-agent
 status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
 or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
 
-The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS, `%USERPROFILE%\.claude-monitor` on
-Windows and `~/.claude-monitor` on Linux (`CM_AGENT_HOME` overrides all three); `cm-agent status` prints it as `home:`. It is deliberately **not** under
+The agent home is the folder the machine already uses (`~/Library/Application Support/ClaudeMonitor` on macOS, `%USERPROFILE%\.claude-monitor` on
+Windows and `~/.claude-monitor` on Linux), and for a machine that has none the aipod folder (`~/Library/Application Support/aipod`, `~/.aipod`):
+nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0013). `AIPOD_AGENT_HOME` / `CM_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
 redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
 (ADR-0002, "Home outside AppData").
 
 **Upgrading a Windows machine** that used the old default (`%LOCALAPPDATA%\ClaudeMonitor`): the first start of the new
-`cm-agent` copies `agent.json` to the new home (no new login; `agent.db` is not moved, so events not yet uploaded are
-lost). The old plugin keeps running the old binary until you run `cm-agent install` again with the new one; do that
-from a normal terminal, then check that `cm-agent status` and `monitor_status` in a new Claude session show the same
+`aipod` copies `agent.json` to the new home (no new login; `agent.db` is not moved, so events not yet uploaded are
+lost). The old plugin keeps running the old binary until you run `aipod install` again with the new one; do that
+from a normal terminal, then check that `aipod status` and `monitor_status` in a new Claude session show the same
 `home:`. The old folder is left in place and can be deleted afterwards.
 
 ### Machine roles, the tool inventory and the session-start block (ADR-0008)
 
 - **Role.** A workspace admin sets each machine's **environment** (dev, test, stage, preprod, production, other) and **function**
   (development, application, web, database, ci, storage, other) on the machine's page; "not set" never means test. Lowering a machine
-  away from production or database asks for a recent sign-in. The machine may say what it is (`cm-agent config role <environment|none>
+  away from production or database asks for a recent sign-in. The machine may say what it is (`aipod config role <environment|none>
   <function|none>`; a service agent: `environment` and `function` in its admin-owned `exec.json`); a claim only makes the role stricter.
 - **What the agent reports.** Whether Claude Code is installed and how many sessions are idle, and a tool inventory (git, dotnet, node,
   npm, python3, pwsh, docker, psql, java, claude and the shell interpreters) probed by absolute path, each marked trusted or not; the
@@ -209,12 +214,12 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
 - **Listening services (off by default).** The machine's owner turns on "Report listening ports" on its page (a recent sign-in or a code is
   needed). The agent then reads the TCP ports it listens on, with the process name where the system shows it (on Linux for the account's own
   processes), and sends them; only the owner and admins see them. Turning it off drops what was stored. Nothing is started to read them.
-- **A machine without Claude Code (standalone agent).** `cm-agent install --standalone --server https://<your Claude Monitor address>` (run as your own user, never
+- **A machine without Claude Code (standalone agent).** `aipod install --standalone --server https://<your Claude Monitor address>` (run as your own user, never
   as root or administrator) logs in first (approve the code on the web), copies the binary into the agent home and then starts the agent at your login: a
   LaunchAgent that runs an application bundle on macOS (no window, no Dock icon), a logon task that runs a windowless copy of the program on Windows, a
   `systemd --user` unit on Linux (without `loginctl enable-linger` it runs only while you are logged in; the installer says so). `uninstall --standalone`
-  removes the autostart and keeps the data. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
-  seconds. It reports `claude=none`; another machine's ask to it is refused (`no_claude`), but it is a normal target for runs. From it, `cm-agent machines`,
+  removes the autostart (under the aipod names `aipod.agent.user`, `aipod.service`, `AipodAgent`, `Aipod.app`, or the old ones, `com.claudemonitor.agent.user`, `claude-monitor-agent.service`, `ClaudeMonitorAgent`, `ClaudeMonitorAgent.app`) and keeps the data; running the install again on a machine that has the old names replaces them. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
+  seconds. It reports `claude=none`; another machine's ask to it is refused (`no_claude`), but it is a normal target for runs. From it, `aipod machines`,
   `machine <x>`, `metrics <x>`, `alerts`, `jobs`, `job-run <id>`, `run --machine <x> (--script <file> --interpreter <i> | --argv ...)`, `result <id> --wait 30` and
   `ask --machine <x> "<question>"` reach the other machines without the web; an approval is still the owner's, on the web.
 - **Asks across your machines.** A Claude session can ask a Claude session on ANOTHER machine of the same user a question (`monitor_ask`, then
@@ -229,7 +234,7 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
   without a ceiling, an environment an admin set on the machine's page (a machine's own claim does not count) and a trusted interpreter in its
   inventory. The owner approves the exact text on the web (every line numbered, non-ASCII made visible, Allow only after the script was
   scrolled to its end and three seconds later); a production or database machine also needs the approver's two-step code, and an approver
-  without two-step sign-in cannot approve there. A script never matches a grant or a job. A script run may also carry up to 8 small text files (64 KiB each, 256 KiB together, relative paths of letters, digits, dot, underscore and dash, at most 4 levels) that are written next to it, and a text for its standard input (64 KiB); the owner reads each one on the approval card (Allow waits until every box was read to its end) and the approval covers them all. `cm-agent run --script main.py --interpreter python --file helper.py=./helper.py --stdin ./input.txt` and `monitor_run_script` send them. A Python script with files runs with `-E -s -B` (its own folder on the module path) instead of `-I -B`. Binary files and archives are not supported (ADR-0010). The agent writes it to `<home>/runs/<run>/script.<ext>`
+  without two-step sign-in cannot approve there. A script never matches a grant or a job. A script run may also carry up to 8 small text files (64 KiB each, 256 KiB together, relative paths of letters, digits, dot, underscore and dash, at most 4 levels) that are written next to it, and a text for its standard input (64 KiB); the owner reads each one on the approval card (Allow waits until every box was read to its end) and the approval covers them all. `aipod run --script main.py --interpreter python --file helper.py=./helper.py --stdin ./input.txt` and `monitor_run_script` send them. A Python script with files runs with `-E -s -B` (its own folder on the module path) instead of `-I -B`. Binary files and archives are not supported (ADR-0010). The agent writes it to `<home>/runs/<run>/script.<ext>`
   (private, never executable), starts it with the interpreter's safe flags and the scratch folder as working directory, with an empty
   environment and `PATH=/usr/bin:/bin:/usr/sbin:/sbin` (set your own PATH inside the script for a user-installed tool), and removes the folder
   afterwards. The workspace's "Output limit for script runs" (1 to 64 MB, default 8) is frozen on each run; `CM_EXEC_SCRIPT_OUTPUT_CEILING`
@@ -238,36 +243,66 @@ from a normal terminal, then check that `cm-agent status` and `monitor_status` i
   sign-in does not replace it), and an approver without two-step sign-in cannot approve there; a plain argv run of another program does not
   (ADR-0008 §9.13).
 - **Projects.** Every project a session works in is listed on the machine's page. For a machine without sessions, or for a folder no session
-  visits, list the folder: `cm-agent config projects add <folder>` (interactive or standalone agent) or `"projects": ["/srv/shop"]` in the
+  visits, list the folder: `aipod config projects add <folder>` (interactive or standalone agent) or `"projects": ["/srv/shop"]` in the
   admin-owned `exec.json` (service agent). The agent reads the branch, the commit and the tag from the `.git` files without running git and
   sends them with an HMAC of the path (the key is generated here and kept in the credential store; the path never leaves the machine).
   `CM_PROJECT_FACTS_EVERY` sets how often they are read again. A run may name a `project` and a `kind` (`test`, `build`, `deploy`, `other`);
   its result, and for a `test` run the passed, failed and skipped counts of dotnet test, vitest, jest and pytest, appear under that project.
+  **Usage limits for Podium (ADR-0011 §7a):** `aipod config claude-statusline on` sets `statusLine` in Claude Code's user settings to `aipod statusline` (your own status line, if you had one, is kept and still printed;
+  `off` puts it back; `status` shows what was seen). Claude Code gives the 5-hour and weekly limits only to a status line command, and only for claude.ai Pro and Max logins after a session has answered once, so Podium
+  shows them with the time they were last seen. It is the one place aipod edits Claude's own settings, and only when you run this verb. A project's own `statusLine` overrides the user one and is not touched.
+  **Test command for Podium (ADR-0011 §7a):** `aipod config projects test <folder> -- <program> [args...]` sets the command that "Start the test" runs for that
+  folder (an argv list, the program an absolute path, no shell; `--clear` removes it). Unlike other projects, the command and the folder path are then reported, so
+  the machine's owner can see and approve exactly what Podium starts; every run still waits for the owner's approval. Not available for a service agent.
+
+## The tray app (aipod-tray)
+
+`aipod-tray` puts the agent's state in the system tray (Windows and macOS; ADR-0012): the tooltip shows the version, the state and whether an
+update is waiting; the right-click menu has Reconnect, Log in, Disconnect, Check for updates, Update, Open the web app and Show the log; the
+status window (menu: "Open the status window") shows the same with the agent's own status lines and buttons. Two lights sit side by side in the
+icon: orange blinks when a message arrives, green when one leaves or reaches a session.
+
+```bash
+dotnet build src/Aipod.Tray                    # to try it: dotnet src/Aipod.Tray/bin/Debug/net10.0/aipod-tray.dll
+AVALONIA_TELEMETRY_OPTOUT=1 dotnet publish src/Aipod.Tray -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
+aipod-tray --status               # prints what the window shows, no screen needed
+aipod-tray --install-autostart    # start at login (macOS LaunchAgent, Windows Run key); --remove-autostart undoes it
+```
+
+It reads the agent's files in the same home as the agent (`CM_AGENT_HOME` / `AIPOD_AGENT_HOME`) and runs the `aipod` command line for
+the commands; it opens no port. Not covered yet: signing and notarization, an installer, a service-mode install's database.
 
 ## Service agent (boot service, remote work)
 
-`cm-agent install --service` registers the daemon to start at boot with no Claude session, so other machines of a
+`aipod install --service` registers the daemon to start at boot with no Claude session, so other machines of a
 workspace can be reached (ADR-0005). It is opt-in and needs root / an elevated prompt; the interactive agent above is
 unchanged. The step-by-step runbook is [docs/remote-work-setup.md](docs/remote-work-setup.md). What the install lays
 down, per OS:
 
 | | Linux (systemd) | macOS (LaunchDaemon) | Windows Server (service) |
 |---|---|---|---|
-| Service account | `cm-agent` (system, no login shell) | `_cmagent` (hidden role account) | `NT SERVICE\cm-agent` (virtual) |
+| Service account | `aipod` (system, no login shell) | `_cmagent` (hidden role account) | `NT SERVICE\cm-agent` (virtual) |
 | Binary (admin-owned) | `/usr/local/lib/cm-agent/cm-agent` | `/Library/Application Support/ClaudeMonitor/bin/cm-agent` | `%ProgramFiles%\ClaudeMonitor\cm-agent.exe` |
 | Service home (account only) | `/var/lib/cm-agent` | `/Library/Application Support/ClaudeMonitor/home` | `%ProgramData%\ClaudeMonitor\service` |
 | Exec policy file (admin-owned) | `/etc/cm-agent/exec.json` | `/Library/Application Support/ClaudeMonitor/exec.json` | `%ProgramFiles%\ClaudeMonitor\exec.json` |
-| Unit / definition | `/etc/systemd/system/cm-agent.service` | `/Library/LaunchDaemons/com.claudemonitor.agent.plist` | service `cm-agent` (`sc query cm-agent`) |
-| Login code (while not connected) | `<home>/login-code.txt`, `journalctl -u cm-agent` | `<home>/login-code.txt` | `<home>\login-code.txt` |
+| Unit / definition | `/etc/systemd/system/cm-agent.service` | `/Library/LaunchDaemons/com.claudemonitor.agent.plist` | service `aipod` (`sc query aipod`) |
+| Login code (while not connected) | `<home>/login-code.txt`, `journalctl -u aipod` | `<home>/login-code.txt` | `<home>\login-code.txt` |
+
+**The names (ADR-0013, tier 2).** The table above is what services installed before the rename have. A fresh `install --service` now uses the aipod names: service and unit `aipod` (`/etc/systemd/system/aipod.service`), accounts `aipod` / `_aipod` / `NT SERVICE\aipod`,
+launchd label `aipod.agent` (`/Library/LaunchDaemons/aipod.agent.plist`), folders `/usr/local/lib/aipod`, `/var/lib/aipod`, `/Library/Application Support/aipod/{bin,home}`, `%ProgramFiles%\aipod`, `%ProgramData%\aipod\service`, the exec policy in
+`/etc/aipod/exec.json`, `/Library/Application Support/aipod/exec.json`, `%ProgramFiles%\aipod\exec.json`, and the sudoers file `aipod-run`; the binary file inside keeps the name `cm-agent`. A service that already exists keeps its old names when it is
+upgraded with `install --service`, and `sudo aipod service migrate` moves it: `--dry-run` shows the plan; the real run stops the old service, copies its home and policy, installs the new service, waits up to 90 s for it to reach the server (Linux, macOS) and only then **disables** the old
+one, which stays for 7 days; `--undo` goes back (the data the new service kept up comes back too), `--finish` removes the old service, account, folders, policy and sudoers file (before 7 days only with `--now`). A failure before the disable puts everything back and starts the old service. On
+**Windows** the tokens are encrypted for the old service account and the new account cannot read them: the machine logs in again and an administrator approves a code. The agent reads the exec policy from the new place first and the old one second.
 
 The service units set `CM_SERVICE=1`, `CM_AGENT_HOME=<service home>` and the single-file extraction folder
-(`DOTNET_BUNDLE_EXTRACT_BASE_DIR=<home>/.net`); nobody sets them by hand. `cm-agent uninstall --service` removes the
+(`DOTNET_BUNDLE_EXTRACT_BASE_DIR=<home>/.net`); nobody sets them by hand. `aipod uninstall --service` removes the
 service and **keeps** the home (the login), the exec policy and the binary.
 
 **The exec policy file** is what decides how much a remote run may do on that machine. The service account cannot
 write it (on Unix it must be owned by root and not group- or world-writable, as must its folder, and neither may be a
 link; on Windows the service must not be able to open it for writing) and **anything doubtful means `off`**: a missing,
-unreadable, invalid or writable file grants nothing. `cm-agent install --service --exec off|argv|shell` writes it
+unreadable, invalid or writable file grants nothing. `aipod install --service --exec off|argv|shell` writes it
 (default `off`; `shell` is a separate, stronger opt-in); an admin may edit it afterwards and restart the service:
 
 ```json
@@ -289,11 +324,11 @@ apply either way. A relative path makes the whole file invalid, hence `off`. The
 
 - **Schedules.** An admin turns on "Allow schedules" in the workspace's remote work settings (off by default). The owner of a machine then starts a schedule for an approved job without a placeholder in its command, on a machine that is not production or a
   database: every 15 minutes to 7 days, or once a day at a UTC time. At most 5 per machine, never overlapping its own last run, no catch-up after downtime, paused after three failed runs in a row, stoppable on the machine's page at any time.
-- **Signed approvals.** Each owner makes a key on their account page (the browser makes it; its private half never leaves the browser) and registers it. On a machine that should trust it, the admin runs `cm-agent approvers add <public key> --name <name>`
-  (copy the key from the account page and compare the fingerprint it prints), then `cm-agent config approvals required`. From then on the machine runs only what a pinned key signed; it takes no job, grant or schedule (each run needs its own signature),
-  and it refuses everything until a key is pinned. `cm-agent approvers list|remove <fingerprint>` and `cm-agent status` show what is pinned. The file is `approvers.json` beside `exec.json` on a service (root-owned: the agent distrusts it otherwise) and in the
+- **Signed approvals.** Each owner makes a key on their account page (the browser makes it; its private half never leaves the browser) and registers it. On a machine that should trust it, the admin runs `aipod approvers add <public key> --name <name>`
+  (copy the key from the account page and compare the fingerprint it prints), then `aipod config approvals required`. From then on the machine runs only what a pinned key signed; it takes no job, grant or schedule (each run needs its own signature),
+  and it refuses everything until a key is pinned. `aipod approvers list|remove <fingerprint>` and `aipod status` show what is pinned. The file is `approvers.json` beside `exec.json` on a service (root-owned: the agent distrusts it otherwise) and in the
   agent's home for an interactive one. Off by default; nothing changes for a machine that does not turn it on.
-- **A separate run account (Linux and macOS service agents).** `sudo cm-agent install --service --server <url> --exec argv --run-account [<name>]` (default `cm-run` on Linux, `_cmrun` on macOS) creates a non-login account, adds the service account to its
+- **A separate run account (Linux and macOS service agents).** `sudo aipod install --service --server <url> --exec argv --run-account [<name>]` (default `cm-run` on Linux, `_cmrun` on macOS) creates a non-login account, adds the service account to its
   group, makes `<home>/run-work` (setgid, shared by the two accounts) and writes `/etc/sudoers.d/cm-agent-run` (checked with `visudo -cf` first) so that only the service account may start commands, and only as the run account. Remote runs then start as that account, with
   `run-work` as their home and working directory. `uninstall --service` removes the sudoers file and keeps the accounts. Windows is refused. Not verified on a real host (ADR-0010 §5).
 
@@ -307,24 +342,24 @@ Design, trust model and limits: [ADR-0004](docs/adr-0004-agent-self-update.md). 
 unless a person runs the command below or turns the setting on.
 
 ```bash
-cm-agent update --check                  # look only: prints "update available: <version>" or why none is taken
-cm-agent update                          # install the newest signed build of this agent's channel
-cm-agent config auto-update off|check|on # what the daemon may do by itself (default off); no argument prints the setting
+aipod update --check                  # look only: prints "update available: <version>" or why none is taken
+aipod update                          # install the newest signed build of this agent's channel
+aipod config auto-update off|check|on # what the daemon may do by itself (default off); no argument prints the setting
 ```
 
-- `cm-agent update` and `--check` are your own decision and ignore both settings below. The agent must be logged in (the build comes from its own
-  server) and installed (`cm-agent install`); the installed binary in the agent home is what is replaced. Exit code 0 = installed or up to date, 1 = refused or failed, 2 = usage.
-- **Machine setting:** `cm-agent config auto-update off|check|on` (saved in `agent.json`) or `CM_AUTO_UPDATE` (wins when set). `check` looks every 6 h and reports; `on` also installs.
+- `aipod update` and `--check` are your own decision and ignore both settings below. The agent must be logged in (the build comes from its own
+  server) and installed (`aipod install`); the installed binary in the agent home is what is replaced. Exit code 0 = installed or up to date, 1 = refused or failed, 2 = usage.
+- **Machine setting:** `aipod config auto-update off|check|on` (saved in `agent.json`) or `CM_AUTO_UPDATE` (wins when set). `check` looks every 6 h and reports; `on` also installs.
 - **Workspace setting** `agentUpdate` (`off` default, `check`, `on`): the cap an owner or admin sets in the workspace settings on the web. **The lower of the two applies.**
   While the effective mode is `off` the daemon makes no update call at all.
-- `cm-agent status` shows `auto-update: <effective> (this machine: <m>, workspace: <w>)`, `update available: <version>`, `update: <from> -> <to> is being checked` while a new
+- `aipod status` shows `auto-update: <effective> (this machine: <m>, workspace: <w>)`, `update available: <version>`, `update: <from> -> <to> is being checked` while a new
   daemon is on probation, and `last update check: <code> (<reason>) <dd/mm/yyyy HH:mm>`. After a refused update the code says why (for example `bad-signature`, `channel`,
   `downgrade`, `hash-mismatch`, `no-key`); after a rolled-back one `status` also prints `update <version> was rolled back and is not retried by itself`. The same lines are in `agent.log`.
 - **Replacement:** the new binary is staged as `cm-agent.new`, the old one is kept as `cm-agent.prev` (one version back), the daemon is stopped through a `daemon.stop`
   file and started again from the new binary. If it does not report its version and get an answer from the API within 90 s, the previous binary is put back automatically.
 - **MCP processes** (one per Claude Code session) keep running the old version until their session ends; they are not killed. Hooks use the new binary at once.
-- **From the web** (agent 0.5.0 and later, [ADR-0005](docs/adr-0005-remote-work.md) "Agent actions from the web"): the machine page has an **Agent actions** card with four buttons for the machine's owner: **Status** (what `cm-agent status` prints), **Check for update**, **Update** (the same as `cm-agent update`) and **Restart** (the same as `cm-agent restart`). It is a fixed set, not a way to run commands: it needs no exec level and no workspace switch. Restart and Update ask for a recent sign-in (a fresh two-step code on a production or database machine). An action the agent has not taken within 10 minutes is dropped; an agent older than 0.5.0 ignores it, so update that one by hand once. A service agent cannot replace its own binary, so Update there reports the refusal and an administrator upgrades it.
-- **The standards repository's `install.py`** may run `cm-agent update` instead of rebuilding when an agent is already installed (it only needs the exit code); that is a
+- **From the web** (agent 0.5.0 and later, [ADR-0005](docs/adr-0005-remote-work.md) "Agent actions from the web"): the machine page has an **Agent actions** card with four buttons for the machine's owner: **Status** (what `aipod status` prints), **Check for update**, **Update** (the same as `aipod update`) and **Restart** (the same as `aipod restart`). It is a fixed set, not a way to run commands: it needs no exec level and no workspace switch. Restart and Update ask for a recent sign-in (a fresh two-step code on a production or database machine). An action the agent has not taken within 10 minutes is dropped; an agent older than 0.5.0 ignores it, so update that one by hand once. A service agent cannot replace its own binary, so Update there reports the refusal and an administrator upgrades it.
+- **The standards repository's `install.py`** may run `aipod update` instead of rebuilding when an agent is already installed (it only needs the exit code); that is a
   choice of that script, nothing here depends on it.
 
 ### Releasing an agent build (maintainer, macOS)
@@ -336,7 +371,7 @@ cm-agent config auto-update off|check|on # what the daemon may do by itself (def
 3. Deploy copies `downloads/` as before (`docs/deploy-windows.md`). **The server offers whatever its web root holds**, so deploy test builds to test and prod builds to prod.
    **Or publish them on a download host** (an R2 bucket behind a public domain): `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh test|prod` uploads the build to `daemons/<channel>/` (and keeps it under `daemons/<version>/<channel>/`),
    and the server's `monitor.env` gets `MONITOR_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>`. The update check then reads `manifest.json` there and offers addresses there; `/downloads/<file>` on the server redirects to the host (`docs/release.md`, "Download host").
-4. Agents already installed at that channel take it when a person runs `cm-agent update` or when `auto-update` allows it.
+4. Agents already installed at that channel take it when a person runs `aipod update` or when `auto-update` allows it.
 
 ## Updating Claude Code (optional, off by default)
 
@@ -345,13 +380,13 @@ it never downloads or replaces a Claude binary and never ends or restarts a sess
 owner restarts them). It needs BOTH switches, and a CLI install (npm or native; the desktop app updates itself and is never touched):
 
 ```bash
-cm-agent config claude-update on         # this machine; the workspace admin must also tick "Allow agents to update Claude Code"
-cm-agent claude-update cancel            # stop a countdown that is running (not tried again for a day)
-cm-agent status                          # shows claude-update: on/off, a running countdown, the last result and versions
+aipod config claude-update on         # this machine; the workspace admin must also tick "Allow agents to update Claude Code"
+aipod claude-update cancel            # stop a countdown that is running (not tried again for a day)
+aipod status                          # shows claude-update: on/off, a running countdown, the last result and versions
 ```
 
 It runs only when every Claude session on the machine has been idle for 10 minutes, after a 5-minute countdown announced in `agent.log`,
-`cm-agent status` and (macOS only) a desktop notification. `claude update` has no dry run, so an enabled machine gets this notice about
+`aipod status` and (macOS only) a desktop notification. `claude update` has no dry run, so an enabled machine gets this notice about
 once a day even when Claude Code is current. Not verified on this repository's machines: the native-installer paths, Windows, and the
 Windows notification (not built).
 
@@ -377,6 +412,9 @@ release, backups, restore drill, rollback) is [docs/deploy-windows.md](docs/depl
 `.env.example` lists every variable with its default and what it is for. The API reads them only in
 `src/ClaudeMonitor.Api/Config/ApiConfig.cs`.
 
+The agent and the tray speak the operating system's language when it is English, Turkish or German, and English otherwise. `AIPOD_LANG=en|tr|de` overrides
+that for one run or one machine (for example `AIPOD_LANG=de aipod status`); it is read by the agent and the tray only, never by the API (ADR-0014, Part A).
+
 ## Secret and token inventory
 
 The repository holds **no secrets**. The API's live in the server's environment (a root-only environment file
@@ -399,7 +437,7 @@ never in a log and never leaves the machine except in the `Authorization` header
 
 | Secret | What it is | Where to get it | Stored | Owner | Rotation |
 |---|---|---|---|---|---|
-| a service agent's credentials (`cred-access-token`, `cred-refresh-token`) | the access and refresh tokens of that machine's service agent, issued when its login code is approved on the web | `cm-agent` service's own first login (the code is in its log and `login-code.txt`, approved on the web) | Linux and macOS: 0600 files `cred-*` in the service home (`/var/lib/cm-agent`, `/Library/Application Support/ClaudeMonitor/home`), refused if their owner or mode is wrong; Windows: DPAPI **CurrentUser** blobs `cred-*.bin` in `%ProgramData%\ClaudeMonitor\service` (never LocalMachine scope) | the machine's admin | on any doubt: revoke the agent on the web (Machines page), then log the service in again. Refresh tokens rotate on every use, so there is nothing else to rotate on a schedule |
+| a service agent's credentials (`cred-access-token`, `cred-refresh-token`) | the access and refresh tokens of that machine's service agent, issued when its login code is approved on the web | `aipod` service's own first login (the code is in its log and `login-code.txt`, approved on the web) | Linux and macOS: 0600 files `cred-*` in the service home (`/var/lib/cm-agent`, `/Library/Application Support/ClaudeMonitor/home`), refused if their owner or mode is wrong; Windows: DPAPI **CurrentUser** blobs `cred-*.bin` in `%ProgramData%\ClaudeMonitor\service` (never LocalMachine scope) | the machine's admin | on any doubt: revoke the agent on the web (Machines page), then log the service in again. Refresh tokens rotate on every use, so there is nothing else to rotate on a schedule |
 
 A remote run that executes as the service account can read that account's files, these tokens included
 (ADR-0005, "Consequences"); that is why the exec level is local, admin-owned and `off` by default.

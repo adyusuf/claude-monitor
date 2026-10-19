@@ -26,7 +26,7 @@ public sealed class HarnessKind
     public DateTimeOffset AddedAt { get; set; }
 }
 
-public sealed class Project
+public sealed class Repo
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid WorkspaceId { get; set; }
@@ -41,7 +41,7 @@ public sealed class HarnessSession
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid WorkspaceId { get; set; }
     public Guid AgentId { get; set; }
-    public Guid? ProjectId { get; set; }
+    public Guid? RepoId { get; set; }
     public string HarnessKind { get; set; } = "";
     public string ExternalId { get; set; } = "";
     public string? Title { get; set; }

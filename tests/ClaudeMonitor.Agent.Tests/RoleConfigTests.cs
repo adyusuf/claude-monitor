@@ -4,7 +4,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>"cm-agent config role" and SavedSettings.SaveRole (ADR-0008 §3a): what a machine says it is, saved in agent.json.</summary>
+/// <summary>"aipod config role" and SavedSettings.SaveRole (ADR-0008 §3a): what a machine says it is, saved in agent.json.</summary>
 public sealed class RoleConfigTests : IDisposable
 {
     private readonly TempHome home = new();
@@ -102,6 +102,6 @@ public sealed class RoleConfigTests : IDisposable
     {
         var (_, output, _) = await Cli_();
 
-        Assert.Contains("cm-agent config role <environment|none> <function|none>", output, StringComparison.Ordinal);
+        Assert.Contains("aipod config role <environment|none> <function|none>", output, StringComparison.Ordinal);
     }
 }

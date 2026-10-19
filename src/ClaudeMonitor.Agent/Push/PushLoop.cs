@@ -25,7 +25,7 @@ public static class PushLoop
             }
             catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException)
             {
-                report($"cm-agent push: {e.GetType().Name}"); // type name only; never content
+                report($"aipod push: {e.GetType().Name}"); // type name only; never content
             }
         }
     }

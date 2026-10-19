@@ -46,14 +46,14 @@ public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
         var outcome = await client.CreateRunAsync(create);
         if (outcome.Pending)
         {
-            return $"Queued on this machine as request {clientKey}; the agent sends it as soon as it can. Call monitor_run_result with runId {clientKey}.";
+            return $"Queued on this machine as request {clientKey}; the agent sends it as soon as it can. Call {McpToolNames.Name("run_result")} with runId {clientKey}.";
         }
 
         if (!outcome.Ok) return MachineTools.Failure(outcome.Error!);
         var run = outcome.Value!;
         return run.Status == RunStatuses.PendingApproval
-            ? $"Run {run.Id} on {RemoteEnvelope.Label(target.Hostname)} waits for its owner's approval on the web (until {run.ExpiresAt:O}). Call monitor_run_result with runId {run.Id} to follow it."
-            : $"Run {run.Id} on {RemoteEnvelope.Label(target.Hostname)}: {run.Status}{(run.GrantId is { } g ? $" (covered by grant {g})" : "")}. Call monitor_run_result with runId {run.Id}.";
+            ? $"Run {run.Id} on {RemoteEnvelope.Label(target.Hostname)} waits for its owner's approval on the web (until {run.ExpiresAt:O}). Call {McpToolNames.Name("run_result")} with runId {run.Id} to follow it."
+            : $"Run {run.Id} on {RemoteEnvelope.Label(target.Hostname)}: {run.Status}{(run.GrantId is { } g ? $" (covered by grant {g})" : "")}. Call {McpToolNames.Name("run_result")} with runId {run.Id}.";
     }
 
     [McpServerTool(Name = "monitor_run_result", ReadOnly = true)]

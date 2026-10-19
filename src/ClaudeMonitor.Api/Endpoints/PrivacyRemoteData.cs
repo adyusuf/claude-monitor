@@ -195,7 +195,8 @@ public static class PrivacyRemoteData
         // ADR-0008 §3a′: the user's machines' project rows and listening services are captured facts, and the project key of an emptied run goes too.
         await db.MachineProjects.Where(p => agentIds.Contains(p.AgentId)).ExecuteDeleteAsync(ct);
         await db.Agents.Where(a => agentIds.Contains(a.Id)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Services, (string?)null)
-            .SetProperty(a => a.ServicesAt, (DateTimeOffset?)null).SetProperty(a => a.ShareServices, false), ct);
+            .SetProperty(a => a.ServicesAt, (DateTimeOffset?)null).SetProperty(a => a.ShareServices, false)
+            .SetProperty(a => a.ClaudeInventory, (string?)null).SetProperty(a => a.ClaudeInventoryAt, (DateTimeOffset?)null).SetProperty(a => a.ShareInventory, false), ct);
         await db.MachineMetrics.Where(m => agentIds.Contains(m.AgentId)).ExecuteDeleteAsync(ct);
         await db.MachineAlerts.Where(a => agentIds.Contains(a.AgentId)).ExecuteDeleteAsync(ct);
     }

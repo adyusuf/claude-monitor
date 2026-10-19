@@ -16,7 +16,7 @@ public static class LaunchdDaemon
     public const int LastId = 399;
 
     private const string AccountShell = "/usr/bin/false";
-    private const string AccountRealName = "Claude Monitor agent";
+    private const string AccountRealName = "aipod agent";
 
     public static string Render(ServiceLayout l)
     {
@@ -27,7 +27,7 @@ public static class LaunchdDaemon
         b.AppendLine("""<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">""");
         b.AppendLine("""<plist version="1.0">""");
         b.AppendLine("<dict>");
-        b.AppendLine($"  <key>Label</key><string>{Esc(Label)}</string>");
+        b.AppendLine($"  <key>Label</key><string>{Esc(l.Names.Label)}</string>");
         b.AppendLine("  <key>ProgramArguments</key>");
         b.AppendLine($"  <array><string>{Esc(l.Binary)}</string><string>daemon</string></array>");
         b.AppendLine($"  <key>UserName</key><string>{Esc(l.Account)}</string>");

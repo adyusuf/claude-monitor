@@ -1,12 +1,15 @@
 import { enMachines } from "./en.machines";
+import { enProjects } from "./en.projects";
+import { enIssues } from "./en.issues";
+import { enSprints } from "./en.sprints";
 import { enTwoStep } from "./en.twoStep";
 import { enRemote } from "./en.remote";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
 export const en = {
-  app: { name: "Claude Monitor", tagline: "Follow your AI coding sessions, live." },
+  app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
-    sessions: "Sessions", machines: "Machines", members: "Members", settings: "Workspace settings",
+    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", settings: "Workspace settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
   },
@@ -71,7 +74,26 @@ export const en = {
     invalid_tag: "Tags are key=value pairs: at most 10, letters, digits, dot, underscore and dash, 1 to 32 characters each.",
     invalid_note: "The note is at most 2000 characters and may not contain control characters.",
     invalid_kind: "Pick a kind: test, build, deploy or other.",
+    claude_control_not_accepted: "The owner of this machine has not switched on starting Claude from the web.", claude_control_environment: "Claude is started from the web only on development and test machines that an admin has set up.",
+    claude_control_service_mode: "A service agent cannot start Claude.", claude_not_installed: "No Claude Code was found on this machine.", invalid_permission_mode: "Pick a permission mode from the list.",
+    invalid_session_ref: "That is not a session id.", claude_not_started_here: "Only a session started from here can be stopped from here.",
     invalid_project: "The project key is 1 to 200 characters without control characters.",
+    no_test_command: "The machine reports no test command for that project (or not recently). Set one at the machine with aipod config projects test.",
+    invalid_plugin: "A plugin is written name@marketplace, with letters, digits, dot, underscore and dash only.", invalid_setting: "Pick a setting and a value from the lists.", action_busy: "The agent is still busy with another change of this kind. Wait for it to finish.",
+    name_taken: "That name is already used here. Pick another.", invalid_list: "Check the list: an entry is empty, too long, repeated or not allowed, or there are too many.",
+    amount_and_currency: "Give the budget amount and its currency together, or neither.", invalid_currency: "Use three capital letters, such as EUR.",
+    before_start: "The end date cannot be before the start date.", invalid_value: "Pick a value from the list.", invalid_url: "That address is not allowed here. Use an https, ssh or git address for the repository and an http or https address for an environment, without a password.",
+    limit_reached: "The most that fits here has been reached.", archived: "This is archived. Restore it first.",
+    invalid_parent: "The parent must be an epic of this project.", invalid_application: "Pick an application of this project.", invalid_component: "Pick a component of the chosen application.", invalid_release: "Pick a release of the chosen application.", bug_only: "Only a bug carries the bug details.", invalid_issue: "Pick another issue of this project.", self_link: "An issue cannot be linked to itself.", cycle: "That link would make the issues block each other in a loop.", duplicate_link: "These two issues are already linked.",
+    released: "A release that went out cannot be cancelled.", cancelled: "A cancelled release cannot be changed.",
+    sprint_active: "Another sprint of this scope is already active. Close it first.", dates_required: "Set the start and end dates before starting the sprint.",
+    invalid_sprint: "Pick a planned sprint of the same scope.", wrong_scope: "This sprint belongs to an application: it takes only that application's issues.",
+    closed: "This sprint is closed.", not_planned: "Only a planned sprint can be deleted.",
+    invalid_run: "Pick a run of this workspace.",
+    invalid_auto_mode: "The automatic mode is on_message or off.",
+    invalid_auto_project: "Pick a project this machine has reported and Claude Code trusts.",
+    invalid_first_prompt: "The first prompt is 1 to 2000 characters of text.", claude_folder_not_trusted: "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt.",
+    claude_start_pending: "Another start on this machine is still waiting: try again when it has finished.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", s: "s", m: "m", h: "h", d: "d" },
@@ -131,7 +153,7 @@ export const en = {
   },
   activity: {
     filterLabel: "Show", all: "All", inputs: "Inputs", assistant: "Assistant", tools: "Tools",
-    monitorInput: "Claude Monitor (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
+    monitorInput: "Podium (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
     sentBy: "sent by {name}", typedBy: "typed by {name}", someone: "a member",
     waiting: "Waiting", pendingTitle: "Waiting to be applied",
     deliveredWith: "delivered together with the message typed in the session",
@@ -139,6 +161,9 @@ export const en = {
     status: { queued: "Waiting", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
   },
   machines: enMachines,
+  projects: enProjects,
+  issues: enIssues,
+  sprints: enSprints,
   twoStep: enTwoStep,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
@@ -162,8 +187,8 @@ export const en = {
     agentUpdateCheck: "Look only: agents find out that an update exists",
     agentUpdateOn: "Allowed: agents may install signed updates by themselves",
     claudeUpdate: "Allow agents to update Claude Code",
-    claudeUpdateHint: "Only when every Claude session on the machine is idle, after a countdown the person can cancel, and only with Claude Code's own update command. Each machine must also turn it on (cm-agent config claude-update on). Running sessions are never restarted.",
-    agentUpdateHint: "The most an agent may do on its own. Each machine must also turn it on (cm-agent config auto-update); the lower of the two applies. Updates are signed and verified by the agent.",
+    claudeUpdateHint: "Only when every Claude session on the machine is idle, after a countdown the person can cancel, and only with Claude Code's own update command. Each machine must also turn it on (aipod config claude-update on). Running sessions are never restarted.",
+    agentUpdateHint: "The most an agent may do on its own. Each machine must also turn it on (aipod config auto-update); the lower of the two applies. Updates are signed and verified by the agent.",
   },
   account: {
     title: "Account", providers: "Sign-in methods", linked: "Linked", link: "Link {provider}", password: "Password",
@@ -171,7 +196,8 @@ export const en = {
     data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
     deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",
     mfa: "Two-step sign-in", mfaOn: "On: every sign-in also asks for a code from your authenticator app.",
-    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
+    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
+
     mfaOpen: "Open in authenticator", mfaEnable: "Turn on", mfaRecovery: "Recovery codes. Keep them somewhere safe: each signs in once without the app. They are shown only now.",
     mfaDisable: "Turn off", mfaDisabled: "Two-step sign-in is off.",
     deleteConfirm: "Type {word} to confirm", deleteButton: "Delete my account", deleted: "Your account is deleted.",
@@ -188,13 +214,14 @@ export const en = {
     plugin1: "Install the plugin. Claude Code asks for the server address, which is:",
     plugin2: "Then, in Claude Code, connect this machine (a code appears; approve it on the page that opens):",
     orManual: "Or install the agent by hand:",
+    pluginOld: "If this machine already has the old monitor-agent plugin: install aipod and run /aipod:connect, which removes the old one so no event is reported twice.",
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: enRemote,
   approvals: {
     title: "Approval keys", intro: "A key made in this browser signs the runs you allow. A machine whose admin pinned the key and switched on signed approvals runs nothing that was not signed with it, so even a compromised server cannot start a run in your name. The private half never leaves this browser.",
     thisBrowser: "This browser", registered: "registered", notRegistered: "not registered yet", defaultName: "This browser", name: "A name for this key", make: "Make a key and register it", register: "Register this key",
-    registeredKeys: "Registered keys", retire: "Retire", pinHint: "On a machine that should trust this key, an admin pins it (compare the fingerprint first), then switches on signed approvals (cm-agent config approvals required):",
+    registeredKeys: "Registered keys", retire: "Retire", pinHint: "On a machine that should trust this key, an admin pins it (compare the fingerprint first), then switches on signed approvals (aipod config approvals required):",
     runNeedsKey: "This machine only runs what a pinned key signed: allowing signs this run with the key of this browser.", needKey: "This machine requires a signed approval, and this browser has no key. Make one on your account page first.",
   },
   schedules: {
@@ -207,7 +234,7 @@ export const en = {
     newHint: "A schedule runs an approved job by itself. It stops after three failed runs in a row, never overlaps its own last run, and you can stop it here at any time.",
     noJobs: "A schedule needs an active job without a placeholder in its command.",
   },
-  notFound: { title: "Page not found", home: "Go to sessions" },
+  notFound: { title: "Page not found", home: "Go to projects" },
 };
 
 export type Dictionary = typeof en;

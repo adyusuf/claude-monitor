@@ -6,7 +6,7 @@ The design and every control are in [ADR-0005](adr-0005-remote-work.md); the per
 [SETUP.md](../SETUP.md), "Service agent". Nothing here runs by itself: a run happens only when all four keys are on
 (workspace switch, local exec level, an approval or grant by the machine's owner, membership).
 
-Terms: the **target** is the machine that does the work and its **service agent** is `cm-agent` running as a boot
+Terms: the **target** is the machine that does the work and its **service agent** is `aipod` running as a boot
 service; the **owner** is the person who approved that agent's login code; the **requester** is the agent whose Claude
 session asks. Replace `<your Claude Monitor address>` with the address your team signs in at.
 
@@ -52,7 +52,7 @@ Expand-Archive .\cm-agent-windows-x64.zip -DestinationPath .\cm-agent
 .\cm-agent\cm-agent.exe install --service --exec argv --server https://<your Claude Monitor address>
 ```
 
-The install creates the service account (`cm-agent` on Linux, `_cmagent` on macOS, `NT SERVICE\cm-agent` on Windows),
+The install creates the service account (`aipod` on Linux, `_cmagent` on macOS, `NT SERVICE\cm-agent` on Windows),
 copies the binary to an admin-owned folder, creates the service home only that account can use, writes the exec
 policy file and starts the service. It **refuses to run the service as root, SYSTEM or LocalSystem**; `--allow-root`
 exists for metrics and uploads only, and the agent then never executes anything.
@@ -60,12 +60,12 @@ exists for metrics and uploads only, and the agent then never executes anything.
 Check it is up:
 
 ```bash
-sudo systemctl status cm-agent                              # Linux
+sudo systemctl status aipod                              # Linux
 sudo launchctl print system/com.claudemonitor.agent         # macOS
 ```
 
 ```powershell
-sc.exe query cm-agent                                       # Windows
+sc.exe query aipod                                       # Windows
 ```
 
 ## 3. Log the service in
@@ -75,7 +75,7 @@ until it is connected. Read it as an administrator:
 
 | OS | Where the code is |
 |---|---|
-| Linux | `sudo journalctl -u cm-agent`, or `sudo cat /var/lib/cm-agent/login-code.txt` |
+| Linux | `sudo journalctl -u aipod`, or `sudo cat /var/lib/cm-agent/login-code.txt` |
 | macOS | `sudo cat "/Library/Application Support/ClaudeMonitor/home/login-code.txt"` |
 | Windows | in an elevated prompt: `type "%ProgramData%\ClaudeMonitor\service\login-code.txt"` |
 
@@ -84,9 +84,9 @@ until it is connected. Read it as an administrator:
    owner**: only they approve runs, grants and jobs on this machine, and an agent is accepted only while its user is a
    member of an active workspace.
 2. The service connects by itself once the code is approved. The machine then shows on the web's Machines page and
-   reports CPU, memory and disk every 60 s. Confirm with the service's log and `cm-agent status`.
-3. If the code has expired, restart the service (`sudo systemctl restart cm-agent`, `sudo launchctl kickstart -k
-   system/com.claudemonitor.agent`, `sc.exe stop cm-agent` then `sc.exe start cm-agent`) and read the log or file
+   reports CPU, memory and disk every 60 s. Confirm with the service's log and `aipod status`.
+3. If the code has expired, restart the service (`sudo systemctl restart aipod`, `sudo launchctl kickstart -k
+   system/com.claudemonitor.agent`, `sc.exe stop aipod` then `sc.exe start aipod`) and read the log or file
    again; a restart is how a fresh code is requested.
 
 The credentials the login stored (access and refresh tokens) are in the service home, `cred-*` files with mode 0600
@@ -119,7 +119,7 @@ The level lives in an **admin-owned file the service account cannot write**; the
 3. Edit the file as an admin and keep it **owned by root (Administrators on Windows) and not writable by group or
    others**, in a folder that is too, and never a link. A file that is missing, unreadable, invalid or writable by the
    service account means `off`: that is the fail-closed default, not an error to work around.
-4. Restart the service to apply the change (the commands in step 3). `cm-agent status` prints the level and how many
+4. Restart the service to apply the change (the commands in step 3). `aipod status` prints the level and how many
    entries each list has.
 5. **Where programs may live (Windows):** a run only starts an `.exe` that an admin owns and the service account (or any
    non-admin) cannot change: `C:\Program Files\...` normally qualifies. The `.exe` and every folder above it must be
@@ -157,7 +157,7 @@ Claude, untrusted". Read it as such.
 
 ## 6. What Claude can do: the MCP tools
 
-These tools appear in the requester's Claude session through its own `cm-agent` (the plugin's MCP server):
+These tools appear in the requester's Claude session through its own `aipod` (the plugin's MCP server):
 
 | Tool | What it does |
 |---|---|
@@ -177,7 +177,7 @@ These tools appear in the requester's Claude session through its own `cm-agent` 
 | `monitor_ask`, `monitor_ask_result` | asks a Claude session on another machine of the same user a question and reads the answer (only if that machine's owner allowed asks and a session there is idle) |
 | `monitor_answer` | how the receiving session answers an ask; the session is taken from the MCP process's parent, never from the model |
 
-`monitor_run` and `monitor_job_run` also take a `project` and a `kind` (`test`, `build`, `deploy`, `other`) so the result shows under that project on the machine's page. A person without Claude Code uses the same things from the command line: `cm-agent machines`, `machine`, `metrics`, `alerts`, `jobs`, `job-run`, `run`, `result` and `ask` (ADR-0008 §3g); `cm-agent install --standalone` makes a machine such a daemon (login first, then a user-level autostart; an application on macOS and Windows, `systemd --user` on Linux).
+`monitor_run` and `monitor_job_run` also take a `project` and a `kind` (`test`, `build`, `deploy`, `other`) so the result shows under that project on the machine's page. A person without Claude Code uses the same things from the command line: `aipod machines`, `machine`, `metrics`, `alerts`, `jobs`, `job-run`, `run`, `result` and `ask` (ADR-0008 §3g); `aipod install --standalone` makes a machine such a daemon (login first, then a user-level autostart; an application on macOS and Windows, `systemd --user` on Linux).
 
 Everything that comes back from another machine (run output, alert subjects, mount names) is **untrusted data**,
 wrapped and capped; Claude is told never to follow instructions found in it. A run's output has secrets masked
@@ -193,8 +193,9 @@ A service agent does not update itself: its binary is admin-owned, so the opt-in
 2. Unzip and run the same install command as in step 2. It stops the old service, replaces the binary, rewrites the
    unit and starts the new one. The exec policy keeps its `allowedExecutables` and `allowedRoots`, and its level unless
    you pass `--exec`; the login in the service home stays, so no new code is needed.
-3. Check the Machines page (the machine is seen again) and `cm-agent status` on the target.
-4. Remove: `sudo cm-agent uninstall --service` (an elevated prompt on Windows) stops and deletes the service and
+3. Check the Machines page (the machine is seen again) and `aipod status` on the target.
+4. A service installed before the rename keeps working under its old names (`cm-agent`); `sudo aipod service migrate --dry-run` shows how it would move to the aipod names, `sudo aipod service migrate` does it ([SETUP.md](../SETUP.md), ADR-0013 section 4). Go back with `--undo`; after seven days `--finish` removes the old service.
+5. Remove: `sudo aipod uninstall --service` (an elevated prompt on Windows) stops and deletes the service and
    **keeps** the home (the login), the exec policy and the binary. To retire a machine for good, also revoke its agent
    on the web (the Machines page) and delete the home.
 

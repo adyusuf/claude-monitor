@@ -6,7 +6,7 @@ using ClaudeMonitor.Agent.Config;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// "cm-agent install": copies the binary to a stable place in the agent's home and registers a Claude Code plugin
+/// "aipod install": copies the binary to a stable place in the agent's home and registers a Claude Code plugin
 /// (a local marketplace with one plugin) whose hooks and MCP server run that binary. Claude Code then starts the
 /// agent itself: the first hook or MCP call wakes the daemon (ADR-0002). Nothing is registered with the OS.
 /// </summary>
@@ -48,27 +48,28 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
             File.Copy(sourceBinary, BinaryPath, overwrite: true);
         }
 
+        BinaryAlias.Ensure(BinaryPath);
         WritePlugin();
         var claude = run ?? Run;
         var added = claude("claude", ["plugin", "marketplace", "add", config.PluginDir]);
         var installed = added == 0 ? claude("claude", ["plugin", "install", $"{AgentConfig.PluginName}@{AgentConfig.MarketplaceName}", "--scope", "user"]) : added;
         if (installed != 0)
         {
-            output.WriteLine("Claude Code could not be reached. Register the plugin yourself:");
+            output.WriteLine(Strings.T(Msg.PluginNoClaude));
             output.WriteLine($"  claude plugin marketplace add \"{config.PluginDir}\"");
             output.WriteLine($"  claude plugin install {AgentConfig.PluginName}@{AgentConfig.MarketplaceName} --scope user");
             return 1;
         }
 
-        output.WriteLine($"Installed. Claude Code starts the agent with its sessions. Binary: {BinaryPath}");
+        output.WriteLine(Strings.T(Msg.PluginInstalled, BinaryPath));
         output.WriteLine(config.StopWait > TimeSpan.Zero
-            ? $"A finished turn waits up to {(int)config.StopWait.TotalSeconds} s for a prompt from the web."
-            : "A finished turn does not wait for the web (cm-agent install --stop-wait <seconds> changes that).");
+            ? Strings.T(Msg.PluginWaits, (int)config.StopWait.TotalSeconds)
+            : Strings.T(Msg.PluginNoWait));
         output.WriteLine(config.ChannelPushEnabled
-            ? $"Push is ON through a channel. Start Claude Code with:  claude {ChannelFlag}  (a channel is a research preview; the agent cannot enable it for you)."
+            ? Strings.T(Msg.PluginPushChannel, ChannelFlag)
             : config.InboxPushEnabled
-                ? "Push is ON through each session's inbox: a web message starts a turn in an idle session, with no start-up flag (ADR-0007)."
-                : "Web messages reach a session at its next prompt (cm-agent install --push inbox delivers them into an idle session).");
+                ? Strings.T(Msg.PluginPushInbox)
+                : Strings.T(Msg.PluginPushOff));
         return 0;
     }
 
@@ -77,7 +78,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         var claude = run ?? Run;
         claude("claude", ["plugin", "uninstall", $"{AgentConfig.PluginName}@{AgentConfig.MarketplaceName}"]);
         claude("claude", ["plugin", "marketplace", "remove", AgentConfig.MarketplaceName]);
-        output.WriteLine("The Claude Code plugin is removed. The agent's data stays in " + config.Home);
+        output.WriteLine(Strings.T(Msg.PluginRemoved, config.Home));
         return 0;
     }
 
@@ -102,7 +103,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         {
             ["name"] = AgentConfig.PluginName,
             ["version"] = AgentConfig.Version,
-            ["description"] = "Claude Monitor agent: hooks and an MCP server that run the installed cm-agent.",
+            ["description"] = "Claude Monitor agent: hooks and an MCP server that run the installed aipod.",
             ["author"] = new JsonObject { ["name"] = "Claude Monitor" },
         };
         // Push on: the MCP server is also a channel (ADR-0003). Without the entry (the default) the plugin is what it was.

@@ -12,7 +12,7 @@ public static class SystemdUnit
     public const string UnitPath = "/etc/systemd/system/cm-agent.service";
     public const string RunDir = "/run/systemd/system";
     public const string NoLoginShell = "/usr/sbin/nologin";
-    public const string Description = "Claude Monitor agent";
+    public const string Description = "aipod agent";
 
     // at least two segments, no space, %, $, quote, backslash, semicolon or newline (\z: $ would allow a trailing newline)
     private static readonly Regex SafePath = new(@"^(/[A-Za-z0-9._+@-]+){2,}\z", RegexOptions.CultureInvariant);

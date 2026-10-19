@@ -44,7 +44,7 @@ describe("the approval keys card", () => {
     mockApi({ "GET /me/approval-keys": { body: [] }, "POST /me/approval-keys": { body: {} } });
     const key = await approvalKeys.generate('My "own" laptop');
     renderPlain(<ApprovalKeysCard />);
-    expect(await screen.findByText(`cm-agent approvers add ${key.publicKey} --name "My own laptop"`)).toBeInTheDocument();
+    expect(await screen.findByText(`aipod approvers add ${key.publicKey} --name "My own laptop"`)).toBeInTheDocument();
     expect(screen.getByText(en.approvals.notRegistered, { exact: false })).toBeInTheDocument();
   });
 

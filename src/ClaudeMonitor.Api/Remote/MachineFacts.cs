@@ -47,6 +47,7 @@ public static class MachineFacts
         agent.Tools = profile.Tools is null ? null : Serialize(profile.Tools);
         agent.Capabilities = profile.Capabilities is null ? null : [.. profile.Capabilities.Where(AgentCapabilities.All.Contains).Distinct()];
         ApplyServices(agent, profile, now);
+        ClaudeInventoryFacts.Apply(agent, profile, now);
     }
 
     /// <summary>

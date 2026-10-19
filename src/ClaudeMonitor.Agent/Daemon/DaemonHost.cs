@@ -16,7 +16,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// "cm-agent daemon": the long-running part, one per user per machine (an exclusive lock on daemon.lock). It runs
+/// "aipod daemon": the long-running part, one per user per machine (an exclusive lock on daemon.lock). It runs
 /// until the process is stopped or the agent is revoked. Started by the first hook or MCP call that finds it absent
 /// (ADR-0002: the agent starts with the harness, not with the OS).
 /// </summary>
@@ -33,7 +33,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var identity = Identity.Load(config);
         if (!identity.Connected)
         {
-            log.Write("not connected: run `cm-agent login --server <url>`");
+            log.Write("not connected: run `aipod login --server <url>`");
             return 1;
         }
 
@@ -45,6 +45,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var streamStore = new LocalStore(config.DatabasePath);
         using var http = ApiClient.CreateHttp(identity.Server!, handler);
         using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout) { StreamIdleTimeout = config.StreamIdleTimeout };
+        flushStore.Set(AuthRefusal.ReasonKey, ""); // connected again: an earlier refusal no longer applies
         var relay = new Relay(config, flushStore, api, clock);
         var beat = new Relay(config, beatStore, api, clock);
         var settings = new Relay(config, settingsStore, api, clock);
@@ -55,7 +56,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var execStore = new LocalStore(config.DatabasePath);
         using var metricsStore = new LocalStore(config.DatabasePath);
         var remote = new RemoteRelay(config, remoteStore, api, clock);
-        var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os));
+        var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os), inventoryReader: new ClaudeInventoryReader(config, new SystemClaudeCli()));
         using var machinesStore = new LocalStore(config.DatabasePath);
         var machines = new MachineCache(config, machinesStore, api, clock);
         var executor = new RunExecutor(config, clock, log,
@@ -65,6 +66,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         runs.Recover();
         ScriptScratch.Sweep(config.Home, _ => false); // no run is running yet: whatever a crash left in the scratch folders goes
         if (monitor.Policy().RunAccount is not null) ScriptScratch.SweepFolder(RunAccount.WorkFolder(config.Home), _ => false, onlyRunFolders: true);
+        var claudeControl = new ClaudeControl(config, new SystemClaudeCli(), clock);
         var actions = new ActionRelay(api, log, async () =>
             {
                 await using var text = new StringWriter();
@@ -72,11 +74,12 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 return text.ToString();
             },
             ct => new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock).CheckAsync(ct),
-            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode);
+            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode, claudeControl, new ClaudeConfigControl(config, new SystemClaudeCli()));
         stream = new Relay(config, streamStore, api, clock) { Runs = runs, Actions = actions };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
         updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
+        Install.BinaryAlias.Ensure(config.BinaryPath); // the new name beside the old one, also after an update swapped the binary
         File.WriteAllText(config.PidPath, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         using (var updating = TryLock(config.UpdateLockPath))
         {
@@ -92,6 +95,12 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var asks = new AskPump(new LiveSettings(config, clock).Current, askStore, new SocketInboxTransport(),
             async (id, update, ct) => await api.RemoteAsync(HttpMethod.Post, $"api/agent/asks/{id}/status", JsonSerializer.SerializeToElement(update, ApiClient.Json), ct),
             () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), clock);
+        // The automatic Claude start (ADR-0014 P3) has its own connection and its own ask pump, only to ask which sessions could take an ask: the loops never share a connection.
+        using var autoStore = new LocalStore(config.DatabasePath);
+        var autoSettings = new LiveSettings(config, clock);
+        var autoAsks = new AskPump(autoSettings.Current, autoStore, new SocketInboxTransport(), (_, _, _) => Task.CompletedTask, () => false, clock);
+        var autoStart = new ClaudeAutoStart(autoSettings.Current, autoStore, claudeControl, (ask, now) => autoAsks.Candidates(ask, autoSettings.Current(), now).Count > 0,
+            () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), log, clock);
         var claudeUpdates = new ClaudeUpdater(config, claudeStore, new SystemProcessRunner(), new SystemNotifier(new SystemProcessRunner(), config.UpdateProbeTimeout), log, clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
         await Task.WhenAll(
@@ -108,6 +117,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             }, api, revoked, error => relay.UploadOutcome(error)),
             Loop("inbox", config.PushPollEvery, ct => inbox.PumpAsync(ct), api, revoked),
             Loop("asks", config.PushPollEvery, ct => asks.PumpAsync(ct), api, revoked),
+            Loop("claude-auto", config.ClaudeAutoEvery, ct => autoStart.RunOnceAsync(ct), api, revoked),
             Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
             Loop("settings", config.SettingsEvery, async ct =>
             {
@@ -122,7 +132,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         if (api.Disconnected)
         {
             (identity with { AgentId = null, WorkspaceId = null }).Save(config);
-            log.Write("the API refused this agent (revoked or expired): run `cm-agent login` again");
+            log.Write(AuthRefusal.Message(api.DisconnectReason));
+            flushStore.Set(AuthRefusal.ReasonKey, api.DisconnectReason ?? "");
+            flushStore.Set(AuthRefusal.AtKey, clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         }
 
         return 0;

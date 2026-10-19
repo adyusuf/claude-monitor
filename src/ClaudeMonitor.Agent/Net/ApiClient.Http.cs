@@ -76,9 +76,9 @@ public sealed partial class ApiClient
         await refreshing.WaitAsync(ct);
         try
         {
-            if (credentials.Read(Credentials.Refresh) is not { } refresh) return Fail();
+            if (credentials.Read(Credentials.Refresh) is not { } refresh) return Fail(NoRefreshToken);
             using var response = await http.PostAsJsonAsync("api/agent/token/refresh", new RefreshRequest(refresh), Json, ct);
-            if (!response.IsSuccessStatusCode) return Fail();
+            if (!response.IsSuccessStatusCode) return Fail(await RefusalReasonAsync(response, ct));
             SaveTokens((await response.Content.ReadFromJsonAsync<TokenResponse>(Json, ct))!);
             return true;
         }
@@ -87,10 +87,30 @@ public sealed partial class ApiClient
             refreshing.Release();
         }
 
-        bool Fail()
+        bool Fail(string reason)
         {
             Disconnected = true;
+            DisconnectReason = reason;
             return false;
+        }
+    }
+
+    /// <summary>The <c>reason</c> of the 401 problem document; an older server sends none, so the status code stands in. Only the closed set of codes is kept.</summary>
+    private static async Task<string> RefusalReasonAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        var fallback = $"http_{(int)response.StatusCode}";
+        try
+        {
+            using var doc = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                   && doc.RootElement.TryGetProperty("reason", out var reason) && reason.ValueKind == System.Text.Json.JsonValueKind.String
+                   && reason.GetString() is { Length: <= 40 } code && code.All(c => char.IsAsciiLetterLower(c) || c == '_')
+                ? code
+                : fallback;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return fallback; // not a problem document (a proxy's page, an empty body)
         }
     }
 

@@ -14,7 +14,7 @@ public sealed partial class ServiceInstaller
     /// <summary>Where the drop-in goes (a test points it elsewhere).</summary>
     public string SudoersFolder { get; init; } = SudoersDir;
 
-    private string SudoersPath => Path.Combine(SudoersFolder, RunAccount.SudoersFileName);
+    private string SudoersPath => Path.Combine(SudoersFolder, Layout().Names.SudoersFileName);
 
     private void EnsureRunAccount(ServiceLayout l, string account)
     {
@@ -51,7 +51,7 @@ public sealed partial class ServiceInstaller
     private void WriteSudoers(string serviceAccount, string runAccount)
     {
         Directory.CreateDirectory(SudoersFolder);
-        var temp = Path.Combine(SudoersFolder, "." + RunAccount.SudoersFileName + ".tmp");
+        var temp = Path.Combine(SudoersFolder, "." + Layout().Names.SudoersFileName + ".tmp");
         File.Delete(temp);
         var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
         if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.GroupRead;

@@ -183,7 +183,7 @@ public sealed partial class ActionRelayTests : IDisposable
         await NewRelay(spawnWorks: false).PerformAsync(action, CancellationToken.None);
 
         Assert.Equal(["report:delivered", "report:succeeded", "spawn:restart"], Order);
-        Assert.Contains("action restart: cm-agent restart could not be started", Log(), StringComparison.Ordinal);
+        Assert.Contains("action restart: aipod restart could not be started", Log(), StringComparison.Ordinal);
     }
 
     [Fact]

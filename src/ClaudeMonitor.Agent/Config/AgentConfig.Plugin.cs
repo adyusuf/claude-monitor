@@ -3,12 +3,12 @@ namespace ClaudeMonitor.Agent.Config;
 /// <summary>What the agent knows when Claude Code runs it from the marketplace plugin (ADR-0007, part B). All null in every other way of starting it.</summary>
 public sealed partial record AgentConfig
 {
-    /// <summary>The marketplace the repository publishes the plugin in (the other one, <see cref="MarketplaceName"/>, is the local copy `cm-agent install` writes).</summary>
+    /// <summary>The marketplace the repository publishes the plugin in (the other one, <see cref="MarketplaceName"/>, is the local copy `aipod install` writes).</summary>
     public const string ReleasesMarketplaceName = "monitor-agent-releases";
 
     /// <summary>
     /// The binary to run and to update (CM_BINARY), set by the plugin's wrapper script to the copy in its data directory. Null: the copy in
-    /// the agent's home, where `cm-agent install` puts it.
+    /// the agent's home, where `aipod install` puts it.
     /// </summary>
     public string? BinaryOverride { get; init; }
 
@@ -24,14 +24,14 @@ public sealed partial record AgentConfig
     /// <summary>
     /// The longest Stop-hook wait the plugin's hook timeout allows (CM_PLUGIN_STOP_WAIT_MAX, set by the plugin's wrapper script of a version whose
     /// hooks have the long timeout; zero when it is not set, as for an older plugin version, whose fixed 15 s would cut a longer wait off and could
-    /// lose a prompt taken just before). The saved stop wait (`cm-agent install --stop-wait`) is held to it for a plugin-started agent.
+    /// lose a prompt taken just before). The saved stop wait (`aipod install --stop-wait`) is held to it for a plugin-started agent.
     /// </summary>
     public TimeSpan PluginStopWaitMax { get; init; } = TimeSpan.Zero;
 
     /// <summary>How often the daemon looks at whether its plugin is still installed and enabled.</summary>
     public TimeSpan PluginWatchEvery { get; init; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>How long `cm-agent connect` waits for the login process to show its code before it says where to look.</summary>
+    /// <summary>How long `aipod connect` waits for the login process to show its code before it says where to look.</summary>
     public TimeSpan ConnectWait { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>A code shown less than this long ago is shown again instead of starting a second login.</summary>

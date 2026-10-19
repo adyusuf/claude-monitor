@@ -44,7 +44,7 @@ public sealed class ClaudeUpdaterRunTests : IDisposable
         Assert.Equal(Start.Add(kit.Config.ClaudeCountdown), DateTimeOffset.Parse(duringCountdown!, null, System.Globalization.DateTimeStyles.RoundtripKind));
 
         var message = Assert.Single(kit.Notifier.Messages);
-        Assert.Contains("cm-agent claude-update cancel", message, StringComparison.Ordinal);
+        Assert.Contains("aipod claude-update cancel", message, StringComparison.Ordinal);
         Assert.Contains("1 min", message, StringComparison.Ordinal);
 
         var state = kit.State;

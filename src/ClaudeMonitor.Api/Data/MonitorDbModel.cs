@@ -16,6 +16,9 @@ internal static class MonitorDbModel
         MonitorDbModelMachines.Configure(b);
         MonitorDbModelAsks.Configure(b);
         MonitorDbModelActions.Configure(b);
+        MonitorDbModelProjects.Configure(b);
+        MonitorDbModelIssues.Configure(b);
+        MonitorDbModelSprints.Configure(b);
         b.Entity<HarnessKind>().HasData(new HarnessKind
         {
             Code = "claude_code",
@@ -25,8 +28,12 @@ internal static class MonitorDbModel
         b.Entity<User>(e =>
         {
             e.HasIndex(x => x.EmailNormalized).IsUnique();
-            e.ToTable(t => t.HasCheckConstraint("ck_users_status",
-                In("status", UserStatuses.Active, UserStatuses.Disabled, UserStatuses.Deleted)));
+            e.Property(x => x.Language).HasMaxLength(2);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_users_status", In("status", UserStatuses.Active, UserStatuses.Disabled, UserStatuses.Deleted));
+                t.HasCheckConstraint("ck_users_language", "language IS NULL OR " + In("language", [.. Mail.MailTemplates.Languages]));
+            });
         });
         b.Entity<UserLogin>(e =>
         {
@@ -83,6 +90,8 @@ internal static class MonitorDbModel
         b.Entity<Agent>(e =>
         {
             e.Property(x => x.PushTransport).HasMaxLength(16);
+            e.Property(x => x.PluginId).HasMaxLength(PluginIds.Max);
+            e.Property(x => x.ClaudeAutoProject).HasMaxLength(RunKinds.ProjectKeyMax);
             e.HasIndex(x => new { x.MachineId, x.UserId }).IsUnique().HasFilter("status = 'active'");
             e.HasIndex(x => x.WorkspaceId);
             e.HasIndex(x => x.UserId);
@@ -102,12 +111,12 @@ internal static class MonitorDbModel
                 DeviceStatuses.Approved, DeviceStatuses.Denied, DeviceStatuses.Expired, DeviceStatuses.Consumed)));
         });
         b.Entity<HarnessKind>(e => e.HasKey(x => x.Code));
-        b.Entity<Project>(e => e.HasIndex(x => new { x.WorkspaceId, x.Key }).IsUnique());
+        b.Entity<Repo>(e => e.HasIndex(x => new { x.WorkspaceId, x.Key }).IsUnique());
         b.Entity<HarnessSession>(e =>
         {
             e.HasIndex(x => new { x.AgentId, x.HarnessKind, x.ExternalId }).IsUnique();
             e.HasIndex(x => new { x.WorkspaceId, x.LastEventAt, x.Id }).IsDescending(false, true, true);
-            e.HasIndex(x => new { x.ProjectId, x.LastEventAt }).IsDescending(false, true);
+            e.HasIndex(x => new { x.RepoId, x.LastEventAt }).IsDescending(false, true);
             e.ToTable(t => t.HasCheckConstraint("ck_harness_sessions_status", In("status", SessionStatuses.Active,
                 SessionStatuses.Idle, SessionStatuses.Waiting, SessionStatuses.Ended)));
         });
@@ -192,10 +201,10 @@ internal static class MonitorDbModel
         Fk<Agent, User>(x => x.UserId);
         Fk<Agent, Workspace>(x => x.WorkspaceId);
         Fk<AgentToken, Agent>(x => x.AgentId);
-        Fk<Project, Workspace>(x => x.WorkspaceId);
+        Fk<Repo, Workspace>(x => x.WorkspaceId);
         Fk<HarnessSession, Workspace>(x => x.WorkspaceId);
         Fk<HarnessSession, Agent>(x => x.AgentId);
-        Fk<HarnessSession, Project>(x => x.ProjectId);
+        Fk<HarnessSession, Repo>(x => x.RepoId);
         Fk<HarnessSession, HarnessKind>(x => x.HarnessKind);
         Fk<SessionTask, HarnessSession>(x => x.SessionId);
         Fk<SubagentRun, HarnessSession>(x => x.SessionId);

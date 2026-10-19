@@ -8,7 +8,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Tests;
 
 /// <summary>
-/// "cm-agent mcp" as a channel (ADR-0003), over its real transport: a child process speaking JSON-RPC on stdio, the way Claude
+/// "aipod mcp" as a channel (ADR-0003), over its real transport: a child process speaking JSON-RPC on stdio, the way Claude
 /// Code starts it. Push on: it declares claude/channel and writes a notification when a web prompt lands in the local database
 /// while it is idle. Push off: it is the server it always was.
 /// </summary>

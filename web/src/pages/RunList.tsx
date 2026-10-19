@@ -5,11 +5,13 @@ import { Button, Notice } from "../components/ui";
 import { VisibleText } from "../components/VisibleText";
 import { useErrorText, useI18n, type Key } from "../i18n";
 import { dateTime } from "../lib/format";
+import { isFinishedRun } from "../lib/issueRuns";
 import { RunFacts } from "./RunFacts";
+import { RunIssues } from "./RunIssues";
 import { RunOutput } from "./RunOutput";
 import { RunOutputAccount } from "./RunOutputAccount";
 
-function statusKey(status: RunStatus | string): Key {
+export function statusKey(status: RunStatus | string): Key {
   switch (status) {
     case "pending_approval":
       return "remote.status.pending_approval";
@@ -73,6 +75,7 @@ function RunRow({ run, ws, version, onChanged }: { run: WebRunView; ws: string; 
   const { t } = useI18n();
   const errorText = useErrorText();
   const [open, setOpen] = useState(false);
+  const [issuesOpen, setIssuesOpen] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   const cancel = async () => {
@@ -93,9 +96,11 @@ function RunRow({ run, ws, version, onChanged }: { run: WebRunView; ws: string; 
         </button>
         <span className="muted small">{run.requesterUser} · {run.requesterHostname}</span>
         <span className="muted small">{dateTime(run.createdAt)}</span>
+        {isFinishedRun(run) ? <Button variant="ghost" aria-expanded={issuesOpen} onClick={() => setIssuesOpen(!issuesOpen)}>{t("issues.runIssues")}</Button> : null}
         {run.visible && CANCELLABLE.includes(run.status) ? <Button variant="ghost" onClick={() => void cancel()}>{t("remote.cancelRun")}</Button> : null}
       </div>
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
+      {issuesOpen ? <RunIssues run={run} ws={ws} /> : null}
       {open ? (
         <div className="run-detail">
           <RunFacts run={run} ws={ws} />
