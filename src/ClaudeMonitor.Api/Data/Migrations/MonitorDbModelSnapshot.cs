@@ -988,6 +988,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("severity");
 
+                    b.Property<Guid?>("SprintId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sprint_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1046,6 +1050,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.HasIndex("ReleaseId")
                         .HasDatabaseName("ix_issues_release_id");
+
+                    b.HasIndex("SprintId")
+                        .HasDatabaseName("ix_issues_sprint_id");
 
                     b.HasIndex("UpdatedBy")
                         .HasDatabaseName("ix_issues_updated_by");
@@ -3050,6 +3057,152 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.ToTable("session_usage", (string)null);
                 });
 
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.Sprint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<decimal?>("Capacity")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("capacity");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<string>("Goal")
+                        .HasColumnType("text")
+                        .HasColumnName("goal");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid?>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("planned")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sprints");
+
+                    b.HasIndex("ApplicationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sprints_active_application")
+                        .HasFilter("status = 'active' AND application_id IS NOT NULL");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_sprints_created_by");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sprints_active_project")
+                        .HasFilter("status = 'active' AND application_id IS NULL");
+
+                    b.HasIndex("ReleaseId")
+                        .HasDatabaseName("ix_sprints_release_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_sprints_updated_by");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("ix_sprints_workspace_id");
+
+                    b.HasIndex("ProjectId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sprints_project_id_number");
+
+                    b.ToTable("sprints", t =>
+                        {
+                            t.HasCheckConstraint("ck_sprints_capacity", "capacity IS NULL OR capacity >= 0");
+
+                            t.HasCheckConstraint("ck_sprints_dates", "start_date IS NULL OR end_date IS NULL OR end_date >= start_date");
+
+                            t.HasCheckConstraint("ck_sprints_number", "number > 0");
+
+                            t.HasCheckConstraint("ck_sprints_status", "status IN ('planned', 'active', 'closed')");
+                        });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.SprintMember", b =>
+                {
+                    b.Property<Guid>("SprintId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sprint_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_at");
+
+                    b.HasKey("SprintId", "UserId")
+                        .HasName("pk_sprint_members");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_sprint_members_user_id");
+
+                    b.ToTable("sprint_members");
+                });
+
             modelBuilder.Entity("ClaudeMonitor.Api.Data.SubagentRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3777,6 +3930,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_issues_application_releases_release_id");
 
+                    b.HasOne("ClaudeMonitor.Api.Data.Sprint", null)
+                        .WithMany()
+                        .HasForeignKey("SprintId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_issues_sprints_sprint_id");
+
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
@@ -4355,6 +4514,66 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_session_usage_harness_sessions_session_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.Sprint", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.ManagedApplication", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sprints_applications_application_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sprints_users_created_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.ManagedProject", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sprints_projects_project_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.ApplicationRelease", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sprints_application_releases_release_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sprints_users_updated_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sprints_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.SprintMember", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.Sprint", null)
+                        .WithMany()
+                        .HasForeignKey("SprintId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sprint_members_sprints_sprint_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sprint_members_users_user_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.SubagentRun", b =>

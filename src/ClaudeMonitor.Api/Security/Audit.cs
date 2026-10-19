@@ -81,6 +81,12 @@ public static class AuditActions
     public const string IssueLinkChanged = "issue.link_changed";
     public const string IssueTestCaseChanged = "issue.test_case_changed";
     public const string IssueCodeLinkChanged = "issue.code_link_changed";
+    public const string SprintCreated = "sprint.created";
+    public const string SprintUpdated = "sprint.updated";
+    public const string SprintStarted = "sprint.started";
+    public const string SprintClosed = "sprint.closed";
+    public const string SprintArchived = "sprint.archived";
+    public const string SprintIssuesChanged = "sprint.issues_changed";
 }
 
 public static class Audit

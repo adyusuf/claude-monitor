@@ -1,6 +1,6 @@
 # ADR-0011: Project management in the web app
 
-**Status:** Phase 1 is on `dev` (19/10/2026); Phase 2 (§4) is being built. Later phases are a plan, not a decision.
+**Status:** Phases 1 and 2 are on `dev` (19/10/2026); Phase 3 (§5) is being built. Later phases are a plan, not a decision.
 **Extends:** [ADR-0002](adr-0002-agent-platform.md) (one API for every client), [data-model.md](data-model.md).
 **Asked for (19/10/2026):** after sign-in a user sees what is theirs: projects (with applications, backlog lists, sprints and issues), the
 machines and the tools and Claude sessions on them, the AI pods of the account, the user and system administration for admins, and
@@ -98,17 +98,40 @@ the automatic fill from the agent's branch and commit names is a later step.
 | `GET`, `POST /api/issues/{id}/test-cases`, `PUT`, `DELETE /api/test-cases/{id}`, `POST /api/test-cases/{id}/result` | read / work |
 | `GET`, `POST /api/issues/{id}/code-links`, `DELETE /api/code-links/{id}` | read / work |
 
-## 5. Later phases (a plan)
+## 5. Phase 3: sprints
 
-3. **Sprints:** number, dates, goal, capacity, state, team, release; start from a project or an application; add existing or new issues;
-   the issues of a sprint by status.
-4. **Machines:** the machine pages exist (ADR-0005, ADR-0008). Open: a per-tool panel on a machine (start, stop, update for the AI pod,
+A sprint belongs to a project and, optionally, to one application (started from the project page or from the application page); it keeps that
+scope for life. It has a number (per project, never reused), an optional name, a goal, start and end dates (the project's default sprint
+length fills the end date in the form), a capacity in the project's estimation unit, a status, a team and the release it contributes to.
+
+**Status:** `planned` -> `active` -> `closed`. Starting needs both dates and no other active sprint of the same scope (one per project-wide
+scope, one per application). A closed sprint is read-only. A planned sprint can be deleted (archived; its issues go back to the backlog).
+Closing asks where the unfinished issues (not `done` or `cancelled`) go: to a planned sprint of the same scope, or back to the backlog,
+where an `in_progress` or `in_review` issue becomes `ready`.
+
+**Issues:** `issues` gains `sprint_id` (an issue is in at most one sprint). The backlog is the issues in no sprint. Issues are added to a
+planned or active sprint from the backlog (many at once) or created new and added; a sprint of an application takes only issues of that
+application. Removing one returns it to the backlog. The sprint page groups its issues by status; a quick status change has its own call.
+**Team:** workspace members who can work. **Release:** a release of an application of the project (of that application when the sprint
+has one). Committed and done estimates are summed from the issues (numeric units only; T-shirt sizes are not summed).
+
+| Call | Needs |
+|---|---|
+| `GET /api/projects/{id}/sprints` (filters `status`, `application`) and `POST` | read / work |
+| `GET /api/sprints/{id}`, `PUT`, `DELETE` (planned only) | read / work |
+| `POST /api/sprints/{id}/start`, `POST /api/sprints/{id}/close` | work |
+| `POST /api/sprints/{id}/issues` (several ids), `DELETE /api/sprints/{id}/issues/{issueId}` | work |
+| `PUT /api/issues/{id}/status` (a quick status change), issue list filter `sprint=<id>`, `scope=backlog` now also means "in no sprint" | work / read |
+
+## 6. Later phases (a plan)
+
+3. **Machines:** the machine pages exist (ADR-0005, ADR-0008). Open: a per-tool panel on a machine (start, stop, update for the AI pod,
    Claude management: sessions, plugins, skills, limits), per-session settings (working mode, branch policy, CI), starting a test and
    following its result.
-5. **AI pods** of the account: needs its own decision first (what a pod is on the server side).
-6. **Administration** (users, system settings) and **profile** pages.
+4. **AI pods** of the account: needs its own decision first (what a pod is on the server side).
+5. **Administration** (users, system settings) and **profile** pages.
 
-## 6. Not decided here
+## 7. Not decided here
 
 Whether the `repos` rows should link to an application by its repository link; account export and deletion for the new tables (the rows
 keep the deleted user's id, like other records, and carry no personal fields of their own); attachments storage (mockups, screenshots, logs, screen recordings: needs a decision on where files live, so Phase 2 has none).

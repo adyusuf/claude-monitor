@@ -51,6 +51,8 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<IssueLink> IssueLinks => Set<IssueLink>();
     public DbSet<IssueTestCase> IssueTestCases => Set<IssueTestCase>();
     public DbSet<IssueCodeLink> IssueCodeLinks => Set<IssueCodeLink>();
+    public DbSet<Sprint> Sprints => Set<Sprint>();
+    public DbSet<SprintMember> SprintMembers => Set<SprintMember>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

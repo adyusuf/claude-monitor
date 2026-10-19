@@ -59,6 +59,19 @@ public static class ProjectAccess
         return grant is null ? null : (issue, grant);
     }
 
+    /// <summary>A sprint (not an archived one) and the caller's rights on its project, or null when the caller cannot see it (answer 404).</summary>
+    public static async Task<(Sprint Sprint, ProjectGrant Grant)?> SprintAsync(MonitorDb db, Guid userId, Guid sprintId, CancellationToken ct)
+    {
+        var sprint = await db.Sprints.FirstOrDefaultAsync(s => s.Id == sprintId && s.ArchivedAt == null, ct);
+        if (sprint is null)
+        {
+            return null;
+        }
+
+        var grant = await OfAsync(db, userId, sprint.ProjectId, ct);
+        return grant is null ? null : (sprint, grant);
+    }
+
     /// <summary>The rules alone, so a test can walk the whole table of roles.</summary>
     public static ProjectGrant Decide(ManagedProject project, WorkspaceMember member, string? projectRole)
     {
