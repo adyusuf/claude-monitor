@@ -79,6 +79,7 @@ public sealed class PluginFilesTests : IDisposable
         var marketplace = JsonNode.Parse(files[MarketplacePlugin.MarketplaceFile])!;
         Assert.Equal(AgentConfig.ReleasesMarketplaceName, marketplace["name"]!.GetValue<string>());
         Assert.Equal("./plugin/monitor-agent", marketplace["plugins"]![0]!["source"]!.GetValue<string>());
+        Assert.Equal("./plugin/aipod", marketplace["plugins"]![1]!["source"]!.GetValue<string>()); // the repository catalog offers the new plugin too
         Assert.All(files.Values, text => Assert.DoesNotMatch(@"https?://[a-z0-9.-]+\.[a-z]{2,}", text)); // host names live in deployment configuration
         Assert.Throws<ArgumentException>(() => MarketplacePlugin.Render(""));
     }
@@ -89,7 +90,7 @@ public sealed class PluginFilesTests : IDisposable
         var files = MarketplacePlugin.Render("1.0.0");
         var aipod = JsonNode.Parse(files[$"{MarketplacePlugin.AipodFolder}/.claude-plugin/plugin.json"])!;
         Assert.Equal(("aipod", "1.0.0"), (aipod["name"]!.GetValue<string>(), aipod["version"]!.GetValue<string>()));
-        Assert.True(aipod["userConfig"]!["server"]!["required"]!.GetValue<bool>());
+        Assert.False(aipod["userConfig"]!["server"]!["required"]!.GetValue<bool>()); // a connected machine is not asked again
         Assert.DoesNotContain("Claude Monitor", aipod.ToJsonString(), StringComparison.Ordinal);
         foreach (var file in new[] { "hooks/hooks.json", ".mcp.json" })
         {

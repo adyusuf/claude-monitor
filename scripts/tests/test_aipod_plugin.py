@@ -44,6 +44,30 @@ class AipodPlugin(AipodCase):
         result = self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://monitor.invalid')
         self.assertIn(f'BIN={self.bin} ID={NEW_ID} SERVER=https://monitor.invalid', result.stdout)
 
+    def test_the_id_is_the_one_of_the_marketplace_the_plugin_is_enabled_from(self):
+        self.install_fake('0.6.0')
+        self.enable('aipod@monitor-agent-releases')  # installed from the repository catalog
+        result = self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://monitor.invalid')
+        self.assertIn('ID=aipod@monitor-agent-releases', result.stdout)
+        self.enable(NEW_ID)  # both: the URL catalog wins
+        self.assertIn(f'ID={NEW_ID}', self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://monitor.invalid').stdout)
+
+    def test_an_option_nobody_set_is_not_taken_for_an_address(self):
+        self.install_fake('0.6.0')
+        result = self.run_script(NEW_RUN, 'mcp', CM_SERVER='${user_config.server}')
+        self.assertIn('SERVER=\n', result.stdout + '\n')  # unset, not the literal text
+        self.assertNotIn('user_config', result.stdout)
+
+    def test_the_bootstrap_takes_the_server_of_a_machine_that_is_already_connected_so_it_is_not_asked_again(self):
+        home = os.path.join(self.tmp, 'agent-home')
+        os.makedirs(home)
+        with open(os.path.join(home, 'agent.json'), 'w') as f:
+            f.write('{\n  "machineKey": "k",\n  "server": "https://monitor.invalid/",\n  "agentId": "x"\n}\n')
+        self.pins('0.6.0')
+        self.run_script(NEW_ENSURE, server='', AIPOD_AGENT_HOME=home)
+        with open(os.path.join(self.data, 'server.txt')) as f:
+            self.assertEqual(f.read().strip(), 'https://monitor.invalid')
+
     def test_a_pre_bridge_old_plugin_keeps_reporting_and_aipod_stands_down_for_hooks_and_mcp_only(self):
         self.install_fake('0.6.0')
         self.enable(OLD_ID, '0.5.0')
@@ -77,10 +101,13 @@ class AipodPlugin(AipodCase):
 class BridgePlugin(AipodCase):
     plugin_folder = PLUGIN
 
-    def test_the_bridge_stands_down_for_hooks_and_mcp_once_aipod_is_enabled_and_not_before(self):
+    def test_the_bridge_stands_down_for_hooks_and_mcp_once_aipod_is_enabled_from_either_catalog_and_not_before(self):
         run = os.path.join(PLUGIN, 'scripts', 'run.sh')
         self.install_fake('0.6.0')
         self.assertIn('args: hook Stop', self.run_script(run, 'hook', 'Stop').stdout)
+        self.enable('aipod@monitor-agent-releases', '0.5.1')
+        self.assertEqual(self.run_script(run, 'hook', 'Stop').stdout, '')
+        os.remove(os.path.join(self.claude_dir(), 'settings.json'))
         self.enable(NEW_ID, '0.5.1')
         for args in (('hook', 'Stop'), ('mcp',)):
             quiet = self.run_script(run, *args)

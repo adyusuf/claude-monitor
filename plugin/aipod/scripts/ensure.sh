@@ -11,6 +11,15 @@ root="${CLAUDE_PLUGIN_ROOT:-}"
 pins="$root/agent-release.txt"
 server="${CLAUDE_PLUGIN_OPTION_SERVER:-}"
 server="${server%/}"
+# The option is not required: a machine that is already connected has a server in its identity file, which is asked instead (AIPOD_AGENT_HOME, CM_AGENT_HOME, then the two default homes).
+if [ -z "$server" ]; then
+  for home in "${AIPOD_AGENT_HOME:-}" "${CM_AGENT_HOME:-}" "$HOME/Library/Application Support/aipod" "$HOME/.aipod" "$HOME/Library/Application Support/ClaudeMonitor" "$HOME/.claude-monitor"; do
+    [ -n "$home" ] && [ -f "$home/agent.json" ] || continue
+    server="$(sed -n 's/.*"server": *"\([^"]*\)".*/\1/p' "$home/agent.json" 2>/dev/null | head -n 1)"
+    server="${server%/}"
+    [ -n "$server" ] && break
+  done
+fi
 msg=""
 mkdir -p "$data/bin" 2>/dev/null || exit 0
 

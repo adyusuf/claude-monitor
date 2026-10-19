@@ -8,7 +8,12 @@
     {
       "name": "monitor-agent",
       "source": "./plugin/monitor-agent",
-      "description": "Installs the Claude Monitor agent, connects it to your server and starts it with your Claude Code sessions."
+      "description": "The old plugin of the aipod agent, kept as a bridge: install aipod instead."
+    },
+    {
+      "name": "aipod",
+      "source": "./plugin/aipod",
+      "description": "Installs the aipod agent, connects it to your server and starts it with your Claude Code sessions."
     }
   ]
 }

@@ -8,7 +8,7 @@ data="${CLAUDE_PLUGIN_DATA:-}"
 # The bridge (ADR-0013 section 1): once the aipod plugin is enabled it reports for this machine, and this one goes quiet so no event is counted twice.
 # Only hooks and the MCP server stand down; status, connect and logout run as before.
 if [ "${1:-}" = "hook" ] || [ "${1:-}" = "mcp" ]; then
-  if grep -q '"aipod@aipod-releases": *true' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null; then exit 0; fi
+  if grep -Eq '"aipod@(aipod|monitor-agent)-releases": *true' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null; then exit 0; fi
 fi
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) bin="$data/bin/cm-agent.exe" ;;

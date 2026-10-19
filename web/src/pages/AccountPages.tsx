@@ -86,12 +86,12 @@ export function DownloadPage() {
           <p>{t("download.pluginIntro")}</p>
           <p className="muted">1. {t("download.plugin1")}</p>
           {config.pluginMarketplace
-            ? <CopyText text={`claude plugin install monitor-agent --marketplace ${config.pluginMarketplace}`} />
+            ? <CopyText text={`claude plugin install aipod --marketplace ${config.pluginMarketplace}`} />
             : <><CopyText text={`claude plugin marketplace add ${origin}/downloads/aipod-marketplace.json`} /><CopyText text="claude plugin install aipod@aipod-releases" /></>}
           <CopyText text={origin} />
           <p className="muted">2. {t("download.plugin2")}</p>
-          <CopyText text={config.pluginMarketplace ? "/monitor-agent:connect" : "/aipod:connect"} />
-          {!config.pluginMarketplace && <p className="muted">{t("download.pluginOld")}</p>}
+          <CopyText text="/aipod:connect" />
+          <p className="muted">{t("download.pluginOld")}</p>
         </Card>
       )}
       {hasPlugin && <p className="muted">{t("download.orManual")}</p>}

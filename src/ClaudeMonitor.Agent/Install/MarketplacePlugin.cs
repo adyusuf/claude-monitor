@@ -49,7 +49,7 @@ public static class MarketplacePlugin
             (AipodFolder, AipodPluginName, "aipod agent: installs itself, connects to your server, reports sessions and delivers web messages.", "aipod"),
         })
         {
-            files[$"{folder}/.claude-plugin/plugin.json"] = Text(Manifest(name, version, description, brand));
+            files[$"{folder}/.claude-plugin/plugin.json"] = Text(Manifest(name, version, description, brand, serverRequired: name != AipodPluginName));
             files[$"{folder}/hooks/hooks.json"] = Text(new JsonObject { ["hooks"] = Hooks() });
             files[$"{folder}/.mcp.json"] = Text(Mcp());
         }
@@ -80,15 +80,23 @@ public static class MarketplacePlugin
         ["name"] = AgentConfig.ReleasesMarketplaceName,
         ["owner"] = new JsonObject { ["name"] = "Claude Monitor" },
         ["description"] = "The Claude Monitor agent as a Claude Code plugin: it installs, connects and stops the agent, which reports this machine's sessions and carries web messages back.",
-        ["plugins"] = new JsonArray(new JsonObject
-        {
-            ["name"] = AgentConfig.PluginName,
-            ["source"] = "./" + PluginFolder,
-            ["description"] = "Installs the Claude Monitor agent, connects it to your server and starts it with your Claude Code sessions.",
-        }),
+        ["plugins"] = new JsonArray(
+            new JsonObject
+            {
+                ["name"] = AgentConfig.PluginName,
+                ["source"] = "./" + PluginFolder,
+                ["description"] = "The old plugin of the aipod agent, kept as a bridge: install aipod instead.",
+            },
+            new JsonObject
+            {
+                ["name"] = AipodPluginName,
+                ["source"] = "./" + AipodFolder,
+                ["description"] = "Installs the aipod agent, connects it to your server and starts it with your Claude Code sessions.",
+            }),
     };
 
-    private static JsonObject Manifest(string name, string version, string description, string brand) => new()
+    /// <summary>The server option is required for the old plugin; the aipod one asks only when the agent has no server of its own to take (a machine that is already connected is not asked again).</summary>
+    private static JsonObject Manifest(string name, string version, string description, string brand, bool serverRequired) => new()
     {
         ["name"] = name,
         ["version"] = version,
@@ -101,7 +109,7 @@ public static class MarketplacePlugin
                 ["type"] = "string",
                 ["title"] = "Server address",
                 ["description"] = $"The https address of your {brand} server: the address you open in the browser.",
-                ["required"] = true,
+                ["required"] = serverRequired,
             },
             ["push"] = new JsonObject
             {

@@ -29,7 +29,14 @@ if [ "${1:-}" = "hook" ] && [ "${2:-}" = "SessionStart" ] && [ "${3:-}" = "--con
   [ "$(printf '%s\n%s\n' "$pinned" "$have" | sort -V | head -n 1)" = "$pinned" ] || exit 0
 fi
 export CM_BINARY="$bin"
-export CM_PLUGIN_ID="aipod@aipod-releases"
+# The id Claude Code knows this plugin by: the marketplace it came from (the URL catalog aipod-releases, or the repository catalog monitor-agent-releases). The enabled one wins.
+plugin_id="aipod@aipod-releases"
+if ! grep -q '"aipod@aipod-releases": *true' "$cfg/settings.json" 2>/dev/null && grep -q '"aipod@monitor-agent-releases": *true' "$cfg/settings.json" 2>/dev/null; then
+  plugin_id="aipod@monitor-agent-releases"
+fi
+export CM_PLUGIN_ID="$plugin_id"
+# An option nobody set may reach the MCP server unexpanded: only an address counts.
+case "${CM_SERVER:-}" in http://* | https://*) ;; *) unset CM_SERVER ;; esac
 # The server: the plugin's option (hooks have it), else what the MCP server was given, else what the bootstrap kept (a Bash tool has neither).
 if [ -n "${CLAUDE_PLUGIN_OPTION_SERVER:-}" ]; then
   export CM_SERVER="$CLAUDE_PLUGIN_OPTION_SERVER"

@@ -134,6 +134,7 @@ public static partial class Cli
             : "commands waiting: 0");
         await stdout.WriteLineAsync($"stop wait: {(int)config.StopWait.TotalSeconds} s");
         await stdout.WriteLineAsync($"remote runs: {ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel))}{(config.ServiceMode ? " (service)" : "")}");
+        await stdout.WriteLineAsync($"Claude from the web: {new Daemon.ClaudeControl(config, new Daemon.SystemClaudeCli(), clock ?? TimeProvider.System).Running().Count} session(s) started here running; automatic start: {Daemon.WorkspaceSettings.Get(config, store, Daemon.ClaudeAutoStart.ModeKey) ?? "off"}");
         await stdout.WriteLineAsync(Approvals.ApproversStore.Describe(Approvals.ApproversStore.Load(config)));
         foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
         foreach (var line in UpdateCommand.Describe(config, store)) await stdout.WriteLineAsync(line);

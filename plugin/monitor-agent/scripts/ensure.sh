@@ -23,7 +23,7 @@ fi
 say() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$data/install.log"; }
 finish() { [ -n "$msg" ] && printf '{"systemMessage":"%s"}\n' "$msg"; exit 0; }
 # With aipod enabled this plugin does not install or restart anything: the aipod plugin owns the binary and the daemon.
-if grep -q '"aipod@aipod-releases": *true' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null; then msg=""; finish; fi
+if grep -Eq '"aipod@(aipod|monitor-agent)-releases": *true' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null; then msg=""; finish; fi
 # The log is for `status`: keep the last lines only.
 if [ -f "$data/install.log" ] && [ "$(wc -c < "$data/install.log")" -gt 200000 ]; then
   tail -n 200 "$data/install.log" > "$data/install.log.tmp" && mv -f "$data/install.log.tmp" "$data/install.log"

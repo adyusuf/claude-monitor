@@ -10,7 +10,7 @@
       "type": "string",
       "title": "Server address",
       "description": "The https address of your aipod server: the address you open in the browser.",
-      "required": true
+      "required": false
     },
     "push": {
       "type": "string",
