@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentActionKind, AgentActionView, AgentAsksView, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentActionKind, AgentActionView, AgentAsksView, AgentClaudeView, ClaudePermissionMode, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
@@ -66,7 +66,9 @@ export const api = {
   setAgentServices: (agentId: string, share: boolean, code?: string) => request<AgentServicesView>("PUT", `/agents/${agentId}/services`, { share, code }),
   setAgentAsks: (agentId: string, accept: boolean, code?: string) => request<AgentAsksView>("PUT", `/agents/${agentId}/asks`, { accept, code }),
   agentActions: (agentId: string) => request<AgentActionView[]>("GET", `/agents/${agentId}/actions`),
-  requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string) => request<AgentActionView>("POST", `/agents/${agentId}/actions`, { kind, code }),
+  requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string, extra?: { projectKey?: string; permissionMode?: ClaudePermissionMode; sessionRef?: string }) =>
+    request<AgentActionView>("POST", `/agents/${agentId}/actions`, { kind, code, ...extra }),
+  setAgentClaude: (agentId: string, accept: boolean, code?: string) => request<AgentClaudeView>("PUT", `/agents/${agentId}/claude`, { accept, code }),
   agentAsks: (agentId: string) => request<AskView[]>("GET", `/agents/${agentId}/asks`),
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>

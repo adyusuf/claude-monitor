@@ -14,6 +14,7 @@ import { ToolList } from "./MachineBadges";
 import { MachineMetrics } from "./MachineMetrics";
 import { NoteEditor, TagsEditor } from "./MachineFacts";
 import { MachineActions } from "./MachineActions";
+import { MachineClaude } from "./MachineClaude";
 import { MachineAsks } from "./MachineAsks";
 import { MachineProjects } from "./MachineProjects";
 import { MachineRoleEditor } from "./MachineRoleEditor";
@@ -84,6 +85,9 @@ export function MachinePage() {
           <Card title={t("machines.services.title")}><MachineServices agentId={agentId} detail={data.detail} owned={data.owned} onChanged={() => void reload()} /></Card>
           <Card title={t("machines.actions.title")}>
             <MachineActions agentId={agentId} view={m} owned={data.owned} agentVersion={data.agentVersion} version={version} onChanged={() => void reload()} />
+          </Card>
+          <Card title={t("machines.claudeControl.title")}>
+            <MachineClaude agentId={agentId} view={m} owned={data.owned} projects={data.detail.projects} agentVersion={data.agentVersion} version={version} onChanged={() => void reload()} />
           </Card>
           <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
           <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} /></Card>

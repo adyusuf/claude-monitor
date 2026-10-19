@@ -19,6 +19,8 @@ export const config = {
   chatOutputChars: 4000,
   /** The first agent version that takes the fixed actions of the machine page (restart, update check, update, status). */
   actionsMinAgentVersion: "0.5.0",
+  /** The first agent that starts and stops Claude from the web (ADR-0013); an older one ignores those actions. */
+  claudeMinAgentVersion: "0.6.0",
   passwordMin: 10,
   nameMax: 100,
   promptMax: 10_000,
