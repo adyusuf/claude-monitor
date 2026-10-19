@@ -65,7 +65,7 @@ public sealed class ClaudeControlTests : IDisposable
     [InlineData("acceptEdits", "acceptEdits")]
     public async Task A_start_runs_claude_bg_in_the_project_folder_with_a_fixed_shape_and_remembers_the_session(string? asked, string used)
     {
-        var outcome = await Control().StartAsync(Project, asked, CancellationToken.None);
+        var outcome = await Control().StartAsync(Project, asked, null, CancellationToken.None);
 
         Assert.Equal(new ClaudeControlOutcome(true, $"started session 34a6ea9d in the background ({used} mode); it appears in the session list", "34a6ea9d"), outcome);
         var run = Assert.Single(claude.Runs);
@@ -83,7 +83,7 @@ public sealed class ClaudeControlTests : IDisposable
     [InlineData("")]
     public async Task A_permission_mode_outside_the_closed_list_is_refused_and_claude_is_never_run(string mode)
     {
-        var outcome = await Control().StartAsync(Project, mode, CancellationToken.None);
+        var outcome = await Control().StartAsync(Project, mode, null, CancellationToken.None);
         Assert.False(outcome.Succeeded);
         Assert.Empty(claude.Runs);
     }
@@ -94,20 +94,20 @@ public sealed class ClaudeControlTests : IDisposable
     [InlineData("bad\nkey")]
     public async Task A_start_without_a_usable_project_key_is_refused(string? key)
     {
-        Assert.False((await Control().StartAsync(key, null, CancellationToken.None)).Succeeded);
+        Assert.False((await Control().StartAsync(key, null, null, CancellationToken.None)).Succeeded);
         Assert.Empty(claude.Runs);
     }
 
     [Fact]
     public async Task A_project_this_machine_does_not_know_and_a_folder_that_is_gone_are_refused_without_running_claude()
     {
-        var unknown = await Control().StartAsync("git:host/other", null, CancellationToken.None);
+        var unknown = await Control().StartAsync("git:host/other", null, null, CancellationToken.None);
         Assert.Contains("knows no such project", unknown.Text, StringComparison.Ordinal);
 
         Directory.Delete(folder, recursive: true);
         try
         {
-            var gone = await Control().StartAsync(Project, null, CancellationToken.None);
+            var gone = await Control().StartAsync(Project, null, null, CancellationToken.None);
             Assert.Contains("folder is gone", gone.Text, StringComparison.Ordinal);
         }
         finally
@@ -126,7 +126,7 @@ public sealed class ClaudeControlTests : IDisposable
         Assert.True(ProjectFolderList.Add(listed.Config, folder));
         var key = Capture.ProjectInfo.Resolve(folder)!.Key;
 
-        var outcome = await new ClaudeControl(listed.Config, claude, clock, () => install).StartAsync(key, null, CancellationToken.None);
+        var outcome = await new ClaudeControl(listed.Config, claude, clock, () => install).StartAsync(key, null, null, CancellationToken.None);
 
         Assert.True(outcome.Succeeded);
         Assert.Equal(folder, Assert.Single(claude.Runs).Folder);
@@ -135,11 +135,11 @@ public sealed class ClaudeControlTests : IDisposable
     [Fact]
     public async Task A_service_agent_and_a_machine_that_claims_to_be_production_never_start_a_session()
     {
-        var service = await Control(home.Config with { ServiceMode = true }).StartAsync(Project, null, CancellationToken.None);
+        var service = await Control(home.Config with { ServiceMode = true }).StartAsync(Project, null, null, CancellationToken.None);
         Assert.Contains("runs as a service", service.Text, StringComparison.Ordinal);
 
         (Identity.Load(home.Config) with { ClaimedEnvironment = MachineEnvironments.Production }).Save(home.Config);
-        var production = await Control().StartAsync(Project, null, CancellationToken.None);
+        var production = await Control().StartAsync(Project, null, null, CancellationToken.None);
         Assert.Contains("production or database", production.Text, StringComparison.Ordinal);
         Assert.Empty(claude.Runs);
     }
@@ -148,7 +148,7 @@ public sealed class ClaudeControlTests : IDisposable
     public async Task Without_a_claude_on_the_machine_nothing_is_run_and_the_text_says_why()
     {
         install = new ClaudeInstall(ClaudeKind.NotFound, null, "no `claude` on the PATH");
-        var outcome = await Control().StartAsync(Project, null, CancellationToken.None);
+        var outcome = await Control().StartAsync(Project, null, null, CancellationToken.None);
         Assert.Contains("no `claude` was found", outcome.Text, StringComparison.Ordinal);
         Assert.Empty(claude.Runs);
     }
@@ -157,15 +157,15 @@ public sealed class ClaudeControlTests : IDisposable
     public async Task No_more_than_the_limit_of_sessions_started_from_the_web_run_at_once_and_a_stopped_one_frees_its_place()
     {
         var small = home.Config with { ClaudeWorkersMax = 1 };
-        Assert.True((await Control(small).StartAsync(Project, null, CancellationToken.None)).Succeeded);
+        Assert.True((await Control(small).StartAsync(Project, null, null, CancellationToken.None)).Succeeded);
 
-        var second = await Control(small).StartAsync(Project, null, CancellationToken.None);
+        var second = await Control(small).StartAsync(Project, null, null, CancellationToken.None);
         Assert.False(second.Succeeded);
         Assert.Contains("1 sessions started from the web are already running", second.Text, StringComparison.Ordinal);
 
         Assert.True((await Control(small).StopAsync("34a6ea9d", CancellationToken.None)).Succeeded);
         claude.Answer = _ => new ClaudeRun(0, "backgrounded · 0123abcd · aipod-shop\n", "");
-        Assert.True((await Control(small).StartAsync(Project, null, CancellationToken.None)).Succeeded);
+        Assert.True((await Control(small).StartAsync(Project, null, null, CancellationToken.None)).Succeeded);
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public sealed class ClaudeControlTests : IDisposable
     {
         claude.Answer = _ => new ClaudeRun(1, "", "Workspace not trusted. Run `claude` in /x once and accept the trust prompt, then retry.\n");
 
-        var outcome = await Control().StartAsync(Project, null, CancellationToken.None);
+        var outcome = await Control().StartAsync(Project, null, null, CancellationToken.None);
 
         Assert.False(outcome.Succeeded);
         Assert.Contains("does not trust that folder yet", outcome.Text, StringComparison.Ordinal);
@@ -184,17 +184,17 @@ public sealed class ClaudeControlTests : IDisposable
     public async Task Another_failure_reports_the_exit_code_and_the_first_line_cleaned_and_cut_and_a_claude_that_will_not_start_is_reported()
     {
         claude.Answer = _ => new ClaudeRun(2, "", "\u001b[31mboom\u001b[0m " + new string('x', 400) + "\nsecond line");
-        var failed = await Control().StartAsync(Project, null, CancellationToken.None);
+        var failed = await Control().StartAsync(Project, null, null, CancellationToken.None);
         Assert.StartsWith("claude --bg failed (exit 2): ", failed.Text, StringComparison.Ordinal);
         Assert.DoesNotContain('\u001b', failed.Text);
         Assert.DoesNotContain("second line", failed.Text, StringComparison.Ordinal);
         Assert.True(failed.Text.Length < 260);
 
         claude.Answer = _ => new ClaudeRun(0, "something else entirely\n", "");
-        Assert.Contains("did not say which session", (await Control().StartAsync(Project, null, CancellationToken.None)).Text, StringComparison.Ordinal);
+        Assert.Contains("did not say which session", (await Control().StartAsync(Project, null, null, CancellationToken.None)).Text, StringComparison.Ordinal);
 
         claude.Throws = new Win32Exception("no such file");
-        Assert.Equal("claude could not be started", (await Control().StartAsync(Project, null, CancellationToken.None)).Text);
+        Assert.Equal("claude could not be started", (await Control().StartAsync(Project, null, null, CancellationToken.None)).Text);
         Assert.Empty(Control().Running());
     }
 
@@ -212,7 +212,7 @@ public sealed class ClaudeControlTests : IDisposable
     [Fact]
     public async Task A_stop_runs_claude_stop_for_a_session_this_agent_started_and_forgets_it_as_running()
     {
-        await Control().StartAsync(Project, null, CancellationToken.None);
+        await Control().StartAsync(Project, null, null, CancellationToken.None);
         claude.Runs.Clear();
 
         var outcome = await Control().StopAsync("34a6ea9d", CancellationToken.None);
@@ -240,7 +240,7 @@ public sealed class ClaudeControlTests : IDisposable
     [Fact]
     public async Task A_session_the_agent_did_not_start_is_never_stopped_even_if_it_exists()
     {
-        await Control().StartAsync(Project, null, CancellationToken.None);
+        await Control().StartAsync(Project, null, null, CancellationToken.None);
         claude.Runs.Clear();
 
         var outcome = await Control().StopAsync("deadbeef", CancellationToken.None);
@@ -253,7 +253,7 @@ public sealed class ClaudeControlTests : IDisposable
     [Fact]
     public async Task A_stop_that_fails_leaves_the_session_listed_as_running_and_says_what_claude_said()
     {
-        await Control().StartAsync(Project, null, CancellationToken.None);
+        await Control().StartAsync(Project, null, null, CancellationToken.None);
         claude.Answer = _ => new ClaudeRun(1, "", "no such session\n");
 
         var outcome = await Control().StopAsync("34a6ea9d", CancellationToken.None);
@@ -273,7 +273,7 @@ public sealed class ClaudeControlTests : IDisposable
 
         Assert.Empty(Control().Running());
         Assert.False((await Control().StopAsync("34a6ea9d", CancellationToken.None)).Succeeded);
-        Assert.True((await Control().StartAsync(Project, null, CancellationToken.None)).Succeeded); // and a new start rewrites it
+        Assert.True((await Control().StartAsync(Project, null, null, CancellationToken.None)).Succeeded); // and a new start rewrites it
         Assert.Single(Control().Running());
     }
 

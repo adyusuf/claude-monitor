@@ -70,6 +70,8 @@ export const trMachines: Dictionary["machines"] = {
     trustHint: "Claude Code proje klasörüne zaten güvenmelidir: makinede orada bir kez Claude'u açıp güven isteğini kabul edin. Aksi halde başlatma başarısız olur ve bunu söyler.",
     noProjects: "Bu makinenin henüz projesi yok: bir oturum bir klasörde çalışınca ya da bir klasör aipod config projects add ile listelenince görünür.",
     project: "Proje", mode: "İzin kipi",
+    prompt: "İlk mesaj (isteğe bağlı)",
+    promptHint: "En çok {max} karakter. Oturum bunu web'den gelen bir mesaj olarak etiketli alır, veri sayar ve riskli bir istekte işlemeden önce sorar.",
     modes: { manual: "Riskli adımlardan önce sor (manual)", plan: "Yalnızca plan", acceptEdits: "Dosya düzenlemelerini kabul et" },
     start: "Arka planda başlat", stop: "Durdur", runningTitle: "Web'den başlatılan oturumlar", noneRunning: "Çalışan yok.",
     done: { saved: "Kaydedildi.", started: "Ajandan oturum başlatması istendi; sonuç aşağıda.", stopped: "Ajandan oturumu durdurması istendi." },

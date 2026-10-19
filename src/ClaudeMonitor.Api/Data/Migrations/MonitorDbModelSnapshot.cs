@@ -320,6 +320,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("project_key");
 
+                    b.Property<string>("Prompt")
+                        .HasColumnType("text")
+                        .HasColumnName("prompt");
+
                     b.Property<Guid>("RequestedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("requested_by");

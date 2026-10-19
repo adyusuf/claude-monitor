@@ -53,12 +53,13 @@ public static class AgentActions
             ProjectKey = claude?.ProjectKey,
             PermissionMode = claude?.PermissionMode,
             SessionRef = claude?.SessionRef,
+            Prompt = claude?.Prompt,
             CreatedAt = now,
             ExpiresAt = now + AgentActionKinds.QueueTtl,
         };
         db.AgentActions.Add(action);
         Audit.Add(db, http, clock, AuditActions.AgentActionRequested, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId,
-            detail: claude is null ? new { kind } : (object)new { kind, projectKey = claude.ProjectKey, permissionMode = claude.PermissionMode, sessionRef = claude.SessionRef });
+            detail: claude is null ? new { kind } : (object)new { kind, projectKey = claude.ProjectKey, permissionMode = claude.PermissionMode, sessionRef = claude.SessionRef, hasPrompt = claude.Prompt is not null });
         try
         {
             await db.SaveChangesAsync(http.RequestAborted);
@@ -71,7 +72,7 @@ public static class AgentActions
         }
 
         Changed(broker, action);
-        broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Action, new AgentActionMessage(action.Id, action.Kind, action.ExpiresAt, action.ProjectKey, action.PermissionMode, action.SessionRef)));
+        broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Action, new AgentActionMessage(action.Id, action.Kind, action.ExpiresAt, action.ProjectKey, action.PermissionMode, action.SessionRef, action.Prompt)));
         return Results.Ok(View(action));
     }
 
@@ -100,7 +101,7 @@ public static class AgentActions
         await ExpireStaleAsync(db, agentId, now, ct);
         return await db.AgentActions.AsNoTracking()
             .Where(a => a.AgentId == agentId && a.Status == AgentActionStatuses.Queued && a.ExpiresAt > now)
-            .OrderBy(a => a.CreatedAt).Select(a => new AgentActionMessage(a.Id, a.Kind, a.ExpiresAt, a.ProjectKey, a.PermissionMode, a.SessionRef)).ToListAsync(ct);
+            .OrderBy(a => a.CreatedAt).Select(a => new AgentActionMessage(a.Id, a.Kind, a.ExpiresAt, a.ProjectKey, a.PermissionMode, a.SessionRef, a.Prompt)).ToListAsync(ct);
     }
 
     /// <summary>
@@ -124,9 +125,9 @@ public static class AgentActions
         var sessionRef = action.Kind == AgentActionKinds.ClaudeStart && req.Status == AgentActionStatuses.Succeeded && AgentActionKinds.IsSessionRef(req.SessionRef) ? req.SessionRef : null;
         var changed = req.Status == AgentActionStatuses.Delivered
             ? await db.AgentActions.Where(a => a.Id == id && a.Status == AgentActionStatuses.Queued && a.ExpiresAt > now)
-                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, AgentActionStatuses.Delivered).SetProperty(a => a.DeliveredAt, now).SetProperty(a => a.ExpiresAt, now + AgentActionKinds.QueueTtl), http.RequestAborted)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, AgentActionStatuses.Delivered).SetProperty(a => a.DeliveredAt, now).SetProperty(a => a.ExpiresAt, now + AgentActionKinds.QueueTtl).SetProperty(a => a.Prompt, (string?)null), http.RequestAborted)
             : await db.AgentActions.Where(a => a.Id == id && a.Status == AgentActionStatuses.Delivered)
-                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, req.Status!).SetProperty(a => a.Result, result).SetProperty(a => a.FinishedAt, now).SetProperty(a => a.SessionRef, a => sessionRef ?? a.SessionRef), http.RequestAborted);
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, req.Status!).SetProperty(a => a.Result, result).SetProperty(a => a.FinishedAt, now).SetProperty(a => a.SessionRef, a => sessionRef ?? a.SessionRef).SetProperty(a => a.Prompt, (string?)null), http.RequestAborted);
         if (changed != 1) return Results.Conflict();
         action.Status = req.Status!;
         Changed(broker, action);
@@ -137,7 +138,7 @@ public static class AgentActions
         new(a.Id, a.AgentId, a.Kind, a.Status, a.Result, a.CreatedAt, a.ExpiresAt, a.FinishedAt, a.ProjectKey, a.PermissionMode, a.SessionRef);
 
     /// <summary>What a Claude request was checked to be: its (cleaned) fields, or why it is refused.</summary>
-    private sealed record ClaudeCheck(string? ProjectKey, string? PermissionMode, string? SessionRef, IResult? Refusal);
+    private sealed record ClaudeCheck(string? ProjectKey, string? PermissionMode, string? SessionRef, IResult? Refusal, string? Prompt = null);
 
     /// <summary>
     /// The rules of starting and stopping Claude from the web (ADR-0014), on top of the owner-only rule: the workspace's remote-work switch, the machine owner's own
@@ -165,9 +166,16 @@ public static class AgentActions
             if (req.ProjectKey is not { Length: >= 1 and <= RunKinds.ProjectKeyMax } project || project.Any(char.IsControl)) return new(null, null, null, Http.Invalid("projectKey", AgentActionErrors.InvalidProject));
             var mode = req.PermissionMode ?? AgentActionKinds.DefaultClaudePermissionMode;
             if (!AgentActionKinds.ClaudePermissionModes.Contains(mode)) return new(null, null, null, Http.Invalid("permissionMode", AgentActionErrors.InvalidPermissionMode));
-            return new(project, mode, null, null);
+            var prompt = req.Prompt?.Trim();
+            if (prompt is { Length: > 0 } && (prompt.Length > AgentActionKinds.PromptMax || prompt.Any(c => char.IsControl(c) && c is not ('\n' or '\t'))))
+            {
+                return new(null, null, null, Http.Invalid("prompt", AgentActionErrors.InvalidPrompt));
+            }
+
+            return new(project, mode, null, null, string.IsNullOrEmpty(prompt) ? null : prompt);
         }
 
+        if (req.Prompt is { Length: > 0 }) return new(null, null, null, Http.Invalid("prompt", AgentActionErrors.InvalidPrompt));
         if (!AgentActionKinds.IsSessionRef(req.SessionRef)) return new(null, null, null, Http.Invalid("sessionRef", AgentActionErrors.InvalidSessionRef));
         var started = await db.AgentActions.AsNoTracking().AnyAsync(a => a.AgentId == agent.Id && a.Kind == AgentActionKinds.ClaudeStart
             && a.Status == AgentActionStatuses.Succeeded && a.SessionRef == req.SessionRef, ct);
@@ -198,7 +206,7 @@ public static class AgentActions
         {
             await db.AgentActions.Where(a => a.AgentId == agentId && (a.Kind == AgentActionKinds.ClaudeStart || a.Kind == AgentActionKinds.ClaudeStop)
                     && (a.Status == AgentActionStatuses.Queued || a.Status == AgentActionStatuses.Delivered))
-                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, AgentActionStatuses.Expired).SetProperty(a => a.FinishedAt, now), http.RequestAborted);
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, AgentActionStatuses.Expired).SetProperty(a => a.FinishedAt, now).SetProperty(a => a.Prompt, (string?)null), http.RequestAborted);
         }
 
         broker.Publish(Broker.Workspace(agent.WorkspaceId), new StreamMessage(AgentRoleEndpoints.MachineEvent, new { agentId }));
@@ -213,7 +221,7 @@ public static class AgentActions
     private static Task<int> ExpireStaleAsync(MonitorDb db, Guid agentId, DateTimeOffset now, CancellationToken ct) =>
         db.AgentActions.Where(a => a.AgentId == agentId && (a.Status == AgentActionStatuses.Queued || a.Status == AgentActionStatuses.Delivered)
                 && a.ExpiresAt <= now)
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, AgentActionStatuses.Expired).SetProperty(a => a.FinishedAt, now), ct);
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, AgentActionStatuses.Expired).SetProperty(a => a.FinishedAt, now).SetProperty(a => a.Prompt, (string?)null), ct);
 
     private static void Changed(Broker broker, AgentAction a) =>
         broker.Publish(Broker.Workspace(a.WorkspaceId), new StreamMessage(WorkspaceEvent, new { id = a.Id, agentId = a.AgentId, status = a.Status }));

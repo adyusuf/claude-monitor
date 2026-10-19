@@ -70,6 +70,8 @@ export const deMachines: Dictionary["machines"] = {
     trustHint: "Claude Code muss dem Ordner des Projekts schon vertrauen: Öffnen Sie dort einmal Claude an der Maschine und bestätigen Sie die Vertrauensabfrage. Sonst schlägt der Start fehl und sagt das.",
     noProjects: "Diese Maschine hat noch kein Projekt: Eines erscheint, wenn eine Sitzung in einem Ordner arbeitet oder wenn ein Ordner mit aipod config projects add aufgeführt wird.",
     project: "Projekt", mode: "Berechtigungsmodus",
+    prompt: "Erste Nachricht (optional)",
+    promptHint: "Höchstens {max} Zeichen. Die Sitzung erhält sie als Nachricht aus dem Web gekennzeichnet, behandelt sie als Daten und fragt vor einer riskanten Anfrage nach.",
     modes: { manual: "Vor riskanten Schritten fragen (manual)", plan: "Nur planen", acceptEdits: "Dateiänderungen akzeptieren" },
     start: "Im Hintergrund starten", stop: "Stoppen", runningTitle: "Über das Web gestartete Sitzungen", noneRunning: "Keine läuft.",
     done: { saved: "Gespeichert.", started: "Der Agent wurde gebeten, eine Sitzung zu starten; das Ergebnis steht unten.", stopped: "Der Agent wurde gebeten, die Sitzung zu stoppen." },

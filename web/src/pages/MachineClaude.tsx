@@ -36,6 +36,7 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const [done, setDone] = useState<"saved" | "started" | "stopped" | null>(null);
   const [project, setProject] = useState("");
   const [mode, setMode] = useState<ClaudePermissionMode>("manual");
+  const [prompt, setPrompt] = useState("");
   const accepting = view.acceptsClaudeControl === true;
   const allowed = view.roleEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.effectiveEnvironment);
   const newEnough = versionAtLeast(agentVersion, config.claudeMinAgentVersion);
@@ -66,8 +67,9 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   };
   const start = async () => {
     setDone(null);
-    if (await action.attempt((code) => api.requestAgentAction(agentId, "claude_start", code, { projectKey: chosen, permissionMode: mode }).then(() => undefined))) {
+    if (await action.attempt((code) => api.requestAgentAction(agentId, "claude_start", code, { projectKey: chosen, permissionMode: mode, ...(prompt.trim() ? { prompt: prompt.trim() } : {}) }).then(() => undefined))) {
       setDone("started");
+      setPrompt("");
       await load();
       onChanged();
     }
@@ -119,6 +121,15 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
               </label>
             </div>
           )}
+          {projects.length > 0 ? (
+            <div className="stack">
+              <label className="stack">
+                <span className="small">{t("machines.claudeControl.prompt")}</span>
+                <textarea value={prompt} maxLength={config.claudePromptMax} rows={3} onChange={(e) => setPrompt(e.target.value)} />
+              </label>
+              <span className="muted small">{t("machines.claudeControl.promptHint", { max: config.claudePromptMax })}</span>
+            </div>
+          ) : null}
           {action.field}
           {action.error ? <Notice kind="error">{action.error}</Notice> : null}
           <div className="row-actions">
