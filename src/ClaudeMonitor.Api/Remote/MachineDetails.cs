@@ -46,7 +46,7 @@ public static class MachineDetails
         var since = now - ErrorWindow;
         var errors = await (from e in db.SessionEvents.AsNoTracking()
                             join s in db.HarnessSessions.AsNoTracking() on e.SessionId equals s.Id
-                            join p in db.Projects.AsNoTracking() on s.ProjectId equals p.Id
+                            join p in db.Repos.AsNoTracking() on s.RepoId equals p.Id
                             where s.AgentId == agentId && s.WorkspaceId == workspaceId && e.Kind == EventKinds.HookPrefix + "PostToolUseFailure" && e.OccurredAt > since
                             group e by p.Key into g
                             select new { Key = g.Key, Count = g.Count() }).ToListAsync(ct);

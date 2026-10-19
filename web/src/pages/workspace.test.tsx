@@ -218,12 +218,12 @@ describe("workspace settings and account", () => {
 
   it("creates a workspace", async () => {
     const calls = mockApi({ "GET /me": { body: ME }, "POST /workspaces": { status: 201, body: { id: "w9" } } });
-    renderAt("/workspaces/new", [{ path: "/workspaces/new", element: <NewWorkspacePage /> }, { path: "/w/:ws/sessions", element: <div>new sessions</div> }]);
+    renderAt("/workspaces/new", [{ path: "/workspaces/new", element: <NewWorkspacePage /> }, { path: "/w/:ws/projects", element: <div>new projects</div> }]);
     await userEvent.click(await screen.findByRole("button", { name: "Create" }));
     expect(screen.getByText("Enter a name (up to 100 characters).")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Name"), "Second");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
-    expect(await screen.findByText("new sessions")).toBeInTheDocument();
+    expect(await screen.findByText("new projects")).toBeInTheDocument();
     expect(calls.find((c) => c.method === "POST")?.body).toEqual({ name: "Second" });
   });
 

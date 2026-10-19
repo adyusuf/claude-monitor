@@ -106,7 +106,7 @@ export function NewWorkspacePage() {
           try {
             const created = await api.createWorkspace(name);
             await refresh();
-            navigate(`/w/${created.id}/sessions`);
+            navigate(`/w/${created.id}/projects`);
           } catch (err) {
             setError(errorText(err));
           }

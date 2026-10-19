@@ -2,6 +2,10 @@ import { request } from "./client";
 import type {
   AgentActionKind, AgentActionView, AgentAsksView, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
+import type {
+  ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
+  ProjectSummary, ProjectView, ReleaseInput, ReleaseView,
+} from "./typesProjects";
 
 const q = (params: Record<string, string | number | undefined | null>) => {
   const s = new URLSearchParams();
@@ -98,6 +102,31 @@ export const api = {
   endSchedule: (id: string) => request<void>("POST", `/schedules/${id}/end`),
   remoteSettings: (id: string) => request<RemoteSettings>("GET", `/workspaces/${id}/remote-settings`),
   saveRemoteSettings: (id: string, settings: RemoteSettings) => request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, settings),
+  projects: (ws: string, opts: { q?: string; status?: string; cursor?: string | null; limit?: number }) =>
+    request<Page<ProjectSummary>>("GET", `/workspaces/${ws}/projects${q(opts)}`),
+  createProject: (ws: string, input: ProjectInput) => request<ProjectView>("POST", `/workspaces/${ws}/projects`, input),
+  project: (id: string) => request<ProjectView>("GET", `/projects/${id}`),
+  updateProject: (id: string, input: ProjectInput) => request<void>("PUT", `/projects/${id}`, input),
+  archiveProject: (id: string) => request<void>("DELETE", `/projects/${id}`),
+  restoreProject: (id: string) => request<void>("POST", `/projects/${id}/restore`),
+  projectMembers: (id: string) => request<ProjectMemberView[]>("GET", `/projects/${id}/members`),
+  putProjectMember: (id: string, userId: string, role: ProjectRole) => request<void>("PUT", `/projects/${id}/members/${userId}`, { role }),
+  removeProjectMember: (id: string, userId: string) => request<void>("DELETE", `/projects/${id}/members/${userId}`),
+  applications: (projectId: string, opts: { status?: string; cursor?: string | null; limit?: number }) =>
+    request<Page<ApplicationSummary>>("GET", `/projects/${projectId}/applications${q(opts)}`),
+  createApplication: (projectId: string, input: ApplicationInput) => request<ApplicationView>("POST", `/projects/${projectId}/applications`, input),
+  application: (id: string) => request<ApplicationView>("GET", `/applications/${id}`),
+  updateApplication: (id: string, input: ApplicationInput) => request<void>("PUT", `/applications/${id}`, input),
+  archiveApplication: (id: string) => request<void>("DELETE", `/applications/${id}`),
+  restoreApplication: (id: string) => request<void>("POST", `/applications/${id}/restore`),
+  components: (applicationId: string) => request<ComponentView[]>("GET", `/applications/${applicationId}/components`),
+  addComponent: (applicationId: string, input: ComponentInput) => request<ComponentView>("POST", `/applications/${applicationId}/components`, input),
+  putComponent: (id: string, input: ComponentInput) => request<void>("PUT", `/components/${id}`, input),
+  archiveComponent: (id: string) => request<void>("DELETE", `/components/${id}`),
+  releases: (applicationId: string) => request<ReleaseView[]>("GET", `/applications/${applicationId}/releases`),
+  addRelease: (applicationId: string, input: ReleaseInput) => request<ReleaseView>("POST", `/applications/${applicationId}/releases`, input),
+  putRelease: (id: string, input: ReleaseInput) => request<void>("PUT", `/releases/${id}`, input),
+  cancelRelease: (id: string) => request<void>("DELETE", `/releases/${id}`),
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),
   approveDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/approve", { userCode, workspaceId }),
   denyDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/deny", { userCode, workspaceId }),

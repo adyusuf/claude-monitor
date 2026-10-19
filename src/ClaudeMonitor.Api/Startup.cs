@@ -132,6 +132,9 @@ public static class Startup
         JobEndpoints.Map(api);
         ScheduleEndpoints.Map(api);
         ApprovalKeyEndpoints.Map(api);
+        ProjectEndpoints.Map(api);
+        ApplicationEndpoints.Map(api);
+        ApplicationPartEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)

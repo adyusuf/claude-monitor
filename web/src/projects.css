@@ -1,0 +1,26 @@
+/* Managed projects and applications (ADR-0011). Uses the tokens of styles.css. */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.tile { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.15s; }
+.tile:hover { border-color: var(--accent); }
+.tile-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.tile-text { margin: 0; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tile-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; }
+.tile-actions { display: flex; gap: 8px; margin-top: auto; position: relative; z-index: 1; }
+.stretch { color: inherit; }
+.stretch::after { content: ""; position: absolute; inset: 0; }
+.stretch:hover { text-decoration: none; color: var(--accent); }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.group { border: none; padding: 0; margin: 0; min-width: 0; }
+.row-input { display: flex; gap: 8px; align-items: center; }
+.row-input .input { flex: 1; min-width: 0; }
+.row-input.grow { flex: 1; flex-wrap: wrap; }
+.row-input.add-row { margin-top: 12px; }
+.env-row { justify-content: space-between; }
+.env-row .check { min-width: 130px; }
+.target-kind { flex: 0 0 170px !important; }
+.check-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.chip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-x { background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px; padding: 0 2px; font: inherit; }
+.bullets { margin: 0; padding-left: 18px; }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.members-add { margin-top: 14px; }

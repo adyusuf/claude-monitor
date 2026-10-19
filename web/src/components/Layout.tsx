@@ -60,7 +60,7 @@ export function Layout() {
         {current ? (
           <label className="switcher">
             <span className="sr-only">Workspace</span>
-            <select value={current.id} onChange={(e) => e.target.value === "new" ? navigate("/workspaces/new") : navigate(`/w/${e.target.value}/sessions`)}>
+            <select value={current.id} onChange={(e) => e.target.value === "new" ? navigate("/workspaces/new") : navigate(`/w/${e.target.value}/projects`)}>
               {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               <option value="new">+ {t("nav.newWorkspace")}</option>
             </select>
@@ -68,6 +68,7 @@ export function Layout() {
         ) : null}
         {current ? (
           <nav className="nav">
+            {link(`/w/${current.id}/projects`, t("nav.projects"), "▦")}
             {link(`/w/${current.id}/sessions`, t("nav.sessions"), "▤")}
             {link(`/w/${current.id}/machines`, t("nav.machines"), "▣", pending)}
             {link(`/w/${current.id}/members`, t("nav.members"), "◍")}
