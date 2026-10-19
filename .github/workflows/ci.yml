@@ -5,10 +5,13 @@
 # A local scripts/quick-check.sh is only a first look; the full gate is here.
 name: CI
 
+# Paused for dev and test (maintainer, 19/10/2026): no run on a push to them or on a pull request into them. prod keeps its run; a run by hand
+# (workflow_dispatch, or scripts/merge-gate.sh locally) still works. To turn it back on, add dev and test to both lists.
 on:
   push:
-    branches: [dev, test, prod]
+    branches: [prod]
   pull_request:
+    branches: [prod]
   workflow_dispatch:
 
 permissions:

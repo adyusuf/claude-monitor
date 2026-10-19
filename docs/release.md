@@ -134,3 +134,10 @@ The agent builds can be published on a download host instead of each server's ow
 
 There is no feature flag yet. A switch ships as a configuration value read by the tier's one configuration
 module (global #2).
+
+## CI paused for dev and test (maintainer, 19/10/2026)
+
+`.github/workflows/ci.yml` runs only for pushes and pull requests to `prod` and by hand (`workflow_dispatch`); the `push: test` trigger of `e2e.yml` is gone (its nightly
+run stays). `.claude/adyusuf.json` sets `run_before_push.dev` and `.test` (`unit`, `e2e`) to no, so merges to dev and test carry `Gate-Waived:` trailers (global rule #34) and
+the report before a prod merge lists them. Coverage (#29) is not waived by this. To turn it back on: add `dev` and `test` to both triggers of `ci.yml`, `push: branches: [test]` to `e2e.yml`,
+and run `adyusuf_config.py unset --project` for the four keys.
