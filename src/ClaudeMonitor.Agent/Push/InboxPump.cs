@@ -40,7 +40,7 @@ public sealed class InboxPump(Func<AgentConfig> settings, LocalStore store, IInb
                     // An id that cannot stand inside the notice (the server only makes GUIDs) gets the whole text instead, and counts as read.
                     var notice = brief && ChannelEnvelopes.IsSafeId(prompts[i].Id);
                     if (brief && !notice) store.MarkRead(prompts[i].Id, now);
-                    var content = notice ? ChannelEnvelopes.BuildInboxShort(prompts[i]) : ChannelEnvelopes.BuildInbox(prompts[i], config.PushContentMax, now);
+                    var content = notice ? ChannelEnvelopes.BuildInboxShort(prompts[i], Mcp.McpToolNames.Parse(inbox.Tools)) : ChannelEnvelopes.BuildInbox(prompts[i], config.PushContentMax, now);
                     await transport.SendAsync(inbox.Endpoint, InboxLines.For(prompts[i], inbox.Token, content), config.InboxConnectTimeout, ct);
                     store.Set(PushStatus.LastPushKey, prompts[i].Id);
                     store.Set(PushStatus.LastPushAtKey, now.ToString("O", CultureInfo.InvariantCulture));

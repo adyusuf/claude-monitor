@@ -1,7 +1,7 @@
 # ADR-0012 (proposed): moving the names left over from the rename to aipod
 
-Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1) and step 2 (the tier 1 display names, section 4);
-the rest is not built.** Follows ADR-0011 (the name people see is aipod; the old names keep working). This ADR
+Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1), step 2 (the tier 1 display names, section 4) and
+step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`); the rest is not built.** Follows ADR-0011 (the name people see is aipod; the old names keep working). This ADR
 designs, one item at a time, the four names ADR-0011 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
@@ -78,6 +78,15 @@ session's context):
 4. **Markers stay unchanged** (section 0) in the first release. If the maintainer wants the visible ones ("claude-monitor web message" in the
    📩 line, the header the web matches) to say aipod: release N teaches the tailer and the web parser to accept both; release N+1 (after the
    web is deployed everywhere) makes the agent write the new ones. Sending first would break delivery confirmation on machines running N-1.
+
+**Built (step 3).** `McpToolNames` holds the mode (`aipod mcp --names aipod|legacy`, else `AIPOD_TOOL_NAMES`/`CM_TOOL_NAMES`, else legacy; scoped to the
+run, so tests cannot leak it) and the one place names are made: `Name("ask_result")`, `Text(...)` (rewrites only the closed list of 19 names, whole words, in
+STATIC text: descriptions, rules, notices), and `Slot`/`Fill` (a placeholder kept in the database for a reader whose mode the writer does not know).
+`ToolRegistry` registers the legacy set exactly as before and creates the aipod set from the same methods with their descriptions and parameter schemas
+rewritten. Text that carries data (an ask's question, a machine name, a script's output) is never rewritten: it names its tools through `Name`. The
+machines block is stored with slots and filled by the SessionStart hook in its own mode; a notice or an ask written into a session names the tools of THAT
+session, because the hook stores the mode in the session's inbox row (`session_inboxes.tools`, additive). **Step 4 must:** pass `--names aipod` in the new
+plugin's `.mcp.json` and export `AIPOD_TOOL_NAMES=aipod` in its `run.sh`; the old plugin passes nothing and keeps `monitor_*`.
 
 **Back.** Omit the flag. **Tests:** both modes, the cross-reference texts, the tailer and the web parser with both markers. **Needs the
 maintainer:** whether the visible markers should change at all (default: no), and the names themselves (`aipod_status` etc., prefix swap only).

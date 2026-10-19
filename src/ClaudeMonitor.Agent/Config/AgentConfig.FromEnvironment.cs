@@ -29,6 +29,7 @@ public sealed partial record AgentConfig
             PushTransport = PushTransports.Normalize(read("CM_PUSH")),
             InboxFormat = InboxFormats.Normalize(read("CM_INBOX_FORMAT")),
             InboxFormatFromEnvironment = read("CM_INBOX_FORMAT") is { Length: > 0 },
+            ToolNamesMode = Mcp.McpToolNames.Parse(read("CM_TOOL_NAMES")),
             BinaryOverride = read("CM_BINARY") is { Length: > 0 } binary ? binary : null,
             PluginId = read("CM_PLUGIN_ID") is { Length: > 0 } pluginId ? pluginId : null,
             PluginDataDir = read("CLAUDE_PLUGIN_DATA") is { Length: > 0 } pluginData ? pluginData : null,

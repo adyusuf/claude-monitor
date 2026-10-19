@@ -67,6 +67,9 @@ public static partial class Cli
         TimeProvider clock)
     {
         ArgumentNullException.ThrowIfNull(args);
+        // The names of the tools for this run (before anything names one): --names, else AIPOD_TOOL_NAMES, else the old ones. Scoped to this call, so
+        // a test that runs the command line in this process does not change what a parallel test sees.
+        using var toolNames = McpToolNames.Scope(Option(args, "--names") is { } names ? McpToolNames.Parse(names) : config.ToolNamesMode);
         // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0005).
         if (args.FirstOrDefault() == "install" && ServiceCommands.IsService(args)) return ServiceCommands.Install(args, stdout, stderr);
         if (args.FirstOrDefault() == "uninstall" && ServiceCommands.IsService(args)) return ServiceCommands.Uninstall(stdout);
@@ -153,12 +156,12 @@ public static partial class Cli
         builder.Services.AddSingleton(clock);
         var mcp = builder.Services.AddMcpServer(o =>
         {
-            if (config.InboxShortEnabled) o.ServerInstructions = ChannelEnvelopes.InboxInstructions; // the one-line notice needs the rule for reading it
+            if (config.InboxShortEnabled) o.ServerInstructions = McpToolNames.Text(ChannelEnvelopes.InboxInstructions); // the one-line notice needs the rule for reading it
             if (!config.ChannelPushEnabled) return; // off, or through the inbox: no channel
             o.Capabilities = new ServerCapabilities { Experimental = new Dictionary<string, object> { [ChannelHost.Capability] = new JsonObject() } };
-            o.ServerInstructions = ChannelEnvelopes.Instructions;
+            o.ServerInstructions = McpToolNames.Text(ChannelEnvelopes.Instructions);
         });
-        mcp.WithStdioServerTransport().WithTools<MonitorTools>().WithTools<MachineTools>().WithTools<RemoteTools>().WithTools<ScriptTools>().WithTools<AskTools>().WithTools<GrantTools>().WithTools<InboxTools>();
+        mcp.WithStdioServerTransport().AddTools(config, clock, McpToolNames.Mode);
         if (config.ChannelPushEnabled) builder.Services.AddHostedService<ChannelHost>();
         await builder.Build().RunAsync();
     }

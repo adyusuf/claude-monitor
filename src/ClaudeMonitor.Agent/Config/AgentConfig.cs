@@ -199,6 +199,9 @@ public sealed partial record AgentConfig
     public string StopRequestPath => Path.Combine(Home, "daemon.stop");
 
     public const string CredentialService = "claude-monitor-agent";
+
+    /// <summary>Which names the MCP tools go by for the processes this one starts' sessions (AIPOD_TOOL_NAMES / CM_TOOL_NAMES: "aipod"); the old names when nothing is said (ADR-0012).</summary>
+    public Mcp.ToolNameMode ToolNamesMode { get; init; } = Mcp.ToolNameMode.Legacy;
     public const string PluginName = "monitor-agent";
     public const string MarketplaceName = "monitor-agent-local";
 

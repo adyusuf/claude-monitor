@@ -41,11 +41,11 @@ public sealed class AskTools(AgentConfig config, TimeProvider clock)
         using (var store = new LocalStore(config.DatabasePath)) project = session is null ? null : store.ProjectKeyOf(session);
         var create = new AskCreate(clientKey, target.AgentId!.Value, TextMask.Mask(question), session, project);
         var outcome = await client.CreateAskAsync(create);
-        if (outcome.Pending) return $"Queued on this machine as request {clientKey}; the agent sends it as soon as it can. Call monitor_ask_result with askId {clientKey}.";
+        if (outcome.Pending) return $"Queued on this machine as request {clientKey}; the agent sends it as soon as it can. Call {McpToolNames.Name("ask_result")} with askId {clientKey}.";
         if (!outcome.Ok) return Refusal(outcome.Error!);
         var ask = outcome.Value!;
         using (var store = new LocalStore(config.DatabasePath)) store.Bump(PushStatus.OutCountKey);
-        return $"Ask {ask.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. If an idle Claude session there takes it, it answers within minutes; call monitor_ask_result with askId {ask.Id} to read the answer.";
+        return $"Ask {ask.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. If an idle Claude session there takes it, it answers within minutes; call {McpToolNames.Name("ask_result")} with askId {ask.Id} to read the answer.";
     }
 
     [McpServerTool(Name = "monitor_ask_result", ReadOnly = true)]

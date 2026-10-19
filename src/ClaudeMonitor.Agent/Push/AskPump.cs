@@ -91,7 +91,7 @@ public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInbox
             {
                 var command = new LocalCommand(ask.Id, inbox.Session, "ask", null, ask.NotAfter);
                 var token = OperatingSystem.IsWindows() ? inbox.Token : null; // never the key where it is optional: a held message is what an ask from another machine deserves
-                await transport.SendAsync(inbox.Endpoint, InboxLines.For(command, token, AskEnvelopes.Build(ask, config.PushContentMax)), config.InboxConnectTimeout, ct);
+                await transport.SendAsync(inbox.Endpoint, InboxLines.For(command, token, AskEnvelopes.Build(ask, config.PushContentMax, Mcp.McpToolNames.Parse(inbox.Tools))), config.InboxConnectTimeout, ct);
             }
             catch (Exception e) when (!ct.IsCancellationRequested && e is IOException or SocketException or TimeoutException or InvalidOperationException
                                           or UnauthorizedAccessException or ArgumentException)

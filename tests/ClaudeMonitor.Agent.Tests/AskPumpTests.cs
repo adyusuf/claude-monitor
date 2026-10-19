@@ -94,6 +94,20 @@ public sealed class AskPumpTests : IDisposable
     }
 
     [Fact]
+    public async Task The_ask_names_the_answer_tool_of_the_session_it_is_written_to()
+    {
+        Session("s-new", 100);
+        store.SaveInbox("s-new", "/tmp/s-new.sock", Token, Start.AddSeconds(100), tools: "aipod");
+        Ask(1);
+
+        await Pump().PumpAsync(CancellationToken.None);
+
+        var content = JsonDocument.Parse(Assert.Single(Assert.Single(transport.Sent).Lines)).RootElement.GetProperty("message").GetProperty("content").GetString()!;
+        Assert.Contains("the aipod_answer tool", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("monitor_answer", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_busy_session_is_not_written_to_and_without_any_idle_session_the_ask_is_kept_queued_with_its_text()
     {
         Session("s-busy", 100, isIdle: false);

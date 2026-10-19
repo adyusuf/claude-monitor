@@ -61,7 +61,8 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             return;
         }
 
-        if (Push.SocketInboxTransport.IsEndpoint(config.MessagingSocket)) store.SaveInbox(session, config.MessagingSocket!, config.MessagingToken?.Value, now, permissionMode is { Length: > 0 and <= 40 } ? permissionMode : null);
+        if (Push.SocketInboxTransport.IsEndpoint(config.MessagingSocket)) store.SaveInbox(session, config.MessagingSocket!, config.MessagingToken?.Value, now, permissionMode is { Length: > 0 and <= 40 } ? permissionMode : null,
+            Mcp.McpToolNames.Word(Mcp.McpToolNames.Mode)); // which names this session's tools have, so a notice written to it names its own
     }
 
     private void Record(string hookEvent, string session, JsonObject payload, ProjectInfo? project, DateTimeOffset now) =>

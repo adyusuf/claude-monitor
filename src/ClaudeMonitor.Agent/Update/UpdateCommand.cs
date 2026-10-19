@@ -101,7 +101,7 @@ public static class UpdateCommand
         {
             SavedSettings.SaveInboxFormat(config, args[2]);
             await stdout.WriteLineAsync(args[2] == InboxFormats.Brief
-                ? "push-format: short (the inbox gets a one-line notice; the session reads the message with monitor_inbox_read)"
+                ? "push-format: short (the inbox gets a one-line notice; the session reads the message with its inbox tool, monitor_inbox_read or aipod_inbox_read)"
                 : "push-format: full (the inbox gets the whole message)");
             return 0;
         }

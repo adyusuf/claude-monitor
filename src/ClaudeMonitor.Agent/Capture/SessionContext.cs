@@ -53,7 +53,7 @@ public static class SessionContext
         if (!File.Exists(config.DatabasePath)) return null;
         var session = stdin is null ? null : SessionOf(stdin);
         using var store = new LocalStore(config.DatabasePath);
-        var machines = config.MachinesContextEnabled ? store.Get(AgentConfig.MachinesContextKey) : null;
+        var machines = config.MachinesContextEnabled && store.Get(AgentConfig.MachinesContextKey) is { } block ? Mcp.McpToolNames.Fill(block) : null; // the tool names of THIS session
         var pending = session is null ? null : Pending(config, store, session, clock.GetUtcNow());
         return machines is { Length: > 0 } && pending is not null ? machines + "\n\n" + pending : pending ?? machines;
     }
