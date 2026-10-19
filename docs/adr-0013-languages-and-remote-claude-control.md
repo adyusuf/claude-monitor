@@ -1,6 +1,6 @@
 # ADR-0013 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
-Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below).** Part A is partly built (the web, the API mails); the rest of A and all of B are design only. Builds on ADR-0005
+Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1 of Part B is built (see "P1 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
 folders, asks) and ADR-0011 (the names aipod and Podium).
 
@@ -102,3 +102,48 @@ Still open: 1. Windows: a test of `claude --bg` on the Windows server (the spike
 only, as proposed, or also a workspace admin). 3. The permission mode of a session nobody watches (proposed: `manual`, so every risky step waits for a person on
 the web; never bypass, auto or dontAsk). 4. The cost of a session is the machine owner's plan: acceptable? 5. What the page says for a folder that is not trusted
 yet ("open Claude in that folder once at the machine and accept the trust prompt").
+
+## P1 as built (19/10/2026): start and stop on demand
+
+What shipped, on the branch with the rest of this work (not released: the agent version is still 0.5.0, the web expects 0.6.0 for these actions and says so):
+
+- **Contracts (additive).** Two kinds join the closed set of agent actions: `claude_start`, `claude_stop` (`AgentActionKinds`). The request, the message to the agent,
+  the report and the view gain optional fields: `projectKey`, `permissionMode` (`manual | plan | acceptEdits`, default `manual`), `sessionRef` (the 8-character short
+  id `claude --bg` prints). Nothing is free text. A start needs a recent sign-in or a two-step code like restart and update; a stop does not.
+- **API.** Migration `ClaudeControl` (additive): `agents.accepts_claude_control` (+ set_at, set_by), `agent_actions.project_key | permission_mode | session_ref`, and the
+  `ck_agent_actions_kind` CHECK widened. `PUT /api/agents/{id}/claude` is the owner's switch (re-authentication to turn it ON, audited, turning it off expires the
+  open Claude actions, a machine moved to another workspace forgets it). Creating a Claude action is refused unless: the workspace's remote-work switch is on, the
+  owner's switch is on, the agent is not a service agent, an admin SET the environment and it is `dev` or `test` and no claim or database function makes it strict,
+  and Claude Code is on the machine. A stop must name a session an earlier SUCCESSFUL start of the same machine returned. Only a successful start may name a session in
+  its report. The audit row of a Claude action carries the kind, the project key, the mode and the session id, never text.
+- **Agent.** `ClaudeControl` runs Claude Code's own commands with fixed argument shapes: `claude --bg --name aipod-<label> --permission-mode <mode>` in the project's folder
+  and `claude stop <id>`. The folder comes from a project the machine has reported (a folder a session visited, or a listed one). It refuses a service agent and a machine
+  that claims production or database, keeps at most 3 sessions started from the web running (`ClaudeWorkersMax`), and records each start in `claude-workers.json`
+  (user-only home): a stop touches only a session in that file. Claude Code's own "Workspace not trusted" refusal is reported with its next step. An unreadable file
+  counts as none of ours, so nothing is stopped on a guess.
+- **Web.** A Claude card on the machine page (owner only): the switch (with the code field when asked), a project and a mode (three choices) and a Start button, the
+  sessions started from the page with a Stop button each, and the recent Claude actions as text. It shows no start on a machine that is not dev or test, and says why;
+  the actions card no longer lists the Claude actions a second time. In Turkish, English and German.
+- **Decisions applied.** Environment = the machine's class; no repositories; no start on production or database machines. The workspace-level switch is the existing
+  remote-work switch (`remote_runs_enabled`), not a new one.
+
+Not built (P2 onward): the automatic `on_message` mode, a per-project trust pre-check in the page, and any change to how the session list marks agent-started sessions.
+
+## Windows: what still has to be tried (not done; this was developed on macOS)
+
+The server this project runs on is Windows, and none of P1 has been run there. The agent compiles for Windows and the tests run on macOS only. On the Windows machine, as
+the user that runs the agent, with Claude Code installed and a project folder you have already opened once in `claude` (accepting the trust prompt):
+
+1. `claude --version` (this feature needs a version that has `--bg`; the spike used 2.1.294) and `claude agents --json`.
+2. In that folder: `claude --bg --name aipod-test --permission-mode manual` and note the printed 8-character id. Does it print `backgrounded · <id> · aipod-test`? (The agent
+   parses exactly that line.) If it prints something else, or fails, copy the text.
+3. `claude agents --json --all`: is the session listed with `kind: background`? `claude stop <id>`: does it say `stopped <id>` and exit 0?
+4. With the aipod plugin installed, start a session as in 2 and look at the web: does it appear, and does a prompt sent from the web reach it while idle? (On Windows the
+   inbox is a named pipe: check that `CLAUDE_CODE_MESSAGING_SOCKET` is a `\\.\pipe\...` name in a hook of that session.)
+5. In an untrusted folder, step 2 must fail with "Workspace not trusted ... accept the trust prompt" and exit non-zero (the agent reports it as "does not trust that folder yet").
+6. Does the daemon (not a terminal) start it? On the Windows server, set the machine to environment `dev` or `test`, switch Claude control on for it on the web, and press Start in
+   the Claude card; `claude-workers.json` in the agent home should then list the session. Watch for: the `claude` on the service or scheduled-task PATH, the user profile the
+   daemon runs under (it needs the same Claude login), and a console window flashing (the agent starts `claude` hidden).
+7. Also check where Claude Code keeps its trust list on Windows (`~/.claude.json`, key format of folder paths: slashes) in case a later version of the page wants to pre-check trust.
+
+Anything that differs goes into this section before P2.
