@@ -1,0 +1,65 @@
+import type { Dictionary } from "./en";
+
+// German machines namespace: the same keys as en.machines.ts (the type makes a missing key a build error).
+export const deMachines: Dictionary["machines"] = {
+  title: "Maschinen", empty: "Noch ist keine Maschine verbunden.", connect: "Eine Maschine verbinden", revoke: "Trennen",
+  revokeConfirm: "Diese Maschine trennen? Ihr Agent hört auf zu melden.", revoked: "Getrennt", lastSeen: "Zuletzt gesehen",
+  version: "Agent", user: "Benutzer", moveTo: "In Arbeitsbereich verschieben", enrolled: "Verbunden",
+  updateAvailable: "Update verfügbar: {version}",
+  updateHint: "Führen Sie auf der Maschine „aipod update“ aus oder lassen Sie sie sich selbst aktualisieren (aipod config auto-update on, wenn der Arbeitsbereich es erlaubt).",
+  role: {
+    title: "Rolle", environment: "Umgebung", function: "Funktion", notSet: "nicht festgelegt", unknown: "unbekannt",
+    claimed: "Die Maschine selbst sagt: {role}.", claimTightens: "Eine Angabe macht die Rolle nur strenger; sie legt sie nie fest und lockert sie nie.",
+    adminOnly: "Nur ein Administrator des Arbeitsbereichs legt die Rolle fest.", save: "Rolle speichern", saved: "Rolle gespeichert.",
+    lowerHint: "Eine Maschine aus Produktion oder Datenbank herauszunehmen erfordert eine aktuelle Anmeldung: Geben Sie einen Code aus Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
+    strict: "Strenges Ziel (Produktion oder Datenbank): Hier gelten die strengeren Freigaberegeln aus ADR-0008.",
+    env: { dev: "Entwicklung", test: "Test", stage: "Staging", preprod: "Vorproduktion", production: "Produktion", other: "sonstige" },
+    fn: { development: "Entwicklerrechner", application: "Anwendungsserver", web: "Webserver", database: "Datenbankserver", ci: "CI-Runner", storage: "Speicher", other: "sonstige" },
+  },
+  claude: {
+    title: "Claude Code", none: "nicht installiert", unknown: "unbekannt (älterer Agent)", idle: "{n} untätig", sessions: "{live} Sitzung(en), {idle} untätig",
+    kind: { npm: "npm-Installation", native: "native Installation", unsupported: "eine Installation, die der Agent nicht aktualisiert" },
+  },
+  tools: {
+    title: "Werkzeuge", none: "Kein Werkzeug aus der Liste gefunden.", unknown: "Noch nicht gemeldet (älterer Agent).",
+    untrusted: "aufgeführt, vom Agent nicht ausgeführt: Die Datei gehört keinem Administrator", interpreters: "Skript-Interpreter",
+    hint: "Der Agent prüft eine feste Liste über absolute Pfade und meldet, was er findet; --version führt er nur für vertrauenswürdige oder eigene Programme aus.",
+  },
+  tags: {
+    title: "Tags", label: "Tags (Schlüssel=Wert, durch Leerzeichen getrennt)", none: "Keine Tags.", save: "Tags speichern", saved: "Tags gespeichert.",
+    hint: "Höchstens {max} Paare; Schlüssel und Werte bestehen aus Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich (1 bis 32 Zeichen). Claude sieht sie als Beschriftungen, nie als Anweisungen.",
+  },
+  note: {
+    title: "Betriebsnotiz", label: "Notiz für die Menschen und die Claude-Sitzungen, die auf dieser Maschine arbeiten", none: "Keine Notiz.", save: "Notiz speichern", saved: "Notiz gespeichert.",
+    hint: "Reiner Text, höchstens {max} Zeichen. Claude erhält sie nur, wenn es nach dieser Maschine fragt, gekennzeichnet als von einem Administrator geschriebener Text.",
+  },
+  services: {
+    title: "Lauschende Dienste", off: "Diese Maschine meldet ihre lauschenden Ports nicht.", waiting: "Eingeschaltet; der Agent hat noch nichts gemeldet.",
+    hidden: "Vom Eigentümer der Maschine eingeschaltet. Nur der Eigentümer und die Administratoren des Arbeitsbereichs sehen die Liste.", at: "Gemeldet {at}",
+    hint: "Die TCP-Ports, auf denen die Maschine lauscht, mit dem Prozessnamen, wo das System ihn zeigt. Standardmäßig aus: Nur der Eigentümer der Maschine schaltet es ein.",
+    turnOn: "Lauschende Ports melden", turnOff: "Nicht mehr melden", saved: "Gespeichert.", ownerOnly: "Das entscheidet nur der Eigentümer der Maschine.",
+    enableHint: "Das Einschalten erfordert eine aktuelle Anmeldung: Geben Sie einen Code aus Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
+  },
+  actions: {
+    title: "Agent-Aktionen", hint: "Bitten Sie den Agent dieser Maschine, eine von wenigen festen Aktionen auszuführen. Es gibt keinen Befehl einzutippen: Jede Schaltfläche ist eine Aktion, die der Agent schon kennt. Das Ergebnis erscheint unten.",
+    ownerOnly: "Nur der Eigentümer der Maschine kann das anfordern.", offline: "Die Maschine ist offline: Eine Aktion wartet 10 Minuten und wird verworfen, wenn der Agent sie bis dahin nicht übernommen hat.",
+    oldAgent: "Dieser Agent ist älter als {min} und ignoriert diese Anfragen. Aktualisieren Sie ihn auf der Maschine mit „aipod update“; danach funktionieren die Schaltflächen.",
+    enableHint: "Neustart und Update erfordern eine aktuelle Anmeldung: Geben Sie einen Code aus Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
+    strictHint: "Diese Maschine ist ein Produktions- oder Datenbankrechner: Neustart und Update brauchen immer einen frischen Code aus Ihrer Authenticator-App.",
+    sent: "Angefordert: {action}. Der Agent antwortet unten.", none: "Noch keine Aktion angefordert.",
+    kind: { status: "Status", update_check: "Auf Update prüfen", update: "Aktualisieren", restart: "Neu starten" },
+    status: { queued: "wartet auf den Agent", delivered: "der Agent hat sie", succeeded: "erledigt", failed: "fehlgeschlagen", expired: "nicht rechtzeitig übernommen" },
+  },
+  asks: {
+    title: "Fragen von Ihren anderen Maschinen", hint: "Eine Claude-Sitzung auf einer anderen Ihrer Maschinen kann einer untätigen Claude-Sitzung hier eine Frage stellen (kein Produktions- oder Datenbankrechner, und nur wenn ein Administrator die Umgebung dieser Maschine festgelegt hat). Die Antwort kommt als Text zurück. Standardmäßig aus: Nur der Eigentümer dieser Maschine schaltet es ein.",
+    off: "Diese Maschine nimmt keine Fragen an.", on: "Diese Maschine nimmt Fragen von Ihren anderen Maschinen an.", turnOn: "Fragen erlauben", turnOff: "Fragen nicht mehr erlauben", saved: "Gespeichert.",
+    ownerOnly: "Das entscheidet nur der Eigentümer der Maschine.", enableHint: "Das Einschalten erfordert eine aktuelle Anmeldung: Geben Sie einen Code aus Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
+    none: "Noch keine Frage.", question: "Frage", answer: "Antwort", answerCut: "Die Antwort wurde an der Grenze des Servers gekürzt.",
+    status: { queued: "wartet", delivered: "zugestellt, wartet auf die Antwort", answered: "beantwortet", no_idle_session: "keine untätige Sitzung", not_accepting: "nimmt nicht an", no_answer: "keine Antwort", expired: "abgelaufen", cancelled: "abgebrochen" },
+  },
+  projects: {
+    title: "Projekte", none: "Auf dieser Maschine ist noch kein Projekt bekannt.", noneHint: "Ein Projekt erscheint, wenn eine Sitzung darin arbeitet oder wenn ein Ordner mit aipod config projects add aufgeführt wird.",
+    listed: "aufgeführter Ordner", session: "aus einer Sitzung", errors: "{n} Werkzeugfehler in 7 Tagen", noRuns: "Für dieses Projekt noch keine Ausführung.", run: "Ausführung", cut: "Ausgabe gekürzt",
+    passed: "{n} bestanden", failed: "{n} fehlgeschlagen", skipped: "{n} übersprungen", kind: { test: "Test", build: "Build", deploy: "Deploy", other: "Sonstiges" },
+  },
+};

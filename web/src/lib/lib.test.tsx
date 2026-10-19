@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError, request } from "../api/client";
 import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
-import { translate } from "../i18n";
+import { de } from "../i18n/de";
+import { languageFor, languages, translate } from "../i18n";
 import { FakeEventSource, mockApi } from "../test/helpers";
 import { age, bytes, count, date, dateTime, remaining, time, usd } from "./format";
 import { debounce, useLive } from "./live";
@@ -62,6 +63,35 @@ describe("i18n", () => {
   it("has every English key in Turkish, and no empty text", () => {
     expect(keys(tr)).toEqual(keys(en));
     for (const k of keys(tr)) expect(translate(tr, k)).not.toBe("");
+  });
+
+  it("has every English key in German too, with the same placeholders, and no empty text", () => {
+    expect(keys(de)).toEqual(keys(en));
+    const placeholders = (text: string) => (text.match(/\{\w+\}/g) ?? []).sort();
+    for (const k of keys(en)) {
+      expect(translate(de, k)).not.toBe("");
+      expect(placeholders(translate(de, k))).toEqual(placeholders(translate(en, k)));
+      expect(placeholders(translate(tr, k))).toEqual(placeholders(translate(en, k)));
+    }
+  });
+
+  it("names the site Podium in every language and the agent aipod, never the old names", () => {
+    for (const dict of [en, tr, de]) {
+      expect(dict.app.name).toBe("Podium");
+      expect(dict.activity.monitorInput).toMatch(/^Podium \(web\)$/i); // German writes "Web" with a capital
+      expect(JSON.stringify(dict)).not.toMatch(/cm-agent|Claude Monitor/);
+    }
+  });
+
+  it("picks the language from a browser tag: ours by their first part, English for the rest", () => {
+    expect(languageFor("de-AT")).toBe("de");
+    expect(languageFor("DE")).toBe("de");
+    expect(languageFor("tr-TR")).toBe("tr");
+    expect(languageFor("en-GB")).toBe("en");
+    expect(languageFor("fr-FR")).toBe("en");
+    expect(languageFor("")).toBe("en");
+    expect(languageFor(undefined)).toBe("en");
+    expect(languages.map((l) => l.code)).toEqual(["en", "tr", "de"]);
   });
 
   it("fills placeholders and shows an unknown key rather than nothing", () => {

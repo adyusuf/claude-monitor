@@ -4,7 +4,7 @@ export const enMachines = {
   revokeConfirm: "Disconnect this machine? Its agent stops reporting.", revoked: "Disconnected", lastSeen: "Last seen",
   version: "Agent", user: "User", moveTo: "Move to workspace", enrolled: "Connected",
   updateAvailable: "Update available: {version}",
-  updateHint: "Run \"cm-agent update\" on the machine, or let it update itself (cm-agent config auto-update on, if the workspace allows it).",
+  updateHint: "Run \"aipod update\" on the machine, or let it update itself (aipod config auto-update on, if the workspace allows it).",
   role: {
     title: "Role", environment: "Environment", function: "Function", notSet: "not set", unknown: "unknown",
     claimed: "The machine itself says: {role}.", claimTightens: "A claim only makes the role stricter; it never sets or loosens it.",
@@ -41,7 +41,7 @@ export const enMachines = {
   actions: {
     title: "Agent actions", hint: "Ask this machine's agent to do one of a few fixed things. There is no command to type: each button is one action the agent already knows. The result is shown below.",
     ownerOnly: "Only the machine's owner can ask for these.", offline: "The machine is offline: an action waits for 10 minutes and is dropped if the agent has not taken it by then.",
-    oldAgent: "This agent is older than {min} and ignores these requests. Update it on the machine with \"cm-agent update\"; after that the buttons work.",
+    oldAgent: "This agent is older than {min} and ignores these requests. Update it on the machine with \"aipod update\"; after that the buttons work.",
     enableHint: "Restart and update need a recent sign-in: enter a code from your authenticator app, or sign in again.",
     strictHint: "This machine is production or a database: restart and update always need a fresh code from your authenticator app.",
     sent: "Asked: {action}. The agent answers below.", none: "No action asked yet.",
@@ -56,7 +56,7 @@ export const enMachines = {
     status: { queued: "waiting", delivered: "delivered, waiting for the answer", answered: "answered", no_idle_session: "no idle session", not_accepting: "not accepting", no_answer: "no answer", expired: "expired", cancelled: "cancelled" },
   },
   projects: {
-    title: "Projects", none: "No project is known on this machine yet.", noneHint: "A project appears when a session works in it, or when a folder is listed with cm-agent config projects add.",
+    title: "Projects", none: "No project is known on this machine yet.", noneHint: "A project appears when a session works in it, or when a folder is listed with aipod config projects add.",
     listed: "listed folder", session: "from a session", errors: "{n} tool errors in 7 days", noRuns: "No run for this project yet.", run: "run", cut: "output cut",
     passed: "{n} passed", failed: "{n} failed", skipped: "{n} skipped", kind: { test: "test", build: "build", deploy: "deploy", other: "other" },
   },

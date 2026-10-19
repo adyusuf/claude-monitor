@@ -6,7 +6,7 @@ export const trMachines: Dictionary["machines"] = {
   revokeConfirm: "Bu makinenin bağlantısı kesilsin mi? Ajanı raporlamayı bırakır.", revoked: "Bağlantı kesildi", lastSeen: "Son görülme",
   version: "Ajan", user: "Kullanıcı", moveTo: "Çalışma alanına taşı", enrolled: "Bağlandı",
   updateAvailable: "Güncelleme var: {version}",
-  updateHint: "Makinede \"cm-agent update\" çalıştırın ya da kendini güncellemesine izin verin (çalışma alanı izin veriyorsa: cm-agent config auto-update on).",
+  updateHint: "Makinede \"aipod update\" çalıştırın ya da kendini güncellemesine izin verin (çalışma alanı izin veriyorsa: aipod config auto-update on).",
   role: {
     title: "Rol", environment: "Ortam", function: "İşlev", notSet: "belirlenmedi", unknown: "bilinmiyor",
     claimed: "Makinenin kendi beyanı: {role}.", claimTightens: "Beyan rolü yalnızca sıkılaştırır; hiçbir zaman belirlemez ya da gevşetmez.",
@@ -43,7 +43,7 @@ export const trMachines: Dictionary["machines"] = {
   actions: {
     title: "Ajan işlemleri", hint: "Bu makinenin ajanından birkaç sabit işten birini yapmasını isteyin. Yazılacak komut yok: her düğme ajanın zaten bildiği tek bir işlemdir. Sonuç aşağıda görünür.",
     ownerOnly: "Bunları yalnızca makinenin sahibi isteyebilir.", offline: "Makine çevrimdışı: işlem 10 dakika bekler, ajan o zamana kadar almazsa düşer.",
-    oldAgent: "Bu ajan {min} sürümünden eski ve bu istekleri yok sayar. Makinede \"cm-agent update\" ile güncelleyin; sonra düğmeler çalışır.",
+    oldAgent: "Bu ajan {min} sürümünden eski ve bu istekleri yok sayar. Makinede \"aipod update\" ile güncelleyin; sonra düğmeler çalışır.",
     enableHint: "Yeniden başlatma ve güncelleme yakın zamanda giriş yapmış olmayı ister: doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapın.",
     strictHint: "Bu makine canlı ya da veritabanı: yeniden başlatma ve güncelleme her seferinde doğrulama uygulamasından yeni bir kod ister.",
     sent: "İstendi: {action}. Ajanın cevabı aşağıda.", none: "Henüz istenen işlem yok.",
@@ -58,7 +58,7 @@ export const trMachines: Dictionary["machines"] = {
     status: { queued: "bekliyor", delivered: "iletildi, cevap bekleniyor", answered: "cevaplandı", no_idle_session: "boşta oturum yok", not_accepting: "kabul etmiyor", no_answer: "cevap yok", expired: "süresi doldu", cancelled: "iptal edildi" },
   },
   projects: {
-    title: "Projeler", none: "Bu makinede henüz bilinen proje yok.", noneHint: "Bir oturum projede çalışınca ya da bir klasör cm-agent config projects add ile listelenince proje görünür.",
+    title: "Projeler", none: "Bu makinede henüz bilinen proje yok.", noneHint: "Bir oturum projede çalışınca ya da bir klasör aipod config projects add ile listelenince proje görünür.",
     listed: "listelenen klasör", session: "bir oturumdan", errors: "7 günde {n} araç hatası", noRuns: "Bu proje için henüz çalıştırma yok.", run: "çalıştırma", cut: "çıktı kesildi",
     passed: "{n} geçti", failed: "{n} kaldı", skipped: "{n} atlandı", kind: { test: "test", build: "derleme", deploy: "dağıtım", other: "diğer" },
   },

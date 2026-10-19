@@ -2,9 +2,21 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { config } from "../config";
 import { en, type Dictionary } from "./en";
 import { tr } from "./tr";
+import { de } from "./de";
 
-export type Language = "en" | "tr";
-export const dictionaries: Record<Language, Dictionary> = { en, tr };
+export type Language = "en" | "tr" | "de";
+export const languages: readonly { code: Language; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "tr", label: "Türkçe" },
+  { code: "de", label: "Deutsch" },
+];
+export const dictionaries: Record<Language, Dictionary> = { en, tr, de };
+
+/** The language for a browser language tag such as "de-AT"; English when it is none of ours. */
+export function languageFor(tag: string | undefined): Language {
+  const base = (tag ?? "").toLowerCase().split("-")[0];
+  return languages.find((l) => l.code === base)?.code ?? "en";
+}
 
 type Leaf<T, P extends string = ""> = {
   [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Leaf<T[K], `${P}${K}.`>;
@@ -23,11 +35,11 @@ export function translate(dict: Dictionary, key: string, vars?: Record<string, s
 export function storedLanguage(): Language {
   try {
     const saved = localStorage.getItem(config.languageKey);
-    if (saved === "en" || saved === "tr") return saved;
+    if (languages.some((l) => l.code === saved)) return saved as Language;
   } catch {
     // storage unavailable: fall back to the browser's language
   }
-  return navigator.language.toLowerCase().startsWith("tr") ? "tr" : "en";
+  return languageFor(navigator.language);
 }
 
 interface I18n {

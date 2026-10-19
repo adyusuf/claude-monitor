@@ -73,7 +73,7 @@ export function ApprovalKeysCard() {
           <div className="stack">
             <p className="small"><strong>{t("approvals.thisBrowser")}</strong> · {local.name} · <code>{grouped(local.fingerprint)}</code> · {registered ? t("approvals.registered") : t("approvals.notRegistered")}</p>
             <p className="muted small">{t("approvals.pinHint")}</p>
-            <CopyText text={`cm-agent approvers add ${local.publicKey} --name "${local.name.replaceAll('"', "")}"`} />
+            <CopyText text={`aipod approvers add ${local.publicKey} --name "${local.name.replaceAll('"', "")}"`} />
           </div>
         ) : (
           <Field label={t("approvals.name")} value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
