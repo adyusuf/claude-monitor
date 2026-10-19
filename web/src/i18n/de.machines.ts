@@ -57,6 +57,7 @@ export const deMachines: Dictionary["machines"] = {
     none: "Noch keine Frage.", question: "Frage", answer: "Antwort", answerCut: "Die Antwort wurde an der Grenze des Servers gekürzt.",
     status: { queued: "wartet", delivered: "zugestellt, wartet auf die Antwort", answered: "beantwortet", no_idle_session: "keine untätige Sitzung", not_accepting: "nimmt nicht an", no_answer: "keine Antwort", expired: "abgelaufen", cancelled: "abgebrochen" },
   },
+  plugin: { old: "altes Plugin: auf aipod wechseln" },
   claudeControl: {
     title: "Claude Code",
     hint: "Starten und stoppen Sie Claude Code auf dieser Maschine von hier aus im Hintergrund. Nur der Eigentümer der Maschine, nur auf einer Entwicklungs- oder Testmaschine und nur, nachdem der Eigentümer es für diese Maschine eingeschaltet hat. Jede Sitzung ist eine eigene Hintergrundsitzung von Claude Code, in einem Projekt, das diese Maschine gemeldet hat, mit dem Claude-Konto und -Tarif des Eigentümers.",

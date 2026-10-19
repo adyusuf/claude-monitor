@@ -30,6 +30,7 @@ public static class MachineReports
         await MachineProjects.ApplyAsync(db, agent.Id, agent.WorkspaceId, profile.Projects, now, ct);
         agent.ApprovalsRequired = profile.ApprovalsRequired == true;
         agent.PushTransport = profile.PushTransport is CommandTransports.Inbox or CommandTransports.Channel ? profile.PushTransport : null;
+        agent.PluginId = PluginIds.IsValid(profile.PluginId) ? profile.PluginId : null;
         if (profile.OsVersion is { Length: > 0 } version)
         {
             var clean = Clean(version, OsVersionMax);

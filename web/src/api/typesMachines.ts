@@ -42,6 +42,8 @@ export interface MachineView {
   acceptsClaudeControl?: boolean | null;
   /** What the daemon may start by itself (ADR-0014 P3): "off" or "on_message"; null or absent is off. */
   claudeAutoMode?: ClaudeAutoMode | null;
+  /** The plugin the agent runs under, as name@marketplace (ADR-0013); absent for an older agent or one that is not a plugin. */
+  pluginId?: string | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {

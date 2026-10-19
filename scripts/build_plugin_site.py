@@ -109,17 +109,25 @@ def main(argv=None):
     parser.add_argument('downloads')
     parser.add_argument('--base-url', required=True)
     parser.add_argument('--plugin-dir', default=None, help='build only the old plugin (monitor-agent) from this folder')
+    parser.add_argument('--without-old', action='store_true', help='retire the old plugin: build only aipod and remove the old zip and catalog from the folder (ADR-0013: 90 days after the bridge, and when the web shows no machine on the old plugin)')
     parser.add_argument('--aipod-dir', default=None, help='build the aipod plugin from this folder (with --plugin-dir: both)')
     args = parser.parse_args(argv)
     base = check_base(args.base_url)
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     given = {'monitor-agent': args.plugin_dir, 'aipod': args.aipod_dir}
     only_given = args.plugin_dir is not None or args.aipod_dir is not None
-    jobs = [(spec, given[spec[0]] or os.path.join(root, 'plugin', spec[0])) for spec in PLUGINS if not only_given or given[spec[0]]]
+    jobs = [(spec, given[spec[0]] or os.path.join(root, 'plugin', spec[0])) for spec in PLUGINS if (not only_given or given[spec[0]]) and not (args.without_old and spec[0] == 'monitor-agent')]
     for _, folder in jobs:
         if not os.path.isdir(folder):
             refuse(f'plugin folder {folder} not found')
     os.makedirs(args.downloads, exist_ok=True)
+    if args.without_old:
+        for spec in PLUGINS:
+            if spec[0] == 'monitor-agent':
+                for name in (spec[2], spec[3]):
+                    path = os.path.join(args.downloads, name)
+                    if os.path.exists(path):
+                        os.remove(path)
     for spec, folder in jobs:
         sha256 = write_zip(folder, os.path.join(args.downloads, spec[2]))
         with open(os.path.join(args.downloads, spec[3]), 'w', encoding='utf-8') as handle:

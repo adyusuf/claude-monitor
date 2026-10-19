@@ -131,6 +131,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("machine_id");
 
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(130)
+                        .HasColumnType("character varying(130)")
+                        .HasColumnName("plugin_id");
+
                     b.Property<DateTimeOffset?>("PresenceAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("presence_at");

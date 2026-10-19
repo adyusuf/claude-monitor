@@ -107,6 +107,9 @@ public sealed class Agent
     /// <summary>The push transport the agent has on (<c>inbox</c> or <c>channel</c>), or null when it is off or the agent does not say.</summary>
     public string? PushTransport { get; set; }
 
+    /// <summary>ADR-0013: the plugin the agent runs under (<c>name@marketplace</c>), as it last reported it; NULL for an agent that is not a plugin or is older.</summary>
+    public string? PluginId { get; set; }
+
     /// <summary>ADR-0010 §4: the machine only runs what a pinned owner key signed; the agent reports it with its profile. False for an older agent.</summary>
     public bool ApprovalsRequired { get; set; }
 }

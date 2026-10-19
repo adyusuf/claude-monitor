@@ -113,6 +113,12 @@ class PluginSite(unittest.TestCase):
                 self.assertEqual((catalog['name'], catalog['plugins'][0]['name']), (catalog_name, plugin))
                 self.assertEqual(catalog['plugins'][0]['source'], {'source': 'archive', 'url': f'{BASE}/downloads/{zip_name}', 'sha256': digest})
 
+    def test_retiring_the_old_plugin_builds_only_aipod_and_removes_the_old_files_from_the_folder(self):
+        self.assertEqual(site.main([self.out, '--base-url', BASE]), 0)
+        self.assertTrue(os.path.exists(os.path.join(self.out, 'marketplace.json')))
+        self.assertEqual(site.main([self.out, '--base-url', BASE, '--without-old']), 0)
+        self.assertEqual(sorted(os.listdir(self.out)), ['aipod-marketplace.json', 'aipod-plugin.zip'])
+
     def test_the_aipod_folder_alone_or_with_the_old_one_is_built_from_the_folders_given(self):
         other = os.path.join(self.tmp.name, 'aipod-plugin')
         make_plugin(other)
