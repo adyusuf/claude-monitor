@@ -18,7 +18,7 @@ public static class ConfigActions
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(req);
-        if (req.Prompt is { Length: > 0 } || req.PermissionMode is not null || req.SessionRef is not null) return Invalid("target", AgentActionErrors.InvalidSetting);
+        if (req.FirstPrompt is { Length: > 0 } || req.PermissionMode is not null || req.SessionRef is not null) return Invalid("target", AgentActionErrors.InvalidSetting);
         if (kind != AgentActionKinds.ProjectSetting)
         {
             if (req.ProjectKey is not null || req.Value is not null) return Invalid("target", AgentActionErrors.InvalidPlugin);

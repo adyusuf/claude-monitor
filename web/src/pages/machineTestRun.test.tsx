@@ -78,7 +78,6 @@ describe("start the test of a project on the machine page", () => {
       expect(lang.machines.projects.startTest.length).toBeGreaterThan(0);
       expect(lang.machines.projects.testIn).toContain("{dir}");
       expect(lang.errors.no_test_command.length).toBeGreaterThan(0);
-      expect(lang.errors.invalid_prompt.length).toBeGreaterThan(0);
     }
   });
 });

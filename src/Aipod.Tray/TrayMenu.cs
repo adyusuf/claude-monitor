@@ -1,3 +1,4 @@
+using ClaudeMonitor.Agent.Config;
 namespace Aipod.Tray;
 
 /// <summary>Everything the menu and the window's buttons can ask for.</summary>
@@ -29,24 +30,24 @@ public static class TrayMenu
         var separator = new MenuEntry(null, "");
         var entries = new List<MenuEntry>
         {
-            new(null, $"aipod {status.Version}", false),
+            new(null, Strings.T(Msg.TrayVersion, status.Version), false),
             new(null, StateLine(status), false),
         };
-        if (status.UpdateAvailable is { } update) entries.Add(new MenuEntry(null, $"Update {update} is available", false));
+        if (status.UpdateAvailable is { } update) entries.Add(new MenuEntry(null, Strings.T(Msg.TrayUpdateAvailable, update), false));
         entries.Add(separator);
-        entries.Add(new MenuEntry(TrayCommand.ShowWindow, "Open the status window"));
+        entries.Add(new MenuEntry(TrayCommand.ShowWindow, Strings.T(Msg.TrayOpenWindow)));
         entries.Add(separator);
-        entries.Add(new MenuEntry(TrayCommand.Reconnect, "Reconnect", status.Connected));
-        entries.Add(new MenuEntry(TrayCommand.Login, status.Connected ? "Log in again…" : "Log in…"));
-        entries.Add(new MenuEntry(TrayCommand.Disconnect, "Disconnect", status.Connected));
+        entries.Add(new MenuEntry(TrayCommand.Reconnect, Strings.T(Msg.TrayReconnect), status.Connected));
+        entries.Add(new MenuEntry(TrayCommand.Login, Strings.T(status.Connected ? Msg.TrayLoginAgain : Msg.TrayLoginDots)));
+        entries.Add(new MenuEntry(TrayCommand.Disconnect, Strings.T(Msg.TrayDisconnect), status.Connected));
         entries.Add(separator);
-        entries.Add(new MenuEntry(TrayCommand.CheckForUpdate, "Check for updates", status.Connected));
-        entries.Add(new MenuEntry(TrayCommand.UpdateNow, status.UpdateAvailable is { } v ? $"Update to {v}" : "Update now", status.Connected && status.UpdateAvailable is not null));
+        entries.Add(new MenuEntry(TrayCommand.CheckForUpdate, Strings.T(Msg.TrayCheckUpdates), status.Connected));
+        entries.Add(new MenuEntry(TrayCommand.UpdateNow, status.UpdateAvailable is { } v ? Strings.T(Msg.TrayUpdateTo, v) : Strings.T(Msg.TrayUpdateNow), status.Connected && status.UpdateAvailable is not null));
         entries.Add(separator);
-        entries.Add(new MenuEntry(TrayCommand.OpenWeb, "Open the web app", status.Server is not null));
-        entries.Add(new MenuEntry(TrayCommand.OpenLog, "Show the log"));
+        entries.Add(new MenuEntry(TrayCommand.OpenWeb, Strings.T(Msg.TrayOpenWeb), status.Server is not null));
+        entries.Add(new MenuEntry(TrayCommand.OpenLog, Strings.T(Msg.TrayShowLog)));
         entries.Add(separator);
-        entries.Add(new MenuEntry(TrayCommand.Quit, "Quit the tray"));
+        entries.Add(new MenuEntry(TrayCommand.Quit, Strings.T(Msg.TrayQuit)));
         return entries;
     }
 

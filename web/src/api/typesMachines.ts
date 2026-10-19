@@ -40,8 +40,12 @@ export interface MachineView {
   acceptsAsks?: boolean | null;
   /** Whether the machine's owner lets Claude be started and stopped on it from the web (ADR-0014). */
   acceptsClaudeControl?: boolean | null;
-  /** What the daemon does by itself with Claude (ADR-0014 P3): "off" or "on_message". */
+  /** What the daemon may start by itself (ADR-0014 P3): "off" or "on_message"; null or absent is off. */
   claudeAutoMode?: ClaudeAutoMode | null;
+  /** The plugin the agent runs under, as name@marketplace (ADR-0013); absent for an older agent or one that is not a plugin. */
+  pluginId?: string | null;
+  /** The project the mode "always" keeps a session running in (ADR-0014 P3). */
+  claudeAutoProject?: string | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
@@ -75,6 +79,8 @@ export interface MachineProjectView {
   source: "session" | "listed"; lastRuns: ProjectRunSummary[]; recentErrors: number;
   /** A test command was set at the machine for this project (ADR-0011 §7a); the command and its folder are sent to the machine's owner only. */
   hasTest?: boolean; testArgv?: string[] | null; testCwd?: string | null;
+  /** What Claude Code's own trust record says about the folder (ADR-0014 P2): null when the agent could not read it, or is older. */
+  trusted?: boolean | null;
 }
 /** Everything about one machine: the list entry, the admin's note, the services the caller may see, and the projects. */
 export interface MachineDetail {
@@ -110,8 +116,8 @@ export interface AgentAsksView { agentId: string; accept: boolean; setAt: string
 export type AgentActionKind = "restart" | "update_check" | "update" | "status" | "claude_start" | "claude_stop"
   | "plugin_enable" | "plugin_disable" | "plugin_update" | "plugin_install" | "project_setting";
 export type ClaudePermissionMode = "manual" | "plan" | "acceptEdits";
-export type ClaudeAutoMode = "off" | "on_message";
-export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null; autoMode?: ClaudeAutoMode }
+export type ClaudeAutoMode = "off" | "on_message" | "always";
+export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null; autoMode?: ClaudeAutoMode | null; autoProject?: string | null }
 export type AgentActionStatus = "queued" | "delivered" | "succeeded" | "failed" | "expired";
 /** One fixed action its owner asked of a machine's agent (ADR-0005); the result is plain text the agent wrote, never markup. */
 export interface AgentActionView {

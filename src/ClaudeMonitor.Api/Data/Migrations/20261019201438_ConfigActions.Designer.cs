@@ -88,11 +88,13 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnName("claimed_function");
 
                     b.Property<string>("ClaudeAutoMode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("off")
                         .HasColumnName("claude_auto_mode");
+
+                    b.Property<string>("ClaudeAutoProject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("claude_auto_project");
 
                     b.Property<string>("ClaudeInventory")
                         .HasColumnType("jsonb")
@@ -144,6 +146,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<Guid>("MachineId")
                         .HasColumnType("uuid")
                         .HasColumnName("machine_id");
+
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(130)
+                        .HasColumnType("character varying(130)")
+                        .HasColumnName("plugin_id");
 
                     b.Property<DateTimeOffset?>("PresenceAt")
                         .HasColumnType("timestamp with time zone")
@@ -295,7 +302,7 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_agents_claimed_function", "claimed_function IS NULL OR claimed_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
 
-                            t.HasCheckConstraint("ck_agents_claude_auto_mode", "claude_auto_mode IN ('off', 'on_message')");
+                            t.HasCheckConstraint("ck_agents_claude_auto_mode", "claude_auto_mode IS NULL OR claude_auto_mode IN ('off', 'on_message', 'always')");
 
                             t.HasCheckConstraint("ck_agents_claude_kind", "claude_kind IS NULL OR claude_kind IN ('none', 'npm', 'native', 'unsupported')");
 
@@ -342,6 +349,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
 
+                    b.Property<string>("FirstPrompt")
+                        .HasColumnType("text")
+                        .HasColumnName("first_prompt");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("text")
@@ -354,10 +365,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<string>("ProjectKey")
                         .HasColumnType("text")
                         .HasColumnName("project_key");
-
-                    b.Property<string>("Prompt")
-                        .HasColumnType("text")
-                        .HasColumnName("prompt");
 
                     b.Property<Guid>("RequestedBy")
                         .HasColumnType("uuid")
@@ -2115,6 +2122,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("branch");
 
+                    b.Property<bool?>("ClaudeTrusted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("claude_trusted");
+
                     b.Property<string>("HeadSha")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -3407,6 +3418,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_sign_ins");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
                     b.Property<DateTimeOffset?>("LockedUntil")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("locked_until");
@@ -3445,6 +3461,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("users", t =>
                         {
+                            t.HasCheckConstraint("ck_users_language", "language IS NULL OR language IN ('en', 'tr', 'de')");
+
                             t.HasCheckConstraint("ck_users_status", "status IN ('active', 'disabled', 'deleted')");
                         });
                 });

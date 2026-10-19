@@ -21,8 +21,8 @@ public sealed class AgentAction
     public string? PermissionMode { get; set; }
     public string? SessionRef { get; set; }
 
-    /// <summary>The optional first prompt of a Claude start (ADR-0014 P2): text from the web, kept only until the agent takes the action (or it ends), then NULL. Never listed, never audited.</summary>
-    public string? Prompt { get; set; }
+    /// <summary>ADR-0014 P2: the text of a start's first prompt, kept only until the agent has taken the action (then NULL); never audited, never shown back.</summary>
+    public string? FirstPrompt { get; set; }
 
     /// <summary>A remote write (ADR-0011 §7a): the plugin id or the setting name, and the value of a setting. Closed shapes (<see cref="ClaudeConfigRules"/>), never free text; NULL for the other kinds.</summary>
     public string? Target { get; set; }

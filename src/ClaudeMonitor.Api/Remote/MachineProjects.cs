@@ -57,6 +57,7 @@ public static partial class MachineProjects
             row.TestArgv = testOk ? [.. fact.TestArgv!] : null;
             row.TestCwd = testOk ? fact.TestCwd : null;
             row.LastSeenAt = now;
+            row.ClaudeTrusted = fact.Trusted;
         }
     }
 

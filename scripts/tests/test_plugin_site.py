@@ -98,11 +98,34 @@ class PluginSite(unittest.TestCase):
         self.assertIn('not a plugin folder', self.refused(BASE, empty))
         self.assertIn('not found', self.refused(BASE, os.path.join(self.tmp.name, 'missing')))
 
-    def test_the_repository_plugin_builds(self):
+    def test_the_repository_plugins_build_side_by_side_each_with_its_own_catalog(self):
         self.assertEqual(site.main([self.out, '--base-url', BASE]), 0)
-        with zipfile.ZipFile(os.path.join(self.out, 'monitor-agent-plugin.zip')) as archive:
-            self.assertIn('.claude-plugin/plugin.json', archive.namelist())
-            self.assertIn('hooks/hooks.json', archive.namelist())
+        for zip_name, catalog_file, catalog_name, plugin in (('monitor-agent-plugin.zip', 'marketplace.json', 'monitor-agent-releases', 'monitor-agent'),
+                                                             ('aipod-plugin.zip', 'aipod-marketplace.json', 'aipod-releases', 'aipod')):
+            with self.subTest(plugin=plugin):
+                with zipfile.ZipFile(os.path.join(self.out, zip_name)) as archive:
+                    self.assertIn('hooks/hooks.json', archive.namelist())
+                    self.assertEqual(json.loads(archive.read('.claude-plugin/plugin.json'))['name'], plugin)
+                with open(os.path.join(self.out, catalog_file), encoding='utf-8') as handle:
+                    catalog = json.load(handle)
+                with open(os.path.join(self.out, zip_name), 'rb') as handle:
+                    digest = hashlib.sha256(handle.read()).hexdigest()
+                self.assertEqual((catalog['name'], catalog['plugins'][0]['name']), (catalog_name, plugin))
+                self.assertEqual(catalog['plugins'][0]['source'], {'source': 'archive', 'url': f'{BASE}/downloads/{zip_name}', 'sha256': digest})
+
+    def test_retiring_the_old_plugin_builds_only_aipod_and_removes_the_old_files_from_the_folder(self):
+        self.assertEqual(site.main([self.out, '--base-url', BASE]), 0)
+        self.assertTrue(os.path.exists(os.path.join(self.out, 'marketplace.json')))
+        self.assertEqual(site.main([self.out, '--base-url', BASE, '--without-old']), 0)
+        self.assertEqual(sorted(os.listdir(self.out)), ['aipod-marketplace.json', 'aipod-plugin.zip'])
+
+    def test_the_aipod_folder_alone_or_with_the_old_one_is_built_from_the_folders_given(self):
+        other = os.path.join(self.tmp.name, 'aipod-plugin')
+        make_plugin(other)
+        self.assertEqual(site.main([self.out, '--base-url', BASE, '--aipod-dir', other]), 0)
+        self.assertEqual(sorted(os.listdir(self.out)), ['aipod-marketplace.json', 'aipod-plugin.zip'])
+        self.assertEqual(site.main([self.out, '--base-url', BASE, '--aipod-dir', other, '--plugin-dir', self.plugin]), 0)
+        self.assertEqual(sorted(os.listdir(self.out)), ['aipod-marketplace.json', 'aipod-plugin.zip', 'marketplace.json', 'monitor-agent-plugin.zip'])
 
 
 if __name__ == '__main__':

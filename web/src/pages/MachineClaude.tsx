@@ -9,7 +9,11 @@ import { versionAtLeast } from "../lib/version";
 import { useCodeGate } from "./useCodeGate";
 
 const MODES: readonly ClaudePermissionMode[] = ["manual", "plan", "acceptEdits"];
-const AUTO_MODES: readonly ClaudeAutoMode[] = ["off", "on_message"];
+const AUTO_MODES: readonly ClaudeAutoMode[] = ["off", "on_message", "always"];
+/** The longest first prompt the API takes (AgentActionKinds.ClaudeFirstPromptMax). */
+export const FIRST_PROMPT_MAX = 2000;
+/** What the agent starts by itself at most per hour (AgentConfig.ClaudeAutoStartsPerHour): said on the page so nobody is surprised by the cost. */
+export const AUTO_STARTS_PER_HOUR = 3;
 /** The environments Claude may be started in from the web (ADR-0014): the machine's class as an admin set it. */
 const ALLOWED_ENVIRONMENTS = ["dev", "test"];
 
@@ -34,16 +38,21 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const action = useCodeGate("reauth_required", "machines.claudeControl.startHint");
   const [actions, setActions] = useState<AgentActionView[]>([]);
   const [error, setError] = useState<string | null>(null); // a stop that failed; a list that cannot be read is already said by the actions card above
-  const [done, setDone] = useState<"saved" | "started" | "stopped" | null>(null);
+  const [done, setDone] = useState<"saved" | "started" | "stopped" | "auto" | null>(null);
   const [project, setProject] = useState("");
   const [mode, setMode] = useState<ClaudePermissionMode>("manual");
   const [prompt, setPrompt] = useState("");
   const accepting = view.acceptsClaudeControl === true;
+  const autoMode: ClaudeAutoMode = view.claudeAutoMode ?? "off";
   const allowed = view.roleEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.effectiveEnvironment);
   const newEnough = versionAtLeast(agentVersion, config.claudeMinAgentVersion);
   const claudeActions = actions.filter((a) => a.kind === "claude_start" || a.kind === "claude_stop");
   const running = runningSessions(actions);
-  const chosen = project || projects[0]?.key || "";
+  const startable = projects.filter((p) => p.trusted !== false); // a folder Claude Code is known not to trust cannot be started in; unknown (null) can
+  const chosen = project || startable[0]?.key || "";
+  const chosenProject = projects.find((p) => p.key === chosen);
+  const promptText = prompt.trim();
+  const promptTooLong = prompt.length > FIRST_PROMPT_MAX;
 
   const load = useCallback(async () => {
     try {
@@ -66,16 +75,16 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
       onChanged();
     }
   };
-  const setAuto = async (autoMode: ClaudeAutoMode) => {
+  const setAuto = async (mode: ClaudeAutoMode, autoProject?: string) => {
     setDone(null);
-    if (await enable.attempt((code) => api.setAgentClaude(agentId, true, code, autoMode).then(() => undefined))) {
-      setDone("saved");
+    if (await enable.attempt((code) => api.setAgentClaude(agentId, true, code, mode, autoProject).then(() => undefined))) {
+      setDone("auto");
       onChanged();
     }
   };
   const start = async () => {
     setDone(null);
-    if (await action.attempt((code) => api.requestAgentAction(agentId, "claude_start", code, { projectKey: chosen, permissionMode: mode, ...(prompt.trim() ? { prompt: prompt.trim() } : {}) }).then(() => undefined))) {
+    if (await action.attempt((code) => api.requestAgentAction(agentId, "claude_start", code, { projectKey: chosen, permissionMode: mode, firstPrompt: promptText || undefined }).then(() => undefined))) {
       setDone("started");
       setPrompt("");
       await load();
@@ -112,14 +121,32 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
 
       {accepting && allowed ? (
         <div className="stack">
+          <label className="stack">
+            <span className="small">{t("machines.claudeControl.auto")}</span>
+            <select value={autoMode} disabled={enable.busy || !newEnough} onChange={(e) => void setAuto(e.target.value as ClaudeAutoMode, e.target.value === "always" ? (view.claudeAutoProject ?? startable[0]?.key) : undefined)}>
+              {AUTO_MODES.map((m) => <option key={m} value={m} disabled={m === "always" && startable.length === 0}>{t(`machines.claudeControl.autoModes.${m}`)}</option>)}
+            </select>
+          </label>
+          {autoMode === "always" ? (
+            <label className="stack">
+              <span className="small">{t("machines.claudeControl.autoProject")}</span>
+              <select value={view.claudeAutoProject ?? ""} disabled={enable.busy} onChange={(e) => void setAuto("always", e.target.value)}>
+                {startable.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
+              </select>
+            </label>
+          ) : null}
+          <p className="muted small">{t("machines.claudeControl.autoHint", { n: AUTO_STARTS_PER_HOUR })}</p>
           <h3>{t("machines.claudeControl.newTitle")}</h3>
           <p className="muted small">{t("machines.claudeControl.trustHint")}</p>
           {projects.length === 0 ? <p className="muted">{t("machines.claudeControl.noProjects")}</p> : (
+            <>
             <div className="row">
               <label className="stack">
                 <span className="small">{t("machines.claudeControl.project")}</span>
                 <select value={chosen} onChange={(e) => setProject(e.target.value)}>
-                  {projects.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
+                  {projects.map((p) => (
+                    <option key={p.key} value={p.key} disabled={p.trusted === false}>{p.trusted === false ? `${p.name} (${t("machines.claudeControl.untrustedOption")})` : p.name}</option>
+                  ))}
                 </select>
               </label>
               <label className="stack">
@@ -129,36 +156,23 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
                 </select>
               </label>
             </div>
+            {chosenProject?.trusted === true ? <p className="muted small">{t("machines.claudeControl.trusted")}</p> : null}
+            {startable.length === 0 ? <Notice>{t("machines.claudeControl.allUntrusted")}</Notice> : null}
+            <label className="stack">
+              <span className="small">{t("machines.claudeControl.firstPrompt")}</span>
+              <textarea className="input" rows={4} value={prompt} maxLength={FIRST_PROMPT_MAX + 1} onChange={(e) => setPrompt(e.target.value)} aria-invalid={promptTooLong} />
+              <span className={promptTooLong ? "small error-text" : "muted small"}>{t("machines.claudeControl.firstPromptCount", { n: prompt.length, max: FIRST_PROMPT_MAX })}</span>
+              <span className="muted small">{t("machines.claudeControl.firstPromptHint")}</span>
+            </label>
+            </>
           )}
-          {projects.length > 0 ? (
-            <div className="stack">
-              <label className="stack">
-                <span className="small">{t("machines.claudeControl.prompt")}</span>
-                <textarea value={prompt} maxLength={config.claudePromptMax} rows={3} onChange={(e) => setPrompt(e.target.value)} />
-              </label>
-              <span className="muted small">{t("machines.claudeControl.promptHint", { max: config.claudePromptMax })}</span>
-            </div>
-          ) : null}
           {action.field}
           {action.error ? <Notice kind="error">{action.error}</Notice> : null}
           <div className="row-actions">
-            <Button variant="primary" busy={action.busy} disabled={!chosen || open("claude_start") || !action.ready || !newEnough || !view.online} onClick={() => void start()}>
+            <Button variant="primary" busy={action.busy} disabled={!chosen || promptTooLong || open("claude_start") || !action.ready || !newEnough || !view.online} onClick={() => void start()}>
               {t("machines.claudeControl.start")}
             </Button>
           </div>
-        </div>
-      ) : null}
-
-      {accepting && allowed ? (
-        <div className="stack">
-          <h3>{t("machines.claudeControl.autoTitle")}</h3>
-          <p className="muted small">{t("machines.claudeControl.autoHint")}</p>
-          <label className="stack">
-            <span className="small">{t("machines.claudeControl.autoLabel")}</span>
-            <select value={view.claudeAutoMode ?? "off"} disabled={enable.busy} onChange={(e) => void setAuto(e.target.value as ClaudeAutoMode)}>
-              {AUTO_MODES.map((m) => <option key={m} value={m}>{t(`machines.claudeControl.auto.${m}`)}</option>)}
-            </select>
-          </label>
         </div>
       ) : null}
 

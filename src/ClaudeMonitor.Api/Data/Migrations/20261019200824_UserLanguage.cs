@@ -5,34 +5,34 @@
 namespace ClaudeMonitor.Api.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class ClaudeAutoMode : Migration
+    public partial class UserLanguage : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "claude_auto_mode",
-                table: "agents",
-                type: "text",
-                nullable: false,
-                defaultValue: "off");
+                name: "language",
+                table: "users",
+                type: "character varying(2)",
+                maxLength: 2,
+                nullable: true);
 
             migrationBuilder.AddCheckConstraint(
-                name: "ck_agents_claude_auto_mode",
-                table: "agents",
-                sql: "claude_auto_mode IN ('off', 'on_message')");
+                name: "ck_users_language",
+                table: "users",
+                sql: "language IS NULL OR language IN ('en', 'tr', 'de')");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropCheckConstraint(
-                name: "ck_agents_claude_auto_mode",
-                table: "agents");
+                name: "ck_users_language",
+                table: "users");
 
             migrationBuilder.DropColumn(
-                name: "claude_auto_mode",
-                table: "agents");
+                name: "language",
+                table: "users");
         }
     }
 }

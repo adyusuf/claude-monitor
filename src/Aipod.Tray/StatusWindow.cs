@@ -1,3 +1,4 @@
+using ClaudeMonitor.Agent.Config;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -42,8 +43,8 @@ public sealed class StatusWindow : Window
     public void Render()
     {
         var status = controller.Status;
-        version.Text = $"aipod {status.Version}";
-        update.Text = status.UpdateAvailable is { } available ? $"Update {available} is available." : status.Connected ? "Up to date, as far as the last check knows." : "";
+        version.Text = Strings.T(Msg.TrayVersion, status.Version);
+        update.Text = status.UpdateAvailable is { } available ? Strings.T(Msg.TrayUpdateAvailableDot, available) : status.Connected ? Strings.T(Msg.TrayUpToDate) : "";
         headline.Text = char.ToUpperInvariant(status.Headline.FirstOrDefault()) + (status.Headline.Length > 1 ? status.Headline[1..] : "");
         lines.Text = string.Join(Environment.NewLine, status.Lines);
         result.Text = controller.LastResult;
@@ -58,9 +59,9 @@ public sealed class StatusWindow : Window
         var buttons = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var (label, command) in new[]
                  {
-                     ("Reconnect", TrayCommand.Reconnect), ("Log in", TrayCommand.Login), ("Disconnect", TrayCommand.Disconnect),
-                     ("Check for updates", TrayCommand.CheckForUpdate), ("Update now", TrayCommand.UpdateNow),
-                     ("Open the web app", TrayCommand.OpenWeb), ("Show the log", TrayCommand.OpenLog),
+                     (Strings.T(Msg.TrayReconnect), TrayCommand.Reconnect), (Strings.T(Msg.TrayLogin), TrayCommand.Login), (Strings.T(Msg.TrayDisconnect), TrayCommand.Disconnect),
+                     (Strings.T(Msg.TrayCheckUpdates), TrayCommand.CheckForUpdate), (Strings.T(Msg.TrayUpdateNow), TrayCommand.UpdateNow),
+                     (Strings.T(Msg.TrayOpenWeb), TrayCommand.OpenWeb), (Strings.T(Msg.TrayShowLog), TrayCommand.OpenLog),
                  })
         {
             var button = new Button { Content = label, Margin = new Thickness(0, 0, 8, 8) };

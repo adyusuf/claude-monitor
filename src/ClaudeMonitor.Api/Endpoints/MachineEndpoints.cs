@@ -119,7 +119,8 @@ public static class MachineEndpoints
         agent.RoleSetBy = null;
         agent.AcceptsAsks = false; // the opt-in belongs to the machine's owner in the workspace they gave it for
         agent.AcceptsClaudeControl = false; // so does the one for starting Claude from the web (ADR-0014)
-        agent.ClaudeAutoMode = ClaudeAutoModes.Off;
+        agent.ClaudeAutoMode = null;
+        agent.ClaudeAutoProject = null;
         agent.ShareInventory = false; // and the one for reporting what Claude has on the machine (ADR-0011 step E)
         agent.ClaudeInventory = null;
         agent.ClaudeInventoryAt = null;

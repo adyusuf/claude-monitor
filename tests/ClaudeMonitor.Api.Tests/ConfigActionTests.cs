@@ -75,7 +75,7 @@ public sealed class ConfigActionTests(ApiFactory api)
         var team = await TeamAsync();
         await AssertInvalidAsync(await Ask(team, AgentActionKinds.PluginEnable, "a@m", value: "true"), "target", AgentActionErrors.InvalidPlugin);
         await AssertInvalidAsync(await Ask(team, AgentActionKinds.PluginEnable, "a@m", project: Project), "target", AgentActionErrors.InvalidPlugin);
-        var withPrompt = await team.User.PostAsync($"/api/agents/{team.TargetId}/actions", new AgentActionRequest(AgentActionKinds.PluginEnable, Target: "a@m", Prompt: "do more"));
+        var withPrompt = await team.User.PostAsync($"/api/agents/{team.TargetId}/actions", new AgentActionRequest(AgentActionKinds.PluginEnable, Target: "a@m", FirstPrompt: "do more"));
         Assert.Equal(HttpStatusCode.BadRequest, withPrompt.StatusCode);
         Assert.Empty(await ActionKit.RowsAsync(api, team.TargetId));
     }

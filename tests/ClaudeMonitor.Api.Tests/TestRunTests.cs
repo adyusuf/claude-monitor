@@ -16,7 +16,7 @@ public sealed class TestRunTests(ApiFactory api)
     private const string Folder = "/work/shop";
 
     private static ProjectFact Fact(string key = "shop", IReadOnlyList<string>? argv = null, string? cwd = Folder) =>
-        new(key, key, "ab12", "main", "0123abcd", null, ProjectSources.Listed, argv, cwd);
+        new(key, key, "ab12", "main", "0123abcd", null, ProjectSources.Listed, null, argv, cwd);
 
     private static async Task SendProfileAsync(RemoteTeam team, params ProjectFact[] facts) => await SendProfileAsync(team, ExecLevels.Argv, facts);
 

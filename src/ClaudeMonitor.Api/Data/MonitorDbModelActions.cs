@@ -28,8 +28,7 @@ internal static class MonitorDbModelActions
         b.Entity<Agent>(e =>
         {
             e.HasOne<User>().WithMany().HasForeignKey(x => x.AcceptsClaudeControlSetBy).OnDelete(DeleteBehavior.Restrict);
-            e.Property(x => x.ClaudeAutoMode).HasDefaultValue(ClaudeAutoModes.Off);
-            e.ToTable(t => t.HasCheckConstraint("ck_agents_claude_auto_mode", MonitorDbModel.In("claude_auto_mode", [.. ClaudeAutoModes.All])));
+            e.ToTable(t => t.HasCheckConstraint("ck_agents_claude_auto_mode", "claude_auto_mode IS NULL OR " + MonitorDbModel.In("claude_auto_mode", [.. ClaudeAutoModes.All])));
         });
     }
 }

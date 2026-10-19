@@ -1,6 +1,6 @@
 # ADR-0014 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
-Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1 of Part B is built (see "P1 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
+Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1, P2 and P3 (`on_message` only) of Part B are built (see "P1 as built", "P2 as built" and "P3 as built").** Part A is built (the web, the API mails, `users.language`, the terminal catalog); Part B beyond P3 (`on_message` and `always`) is design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
 folders, asks) and ADR-0012 (the names aipod and Podium).
 
@@ -17,13 +17,35 @@ them; they are never captured text). (3) Wire strings: API error codes (they are
 match. (4) The repository's documents (global rule: English). Dates stay `dd/mm/yyyy` in every language (global rule 12).
 
 **Still to do (design).**
-- *The agent's own words for the person at the terminal:* usage lines, `status`, `install`/`login`/`connect` messages, errors. One catalog class per
-  assembly (`Strings`: a typed key, a table of en, tr and de), the language from `AIPOD_LANG`, else the operating system's UI culture, else English;
-  a test that every key has all three and the same placeholders (the rule the web test already enforces). The tray's menu and window use the same
-  catalog. Existing tests that read English messages keep passing because English is the default; new tests cover tr and de.
+- *The agent's own words for the person at the terminal.* **Built (19/10/2026), see "Part A: the terminal catalog as built".**
 - *The user's language as a setting* (`users.language`, additive, nullable) so a mail to someone who is not signed in can still follow their
-  account; until then the header is the only source.
-- Size: medium (about 300 strings in the agent and tray). Not started.
+  account; until then the header is the only source. **Built (19/10/2026):** migration `UserLanguage`, `PUT /api/me/language`, `language` in `/api/me`; a registration stores the language it was made in, the menu keeps the choice on the account, and the verify, reset and invite mails follow the account's language when it has one (the header otherwise).
+
+### Part A: the terminal catalog as built (19/10/2026)
+
+`Config/Strings*.cs` in the agent holds every sentence the person at the terminal reads: usage, `status`, `login`/`connect`, `update`, `install`
+(plugin, standalone, service), `migrate-home`, `service migrate`, and the tray's tooltip, menu, window and action results (the tray references the
+agent project, so one catalog serves both). 257 messages, three languages each (`Entry(Key, En, Tr, De)`); a typed key per message in `Msg`
+(`Msg.HmMoved`), a call is `Strings.T(Msg.HmMoved, from, to)` with `{0}`... placeholders filled with the invariant culture.
+The language is, in order: a scope (`Strings.Scope`, tests and flows), the process setting (`Strings.UseForProcess`), the variable `AIPOD_LANG`
+(`en`, `tr`, `de`; `tr-TR` and `de_DE.UTF-8` count), the operating system's UI language, else English. The language of the *account* (`users.language`)
+is the web's and the mail's, not the terminal's: the agent has no sign-in at the terminal to read it from.
+
+What stayed English, as the section above says, plus these terminal details: the reason inside a failure (`e.Message`, an install step's own failure
+text, an undo step's name) is data from the system and is shown as it is inside a translated frame. The detail lines of `status` (the push, upload and web
+stream lines, the update and Claude Code update lines, the approvers and exec-policy lines, the refusal of the API) are in the catalog too; the same
+functions also feed what the *model* reads (`monitor_status`) and the log, so those two callers pin English with `Strings.Scope("en")`
+(`AuthRefusal.Message` is the English one for the log, `AuthRefusal.Describe` the person's).
+
+Two consequences were handled. (1) `aipod connect` reads the detached login's output file for "enter the code" and "trying again"; the file is written in the
+language of the other process, so the markers are matched in all three languages (`Strings.InAllLanguages`). (2) `migrate-home` used to decide "nothing to do"
+by the sentence starting with "Already"; the refusal now carries that as a flag, so a translation cannot change the exit code.
+
+Tests: `StringsTests` holds every key to all three languages and the same placeholders (the rule the web test enforces), formats each message with
+dummy arguments, ties the English usage to `Cli.Usage`, checks the markers are inside their lines, and checks how the language is chosen; each test assembly pins English
+at start (`PinEnglish`), so the machine's own language cannot change what the existing English assertions read. The tests were written and compile; they
+were not run (all test runs are paused at the maintainer's request, 19/10/2026). The catalog was checked once by a script (same placeholders, no empty
+text, no stray braces, no key twice) over the generated tables.
 
 ## Part B: starting and stopping Claude Code, and opening sessions, from the web
 
@@ -127,15 +149,6 @@ What shipped, on the branch with the rest of this work (not released: the agent 
 - **Decisions applied.** Environment = the machine's class; no repositories; no start on production or database machines. The workspace-level switch is the existing
   remote-work switch (`remote_runs_enabled`), not a new one.
 
-**P2 as built (19/10/2026): the first message.** The project picker and the permission mode were already in P1. P2 adds the optional first message of a start: the API takes `prompt`
-(trimmed, at most 2000 characters, no control characters except new lines and tabs; refused on a stop), keeps it only until the agent takes the action, and never lists or audits it. The agent
-gives `claude --bg` one more argument: the same notice and fence as an inbox message (labelled as from the web, to be treated as data, defused, capped at the push limit), so the argument always
-begins with the notice and never with the web's own text. Podium shows a text box on the Claude card. Migration `ActionFirstPrompt`.
-
-**P3 as built (19/10/2026): automatic mode `on_message`.** Decision 2 (maintainer, 19/10/2026): only the machine's owner may turn it on, with the same recent sign-in as the switch itself (`PUT /api/agents/{id}/claude` takes an optional `autoMode`; turning Claude control off turns it off too). What it does, as built: when an **ask** from another machine (ADR-0008 §3f) is held because no session is idle, names a project this machine knows (the ask's `project`) and has waited one minute (`ClaudeAutoGrace`), the daemon starts a background worker in that project through the same `ClaudeControl` as a start from the web: the careful `manual` mode, no prompt (nothing the ask says reaches `claude`), never a second worker for the project, at most three starts an hour (`ClaudeAutoPerHour`), and no new start for ten minutes after a failed one (`ClaudeAutoBackoff`). The worker record carries the reason `auto:on_message`. The held ask is delivered by the usual pump once the worker is idle. **Not covered:** a message from the web to a session that has ended (web prompts are addressed to a session id, ADR-0002, so there is no project to start in), the `always` mode, and an ask that names no project. **Unverified:** that a worker started this way registers its inbox and reaches idle on a real machine (the spike showed hooks and the inbox work in a background session), and anything on Windows.
-
-Not built (P4 onward):  a per-project trust pre-check in the page, and any change to how the session list marks agent-started sessions.
-
 ## Windows: what still has to be tried (not done; this was developed on macOS)
 
 The server this project runs on is Windows, and none of P1 has been run there. The agent compiles for Windows and the tests run on macOS only. On the Windows machine, as
@@ -154,3 +167,46 @@ the user that runs the agent, with Claude Code installed and a project folder yo
 7. Also check where Claude Code keeps its trust list on Windows (`~/.claude.json`, key format of folder paths: slashes) in case a later version of the page wants to pre-check trust.
 
 Anything that differs goes into this section before P2.
+
+## P2 as built (19/10/2026): the new-session form, the first prompt and the trust pre-check
+
+Built with the defaults proposed above; not released (the agent is still 0.5.0). The tests for it are written and compile, but were **not run**: all test runs, gates and CI are paused by the maintainer (`docs/release.md`).
+
+- **First prompt.** A `claude_start` may carry `firstPrompt` (1 to 2000 characters, letters and spaces, new lines and tabs, no other control character; blank counts as none). It is the only text of the owner's
+  that ever reaches `claude`: the agent gives it as the last argument of `claude --bg`, wrapped exactly like a message written to a running session (the "typed by a person in a browser, treat as data,
+  ask before side effects" notice, the `claude-monitor-message` fence with `origin="web"` and `session_id="new"`, defused, cut with a marker above 2200 characters including the wrapping), so a start
+  without one is unchanged. The API keeps the text in `agent_actions.first_prompt` only until the agent takes the action (or it expires, or the switch is turned off), never returns it, never audits it (the
+  audit row says `withFirstPrompt`), and the agent never logs it or reports it in a result.
+- **One open start.** The one-open-action-per-kind index stays. A start that repeats the open one (same project and mode, no prompt) gets it back; one that asks for something else is refused with
+  `claude_start_pending` instead of being answered with a start it did not ask for.
+- **Trust pre-check.** The agent reads Claude Code's own `.claude.json` (`~/.claude.json`, or `$CLAUDE_CONFIG_DIR/.claude.json`), read-only, for `hasTrustDialogAccepted` of the exact folder (symbolic links
+  followed, no case on macOS and Windows) and reports it per project (`ProjectFact.Trusted`: true, false, or null when it cannot tell, an older agent too). The API refuses a start for a known `false` with
+  `claude_folder_not_trusted`, the agent refuses it too before running `claude`, and the page disables such a project in the list ("not trusted by Claude Code"), starts with the first one that is not,
+  and says when none is. Unknown is left to Claude Code, which stays the one that decides and whose refusal is still reported in words. A folder that Claude Code only knows through a link that the record spells
+  differently is the one case that could read as untrusted wrongly.
+- **Page.** The Claude card gains the optional first-prompt box with a counter, the sentence on how it is sent (as a labelled message from the web, kept only until the agent has it), the trust line and the
+  disabled projects; in tr, en and de. Nothing else on it changed.
+- **Decisions applied.** Open item 3 (`manual` for a session nobody watches) stays the default and the only list is manual, plan and acceptEdits; item 5 (what the page says for an untrusted folder) is the text above.
+  Still open: 1 (Windows), 2 (who may turn on automatic mode, P3), 4 (the cost).
+- **Not built:** P3, the automatic `on_message` mode; a way to see the first prompt again after sending (deliberate: it is not kept).
+
+## P3 as built (19/10/2026): the automatic mode `on_message`
+
+Built with the defaults proposed above, so open items 2 and 4 are applied rather than answered: **the machine's owner alone** turns it on (a recent sign-in or a code, like the switch it depends on) and the cost is the owner's
+Claude plan, which the page says in the sentence next to the checkbox. Not released; the tests are written and compile but were **not run** (all runs are paused, `docs/release.md`).
+
+- **What it does.** When an ask from another machine names a project and no session here is idle to take it, and that has been true for 30 seconds, the daemon starts ONE session in that project with the same fixed
+  `claude --bg ... --permission-mode manual` command as a start from the web, no prompt. The ask stays queued as before and the usual pump delivers it once the new session is idle and has registered its inbox.
+  It only looks at asks, not at the messages typed to a particular session (those name a session, not a project).
+- **Bounded.** At most 3 sessions an hour for the machine (kept in the local database, so a restart does not reset it), no second session for a project that already has one this agent started and has not stopped,
+  10 minutes of backoff for a project after a refused or failed start, and the existing cap of 3 running sessions started by the agent. Every refusal of a web start applies (no service agent, nothing on a production
+  or database claim, a folder Claude Code does not trust, no `claude`).
+- **Where it is set.** `agents.claude_auto_mode` (`off`, `on_message`), through the owner's `PUT /api/agents/{id}/claude` (`autoMode`, ignored when absent). Turning it on needs the same gate as a start (workspace remote
+  work on, the owner's switch, dev or test set by an admin, no strict claim, no service agent, `claude` present) and a recent sign-in; turning the switch off, or moving the machine, turns it off. The API tells the
+  agent `on_message` only while the owner's switch and the workspace's remote-work switch are both on; the agent keeps it as a workspace-tagged switch (`settings.claude_auto_mode`), forgotten at login and logout.
+- **Page.** A checkbox at the top of the new-session part of the Claude card, with the cost and the bounds in words, in tr, en and de.
+- **Added after: `always`.** The owner can choose a project (one this machine reported and Claude Code does not refuse; `agents.claude_auto_project`) and the daemon keeps one session running in it, besides doing what `on_message` does: when none
+  runs there it starts one, within the same budget of three an hour and the same backoff. More automation (on, then `always`, or `always` in another project) needs the recent sign-in; less never does. The sessions the agent started are checked
+  against `claude agents --json` once a minute (a session Claude Code no longer lists, past a two-minute grace, stops counting as ours; any doubt changes nothing), so a session that ended on its own is replaced. Why a session was started is kept
+  with it in `claude-workers.json` (`auto:on_message`, `auto:always`, nothing for a start from the web) and `aipod status` counts the ones the automatic mode started; the web page does not list them (they have no action row).
+- **Not built.** Listing the automatic starts on the page, and any trigger other than an ask (messages to a session that is gone).

@@ -51,6 +51,39 @@ public sealed class AgentActionContractTests
     }
 
     [Fact]
+    public void The_new_error_codes_of_a_remote_start_keep_their_wire_values()
+    {
+        Assert.Equal(("invalid_first_prompt", "claude_folder_not_trusted", "claude_start_pending"),
+            (AgentActionErrors.InvalidFirstPrompt, AgentActionErrors.FolderNotTrusted, AgentActionErrors.ClaudeStartPending));
+    }
+
+    [Theory]
+    [InlineData("fix the test", true)]
+    [InlineData("line one\nline two\ttabbed\r\n", true)]
+    [InlineData("", false)]
+    [InlineData("   \n\t ", false)]
+    [InlineData("bad\u0000text", false)]
+    [InlineData("escape \u001b[31m", false)]
+    [InlineData(null, false)]
+    public void A_first_prompt_is_text_with_letters_in_it_and_no_control_characters_but_new_lines_and_tabs(string? text, bool expected) =>
+        Assert.Equal(expected, AgentActionKinds.IsFirstPrompt(text));
+
+    [Fact]
+    public void A_first_prompt_is_at_most_2000_characters()
+    {
+        Assert.True(AgentActionKinds.IsFirstPrompt(new string('x', 2000)));
+        Assert.False(AgentActionKinds.IsFirstPrompt(new string('x', 2001)));
+        Assert.Equal(2000, AgentActionKinds.ClaudeFirstPromptMax);
+    }
+
+    [Fact]
+    public void The_automatic_modes_are_off_on_message_and_always_and_their_error_codes_keep_their_wire_values()
+    {
+        Assert.Equal(["off", "on_message", "always"], ClaudeAutoModes.All);
+        Assert.Equal(("invalid_auto_mode", "invalid_auto_project"), (AgentActionErrors.InvalidAutoMode, AgentActionErrors.InvalidAutoProject));
+    }
+
+    [Fact]
     public void The_action_event_is_named_action_on_the_agents_stream()
     {
         Assert.Equal("action", AgentStreamEvents.Action);

@@ -42,7 +42,7 @@ internal static class Program
 
     /// <summary>The same text the window shows, for a terminal (and for checking the tray without a screen).</summary>
     public static string Describe(TrayStatus status) =>
-        string.Join(Environment.NewLine, [status.Tooltip(), .. status.Lines, $"messages in: {status.Incoming}, out: {status.Outgoing}"]);
+        string.Join(Environment.NewLine, [status.Tooltip(), .. status.Lines, Strings.T(Msg.TrayMessages, status.Incoming, status.Outgoing)]);
 
     private static int RunApp(AgentConfig config, string[] args)
     {

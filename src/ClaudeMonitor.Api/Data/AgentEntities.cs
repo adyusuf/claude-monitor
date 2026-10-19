@@ -107,14 +107,21 @@ public sealed class Agent
 
     /// <summary>ADR-0014: the machine's owner lets Claude be started and stopped on it from the web; off until they say so, and reset when the machine moves workspace.</summary>
     public bool AcceptsClaudeControl { get; set; }
+
+    /// <summary>ADR-0014 P3: what the daemon may start by itself (<see cref="ClaudeAutoModes"/>); NULL is off. Reset with the switch when the machine moves workspace.</summary>
+    public string? ClaudeAutoMode { get; set; }
+
+    /// <summary>ADR-0014 P3: the project key the mode <c>always</c> keeps a session running in; NULL for every other mode.</summary>
+    public string? ClaudeAutoProject { get; set; }
     public DateTimeOffset? AcceptsClaudeControlSetAt { get; set; }
     public Guid? AcceptsClaudeControlSetBy { get; set; }
 
-    /// <summary>ADR-0014 P3: what the daemon does by itself with Claude (<see cref="ClaudeAutoModes"/>); off until the owner says so, and off again whenever Claude control is off or the machine moves workspace.</summary>
-    public string ClaudeAutoMode { get; set; } = ClaudeAutoModes.Off;
 
     /// <summary>The push transport the agent has on (<c>inbox</c> or <c>channel</c>), or null when it is off or the agent does not say.</summary>
     public string? PushTransport { get; set; }
+
+    /// <summary>ADR-0013: the plugin the agent runs under (<c>name@marketplace</c>), as it last reported it; NULL for an agent that is not a plugin or is older.</summary>
+    public string? PluginId { get; set; }
 
     /// <summary>ADR-0010 §4: the machine only runs what a pinned owner key signed; the agent reports it with its profile. False for an older agent.</summary>
     public bool ApprovalsRequired { get; set; }
@@ -171,6 +178,8 @@ public sealed class MachineProject
     /// <summary>The test command the person at the machine set for this folder and the folder path it runs in (ADR-0011 §7a); both NULL when there is none.</summary>
     public List<string>? TestArgv { get; set; }
     public string? TestCwd { get; set; }
+    /// <summary>ADR-0014 P2: whether Claude Code trusts the folder, as the agent read it (NULL: unknown). A remote start is refused for a folder known not to be trusted.</summary>
+    public bool? ClaudeTrusted { get; set; }
 }
 
 /// <summary>

@@ -14,8 +14,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ClaudeMonitor.Api.Data.Migrations
 {
     [DbContext(typeof(MonitorDb))]
-    [Migration("20261019130104_ActionFirstPrompt")]
-    partial class ActionFirstPrompt
+    [Migration("20261019200303_ClaudeAlways")]
+    partial class ClaudeAlways
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -87,6 +87,15 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("claimed_function");
 
+                    b.Property<string>("ClaudeAutoMode")
+                        .HasColumnType("text")
+                        .HasColumnName("claude_auto_mode");
+
+                    b.Property<string>("ClaudeAutoProject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("claude_auto_project");
+
                     b.Property<string>("ClaudeKind")
                         .HasColumnType("text")
                         .HasColumnName("claude_kind");
@@ -129,6 +138,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<Guid>("MachineId")
                         .HasColumnType("uuid")
                         .HasColumnName("machine_id");
+
+                    b.Property<string>("PluginId")
+                        .HasMaxLength(130)
+                        .HasColumnType("character varying(130)")
+                        .HasColumnName("plugin_id");
 
                     b.Property<DateTimeOffset?>("PresenceAt")
                         .HasColumnType("timestamp with time zone")
@@ -265,6 +279,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_agents_claimed_function", "claimed_function IS NULL OR claimed_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
 
+                            t.HasCheckConstraint("ck_agents_claude_auto_mode", "claude_auto_mode IS NULL OR claude_auto_mode IN ('off', 'on_message', 'always')");
+
                             t.HasCheckConstraint("ck_agents_claude_kind", "claude_kind IS NULL OR claude_kind IN ('none', 'npm', 'native', 'unsupported')");
 
                             t.HasCheckConstraint("ck_agents_claude_sessions", "(claude_sessions_live IS NULL OR claude_sessions_live >= 0) AND (claude_sessions_idle IS NULL OR claude_sessions_idle >= 0)");
@@ -310,6 +326,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
 
+                    b.Property<string>("FirstPrompt")
+                        .HasColumnType("text")
+                        .HasColumnName("first_prompt");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("text")
@@ -322,10 +342,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<string>("ProjectKey")
                         .HasColumnType("text")
                         .HasColumnName("project_key");
-
-                    b.Property<string>("Prompt")
-                        .HasColumnType("text")
-                        .HasColumnName("prompt");
 
                     b.Property<Guid>("RequestedBy")
                         .HasColumnType("uuid")
@@ -458,125 +474,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.ToTable("agent_tokens", t =>
                         {
                             t.HasCheckConstraint("ck_agent_tokens_kind", "kind IN ('access', 'refresh')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ApplicationComponent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("application_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("component")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NameSearch")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name_search");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("active")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_application_components");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_application_components_workspace_id");
-
-                    b.HasIndex("ApplicationId", "NameSearch")
-                        .IsUnique()
-                        .HasDatabaseName("ix_application_components_application_id_name_search")
-                        .HasFilter("status = 'active'");
-
-                    b.ToTable("application_components", t =>
-                        {
-                            t.HasCheckConstraint("ck_application_components_kind", "kind IN ('component', 'module')");
-
-                            t.HasCheckConstraint("ck_application_components_status", "status IN ('active', 'archived')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ApplicationRelease", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("application_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NameSearch")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name_search");
-
-                    b.Property<DateOnly?>("PlannedDate")
-                        .HasColumnType("date")
-                        .HasColumnName("planned_date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("planned")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_application_releases");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_application_releases_workspace_id");
-
-                    b.HasIndex("ApplicationId", "NameSearch")
-                        .IsUnique()
-                        .HasDatabaseName("ix_application_releases_application_id_name_search")
-                        .HasFilter("status <> 'cancelled'");
-
-                    b.ToTable("application_releases", t =>
-                        {
-                            t.HasCheckConstraint("ck_application_releases_status", "status IN ('planned', 'released', 'cancelled')");
                         });
                 });
 
@@ -885,9 +782,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("model");
 
-                    b.Property<Guid?>("RepoId")
+                    b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid")
-                        .HasColumnName("repo_id");
+                        .HasColumnName("project_id");
 
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone")
@@ -917,9 +814,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.HasIndex("HarnessKind")
                         .HasDatabaseName("ix_harness_sessions_harness_kind");
 
-                    b.HasIndex("RepoId", "LastEventAt")
+                    b.HasIndex("ProjectId", "LastEventAt")
                         .IsDescending(false, true)
-                        .HasDatabaseName("ix_harness_sessions_repo_id_last_event_at");
+                        .HasDatabaseName("ix_harness_sessions_project_id_last_event_at");
 
                     b.HasIndex("AgentId", "HarnessKind", "ExternalId")
                         .IsUnique()
@@ -932,413 +829,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.ToTable("harness_sessions", t =>
                         {
                             t.HasCheckConstraint("ck_harness_sessions_status", "status IN ('active', 'idle', 'waiting', 'ended')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.Issue", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AcceptanceCriteria")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("acceptance_criteria");
-
-                    b.Property<string>("ActualResult")
-                        .HasColumnType("text")
-                        .HasColumnName("actual_result");
-
-                    b.Property<Guid?>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("application_id");
-
-                    b.Property<DateTimeOffset?>("ArchivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("archived_at");
-
-                    b.Property<Guid?>("AssigneeUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("assignee_user_id");
-
-                    b.Property<string>("BugEnvironment")
-                        .HasColumnType("text")
-                        .HasColumnName("bug_environment");
-
-                    b.Property<Guid?>("ComponentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("component_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Estimate")
-                        .HasColumnType("text")
-                        .HasColumnName("estimate");
-
-                    b.Property<string>("ExpectedResult")
-                        .HasColumnType("text")
-                        .HasColumnName("expected_result");
-
-                    b.Property<int>("Number")
-                        .HasColumnType("integer")
-                        .HasColumnName("number");
-
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("parent_id");
-
-                    b.Property<double>("Position")
-                        .HasColumnType("double precision")
-                        .HasColumnName("position");
-
-                    b.Property<string>("Priority")
-                        .HasColumnType("text")
-                        .HasColumnName("priority");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<Guid?>("ReleaseId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("release_id");
-
-                    b.Property<string>("ReproSteps")
-                        .HasColumnType("text")
-                        .HasColumnName("repro_steps");
-
-                    b.Property<string>("Severity")
-                        .HasColumnType("text")
-                        .HasColumnName("severity");
-
-                    b.Property<Guid?>("SprintId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("sprint_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("backlog")
-                        .HasColumnName("status");
-
-                    b.Property<string>("TechnicalDesign")
-                        .HasColumnType("text")
-                        .HasColumnName("technical_design");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("title");
-
-                    b.Property<string>("TitleSearch")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("title_search");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("type");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_issues");
-
-                    b.HasIndex("ApplicationId")
-                        .HasDatabaseName("ix_issues_application_id");
-
-                    b.HasIndex("AssigneeUserId")
-                        .HasDatabaseName("ix_issues_assignee_user_id");
-
-                    b.HasIndex("ComponentId")
-                        .HasDatabaseName("ix_issues_component_id");
-
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_issues_created_by");
-
-                    b.HasIndex("ParentId")
-                        .HasDatabaseName("ix_issues_parent_id");
-
-                    b.HasIndex("ReleaseId")
-                        .HasDatabaseName("ix_issues_release_id");
-
-                    b.HasIndex("SprintId")
-                        .HasDatabaseName("ix_issues_sprint_id");
-
-                    b.HasIndex("UpdatedBy")
-                        .HasDatabaseName("ix_issues_updated_by");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_issues_workspace_id");
-
-                    b.HasIndex("ProjectId", "Number")
-                        .IsUnique()
-                        .HasDatabaseName("ix_issues_project_id_number");
-
-                    b.HasIndex("ProjectId", "Status")
-                        .HasDatabaseName("ix_issues_project_id_status");
-
-                    b.HasIndex("ProjectId", "Position", "Id")
-                        .HasDatabaseName("ix_issues_project_id_position_id");
-
-                    b.ToTable("issues", t =>
-                        {
-                            t.HasCheckConstraint("ck_issues_bug_fields", "type = 'bug' OR (bug_environment IS NULL AND repro_steps IS NULL AND expected_result IS NULL AND actual_result IS NULL AND severity IS NULL)");
-
-                            t.HasCheckConstraint("ck_issues_criteria", "acceptance_criteria IS NULL OR (jsonb_typeof(acceptance_criteria) = 'array' AND jsonb_array_length(acceptance_criteria) <= 30)");
-
-                            t.HasCheckConstraint("ck_issues_number", "number > 0");
-
-                            t.HasCheckConstraint("ck_issues_parent", "parent_id IS NULL OR parent_id <> id");
-
-                            t.HasCheckConstraint("ck_issues_severity", "severity IS NULL OR severity IN ('critical', 'major', 'minor', 'trivial')");
-
-                            t.HasCheckConstraint("ck_issues_status", "status IN ('backlog', 'ready', 'in_progress', 'in_review', 'done', 'cancelled')");
-
-                            t.HasCheckConstraint("ck_issues_type", "type IN ('epic', 'story', 'task', 'bug', 'spike')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueCodeLink", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by");
-
-                    b.Property<Guid>("IssueId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("issue_id");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("manual")
-                        .HasColumnName("source");
-
-                    b.Property<string>("Title")
-                        .HasColumnType("text")
-                        .HasColumnName("title");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("url");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_issue_code_links");
-
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_issue_code_links_created_by");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_issue_code_links_workspace_id");
-
-                    b.HasIndex("IssueId", "Url")
-                        .IsUnique()
-                        .HasDatabaseName("ix_issue_code_links_issue_id_url");
-
-                    b.ToTable("issue_code_links", t =>
-                        {
-                            t.HasCheckConstraint("ck_issue_code_links_kind", "kind IN ('pr', 'commit')");
-
-                            t.HasCheckConstraint("ck_issue_code_links_source", "source IN ('manual', 'auto')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueLink", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("BlockedIssueId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("blocked_issue_id");
-
-                    b.Property<Guid>("BlockerIssueId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("blocker_issue_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_issue_links");
-
-                    b.HasIndex("BlockedIssueId")
-                        .HasDatabaseName("ix_issue_links_blocked_issue_id");
-
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_issue_links_created_by");
-
-                    b.HasIndex("ProjectId")
-                        .HasDatabaseName("ix_issue_links_project_id");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_issue_links_workspace_id");
-
-                    b.HasIndex("BlockerIssueId", "BlockedIssueId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_issue_links_blocker_issue_id_blocked_issue_id");
-
-                    b.ToTable("issue_links", t =>
-                        {
-                            t.HasCheckConstraint("ck_issue_links_distinct", "blocker_issue_id <> blocked_issue_id");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueRun", b =>
-                {
-                    b.Property<Guid>("IssueId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("issue_id");
-
-                    b.Property<Guid>("RunId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("run_id");
-
-                    b.Property<DateTimeOffset>("LinkedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("linked_at");
-
-                    b.Property<Guid>("LinkedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("linked_by");
-
-                    b.HasKey("IssueId", "RunId")
-                        .HasName("pk_issue_runs");
-
-                    b.HasIndex("LinkedBy")
-                        .HasDatabaseName("ix_issue_runs_linked_by");
-
-                    b.HasIndex("RunId")
-                        .HasDatabaseName("ix_issue_runs_run_id");
-
-                    b.ToTable("issue_runs");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueTestCase", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Expected")
-                        .HasColumnType("text")
-                        .HasColumnName("expected");
-
-                    b.Property<Guid>("IssueId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("issue_id");
-
-                    b.Property<string>("Result")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("not_run")
-                        .HasColumnName("result");
-
-                    b.Property<DateTimeOffset?>("ResultAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("result_at");
-
-                    b.Property<Guid?>("ResultBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("result_by");
-
-                    b.Property<string>("ResultNote")
-                        .HasColumnType("text")
-                        .HasColumnName("result_note");
-
-                    b.Property<string>("Steps")
-                        .HasColumnType("text")
-                        .HasColumnName("steps");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("title");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_issue_test_cases");
-
-                    b.HasIndex("ResultBy")
-                        .HasDatabaseName("ix_issue_test_cases_result_by");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_issue_test_cases_workspace_id");
-
-                    b.HasIndex("IssueId", "CreatedAt", "Id")
-                        .HasDatabaseName("ix_issue_test_cases_issue_id_created_at_id");
-
-                    b.ToTable("issue_test_cases", t =>
-                        {
-                            t.HasCheckConstraint("ck_issue_test_cases_result", "result IN ('not_run', 'passed', 'failed', 'blocked')");
                         });
                 });
 
@@ -2075,6 +1565,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("branch");
 
+                    b.Property<bool?>("ClaudeTrusted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("claude_trusted");
+
                     b.Property<string>("HeadSha")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -2119,287 +1613,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.ToTable("machine_projects", t =>
                         {
                             t.HasCheckConstraint("ck_machine_projects_source", "source IN ('session', 'listed')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ManagedApplication", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Environments")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("environments");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("web")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NameSearch")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name_search");
-
-                    b.Property<string>("NonFunctionalTargets")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("non_functional_targets");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<string>("RepoUrl")
-                        .HasColumnType("text")
-                        .HasColumnName("repo_url");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("active")
-                        .HasColumnName("status");
-
-                    b.Property<Guid?>("TechOwnerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tech_owner_user_id");
-
-                    b.PrimitiveCollection<string[]>("TechStack")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("tech_stack");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by");
-
-                    b.Property<string>("VersioningScheme")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("semver")
-                        .HasColumnName("versioning_scheme");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_applications");
-
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_applications_created_by");
-
-                    b.HasIndex("TechOwnerUserId")
-                        .HasDatabaseName("ix_applications_tech_owner_user_id");
-
-                    b.HasIndex("UpdatedBy")
-                        .HasDatabaseName("ix_applications_updated_by");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_applications_workspace_id");
-
-                    b.HasIndex("ProjectId", "NameSearch")
-                        .IsUnique()
-                        .HasDatabaseName("ix_applications_project_id_name_search")
-                        .HasFilter("status = 'active'");
-
-                    b.HasIndex("ProjectId", "CreatedAt", "Id")
-                        .IsDescending(false, true, true)
-                        .HasDatabaseName("ix_applications_project_id_created_at_id");
-
-                    b.ToTable("applications", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_applications_environments", "environments IS NULL OR (jsonb_typeof(environments) = 'array' AND jsonb_array_length(environments) <= 3)");
-
-                            t.HasCheckConstraint("ck_applications_kind", "kind IN ('web', 'mobile', 'api', 'other')");
-
-                            t.HasCheckConstraint("ck_applications_status", "status IN ('active', 'archived')");
-
-                            t.HasCheckConstraint("ck_applications_targets", "non_functional_targets IS NULL OR (jsonb_typeof(non_functional_targets) = 'array' AND jsonb_array_length(non_functional_targets) <= 20)");
-
-                            t.HasCheckConstraint("ck_applications_tech_stack", "cardinality(tech_stack) <= 30");
-
-                            t.HasCheckConstraint("ck_applications_versioning_scheme", "versioning_scheme IN ('semver', 'calver', 'none')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ManagedProject", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<decimal?>("BudgetAmount")
-                        .HasColumnType("numeric(14,2)")
-                        .HasColumnName("budget_amount");
-
-                    b.Property<string>("BudgetCurrency")
-                        .HasColumnType("text")
-                        .HasColumnName("budget_currency");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by");
-
-                    b.PrimitiveCollection<string[]>("DefinitionOfDone")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("definition_of_done");
-
-                    b.PrimitiveCollection<string[]>("DefinitionOfReady")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("definition_of_ready");
-
-                    b.Property<DateOnly?>("EndDate")
-                        .HasColumnType("date")
-                        .HasColumnName("end_date");
-
-                    b.Property<string>("EstimationUnit")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("story_points")
-                        .HasColumnName("estimation_unit");
-
-                    b.PrimitiveCollection<string[]>("ItemTypes")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("item_types");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NameSearch")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name_search");
-
-                    b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_user_id");
-
-                    b.Property<string>("PriorityScale")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("p0_p3")
-                        .HasColumnName("priority_scale");
-
-                    b.Property<string>("Purpose")
-                        .HasColumnType("text")
-                        .HasColumnName("purpose");
-
-                    b.Property<string>("Sponsor")
-                        .HasColumnType("text")
-                        .HasColumnName("sponsor");
-
-                    b.Property<int>("SprintLengthDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(14)
-                        .HasColumnName("sprint_length_days");
-
-                    b.Property<string>("Stakeholders")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("stakeholders");
-
-                    b.Property<DateOnly?>("StartDate")
-                        .HasColumnType("date")
-                        .HasColumnName("start_date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("active")
-                        .HasColumnName("status");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_projects");
-
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_projects_created_by");
-
-                    b.HasIndex("OwnerUserId")
-                        .HasDatabaseName("ix_projects_owner_user_id");
-
-                    b.HasIndex("UpdatedBy")
-                        .HasDatabaseName("ix_projects_updated_by");
-
-                    b.HasIndex("WorkspaceId", "NameSearch")
-                        .IsUnique()
-                        .HasDatabaseName("ix_projects_workspace_id_name_search")
-                        .HasFilter("status = 'active'");
-
-                    b.HasIndex("WorkspaceId", "CreatedAt", "Id")
-                        .IsDescending(false, true, true)
-                        .HasDatabaseName("ix_projects_workspace_id_created_at_id");
-
-                    b.ToTable("projects", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_projects_budget", "(budget_amount IS NULL) = (budget_currency IS NULL) AND (budget_amount IS NULL OR budget_amount >= 0)");
-
-                            t.HasCheckConstraint("ck_projects_checklists", "cardinality(definition_of_ready) <= 30 AND cardinality(definition_of_done) <= 30");
-
-                            t.HasCheckConstraint("ck_projects_dates", "end_date IS NULL OR start_date IS NULL OR end_date >= start_date");
-
-                            t.HasCheckConstraint("ck_projects_estimation_unit", "estimation_unit IN ('story_points', 'hours', 'days', 't_shirt')");
-
-                            t.HasCheckConstraint("ck_projects_item_types", "cardinality(item_types) >= 1 AND item_types <@ ARRAY['epic', 'story', 'task', 'bug', 'spike']::text[]");
-
-                            t.HasCheckConstraint("ck_projects_priority_scale", "priority_scale IN ('p0_p3', 'moscow', 'high_medium_low', 'one_to_five')");
-
-                            t.HasCheckConstraint("ck_projects_sprint_length", "sprint_length_days BETWEEN 1 AND 42");
-
-                            t.HasCheckConstraint("ck_projects_stakeholders", "stakeholders IS NULL OR (jsonb_typeof(stakeholders) = 'array' AND jsonb_array_length(stakeholders) <= 50)");
-
-                            t.HasCheckConstraint("ck_projects_status", "status IN ('active', 'archived')");
                         });
                 });
 
@@ -2475,42 +1688,44 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ProjectMember", b =>
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.Project", b =>
                 {
-                    b.Property<Guid>("ProjectId")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
-                        .HasColumnName("project_id");
+                        .HasColumnName("id");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<DateTimeOffset>("AddedAt")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("added_at");
+                        .HasColumnName("created_at");
 
-                    b.Property<Guid>("AddedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("added_by");
-
-                    b.Property<string>("Role")
+                    b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("role");
+                        .HasColumnName("display_name");
 
-                    b.HasKey("ProjectId", "UserId")
-                        .HasName("pk_project_members");
+                    b.Property<string>("DisplayNameSearch")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name_search");
 
-                    b.HasIndex("AddedBy")
-                        .HasDatabaseName("ix_project_members_added_by");
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("key");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_project_members_user_id");
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
 
-                    b.ToTable("project_members", t =>
-                        {
-                            t.HasCheckConstraint("ck_project_members_role", "role IN ('manager', 'contributor', 'reviewer', 'viewer')");
-                        });
+                    b.HasKey("Id")
+                        .HasName("pk_projects");
+
+                    b.HasIndex("WorkspaceId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_projects_workspace_id_key");
+
+                    b.ToTable("projects");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.RemoteRun", b =>
@@ -2857,46 +2072,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.Repo", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("display_name");
-
-                    b.Property<string>("DisplayNameSearch")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("display_name_search");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("key");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_repos");
-
-                    b.HasIndex("WorkspaceId", "Key")
-                        .IsUnique()
-                        .HasDatabaseName("ix_repos_workspace_id_key");
-
-                    b.ToTable("repos");
-                });
-
             modelBuilder.Entity("ClaudeMonitor.Api.Data.SessionCommand", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3123,152 +2298,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasName("pk_session_usage");
 
                     b.ToTable("session_usage", (string)null);
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.Sprint", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("ApplicationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("application_id");
-
-                    b.Property<DateTimeOffset?>("ArchivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("archived_at");
-
-                    b.Property<decimal?>("Capacity")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("capacity");
-
-                    b.Property<DateTimeOffset?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("closed_at");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by");
-
-                    b.Property<DateOnly?>("EndDate")
-                        .HasColumnType("date")
-                        .HasColumnName("end_date");
-
-                    b.Property<string>("Goal")
-                        .HasColumnType("text")
-                        .HasColumnName("goal");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<int>("Number")
-                        .HasColumnType("integer")
-                        .HasColumnName("number");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<Guid?>("ReleaseId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("release_id");
-
-                    b.Property<DateOnly?>("StartDate")
-                        .HasColumnType("date")
-                        .HasColumnName("start_date");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasDefaultValue("planned")
-                        .HasColumnName("status");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_sprints");
-
-                    b.HasIndex("ApplicationId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_sprints_active_application")
-                        .HasFilter("status = 'active' AND application_id IS NOT NULL");
-
-                    b.HasIndex("CreatedBy")
-                        .HasDatabaseName("ix_sprints_created_by");
-
-                    b.HasIndex("ProjectId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_sprints_active_project")
-                        .HasFilter("status = 'active' AND application_id IS NULL");
-
-                    b.HasIndex("ReleaseId")
-                        .HasDatabaseName("ix_sprints_release_id");
-
-                    b.HasIndex("UpdatedBy")
-                        .HasDatabaseName("ix_sprints_updated_by");
-
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_sprints_workspace_id");
-
-                    b.HasIndex("ProjectId", "Number")
-                        .IsUnique()
-                        .HasDatabaseName("ix_sprints_project_id_number");
-
-                    b.ToTable("sprints", t =>
-                        {
-                            t.HasCheckConstraint("ck_sprints_capacity", "capacity IS NULL OR capacity >= 0");
-
-                            t.HasCheckConstraint("ck_sprints_dates", "start_date IS NULL OR end_date IS NULL OR end_date >= start_date");
-
-                            t.HasCheckConstraint("ck_sprints_number", "number > 0");
-
-                            t.HasCheckConstraint("ck_sprints_status", "status IN ('planned', 'active', 'closed')");
-                        });
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.SprintMember", b =>
-                {
-                    b.Property<Guid>("SprintId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("sprint_id");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<DateTimeOffset>("AddedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("added_at");
-
-                    b.HasKey("SprintId", "UserId")
-                        .HasName("pk_sprint_members");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_sprint_members_user_id");
-
-                    b.ToTable("sprint_members");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.SubagentRun", b =>
@@ -3874,40 +2903,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasConstraintName("fk_agent_tokens_agents_agent_id");
                 });
 
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ApplicationComponent", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedApplication", null)
-                        .WithMany()
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_application_components_applications_application_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_application_components_workspaces_workspace_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ApplicationRelease", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedApplication", null)
-                        .WithMany()
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_application_releases_applications_application_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_application_releases_workspaces_workspace_id");
-                });
-
             modelBuilder.Entity("ClaudeMonitor.Api.Data.ApprovalKey", b =>
                 {
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
@@ -3944,11 +2939,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_harness_sessions_harness_kinds_harness_kind");
 
-                    b.HasOne("ClaudeMonitor.Api.Data.Repo", null)
+                    b.HasOne("ClaudeMonitor.Api.Data.Project", null)
                         .WithMany()
-                        .HasForeignKey("RepoId")
+                        .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_harness_sessions_repos_repo_id");
+                        .HasConstraintName("fk_harness_sessions_projects_project_id");
 
                     b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
                         .WithMany()
@@ -3956,181 +2951,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_harness_sessions_workspaces_workspace_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.Issue", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedApplication", null)
-                        .WithMany()
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issues_applications_application_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("AssigneeUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issues_users_assignee_user_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ApplicationComponent", null)
-                        .WithMany()
-                        .HasForeignKey("ComponentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issues_application_components_component_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issues_users_created_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Issue", null)
-                        .WithMany()
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issues_issues_parent_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedProject", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issues_projects_project_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ApplicationRelease", null)
-                        .WithMany()
-                        .HasForeignKey("ReleaseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issues_application_releases_release_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Sprint", null)
-                        .WithMany()
-                        .HasForeignKey("SprintId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issues_sprints_sprint_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issues_users_updated_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issues_workspaces_workspace_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueCodeLink", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issue_code_links_users_created_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Issue", null)
-                        .WithMany()
-                        .HasForeignKey("IssueId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_code_links_issues_issue_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_code_links_workspaces_workspace_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueLink", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.Issue", null)
-                        .WithMany()
-                        .HasForeignKey("BlockedIssueId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_links_issues_blocked_issue_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Issue", null)
-                        .WithMany()
-                        .HasForeignKey("BlockerIssueId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_links_issues_blocker_issue_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_links_users_created_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedProject", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_links_projects_project_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_links_workspaces_workspace_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueRun", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.Issue", null)
-                        .WithMany()
-                        .HasForeignKey("IssueId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_runs_issues_issue_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("LinkedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_runs_users_linked_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.RemoteRun", null)
-                        .WithMany()
-                        .HasForeignKey("RunId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_runs_remote_runs_run_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueTestCase", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.Issue", null)
-                        .WithMany()
-                        .HasForeignKey("IssueId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_test_cases_issues_issue_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("ResultBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_issue_test_cases_users_result_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_issue_test_cases_workspaces_workspace_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.JobSchedule", b =>
@@ -4377,74 +3197,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasConstraintName("fk_machine_projects_workspaces_workspace_id");
                 });
 
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ManagedApplication", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_applications_users_created_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedProject", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_applications_projects_project_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("TechOwnerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_applications_users_tech_owner_user_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_applications_users_updated_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_applications_workspaces_workspace_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ManagedProject", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_projects_users_created_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("OwnerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_projects_users_owner_user_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_projects_users_updated_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_projects_workspaces_workspace_id");
-                });
-
             modelBuilder.Entity("ClaudeMonitor.Api.Data.PermissionRequest", b =>
                 {
                     b.HasOne("ClaudeMonitor.Api.Data.HarnessSession", null)
@@ -4455,28 +3207,14 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasConstraintName("fk_permission_requests_harness_sessions_session_id");
                 });
 
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.ProjectMember", b =>
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.Project", b =>
                 {
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
                         .WithMany()
-                        .HasForeignKey("AddedBy")
+                        .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_project_members_users_added_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedProject", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_project_members_projects_project_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_project_members_users_user_id");
+                        .HasConstraintName("fk_projects_workspaces_workspace_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.RemoteRun", b =>
@@ -4557,16 +3295,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasConstraintName("fk_remote_run_output_remote_runs_run_id");
                 });
 
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.Repo", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_repos_workspaces_workspace_id");
-                });
-
             modelBuilder.Entity("ClaudeMonitor.Api.Data.SessionCommand", b =>
                 {
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
@@ -4612,66 +3340,6 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_session_usage_harness_sessions_session_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.Sprint", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedApplication", null)
-                        .WithMany()
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_sprints_applications_application_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sprints_users_created_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ManagedProject", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sprints_projects_project_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.ApplicationRelease", null)
-                        .WithMany()
-                        .HasForeignKey("ReleaseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_sprints_application_releases_release_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sprints_users_updated_by");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sprints_workspaces_workspace_id");
-                });
-
-            modelBuilder.Entity("ClaudeMonitor.Api.Data.SprintMember", b =>
-                {
-                    b.HasOne("ClaudeMonitor.Api.Data.Sprint", null)
-                        .WithMany()
-                        .HasForeignKey("SprintId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sprint_members_sprints_sprint_id");
-
-                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_sprint_members_users_user_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.SubagentRun", b =>

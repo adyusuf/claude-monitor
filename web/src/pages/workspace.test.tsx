@@ -256,9 +256,9 @@ describe("workspace settings and account", () => {
       mockApi({ "GET /me": { body: ME } });
       renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
       expect(await screen.findByText("Install as a Claude Code plugin (recommended)")).toBeInTheDocument();
-      expect(screen.getByText("claude plugin install monitor-agent --marketplace owner/repo#prod")).toBeInTheDocument();
+      expect(screen.getByText("claude plugin install aipod --marketplace owner/repo#prod")).toBeInTheDocument();
       expect(screen.getByText(window.location.origin)).toBeInTheDocument();
-      expect(screen.getByText("/monitor-agent:connect")).toBeInTheDocument();
+      expect(screen.getByText("/aipod:connect")).toBeInTheDocument();
       expect(screen.getByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument(); // the manual way stays
     } finally {
       settable.pluginMarketplace = "";
@@ -272,8 +272,10 @@ describe("workspace settings and account", () => {
       mockApi({ "GET /me": { body: ME } });
       renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
       expect(await screen.findByText("Install as a Claude Code plugin (recommended)")).toBeInTheDocument();
-      expect(screen.getByText(`claude plugin marketplace add ${window.location.origin}/downloads/marketplace.json`)).toBeInTheDocument();
-      expect(screen.getByText("claude plugin install monitor-agent@monitor-agent-releases")).toBeInTheDocument();
+      expect(screen.getByText(`claude plugin marketplace add ${window.location.origin}/downloads/aipod-marketplace.json`)).toBeInTheDocument();
+      expect(screen.getByText("claude plugin install aipod@aipod-releases")).toBeInTheDocument();
+      expect(screen.getByText("/aipod:connect")).toBeInTheDocument();
+      expect(screen.getByText(/already has the old monitor-agent plugin/)).toBeInTheDocument(); // the order for a machine that is on the old plugin
       expect(screen.getByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument();
     } finally {
       settable.pluginFromServer = false;
@@ -287,7 +289,7 @@ describe("workspace settings and account", () => {
     try {
       mockApi({ "GET /me": { body: ME } });
       renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
-      expect(await screen.findByText("claude plugin install monitor-agent --marketplace owner/repo#prod")).toBeInTheDocument();
+      expect(await screen.findByText("claude plugin install aipod --marketplace owner/repo#prod")).toBeInTheDocument();
       expect(screen.queryByText(/marketplace add/)).not.toBeInTheDocument();
     } finally {
       settable.pluginMarketplace = "";

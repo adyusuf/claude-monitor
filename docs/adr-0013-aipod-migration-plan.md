@@ -1,7 +1,7 @@
 # ADR-0013 (proposed): moving the names left over from the rename to aipod
 
 Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1), step 2 (the tier 1 display names, section 4) and
-step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
+step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`), step 4 (the `aipod` plugin and the bridge, section 1, "As built") step 5 (`aipod migrate-home`, section 3, "As built") and step 6 (`aipod service migrate`, section 4, "As built"); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
 designs, one item at a time, the four names ADR-0012 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
@@ -57,6 +57,19 @@ tokens live in the agent home and the OS credential store, which the plugin does
 both directions (the existing `test_plugin_run.py` / `test_plugin_ensure.py` patterns). **Needs a spike on a real Claude Code first** (about an
 hour): that a skill can run `claude plugin uninstall`, that two plugins with the same MCP server key do not collide, and how `userConfig` is
 carried. **Needs the maintainer:** the retire period (section 5), and whether the agent may report its plugin id.
+
+**As built (19/10/2026, step 4).** The spike ran on Claude Code 2.1.294 in a private config directory: two plugins that carry the same MCP server key install
+side by side and do not collide (the server is namespaced by plugin, `plugin:<name>:claude-monitor`, so the tools are `mcp__plugin_aipod_claude-monitor__*`);
+`claude plugin uninstall <id> --json` works from a shell, which is all a skill needs; `claude plugin configure <id> --values-stdin` saves a `userConfig` value;
+a plugin whose required option is unset starts no MCP server. Built: `plugin/aipod` (same hooks and MCP server, its own words, id `aipod@aipod-releases` in
+`run.sh`), the old plugin as the bridge, both rendered by `aipod plugin-files` so the drift test covers both, `scripts/build_plugin_site.py` writing
+`aipod-plugin.zip` + `aipod-marketplace.json` beside the old pair, and `write_plugin_pins.py` writing the same pins to both folders. Two details the text above left open:
+the plugin's version is the agent's version (the generator takes `AgentConfig.Version`), so "pre-bridge" is "up to 0.5.0": `aipod`'s `run.sh` stands down for
+hooks and the MCP server while `monitor-agent@monitor-agent-releases` is enabled at 0.5.0 or older (a version it cannot read means "go on", because the bridge is the likelier
+one), and the bridge stands down when `aipod@aipod-releases` is enabled; `status`, `connect` and `logout` are never held back. The bridge says once, at a session start, that aipod
+has a new plugin. `/aipod:connect` uninstalls the old plugin and names the new permission prefix. Added after: the repository catalog (`.claude-plugin/marketplace.json`) lists both plugins, so `aipod` can also be installed from git (its id is then `aipod@monitor-agent-releases`: the wrapper picks whichever of the two ids is enabled, and the bridge stands down for either); the `server` option of `aipod` is no longer required (a connected machine's `agent.json` is read, and an option nobody set that reaches the MCP server unexpanded is ignored); the git route of the web page shows the `aipod` commands. Built after: the agent reports its plugin id with the profile (`agents.plugin_id`, validated as `name@marketplace`, migration `PluginId`), the machines list marks a machine still on the old plugin, and `scripts/build_plugin_site.py --without-old` retires it (builds only aipod and removes the old zip and catalog): run it 90 days after the bridge shipped and only when the list shows no machine on the old plugin. The site route of that page now shows the `aipod`
+commands and a note for machines on the old plugin; deploy the downloads with `aipod-marketplace.json` before that web build (`docs/release.md`), or the command points at a file that is not there). The git marketplace
+(`.claude-plugin/marketplace.json`) still lists only the old plugin: one repository has one catalog, and its name is the old id.
 
 ## 2. The MCP tool names (`monitor_*`) and the server key (`claude-monitor`)
 
@@ -117,6 +130,15 @@ as pure functions; the move on temp folders with a held lock, a running-daemon r
 tests stay. **Needs the maintainer:** agree that no automatic move happens in the first release (the cost of "never" is two different paths
 on a fleet, which docs and the tray handle through the resolver).
 
+**As built (19/10/2026, step 5).** `aipod migrate-home [--dry-run]` (`HomeMove`): it runs before anything else writes in the home, checks everything first, and only
+then stops the daemon (the `restart` way, a kill if it hangs), takes the daemon's own lock so none starts in between, renames the folder in one step, makes a symbolic link
+at the old path and starts the daemon again if it had been running; if the link cannot be made the folder is put back, and a daemon it stopped is started again after any
+failure. It refuses (exit 2, nothing touched) for a home named by `AIPOD_AGENT_HOME`/`CM_AGENT_HOME`, a boot service's home, a home that is neither the old nor the aipod
+folder, an aipod folder that has content (an empty one is replaced), and **Windows**, which needs a junction and test machines and stays on the resolver for now. "Already
+using the aipod folder" and "already a link" are exit 0. Tested on temp folders (move, link, no-start when it was not running, dry run, stop failure, lock taken in the
+meantime, each refusal) and run once for real against a throwaway `HOME`; never run on a real home, a launchd or systemd unit (a unit that restarts the daemon by itself can
+race the stop: the lock turns that into a refusal, not a corrupt move) or Windows. Not built: the automatic offer (3.3), a junction for Windows.
+
 ## 4. The service, unit, task and label names
 
 **What exists.** Boot service (ADR-0005): service and unit `cm-agent`, accounts `cm-agent` (Linux), `_cmagent` (macOS), `NT SERVICE\cm-agent`
@@ -145,6 +167,24 @@ maintainer:** tier 1 yes/no, tier 2 yes/no (my recommendation: tier 1 now, tier 
 reverse-DNS prefix for launchd labels and bundle ids. ADR-0012's tray used `net.aipod.tray` as a placeholder; no domain of ours is known, so it is now `aipod.tray` (launchd needs a unique label, not a
 reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as they are, and a real prefix is only needed if tier 2 renames them.
 
+**As built (19/10/2026, step 6, on the maintainer's yes; it first read "decided against" and was corrected the same day).** Not run on any real service, nor on macOS or Windows: the tests (written, not run) drive the Linux flow on temp folders with a fake `systemctl`.
+
+- **Names.** `ServiceNames` (service/unit, unit path, launchd label, plist path, sudoers file) rides on `ServiceLayout.Names`; the old set is `ServiceNames.Legacy` (unchanged constants), the new one `ServiceNames.Aipod`: `aipod`, `aipod.service`, label `aipod.agent` (no reverse-DNS, as for the tray),
+  accounts `aipod`, `_aipod`, `NT SERVICE\aipod`, folders and policy under `aipod` names (the table in `SETUP.md`), sudoers `aipod-run`. The binary file stays `cm-agent`. `install --service` picks the aipod layout for a fresh install and keeps the old one for a service that exists;
+  `uninstall --service` removes whichever exists (both, half way through a migration).
+- **Policy path.** `AgentConfig.ExecConfigPath` is the aipod place when a policy is there, else the old one (and the approvers file follows it).
+- **`aipod service migrate [--dry-run | --undo | --finish [--now]]`** (`ServiceMigrator`). Refuses (changes nothing) unless the old service is installed and connected, the aipod names and folders are free and it runs as an administrator (a dry run needs none). Real run: stop the old service; copy the home
+  (not the bundle folder, locks, login code or the run scratch folder) and `exec.json`/`approvers.json`; install the new service with the same installer as a fresh install (account, binary copy, policy kept, unit, start); wait up to 90 s for the new database to show a contact with the server
+  (read-only; Linux and macOS); disable (not remove) the old service; write a marker with the time beside the new policy. Any failure before the disable removes what the run made and starts the old service again. `--undo` stops and disables the new service, brings its identity and database
+  (and policy) back to the old places and enables the old one. `--finish` needs seven days since the marker (or `--now`), checks every path it will delete against the new layout first, then removes the old unit/plist, account, folders, policy, sudoers drop-in.
+- **Windows is different.** The tokens are DPAPI-protected for `NT SERVICE\cm-agent` and cannot be read by `NT SERVICE\aipod`, so the home is copied after the new service exists (so the files take its ACL) without the `cred-*.bin` files, the identity loses its agent and workspace ids and keeps its
+  machine key and server, and the service logs in again: an administrator reads the code in the new home and approves it. No health wait there; the old service is disabled right after the new one starts.
+- **Standalone registrations (added the same day).** `install --standalone` now registers under the aipod names (`StandaloneNames.Aipod`: label `aipod.agent.user`, user unit `aipod.service`, logon task `AipodAgent`, bundle `Aipod.app` with id `aipod.agent.app`; the binaries keep their file names) and, when
+  the old layout has a registration (label `com.claudemonitor.agent.user`, unit `claude-monitor-agent.service`, task `ClaudeMonitorAgent`, bundle `ClaudeMonitorAgent.app`), stops and removes it before the new one is enabled: that is the whole migration, no separate verb, because it is the user's own account
+  and the home does not move. `uninstall --standalone` removes either set. If enabling the new one fails after the old was removed, the machine has no autostart until the install is run again.
+- **Not built.** A Windows service host name inside the program stays `cm-agent` (for an own-process service Windows ignores it).
+  The run account (`cm-run`, `_cmrun`) is shared by both services and is never removed.
+
 ## Order and size
 
 | Step | Items | Size | Risk | Needs |
@@ -154,7 +194,7 @@ reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as
 | 3 | Tool-name mapping and `--names` (2) | large (about 200 text sites) | medium | nothing |
 | 4 | New plugin, both catalogs, bridge (1) | large | medium | the Claude Code spike |
 | 5 | `migrate-home` (3.2) | medium | medium | test machines |
-| 6 | Tier 2 service migrate (4) | large | high | Windows and macOS machines, maintainer yes |
+| 6 | Tier 2 service migrate (4) | large | high | built 19/10/2026 on the maintainer's yes; **not run on a real service or on macOS and Windows** |
 
 Still outside this ADR: the release file names and the update manifest (`cm-agent-<os>-<arch>.zip`, `cm-agent-update/1`; a dual-publish plus a
 manifest version for old agents), the .NET namespaces and project names (internal, no compatibility cost, one large mechanical commit), and the

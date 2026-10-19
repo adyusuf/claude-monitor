@@ -157,7 +157,7 @@ dev and test machines only, at most 3 workers); runs of kind `test | build | dep
 |---|---|---|
 | A | The new-session form on the Claude card (ADR-0014 P2): project from the machine's reported list, permission mode, optional first prompt (wrapped, labelled as from the web, capped, never audited) | decision 3 |
 | B | "Start a test" on the machine page: the project's test command is set at the machine, Podium only picks the project (design below); the existing run approval flow; the result on the same card, with the link to an issue from §6 | decision 9 (made) |
-| C | Automatic mode `on_message` (ADR-0014 P3): backoff after a failed start, a start budget per hour, never a second worker for one project. Done on `dev` (19/10/2026) for held asks; web messages to an ended session are not covered | decision 2 (made: owner only) |
+| C | Automatic mode `on_message` (ADR-0014 P3): backoff after a failed start, a start budget per hour, never a second worker for one project. Done on `dev` (19/10/2026) for held asks, in the other session's build of ADR-0014 P3 (which also has the mode `always`); web messages to an ended session are not covered | decision 2 (made: owner only) |
 | D | A tool panel per machine: aipod status and update (the existing actions in one card). Done on `dev` (19/10/2026) as the "aipod" card: its facts for every member (version, how it runs, what it may run, last heard) above the owner's fixed actions; a pod is the aipod daemon, on a server or a desktop (decision 8) | decision 8 (made) |
 | E | Claude management (sessions list, plugins, skills, limits) and per-session settings (working mode, branch policy, CI) | decisions 5 and 6 (made); read-only parts done, writes and limits below |
 

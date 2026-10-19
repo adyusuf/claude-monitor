@@ -94,8 +94,13 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var askStore = new LocalStore(config.DatabasePath);
         var asks = new AskPump(new LiveSettings(config, clock).Current, askStore, new SocketInboxTransport(),
             async (id, update, ct) => await api.RemoteAsync(HttpMethod.Post, $"api/agent/asks/{id}/status", JsonSerializer.SerializeToElement(update, ApiClient.Json), ct),
-            () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), clock,
-            unserved: new ClaudeAutoStart(config, claudeControl, askStore, clock, line => log.Write(line)).OnUnservedAsync);
+            () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), clock);
+        // The automatic Claude start (ADR-0014 P3) has its own connection and its own ask pump, only to ask which sessions could take an ask: the loops never share a connection.
+        using var autoStore = new LocalStore(config.DatabasePath);
+        var autoSettings = new LiveSettings(config, clock);
+        var autoAsks = new AskPump(autoSettings.Current, autoStore, new SocketInboxTransport(), (_, _, _) => Task.CompletedTask, () => false, clock);
+        var autoStart = new ClaudeAutoStart(autoSettings.Current, autoStore, claudeControl, (ask, now) => autoAsks.Candidates(ask, autoSettings.Current(), now).Count > 0,
+            () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), log, clock);
         var claudeUpdates = new ClaudeUpdater(config, claudeStore, new SystemProcessRunner(), new SystemNotifier(new SystemProcessRunner(), config.UpdateProbeTimeout), log, clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
         await Task.WhenAll(
@@ -112,6 +117,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             }, api, revoked, error => relay.UploadOutcome(error)),
             Loop("inbox", config.PushPollEvery, ct => inbox.PumpAsync(ct), api, revoked),
             Loop("asks", config.PushPollEvery, ct => asks.PumpAsync(ct), api, revoked),
+            Loop("claude-auto", config.ClaudeAutoEvery, ct => autoStart.RunOnceAsync(ct), api, revoked),
             Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
             Loop("settings", config.SettingsEvery, async ct =>
             {

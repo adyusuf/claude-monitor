@@ -79,16 +79,16 @@ public static class ChannelEnvelopes
     }
 
     /// <summary>
-    /// The first prompt of a session started from the web (ADR-0014 P2), as the argument of `claude --bg`: the same notice and fence as an inbox message, with no
-    /// message id or session (there is none yet). The text is capped and defused, and the argument always starts with the notice, never with the web's own text.
+    /// The first prompt of a session started from the web (ADR-0014 P2): the same wrapper and the same notice as a message written to a running session, so Claude is
+    /// told who wrote it, that it is data and to ask before acting on side effects; the text is defused and cut like any web message. There is no session id yet.
     /// </summary>
-    public static string BuildFirstPrompt(string text, int contentMax, DateTimeOffset now)
+    public static string BuildFirstPrompt(Guid actionId, string text, int contentMax, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(text);
         var body = Defuse(text);
         if (body.Length > contentMax) body = body[..contentMax] + Cut;
         var sent = now.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
-        return $"{InboxNotice}\n{Open} origin=\"web\" sent_at=\"{sent}\"\n{body}\n{Close}";
+        return $"{InboxNotice}\n{Open} id={actionId:N} origin=\"web\" session_id=\"new\" sent_at=\"{sent}\"\n{body}\n{Close}";
     }
 
     /// <summary>The line before an inbox message: who wrote it and that it is data (the same rules as <see cref="Instructions"/>).</summary>

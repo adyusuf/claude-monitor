@@ -28,8 +28,12 @@ internal static class MonitorDbModel
         b.Entity<User>(e =>
         {
             e.HasIndex(x => x.EmailNormalized).IsUnique();
-            e.ToTable(t => t.HasCheckConstraint("ck_users_status",
-                In("status", UserStatuses.Active, UserStatuses.Disabled, UserStatuses.Deleted)));
+            e.Property(x => x.Language).HasMaxLength(2);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_users_status", In("status", UserStatuses.Active, UserStatuses.Disabled, UserStatuses.Deleted));
+                t.HasCheckConstraint("ck_users_language", "language IS NULL OR " + In("language", [.. Mail.MailTemplates.Languages]));
+            });
         });
         b.Entity<UserLogin>(e =>
         {
@@ -86,6 +90,8 @@ internal static class MonitorDbModel
         b.Entity<Agent>(e =>
         {
             e.Property(x => x.PushTransport).HasMaxLength(16);
+            e.Property(x => x.PluginId).HasMaxLength(PluginIds.Max);
+            e.Property(x => x.ClaudeAutoProject).HasMaxLength(RunKinds.ProjectKeyMax);
             e.HasIndex(x => new { x.MachineId, x.UserId }).IsUnique().HasFilter("status = 'active'");
             e.HasIndex(x => x.WorkspaceId);
             e.HasIndex(x => x.UserId);

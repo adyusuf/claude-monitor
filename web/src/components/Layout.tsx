@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router";
+import { api } from "../api/endpoints";
 import { useSession } from "../auth/session";
 import { config } from "../config";
 import { languages, useI18n, type Language } from "../i18n";
@@ -86,7 +87,11 @@ export function Layout() {
             <span className="who-name">{me?.displayName}</span>
           </NavLink>
           <div className="prefs">
-            <select aria-label={t("nav.language")} value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
+            <select aria-label={t("nav.language")} value={language} onChange={(e) => {
+              const next = e.target.value as Language;
+              setLanguage(next);
+              if (me) void api.setMyLanguage(next).catch(() => undefined); // kept on the account for the mails; the menu works without it
+            }}>
               {languages.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
             <select aria-label={t("nav.theme")} value={theme} onChange={(e) => setTheme(e.target.value as Theme)}>

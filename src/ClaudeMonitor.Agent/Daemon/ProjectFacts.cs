@@ -32,7 +32,7 @@ public sealed class ProjectFacts(AgentConfig config, ICredentialStore? credentia
                 if (!Directory.Exists(folder) || ProjectInfo.Resolve(folder) is not { } info || facts.Any(f => f.Key == info.Key)) continue;
                 var git = GitFacts.Read(folder);
                 var test = tests is not null && tests.TryGetValue(ProjectTestCommands.Normalize(folder), out var argv) && ProjectTestCommands.IsValid(argv) ? argv : null;
-                facts.Add(new ProjectFact(info.Key, info.Name, Hmac(key, Path.GetFullPath(folder)), git?.Branch ?? info.Branch, git?.HeadSha, git?.Tag, source,
+                facts.Add(new ProjectFact(info.Key, info.Name, Hmac(key, Path.GetFullPath(folder)), git?.Branch ?? info.Branch, git?.HeadSha, git?.Tag, source, ClaudeTrust.IsTrusted(config, folder),
                     test, test is null ? null : ProjectTestCommands.Normalize(folder)));
             }
         }

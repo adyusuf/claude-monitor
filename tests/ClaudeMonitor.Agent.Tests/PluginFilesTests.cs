@@ -79,19 +79,40 @@ public sealed class PluginFilesTests : IDisposable
         var marketplace = JsonNode.Parse(files[MarketplacePlugin.MarketplaceFile])!;
         Assert.Equal(AgentConfig.ReleasesMarketplaceName, marketplace["name"]!.GetValue<string>());
         Assert.Equal("./plugin/monitor-agent", marketplace["plugins"]![0]!["source"]!.GetValue<string>());
+        Assert.Equal("./plugin/aipod", marketplace["plugins"]![1]!["source"]!.GetValue<string>()); // the repository catalog offers the new plugin too
         Assert.All(files.Values, text => Assert.DoesNotMatch(@"https?://[a-z0-9.-]+\.[a-z]{2,}", text)); // host names live in deployment configuration
         Assert.Throws<ArgumentException>(() => MarketplacePlugin.Render(""));
+    }
+
+    [Fact]
+    public void The_aipod_plugin_is_the_old_one_under_the_new_name_with_the_same_hooks_and_mcp_server_and_its_own_words()
+    {
+        var files = MarketplacePlugin.Render("1.0.0");
+        var aipod = JsonNode.Parse(files[$"{MarketplacePlugin.AipodFolder}/.claude-plugin/plugin.json"])!;
+        Assert.Equal(("aipod", "1.0.0"), (aipod["name"]!.GetValue<string>(), aipod["version"]!.GetValue<string>()));
+        Assert.False(aipod["userConfig"]!["server"]!["required"]!.GetValue<bool>()); // a connected machine is not asked again
+        Assert.DoesNotContain("Claude Monitor", aipod.ToJsonString(), StringComparison.Ordinal);
+        foreach (var file in new[] { "hooks/hooks.json", ".mcp.json" })
+        {
+            Assert.Equal(files[$"{MarketplacePlugin.PluginFolder}/{file}"], files[$"{MarketplacePlugin.AipodFolder}/{file}"]);
+        }
+
+        var old = JsonNode.Parse(files[$"{MarketplacePlugin.PluginFolder}/.claude-plugin/plugin.json"])!;
+        Assert.StartsWith("Replaced by the aipod plugin", old["description"]!.GetValue<string>(), StringComparison.Ordinal); // the bridge says so in the plugin list
     }
 
     [Fact]
     public async Task Writing_the_files_creates_the_folders_and_the_plugin_files_verb_does_it_from_the_command_line()
     {
         var target = Path.Combine(home.Dir, "out");
-        Assert.Equal(4, MarketplacePlugin.WriteTo(target, "2.0.0"));
-        Assert.Contains("\"version\": \"2.0.0\"", File.ReadAllText(Path.Combine(target, "plugin", "monitor-agent", ".claude-plugin", "plugin.json")), StringComparison.Ordinal);
+        Assert.Equal(7, MarketplacePlugin.WriteTo(target, "2.0.0"));
+        foreach (var plugin in new[] { "monitor-agent", "aipod" })
+        {
+            Assert.Contains("\"version\": \"2.0.0\"", File.ReadAllText(Path.Combine(target, "plugin", plugin, ".claude-plugin", "plugin.json")), StringComparison.Ordinal);
+        }
         var stdout = new StringWriter();
         Assert.Equal(0, await Cli.RunAsync(["plugin-files", Path.Combine(home.Dir, "out2")], home.Config, new StringReader(""), stdout, new StringWriter(), TimeProvider.System));
-        Assert.Contains("4 files written", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("7 files written", stdout.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

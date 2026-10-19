@@ -26,7 +26,6 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     public const string ThresholdsKey = "settings.alert_thresholds";
     public const string RemoteRunsKey = "settings.remote_runs";
     public const string ShareServicesKey = "settings.share_services";
-    public const string ClaudeAutoKey = "settings.claude_auto";
     public const string ShareInventoryKey = "settings.share_inventory";
     public const int KeepSamples = 60;
     /// <summary>A folder a session worked in is read for its commit and tag for this long after the last visit (ADR-0008 §3a′).</summary>
@@ -68,7 +67,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var (services, projects) = Extras(policy);
         var inventory = await InventoryAsync(policy, ct);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
-            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required, inventory);
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required,
+            PluginIds.IsValid(config.PluginId) ? config.PluginId : null, inventory);
         var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default }, Inventory = inventory is null ? null : inventory with { At = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
@@ -187,7 +187,6 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     {
         ArgumentNullException.ThrowIfNull(settings);
         List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false"), (ShareServicesKey, settings.ShareServices ? "true" : "false"),
-            (ClaudeAutoKey, settings.ClaudeAuto == ClaudeAutoModes.OnMessage ? ClaudeAutoModes.OnMessage : ClaudeAutoModes.Off),
             (ShareInventoryKey, settings.ShareInventory ? "true" : "false")];
         if (settings.Alerts is { } a)
         {

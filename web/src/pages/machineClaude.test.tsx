@@ -1,14 +1,13 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { config } from "../config";
 import type { AgentActionView, MachineDetail, MachineProjectView } from "../api/types";
 import { de } from "../i18n/de";
 import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
-import { runningSessions } from "./MachineClaude";
+import { AUTO_STARTS_PER_HOUR, FIRST_PROMPT_MAX, runningSessions } from "./MachineClaude";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
 
@@ -83,53 +82,128 @@ describe("the Claude card on the machine page", () => {
     expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/blog", permissionMode: "plan" });
   });
 
-  it("sends the first message trimmed, only when there is one, and clears it after the start", async () => {
+  it("sends a first prompt with the start, trimmed, and clears the box; an empty box sends none", async () => {
     const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev);
     open();
-    await userEvent.type(await screen.findByLabelText(en.machines.claudeControl.prompt), "  look at the failing test  ");
+    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[()]/g, "\\$&")));
+    await userEvent.click(await screen.findByRole("button", { name: en.machines.claudeControl.start }));
+    expect(await screen.findByText(en.machines.claudeControl.done.started)).toBeInTheDocument();
+    expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/shop", permissionMode: "manual" }); // no firstPrompt key at all
+
+    fireEvent.change(box, { target: { value: "  fix the failing test\n" } });
     await userEvent.click(screen.getByRole("button", { name: en.machines.claudeControl.start }));
-    await screen.findByText(en.machines.claudeControl.done.started);
-    expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/shop", permissionMode: "manual", prompt: "look at the failing test" });
-    expect(screen.getByLabelText(en.machines.claudeControl.prompt)).toHaveValue("");
+
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(2));
+    expect(posts(calls)[1]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/shop", permissionMode: "manual", firstPrompt: "fix the failing test" });
+    await vi.waitFor(() => expect((box as HTMLTextAreaElement).value).toBe(""));
   });
 
-  it("limits the first message to the length the API takes", async () => {
+  it("counts the characters of the first prompt, says how it is sent, and keeps Start off over the limit", async () => {
     api({}, dev);
     open();
-    expect(await screen.findByLabelText(en.machines.claudeControl.prompt)).toHaveAttribute("maxlength", String(config.claudePromptMax));
+    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[()]/g, "\\$&")));
+    expect(screen.getByText(en.machines.claudeControl.firstPromptHint)).toBeInTheDocument();
+    expect(screen.getByText(`0 / ${FIRST_PROMPT_MAX}`)).toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: "x".repeat(FIRST_PROMPT_MAX) } });
+    expect(screen.getByText(`${FIRST_PROMPT_MAX} / ${FIRST_PROMPT_MAX}`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeEnabled();
+
+    fireEvent.change(box, { target: { value: "x".repeat(FIRST_PROMPT_MAX + 1) } });
+    expect(box).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
   });
 
-  it("shows the automatic start choice to the owner, off by default, and saves the choice with the switch kept on", async () => {
-    const calls = api({ "PUT /agents/a1/claude": { body: { agentId: "a1", accepts: true, setAt: null, setBy: null, autoMode: "on_message" } } }, dev);
+  it("does not let a project Claude Code does not trust be chosen, starts with the first one that is not known untrusted, and says which are trusted", async () => {
+    const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev, [], [
+      project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new", trusted: null }),
+    ]);
     open();
-    const select = await screen.findByLabelText(en.machines.claudeControl.autoLabel);
+    const select = await screen.findByLabelText(en.machines.claudeControl.project);
+    const options = [...select.querySelectorAll("option")];
+    expect(options.map((o) => [o.getAttribute("value"), (o as HTMLOptionElement).disabled])).toEqual([["git:host/old", true], ["git:host/blog", false], ["git:host/new", false]]);
+    expect(options[0]!.textContent).toBe(`old (${en.machines.claudeControl.untrustedOption})`);
+    expect((select as HTMLSelectElement).value).toBe("git:host/blog");
+    expect(screen.getByText(en.machines.claudeControl.trusted)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: en.machines.claudeControl.start }));
+
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0]!.body).toMatchObject({ projectKey: "git:host/blog" });
+  });
+
+  it("says so and keeps Start off when Claude Code trusts none of the projects", async () => {
+    api({}, dev, [], [project({ trusted: false })]);
+    open();
+    expect(await screen.findByText(en.machines.claudeControl.allUntrusted)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
+  });
+
+  it("shows the automatic start off by default, says what it costs and turns it on with the mode in the request", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, dev);
+    open();
+    const select = await screen.findByLabelText(en.machines.claudeControl.auto);
     expect(select).toHaveValue("off");
-    expect([...select.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["off", "on_message"]);
+    expect(screen.getByText(en.machines.claudeControl.autoHint.replace("{n}", String(AUTO_STARTS_PER_HOUR)))).toBeInTheDocument();
 
     await userEvent.selectOptions(select, "on_message");
 
-    await screen.findByText(en.machines.claudeControl.done.saved);
-    expect(calls.filter((c) => c.method === "PUT" && c.path === "/agents/a1/claude").map((c) => c.body)).toEqual([{ accept: true, autoMode: "on_message" }]);
+    expect(await screen.findByText(en.machines.claudeControl.done.auto)).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "on_message" });
   });
 
-  it("shows the chosen automatic mode and hides the choice while starting from the web is off", async () => {
-    api({}, { ...dev, claudeAutoMode: "on_message" });
+  it("shows the mode the machine says it has and turns it off with off", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { ...dev, claudeAutoMode: "on_message" });
     open();
-    expect(await screen.findByLabelText(en.machines.claudeControl.autoLabel)).toHaveValue("on_message");
+    const select = await screen.findByLabelText(en.machines.claudeControl.auto);
+    expect(select).toHaveValue("on_message");
+
+    await userEvent.selectOptions(select, "off");
+
+    await vi.waitFor(() => expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")).toBeTruthy());
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "off" });
   });
 
-  it("offers no automatic start when the switch is off", async () => {
+  it("keeps a session running in a project: choosing always sends the first project that is not known untrusted, and the project can be changed", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, dev, [], [
+      project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new" }),
+    ]);
+    open();
+
+    await userEvent.selectOptions(await screen.findByLabelText(en.machines.claudeControl.auto), "always");
+
+    await vi.waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.path === "/agents/a1/claude")).toBe(true));
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "always", autoProject: "git:host/blog" });
+  });
+
+  it("shows the project of the always mode, lists only projects Claude Code may start in, and changing it sends the new one", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { ...dev, claudeAutoMode: "always", claudeAutoProject: "git:host/blog" }, [], [
+      project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new" }),
+    ]);
+    open();
+    const projectSelect = await screen.findByLabelText(en.machines.claudeControl.autoProject);
+    expect(projectSelect).toHaveValue("git:host/blog");
+    expect([...projectSelect.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["git:host/blog", "git:host/new"]);
+
+    await userEvent.selectOptions(projectSelect, "git:host/new");
+
+    await vi.waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.path === "/agents/a1/claude")).toBe(true));
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "always", autoProject: "git:host/new" });
+  });
+
+  it("does not offer always when Claude Code trusts no project, and offers no project choice for the other modes", async () => {
+    api({}, { ...dev, claudeAutoMode: "on_message" }, [], [project({ trusted: false })]);
+    open();
+    const select = await screen.findByLabelText(en.machines.claudeControl.auto);
+    expect([...select.querySelectorAll("option")].find((o) => o.getAttribute("value") === "always")).toBeDisabled();
+    expect(screen.queryByLabelText(en.machines.claudeControl.autoProject)).toBeNull();
+  });
+
+  it("shows no automatic start on a machine where starting Claude is off or not allowed", async () => {
     api({}, { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: false });
     open();
     await screen.findByText(en.machines.claudeControl.off);
-    expect(screen.queryByLabelText(en.machines.claudeControl.autoLabel)).toBeNull();
-  });
-
-  it("tells the owner in words whose Claude plan every started session uses", async () => {
-    api({}, dev);
-    open();
-    const owner = machine().userName;
-    expect(await screen.findByText(en.machines.claudeControl.cost.replace("{name}", owner))).toBeInTheDocument();
+    expect(screen.queryByLabelText(en.machines.claudeControl.auto)).toBeNull();
   });
 
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
@@ -217,6 +291,16 @@ describe("the texts", () => {
       expect(Object.keys(dict.machines.claudeControl.modes)).toEqual(["manual", "plan", "acceptEdits"]);
       expect(dict.machines.actions.kind.claude_start).not.toBe("");
       expect(dict.errors.claude_control_environment).not.toBe("");
+      for (const key of ["invalid_first_prompt", "claude_folder_not_trusted", "claude_start_pending"] as const) expect(dict.errors[key]).not.toBe("");
+      expect(dict.machines.claudeControl.autoHint).toContain("{n}");
+      for (const key of ["auto", "autoHint", "autoProject"] as const) expect(dict.machines.claudeControl[key]).not.toBe("");
+      expect(Object.keys(dict.machines.claudeControl.autoModes)).toEqual(["off", "on_message", "always"]);
+      expect(dict.errors.invalid_auto_project).not.toBe("");
+      expect(dict.machines.claudeControl.done.auto).not.toBe("");
+      expect(dict.errors.invalid_auto_mode).not.toBe("");
+      expect(dict.machines.claudeControl.firstPromptCount).toContain("{n}");
+      expect(dict.machines.claudeControl.firstPromptCount).toContain("{max}");
+      for (const key of ["firstPrompt", "firstPromptHint", "untrustedOption", "trusted", "allUntrusted"] as const) expect(dict.machines.claudeControl[key]).not.toBe("");
     }
   });
 });

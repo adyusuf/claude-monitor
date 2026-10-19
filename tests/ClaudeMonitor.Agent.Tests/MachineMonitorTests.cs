@@ -200,6 +200,21 @@ public sealed class MachineMonitorTests : IDisposable
     }
 
     [Theory]
+    [InlineData("aipod@aipod-releases", "aipod@aipod-releases")]
+    [InlineData("monitor-agent@monitor-agent-releases", "monitor-agent@monitor-agent-releases")]
+    [InlineData("not a plugin id", null)]
+    [InlineData("a@", null)]
+    [InlineData(null, null)]
+    public async Task The_profile_says_which_plugin_the_agent_runs_under_and_nothing_for_anything_that_is_not_a_plugin_id(string? id, string? expected)
+    {
+        var own = new MachineMonitor(fx.Home.Config with { PluginId = id }, fx.Store, fx.Api, fx.Clock, source);
+
+        await own.ProfileAsync(CancellationToken.None);
+
+        Assert.Equal(expected, Body<AgentProfile>(Assert.Single(fx.Fake.Seen, s => s.Path == "/api/agent/profile").Body).PluginId);
+    }
+
+    [Theory]
     [InlineData(new[] { "/usr/bin/tail" }, new string[0], "argv")]
     [InlineData(new string[0], new[] { "/var/log" }, "argv")]
     [InlineData(new string[0], new string[0], "shell")]

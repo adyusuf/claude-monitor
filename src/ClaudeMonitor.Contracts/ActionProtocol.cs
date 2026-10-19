@@ -41,8 +41,15 @@ public static class AgentActionKinds
 
     public const string DefaultClaudePermissionMode = "manual";
 
-    /// <summary>The most characters of the optional first prompt of a Claude start (ADR-0014 P2). It is text from the web: capped, wrapped and labelled by the agent.</summary>
-    public const int PromptMax = 2000;
+    /// <summary>
+    /// The longest first prompt of a remote start (ADR-0014 P2), in characters. It is text from the web: capped here, wrapped and labelled by the agent, kept only until the
+    /// agent has it, never written to an audit row or a log.
+    /// </summary>
+    public const int ClaudeFirstPromptMax = 2000;
+
+    /// <summary>A first prompt is text a person typed: letters, spaces and new lines, no other control characters.</summary>
+    public static bool IsFirstPrompt(string? text) =>
+        text is { Length: >= 1 and <= ClaudeFirstPromptMax } && !string.IsNullOrWhiteSpace(text) && text.All(c => !char.IsControl(c) || c is '\n' or '\r' or '\t');
 
     /// <summary>The environments an admin must have set on a machine before Claude may be started on it from the web (production and database machines never).</summary>
     public static readonly IReadOnlyList<string> ClaudeEnvironments = ["dev", "test"];
@@ -74,37 +81,42 @@ public static class AgentActionStatuses
 }
 
 /// <summary>An action for the agent to perform, sent on its stream (event <see cref="AgentStreamEvents.Action"/>).</summary>
-public sealed record AgentActionMessage(Guid Id, string Kind, DateTimeOffset ExpiresAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null, string? Prompt = null,
-    string? Target = null, string? Value = null);
+public sealed record AgentActionMessage(Guid Id, string Kind, DateTimeOffset ExpiresAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null,
+    string? FirstPrompt = null, string? Target = null, string? Value = null);
 
 /// <summary>The agent's report: "delivered" when it takes the action, then "succeeded" or "failed" with a short text.</summary>
 public sealed record AgentActionReport(string Status, string? Result = null, string? SessionRef = null);
 
 /// <summary>The owner's request. Code: a two-step code, when the kind needs the re-authentication and the sign-in is not recent.</summary>
-public sealed record AgentActionRequest(string Kind, string? Code = null, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null, string? Prompt = null,
-    string? Target = null, string? Value = null);
+public sealed record AgentActionRequest(string Kind, string? Code = null, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null,
+    string? FirstPrompt = null, string? Target = null, string? Value = null);
 
 /// <summary>An action as the owner's page shows it. Result is plain text from the agent: data, never markup.</summary>
 public sealed record AgentActionView(Guid Id, Guid AgentId, string Kind, string Status, string? Result, DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt, DateTimeOffset? FinishedAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null, string? Target = null, string? Value = null);
 
-/// <summary>The machine owner's switch for starting Claude from the web on this machine (ADR-0014); off until they say so. Code: a two-step code when turning it on needs one.</summary>
-public sealed record AgentClaudeRequest(bool Accept, string? Code = null, string? AutoMode = null);
-
 /// <summary>The owner asks to start the test command the machine reports for a project (ADR-0011 §7a). The command is never part of the request.</summary>
 public sealed record TestRunRequest(string ProjectKey);
 
-public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy, string AutoMode = ClaudeAutoModes.Off);
+/// <summary>
+/// The machine owner's switch for starting Claude from the web on this machine (ADR-0014); off until they say so. Code: a two-step code when turning it on needs one.
+/// AutoMode (P3): null leaves the automatic mode as it is, one of <see cref="ClaudeAutoModes"/> sets it; turning it on needs the same sign-in as the switch.
+/// </summary>
+public sealed record AgentClaudeRequest(bool Accept, string? Code = null, string? AutoMode = null, string? AutoProject = null);
+
+public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy, string? AutoMode = null, string? AutoProject = null);
 
 /// <summary>
-/// What the daemon does by itself with Claude on a machine (ADR-0014 P3), set by the machine's owner only. <c>on_message</c>: an ask from another machine that finds no idle session and names a project
-/// this machine knows gets a background worker in that project. The agent only ever sees a mode the API found allowed (switch on, dev or test machine, not a service).
+/// What the daemon may do about a Claude session by itself (ADR-0014 P3), set per machine by its owner. Off by default. <c>on_message</c>: when an ask from another machine names a project
+/// and no session there is idle to take it, start one session in that project (bounded: a budget per hour, backoff after a failure, never a second one for a project that has one).
+/// <c>always</c>: the same, and one session is also kept running in the project the owner named (<c>AutoProject</c>): when it ends, the daemon starts another within the same bounds.
 /// </summary>
 public static class ClaudeAutoModes
 {
     public const string Off = "off";
     public const string OnMessage = "on_message";
-    public static readonly IReadOnlyList<string> All = [Off, OnMessage];
+    public const string Always = "always";
+    public static readonly IReadOnlyList<string> All = [Off, OnMessage, Always];
 }
 
 public static class AgentActionErrors
@@ -122,13 +134,22 @@ public static class AgentActionErrors
     public const string InvalidProject = "invalid_project";
     public const string InvalidPermissionMode = "invalid_permission_mode";
     public const string InvalidSessionRef = "invalid_session_ref";
-    public const string InvalidPrompt = "invalid_prompt";
     public const string NoTestCommand = "no_test_command";
     public const string InvalidAutoMode = "invalid_auto_mode";
     public const string InvalidPlugin = "invalid_plugin";
     public const string InvalidSetting = "invalid_setting";
     public const string ActionBusy = "action_busy";
     public const string NotStartedHere = "claude_not_started_here";
+    public const string InvalidFirstPrompt = "invalid_first_prompt";
+
+    /// <summary>Another start of this machine is still open (queued or running its start): wait for it, then ask again.</summary>
+    public const string ClaudeStartPending = "claude_start_pending";
+
+    /// <summary>The automatic mode "always" needs a project this machine has reported and Claude Code does not refuse.</summary>
+    public const string InvalidAutoProject = "invalid_auto_project";
+
+    /// <summary>The machine's agent read Claude Code's own trust record and the folder is not in it: a start would only be refused there (ADR-0014 P2).</summary>
+    public const string FolderNotTrusted = "claude_folder_not_trusted";
 }
 
 /// <summary>

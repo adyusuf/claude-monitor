@@ -119,7 +119,11 @@ not there yet); the transcript is read later, so nothing of it is lost. **Uninst
 unknown shape it falls back to the data directory and the settings alone). The old local plugin (`aipod install`, `monitor-agent-local`) reports
 every event a second time if it stays enabled: `/monitor-agent:connect` removes it, and the bootstrap says so while it is there.
 
-A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
+The plugin is now called `aipod` (ADR-0013 section 1): `claude plugin marketplace add <site>/downloads/aipod-marketplace.json`, `claude plugin install aipod@aipod-releases`,
+then `/aipod:connect` (which removes the old `monitor-agent` plugin; the skills are `/aipod:connect|status|disconnect`). The `monitor-agent` plugin stays as a bridge: it goes
+quiet once `aipod` is enabled, and `aipod` goes quiet while a pre-bridge (0.5.0 or older) `monitor-agent` is still enabled, so no event is reported twice. Everything above applies to either name.
+
+A maintainer renders the plugin's manifest, hooks and MCP file (for both plugins) from the one list of hooks in the agent with
 `dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
 plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
@@ -214,7 +218,7 @@ from a normal terminal, then check that `aipod status` and `monitor_status` in a
   as root or administrator) logs in first (approve the code on the web), copies the binary into the agent home and then starts the agent at your login: a
   LaunchAgent that runs an application bundle on macOS (no window, no Dock icon), a logon task that runs a windowless copy of the program on Windows, a
   `systemd --user` unit on Linux (without `loginctl enable-linger` it runs only while you are logged in; the installer says so). `uninstall --standalone`
-  removes the autostart and keeps the data. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
+  removes the autostart (under the aipod names `aipod.agent.user`, `aipod.service`, `AipodAgent`, `Aipod.app`, or the old ones, `com.claudemonitor.agent.user`, `claude-monitor-agent.service`, `ClaudeMonitorAgent`, `ClaudeMonitorAgent.app`) and keeps the data; running the install again on a machine that has the old names replaces them. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
   seconds. It reports `claude=none`; another machine's ask to it is refused (`no_claude`), but it is a normal target for runs. From it, `aipod machines`,
   `machine <x>`, `metrics <x>`, `alerts`, `jobs`, `job-run <id>`, `run --machine <x> (--script <file> --interpreter <i> | --argv ...)`, `result <id> --wait 30` and
   `ask --machine <x> "<question>"` reach the other machines without the web; an approval is still the owner's, on the web.
@@ -283,6 +287,13 @@ down, per OS:
 | Exec policy file (admin-owned) | `/etc/cm-agent/exec.json` | `/Library/Application Support/ClaudeMonitor/exec.json` | `%ProgramFiles%\ClaudeMonitor\exec.json` |
 | Unit / definition | `/etc/systemd/system/cm-agent.service` | `/Library/LaunchDaemons/com.claudemonitor.agent.plist` | service `aipod` (`sc query aipod`) |
 | Login code (while not connected) | `<home>/login-code.txt`, `journalctl -u aipod` | `<home>/login-code.txt` | `<home>\login-code.txt` |
+
+**The names (ADR-0013, tier 2).** The table above is what services installed before the rename have. A fresh `install --service` now uses the aipod names: service and unit `aipod` (`/etc/systemd/system/aipod.service`), accounts `aipod` / `_aipod` / `NT SERVICE\aipod`,
+launchd label `aipod.agent` (`/Library/LaunchDaemons/aipod.agent.plist`), folders `/usr/local/lib/aipod`, `/var/lib/aipod`, `/Library/Application Support/aipod/{bin,home}`, `%ProgramFiles%\aipod`, `%ProgramData%\aipod\service`, the exec policy in
+`/etc/aipod/exec.json`, `/Library/Application Support/aipod/exec.json`, `%ProgramFiles%\aipod\exec.json`, and the sudoers file `aipod-run`; the binary file inside keeps the name `cm-agent`. A service that already exists keeps its old names when it is
+upgraded with `install --service`, and `sudo aipod service migrate` moves it: `--dry-run` shows the plan; the real run stops the old service, copies its home and policy, installs the new service, waits up to 90 s for it to reach the server (Linux, macOS) and only then **disables** the old
+one, which stays for 7 days; `--undo` goes back (the data the new service kept up comes back too), `--finish` removes the old service, account, folders, policy and sudoers file (before 7 days only with `--now`). A failure before the disable puts everything back and starts the old service. On
+**Windows** the tokens are encrypted for the old service account and the new account cannot read them: the machine logs in again and an administrator approves a code. The agent reads the exec policy from the new place first and the old one second.
 
 The service units set `CM_SERVICE=1`, `CM_AGENT_HOME=<service home>` and the single-file extraction folder
 (`DOTNET_BUNDLE_EXTRACT_BASE_DIR=<home>/.net`); nobody sets them by hand. `aipod uninstall --service` removes the
@@ -400,6 +411,9 @@ release, backups, restore drill, rollback) is [docs/deploy-windows.md](docs/depl
 
 `.env.example` lists every variable with its default and what it is for. The API reads them only in
 `src/ClaudeMonitor.Api/Config/ApiConfig.cs`.
+
+The agent and the tray speak the operating system's language when it is English, Turkish or German, and English otherwise. `AIPOD_LANG=en|tr|de` overrides
+that for one run or one machine (for example `AIPOD_LANG=de aipod status`); it is read by the agent and the tray only, never by the API (ADR-0014, Part A).
 
 ## Secret and token inventory
 

@@ -106,7 +106,7 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   (the version and the SHA-256 of every zip; the digests of one version accumulate across environments, `scripts/write_plugin_pins.py <dir> <version> --replace` starts over).
   **Commit that file with the release**: the plugin's bootstrap installs exactly the zips it pins and refuses
   anything else, so a plugin published before its pins names no build and installs nothing. Order: build -> commit the pins -> promote; the zips must be in the
-  environment's `/downloads` before the plugin version that pins them is published. To serve the plugin from the environment's own site instead of the repository, set `AGENT_SITE_URL=https://<site>` for `build-agent.sh` (it writes `marketplace.json` and `monitor-agent-plugin.zip` into `/downloads`, ADR-0007 section 9.2) and `VITE_PLUGIN_FROM_SERVER=1` for the web build. Otherwise set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
+  environment's `/downloads` before the plugin version that pins them is published. To serve the plugin from the environment's own site instead of the repository, set `AGENT_SITE_URL=https://<site>` for `build-agent.sh` (it writes `aipod-marketplace.json` + `aipod-plugin.zip` and the old pair `marketplace.json` + `monitor-agent-plugin.zip` into `/downloads`, ADR-0007 section 9.2 and ADR-0013 section 1; the pins file is written for both plugin folders) and `VITE_PLUGIN_FROM_SERVER=1` for the web build. **Order (ADR-0013 section 1): publish the `/downloads` that hold `aipod-marketplace.json` and `aipod-plugin.zip` before the web build with `VITE_PLUGIN_FROM_SERVER=1` goes out, because the "Get the agent" page now shows the `aipod` commands (the git marketplace path still shows the old plugin: that catalog lists only it).** Otherwise set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
   (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `aipod plugin-files .` and commit the result (a test fails otherwise).
   `--push inbox` pushes through the session's inbox (no start-up flag); `--push on` and `--push channel` are the old channel, unchanged.
 
@@ -134,3 +134,10 @@ The agent builds can be published on a download host instead of each server's ow
 
 There is no feature flag yet. A switch ships as a configuration value read by the tier's one configuration
 module (global #2).
+
+## CI, gates and test runs paused (maintainer, 19/10/2026)
+
+First dev and test, then everything: `.github/workflows/ci.yml` and `e2e.yml` now start only by hand (`workflow_dispatch`; the nightly e2e run is gone too).
+`.claude/adyusuf.json` sets `run_before_push` (`unit`, `e2e`) to no for dev, test and prod, so merges carry `Gate-Waived:` trailers (global rule #34) and the report before a prod merge
+lists them; no session runs `scripts/quick-check.sh` or the test suites while it stands. Coverage (#29) is not met by this: it is only not measured. To turn it back on: restore the triggers
+(see the comments in both workflow files) and run `adyusuf_config.py unset --project` for the keys in `.claude/adyusuf.json`.

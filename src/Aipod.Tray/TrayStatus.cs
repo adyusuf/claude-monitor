@@ -15,7 +15,7 @@ public sealed record TrayStatus(string Version, bool Connected, bool DaemonRunni
     /// <summary>The text under the pointer: short enough for the Windows limit of 127 characters, with the version, the state and the update.</summary>
     public string Tooltip()
     {
-        var text = $"aipod {Version} - {Headline}" + (UpdateAvailable is { } update ? $"; update {update} available" : "");
+        var text = Strings.T(Msg.TrayTooltip, Version, Headline) + (UpdateAvailable is { } update ? Strings.T(Msg.TrayTooltipUpdate, update) : "");
         return text.Length <= 120 ? text : text[..119] + "…";
     }
 }
@@ -45,7 +45,7 @@ public sealed class StatusReader(AgentConfig config, TimeProvider clock)
         var running = Directory.Exists(config.Home) && PushStatus.DaemonRunning(config);
         var update = UpdateState.Load(config).Available;
         var server = identity?.Server;
-        if (!File.Exists(config.DatabasePath)) return Make(AgentConfig.Version, connected, running, server, connected ? "waiting for the agent to start" : "not connected", [], update, 0, 0);
+        if (!File.Exists(config.DatabasePath)) return Make(AgentConfig.Version, connected, running, server, Strings.T(connected ? Msg.TrayHlWaiting : Msg.TrayHlNotConnected), [], update, 0, 0);
         try
         {
             using var store = new LocalStore(config.DatabasePath);
@@ -56,7 +56,7 @@ public sealed class StatusReader(AgentConfig config, TimeProvider clock)
         }
         catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException)
         {
-            return Make(AgentConfig.Version, connected, running, server, $"cannot read the agent's status ({e.GetType().Name})", [], update, 0, 0);
+            return Make(AgentConfig.Version, connected, running, server, Strings.T(Msg.TrayHlCannotRead, e.GetType().Name), [], update, 0, 0);
         }
     }
 
@@ -65,18 +65,18 @@ public sealed class StatusReader(AgentConfig config, TimeProvider clock)
 
     private static string Headline(LocalStore store, bool connected, bool running)
     {
-        if (store.Get(AuthRefusal.ReasonKey) is { Length: > 0 } && !connected) return "disconnected: the API refused this agent (see the window)";
-        if (!connected) return "not connected";
-        if (!running) return "connected, the agent is not running";
+        if (store.Get(AuthRefusal.ReasonKey) is { Length: > 0 } && !connected) return Strings.T(Msg.TrayHlRefused);
+        if (!connected) return Strings.T(Msg.TrayHlNotConnected);
+        if (!running) return Strings.T(Msg.TrayHlNotRunning);
         return store.Get(PushStatus.StreamStateKey) switch
         {
-            PushStatus.Connected => "connected",
-            PushStatus.Reconnecting => "reconnecting to the server",
-            _ => "connected, stream not open yet",
+            PushStatus.Connected => Strings.T(Msg.TrayHlConnected),
+            PushStatus.Reconnecting => Strings.T(Msg.TrayHlReconnecting),
+            _ => Strings.T(Msg.TrayHlStreamNotOpen),
         };
     }
 
     /// <summary>"3 s", "5 min": how old a reading is, for the window's footer.</summary>
     public static string Age(TimeSpan span) =>
-        span.TotalSeconds < 120 ? string.Create(CultureInfo.InvariantCulture, $"{Math.Max(0, (int)span.TotalSeconds)} s") : string.Create(CultureInfo.InvariantCulture, $"{(int)span.TotalMinutes} min");
+        span.TotalSeconds < 120 ? Strings.T(Msg.TrayAgeSeconds, Math.Max(0, (int)span.TotalSeconds)) : Strings.T(Msg.TrayAgeMinutes, (int)span.TotalMinutes);
 }

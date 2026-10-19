@@ -22,6 +22,7 @@ const q = (params: Record<string, string | number | boolean | undefined | null>)
 /** Every API call the web makes, one function each. */
 export const api = {
   me: () => request<Me>("GET", "/me"),
+  setMyLanguage: (language: string) => request<void>("PUT", "/me/language", { language }),
   providers: () => request<{ available: string[] }>("GET", "/auth/providers"),
   register: (email: string, password: string, displayName: string) =>
     request<void>("POST", "/auth/register", { email, password, displayName }),
@@ -76,10 +77,11 @@ export const api = {
   setAgentServices: (agentId: string, share: boolean, code?: string) => request<AgentServicesView>("PUT", `/agents/${agentId}/services`, { share, code }),
   setAgentAsks: (agentId: string, accept: boolean, code?: string) => request<AgentAsksView>("PUT", `/agents/${agentId}/asks`, { accept, code }),
   agentActions: (agentId: string) => request<AgentActionView[]>("GET", `/agents/${agentId}/actions`),
-  requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string, extra?: { projectKey?: string; permissionMode?: ClaudePermissionMode; sessionRef?: string; prompt?: string; target?: string; value?: string }) =>
+  requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string, extra?: { projectKey?: string; permissionMode?: ClaudePermissionMode; sessionRef?: string; firstPrompt?: string; target?: string; value?: string }) =>
     request<AgentActionView>("POST", `/agents/${agentId}/actions`, { kind, code, ...extra }),
   startProjectTest: (agentId: string, projectKey: string) => request<{ id: string; status: string }>("POST", `/agents/${agentId}/test-runs`, { projectKey }),
-  setAgentClaude: (agentId: string, accept: boolean, code?: string, autoMode?: ClaudeAutoMode) => request<AgentClaudeView>("PUT", `/agents/${agentId}/claude`, { accept, code, ...(autoMode ? { autoMode } : {}) }),
+  setAgentClaude: (agentId: string, accept: boolean, code?: string, autoMode?: ClaudeAutoMode, autoProject?: string) =>
+    request<AgentClaudeView>("PUT", `/agents/${agentId}/claude`, { accept, code, autoMode, autoProject }),
   agentAsks: (agentId: string) => request<AskView[]>("GET", `/agents/${agentId}/asks`),
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>

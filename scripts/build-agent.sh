@@ -12,7 +12,7 @@
 # Windows and Linux builds are not signed (ADR-0002, open item: the signing route; ADR-0005): an admin verifies the
 # SHA-256 in SHA256SUMS before a service upgrade (docs/release.md). Single file, never compressed (see the csproj).
 #
-# The plugin's pins (ADR-0007): the SHA-256 of every zip is written to plugin/monitor-agent/agent-release.txt for the release commit.
+# The plugin's pins (ADR-0007): the SHA-256 of every zip is written to plugin/aipod/agent-release.txt and plugin/monitor-agent/agent-release.txt for the release commit.
 #
 # Self-update (ADR-0004): AGENT_UPDATE_CHANNEL=test|prod builds the channel's public key (deploy/update-keys/<channel>.pub)
 # into the agent and signs a manifest.json for the zips with the channel's PRIVATE key, which lives only in the
@@ -64,7 +64,7 @@ done
 mv "$work/SHA256SUMS" "$out/SHA256SUMS"
 rm -f "$out/manifest.json"
 version="$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' "$project/ClaudeMonitor.Agent.csproj" | head -1)"
-# The Claude Code plugin pins these zips by SHA-256 (ADR-0007): commit plugin/monitor-agent/agent-release.txt with the release.
+# The Claude Code plugin pins these zips by SHA-256 (ADR-0007): commit both plugins' agent-release.txt files with the release.
 python3 "$root/scripts/write_plugin_pins.py" "$out" "$version"
 if [ -n "$channel" ]; then
   python3 "$root/scripts/sign_manifest.py" sign --channel "$channel" --downloads "$out" --version "$version" \

@@ -5,15 +5,16 @@
 namespace ClaudeMonitor.Api.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class ActionFirstPrompt : Migration
+    public partial class PluginId : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "prompt",
-                table: "agent_actions",
-                type: "text",
+                name: "plugin_id",
+                table: "agents",
+                type: "character varying(130)",
+                maxLength: 130,
                 nullable: true);
         }
 
@@ -21,8 +22,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "prompt",
-                table: "agent_actions");
+                name: "plugin_id",
+                table: "agents");
         }
     }
 }

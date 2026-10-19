@@ -12,6 +12,8 @@ export interface Me {
   providers: string[];
   workspaces: MeWorkspace[];
   mfaEnabled?: boolean;
+  /** The language kept on the account (ADR-0014 Part A): the mails to the person follow it. */
+  language?: string | null;
 }
 
 export type AgentUpdateMode = "off" | "check" | "on";

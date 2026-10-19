@@ -63,7 +63,7 @@ public static partial class StandaloneUnits
         b.AppendLine("""<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">""");
         b.AppendLine("""<plist version="1.0">""");
         b.AppendLine("<dict>");
-        b.AppendLine($"  <key>Label</key><string>{Esc(StandaloneLayout.Label)}</string>");
+        b.AppendLine($"  <key>Label</key><string>{Esc(l.Names.Label)}</string>");
         b.AppendLine("  <key>ProgramArguments</key>");
         b.AppendLine($"  <array><string>{Esc(l.AutostartBinary)}</string><string>daemon</string></array>");
         b.AppendLine("  <key>EnvironmentVariables</key>");
@@ -81,15 +81,16 @@ public static partial class StandaloneUnits
     }
 
     /// <summary>The bundle's Info.plist: an agent application with no Dock icon and no menu (LSUIElement).</summary>
-    public static string RenderInfoPlist(string version)
+    public static string RenderInfoPlist(string version, string bundleId = "com.claudemonitor.agent.app")
     {
         ArgumentException.ThrowIfNullOrEmpty(version);
+        ArgumentException.ThrowIfNullOrEmpty(bundleId);
         var b = new StringBuilder();
         b.AppendLine("""<?xml version="1.0" encoding="UTF-8"?>""");
         b.AppendLine("""<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">""");
         b.AppendLine("""<plist version="1.0">""");
         b.AppendLine("<dict>");
-        b.AppendLine("  <key>CFBundleIdentifier</key><string>com.claudemonitor.agent.app</string>");
+        b.AppendLine($"  <key>CFBundleIdentifier</key><string>{Esc(bundleId)}</string>");
         b.AppendLine("  <key>CFBundleName</key><string>aipod</string>");
         b.AppendLine("  <key>CFBundleDisplayName</key><string>aipod</string>");
         b.AppendLine("  <key>CFBundleExecutable</key><string>cm-agent</string>");
