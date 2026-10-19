@@ -6,9 +6,11 @@
 name: CI
 
 on:
+  # dev and test are switched off for now (maintainer, 19/10/2026): CI runs on prod, and on dev or test only when started by hand.
   push:
-    branches: [dev, test, prod]
+    branches: [prod]
   pull_request:
+    branches: [prod]
   workflow_dispatch:
 
 permissions:
