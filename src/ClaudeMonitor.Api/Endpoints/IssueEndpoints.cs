@@ -25,7 +25,7 @@ public static class IssueEndpoints
     }
 
     private static async Task<IResult> List(Guid id, string? q, string? type, string? status, Guid? assignee, Guid? application, Guid? component,
-        Guid? parent, Guid? release, string? scope, bool? archived, string? cursor, int? limit, HttpContext http, MonitorDb db, ApiConfig config)
+        Guid? parent, Guid? release, Guid? sprint, string? scope, bool? archived, string? cursor, int? limit, HttpContext http, MonitorDb db, ApiConfig config)
     {
         if (await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
         var take = Http.Limit(limit, config);
@@ -39,7 +39,8 @@ public static class IssueEndpoints
         if (component is { } c) query = query.Where(i => i.ComponentId == c);
         if (parent is { } p) query = query.Where(i => i.ParentId == p);
         if (release is { } r) query = query.Where(i => i.ReleaseId == r);
-        if (scope == "backlog") query = query.Where(i => i.Status == IssueStatuses.Backlog || i.Status == IssueStatuses.Ready);
+        if (sprint is { } sp) query = query.Where(i => i.SprintId == sp);
+        if (scope == "backlog") query = query.Where(i => i.SprintId == null && (i.Status == IssueStatuses.Backlog || i.Status == IssueStatuses.Ready));
         if (PositionCursor.Parse(cursor) is { } after)
         {
             query = query.Where(i => i.Position > after.Position || (i.Position == after.Position && i.Id.CompareTo(after.Id) > 0));
@@ -178,7 +179,7 @@ public static class IssueEndpoints
         return result;
     }
 
-    private static Task<int> LockProjectAsync(MonitorDb db, Guid projectId, CancellationToken ct) =>
+    internal static Task<int> LockProjectAsync(MonitorDb db, Guid projectId, CancellationToken ct) =>
         db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM projects WHERE id = {projectId} FOR UPDATE", ct);
 
     private static void Fill(Issue i, IssueInput r, ManagedProject project, string type, Guid userId, DateTimeOffset now)

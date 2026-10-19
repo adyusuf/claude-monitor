@@ -55,6 +55,8 @@ export interface IssueSummary {
   archived: boolean;
   createdAt: string;
   updatedAt: string;
+  /** The sprint the issue is in, if any. */
+  sprintId: string | null;
 }
 
 export interface IssueLinkView { linkId: string; issueId: string; number: number; title: string; status: IssueStatus }
@@ -85,6 +87,7 @@ export type IssueQuery = {
   component?: string;
   parent?: string;
   release?: string;
+  sprint?: string;
   scope?: "backlog";
   archived?: boolean;
   cursor?: string | null;

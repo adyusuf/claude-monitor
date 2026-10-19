@@ -8,7 +8,7 @@ internal static class IssueViews
 {
     public static IssueSummary Summary(Issue i, string? assigneeName) =>
         new(i.Id, i.ProjectId, i.ApplicationId, i.Number, i.Title, i.Type, i.Priority, i.Estimate, i.Status, i.AssigneeUserId, assigneeName,
-            i.ParentId, i.ComponentId, i.ReleaseId, i.Position, i.ArchivedAt is not null, i.CreatedAt, i.UpdatedAt);
+            i.ParentId, i.ComponentId, i.ReleaseId, i.Position, i.ArchivedAt is not null, i.CreatedAt, i.UpdatedAt, i.SprintId);
 
     public static async Task<Dictionary<Guid, string>> NamesAsync(MonitorDb db, IEnumerable<Guid?> userIds, CancellationToken ct)
     {

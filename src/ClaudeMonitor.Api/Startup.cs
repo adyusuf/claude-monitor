@@ -138,6 +138,8 @@ public static class Startup
         IssueEndpoints.Map(api);
         IssueLinkEndpoints.Map(api);
         IssueEvidenceEndpoints.Map(api);
+        SprintEndpoints.Map(api);
+        SprintIssueEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)

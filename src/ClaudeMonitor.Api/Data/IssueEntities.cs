@@ -70,6 +70,8 @@ public sealed class Issue
     public Guid? ParentId { get; set; }
     public Guid? ComponentId { get; set; }
     public Guid? ReleaseId { get; set; }
+    /// <summary>The sprint the issue is planned into; null while it is in the backlog.</summary>
+    public Guid? SprintId { get; set; }
     public string? Description { get; set; }
     /// <summary>jsonb: <c>[{given, when, then}]</c>, at most 30.</summary>
     public string? AcceptanceCriteria { get; set; }

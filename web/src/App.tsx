@@ -15,6 +15,8 @@ import { MembersPage } from "./pages/MembersPage";
 import { MfaPage } from "./pages/Mfa";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { SprintPage } from "./pages/SprintPage";
+import { SprintsPage } from "./pages/SprintsPage";
 import { SessionPage } from "./pages/SessionPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { NewWorkspacePage, WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage";
@@ -55,6 +57,9 @@ export function App() {
         <Route path="/w/:ws/projects/:projectId/backlog" element={<BacklogPage />} />
         <Route path="/w/:ws/projects/:projectId/applications/:appId/backlog" element={<BacklogPage />} />
         <Route path="/w/:ws/projects/:projectId/issues/:id" element={<IssuePage />} />
+        <Route path="/w/:ws/projects/:projectId/sprints" element={<SprintsPage />} />
+        <Route path="/w/:ws/projects/:projectId/applications/:appId/sprints" element={<SprintsPage />} />
+        <Route path="/w/:ws/projects/:projectId/sprints/:id" element={<SprintPage />} />
         <Route path="/w/:ws/sessions" element={<SessionsPage />} />
         <Route path="/w/:ws/sessions/:id" element={<SessionPage />} />
         <Route path="/w/:ws/machines" element={<MachinesPage />} />

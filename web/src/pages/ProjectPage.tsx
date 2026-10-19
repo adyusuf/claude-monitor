@@ -6,6 +6,7 @@ import type { ProjectInput, ProjectView } from "../api/typesProjects";
 import { Button, Card, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { draftOfProject } from "../lib/projectForm";
+import { ProjectActiveSprints } from "./ProjectActiveSprints";
 import { ProjectApplications } from "./ProjectApplications";
 import { ProjectDefinition } from "./ProjectDefinition";
 import { ProjectForm } from "./ProjectForm";
@@ -70,6 +71,8 @@ export function ProjectPage() {
         <h1>{project.name} {archived ? <span className="badge warn">{t("projects.archived")}</span> : <span className="badge ok">{t("projects.active")}</span>}</h1>
         <div className="row-actions">
           <Link className="btn btn-ghost" to={`/w/${ws}/projects/${id}/backlog`}>{t("issues.backlog")}</Link>
+          <Link className="btn btn-ghost" to={`/w/${ws}/projects/${id}/sprints`}>{t("sprints.title")}</Link>
+          {access.canEditApplications && !archived ? <Link className="btn btn-ghost" to={`/w/${ws}/projects/${id}/sprints?new=1`}>{t("sprints.startSprint")}</Link> : null}
           {access.canEdit && !archived && !editing ? <Button variant="ghost" onClick={() => setEditing(true)}>{t("projects.edit")}</Button> : null}
           {access.canArchive && !archived ? <Button variant="ghost" onClick={archive}>{t("projects.archive")}</Button> : null}
         </div>
@@ -89,6 +92,7 @@ export function ProjectPage() {
             onSubmit={save} onCancel={() => setEditing(false)} />
         </Card>
       ) : <ProjectDefinition project={project} />}
+      <ProjectActiveSprints ws={ws} projectId={id} unit={project.estimationUnit} />
       <ProjectMembers projectId={id} workspaceMembers={members} canEdit={access.canEdit && !archived} />
       <ProjectApplications ws={ws} projectId={id} canEdit={access.canEditApplications && !archived} workspaceMembers={members} />
     </div>

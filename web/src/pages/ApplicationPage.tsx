@@ -70,6 +70,8 @@ export function ApplicationPage() {
         <h1>{app.name} <span className="badge">{t(`projects.kinds.${app.kind}`)}</span> {archived ? <span className="badge warn">{t("projects.archived")}</span> : null}</h1>
         <div className="row-actions">
           <Link className="btn btn-ghost" to={`/w/${ws}/projects/${projectId}/applications/${id}/backlog`}>{t("issues.backlog")}</Link>
+          <Link className="btn btn-ghost" to={`/w/${ws}/projects/${projectId}/applications/${id}/sprints`}>{t("sprints.title")}</Link>
+          {canEdit ? <Link className="btn btn-ghost" to={`/w/${ws}/projects/${projectId}/applications/${id}/sprints?new=1`}>{t("sprints.startSprint")}</Link> : null}
           {canEdit && !editing ? <Button variant="ghost" onClick={() => setEditing(true)}>{t("projects.edit")}</Button> : null}
           {canEdit ? <Button variant="ghost" onClick={archive}>{t("projects.archive")}</Button> : null}
         </div>

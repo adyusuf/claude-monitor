@@ -18,6 +18,7 @@ const serve = (over: Parameters<typeof mockApi>[0] = {}) => mockApi({
   "GET /projects/p1": { body: project() },
   "GET /workspaces/w1/members": { body: workspaceMembers },
   "GET /projects/p1/members": { body: [projectMember()] },
+  "GET /projects/p1/sprints": { body: { items: [], next: null } },
   "GET /projects/p1/applications": apps(appSummary(), appSummary({ id: "a2", name: "Mobile app", kind: "mobile", techStack: [], status: "archived" })),
   ...over,
 });
