@@ -121,3 +121,22 @@ export interface CodeLinkView {
   source: CodeLinkSource;
   createdAt: string;
 }
+
+/** A remote run linked to an issue (ADR-0011): its outcome only, never the command or the output. Newest run first. */
+export interface IssueRunView {
+  runId: string;
+  kind: string | null;
+  status: string;
+  exitCode: number | null;
+  testsPassed: number | null;
+  testsFailed: number | null;
+  testsSkipped: number | null;
+  targetHostname: string;
+  projectKey: string | null;
+  createdAt: string;
+  endedAt: string | null;
+  linkedAt: string;
+}
+
+/** An issue a run is linked to, as the run list shows it. */
+export interface RunIssueView { issueId: string; projectId: string; number: number; title: string; status: IssueStatus }

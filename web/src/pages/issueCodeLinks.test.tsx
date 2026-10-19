@@ -18,6 +18,7 @@ const serve = (over: Parameters<typeof mockApi>[0] = {}) => mockApi({
   "GET /projects/p1/issues": (c) => ({ body: { items: c.path.includes("q=") ? found : [], next: null } }),
   "GET /issues/i1/test-cases": { body: [] },
   "GET /issues/i1/code-links": { body: [] },
+  "GET /issues/i1/runs": { body: [] },
   ...over,
 });
 const open = async () => {

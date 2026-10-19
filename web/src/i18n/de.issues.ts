@@ -32,4 +32,12 @@ export const deIssues: Dictionary["issues"] = {
   codeLinks: "Pull Requests und Commits", noCodeLinks: "Keine Pull Requests oder Commits verknüpft.", codeKind: "Art", codeUrl: "Adresse (https)",
   codeTitle: "Titel (optional)", addCodeLink: "Hinzufügen", automatic: "Automatisch",
   codeKinds: { pr: "Pull Request", commit: "Commit" },
+  runs: "Testläufe", noRuns: "Noch keine Läufe angehängt.", attachRun: "Lauf anhängen", runToAttach: "Anzuhängender Lauf", attach: "Anhängen",
+  noRunsToAttach: "Es gibt keine neuen, beendeten Läufe zum Anhängen.", runTests: "{passed} bestanden, {failed} fehlgeschlagen, {skipped} übersprungen",
+  runKinds: { test: "Test", build: "Build", deploy: "Deployment", other: "Sonstiges" }, runEnded: "Beendet {when}", runNotEnded: "Nicht beendet",
+  runDuplicate: "Dieser Lauf ist diesem Vorgang bereits angehängt.",
+  runIssues: "Vorgänge", runIssuesNone: "Dieser Lauf ist mit keinem Vorgang verknüpft.", runLinkTo: "Mit einem Vorgang verknüpfen…", runProject: "Projekt", runLinkAction: "Verknüpfen",
+  runCreateBug: "Fehler anlegen", runBugTitle: "Titel des Fehlers", runBugTitleTests: "Testlauf auf {host} fehlgeschlagen: {n} fehlgeschlagen",
+  runBugTitleExit: "Lauf auf {host} fehlgeschlagen: Exit-Code {code}", runNoBugProject: "Kein Projekt dieses Arbeitsbereichs verwendet Fehler.", runNoProjects: "Es gibt noch keine Projekte.",
+  runCreateAction: "Fehler erstellen", runBugNote: "Der Fehler enthält nur diesen Titel: Befehl und Ausgabe des Laufs werden nicht kopiert.",
 };

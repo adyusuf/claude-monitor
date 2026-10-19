@@ -88,6 +88,7 @@ export const tr: Dictionary = {
     sprint_active: "Bu kapsamda başka bir sprint zaten aktif. Önce onu kapatın.", dates_required: "Sprinti başlatmadan önce başlangıç ve bitiş tarihlerini girin.",
     invalid_sprint: "Aynı kapsamdan planlanmış bir sprint seçin.", wrong_scope: "Bu sprint bir uygulamaya ait: yalnızca o uygulamanın işlerini alır.",
     closed: "Bu sprint kapandı.", not_planned: "Yalnızca planlanmış bir sprint silinebilir.",
+    invalid_run: "Bu çalışma alanından bir çalıştırma seçin.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
   time: { now: "şimdi", s: "sn", m: "dk", h: "sa", d: "g" },

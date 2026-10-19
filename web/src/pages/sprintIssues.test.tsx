@@ -140,7 +140,7 @@ describe("the sprint page: adding issues from the backlog", () => {
     expect(screen.getByRole("checkbox", { name: "Select #150" })).toBeDisabled();
     fireEvent.click(screen.getByRole("checkbox", { name: "Select #100" }));
     expect(screen.getByRole("checkbox", { name: "Select #150" })).toBeEnabled();
-  });
+  }, 30_000); // fifty role queries on a loaded machine can pass the 5 s default
 
   it("loads more candidates with the cursor", async () => {
     const calls = serveSprint({

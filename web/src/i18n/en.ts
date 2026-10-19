@@ -87,6 +87,7 @@ export const en = {
     sprint_active: "Another sprint of this scope is already active. Close it first.", dates_required: "Set the start and end dates before starting the sprint.",
     invalid_sprint: "Pick a planned sprint of the same scope.", wrong_scope: "This sprint belongs to an application: it takes only that application's issues.",
     closed: "This sprint is closed.", not_planned: "Only a planned sprint can be deleted.",
+    invalid_run: "Pick a run of this workspace.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", s: "s", m: "m", h: "h", d: "d" },

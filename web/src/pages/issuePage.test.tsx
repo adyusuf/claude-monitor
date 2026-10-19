@@ -22,6 +22,7 @@ const serve = (over: Parameters<typeof mockApi>[0] = {}) => mockApi({
   "GET /projects/p1/issues": { body: { items: epics, next: null } },
   "GET /issues/i1/test-cases": { body: [] },
   "GET /issues/i1/code-links": { body: [] },
+  "GET /issues/i1/runs": { body: [] },
   "GET /applications/a1/components": { body: [component(), component({ id: "c2", name: "Checkout form" })] },
   "GET /applications/a1/releases": { body: [release()] },
   "GET /applications/a2/components": { body: [] },
