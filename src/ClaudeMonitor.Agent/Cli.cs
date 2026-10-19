@@ -78,7 +78,7 @@ public static partial class Cli
         switch (args.FirstOrDefault())
         {
             case "hook" when args.Length > 2 && args[1] == SessionContext.HookEvent && args[2] == SessionContext.ContextOption:
-                return await SessionContext.RunAsync(config, stdout, stderr, clock); // the machines block, no network, exit 0 (ADR-0008)
+                return await SessionContext.RunAsync(config, stdout, stderr, clock, stdin); // the machines block and the prompts waiting for this session, no network, exit 0 (ADR-0008)
             case "hook" when args.Length > 1:
                 return await HookAsync(args[1], config, stdin, stdout, stderr, clock, log);
             case "mcp":
