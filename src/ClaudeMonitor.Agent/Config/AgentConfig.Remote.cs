@@ -15,6 +15,11 @@ public sealed partial record AgentConfig
     /// <summary>The most Claude sessions this agent keeps running that were started from the web (ADR-0014).</summary>
     public int ClaudeWorkersMax { get; init; } = 3;
 
+    /// <summary>Automatic mode on_message (ADR-0014 P3): how long an ask waits for an idle session before a worker is started for it, how long a failed start blocks the next, and how many starts an hour may make.</summary>
+    public TimeSpan ClaudeAutoGrace { get; init; } = TimeSpan.FromSeconds(60);
+    public TimeSpan ClaudeAutoBackoff { get; init; } = TimeSpan.FromMinutes(10);
+    public int ClaudeAutoPerHour { get; init; } = 3;
+
     /// <summary>The sessions this agent started from the web and has not stopped (ids and folders, in the user-only home).</summary>
     public string ClaudeWorkersPath => Path.Combine(Home, "claude-workers.json");
 

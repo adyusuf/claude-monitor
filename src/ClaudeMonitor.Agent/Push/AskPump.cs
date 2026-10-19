@@ -18,7 +18,7 @@ namespace ClaudeMonitor.Agent.Push;
 /// API expires it (it is not given up at once). The text is never logged.
 /// </summary>
 public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInboxTransport transport, Func<string, AskStatusUpdate, CancellationToken, Task> report,
-    Func<bool> strictClaim, TimeProvider clock, Func<DateTimeOffset, ISet<int>>? idlePids = null)
+    Func<bool> strictClaim, TimeProvider clock, Func<DateTimeOffset, ISet<int>>? idlePids = null, Func<AskIn, CancellationToken, Task>? unserved = null)
 {
     public const int Attempts = 2;
     public static readonly string[] AcceptingModes = ["default", "plan"];
@@ -39,7 +39,8 @@ public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInbox
                 continue;
             }
 
-            if (await DeliverAsync(ask, config, now, ct)) delivered++; // no idle session now: the ask stays queued for the next pass (or the next session)
+            if (await DeliverAsync(ask, config, now, ct)) delivered++;
+            else if (unserved is not null) await unserved(ask, ct); // no idle session now: the ask stays queued for the next pass (or the next session); automatic mode may start a worker for it
         }
 
         foreach (var ask in store.StaleQueuedAsks(now)) store.CloseAsk(ask.Id);

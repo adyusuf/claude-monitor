@@ -73,6 +73,8 @@ export const deMachines: Dictionary["machines"] = {
     prompt: "Erste Nachricht (optional)",
     promptHint: "Höchstens {max} Zeichen. Die Sitzung erhält sie als Nachricht aus dem Web gekennzeichnet, behandelt sie als Daten und fragt vor einer riskanten Anfrage nach.",
     modes: { manual: "Vor riskanten Schritten fragen (manual)", plan: "Nur planen", acceptEdits: "Dateiänderungen akzeptieren" },
+    autoTitle: "Automatischer Start", autoHint: "Findet eine Anfrage von einer anderen Maschine hier keine freie Claude-Sitzung und nennt ein Projekt, das diese Maschine kennt, darf der Daemon in diesem Projekt eine Hintergrundsitzung starten, damit die Anfrage zugestellt werden kann. Nur der Eigentümer der Maschine kann das einschalten; es wartet eine Minute, startet höchstens drei pro Stunde, nie eine zweite für dasselbe Projekt und nutzt den vorsichtigen manuellen Modus. Dieser Schritt gibt Claude nichts weiter, was die Anfrage sagt.", autoLabel: "Wann eine Sitzung von selbst gestartet wird",
+    auto: { off: "Nie (nur wenn ich auf Start drücke)", on_message: "Wenn eine Anfrage auf eine Sitzung wartet" },
     start: "Im Hintergrund starten", stop: "Stoppen", runningTitle: "Über das Web gestartete Sitzungen", noneRunning: "Keine läuft.",
     done: { saved: "Gespeichert.", started: "Der Agent wurde gebeten, eine Sitzung zu starten; das Ergebnis steht unten.", stopped: "Der Agent wurde gebeten, die Sitzung zu stoppen." },
   },

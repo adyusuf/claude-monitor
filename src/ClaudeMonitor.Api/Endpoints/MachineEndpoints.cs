@@ -119,6 +119,7 @@ public static class MachineEndpoints
         agent.RoleSetBy = null;
         agent.AcceptsAsks = false; // the opt-in belongs to the machine's owner in the workspace they gave it for
         agent.AcceptsClaudeControl = false; // so does the one for starting Claude from the web (ADR-0014)
+        agent.ClaudeAutoMode = ClaudeAutoModes.Off;
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
         // The move and the end of the agent's remote work in its old workspace commit together.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);

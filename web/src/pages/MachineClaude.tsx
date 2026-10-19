@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/endpoints";
-import type { AgentActionView, ClaudePermissionMode, MachineProjectView, MachineView } from "../api/types";
+import type { AgentActionView, ClaudeAutoMode, ClaudePermissionMode, MachineProjectView, MachineView } from "../api/types";
 import { Button, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
@@ -9,6 +9,7 @@ import { versionAtLeast } from "../lib/version";
 import { useCodeGate } from "./useCodeGate";
 
 const MODES: readonly ClaudePermissionMode[] = ["manual", "plan", "acceptEdits"];
+const AUTO_MODES: readonly ClaudeAutoMode[] = ["off", "on_message"];
 /** The environments Claude may be started in from the web (ADR-0014): the machine's class as an admin set it. */
 const ALLOWED_ENVIRONMENTS = ["dev", "test"];
 
@@ -61,6 +62,13 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const set = async (accept: boolean) => {
     setDone(null);
     if (await enable.attempt((code) => api.setAgentClaude(agentId, accept, code).then(() => undefined))) {
+      setDone("saved");
+      onChanged();
+    }
+  };
+  const setAuto = async (autoMode: ClaudeAutoMode) => {
+    setDone(null);
+    if (await enable.attempt((code) => api.setAgentClaude(agentId, true, code, autoMode).then(() => undefined))) {
       setDone("saved");
       onChanged();
     }
@@ -137,6 +145,19 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
               {t("machines.claudeControl.start")}
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {accepting && allowed ? (
+        <div className="stack">
+          <h3>{t("machines.claudeControl.autoTitle")}</h3>
+          <p className="muted small">{t("machines.claudeControl.autoHint")}</p>
+          <label className="stack">
+            <span className="small">{t("machines.claudeControl.autoLabel")}</span>
+            <select value={view.claudeAutoMode ?? "off"} disabled={enable.busy} onChange={(e) => void setAuto(e.target.value as ClaudeAutoMode)}>
+              {AUTO_MODES.map((m) => <option key={m} value={m}>{t(`machines.claudeControl.auto.${m}`)}</option>)}
+            </select>
+          </label>
         </div>
       ) : null}
 

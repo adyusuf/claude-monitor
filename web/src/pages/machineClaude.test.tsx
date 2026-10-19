@@ -99,6 +99,32 @@ describe("the Claude card on the machine page", () => {
     expect(await screen.findByLabelText(en.machines.claudeControl.prompt)).toHaveAttribute("maxlength", String(config.claudePromptMax));
   });
 
+  it("shows the automatic start choice to the owner, off by default, and saves the choice with the switch kept on", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: { agentId: "a1", accepts: true, setAt: null, setBy: null, autoMode: "on_message" } } }, dev);
+    open();
+    const select = await screen.findByLabelText(en.machines.claudeControl.autoLabel);
+    expect(select).toHaveValue("off");
+    expect([...select.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["off", "on_message"]);
+
+    await userEvent.selectOptions(select, "on_message");
+
+    await screen.findByText(en.machines.claudeControl.done.saved);
+    expect(calls.filter((c) => c.method === "PUT" && c.path === "/agents/a1/claude").map((c) => c.body)).toEqual([{ accept: true, autoMode: "on_message" }]);
+  });
+
+  it("shows the chosen automatic mode and hides the choice while starting from the web is off", async () => {
+    api({}, { ...dev, claudeAutoMode: "on_message" });
+    open();
+    expect(await screen.findByLabelText(en.machines.claudeControl.autoLabel)).toHaveValue("on_message");
+  });
+
+  it("offers no automatic start when the switch is off", async () => {
+    api({}, { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: false });
+    open();
+    await screen.findByText(en.machines.claudeControl.off);
+    expect(screen.queryByLabelText(en.machines.claudeControl.autoLabel)).toBeNull();
+  });
+
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
     api({}, dev);
     open();

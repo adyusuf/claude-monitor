@@ -73,6 +73,8 @@ export const trMachines: Dictionary["machines"] = {
     prompt: "İlk mesaj (isteğe bağlı)",
     promptHint: "En çok {max} karakter. Oturum bunu web'den gelen bir mesaj olarak etiketli alır, veri sayar ve riskli bir istekte işlemeden önce sorar.",
     modes: { manual: "Riskli adımlardan önce sor (manual)", plan: "Yalnızca plan", acceptEdits: "Dosya düzenlemelerini kabul et" },
+    autoTitle: "Otomatik başlatma", autoHint: "Başka bir makineden gelen bir soru burada boşta bir Claude oturumu bulamazsa ve bu makinenin bildiği bir projeyi adlandırıyorsa, daemon soru teslim edilebilsin diye o projede arka planda bir oturum başlatabilir. Yalnızca makinenin sahibi açabilir; bir dakika bekler, saatte en çok üç tane başlatır, aynı proje için asla ikinci bir tane başlatmaz ve dikkatli manuel kipi kullanır. Bu adım sorunun söylediği hiçbir şeyi Claude'a vermez.", autoLabel: "Ne zaman kendiliğinden oturum başlatılsın",
+    auto: { off: "Hiçbir zaman (yalnızca ben Başlat'a basınca)", on_message: "Bir soru oturum beklerken" },
     start: "Arka planda başlat", stop: "Durdur", runningTitle: "Web'den başlatılan oturumlar", noneRunning: "Çalışan yok.",
     done: { saved: "Kaydedildi.", started: "Ajandan oturum başlatması istendi; sonuç aşağıda.", stopped: "Ajandan oturumu durdurması istendi." },
   },

@@ -157,7 +157,7 @@ dev and test machines only, at most 3 workers); runs of kind `test | build | dep
 |---|---|---|
 | A | The new-session form on the Claude card (ADR-0014 P2): project from the machine's reported list, permission mode, optional first prompt (wrapped, labelled as from the web, capped, never audited) | decision 3 |
 | B | "Start a test" on the machine page: the project's test command is set at the machine, Podium only picks the project (design below); the existing run approval flow; the result on the same card, with the link to an issue from §6 | decision 9 (made) |
-| C | Automatic mode `on_message` (ADR-0014 P3): backoff after a failed start, a start budget per hour, never a second worker for one project | decision 2 |
+| C | Automatic mode `on_message` (ADR-0014 P3): backoff after a failed start, a start budget per hour, never a second worker for one project. Done on `dev` (19/10/2026) for held asks; web messages to an ended session are not covered | decision 2 (made: owner only) |
 | D | A tool panel per machine: aipod status and update (the existing actions in one card) | decision 8 |
 | E | Claude management (sessions list, plugins, skills, limits) and per-session settings (working mode, branch policy, CI) | decisions 5, 6; needs facts and commands in the agent that do not exist yet |
 
@@ -173,6 +173,7 @@ dev and test machines only, at most 3 workers); runs of kind `test | build | dep
 - *Not done:* a test command chosen or edited from the web; a shell or script test; a schedule (jobs exist for that).
 
 **Decided (maintainer, 19/10/2026).**
+2. **Automatic mode:** only the machine's owner may turn it on.
 1. **Windows:** `claude --bg` has to be tried on the Windows server with the list in ADR-0014 ("Windows: what still has to be tried") before anything in A or C is
    called working there; until then the Claude card is documented as macOS-verified only.
 3. **Permission mode of an unwatched session:** `manual` is the default and the highest offered; `bypassPermissions`, `auto` and `dontAsk` are never offered from Podium.
@@ -180,7 +181,6 @@ dev and test machines only, at most 3 workers); runs of kind `test | build | dep
    Claude's own trust list (no access to `~/.claude.json` for this).
 
 **Still open.**
-2. Who may turn the automatic mode on: the machine's owner only (proposed) or also a workspace admin.
 4. The cost of a started session is the machine owner's Claude plan: accepted, and does the page say so?
 5. The limit view (5-hour, weekly): where the numbers come from. Nothing in aipod reads them today; a source would have to be found and measured first, or the view dropped.
 6. Remote plugin and skill install, and changing a session's settings from Podium: a new attack surface (a command from the web that changes what runs on the machine). Only with
