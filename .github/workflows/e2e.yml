@@ -5,11 +5,10 @@
 # Kept by the maintainer's decision of 17/10/2026 (non-blocking for now). Ask for the verdict with: scripts/ci-status.sh <branch> --workflow e2e
 name: e2e
 
-# The run on a push to test is paused with ci.yml (maintainer, 19/10/2026); to turn it back on, add `push: branches: [test]` here.
+# Paused entirely (maintainer, 19/10/2026): no run on a push and no nightly run, only by hand. To turn it back on, add `push: branches: [test]` and the
+# `schedule: - cron: "17 3 * * *"` (nightly, 03:17 UTC) trigger here.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 3 * * *" # nightly, 03:17 UTC, on the default branch
 
 permissions:
   contents: read
