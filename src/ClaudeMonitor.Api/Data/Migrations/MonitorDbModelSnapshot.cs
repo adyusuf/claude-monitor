@@ -375,6 +375,14 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasDefaultValue("queued")
                         .HasColumnName("status");
 
+                    b.Property<string>("Target")
+                        .HasColumnType("text")
+                        .HasColumnName("target");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("text")
+                        .HasColumnName("value");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
                         .HasColumnName("workspace_id");
@@ -399,7 +407,7 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("agent_actions", t =>
                         {
-                            t.HasCheckConstraint("ck_agent_actions_kind", "kind IN ('restart', 'update_check', 'update', 'status', 'claude_start', 'claude_stop')");
+                            t.HasCheckConstraint("ck_agent_actions_kind", "kind IN ('restart', 'update_check', 'update', 'status', 'claude_start', 'claude_stop', 'plugin_enable', 'plugin_disable', 'plugin_update', 'plugin_install', 'project_setting')");
 
                             t.HasCheckConstraint("ck_agent_actions_status", "status IN ('queued', 'delivered', 'succeeded', 'failed', 'expired')");
                         });

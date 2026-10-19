@@ -46,7 +46,7 @@ export const enMachines = {
     strictHint: "This machine is production or a database: restart and update always need a fresh code from your authenticator app.",
     sent: "Asked: {action}. The agent answers below.", none: "No action asked yet.",
     version: "Version", versionUnknown: "unknown", pod: "AI pod", podServer: "server (runs as a service)", podDesktop: "desktop (runs in a person's session)", exec: "May run", lastSeen: "Last heard",
-    kind: { status: "Status", update_check: "Check for update", update: "Update", restart: "Restart", claude_start: "Start Claude", claude_stop: "Stop Claude" },
+    kind: { status: "Status", update_check: "Check for update", update: "Update", restart: "Restart", claude_start: "Start Claude", claude_stop: "Stop Claude", plugin_enable: "Enable plugin", plugin_disable: "Disable plugin", plugin_update: "Update plugin", plugin_install: "Install plugin", project_setting: "Change project setting" },
     status: { queued: "waiting for the agent", delivered: "the agent has it", succeeded: "done", failed: "failed", expired: "not taken in time" },
   },
   asks: {
@@ -83,6 +83,9 @@ export const enMachines = {
     plugins: "Installed plugins", noPlugins: "No plugin is installed.", skills: "Skills", noSkills: "No skill was found.", skillCount: "{n} skills",
     settings: "Project settings", noSettings: "No project here keeps a working mode or gates.", yes: "yes", no: "no", enabled: "enabled", disabled: "disabled", mode: "mode {mode}",
     off: "The agent reads none of this while the switch is off. Turn it on to see this machine's Claude sessions, plugins, skills and project settings here.", waiting: "Switched on: the agent reports it with its next profile. It appears here in a few minutes.", turnOn: "Show Claude's sessions, plugins and skills", turnOff: "Stop showing them", saved: "Saved.", enableHint: "Turning this on needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
+    enable: "Enable", disable: "Disable", update: "Update", install: "Install", installLabel: "Install a plugin (name@marketplace)",
+    setting: "Setting", value: "Value", apply: "Apply", writesHint: "Changes are asked of the agent and need a recent sign-in. The result shows in the actions list of the aipod card. A setting is written to the project's own files, so commit it yourself. Skills come with plugins: enabling, disabling or installing a plugin is how skills change.", writesOff: "To change plugins or settings from here, switch on starting Claude from the web for this machine (development or test machines only) and keep the agent up to date.",
+    asked: "Asked the agent. The result appears in the actions list of the aipod card.", writeHint: "Changing Claude's setup needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
     unknown: "The agent could not read this.",
   },
   projects: {

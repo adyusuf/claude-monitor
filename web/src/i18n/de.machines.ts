@@ -48,7 +48,7 @@ export const deMachines: Dictionary["machines"] = {
     strictHint: "Diese Maschine ist ein Produktions- oder Datenbankrechner: Neustart und Update brauchen immer einen frischen Code aus Ihrer Authenticator-App.",
     sent: "Angefordert: {action}. Der Agent antwortet unten.", none: "Noch keine Aktion angefordert.",
     version: "Version", versionUnknown: "unbekannt", pod: "AI-Pod", podServer: "Server (läuft als Dienst)", podDesktop: "Desktop (läuft in der Sitzung einer Person)", exec: "Darf ausführen", lastSeen: "Zuletzt gehört",
-    kind: { status: "Status", update_check: "Auf Update prüfen", update: "Aktualisieren", restart: "Neu starten", claude_start: "Claude starten", claude_stop: "Claude stoppen" },
+    kind: { status: "Status", update_check: "Auf Update prüfen", update: "Aktualisieren", restart: "Neu starten", claude_start: "Claude starten", claude_stop: "Claude stoppen", plugin_enable: "Plugin aktivieren", plugin_disable: "Plugin deaktivieren", plugin_update: "Plugin aktualisieren", plugin_install: "Plugin installieren", project_setting: "Projekteinstellung ändern" },
     status: { queued: "wartet auf den Agent", delivered: "der Agent hat sie", succeeded: "erledigt", failed: "fehlgeschlagen", expired: "nicht rechtzeitig übernommen" },
   },
   asks: {
@@ -85,6 +85,9 @@ export const deMachines: Dictionary["machines"] = {
     plugins: "Installierte Plugins", noPlugins: "Kein Plugin installiert.", skills: "Skills", noSkills: "Kein Skill gefunden.", skillCount: "{n} Skills",
     settings: "Projekteinstellungen", noSettings: "Kein Projekt hier hält einen Arbeitsmodus oder Gates.", yes: "ja", no: "nein", enabled: "aktiv", disabled: "deaktiviert", mode: "Modus {mode}",
     off: "Solange der Schalter aus ist, liest der Agent nichts davon. Schalten Sie ihn ein, um die Claude-Sitzungen, Plugins, Skills und Projekteinstellungen dieser Maschine hier zu sehen.", waiting: "Eingeschaltet: Der Agent meldet es mit seinem nächsten Profil. Es erscheint hier in wenigen Minuten.", turnOn: "Claude-Sitzungen, Plugins und Skills anzeigen", turnOff: "Nicht mehr anzeigen", saved: "Gespeichert.", enableHint: "Zum Einschalten ist eine aktuelle Anmeldung nötig: Geben Sie einen Code Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
+    enable: "Aktivieren", disable: "Deaktivieren", update: "Aktualisieren", install: "Installieren", installLabel: "Plugin installieren (name@marketplace)",
+    setting: "Einstellung", value: "Wert", apply: "Anwenden", writesHint: "Änderungen werden beim Agent angefragt und brauchen eine aktuelle Anmeldung. Das Ergebnis erscheint in der Aktionsliste der aipod-Karte. Eine Einstellung wird in die eigenen Dateien des Projekts geschrieben, einchecken müssen Sie selbst. Skills kommen mit Plugins: Plugins zu aktivieren, zu deaktivieren oder zu installieren ändert die Skills.", writesOff: "Um Plugins oder Einstellungen von hier zu ändern, schalten Sie das Starten von Claude über das Web für diese Maschine ein (nur Entwicklungs- und Testmaschinen) und halten Sie den Agent aktuell.",
+    asked: "Beim Agent angefragt. Das Ergebnis erscheint in der Aktionsliste der aipod-Karte.", writeHint: "Claude-Einrichtung zu ändern braucht eine aktuelle Anmeldung: Geben Sie einen Code Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
     unknown: "Der Agent konnte das nicht lesen.",
   },
   projects: {
