@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Api.Remote;
 /// <summary>
 /// What Claude Code has on a machine, as its agent reported it (ADR-0011 §7a, step E): sessions, plugins, skill names and the adyusuf settings of project folders. It is text
 /// from a machine, so it is checked again here: lists are capped, strings are cut and stripped of control characters, ids, words and gate names must fit a closed shape, a mode
-/// is one letter A to E. It is stored as one JSON document, shown to the machine's owner and to admins only, and replaced by every profile (a profile without it leaves the column NULL).
+/// is one letter A to E. It is stored as one JSON document only while the machine owner's switch is on, shown to the owner and to admins only, and replaced by every profile (a profile without it, or a switch that is off, leaves the column NULL).
 /// </summary>
 public static partial class ClaudeInventoryFacts
 {
@@ -28,7 +28,7 @@ public static partial class ClaudeInventoryFacts
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(profile);
-        if (profile.Inventory is not { } inventory)
+        if (!agent.ShareInventory || profile.Inventory is not { } inventory)
         {
             agent.ClaudeInventory = null;
             agent.ClaudeInventoryAt = null;

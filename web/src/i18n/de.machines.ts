@@ -83,6 +83,7 @@ export const deMachines: Dictionary["machines"] = {
     title: "Claude auf dieser Maschine", hint: "Von der Maschine gelesen am {at}: nur Sie und Administratoren sehen das, und nichts davon lässt sich über das Web ändern.", sessions: "Sitzungen", noSessions: "Es läuft keine Claude-Sitzung.", unnamed: "unbenannte Sitzung",
     plugins: "Installierte Plugins", noPlugins: "Kein Plugin installiert.", skills: "Skills", noSkills: "Kein Skill gefunden.", skillCount: "{n} Skills",
     settings: "Projekteinstellungen", noSettings: "Kein Projekt hier hält einen Arbeitsmodus oder Gates.", yes: "ja", no: "nein", enabled: "aktiv", disabled: "deaktiviert", mode: "Modus {mode}",
+    off: "Solange der Schalter aus ist, liest der Agent nichts davon. Schalten Sie ihn ein, um die Claude-Sitzungen, Plugins, Skills und Projekteinstellungen dieser Maschine hier zu sehen.", waiting: "Eingeschaltet: Der Agent meldet es mit seinem nächsten Profil. Es erscheint hier in wenigen Minuten.", turnOn: "Claude-Sitzungen, Plugins und Skills anzeigen", turnOff: "Nicht mehr anzeigen", saved: "Gespeichert.", enableHint: "Zum Einschalten ist eine aktuelle Anmeldung nötig: Geben Sie einen Code Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
     unknown: "Der Agent konnte das nicht lesen.",
   },
   projects: {

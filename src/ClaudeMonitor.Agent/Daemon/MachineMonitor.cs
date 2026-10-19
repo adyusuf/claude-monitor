@@ -27,6 +27,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     public const string RemoteRunsKey = "settings.remote_runs";
     public const string ShareServicesKey = "settings.share_services";
     public const string ClaudeAutoKey = "settings.claude_auto";
+    public const string ShareInventoryKey = "settings.share_inventory";
     public const int KeepSamples = 60;
     /// <summary>A folder a session worked in is read for its commit and tag for this long after the last visit (ADR-0008 §3a′).</summary>
     public static readonly TimeSpan VisitedFor = TimeSpan.FromDays(30);
@@ -73,10 +74,16 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
     }
 
-    /// <summary>What Claude Code has here (sessions, plugins, skills, project settings), read again at most every <see cref="AgentConfig.ClaudeInventoryEvery"/>; null when no reader was given (tests) or it failed.</summary>
+    /// <summary>What Claude Code has here (sessions, plugins, skills, project settings), read again at most every <see cref="AgentConfig.ClaudeInventoryEvery"/>, and only while the machine owner's switch is on; null when it is off, no reader was given (tests) or it failed.</summary>
     private async Task<ClaudeInventory?> InventoryAsync(ExecPolicy policy, CancellationToken ct)
     {
         if (inventoryReader is null) return null;
+        if (store.Get(ShareInventoryKey) != "true")
+        {
+            inventory = null; // the owner has not switched it on (or switched it off): nothing is read and nothing is sent
+            return null;
+        }
+
         var now = clock.GetUtcNow();
         if (inventory is { } cached && now - inventoryAt < config.ClaudeInventoryEvery && now >= inventoryAt) return cached;
         try
@@ -180,7 +187,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     {
         ArgumentNullException.ThrowIfNull(settings);
         List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false"), (ShareServicesKey, settings.ShareServices ? "true" : "false"),
-            (ClaudeAutoKey, settings.ClaudeAuto == ClaudeAutoModes.OnMessage ? ClaudeAutoModes.OnMessage : ClaudeAutoModes.Off)];
+            (ClaudeAutoKey, settings.ClaudeAuto == ClaudeAutoModes.OnMessage ? ClaudeAutoModes.OnMessage : ClaudeAutoModes.Off),
+            (ShareInventoryKey, settings.ShareInventory ? "true" : "false")];
         if (settings.Alerts is { } a)
         {
             entries.Add((ThresholdsKey, string.Join(',', new[] { a.CpuPct, a.MemoryPct, a.DiskPct, a.SustainSeconds }

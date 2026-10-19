@@ -21,6 +21,7 @@ public sealed class MachineInventoryProfileTests : IDisposable
     {
         fx = new RemoteFixture(c => c with { ClaudeConfigDir = files.ConfigDir });
         fx.Fake.On(Put, RemoteFixture.NoContent);
+        fx.Store.Set(MachineMonitor.ShareInventoryKey, "true"); // the owner switched it on (the settings pass remembers it)
     }
 
     public void Dispose()
@@ -72,5 +73,22 @@ public sealed class MachineInventoryProfileTests : IDisposable
 
         Assert.Equal(2, Sent().Count);
         Assert.Equal("b@m", Assert.Single(Sent()[1].Inventory!.Plugins!).Id);
+    }
+
+    [Fact]
+    public async Task While_the_owners_switch_is_off_nothing_is_read_or_sent_and_turning_it_off_stops_it_at_once()
+    {
+        var monitor = Monitor();
+        fx.Store.Set(MachineMonitor.ShareInventoryKey, "false");
+        await monitor.ProfileAsync(CancellationToken.None);
+        Assert.Null(Assert.Single(Sent()).Inventory);
+
+        fx.Store.Set(MachineMonitor.ShareInventoryKey, "true");
+        await monitor.ProfileAsync(CancellationToken.None);
+        Assert.NotNull(Sent()[^1].Inventory);
+
+        fx.Store.Set(MachineMonitor.ShareInventoryKey, "false"); // no waiting for the interval
+        await monitor.ProfileAsync(CancellationToken.None);
+        Assert.Null(Sent()[^1].Inventory);
     }
 }

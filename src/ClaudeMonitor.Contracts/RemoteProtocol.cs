@@ -131,7 +131,7 @@ public sealed record MachineProjectView(string Key, string Name, string? Branch,
 /// see them (the machine's owner and workspace admins; null otherwise, and when the owner has not opted in) and its projects.
 /// </summary>
 public sealed record MachineDetail(MachineView Machine, string? Note, DateTimeOffset? NoteSetAt, bool ServicesShared,
-    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects, ClaudeInventory? Inventory = null);
+    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects, ClaudeInventory? Inventory = null, bool InventoryShared = false);
 
 /// <summary>The limits of a project's test command (ADR-0011 §7a), shared by the agent that takes it and the API that stores it.</summary>
 public static class ProjectTestRules

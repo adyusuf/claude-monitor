@@ -90,7 +90,9 @@ export function MachinePage() {
           <Card title={t("machines.claudeControl.title")}>
             <MachineClaude agentId={agentId} view={m} owned={data.owned} projects={data.detail.projects} agentVersion={data.agentVersion} version={version} onChanged={() => void reload()} />
           </Card>
-          {data.detail.inventory ? <Card title={t("machines.inventory.title")}><MachineInventory inventory={data.detail.inventory} projects={data.detail.projects} /></Card> : null}
+          {data.owned || data.detail.inventory ? (
+            <Card title={t("machines.inventory.title")}><MachineInventory agentId={agentId} detail={data.detail} owned={data.owned} onChanged={() => void reload()} /></Card>
+          ) : null}
           <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
           <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} agentId={agentId} owned={data.owned} onStarted={() => void reload()} /></Card>
         </>

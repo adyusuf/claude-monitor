@@ -20,6 +20,11 @@ public sealed record AgentServicesRequest(bool Share, string? Code = null);
 
 public sealed record AgentServicesView(Guid AgentId, bool Share, DateTimeOffset? SetAt, Guid? SetBy);
 
+/// <summary>The machine owner's choice to report what Claude Code has on the machine (ADR-0011 §7a, step E). Code: a two-step code when enabling needs a recent sign-in.</summary>
+public sealed record AgentInventoryRequest(bool Share, string? Code = null);
+
+public sealed record AgentInventoryView(Guid AgentId, bool Share, DateTimeOffset? SetAt, Guid? SetBy);
+
 /// <summary>
 /// What a person types about a machine (ADR-0008 §3a′). Tags and the note: only a workspace admin (anyone else gets 404, as for a
 /// workspace they cannot see), every change audited; the note is untrusted text and only its length is audited. Listening services:
@@ -36,6 +41,7 @@ public static class AgentFactsEndpoints
         g.MapPut("/{id:guid}/tags", PutTags);
         g.MapPut("/{id:guid}/note", PutNote);
         g.MapPut("/{id:guid}/services", PutServices);
+        g.MapPut("/{id:guid}/inventory", PutInventory);
     }
 
     private static async Task<IResult> PutTags(Guid id, AgentTagsRequest req, HttpContext http, MonitorDb db, TimeProvider clock, Broker broker)
@@ -105,6 +111,37 @@ public static class AgentFactsEndpoints
         await db.SaveChangesAsync(http.RequestAborted);
         Changed(broker, agent);
         return Results.Ok(new AgentServicesView(id, agent.ShareServices, agent.ShareServicesSetAt, agent.ShareServicesSetBy));
+    }
+
+    /// <summary>The owner's switch for the Claude inventory (ADR-0011 §7a, step E): owner only, a recent sign-in to turn it on, an audit row, and turning it off drops what was stored.</summary>
+    private static async Task<IResult> PutInventory(Guid id, AgentInventoryRequest req, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock, Broker broker)
+    {
+        var userId = http.User.UserId();
+        var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == id && a.Status == AgentStatuses.Active, http.RequestAborted);
+        if (agent is null || agent.UserId != userId || await Access.MemberAsync(db, userId, agent.WorkspaceId, Roles.Viewer, http.RequestAborted) is null)
+        {
+            return Http.NotFound();
+        }
+
+        if (req.Share && !agent.ShareInventory && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code))
+        {
+            return RemoteChecks.ReauthRefused();
+        }
+
+        var was = agent.ShareInventory;
+        agent.ShareInventory = req.Share;
+        agent.ShareInventorySetAt = clock.GetUtcNow();
+        agent.ShareInventorySetBy = userId;
+        if (!req.Share)
+        {
+            agent.ClaudeInventory = null;
+            agent.ClaudeInventoryAt = null;
+        }
+
+        Audit.Add(db, http, clock, AuditActions.AgentInventoryChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: id, detail: new { before = was, after = req.Share });
+        await db.SaveChangesAsync(http.RequestAborted);
+        Changed(broker, agent);
+        return Results.Ok(new AgentInventoryView(id, agent.ShareInventory, agent.ShareInventorySetAt, agent.ShareInventorySetBy));
     }
 
     private static async Task<Agent?> AdminAgentAsync(MonitorDb db, HttpContext http, Guid userId, Guid id)

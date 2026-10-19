@@ -98,7 +98,7 @@ public static class AgentEndpoints
         var auto = agent is { AcceptsClaudeControl: true, ClaudeAutoMode: ClaudeAutoModes.OnMessage } && s.RemoteRunsEnabled && AgentActions.AutoModeRefusal(agent) is null
             ? ClaudeAutoModes.OnMessage : ClaudeAutoModes.Off;
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
-            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, agent?.ShareServices ?? false, auto));
+            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, agent?.ShareServices ?? false, auto, agent?.ShareInventory ?? false));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>

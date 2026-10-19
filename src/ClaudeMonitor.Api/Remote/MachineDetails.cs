@@ -29,7 +29,8 @@ public static class MachineDetails
         return new MachineDetail(machine, agent.AdminNote, agent.AdminNoteSetAt, agent.ShareServices,
             servicesAllowed ? MachineFacts.ServicesFrom(agent.Services) : null, servicesAllowed ? agent.ServicesAt : null,
             await ProjectsAsync(db, workspaceId, agentId, agent.UserId == callerUserId, now, ct),
-            callerIsAdmin || agent.UserId == callerUserId ? ClaudeInventoryFacts.From(agent.ClaudeInventory, agent.ClaudeInventoryAt) : null);
+            agent.ShareInventory && (callerIsAdmin || agent.UserId == callerUserId) ? ClaudeInventoryFacts.From(agent.ClaudeInventory, agent.ClaudeInventoryAt) : null,
+            agent.ShareInventory);
     }
 
     private static async Task<IReadOnlyList<MachineProjectView>> ProjectsAsync(MonitorDb db, Guid workspaceId, Guid agentId, bool owner, DateTimeOffset now,

@@ -193,6 +193,18 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("services_at");
 
+                    b.Property<bool>("ShareInventory")
+                        .HasColumnType("boolean")
+                        .HasColumnName("share_inventory");
+
+                    b.Property<DateTimeOffset?>("ShareInventorySetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("share_inventory_set_at");
+
+                    b.Property<Guid?>("ShareInventorySetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("share_inventory_set_by");
+
                     b.Property<bool>("ShareServices")
                         .HasColumnType("boolean")
                         .HasColumnName("share_services");
@@ -253,6 +265,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.HasIndex("RoleSetBy")
                         .HasDatabaseName("ix_agents_role_set_by");
+
+                    b.HasIndex("ShareInventorySetBy")
+                        .HasDatabaseName("ix_agents_share_inventory_set_by");
 
                     b.HasIndex("ShareServicesSetBy")
                         .HasDatabaseName("ix_agents_share_services_set_by");
@@ -3824,6 +3839,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasForeignKey("RoleSetBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_agents_users_role_set_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("ShareInventorySetBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agents_users_share_inventory_set_by");
 
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()

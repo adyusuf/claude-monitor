@@ -21,6 +21,7 @@ internal static class MonitorDbModelMachines
             e.HasOne<User>().WithMany().HasForeignKey(x => x.TagsSetBy).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.AdminNoteSetBy).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.ShareServicesSetBy).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.ShareInventorySetBy).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.RoleSetBy).OnDelete(DeleteBehavior.Restrict);
             e.ToTable(t =>
             {

@@ -93,6 +93,11 @@ public sealed class Agent
 
     /// <summary>What Claude Code has on the machine (ADR-0011 §7a, step E): one JSON document, replaced by every profile; NULL when the agent does not report it.</summary>
     public string? ClaudeInventory { get; set; }
+
+    /// <summary>The machine owner's switch for reporting what Claude Code has on the machine (ADR-0011 §7a, step E); off until they say so. Off: the agent does not read it and the API keeps none.</summary>
+    public bool ShareInventory { get; set; }
+    public DateTimeOffset? ShareInventorySetAt { get; set; }
+    public Guid? ShareInventorySetBy { get; set; }
     public DateTimeOffset? ClaudeInventoryAt { get; set; }
 
     /// <summary>ADR-0008 §3f: the machine's owner lets another machine of the same user ask a question of a Claude session here; off until they say so.</summary>
