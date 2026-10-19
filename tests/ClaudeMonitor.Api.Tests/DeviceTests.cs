@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -193,6 +194,41 @@ public sealed class DeviceTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.Unauthorized, (await agent.Http.PostAsync("/api/agent/heartbeat", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await http.PostAsJsonAsync("/api/agent/token/refresh", new RefreshRequest("made-up"), TestUser.Json)).StatusCode);
+    }
+
+    private static async Task<string?> ReasonAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(TestUser.Json);
+        Assert.Equal("invalid_refresh_token", body.GetProperty("title").GetString()); // the title keeps its old value
+        return body.GetProperty("reason").GetString();
+    }
+
+    [Fact]
+    public async Task A_refused_refresh_says_why_unknown_reused_revoked_or_expired()
+    {
+        var user = await api.NewClient().SignedUpAsync("refresh-reason");
+        var http = api.CreateClient();
+        Task<HttpResponseMessage> Refresh(string token) => http.PostAsJsonAsync("/api/agent/token/refresh", new RefreshRequest(token), TestUser.Json);
+
+        Assert.Equal(RefreshReasons.Unknown, await ReasonAsync(await Refresh("made-up")));
+
+        var reused = await user.ConnectAgentAsync();
+        var rotated = await (await Refresh(reused.Tokens.RefreshToken)).Content.ReadFromJsonAsync<TokenResponse>(TestUser.Json);
+        Assert.Equal(RefreshReasons.Reused, await ReasonAsync(await Refresh(reused.Tokens.RefreshToken)));
+        Assert.Equal(RefreshReasons.Revoked, await ReasonAsync(await Refresh(rotated!.RefreshToken))); // the reuse revoked every token of the agent
+
+        var expired = await user.ConnectAgentAsync(machineKey: "expired-" + Guid.NewGuid());
+        await using (var db = api.Db())
+        {
+            await db.AgentTokens.Where(t => t.AgentId == expired.Tokens.AgentId).ExecuteUpdateAsync(s => s.SetProperty(t => t.ExpiresAt, DateTimeOffset.UtcNow.AddDays(-1)));
+        }
+
+        Assert.Equal(RefreshReasons.Expired, await ReasonAsync(await Refresh(expired.Tokens.RefreshToken)));
+
+        var revoked = await user.ConnectAgentAsync(machineKey: "revoked-" + Guid.NewGuid());
+        Assert.Equal(HttpStatusCode.NoContent, (await user.PostAsync($"/api/agents/{revoked.Tokens.AgentId}/revoke")).StatusCode);
+        Assert.Equal(RefreshReasons.AgentRevoked, await ReasonAsync(await Refresh(revoked.Tokens.RefreshToken)));
     }
 
     [Fact]

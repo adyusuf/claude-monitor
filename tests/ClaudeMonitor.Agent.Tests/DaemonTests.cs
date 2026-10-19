@@ -103,9 +103,76 @@ public sealed class DaemonTests
                 return (HttpStatusCode.Unauthorized, "{}");
             });
         (Identity.Load(home.Config) with { Server = "https://m.invalid", AgentId = Guid.NewGuid() }).Save(home.Config);
+        Credentials.For(home.Config).Write(Credentials.Access, "a");
+        Credentials.For(home.Config).Write(Credentials.Refresh, "r");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         Assert.Equal(0, await new DaemonHost(home.Config, TimeProvider.System, new AgentLog(home.Config, TimeProvider.System), fake).RunAsync(timeout.Token));
         Assert.False(Identity.Load(home.Config).Connected);
+        Assert.Contains("the server gave no reason", await File.ReadAllTextAsync(home.Config.LogPath), StringComparison.Ordinal); // an older server: only the status code is known
+    }
+
+    [Theory]
+    [InlineData("token_expired", "credentials expired")]
+    [InlineData("token_revoked", "it was revoked")]
+    [InlineData("agent_revoked", "it was revoked")]
+    [InlineData("token_reused", "used twice")]
+    [InlineData("unknown_token", "does not know these credentials")]
+    public async Task A_refused_refresh_names_the_reason_the_api_gave_and_the_next_step_in_the_log_and_in_status(string reason, string phrase)
+    {
+        using var home = new TempHome(c => c with { FlushEvery = TimeSpan.FromMilliseconds(20) });
+        var fake = new FakeApi()
+            .On("POST /api/agent/heartbeat", HttpStatusCode.Unauthorized, "{}")
+            .On("POST /api/agent/token/refresh", HttpStatusCode.Unauthorized, $$"""{"title":"invalid_refresh_token","status":401,"reason":"{{reason}}"}""")
+            .On("GET /api/agent/stream", _ =>
+            {
+                Thread.Sleep(200);
+                return (HttpStatusCode.Unauthorized, "{}");
+            });
+        (Identity.Load(home.Config) with { Server = "https://m.invalid", AgentId = Guid.NewGuid() }).Save(home.Config);
+        Credentials.For(home.Config).Write(Credentials.Access, "a");
+        Credentials.For(home.Config).Write(Credentials.Refresh, "r");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        Assert.Equal(0, await new DaemonHost(home.Config, TimeProvider.System, new AgentLog(home.Config, TimeProvider.System), fake).RunAsync(timeout.Token));
+
+        var log = await File.ReadAllTextAsync(home.Config.LogPath);
+        Assert.Contains(phrase, log, StringComparison.Ordinal);
+        Assert.Contains($"({reason})", log, StringComparison.Ordinal);
+        Assert.Contains("cm-agent login", log, StringComparison.Ordinal);
+        using var store = new Storage.LocalStore(home.Config.DatabasePath);
+        Assert.Equal(reason, store.Get(AuthRefusal.ReasonKey));
+        var status = string.Join("\n", Push.PushStatus.Describe(home.Config, store, DateTimeOffset.UtcNow, null, daemonRunning: false));
+        Assert.Contains("Connection: ", status, StringComparison.Ordinal);
+        Assert.Contains(phrase, status, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_daemon_with_no_refresh_token_stored_says_so_instead_of_blaming_the_server()
+    {
+        using var home = new TempHome(c => c with { FlushEvery = TimeSpan.FromMilliseconds(20) });
+        var fake = new FakeApi()
+            .On("POST /api/agent/heartbeat", HttpStatusCode.Unauthorized, "{}")
+            .On("GET /api/agent/stream", _ =>
+            {
+                Thread.Sleep(200);
+                return (HttpStatusCode.Unauthorized, "{}");
+            });
+        (Identity.Load(home.Config) with { Server = "https://m.invalid", AgentId = Guid.NewGuid() }).Save(home.Config);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        Assert.Equal(0, await new DaemonHost(home.Config, TimeProvider.System, new AgentLog(home.Config, TimeProvider.System), fake).RunAsync(timeout.Token));
+
+        Assert.Contains("no refresh token is stored", await File.ReadAllTextAsync(home.Config.LogPath), StringComparison.Ordinal);
+        Assert.Equal(0, fake.Count("POST /api/agent/token/refresh")); // nothing to send
+    }
+
+    [Fact]
+    public void A_refusal_message_never_echoes_an_unknown_reason_and_covers_the_odd_cases()
+    {
+        Assert.DoesNotContain("evil", AuthRefusal.Message("evil\nreason"), StringComparison.Ordinal);
+        Assert.Contains("no refresh token", AuthRefusal.Message(Net.ApiClient.NoRefreshToken), StringComparison.Ordinal);
+        Assert.Contains("http_503", AuthRefusal.Message("http_503"), StringComparison.Ordinal);
+        Assert.Contains("no reason given", AuthRefusal.Message(null), StringComparison.Ordinal);
     }
 
     [Fact]

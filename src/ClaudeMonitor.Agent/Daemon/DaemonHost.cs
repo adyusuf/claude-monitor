@@ -45,6 +45,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var streamStore = new LocalStore(config.DatabasePath);
         using var http = ApiClient.CreateHttp(identity.Server!, handler);
         using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout) { StreamIdleTimeout = config.StreamIdleTimeout };
+        flushStore.Set(AuthRefusal.ReasonKey, ""); // connected again: an earlier refusal no longer applies
         var relay = new Relay(config, flushStore, api, clock);
         var beat = new Relay(config, beatStore, api, clock);
         var settings = new Relay(config, settingsStore, api, clock);
@@ -122,7 +123,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         if (api.Disconnected)
         {
             (identity with { AgentId = null, WorkspaceId = null }).Save(config);
-            log.Write("the API refused this agent (revoked or expired): run `cm-agent login` again");
+            log.Write(AuthRefusal.Message(api.DisconnectReason));
+            flushStore.Set(AuthRefusal.ReasonKey, api.DisconnectReason ?? "");
+            flushStore.Set(AuthRefusal.AtKey, clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         }
 
         return 0;

@@ -43,6 +43,11 @@ public static class PushStatus
             lines.Add($"Last upload failure: {uploadError} at {Clock(Time(store.Get(UploadErrorAtKey)))}.");
         }
 
+        if (store.Get(Auth.AuthRefusal.ReasonKey) is { Length: > 0 } refused && Auth.Identity.Peek(config)?.Connected != true)
+        {
+            lines.Add($"Connection: {Auth.AuthRefusal.Message(refused)} (refused at {Clock(Time(store.Get(Auth.AuthRefusal.AtKey)))})");
+        }
+
         lines.Add(daemonRunning ? Stream(store, now) : "Web stream: the agent daemon is not running.");
         lines.Add(Push(config, store, now, session));
         return lines;
