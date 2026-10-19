@@ -86,6 +86,8 @@ export const enMachines = {
     enable: "Enable", disable: "Disable", update: "Update", install: "Install", installLabel: "Install a plugin (name@marketplace)",
     setting: "Setting", value: "Value", apply: "Apply", writesHint: "Changes are asked of the agent and need a recent sign-in. The result shows in the actions list of the aipod card. A setting is written to the project's own files, so commit it yourself. Skills come with plugins: enabling, disabling or installing a plugin is how skills change.", writesOff: "To change plugins or settings from here, switch on starting Claude from the web for this machine (development or test machines only) and keep the agent up to date.",
     asked: "Asked the agent. The result appears in the actions list of the aipod card.", writeHint: "Changing Claude's setup needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
+    limits: "Usage limits", fiveHour: "5-hour window", sevenDay: "Weekly window", spend: "Spend limit", used: "{pct}% used", resets: "resets {at}",
+    limitsSeen: "Last seen {at}. Claude Code gives these only while a session is running, so they can be old.", noLimits: "No usage limits seen. They exist only for claude.ai Pro and Max logins, after a session has answered once, and only if the person at the machine ran \"aipod config claude-statusline on\".",
     unknown: "The agent could not read this.",
   },
   projects: {

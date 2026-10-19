@@ -244,6 +244,9 @@ from a normal terminal, then check that `aipod status` and `monitor_status` in a
   sends them with an HMAC of the path (the key is generated here and kept in the credential store; the path never leaves the machine).
   `CM_PROJECT_FACTS_EVERY` sets how often they are read again. A run may name a `project` and a `kind` (`test`, `build`, `deploy`, `other`);
   its result, and for a `test` run the passed, failed and skipped counts of dotnet test, vitest, jest and pytest, appear under that project.
+  **Usage limits for Podium (ADR-0011 §7a):** `aipod config claude-statusline on` sets `statusLine` in Claude Code's user settings to `aipod statusline` (your own status line, if you had one, is kept and still printed;
+  `off` puts it back; `status` shows what was seen). Claude Code gives the 5-hour and weekly limits only to a status line command, and only for claude.ai Pro and Max logins after a session has answered once, so Podium
+  shows them with the time they were last seen. It is the one place aipod edits Claude's own settings, and only when you run this verb. A project's own `statusLine` overrides the user one and is not touched.
   **Test command for Podium (ADR-0011 §7a):** `aipod config projects test <folder> -- <program> [args...]` sets the command that "Start the test" runs for that
   folder (an argv list, the program an absolute path, no shell; `--clear` removes it). Unlike other projects, the command and the folder path are then reported, so
   the machine's owner can see and approve exactly what Podium starts; every run still waits for the owner's approval. Not available for a service agent.

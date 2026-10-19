@@ -11,7 +11,7 @@ namespace ClaudeMonitor.Api.Tests;
 public sealed class ClaudeInventoryTests(ApiFactory api)
 {
     private static ClaudeInventory Inventory(IReadOnlyList<InventorySession>? sessions = null, IReadOnlyList<InventoryPlugin>? plugins = null, IReadOnlyList<string>? skills = null,
-        IReadOnlyList<InventorySetting>? settings = null) => new(sessions, plugins, skills, settings, DateTimeOffset.UtcNow);
+        IReadOnlyList<InventorySetting>? settings = null, ClaudeLimits? limits = null) => new(sessions, plugins, skills, settings, DateTimeOffset.UtcNow, limits);
 
     private static async Task SendAsync(RemoteTeam team, ClaudeInventory? inventory) =>
         (await team.Target.Http.PutAsJsonAsync("/api/agent/profile", new AgentProfile(ExecLevels.Argv, false, null, null, 2, Inventory: inventory), TestUser.Json)).EnsureSuccessStatusCode();
@@ -153,5 +153,47 @@ public sealed class ClaudeInventoryTests(ApiFactory api)
         await using var db = api.Db();
         var row = await db.Agents.AsNoTracking().SingleAsync(a => a.Id == team.TargetId);
         Assert.Equal((false, null), (row.ShareInventory, row.ClaudeInventory));
+    }
+
+    [Fact]
+    public async Task The_usage_limits_are_stored_checked_and_shown_to_the_owner_and_admins_with_the_time_they_were_seen()
+    {
+        var team = await SharedTeamAsync(api);
+        var now = api.Clock.GetUtcNow();
+        await SendAsync(team, Inventory(limits: new ClaudeLimits(new ClaudeLimitWindow(23.46, now.AddHours(2)), new ClaudeLimitWindow(41.2, now.AddDays(3)), null, now.AddMinutes(-3))));
+
+        foreach (var reader in new[] { team.Owner, team.Admin })
+        {
+            var limits = (await DetailAsync(reader, team)).GetProperty("inventory").GetProperty("limits");
+            Assert.Equal(23.5, limits.GetProperty("fiveHour").GetProperty("usedPercentage").GetDouble());
+            Assert.Equal(41.2, limits.GetProperty("sevenDay").GetProperty("usedPercentage").GetDouble());
+            Assert.Equal(JsonValueKind.Null, limits.GetProperty("spend").ValueKind);
+            Assert.True(limits.GetProperty("seenAt").GetDateTimeOffset() < now);
+        }
+    }
+
+    [Fact]
+    public async Task Limits_from_the_machine_are_clamped_and_a_reset_time_or_seen_time_that_cannot_be_right_is_dropped()
+    {
+        var team = await SharedTeamAsync(api);
+        var now = api.Clock.GetUtcNow();
+        await SendAsync(team, Inventory(limits: new ClaudeLimits(new ClaudeLimitWindow(-4, now.AddYears(5)), new ClaudeLimitWindow(99999, now.AddDays(-30)), null, now.AddDays(2))));
+
+        var limits = (await DetailAsync(team.Owner, team)).GetProperty("inventory").GetProperty("limits");
+
+        Assert.Equal((0, JsonValueKind.Null), (limits.GetProperty("fiveHour").GetProperty("usedPercentage").GetDouble(), limits.GetProperty("fiveHour").GetProperty("resetsAt").ValueKind));
+        Assert.Equal((1000, JsonValueKind.Null), (limits.GetProperty("sevenDay").GetProperty("usedPercentage").GetDouble(), limits.GetProperty("sevenDay").GetProperty("resetsAt").ValueKind));
+        Assert.True(limits.GetProperty("seenAt").GetDateTimeOffset() <= api.Clock.GetUtcNow().AddMinutes(1)); // a time in the future is replaced by now
+    }
+
+    [Fact]
+    public async Task Limits_with_no_usable_window_are_not_stored_at_all()
+    {
+        var team = await SharedTeamAsync(api);
+        await SendAsync(team, Inventory(plugins: [new InventoryPlugin("a@m", "1", true, null)], limits: new ClaudeLimits(null, null, null, DateTimeOffset.UtcNow)));
+
+        var inventory = (await DetailAsync(team.Owner, team)).GetProperty("inventory");
+
+        Assert.Equal(JsonValueKind.Null, inventory.GetProperty("limits").ValueKind);
     }
 }
