@@ -71,6 +71,8 @@ export interface ProjectRunSummary {
 export interface MachineProjectView {
   key: string; name: string; branch: string | null; headSha: string | null; tag: string | null; lastSeenAt: string;
   source: "session" | "listed"; lastRuns: ProjectRunSummary[]; recentErrors: number;
+  /** A test command was set at the machine for this project (ADR-0011 §7a); the command and its folder are sent to the machine's owner only. */
+  hasTest?: boolean; testArgv?: string[] | null; testCwd?: string | null;
 }
 /** Everything about one machine: the list entry, the admin's note, the services the caller may see, and the projects. */
 export interface MachineDetail {

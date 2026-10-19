@@ -79,6 +79,7 @@ export const tr: Dictionary = {
     claude_control_service_mode: "Bir hizmet ajanı Claude'u başlatamaz.", claude_not_installed: "Bu makinede Claude Code bulunamadı.", invalid_permission_mode: "Listeden bir izin kipi seçin.",
     invalid_session_ref: "Bu bir oturum kimliği değil.", claude_not_started_here: "Yalnızca buradan başlatılan bir oturum buradan durdurulabilir.",
     invalid_project: "Proje anahtarı 1 ile 200 karakter olmalı, denetim karakteri içermemeli.",
+    no_test_command: "Makine bu proje için test komutu bildirmiyor (ya da yakın zamanda bildirmedi). Makinede aipod config projects test ile tanımlayın.", invalid_prompt: "İlk mesaj en çok 2000 karakter olmalı; yeni satır ve sekme dışında denetim karakteri içermemeli.",
     name_taken: "Bu ad burada zaten kullanılıyor. Başka bir ad seçin.", invalid_list: "Listeyi kontrol edin: bir girdi boş, çok uzun, tekrarlı ya da geçersiz, ya da çok fazla girdi var.",
     amount_and_currency: "Bütçe tutarını ve para birimini birlikte verin ya da ikisini de boş bırakın.", invalid_currency: "Üç büyük harf kullanın, örneğin TRY.",
     before_start: "Bitiş tarihi başlangıç tarihinden önce olamaz.", invalid_value: "Listeden bir değer seçin.", invalid_url: "Bu adrese burada izin verilmiyor. Depo için https, ssh ya da git, ortam için http ya da https adresi kullanın; parola olmasın.",

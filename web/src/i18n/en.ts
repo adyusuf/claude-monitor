@@ -78,6 +78,7 @@ export const en = {
     claude_control_service_mode: "A service agent cannot start Claude.", claude_not_installed: "No Claude Code was found on this machine.", invalid_permission_mode: "Pick a permission mode from the list.",
     invalid_session_ref: "That is not a session id.", claude_not_started_here: "Only a session started from here can be stopped from here.",
     invalid_project: "The project key is 1 to 200 characters without control characters.",
+    no_test_command: "The machine reports no test command for that project (or not recently). Set one at the machine with aipod config projects test.", invalid_prompt: "The first message is at most 2000 characters, with no control characters other than new lines and tabs.",
     name_taken: "That name is already used here. Pick another.", invalid_list: "Check the list: an entry is empty, too long, repeated or not allowed, or there are too many.",
     amount_and_currency: "Give the budget amount and its currency together, or neither.", invalid_currency: "Use three capital letters, such as EUR.",
     before_start: "The end date cannot be before the start date.", invalid_value: "Pick a value from the list.", invalid_url: "That address is not allowed here. Use an https, ssh or git address for the repository and an http or https address for an environment, without a password.",

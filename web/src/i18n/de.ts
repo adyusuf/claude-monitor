@@ -79,6 +79,7 @@ export const de: Dictionary = {
     claude_control_service_mode: "Ein Dienst-Agent kann Claude nicht starten.", claude_not_installed: "Auf dieser Maschine wurde kein Claude Code gefunden.", invalid_permission_mode: "Wählen Sie einen Berechtigungsmodus aus der Liste.",
     invalid_session_ref: "Das ist keine Sitzungs-ID.", claude_not_started_here: "Nur eine von hier gestartete Sitzung kann von hier gestoppt werden.",
     invalid_project: "Der Projektschlüssel hat 1 bis 200 Zeichen ohne Steuerzeichen.",
+    no_test_command: "Die Maschine meldet für dieses Projekt keinen Testbefehl (oder nicht kürzlich). Legen Sie ihn an der Maschine mit aipod config projects test fest.", invalid_prompt: "Die erste Nachricht hat höchstens 2000 Zeichen und enthält außer Zeilenumbrüchen und Tabs keine Steuerzeichen.",
     name_taken: "Dieser Name wird hier schon verwendet. Wählen Sie einen anderen.", invalid_list: "Prüfen Sie die Liste: Ein Eintrag ist leer, zu lang, doppelt oder nicht erlaubt, oder es sind zu viele.",
     amount_and_currency: "Geben Sie den Budgetbetrag und seine Währung zusammen an oder keines von beiden.", invalid_currency: "Verwenden Sie drei Großbuchstaben, zum Beispiel EUR.",
     before_start: "Das Enddatum darf nicht vor dem Startdatum liegen.", invalid_value: "Wählen Sie einen Wert aus der Liste.", invalid_url: "Diese Adresse ist hier nicht erlaubt. Verwenden Sie für das Repository eine https-, ssh- oder git-Adresse und für eine Umgebung eine http- oder https-Adresse, ohne Passwort.",

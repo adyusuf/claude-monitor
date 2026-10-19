@@ -135,7 +135,7 @@ public static class UpdateCommand
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
-        await stderr.WriteLineAsync("usage: aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
+        await stderr.WriteLineAsync("usage: aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list|test [<folder>]]");
         return 2;
     }
 
@@ -175,7 +175,34 @@ public static class UpdateCommand
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: aipod config projects add <folder> | remove <folder> | list");
+        if (args.Length >= 4 && args[2] == "test")
+        {
+            return await ProjectTestAsync(args, config, stdout, stderr);
+        }
+
+        await stderr.WriteLineAsync("usage: aipod config projects add <folder> | remove <folder> | list | test <folder> -- <program> [args...] | test <folder> --clear");
+        return 2;
+    }
+
+    /// <summary>
+    /// `aipod config projects test &lt;folder&gt; -- &lt;program&gt; [args...]` sets the test command of a project folder, `--clear` removes it (ADR-0011 §7a). The command is
+    /// an argv list, never a shell line; it is reported with the folder so the owner can start it from Podium, and each run still waits for the owner's approval.
+    /// </summary>
+    private static async Task<int> ProjectTestAsync(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr)
+    {
+        if (args.Length == 5 && args[4] == "--clear")
+        {
+            await (ProjectTestCommands.Clear(config, args[3]) ? stdout.WriteLineAsync("test command removed") : stderr.WriteLineAsync("that folder had no test command"));
+            return 0;
+        }
+
+        if (args.Length >= 6 && args[4] == "--" && ProjectTestCommands.Set(config, args[3], args[5..]))
+        {
+            await stdout.WriteLineAsync("test command set (it is reported with this folder's path; each run from Podium still waits for your approval)");
+            return 0;
+        }
+
+        await stderr.WriteLineAsync($"not set: give the absolute path of an existing folder, then -- and the program (an absolute path) with its arguments (at most {ProjectTestCommands.MaxElements} elements of {ProjectTestCommands.MaxElementLength} characters, no control characters).");
         return 2;
     }
 

@@ -76,6 +76,9 @@ public sealed record AgentActionView(Guid Id, Guid AgentId, string Kind, string 
 /// <summary>The machine owner's switch for starting Claude from the web on this machine (ADR-0014); off until they say so. Code: a two-step code when turning it on needs one.</summary>
 public sealed record AgentClaudeRequest(bool Accept, string? Code = null);
 
+/// <summary>The owner asks to start the test command the machine reports for a project (ADR-0011 §7a). The command is never part of the request.</summary>
+public sealed record TestRunRequest(string ProjectKey);
+
 public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy);
 
 public static class AgentActionErrors
@@ -94,5 +97,6 @@ public static class AgentActionErrors
     public const string InvalidPermissionMode = "invalid_permission_mode";
     public const string InvalidSessionRef = "invalid_session_ref";
     public const string InvalidPrompt = "invalid_prompt";
+    public const string NoTestCommand = "no_test_command";
     public const string NotStartedHere = "claude_not_started_here";
 }
