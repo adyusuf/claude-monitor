@@ -79,6 +79,12 @@ export const deMachines: Dictionary["machines"] = {
     start: "Im Hintergrund starten", stop: "Stoppen", runningTitle: "Über das Web gestartete Sitzungen", noneRunning: "Keine läuft.",
     done: { saved: "Gespeichert.", started: "Der Agent wurde gebeten, eine Sitzung zu starten; das Ergebnis steht unten.", stopped: "Der Agent wurde gebeten, die Sitzung zu stoppen." },
   },
+  inventory: {
+    title: "Claude auf dieser Maschine", hint: "Von der Maschine gelesen am {at}: nur Sie und Administratoren sehen das, und nichts davon lässt sich über das Web ändern.", sessions: "Sitzungen", noSessions: "Es läuft keine Claude-Sitzung.", unnamed: "unbenannte Sitzung",
+    plugins: "Installierte Plugins", noPlugins: "Kein Plugin installiert.", skills: "Skills", noSkills: "Kein Skill gefunden.", skillCount: "{n} Skills",
+    settings: "Projekteinstellungen", noSettings: "Kein Projekt hier hält einen Arbeitsmodus oder Gates.", yes: "ja", no: "nein", enabled: "aktiv", disabled: "deaktiviert", mode: "Modus {mode}",
+    unknown: "Der Agent konnte das nicht lesen.",
+  },
   projects: {
     title: "Projekte", none: "Auf dieser Maschine ist noch kein Projekt bekannt.", noneHint: "Ein Projekt erscheint, wenn eine Sitzung darin arbeitet oder wenn ein Ordner mit aipod config projects add aufgeführt wird.",
     listed: "aufgeführter Ordner", session: "aus einer Sitzung", errors: "{n} Werkzeugfehler in 7 Tagen", noRuns: "Für dieses Projekt noch keine Ausführung.", run: "Ausführung", cut: "Ausgabe gekürzt",

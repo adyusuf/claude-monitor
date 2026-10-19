@@ -7,7 +7,8 @@ namespace ClaudeMonitor.Contracts;
 public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? OsVersion, string? OsAccount, int MaxConcurrent,
     string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
     IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
-    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null);
+    IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null,
+    ClaudeInventory? Inventory = null);
 
 /// <summary>One listening TCP port (ADR-0008 §3a′): the port, the protocol (<c>tcp</c>) and the owning process name when the OS lets the agent see it.</summary>
 public sealed record ServiceInfo(int Port, string Proto, string? Process);
@@ -130,7 +131,7 @@ public sealed record MachineProjectView(string Key, string Name, string? Branch,
 /// see them (the machine's owner and workspace admins; null otherwise, and when the owner has not opted in) and its projects.
 /// </summary>
 public sealed record MachineDetail(MachineView Machine, string? Note, DateTimeOffset? NoteSetAt, bool ServicesShared,
-    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects);
+    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects, ClaudeInventory? Inventory = null);
 
 /// <summary>The limits of a project's test command (ADR-0011 §7a), shared by the agent that takes it and the API that stores it.</summary>
 public static class ProjectTestRules

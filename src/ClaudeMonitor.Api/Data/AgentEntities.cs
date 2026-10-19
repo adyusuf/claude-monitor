@@ -91,6 +91,10 @@ public sealed class Agent
     public string? Services { get; set; }
     public DateTimeOffset? ServicesAt { get; set; }
 
+    /// <summary>What Claude Code has on the machine (ADR-0011 §7a, step E): one JSON document, replaced by every profile; NULL when the agent does not report it.</summary>
+    public string? ClaudeInventory { get; set; }
+    public DateTimeOffset? ClaudeInventoryAt { get; set; }
+
     /// <summary>ADR-0008 §3f: the machine's owner lets another machine of the same user ask a question of a Claude session here; off until they say so.</summary>
     public bool AcceptsAsks { get; set; }
     public DateTimeOffset? AcceptsAsksSetAt { get; set; }

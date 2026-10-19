@@ -91,6 +91,14 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasDefaultValue("off")
                         .HasColumnName("claude_auto_mode");
 
+                    b.Property<string>("ClaudeInventory")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("claude_inventory");
+
+                    b.Property<DateTimeOffset?>("ClaudeInventoryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claude_inventory_at");
+
                     b.Property<string>("ClaudeKind")
                         .HasColumnType("text")
                         .HasColumnName("claude_kind");

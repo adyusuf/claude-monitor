@@ -56,7 +56,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var execStore = new LocalStore(config.DatabasePath);
         using var metricsStore = new LocalStore(config.DatabasePath);
         var remote = new RemoteRelay(config, remoteStore, api, clock);
-        var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os));
+        var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os), inventoryReader: new ClaudeInventoryReader(config, new SystemClaudeCli()));
         using var machinesStore = new LocalStore(config.DatabasePath);
         var machines = new MachineCache(config, machinesStore, api, clock);
         var executor = new RunExecutor(config, clock, log,

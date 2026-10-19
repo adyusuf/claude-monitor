@@ -20,7 +20,8 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// </summary>
 public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, IMetricsSource source,
     Func<ExecPolicy>? policySource = null, Func<(ClaudePresence? Claude, IReadOnlyList<ToolInfo> Tools)>? factsSource = null,
-    Func<IReadOnlyList<ServiceInfo>>? servicesSource = null, Func<IReadOnlyList<ProjectFact>>? projectsSource = null)
+    Func<IReadOnlyList<ServiceInfo>>? servicesSource = null, Func<IReadOnlyList<ProjectFact>>? projectsSource = null,
+    ClaudeInventoryReader? inventoryReader = null)
 {
     public const string ThresholdsKey = "settings.alert_thresholds";
     public const string RemoteRunsKey = "settings.remote_runs";
@@ -40,6 +41,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     private string factsStamp = "";
     private (IReadOnlyList<ServiceInfo>? Services, IReadOnlyList<ProjectFact>? Projects, bool Share)? extras;
     private DateTimeOffset extrasAt;
+    private ClaudeInventory? inventory;
+    private DateTimeOffset inventoryAt;
 
     /// <summary>The exec level this agent allows now: the admin-owned file in service mode, agent.json otherwise (with the role claim, ADR-0008).</summary>
     public ExecPolicy Policy()
@@ -62,11 +65,33 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
             : policy.Level == ExecLevels.Shell && policy.HasCeiling ? ExecLevels.Argv : policy.Level;
         var (claude, tools) = Facts();
         var (services, projects) = Extras(policy);
+        var inventory = await InventoryAsync(policy, ct);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
-            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required);
-        var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default } }, ApiClient.Json);
+            policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required, inventory);
+        var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default }, Inventory = inventory is null ? null : inventory with { At = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
+    }
+
+    /// <summary>What Claude Code has here (sessions, plugins, skills, project settings), read again at most every <see cref="AgentConfig.ClaudeInventoryEvery"/>; null when no reader was given (tests) or it failed.</summary>
+    private async Task<ClaudeInventory?> InventoryAsync(ExecPolicy policy, CancellationToken ct)
+    {
+        if (inventoryReader is null) return null;
+        var now = clock.GetUtcNow();
+        if (inventory is { } cached && now - inventoryAt < config.ClaudeInventoryEvery && now >= inventoryAt) return cached;
+        try
+        {
+            var dirs = ClaudeUpdate.ClaudeSessions.ConfigDirs(config, store, now, TimeSpan.FromDays(1));
+            var folders = (policy.ProjectFolders ?? []).Concat(store.VisitedFolders(now - VisitedFor)).Distinct(StringComparer.Ordinal).Take(ProjectFolderList.Max * 2).ToList();
+            inventory = await inventoryReader.ReadAsync(dirs, folders, now, ct);
+        }
+        catch (Exception e) when (!ct.IsCancellationRequested && e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            inventory = null; // not reported this time; the next pass tries again
+        }
+
+        inventoryAt = now;
+        return inventory;
     }
 
     /// <summary>The push transport this machine has on now (the saved setting, read fresh), or null when push is off: the web words its idle-session warning by it.</summary>
