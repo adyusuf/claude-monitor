@@ -1,4 +1,4 @@
-# ADR-0011: the name aipod, and the tray app with its status window
+# ADR-0012: the name aipod, and the tray app with its status window
 
 Status: accepted 19/10/2026 (the maintainer chose the order: a compatible rename first, then the tray). Builds on ADR-0002 (agent platform), ADR-0004 (self-update), ADR-0007 (plugin, inbox).
 

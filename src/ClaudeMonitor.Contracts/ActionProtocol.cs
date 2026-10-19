@@ -11,7 +11,7 @@ public static class AgentActionKinds
     public const string Update = "update";
     public const string Status = "status";
 
-    /// <summary>ADR-0013: start a Claude Code session in the background in a reported, trusted folder (`claude --bg`), and stop one the agent started (`claude stop`).</summary>
+    /// <summary>ADR-0014: start a Claude Code session in the background in a reported, trusted folder (`claude --bg`), and stop one the agent started (`claude stop`).</summary>
     public const string ClaudeStart = "claude_start";
 
     public const string ClaudeStop = "claude_stop";
@@ -70,7 +70,7 @@ public sealed record AgentActionRequest(string Kind, string? Code = null, string
 public sealed record AgentActionView(Guid Id, Guid AgentId, string Kind, string Status, string? Result, DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt, DateTimeOffset? FinishedAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null);
 
-/// <summary>The machine owner's switch for starting Claude from the web on this machine (ADR-0013); off until they say so. Code: a two-step code when turning it on needs one.</summary>
+/// <summary>The machine owner's switch for starting Claude from the web on this machine (ADR-0014); off until they say so. Code: a two-step code when turning it on needs one.</summary>
 public sealed record AgentClaudeRequest(bool Accept, string? Code = null);
 
 public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy);
@@ -82,7 +82,7 @@ public static class AgentActionErrors
     /// <summary>Only the machine's owner (the agent's user) asks for an action on it.</summary>
     public const string OwnerOnly = "owner_only";
 
-    // Claude control (ADR-0013): why a start or stop is refused. They are i18n keys the web translates.
+    // Claude control (ADR-0014): why a start or stop is refused. They are i18n keys the web translates.
     public const string ClaudeNotAccepted = "claude_control_not_accepted";
     public const string ClaudeEnvironment = "claude_control_environment";
     public const string ClaudeServiceMode = "claude_control_service_mode";

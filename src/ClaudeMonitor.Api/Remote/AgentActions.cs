@@ -10,7 +10,7 @@ namespace ClaudeMonitor.Api.Remote;
 
 /// <summary>
 /// The fixed actions a machine's owner asks of its agent from the web (ADR-0005, "Agent actions from the web"). The request is only
-/// a kind from a closed set, plus (for the two Claude kinds of ADR-0013) a project key, a permission mode from a closed list or the short id of a session the
+/// a kind from a closed set, plus (for the two Claude kinds of ADR-0014) a project key, a permission mode from a closed list or the short id of a session the
 /// agent started; the agent performs it with its own code. Fail-closed: a member of the workspace, the machine's owner,
 /// and for restart and update a recent sign-in (a fresh two-step code on a strict target). Every state change is a compare-and-set
 /// and is published after it is committed.
@@ -140,7 +140,7 @@ public static class AgentActions
     private sealed record ClaudeCheck(string? ProjectKey, string? PermissionMode, string? SessionRef, IResult? Refusal);
 
     /// <summary>
-    /// The rules of starting and stopping Claude from the web (ADR-0013), on top of the owner-only rule: the workspace's remote-work switch, the machine owner's own
+    /// The rules of starting and stopping Claude from the web (ADR-0014), on top of the owner-only rule: the workspace's remote-work switch, the machine owner's own
     /// opt-in, an admin-set environment of dev or test that no claim makes stricter (production and database machines never), a Claude Code on the machine, no
     /// service agent, and fields that are keys and enums, never text. A stop names only a session this agent's earlier start returned.
     /// </summary>
@@ -175,7 +175,7 @@ public static class AgentActions
     }
 
     /// <summary>
-    /// The machine owner's switch (ADR-0013): only the owner, a recent sign-in or a two-step code to turn it ON, an audit row either way. Turning it off ends every
+    /// The machine owner's switch (ADR-0014): only the owner, a recent sign-in or a two-step code to turn it ON, an audit row either way. Turning it off ends every
     /// open Claude action of the machine at once, so nothing queued is started later.
     /// </summary>
     public static async Task<IResult> SetClaudeControlAsync(Guid agentId, AgentClaudeRequest req, HttpContext http, MonitorDb db, ApiConfig config, TimeProvider clock, Broker broker)

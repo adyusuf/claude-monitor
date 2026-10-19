@@ -181,7 +181,7 @@ or failure. `scripts/push-check.py` repeats the end-to-end check against the loc
 
 The agent home is the folder the machine already uses (`~/Library/Application Support/ClaudeMonitor` on macOS, `%USERPROFILE%\.claude-monitor` on
 Windows and `~/.claude-monitor` on Linux), and for a machine that has none the aipod folder (`~/Library/Application Support/aipod`, `~/.aipod`):
-nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0012). `AIPOD_AGENT_HOME` / `CM_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
+nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0013). `AIPOD_AGENT_HOME` / `CM_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
 redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
 (ADR-0002, "Home outside AppData").
@@ -247,7 +247,7 @@ from a normal terminal, then check that `aipod status` and `monitor_status` in a
 
 ## The tray app (aipod-tray)
 
-`aipod-tray` puts the agent's state in the system tray (Windows and macOS; ADR-0011): the tooltip shows the version, the state and whether an
+`aipod-tray` puts the agent's state in the system tray (Windows and macOS; ADR-0012): the tooltip shows the version, the state and whether an
 update is waiting; the right-click menu has Reconnect, Log in, Disconnect, Check for updates, Update, Open the web app and Show the log; the
 status window (menu: "Open the status window") shows the same with the agent's own status lines and buttons. Two lights sit side by side in the
 icon: orange blinks when a message arrives, green when one leaves or reaches a session.

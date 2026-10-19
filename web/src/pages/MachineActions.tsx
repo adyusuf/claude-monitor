@@ -45,7 +45,7 @@ export function MachineActions({ agentId, view, owned, agentVersion, version, on
     if (owned) void load();
   }, [owned, version, load]);
 
-  // The Claude actions have their own card (ADR-0013): they are not listed twice.
+  // The Claude actions have their own card (ADR-0014): they are not listed twice.
   const shown = actions.filter((a) => a.kind !== "claude_start" && a.kind !== "claude_stop");
   const open = (kind: AgentActionKind) => actions.some((a) => a.kind === kind && (a.status === "queued" || a.status === "delivered"));
 

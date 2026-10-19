@@ -4,7 +4,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>ADR-0012 step 1: which folder is the home when no variable says; a machine keeps the one it uses, a new one gets the aipod folder, nothing is moved.</summary>
+/// <summary>ADR-0013 step 1: which folder is the home when no variable says; a machine keeps the one it uses, a new one gets the aipod folder, nothing is moved.</summary>
 public sealed class HomeResolverTests
 {
     private static readonly string[] Systems = [OsKinds.MacOs, OsKinds.Windows, OsKinds.Linux];
@@ -96,7 +96,7 @@ public sealed class HomeResolverTests
     }
 }
 
-/// <summary>ADR-0012 step 2 (tier 1): what people see says aipod; what the system keys on keeps its name.</summary>
+/// <summary>ADR-0013 step 2 (tier 1): what people see says aipod; what the system keys on keeps its name.</summary>
 public sealed class DisplayNameTests
 {
     [Fact]

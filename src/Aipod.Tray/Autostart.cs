@@ -31,7 +31,7 @@ public static class Autostart
     public static AutostartOs Current =>
         OperatingSystem.IsMacOS() ? AutostartOs.MacOs : OperatingSystem.IsWindows() ? AutostartOs.Windows : AutostartOs.Other;
 
-    /// <summary>The launchd label: no domain of ours is known, so it is not a reverse-DNS name; launchd only needs it to be unique (ADR-0012).</summary>
+    /// <summary>The launchd label: no domain of ours is known, so it is not a reverse-DNS name; launchd only needs it to be unique (ADR-0013).</summary>
     public const string Label = "aipod.tray";
     public const string RunValueName = "aipod-tray";
 

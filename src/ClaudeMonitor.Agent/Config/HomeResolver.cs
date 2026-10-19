@@ -3,7 +3,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Config;
 
 /// <summary>
-/// Which folder is the agent's home when no variable says (ADR-0012, step 1). A machine keeps the folder it already uses; a new one gets the
+/// Which folder is the agent's home when no variable says (ADR-0013, step 1). A machine keeps the folder it already uses; a new one gets the
 /// aipod folder; nothing is moved or copied. "Already uses" means the folder holds the agent's own files (the identity file or the database): an
 /// empty folder someone made, or a folder a tool created by accident, never takes a working agent's data out of sight. The aipod folder wins when
 /// both hold files, because only a process that resolved to it could have written them there.

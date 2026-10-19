@@ -13,7 +13,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>Starting and stopping Claude in the background from the web (ADR-0013), with a fake `claude`: what is run, in which folder, what is refused, and what is remembered.</summary>
+/// <summary>Starting and stopping Claude in the background from the web (ADR-0014), with a fake `claude`: what is run, in which folder, what is refused, and what is remembered.</summary>
 public sealed class ClaudeControlTests : IDisposable
 {
     private const string Project = "git:host/shop";

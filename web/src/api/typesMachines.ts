@@ -38,7 +38,7 @@ export interface MachineView {
   tags?: Record<string, string> | null;
   /** Whether the machine's owner lets their other machines ask a Claude session here (ADR-0008 §3f). */
   acceptsAsks?: boolean | null;
-  /** Whether the machine's owner lets Claude be started and stopped on it from the web (ADR-0013). */
+  /** Whether the machine's owner lets Claude be started and stopped on it from the web (ADR-0014). */
   acceptsClaudeControl?: boolean | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
@@ -95,6 +95,6 @@ export type AgentActionStatus = "queued" | "delivered" | "succeeded" | "failed" 
 export interface AgentActionView {
   id: string; agentId: string; kind: AgentActionKind; status: AgentActionStatus; result: string | null;
   createdAt: string; expiresAt: string; finishedAt: string | null;
-  /** Claude control (ADR-0013): the project and mode of a start, the short id of the session a start returned or a stop names. */
+  /** Claude control (ADR-0014): the project and mode of a start, the short id of the session a start returned or a stop names. */
   projectKey?: string | null; permissionMode?: ClaudePermissionMode | null; sessionRef?: string | null;
 }

@@ -1,8 +1,8 @@
-# ADR-0013 (proposed): languages across the system, and starting and stopping Claude Code from the web
+# ADR-0014 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
 Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1 of Part B is built (see "P1 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
-folders, asks) and ADR-0011 (the names aipod and Podium).
+folders, asks) and ADR-0012 (the names aipod and Podium).
 
 ## Part A: every surface in tr, en and de
 

@@ -7,7 +7,7 @@ The maintainer's global rules apply; these are this repository's own.
 ## Rules
 
 - **Stack** (approved 03/10/2026): .NET 10 for the API and the agent, PostgreSQL 18, React + Vite +
-  TypeScript, Playwright for e2e. Avalonia 12.1.4 for the tray app (approved 19/10/2026, ADR-0011). Any other dependency is asked first (#10).
+  TypeScript, Playwright for e2e. Avalonia 12.1.4 for the tray app (approved 19/10/2026, ADR-0012). Any other dependency is asked first (#10).
 - **The agent never blocks a session.** Its hook and MCP entry points print to stderr and exit 0.
 - **The agent opens no network port:** hooks and daemon share a SQLite file in the user-only home; it talks to the API outbound.
 - **Fail-closed, workspace-scoped** (#6): every API call checks membership; only a session's owner commands it.

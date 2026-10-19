@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Install;
 /// </summary>
 public static class WindowsServiceSetup
 {
-    /// <summary>What the Services list shows as the name; the service name itself (the identifier) is unchanged (ADR-0012, tier 1).</summary>
+    /// <summary>What the Services list shows as the name; the service name itself (the identifier) is unchanged (ADR-0013, tier 1).</summary>
     public const string DisplayName = "aipod agent";
 
     public const string Description = "aipod agent: reports this machine to aipod and runs approved remote work.";

@@ -96,7 +96,7 @@ public sealed class Agent
     public DateTimeOffset? AcceptsAsksSetAt { get; set; }
     public Guid? AcceptsAsksSetBy { get; set; }
 
-    /// <summary>ADR-0013: the machine's owner lets Claude be started and stopped on it from the web; off until they say so, and reset when the machine moves workspace.</summary>
+    /// <summary>ADR-0014: the machine's owner lets Claude be started and stopped on it from the web; off until they say so, and reset when the machine moves workspace.</summary>
     public bool AcceptsClaudeControl { get; set; }
     public DateTimeOffset? AcceptsClaudeControlSetAt { get; set; }
     public Guid? AcceptsClaudeControlSetBy { get; set; }

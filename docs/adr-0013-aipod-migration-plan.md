@@ -1,8 +1,8 @@
-# ADR-0012 (proposed): moving the names left over from the rename to aipod
+# ADR-0013 (proposed): moving the names left over from the rename to aipod
 
 Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1), step 2 (the tier 1 display names, section 4) and
-step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`); the rest is not built.** Follows ADR-0011 (the name people see is aipod; the old names keep working). This ADR
-designs, one item at a time, the four names ADR-0011 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
+step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
+designs, one item at a time, the four names ADR-0012 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
 Rules that shape every item: additive only (global rule 4: nothing is deleted or renamed without a period in which both work); a hook never
@@ -38,7 +38,7 @@ tokens live in the agent home and the OS credential store, which the plugin does
    nothing there.
 2. *A new plugin `aipod`* in `plugin/aipod/` (git mv), catalog `aipod-releases`, zip `aipod-plugin.zip`, skills `/aipod:connect|status|disconnect`,
    local marketplace `aipod-local`; `build_plugin_site.py` publishes **both** catalogs from the same agent builds (the zips of the agent keep
-   their names, see ADR-0011).
+   their names, see ADR-0012).
 3. *A final version of the old plugin (the bridge)*: its `run.sh` exits quietly (as it does with no binary) when `aipod@aipod-releases` is enabled
    in the user's `settings.json`, so the two never report together; its `ensure.sh` says once "aipod replaces this plugin: run /aipod:connect".
    The new plugin's `run.sh` does the mirror image for a still-enabled *pre-bridge* old plugin (it cannot know the old one is a bridge): it
@@ -142,7 +142,7 @@ user unit `claude-monitor-agent.service`, scheduled task `ClaudeMonitorAgent`, `
 functions (as `WindowsServiceSetup` and `ServiceInstallerTests` do now), a Linux run in a container if one is available; **Windows and macOS
 cannot be exercised on this Mac, so tier 2 needs a Windows Server test machine and a macOS test machine before it ships.** **Needs the
 maintainer:** tier 1 yes/no, tier 2 yes/no (my recommendation: tier 1 now, tier 2 not unless a name becomes a real problem), and the
-reverse-DNS prefix for launchd labels and bundle ids. ADR-0011's tray used `net.aipod.tray` as a placeholder; no domain of ours is known, so it is now `aipod.tray` (launchd needs a unique label, not a
+reverse-DNS prefix for launchd labels and bundle ids. ADR-0012's tray used `net.aipod.tray` as a placeholder; no domain of ours is known, so it is now `aipod.tray` (launchd needs a unique label, not a
 reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as they are, and a real prefix is only needed if tier 2 renames them.
 
 ## Order and size

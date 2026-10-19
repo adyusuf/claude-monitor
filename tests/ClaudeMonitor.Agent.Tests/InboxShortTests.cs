@@ -48,7 +48,7 @@ public sealed class InboxShortTests : IDisposable
 
     private InboxTools Tool(AgentConfig? config = null) => new(config ?? home.Config, clock);
 
-    // ---- the notice names the tool of the session it is written to (ADR-0012) -----------------------------------------
+    // ---- the notice names the tool of the session it is written to (ADR-0013) -----------------------------------------
 
     [Fact]
     public async Task A_session_that_has_the_new_tool_names_gets_a_notice_that_names_them_and_an_old_one_keeps_the_old_name()

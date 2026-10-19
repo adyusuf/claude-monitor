@@ -57,7 +57,7 @@ public sealed partial class LocalStore : IDisposable
         CreateAskTables();
         CreateAsksOutTable();
         CreateFolderTables();
-        AddColumnIfMissing("session_inboxes", "tools", "TEXT"); // a database made before the names of a session's tools were kept (ADR-0012)
+        AddColumnIfMissing("session_inboxes", "tools", "TEXT"); // a database made before the names of a session's tools were kept (ADR-0013)
         AddColumnIfMissing("session_inboxes", "permission_mode", "TEXT"); // a database made before the mode of a session was kept (ADR-0008 §3f)
     }
 

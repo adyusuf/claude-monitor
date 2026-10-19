@@ -16,7 +16,7 @@ public sealed class AgentAction
     public string Status { get; set; } = AgentActionStatuses.Queued;
     public string? Result { get; set; }
 
-    /// <summary>Claude control (ADR-0013): the project key and permission mode of a start, and the short session id a start returned or a stop names. NULL for the other kinds.</summary>
+    /// <summary>Claude control (ADR-0014): the project key and permission mode of a start, and the short session id a start returned or a stop names. NULL for the other kinds.</summary>
     public string? ProjectKey { get; set; }
     public string? PermissionMode { get; set; }
     public string? SessionRef { get; set; }

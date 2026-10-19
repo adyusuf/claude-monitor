@@ -56,14 +56,14 @@ public sealed class SystemClaudeCli : IClaudeCli
     }
 }
 
-/// <summary>A background session this agent started (ADR-0013). The folder stays here, in the user-only home; the API only ever hears the project key.</summary>
+/// <summary>A background session this agent started (ADR-0014). The folder stays here, in the user-only home; the API only ever hears the project key.</summary>
 public sealed record ClaudeWorker(string Id, string ProjectKey, string Folder, string Mode, DateTimeOffset StartedAt, DateTimeOffset? StoppedAt = null);
 
 /// <summary>What a start or a stop came to: whether it worked, the text for the owner's page, and (for a start) the short id of the session.</summary>
 public sealed record ClaudeControlOutcome(bool Succeeded, string Text, string? SessionRef = null);
 
 /// <summary>
-/// Starts and stops Claude Code sessions in the background for the machine's owner, from the web (ADR-0013), with Claude Code's OWN commands:
+/// Starts and stops Claude Code sessions in the background for the machine's owner, from the web (ADR-0014), with Claude Code's OWN commands:
 /// `claude --bg` and `claude stop` (measured on 2.1.294). Nothing is built here. It only ever starts a session in a folder that is a project this
 /// machine has reported, with a permission mode from a closed list, never in a service agent, never above <see cref="AgentConfig.ClaudeWorkersMax"/> at a
 /// time, and it ends only a session it started itself (its id is written to <c>claude-workers.json</c> when it starts): a session the person started

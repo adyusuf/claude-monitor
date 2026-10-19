@@ -9,7 +9,7 @@ import { versionAtLeast } from "../lib/version";
 import { useCodeGate } from "./useCodeGate";
 
 const MODES: readonly ClaudePermissionMode[] = ["manual", "plan", "acceptEdits"];
-/** The environments Claude may be started in from the web (ADR-0013): the machine's class as an admin set it. */
+/** The environments Claude may be started in from the web (ADR-0014): the machine's class as an admin set it. */
 const ALLOWED_ENVIRONMENTS = ["dev", "test"];
 
 /** The sessions started from this page that nobody has stopped: a successful start that names a session, with no successful stop of that session after it. */
@@ -19,7 +19,7 @@ export function runningSessions(actions: AgentActionView[]): AgentActionView[] {
 }
 
 /**
- * Starting and stopping Claude Code on this machine from the web (ADR-0013). Only the machine's owner sees it. The owner switches it on for the machine
+ * Starting and stopping Claude Code on this machine from the web (ADR-0014). Only the machine's owner sees it. The owner switches it on for the machine
  * (a recent sign-in, like asks), then picks one of the machine's own projects and a careful permission mode and starts a background session with
  * Claude Code's own `claude --bg`; each session started here can be stopped here. There is no free text anywhere: a project from the list, a mode from three.
  * Production and database machines never show a start. Claude Code must already trust the folder (that is done once, by hand, at the machine).

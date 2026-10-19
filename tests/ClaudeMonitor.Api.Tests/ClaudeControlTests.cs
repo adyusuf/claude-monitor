@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClaudeMonitor.Api.Tests;
 
-/// <summary>Starting and stopping Claude from the web (ADR-0013): the machine owner's opt-in, the environment gate, closed fields, and what a start tells the page.</summary>
+/// <summary>Starting and stopping Claude from the web (ADR-0014): the machine owner's opt-in, the environment gate, closed fields, and what a start tells the page.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class ClaudeControlTests(ApiFactory api)
 {

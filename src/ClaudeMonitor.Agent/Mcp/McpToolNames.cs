@@ -10,7 +10,7 @@ public enum ToolNameMode
 }
 
 /// <summary>
-/// The tool names in one place (ADR-0012 step 3). The plugin decides the mode for the processes it starts (`aipod mcp --names aipod`, or
+/// The tool names in one place (ADR-0013 step 3). The plugin decides the mode for the processes it starts (`aipod mcp --names aipod`, or
 /// <c>AIPOD_TOOL_NAMES=aipod</c> for the hooks); with nothing said the names are the old ones. Every text that names a tool for the model is built here, so a
 /// session never reads the name of a tool it does not have. Only the closed list of tool names is ever rewritten: other words that start with
 /// <c>monitor_</c> (a database called monitor_prod in a script's output) are never touched.

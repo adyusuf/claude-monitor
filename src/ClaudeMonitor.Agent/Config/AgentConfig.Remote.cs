@@ -12,7 +12,7 @@ public sealed partial record AgentConfig
     /// </summary>
     public bool ServiceMode { get; init; }
 
-    /// <summary>The most Claude sessions this agent keeps running that were started from the web (ADR-0013).</summary>
+    /// <summary>The most Claude sessions this agent keeps running that were started from the web (ADR-0014).</summary>
     public int ClaudeWorkersMax { get; init; } = 3;
 
     /// <summary>The sessions this agent started from the web and has not stopped (ids and folders, in the user-only home).</summary>

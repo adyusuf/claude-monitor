@@ -8,7 +8,7 @@ using ModelContextProtocol.Server;
 namespace ClaudeMonitor.Agent.Mcp;
 
 /// <summary>
-/// Registers the MCP tools under the names of a mode (ADR-0012 step 3). The old names are the attributes on the tool methods and are registered the way
+/// Registers the MCP tools under the names of a mode (ADR-0013 step 3). The old names are the attributes on the tool methods and are registered the way
 /// they always were; the aipod names are the same methods created under another name, with the names inside their descriptions (and their parameters'
 /// descriptions) rewritten, so each mode lists exactly one set and no tool is ever listed twice.
 /// </summary>

@@ -59,7 +59,7 @@ public sealed partial record AgentConfig
     }
 
     /// <summary>
-    /// The home when no variable names one (<see cref="HomeResolver"/>, ADR-0012): the folder the machine already uses (macOS
+    /// The home when no variable names one (<see cref="HomeResolver"/>, ADR-0013): the folder the machine already uses (macOS
     /// ~/Library/Application Support/ClaudeMonitor; Windows %USERPROFILE%\.claude-monitor), else the aipod folder (~/Library/Application
     /// Support/aipod; ~/.aipod). Not under AppData: the Claude desktop app is a packaged (MSIX) app, and every process it starts sees
     /// %LOCALAPPDATA% redirected to a private copy, so a login made in a normal terminal was invisible to its hooks and MCP server.

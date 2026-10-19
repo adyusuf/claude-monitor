@@ -13,7 +13,7 @@ using ModelContextProtocol.Server;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>ADR-0012 step 3: the plugin picks the names of the tools (old by default), and every text that names a tool names the ones the session has.</summary>
+/// <summary>ADR-0013 step 3: the plugin picks the names of the tools (old by default), and every text that names a tool names the ones the session has.</summary>
 public sealed class McpToolNamesTests
 {
     private static string[] Registered() => ToolRegistry.ToolTypes
