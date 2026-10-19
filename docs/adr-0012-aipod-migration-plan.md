@@ -1,6 +1,7 @@
 # ADR-0012 (proposed): moving the names left over from the rename to aipod
 
-Status: **proposed 19/10/2026, nothing in it is built.** Follows ADR-0011 (the name people see is aipod; the old names keep working). This ADR
+Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1) and step 2 (the tier 1 display names, section 4);
+the rest is not built.** Follows ADR-0011 (the name people see is aipod; the old names keep working). This ADR
 designs, one item at a time, the four names ADR-0011 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
@@ -132,8 +133,8 @@ user unit `claude-monitor-agent.service`, scheduled task `ClaudeMonitorAgent`, `
 functions (as `WindowsServiceSetup` and `ServiceInstallerTests` do now), a Linux run in a container if one is available; **Windows and macOS
 cannot be exercised on this Mac, so tier 2 needs a Windows Server test machine and a macOS test machine before it ships.** **Needs the
 maintainer:** tier 1 yes/no, tier 2 yes/no (my recommendation: tier 1 now, tier 2 not unless a name becomes a real problem), and the
-reverse-DNS prefix for launchd labels and bundle ids. ADR-0011's tray used `net.aipod.tray` as a placeholder: no domain is known, so the
-placeholder should be replaced (or the prefix chosen) before anything ships.
+reverse-DNS prefix for launchd labels and bundle ids. ADR-0011's tray used `net.aipod.tray` as a placeholder; no domain of ours is known, so it is now `aipod.tray` (launchd needs a unique label, not a
+reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as they are, and a real prefix is only needed if tier 2 renames them.
 
 ## Order and size
 

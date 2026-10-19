@@ -90,11 +90,11 @@ public sealed class AutostartTests
     {
         var plist = Autostart.Plist("/Apps/Tom & Jerry/<aipod-tray>");
 
-        Assert.Contains("<key>Label</key><string>net.aipod.tray</string>", plist, StringComparison.Ordinal);
+        Assert.Contains("<key>Label</key><string>aipod.tray</string>", plist, StringComparison.Ordinal);
         Assert.Contains("<string>/Apps/Tom &amp; Jerry/&lt;aipod-tray&gt;</string>", plist, StringComparison.Ordinal);
         Assert.Contains("<key>RunAtLoad</key><true/>", plist, StringComparison.Ordinal);
         Assert.Contains("<key>KeepAlive</key><false/>", plist, StringComparison.Ordinal);
-        Assert.Equal(Path.Combine("/Users/x", "Library", "LaunchAgents", "net.aipod.tray.plist"), Autostart.PlistPath("/Users/x"));
+        Assert.Equal(Path.Combine("/Users/x", "Library", "LaunchAgents", "aipod.tray.plist"), Autostart.PlistPath("/Users/x"));
     }
 
     [Fact]

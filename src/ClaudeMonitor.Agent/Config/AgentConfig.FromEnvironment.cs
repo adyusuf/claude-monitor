@@ -5,7 +5,7 @@ namespace ClaudeMonitor.Agent.Config;
 /// <summary>How the configuration is read from the environment (every variable is in .env.example) and where the home is.</summary>
 public sealed partial record AgentConfig
 {
-    public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null)
+    public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null, Func<string, bool>? fileExists = null)
     {
         read = Brand.WithAliases(read ?? Environment.GetEnvironmentVariable); // AIPOD_X wins over CM_X
         legacyHome ??= LegacyHome;
@@ -17,7 +17,7 @@ public sealed partial record AgentConfig
         var explicitHome = read("CM_AGENT_HOME") is { Length: > 0 };
         return new AgentConfig
         {
-            Home = explicitHome ? read("CM_AGENT_HOME")! : DefaultHome(),
+            Home = explicitHome ? read("CM_AGENT_HOME")! : DefaultHome(fileExists),
             MigrateFrom = explicitHome ? null : legacyHome(),
             ServerOverride = read("CM_SERVER") is { Length: > 0 } s ? s.TrimEnd('/') : null,
             CredentialStore = read("CM_CREDENTIALS") == "file" ? "file" : "keychain",
@@ -58,11 +58,13 @@ public sealed partial record AgentConfig
     }
 
     /// <summary>
-    /// macOS: ~/Library/Application Support/ClaudeMonitor; Windows: %USERPROFILE%\.claude-monitor. Not under AppData: the
-    /// Claude desktop app is a packaged (MSIX) app, and every process it starts sees %LOCALAPPDATA% redirected to a private
-    /// copy, so a login made in a normal terminal was invisible to its hooks and MCP server.
+    /// The home when no variable names one (<see cref="HomeResolver"/>, ADR-0012): the folder the machine already uses (macOS
+    /// ~/Library/Application Support/ClaudeMonitor; Windows %USERPROFILE%\.claude-monitor), else the aipod folder (~/Library/Application
+    /// Support/aipod; ~/.aipod). Not under AppData: the Claude desktop app is a packaged (MSIX) app, and every process it starts sees
+    /// %LOCALAPPDATA% redirected to a private copy, so a login made in a normal terminal was invisible to its hooks and MCP server.
     /// </summary>
-    public static string DefaultHome() => HomeFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    public static string DefaultHome(Func<string, bool>? fileExists = null) =>
+        HomeResolver.Resolve(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), fileExists ?? File.Exists);
 
     /// <summary>The older Windows default (%LOCALAPPDATA%\ClaudeMonitor), kept only to migrate from and to find old installs; null on macOS.</summary>
     public static string? LegacyHome() =>

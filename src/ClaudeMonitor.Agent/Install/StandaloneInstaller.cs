@@ -47,7 +47,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         {
             if (string.IsNullOrWhiteSpace(server))
             {
-                output.WriteLine("Not connected: give the server, aipod install --standalone --server https://<your Claude Monitor address>, or run aipod login --server <url> first.");
+                output.WriteLine("Not connected: give the server, aipod install --standalone --server https://<your aipod server address>, or run aipod login --server <url> first.");
                 return 2;
             }
 

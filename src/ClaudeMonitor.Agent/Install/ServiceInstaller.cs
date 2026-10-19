@@ -163,7 +163,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
             _ => $"type \"{l.LoginCodePath}\"   (in an elevated prompt)",
         };
         output.WriteLine(l.Server is null
-            ? "Not connected: install again with --server https://<your Claude Monitor address> so the service can log in by itself."
+            ? "Not connected: install again with --server https://<your aipod server address> so the service can log in by itself."
             : "The service logs in by itself: it shows a code to approve on the web. Read it with:");
         if (l.Server is not null) output.WriteLine($"  {log}");
         output.WriteLine("Then approve the code on the web while signed in; the service starts reporting at once.");

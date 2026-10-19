@@ -31,7 +31,7 @@ public sealed class ConnectCommand(AgentConfig config, TextWriter output, TimePr
         var server = (serverArg ?? config.ServerOverride ?? identity.Server)?.TrimEnd('/');
         if (server is null || !Uri.TryCreate(server, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && !uri.IsLoopback))
         {
-            await output.WriteLineAsync("Give the server: aipod connect --server https://<your Claude Monitor address> (https, or http on localhost).");
+            await output.WriteLineAsync("Give the server: aipod connect --server https://<your aipod server address> (https, or http on localhost).");
             return 2;
         }
 

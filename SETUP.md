@@ -179,8 +179,9 @@ never touches the network. Revoke it from the web's Machines page; rotation is `
 status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
 or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
 
-The agent home is `~/Library/Application Support/ClaudeMonitor` on macOS, `%USERPROFILE%\.claude-monitor` on
-Windows and `~/.claude-monitor` on Linux (`CM_AGENT_HOME` overrides all three); `aipod status` prints it as `home:`. It is deliberately **not** under
+The agent home is the folder the machine already uses (`~/Library/Application Support/ClaudeMonitor` on macOS, `%USERPROFILE%\.claude-monitor` on
+Windows and `~/.claude-monitor` on Linux), and for a machine that has none the aipod folder (`~/Library/Application Support/aipod`, `~/.aipod`):
+nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0012). `AIPOD_AGENT_HOME` / `CM_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
 redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
 (ADR-0002, "Home outside AppData").

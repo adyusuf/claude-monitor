@@ -8,7 +8,10 @@ namespace ClaudeMonitor.Agent.Install;
 /// </summary>
 public static class WindowsServiceSetup
 {
-    public const string Description = "Claude Monitor agent: reports this machine to Claude Monitor and runs approved remote work.";
+    /// <summary>What the Services list shows as the name; the service name itself (the identifier) is unchanged (ADR-0012, tier 1).</summary>
+    public const string DisplayName = "aipod agent";
+
+    public const string Description = "aipod agent: reports this machine to aipod and runs approved remote work.";
     public const string RegistryKey = @"HKLM\SYSTEM\CurrentControlSet\Services\" + ServiceLayout.ServiceName;
     public const string RestartActions = "restart/10000/restart/60000//";
     public const string ResetSeconds = "86400";
@@ -38,7 +41,7 @@ public static class WindowsServiceSetup
     public static IReadOnlyList<string> Create(ServiceLayout l)
     {
         ArgumentNullException.ThrowIfNull(l);
-        return ["create", ServiceLayout.ServiceName, "binPath=", $"\"{l.Binary}\" daemon", "obj=", l.Account, "start=", "delayed-auto"];
+        return ["create", ServiceLayout.ServiceName, "binPath=", $"\"{l.Binary}\" daemon", "obj=", l.Account, "start=", "delayed-auto", "DisplayName=", DisplayName];
     }
 
     public static IReadOnlyList<string> Failure() =>

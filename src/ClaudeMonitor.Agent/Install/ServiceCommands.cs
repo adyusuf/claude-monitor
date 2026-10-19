@@ -31,7 +31,7 @@ public static class ServiceCommands
         if (server is not null && (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps
                                    || server.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || c is '"' or '%' or '|')))
         {
-            stderr.WriteLine($"{ServerOption} takes the https address of Claude Monitor, not \"{server}\".");
+            stderr.WriteLine($"{ServerOption} takes the https address of the aipod server, not \"{server}\".");
             return 2;
         }
 
