@@ -218,7 +218,7 @@ from a normal terminal, then check that `aipod status` and `monitor_status` in a
   as root or administrator) logs in first (approve the code on the web), copies the binary into the agent home and then starts the agent at your login: a
   LaunchAgent that runs an application bundle on macOS (no window, no Dock icon), a logon task that runs a windowless copy of the program on Windows, a
   `systemd --user` unit on Linux (without `loginctl enable-linger` it runs only while you are logged in; the installer says so). `uninstall --standalone`
-  removes the autostart and keeps the data. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
+  removes the autostart (under the aipod names `aipod.agent.user`, `aipod.service`, `AipodAgent`, `Aipod.app`, or the old ones, `com.claudemonitor.agent.user`, `claude-monitor-agent.service`, `ClaudeMonitorAgent`, `ClaudeMonitorAgent.app`) and keeps the data; running the install again on a machine that has the old names replaces them. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
   seconds. It reports `claude=none`; another machine's ask to it is refused (`no_claude`), but it is a normal target for runs. From it, `aipod machines`,
   `machine <x>`, `metrics <x>`, `alerts`, `jobs`, `job-run <id>`, `run --machine <x> (--script <file> --interpreter <i> | --argv ...)`, `result <id> --wait 30` and
   `ask --machine <x> "<question>"` reach the other machines without the web; an approval is still the owner's, on the web.

@@ -179,7 +179,10 @@ reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as
   (and policy) back to the old places and enables the old one. `--finish` needs seven days since the marker (or `--now`), checks every path it will delete against the new layout first, then removes the old unit/plist, account, folders, policy, sudoers drop-in.
 - **Windows is different.** The tokens are DPAPI-protected for `NT SERVICE\cm-agent` and cannot be read by `NT SERVICE\aipod`, so the home is copied after the new service exists (so the files take its ACL) without the `cred-*.bin` files, the identity loses its agent and workspace ids and keeps its
   machine key and server, and the service logs in again: an administrator reads the code in the new home and approves it. No health wait there; the old service is disabled right after the new one starts.
-- **Not built.** The standalone (user-level) registrations keep their names (label `com.claudemonitor.agent.user`, unit `claude-monitor-agent.service`, task `ClaudeMonitorAgent`, the app bundle); a Windows service host name inside the program stays `cm-agent` (for an own-process service Windows ignores it).
+- **Standalone registrations (added the same day).** `install --standalone` now registers under the aipod names (`StandaloneNames.Aipod`: label `aipod.agent.user`, user unit `aipod.service`, logon task `AipodAgent`, bundle `Aipod.app` with id `aipod.agent.app`; the binaries keep their file names) and, when
+  the old layout has a registration (label `com.claudemonitor.agent.user`, unit `claude-monitor-agent.service`, task `ClaudeMonitorAgent`, bundle `ClaudeMonitorAgent.app`), stops and removes it before the new one is enabled: that is the whole migration, no separate verb, because it is the user's own account
+  and the home does not move. `uninstall --standalone` removes either set. If enabling the new one fails after the old was removed, the machine has no autostart until the install is run again.
+- **Not built.** A Windows service host name inside the program stays `cm-agent` (for an own-process service Windows ignores it).
   The run account (`cm-run`, `_cmrun`) is shared by both services and is never removed.
 
 ## Order and size

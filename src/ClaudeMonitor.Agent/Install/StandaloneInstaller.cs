@@ -11,7 +11,7 @@ namespace ClaudeMonitor.Agent.Install;
 /// has no identity. On macOS and Windows the autostart is an application, not a console program (decision §9.12); on Linux a <c>systemd --user</c> unit.
 /// </summary>
 public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnlyList<string>, int> run, Func<string, IReadOnlyList<string>, string?> read,
-    StandaloneLayout layout, bool isRoot, Func<bool> connected, Func<string?, Task<int>> login, Func<uint?> uid, string version)
+    StandaloneLayout layout, bool isRoot, Func<bool> connected, Func<string?, Task<int>> login, Func<uint?> uid, string version, StandaloneLayout? legacy = null)
 {
     private const string Systemctl = "/usr/bin/systemctl";
     private const string Loginctl = "/usr/bin/loginctl";
@@ -65,6 +65,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
             effective = CopyBinaries(currentBinary);
             if (effective.BundlePath is not null) WriteBundle(effective);
             WriteDefinition(effective);
+            ReplaceLegacy();
             Enable(effective);
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException or System.Xml.XmlException or ArgumentException)
@@ -79,58 +80,85 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         return 0;
     }
 
-    /// <summary>Stops the autostart and removes its definition and the application bundle. The home, the login and the binary copy stay.</summary>
+    /// <summary>
+    /// Stops the autostart and removes its definition and the application bundle, under the aipod names and, when the old layout is known, under the old ones too (an agent installed before the
+    /// rename). The home, the login and the binary copy stay.
+    /// </summary>
     public int Uninstall()
     {
+        var any = false;
+        foreach (var l in new[] { layout, legacy }.Where(l => l is not null).Cast<StandaloneLayout>())
+        {
+            var code = RemoveRegistration(l, report: false, out var found);
+            if (code != 0) return code;
+            any |= found;
+        }
+
+        if (!any)
+        {
+            output.WriteLine("The standalone autostart is not installed.");
+            return 0;
+        }
+
+        output.WriteLine($"The standalone autostart is removed. Kept: the home {layout.Home} (the login and the queue) and the binary {layout.Binary}.");
+        return 0;
+    }
+
+    /// <summary>Removes one registration; <paramref name="found"/> says whether there was one. Returns 0, or the exit code to give.</summary>
+    private int RemoveRegistration(StandaloneLayout l, bool report, out bool found)
+    {
+        found = false;
         try
         {
-            switch (layout.Os)
+            switch (l.Os)
             {
                 case OsKinds.Windows:
-                    if (run(Schtasks(), ["/Query", "/TN", StandaloneLayout.TaskName]) != 0 && !File.Exists(layout.DefinitionPath))
-                    {
-                        output.WriteLine("The standalone autostart is not installed.");
-                        return 0;
-                    }
-
-                    run(Schtasks(), ["/End", "/TN", StandaloneLayout.TaskName]); // not running is fine
-                    run(Schtasks(), ["/Delete", "/TN", StandaloneLayout.TaskName, "/F"]);
+                    if (run(Schtasks(), ["/Query", "/TN", l.Names.TaskName]) != 0 && !File.Exists(l.DefinitionPath)) return Absent(report);
+                    run(Schtasks(), ["/End", "/TN", l.Names.TaskName]); // not running is fine
+                    run(Schtasks(), ["/Delete", "/TN", l.Names.TaskName, "/F"]);
                     break;
                 case OsKinds.MacOs:
-                    if (!File.Exists(layout.DefinitionPath))
-                    {
-                        output.WriteLine("The standalone autostart is not installed.");
-                        return 0;
-                    }
-
-                    run(Launchctl, ["bootout", $"gui/{uid() ?? 0}/{StandaloneLayout.Label}"]); // not loaded is fine
+                    if (!File.Exists(l.DefinitionPath)) return Absent(report);
+                    run(Launchctl, ["bootout", $"gui/{uid() ?? 0}/{l.Names.Label}"]); // not loaded is fine
                     break;
                 case OsKinds.Linux:
-                    if (!File.Exists(layout.DefinitionPath))
-                    {
-                        output.WriteLine("The standalone autostart is not installed.");
-                        return 0;
-                    }
-
-                    Step("stop and disable the unit", Systemctl, ["--user", "disable", "--now", StandaloneLayout.UnitName]);
+                    if (!File.Exists(l.DefinitionPath)) return Absent(report);
+                    Step("stop and disable the unit", Systemctl, ["--user", "disable", "--now", l.Names.UnitName]);
                     break;
                 default:
-                    output.WriteLine($"A standalone agent is not supported on this OS ({layout.Os}).");
+                    output.WriteLine($"A standalone agent is not supported on this OS ({l.Os}).");
                     return 2;
             }
 
-            if (File.Exists(layout.DefinitionPath)) File.Delete(layout.DefinitionPath);
-            if (layout.BundlePath is { } bundle && Directory.Exists(bundle)) Directory.Delete(bundle, recursive: true);
-            if (layout.Os == OsKinds.Linux) run(Systemctl, ["--user", "daemon-reload"]);
+            found = true;
+            if (File.Exists(l.DefinitionPath)) File.Delete(l.DefinitionPath);
+            if (l.BundlePath is { } bundle && Directory.Exists(bundle)) Directory.Delete(bundle, recursive: true);
+            if (l.Os == OsKinds.Linux) run(Systemctl, ["--user", "daemon-reload"]);
+            return 0;
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
         {
             output.WriteLine($"Uninstall failed: {e.Message}");
             return 1;
         }
+    }
 
-        output.WriteLine($"The standalone autostart is removed. Kept: the home {layout.Home} (the login and the queue) and the binary {layout.Binary}.");
+    private int Absent(bool report)
+    {
+        if (report) output.WriteLine("The standalone autostart is not installed.");
         return 0;
+    }
+
+    /// <summary>
+    /// An install since the rename replaces a registration under the old names (ADR-0013, tier 2): its supervisor is stopped and its definition and bundle removed before the new one is enabled,
+    /// so a machine is never started by both. The daemon lock keeps a second daemon out anyway.
+    /// </summary>
+    private void ReplaceLegacy()
+    {
+        if (legacy is null || legacy.Names == layout.Names) return;
+        var code = RemoveRegistration(legacy, report: false, out var found);
+        if (code != 0) throw new StepFailedException("could not remove the autostart under the old names");
+        if (found) output.WriteLine("Replaced the autostart that had the old names (com.claudemonitor.agent.user / claude-monitor-agent / ClaudeMonitorAgent).");
     }
 
     /// <summary>The console binary into the home, and the application's executable (macOS) or the windowless build (Windows) beside it.</summary>
@@ -165,7 +193,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
     {
         Directory.CreateDirectory(Path.GetDirectoryName(l.InfoPlistPath)!);
         undo.Add(("the application bundle", () => DeleteTree(l.BundlePath!)));
-        WriteAtomic(l.InfoPlistPath, StandaloneUnits.RenderInfoPlist(version), "write the bundle's Info.plist");
+        WriteAtomic(l.InfoPlistPath, StandaloneUnits.RenderInfoPlist(version, l.Names.BundleId), "write the bundle's Info.plist");
     }
 
     private void WriteDefinition(StandaloneLayout l)
@@ -192,20 +220,20 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         {
             case OsKinds.MacOs:
                 var domain = $"gui/{uid() ?? 0}";
-                run(Launchctl, ["bootout", $"{domain}/{StandaloneLayout.Label}"]); // a reinstall replaces what is loaded
+                run(Launchctl, ["bootout", $"{domain}/{l.Names.Label}"]); // a reinstall replaces what is loaded
                 Step("load the LaunchAgent", Launchctl, ["bootstrap", domain, l.DefinitionPath]);
-                undo.Add(("the loaded LaunchAgent", () => run(Launchctl, ["bootout", $"{domain}/{StandaloneLayout.Label}"])));
-                Step("start the agent", Launchctl, ["kickstart", "-k", $"{domain}/{StandaloneLayout.Label}"]);
+                undo.Add(("the loaded LaunchAgent", () => run(Launchctl, ["bootout", $"{domain}/{l.Names.Label}"])));
+                Step("start the agent", Launchctl, ["kickstart", "-k", $"{domain}/{l.Names.Label}"]);
                 break;
             case OsKinds.Linux:
                 Step("reload systemd", Systemctl, ["--user", "daemon-reload"]);
-                Step("enable and start the unit", Systemctl, ["--user", "enable", "--now", StandaloneLayout.UnitName]);
-                undo.Add(("the enabled unit", () => run(Systemctl, ["--user", "disable", "--now", StandaloneLayout.UnitName])));
+                Step("enable and start the unit", Systemctl, ["--user", "enable", "--now", l.Names.UnitName]);
+                undo.Add(("the enabled unit", () => run(Systemctl, ["--user", "disable", "--now", l.Names.UnitName])));
                 break;
             default:
-                Step("create the logon task", Schtasks(), ["/Create", "/TN", StandaloneLayout.TaskName, "/XML", l.DefinitionPath, "/F"]);
-                undo.Add(("the logon task", () => run(Schtasks(), ["/Delete", "/TN", StandaloneLayout.TaskName, "/F"])));
-                Step("start the agent now", Schtasks(), ["/Run", "/TN", StandaloneLayout.TaskName]);
+                Step("create the logon task", Schtasks(), ["/Create", "/TN", l.Names.TaskName, "/XML", l.DefinitionPath, "/F"]);
+                undo.Add(("the logon task", () => run(Schtasks(), ["/Delete", "/TN", l.Names.TaskName, "/F"])));
+                Step("start the agent now", Schtasks(), ["/Run", "/TN", l.Names.TaskName]);
                 break;
         }
     }

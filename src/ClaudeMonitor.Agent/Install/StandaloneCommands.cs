@@ -39,8 +39,11 @@ public static class StandaloneCommands
     private static StandaloneInstaller Installer(AgentConfig config, TextWriter stdout, Func<string, IReadOnlyList<string>, int>? run, bool? isRoot,
         Func<string?, Task<int>> login)
     {
-        var layout = StandaloneLayout.For(AgentConfig.Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), config.Home, Environment.UserName);
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        // New installs use the aipod names; the old layout is passed so that an install replaces a registration under the old names and an uninstall removes either (ADR-0013, tier 2).
+        var layout = StandaloneLayout.ForAipod(AgentConfig.Os, profile, config.Home, Environment.UserName);
         return new StandaloneInstaller(stdout, run ?? ServiceInstaller.RunTool, ServiceInstaller.CaptureTool, layout, isRoot ?? ExecPolicyLoader.RunningAsRoot(),
-            () => Identity.Peek(config)?.Connected == true, login, () => OperatingSystem.IsWindows() ? null : UnixFiles.Euid(), AgentConfig.Version);
+            () => Identity.Peek(config)?.Connected == true, login, () => OperatingSystem.IsWindows() ? null : UnixFiles.Euid(), AgentConfig.Version,
+            StandaloneLayout.For(AgentConfig.Os, profile, config.Home, Environment.UserName));
     }
 }
