@@ -7,15 +7,29 @@ import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
 import { versionAtLeast } from "../lib/version";
 import { isStrict } from "./MachineBadges";
+import { ExecBadge, ServiceBadge } from "./MachineBits";
 import { useCodeGate } from "./useCodeGate";
 
 /** Restart and update change the machine: they ask for a recent sign-in (a fresh two-step code on a production or database machine). */
 const GATED: readonly AgentActionKind[] = ["restart", "update"];
 const KINDS: readonly AgentActionKind[] = ["status", "update_check", "update", "restart"];
 
+/** What the page knows about the aipod daemon on this machine, for any member: the version, how it runs, what it may run, and when it last spoke. */
+function AipodFacts({ view, agentVersion }: { view: MachineView; agentVersion: string | null }) {
+  const { t } = useI18n();
+  return (
+    <dl className="facts row small">
+      <div><dt className="muted">{t("machines.actions.version")}</dt><dd>{agentVersion || t("machines.actions.versionUnknown")}</dd></div>
+      <div><dt className="muted">{t("machines.actions.runs")}</dt><dd>{view.serviceMode ? <ServiceBadge serviceMode /> : <span className="badge">{t("machines.actions.interactive")}</span>}</dd></div>
+      <div><dt className="muted">{t("machines.actions.exec")}</dt><dd><ExecBadge level={view.execLevel} /></dd></div>
+      <div><dt className="muted">{t("machines.actions.lastSeen")}</dt><dd>{view.lastSeenAt ? dateTime(view.lastSeenAt) : "–"}</dd></div>
+    </dl>
+  );
+}
+
 /**
- * The fixed actions the machine's owner can ask of its agent (ADR-0005, "Agent actions from the web"): read its status, check for an update, update,
- * restart. There is no command text: each button is one kind from a closed set and the agent performs it with its own code. Only the owner sees the
+ * The aipod card of a machine (ADR-0011 §7a, step D): the daemon's facts for every member, and for the owner the fixed actions
+ * (ADR-0005, "Agent actions from the web"): read its status, check for an update, update, restart. There is no command text: each button is one kind from a closed set and the agent performs it with its own code. Only the owner sees the
  * buttons and the results; the result is text the agent wrote and is shown as text, never as markup.
  */
 export function MachineActions({ agentId, view, owned, agentVersion, version, onChanged }: {
@@ -59,9 +73,18 @@ export function MachineActions({ agentId, view, owned, agentVersion, version, on
     }
   };
 
-  if (!owned) return <p className="muted small">{t("machines.actions.ownerOnly")}</p>;
+  if (!owned) {
+    return (
+      <div className="stack">
+        <AipodFacts view={view} agentVersion={agentVersion} />
+        <p className="muted small">{t("machines.actions.ownerOnly")}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="stack">
+      <AipodFacts view={view} agentVersion={agentVersion} />
       <p className="muted small">{t("machines.actions.hint")}</p>
       {!newEnough ? <Notice>{t("machines.actions.oldAgent", { min: config.actionsMinAgentVersion })}</Notice> : null}
       {!view.online ? <p className="muted small">{t("machines.actions.offline")}</p> : null}
