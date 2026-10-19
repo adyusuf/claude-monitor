@@ -104,4 +104,13 @@ public sealed partial class StringsTests
         Assert.Equal("no.such.key", Strings.T("no.such.key", 1));
         Assert.Equal(["enter the code", "kodu girin", "geben Sie den Code ein"], Strings.InAllLanguages(Msg.LoginCodeMarker));
     }
+
+    [Fact]
+    public void The_log_and_the_model_stay_English_while_the_person_gets_their_language()
+    {
+        using var turkish = Strings.Scope("tr");
+        Assert.Contains("no reason given", Auth.AuthRefusal.Message(null), StringComparison.Ordinal);
+        Assert.Contains("neden verilmedi", Auth.AuthRefusal.Describe(null), StringComparison.Ordinal);
+        Assert.Contains("imzalı onaylar: kapalı", Approvals.ApproversStore.Describe(new Approvals.ApproversPolicy(false, [])), StringComparison.Ordinal);
+    }
 }

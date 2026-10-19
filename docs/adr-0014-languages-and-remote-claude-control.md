@@ -1,6 +1,6 @@
 # ADR-0014 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
-Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1, P2 and P3 (`on_message` only) of Part B are built (see "P1 as built", "P2 as built" and "P3 as built").** Part A is built except the `status` detail lines of the push, update and approver modules (the web, the API mails, `users.language`, the terminal catalog); Part B beyond P3 (`on_message` and `always`) is design only. Builds on ADR-0005
+Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1, P2 and P3 (`on_message` only) of Part B are built (see "P1 as built", "P2 as built" and "P3 as built").** Part A is built (the web, the API mails, `users.language`, the terminal catalog); Part B beyond P3 (`on_message` and `always`) is design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
 folders, asks) and ADR-0012 (the names aipod and Podium).
 
@@ -25,16 +25,17 @@ match. (4) The repository's documents (global rule: English). Dates stay `dd/mm/
 
 `Config/Strings*.cs` in the agent holds every sentence the person at the terminal reads: usage, `status`, `login`/`connect`, `update`, `install`
 (plugin, standalone, service), `migrate-home`, `service migrate`, and the tray's tooltip, menu, window and action results (the tray references the
-agent project, so one catalog serves both). 208 messages, three languages each (`Entry(Key, En, Tr, De)`); a typed key per message in `Msg`
+agent project, so one catalog serves both). 257 messages, three languages each (`Entry(Key, En, Tr, De)`); a typed key per message in `Msg`
 (`Msg.HmMoved`), a call is `Strings.T(Msg.HmMoved, from, to)` with `{0}`... placeholders filled with the invariant culture.
 The language is, in order: a scope (`Strings.Scope`, tests and flows), the process setting (`Strings.UseForProcess`), the variable `AIPOD_LANG`
 (`en`, `tr`, `de`; `tr-TR` and `de_DE.UTF-8` count), the operating system's UI language, else English. The language of the *account* (`users.language`)
 is the web's and the mail's, not the terminal's: the agent has no sign-in at the terminal to read it from.
 
 What stayed English, as the section above says, plus these terminal details: the reason inside a failure (`e.Message`, an install step's own failure
-text, an undo step's name) is data from the system and is shown as it is inside a translated frame; the `Describe` lines of `status`
-that come from the push, update and approver modules (`PushStatus`, `UpdateCommand.Describe`, `ApproversStore.Describe`, `ClaudeUpdateCommand`) are not in the
-catalog yet (they are operator lines, listed as the one remaining area).
+text, an undo step's name) is data from the system and is shown as it is inside a translated frame. The detail lines of `status` (the push, upload and web
+stream lines, the update and Claude Code update lines, the approvers and exec-policy lines, the refusal of the API) are in the catalog too; the same
+functions also feed what the *model* reads (`monitor_status`) and the log, so those two callers pin English with `Strings.Scope("en")`
+(`AuthRefusal.Message` is the English one for the log, `AuthRefusal.Describe` the person's).
 
 Two consequences were handled. (1) `aipod connect` reads the detached login's output file for "enter the code" and "trying again"; the file is written in the
 language of the other process, so the markers are matched in all three languages (`Strings.InAllLanguages`). (2) `migrate-home` used to decide "nothing to do"

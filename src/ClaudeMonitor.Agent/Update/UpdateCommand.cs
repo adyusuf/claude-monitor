@@ -184,18 +184,18 @@ public static class UpdateCommand
         ArgumentNullException.ThrowIfNull(store);
         var answer = Daemon.WorkspaceSettings.Get(config, store, UpdatePolicy.WorkspaceKey);
         var workspace = answer is null ? Daemon.WorkspaceSettings.Unread : UpdateModes.Normalize(answer);
-        yield return $"auto-update: {UpdatePolicy.Effective(config, store)} (this machine: {config.AutoUpdate}, workspace: {workspace})";
+        yield return Strings.T(Msg.UpAuto, UpdatePolicy.Effective(config, store), config.AutoUpdate, workspace);
         var state = UpdateState.Load(config);
-        if (state.Phase == UpdateState.PendingHealth) yield return $"update: {state.From} -> {state.To} is being checked";
-        if (state.Available is { } available) yield return $"update available: {available} (aipod update)";
+        if (state.Phase == UpdateState.PendingHealth) yield return Strings.T(Msg.UpChecking, state.From, state.To);
+        if (state.Available is { } available) yield return Strings.T(Msg.UpAvailable, available);
         if (state.Result is { } result && result != UpdateCodes.Available)
         {
             var at = DateTimeOffset.TryParse(state.CheckedAt ?? state.InstalledAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var when)
                 ? when.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)
                 : "?";
-            yield return $"last update check: {result} ({state.Detail}) {at}";
+            yield return Strings.T(Msg.UpLastCheck, result, state.Detail, at);
         }
 
-        if (state.BlockedVersion is { } blocked) yield return $"update {blocked} was rolled back and is not retried by itself";
+        if (state.BlockedVersion is { } blocked) yield return Strings.T(Msg.UpRolledBack, blocked);
     }
 }

@@ -108,5 +108,5 @@ public static class ApproversStore
 
     /// <summary>One line for `aipod status`: the mode and how many keys, never a key.</summary>
     public static string Describe(ApproversPolicy policy) =>
-        policy.Required ? $"signed approvals: required, {policy.Keys.Count} key(s) pinned" : $"signed approvals: off, {policy.Keys.Count} key(s) pinned";
+        Strings.T(policy.Required ? Msg.ApRequired : Msg.ApOff, policy.Keys.Count);
 }

@@ -123,7 +123,7 @@ public static class ExecPolicyLoader
     public static string Describe(ExecPolicy p)
     {
         ArgumentNullException.ThrowIfNull(p);
-        return $"exec level {p.Level}, {p.AllowedExecutables.Count} allowed executables, {p.AllowedRoots.Count} allowed roots{(p.RunAccount is { } a ? $", runs as {a}" : "")}";
+        return Strings.T(Msg.ExDescribe, p.Level, p.AllowedExecutables.Count, p.AllowedRoots.Count, p.RunAccount is { } a ? Strings.T(Msg.ExRunsAs, a) : "");
     }
 
     /// <summary>True for root (Unix) or SYSTEM and administrators (Windows); the executor refuses to run then. Unknown counts as true.</summary>
