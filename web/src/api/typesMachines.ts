@@ -71,6 +71,8 @@ export interface ProjectRunSummary {
 export interface MachineProjectView {
   key: string; name: string; branch: string | null; headSha: string | null; tag: string | null; lastSeenAt: string;
   source: "session" | "listed"; lastRuns: ProjectRunSummary[]; recentErrors: number;
+  /** What Claude Code's own trust record says about the folder (ADR-0014 P2): null when the agent could not read it, or is older. */
+  trusted?: boolean | null;
 }
 /** Everything about one machine: the list entry, the admin's note, the services the caller may see, and the projects. */
 export interface MachineDetail {

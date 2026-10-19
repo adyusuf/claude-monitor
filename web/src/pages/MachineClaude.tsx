@@ -9,6 +9,8 @@ import { versionAtLeast } from "../lib/version";
 import { useCodeGate } from "./useCodeGate";
 
 const MODES: readonly ClaudePermissionMode[] = ["manual", "plan", "acceptEdits"];
+/** The longest first prompt the API takes (AgentActionKinds.ClaudeFirstPromptMax). */
+export const FIRST_PROMPT_MAX = 2000;
 /** The environments Claude may be started in from the web (ADR-0014): the machine's class as an admin set it. */
 const ALLOWED_ENVIRONMENTS = ["dev", "test"];
 
@@ -36,12 +38,17 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const [done, setDone] = useState<"saved" | "started" | "stopped" | null>(null);
   const [project, setProject] = useState("");
   const [mode, setMode] = useState<ClaudePermissionMode>("manual");
+  const [prompt, setPrompt] = useState("");
   const accepting = view.acceptsClaudeControl === true;
   const allowed = view.roleEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.effectiveEnvironment);
   const newEnough = versionAtLeast(agentVersion, config.claudeMinAgentVersion);
   const claudeActions = actions.filter((a) => a.kind === "claude_start" || a.kind === "claude_stop");
   const running = runningSessions(actions);
-  const chosen = project || projects[0]?.key || "";
+  const startable = projects.filter((p) => p.trusted !== false); // a folder Claude Code is known not to trust cannot be started in; unknown (null) can
+  const chosen = project || startable[0]?.key || "";
+  const chosenProject = projects.find((p) => p.key === chosen);
+  const promptText = prompt.trim();
+  const promptTooLong = prompt.length > FIRST_PROMPT_MAX;
 
   const load = useCallback(async () => {
     try {
@@ -66,8 +73,9 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   };
   const start = async () => {
     setDone(null);
-    if (await action.attempt((code) => api.requestAgentAction(agentId, "claude_start", code, { projectKey: chosen, permissionMode: mode }).then(() => undefined))) {
+    if (await action.attempt((code) => api.requestAgentAction(agentId, "claude_start", code, { projectKey: chosen, permissionMode: mode, firstPrompt: promptText || undefined }).then(() => undefined))) {
       setDone("started");
+      setPrompt("");
       await load();
       onChanged();
     }
@@ -104,11 +112,14 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
           <h3>{t("machines.claudeControl.newTitle")}</h3>
           <p className="muted small">{t("machines.claudeControl.trustHint")}</p>
           {projects.length === 0 ? <p className="muted">{t("machines.claudeControl.noProjects")}</p> : (
+            <>
             <div className="row">
               <label className="stack">
                 <span className="small">{t("machines.claudeControl.project")}</span>
                 <select value={chosen} onChange={(e) => setProject(e.target.value)}>
-                  {projects.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
+                  {projects.map((p) => (
+                    <option key={p.key} value={p.key} disabled={p.trusted === false}>{p.trusted === false ? `${p.name} (${t("machines.claudeControl.untrustedOption")})` : p.name}</option>
+                  ))}
                 </select>
               </label>
               <label className="stack">
@@ -118,11 +129,20 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
                 </select>
               </label>
             </div>
+            {chosenProject?.trusted === true ? <p className="muted small">{t("machines.claudeControl.trusted")}</p> : null}
+            {startable.length === 0 ? <Notice>{t("machines.claudeControl.allUntrusted")}</Notice> : null}
+            <label className="stack">
+              <span className="small">{t("machines.claudeControl.firstPrompt")}</span>
+              <textarea className="input" rows={4} value={prompt} maxLength={FIRST_PROMPT_MAX + 1} onChange={(e) => setPrompt(e.target.value)} aria-invalid={promptTooLong} />
+              <span className={promptTooLong ? "small error-text" : "muted small"}>{t("machines.claudeControl.firstPromptCount", { n: prompt.length, max: FIRST_PROMPT_MAX })}</span>
+              <span className="muted small">{t("machines.claudeControl.firstPromptHint")}</span>
+            </label>
+            </>
           )}
           {action.field}
           {action.error ? <Notice kind="error">{action.error}</Notice> : null}
           <div className="row-actions">
-            <Button variant="primary" busy={action.busy} disabled={!chosen || open("claude_start") || !action.ready || !newEnough || !view.online} onClick={() => void start()}>
+            <Button variant="primary" busy={action.busy} disabled={!chosen || promptTooLong || open("claude_start") || !action.ready || !newEnough || !view.online} onClick={() => void start()}>
               {t("machines.claudeControl.start")}
             </Button>
           </div>

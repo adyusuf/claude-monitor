@@ -75,6 +75,8 @@ export const en = {
     claude_control_service_mode: "A service agent cannot start Claude.", claude_not_installed: "No Claude Code was found on this machine.", invalid_permission_mode: "Pick a permission mode from the list.",
     invalid_session_ref: "That is not a session id.", claude_not_started_here: "Only a session started from here can be stopped from here.",
     invalid_project: "The project key is 1 to 200 characters without control characters.",
+    invalid_first_prompt: "The first prompt is 1 to 2000 characters of text.", claude_folder_not_trusted: "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt.",
+    claude_start_pending: "Another start on this machine is still waiting: try again when it has finished.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", s: "s", m: "m", h: "h", d: "d" },

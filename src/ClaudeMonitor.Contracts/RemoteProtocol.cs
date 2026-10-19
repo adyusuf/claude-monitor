@@ -16,7 +16,8 @@ public sealed record ServiceInfo(int Port, string Proto, string? Process);
 /// What the agent read from one project folder's <c>.git</c> files (ADR-0008 §3a′): the key and name, an HMAC of the folder path (never the path),
 /// the branch, the commit and the tag that points at it. Reported for admin-listed folders and for folders a session visited.
 /// </summary>
-public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source);
+/// <summary>Trusted: what Claude Code's own trust record says about the folder (true, false), or null when the agent could not read it (an older agent too).</summary>
+public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source, bool? Trusted = null);
 
 /// <summary>
 /// Claude Code on the agent's machine (ADR-0008 §3e): how it is installed (<see cref="ClaudeKinds"/>), where (home-relative, never
@@ -121,7 +122,7 @@ public sealed record ProjectRunSummary(string? Kind, string Status, int? ExitCod
 
 /// <summary>A project on a machine: what the agent read from its folder, the last runs per kind and the tool failures sessions had in it recently.</summary>
 public sealed record MachineProjectView(string Key, string Name, string? Branch, string? HeadSha, string? Tag, DateTimeOffset LastSeenAt,
-    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors);
+    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors, bool? Trusted = null);
 
 /// <summary>
 /// Everything about one machine (ADR-0008 §3a′): its list entry, the admin's note (untrusted text), the listening services when the caller may

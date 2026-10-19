@@ -73,7 +73,7 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
         switch (action.Kind)
         {
             case AgentActionKinds.ClaudeStart when claude is not null:
-                var started = await claude.StartAsync(action.ProjectKey, action.PermissionMode, ct);
+                var started = await claude.StartAsync(action.ProjectKey, action.PermissionMode, ct, action.FirstPrompt, action.Id);
                 return (started.Succeeded, started.Text, null, started.SessionRef);
             case AgentActionKinds.ClaudeStop when claude is not null:
                 var stopped = await claude.StopAsync(action.SessionRef, ct);

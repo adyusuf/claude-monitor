@@ -28,6 +28,16 @@ public static class AgentActionKinds
 
     public const string DefaultClaudePermissionMode = "manual";
 
+    /// <summary>
+    /// The longest first prompt of a remote start (ADR-0014 P2), in characters. It is text from the web: capped here, wrapped and labelled by the agent, kept only until the
+    /// agent has it, never written to an audit row or a log.
+    /// </summary>
+    public const int ClaudeFirstPromptMax = 2000;
+
+    /// <summary>A first prompt is text a person typed: letters, spaces and new lines, no other control characters.</summary>
+    public static bool IsFirstPrompt(string? text) =>
+        text is { Length: >= 1 and <= ClaudeFirstPromptMax } && !string.IsNullOrWhiteSpace(text) && text.All(c => !char.IsControl(c) || c is '\n' or '\r' or '\t');
+
     /// <summary>The environments an admin must have set on a machine before Claude may be started on it from the web (production and database machines never).</summary>
     public static readonly IReadOnlyList<string> ClaudeEnvironments = ["dev", "test"];
 
@@ -58,13 +68,15 @@ public static class AgentActionStatuses
 }
 
 /// <summary>An action for the agent to perform, sent on its stream (event <see cref="AgentStreamEvents.Action"/>).</summary>
-public sealed record AgentActionMessage(Guid Id, string Kind, DateTimeOffset ExpiresAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null);
+public sealed record AgentActionMessage(Guid Id, string Kind, DateTimeOffset ExpiresAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null,
+    string? FirstPrompt = null);
 
 /// <summary>The agent's report: "delivered" when it takes the action, then "succeeded" or "failed" with a short text.</summary>
 public sealed record AgentActionReport(string Status, string? Result = null, string? SessionRef = null);
 
 /// <summary>The owner's request. Code: a two-step code, when the kind needs the re-authentication and the sign-in is not recent.</summary>
-public sealed record AgentActionRequest(string Kind, string? Code = null, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null);
+public sealed record AgentActionRequest(string Kind, string? Code = null, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null,
+    string? FirstPrompt = null);
 
 /// <summary>An action as the owner's page shows it. Result is plain text from the agent: data, never markup.</summary>
 public sealed record AgentActionView(Guid Id, Guid AgentId, string Kind, string Status, string? Result, DateTimeOffset CreatedAt,
@@ -91,4 +103,11 @@ public static class AgentActionErrors
     public const string InvalidPermissionMode = "invalid_permission_mode";
     public const string InvalidSessionRef = "invalid_session_ref";
     public const string NotStartedHere = "claude_not_started_here";
+    public const string InvalidFirstPrompt = "invalid_first_prompt";
+
+    /// <summary>Another start of this machine is still open (queued or running its start): wait for it, then ask again.</summary>
+    public const string ClaudeStartPending = "claude_start_pending";
+
+    /// <summary>The machine's agent read Claude Code's own trust record and the folder is not in it: a start would only be refused there (ADR-0014 P2).</summary>
+    public const string FolderNotTrusted = "claude_folder_not_trusted";
 }

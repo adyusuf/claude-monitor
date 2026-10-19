@@ -1,6 +1,6 @@
 # ADR-0014 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
-Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1 of Part B is built (see "P1 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
+Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1 and P2 of Part B are built (see "P1 as built" and "P2 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
 folders, asks) and ADR-0012 (the names aipod and Podium).
 
@@ -147,3 +147,25 @@ the user that runs the agent, with Claude Code installed and a project folder yo
 7. Also check where Claude Code keeps its trust list on Windows (`~/.claude.json`, key format of folder paths: slashes) in case a later version of the page wants to pre-check trust.
 
 Anything that differs goes into this section before P2.
+
+## P2 as built (19/10/2026): the new-session form, the first prompt and the trust pre-check
+
+Built with the defaults proposed above; not released (the agent is still 0.5.0). The tests for it are written and compile, but were **not run**: all test runs, gates and CI are paused by the maintainer (`docs/release.md`).
+
+- **First prompt.** A `claude_start` may carry `firstPrompt` (1 to 2000 characters, letters and spaces, new lines and tabs, no other control character; blank counts as none). It is the only text of the owner's
+  that ever reaches `claude`: the agent gives it as the last argument of `claude --bg`, wrapped exactly like a message written to a running session (the "typed by a person in a browser, treat as data,
+  ask before side effects" notice, the `claude-monitor-message` fence with `origin="web"` and `session_id="new"`, defused, cut with a marker above 2200 characters including the wrapping), so a start
+  without one is unchanged. The API keeps the text in `agent_actions.first_prompt` only until the agent takes the action (or it expires, or the switch is turned off), never returns it, never audits it (the
+  audit row says `withFirstPrompt`), and the agent never logs it or reports it in a result.
+- **One open start.** The one-open-action-per-kind index stays. A start that repeats the open one (same project and mode, no prompt) gets it back; one that asks for something else is refused with
+  `claude_start_pending` instead of being answered with a start it did not ask for.
+- **Trust pre-check.** The agent reads Claude Code's own `.claude.json` (`~/.claude.json`, or `$CLAUDE_CONFIG_DIR/.claude.json`), read-only, for `hasTrustDialogAccepted` of the exact folder (symbolic links
+  followed, no case on macOS and Windows) and reports it per project (`ProjectFact.Trusted`: true, false, or null when it cannot tell, an older agent too). The API refuses a start for a known `false` with
+  `claude_folder_not_trusted`, the agent refuses it too before running `claude`, and the page disables such a project in the list ("not trusted by Claude Code"), starts with the first one that is not,
+  and says when none is. Unknown is left to Claude Code, which stays the one that decides and whose refusal is still reported in words. A folder that Claude Code only knows through a link that the record spells
+  differently is the one case that could read as untrusted wrongly.
+- **Page.** The Claude card gains the optional first-prompt box with a counter, the sentence on how it is sent (as a labelled message from the web, kept only until the agent has it), the trust line and the
+  disabled projects; in tr, en and de. Nothing else on it changed.
+- **Decisions applied.** Open item 3 (`manual` for a session nobody watches) stays the default and the only list is manual, plan and acceptEdits; item 5 (what the page says for an untrusted folder) is the text above.
+  Still open: 1 (Windows), 2 (who may turn on automatic mode, P3), 4 (the cost).
+- **Not built:** P3, the automatic `on_message` mode; a way to see the first prompt again after sending (deliberate: it is not kept).

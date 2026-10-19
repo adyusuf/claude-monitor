@@ -18,7 +18,11 @@ public sealed class TempHome : IDisposable
             "CM_CREDENTIALS" => "file",
             _ => null,
         }) with
-        { PollEvery = TimeSpan.FromMilliseconds(10), PermissionWait = TimeSpan.FromSeconds(2) };
+        {
+            PollEvery = TimeSpan.FromMilliseconds(10),
+            PermissionWait = TimeSpan.FromSeconds(2),
+            ClaudeConfigDir = Path.Combine(Dir, "claude-config"), // never the real ~/.claude and ~/.claude.json, which the trust check reads
+        };
         Config = tweak is null ? config : tweak(config);
         Config.EnsureHome();
     }

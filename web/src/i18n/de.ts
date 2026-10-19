@@ -76,6 +76,8 @@ export const de: Dictionary = {
     claude_control_service_mode: "Ein Dienst-Agent kann Claude nicht starten.", claude_not_installed: "Auf dieser Maschine wurde kein Claude Code gefunden.", invalid_permission_mode: "Wählen Sie einen Berechtigungsmodus aus der Liste.",
     invalid_session_ref: "Das ist keine Sitzungs-ID.", claude_not_started_here: "Nur eine von hier gestartete Sitzung kann von hier gestoppt werden.",
     invalid_project: "Der Projektschlüssel hat 1 bis 200 Zeichen ohne Steuerzeichen.",
+    invalid_first_prompt: "Die erste Eingabe ist ein Text mit 1 bis 2000 Zeichen.", claude_folder_not_trusted: "Claude Code vertraut diesem Ordner noch nicht: Öffnen Sie Claude dort einmal an der Maschine und bestätigen Sie die Vertrauensfrage.",
+    claude_start_pending: "Ein anderer Start auf dieser Maschine wartet noch: Versuchen Sie es erneut, wenn er fertig ist.",
   },
   status: { active: "Arbeitet", idle: "Untätig", waiting: "Braucht Sie", ended: "Beendet" },
   time: { now: "jetzt", s: "s", m: "min", h: "h", d: "T" },

@@ -6,6 +6,7 @@ using ClaudeMonitor.Agent.Auth;
 using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Agent.Capture;
+using ClaudeMonitor.Agent.Push;
 using ClaudeMonitor.Agent.Storage;
 using ClaudeMonitor.Contracts;
 
@@ -68,22 +69,25 @@ public sealed record ClaudeControlOutcome(bool Succeeded, string Text, string? S
 /// machine has reported, with a permission mode from a closed list, never in a service agent, never above <see cref="AgentConfig.ClaudeWorkersMax"/> at a
 /// time, and it ends only a session it started itself (its id is written to <c>claude-workers.json</c> when it starts): a session the person started
 /// is never touched. Claude Code decides whether a folder is trusted; the person has to have accepted that once, by hand, and a refusal is reported as such.
-/// No text of the owner's is ever given to `claude`: the arguments are a fixed shape of keys and enums.
+/// The only text of the owner's that is ever given to `claude` is the optional first prompt (P2): wrapped as a message from the web, never logged; the rest of the
+/// arguments are a fixed shape of keys and enums. A folder Claude Code's own record shows as not trusted is refused before `claude` is asked.
 /// </summary>
 public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, TimeProvider clock, Func<ClaudeInstall>? locate = null)
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(30);
+    private const string NotTrusted = "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt, then try again";
     private readonly Lock gate = new();
     private readonly Func<ClaudeInstall> locator = locate ?? (() => ClaudeLocator.Locate(config));
 
     [GeneratedRegex(@"backgrounded\s*·\s*(?<id>[0-9a-f]{8})", RegexOptions.CultureInvariant)]
     private static partial Regex Backgrounded();
 
-    public async Task<ClaudeControlOutcome> StartAsync(string? projectKey, string? permissionMode, CancellationToken ct)
+    public async Task<ClaudeControlOutcome> StartAsync(string? projectKey, string? permissionMode, CancellationToken ct, string? firstPrompt = null, Guid actionId = default)
     {
         var mode = permissionMode ?? AgentActionKinds.DefaultClaudePermissionMode;
         if (!AgentActionKinds.ClaudePermissionModes.Contains(mode)) return new(false, "refused: that permission mode is not one a remote start may ask for");
         if (projectKey is not { Length: > 0 and <= RunKinds.ProjectKeyMax } || projectKey.Any(char.IsControl)) return new(false, "refused: no project was named");
+        if (firstPrompt is not null && !AgentActionKinds.IsFirstPrompt(firstPrompt)) return new(false, "refused: the first prompt is not text a remote start may carry");
         if (config.ServiceMode) return new(false, "this agent runs as a service: there is no Claude login or user folder for it to start a session in");
         if (Identity.Peek(config) is { } identity && MachineRoles.IsStrict(identity.ClaimedEnvironment, identity.ClaimedFunction))
         {
@@ -94,22 +98,26 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
         if (claude.Path is null) return new(false, "no `claude` was found on this machine's PATH");
         if (FolderOf(projectKey) is not { } folder) return new(false, "this machine knows no such project (it appears once a session works in it, or its folder is listed with `aipod config projects add`)");
         if (!Directory.Exists(folder)) return new(false, "the project's folder is gone from this machine");
+        if (ClaudeTrust.IsTrusted(config, folder) == false) return new(false, NotTrusted); // Claude Code's own record says so: do not even ask it
         if (Running().Count >= config.ClaudeWorkersMax) return new(false, $"{config.ClaudeWorkersMax} sessions started from the web are already running here: stop one first");
 
-        var run = await RunClaudeAsync(claude.Path, ["--bg", "--name", NameFor(projectKey), "--permission-mode", mode], folder, ct);
+        List<string> args = ["--bg", "--name", NameFor(projectKey), "--permission-mode", mode];
+        // The first prompt is the only text of the owner's that ever reaches `claude`: wrapped and labelled as coming from the web, defused and cut, and last on the line.
+        if (firstPrompt is not null) args.Add(ChannelEnvelopes.BuildFirstPrompt(actionId, firstPrompt, config.ClaudeFirstPromptMax, clock.GetUtcNow()));
+        var run = await RunClaudeAsync(claude.Path, args, folder, ct);
         if (run is null) return new(false, "claude could not be started");
         if (run.ExitCode != 0)
         {
             var said = run.Error + run.Output;
             return said.Contains("not trusted", StringComparison.OrdinalIgnoreCase)
-                ? new(false, "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt, then try again")
+                ? new(false, NotTrusted)
                 : new(false, $"claude --bg failed (exit {run.ExitCode}): {FirstLine(said)}");
         }
 
         if (Backgrounded().Match(run.Output) is not { Success: true } match) return new(false, $"claude --bg did not say which session it started: {FirstLine(run.Output)}");
         var id = match.Groups["id"].Value;
         Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow())).ToList());
-        return new(true, $"started session {id} in the background ({mode} mode); it appears in the session list", id);
+        return new(true, $"started session {id} in the background ({mode} mode{(firstPrompt is null ? "" : ", with a first prompt")}); it appears in the session list", id);
     }
 
     public async Task<ClaudeControlOutcome> StopAsync(string? sessionRef, CancellationToken ct)

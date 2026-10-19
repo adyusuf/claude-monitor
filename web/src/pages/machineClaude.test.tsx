@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentActionView, MachineDetail, MachineProjectView } from "../api/types";
@@ -7,7 +7,7 @@ import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
-import { runningSessions } from "./MachineClaude";
+import { FIRST_PROMPT_MAX, runningSessions } from "./MachineClaude";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
 
@@ -80,6 +80,63 @@ describe("the Claude card on the machine page", () => {
 
     expect(await screen.findByText(en.machines.claudeControl.done.started)).toBeInTheDocument();
     expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/blog", permissionMode: "plan" });
+  });
+
+  it("sends a first prompt with the start, trimmed, and clears the box; an empty box sends none", async () => {
+    const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev);
+    open();
+    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[()]/g, "\\$&")));
+    await userEvent.click(await screen.findByRole("button", { name: en.machines.claudeControl.start }));
+    expect(await screen.findByText(en.machines.claudeControl.done.started)).toBeInTheDocument();
+    expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/shop", permissionMode: "manual" }); // no firstPrompt key at all
+
+    fireEvent.change(box, { target: { value: "  fix the failing test\n" } });
+    await userEvent.click(screen.getByRole("button", { name: en.machines.claudeControl.start }));
+
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(2));
+    expect(posts(calls)[1]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/shop", permissionMode: "manual", firstPrompt: "fix the failing test" });
+    await vi.waitFor(() => expect((box as HTMLTextAreaElement).value).toBe(""));
+  });
+
+  it("counts the characters of the first prompt, says how it is sent, and keeps Start off over the limit", async () => {
+    api({}, dev);
+    open();
+    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[()]/g, "\\$&")));
+    expect(screen.getByText(en.machines.claudeControl.firstPromptHint)).toBeInTheDocument();
+    expect(screen.getByText(`0 / ${FIRST_PROMPT_MAX}`)).toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: "x".repeat(FIRST_PROMPT_MAX) } });
+    expect(screen.getByText(`${FIRST_PROMPT_MAX} / ${FIRST_PROMPT_MAX}`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeEnabled();
+
+    fireEvent.change(box, { target: { value: "x".repeat(FIRST_PROMPT_MAX + 1) } });
+    expect(box).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
+  });
+
+  it("does not let a project Claude Code does not trust be chosen, starts with the first one that is not known untrusted, and says which are trusted", async () => {
+    const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev, [], [
+      project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new", trusted: null }),
+    ]);
+    open();
+    const select = await screen.findByLabelText(en.machines.claudeControl.project);
+    const options = [...select.querySelectorAll("option")];
+    expect(options.map((o) => [o.getAttribute("value"), (o as HTMLOptionElement).disabled])).toEqual([["git:host/old", true], ["git:host/blog", false], ["git:host/new", false]]);
+    expect(options[0]!.textContent).toBe(`old (${en.machines.claudeControl.untrustedOption})`);
+    expect((select as HTMLSelectElement).value).toBe("git:host/blog");
+    expect(screen.getByText(en.machines.claudeControl.trusted)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: en.machines.claudeControl.start }));
+
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0]!.body).toMatchObject({ projectKey: "git:host/blog" });
+  });
+
+  it("says so and keeps Start off when Claude Code trusts none of the projects", async () => {
+    api({}, dev, [], [project({ trusted: false })]);
+    open();
+    expect(await screen.findByText(en.machines.claudeControl.allUntrusted)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
   });
 
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
@@ -167,6 +224,10 @@ describe("the texts", () => {
       expect(Object.keys(dict.machines.claudeControl.modes)).toEqual(["manual", "plan", "acceptEdits"]);
       expect(dict.machines.actions.kind.claude_start).not.toBe("");
       expect(dict.errors.claude_control_environment).not.toBe("");
+      for (const key of ["invalid_first_prompt", "claude_folder_not_trusted", "claude_start_pending"] as const) expect(dict.errors[key]).not.toBe("");
+      expect(dict.machines.claudeControl.firstPromptCount).toContain("{n}");
+      expect(dict.machines.claudeControl.firstPromptCount).toContain("{max}");
+      for (const key of ["firstPrompt", "firstPromptHint", "untrustedOption", "trusted", "allUntrusted"] as const) expect(dict.machines.claudeControl[key]).not.toBe("");
     }
   });
 });

@@ -54,6 +54,6 @@ public static class MachineDetails
             runs.Where(x => x.ProjectKey == r.ProjectKey).GroupBy(x => x.Kind).SelectMany(g => g.Take(RunsPerKind))
                 .Select(x => new ProjectRunSummary(x.Kind, x.Status, x.ExitCode, x.EndedAt ?? x.CreatedAt, x.OutputTruncated, x.TestsPassed, x.TestsFailed, x.TestsSkipped))
                 .OrderByDescending(x => x.At).ToList(),
-            errors.FirstOrDefault(e => e.Key == r.ProjectKey)?.Count ?? 0)).ToList();
+            errors.FirstOrDefault(e => e.Key == r.ProjectKey)?.Count ?? 0, r.ClaudeTrusted)).ToList();
     }
 }

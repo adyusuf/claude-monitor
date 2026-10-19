@@ -15,6 +15,9 @@ public sealed partial record AgentConfig
     /// <summary>The most Claude sessions this agent keeps running that were started from the web (ADR-0014).</summary>
     public int ClaudeWorkersMax { get; init; } = 3;
 
+    /// <summary>The longest first prompt of a web start the agent hands to `claude` (the API caps what a person may type at ClaudeFirstPromptMax; the extra room is for the characters wrapping adds, and anything longer is cut with a marker).</summary>
+    public int ClaudeFirstPromptMax { get; init; } = AgentActionKinds.ClaudeFirstPromptMax + 200;
+
     /// <summary>The sessions this agent started from the web and has not stopped (ids and folders, in the user-only home).</summary>
     public string ClaudeWorkersPath => Path.Combine(Home, "claude-workers.json");
 

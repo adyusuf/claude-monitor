@@ -54,6 +54,7 @@ public static partial class MachineProjects
             row.Tag = fact.Tag is { Length: > 0 } t ? MachineReports.Clean(t, 64) : null;
             row.Source = ProjectSources.All.Contains(fact.Source) ? fact.Source : ProjectSources.Listed;
             row.LastSeenAt = now;
+            row.ClaudeTrusted = fact.Trusted;
         }
     }
 

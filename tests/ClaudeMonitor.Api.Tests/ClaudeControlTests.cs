@@ -186,6 +186,179 @@ public sealed class ClaudeControlTests(ApiFactory api)
         Assert.Empty(await ActionKit.RowsAsync(api, team.TargetId));
     }
 
+    // ---- the first prompt and the trust check (ADR-0014 P2) ----------------------------------------------------------
+
+    private static Task<HttpResponseMessage> StartWith(AskTeam team, string? prompt, string? project = Project, string? mode = null) =>
+        team.User.PostAsync($"/api/agents/{team.TargetId}/actions", new AgentActionRequest(AgentActionKinds.ClaudeStart, null, project, mode, null, prompt));
+
+    private async Task SetTrustAsync(AskTeam team, string project, bool? trusted)
+    {
+        await using var db = api.Db();
+        db.MachineProjects.Add(new ClaudeMonitor.Api.Data.MachineProject { AgentId = team.TargetId, ProjectKey = project, WorkspaceId = team.WorkspaceId, Name = "shop", ClaudeTrusted = trusted });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task A_first_prompt_is_kept_for_the_agent_only_never_shown_back_and_never_audited()
+    {
+        var team = await TeamAsync();
+        using var agent = await RemoteKit.OpenAsync(team.Target.Http, "/api/agent/stream");
+        await RemoteKit.NextEventAsync(agent, AgentStreamEvents.Ready);
+        const string text = "fix the failing test in the shop project";
+
+        var response = await StartWith(team, text);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("firstPrompt", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(text, body, StringComparison.Ordinal);
+        var toAgent = await RemoteKit.NextEventAsync(agent, AgentStreamEvents.Action);
+        Assert.Equal(text, toAgent.GetProperty("firstPrompt").GetString());
+        var id = (await ActionKit.RowsAsync(api, team.TargetId)).Single().Id;
+        Assert.Equal(text, (await ActionKit.RowAsync(api, id)).FirstPrompt);
+        Assert.Equal(text, Assert.Single(await ActionKit.WaitingAsync(api, team.TargetId)).FirstPrompt);
+        await using var db = api.Db();
+        var audit = await db.AuditEvents.AsNoTracking().SingleAsync(a => a.Action == AuditActions.AgentActionRequested && a.TargetId == team.TargetId.ToString());
+        Assert.DoesNotContain(text, audit.Detail!.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.True(audit.Detail.RootElement.GetProperty("withFirstPrompt").GetBoolean());
+        var listed = await ActionKit.ListAsync(team.User, team.TargetId);
+        Assert.DoesNotContain(text, string.Join("", listed.Select(l => l.GetRawText())), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_prompt_is_forgotten_the_moment_the_agent_takes_the_action()
+    {
+        var team = await TeamAsync();
+        var id = (await (await StartWith(team, "do the thing")).Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!.Id;
+
+        Assert.Equal(HttpStatusCode.NoContent, (await ActionKit.ReportAsync(team.Target, id, AgentActionStatuses.Delivered)).StatusCode);
+
+        Assert.Null((await ActionKit.RowAsync(api, id)).FirstPrompt);
+    }
+
+    [Fact]
+    public async Task A_prompt_nobody_took_is_forgotten_when_the_action_expires()
+    {
+        var team = await TeamAsync();
+        var id = (await (await StartWith(team, "do the thing")).Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!.Id;
+
+        api.Clock.Advance(AgentActionKinds.QueueTtl + TimeSpan.FromSeconds(1));
+        _ = await ActionKit.ListAsync(team.User, team.TargetId); // any look at the machine's actions expires the stale ones
+
+        var row = await ActionKit.RowAsync(api, id);
+        Assert.Equal((AgentActionStatuses.Expired, null), (row.Status, row.FirstPrompt));
+    }
+
+    [Fact]
+    public async Task Turning_the_switch_off_forgets_the_prompt_of_the_start_it_ends()
+    {
+        var team = await TeamAsync();
+        var id = (await (await StartWith(team, "do the thing")).Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!.Id;
+
+        await Accept(team, false);
+
+        Assert.Null((await ActionKit.RowAsync(api, id)).FirstPrompt);
+    }
+
+    [Theory]
+    [InlineData("bad\u0000text")]
+    [InlineData("escape \u001b[31m")]
+    public async Task A_first_prompt_with_control_characters_is_refused(string prompt)
+    {
+        var team = await TeamAsync();
+        await AssertInvalidAsync(await StartWith(team, prompt), "firstPrompt", AgentActionErrors.InvalidFirstPrompt);
+        Assert.Empty(await ActionKit.RowsAsync(api, team.TargetId));
+    }
+
+    [Fact]
+    public async Task A_first_prompt_is_at_most_2000_characters_new_lines_and_tabs_are_text_and_an_empty_one_means_none()
+    {
+        var team = await TeamAsync();
+        await AssertInvalidAsync(await StartWith(team, new string('x', AgentActionKinds.ClaudeFirstPromptMax + 1)), "firstPrompt", AgentActionErrors.InvalidFirstPrompt);
+        Assert.Empty(await ActionKit.RowsAsync(api, team.TargetId));
+
+        var ok = await StartWith(team, "line one\n\tline two" + new string('x', AgentActionKinds.ClaudeFirstPromptMax - 19));
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        var id = (await ok.Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!.Id;
+        await ActionKit.FinishAsync(team.Target, id, AgentActionStatuses.Failed, "x");
+
+        var blank = await StartWith(team, "   \n ");
+        Assert.Equal(HttpStatusCode.OK, blank.StatusCode);
+        Assert.Null((await ActionKit.RowAsync(api, (await blank.Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!.Id)).FirstPrompt);
+    }
+
+    [Fact]
+    public async Task A_first_prompt_belongs_to_a_start_only_a_stop_carries_none()
+    {
+        var team = await TeamAsync();
+        var start = (await (await Start(team)).Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!;
+        await ActionKit.FinishAsync(team.Target, start.Id, AgentActionStatuses.Succeeded);
+        await using (var db = api.Db())
+        {
+            var row = await db.AgentActions.SingleAsync(a => a.Id == start.Id);
+            row.SessionRef = "34a6ea9d";
+            await db.SaveChangesAsync();
+        }
+
+        var stop = await team.User.PostAsync($"/api/agents/{team.TargetId}/actions", new AgentActionRequest(AgentActionKinds.ClaudeStop, null, null, null, "34a6ea9d", "ignored"));
+
+        Assert.Equal(HttpStatusCode.OK, stop.StatusCode);
+        Assert.Null((await ActionKit.RowAsync(api, (await stop.Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!.Id)).FirstPrompt);
+    }
+
+    [Fact]
+    public async Task A_folder_the_agent_read_as_not_trusted_by_claude_code_is_refused_before_anything_is_queued()
+    {
+        var team = await TeamAsync();
+        await SetTrustAsync(team, Project, false);
+
+        await RemoteKit.AssertProblemAsync(await Start(team), HttpStatusCode.Conflict, AgentActionErrors.FolderNotTrusted);
+        await RemoteKit.AssertProblemAsync(await StartWith(team, "hello"), HttpStatusCode.Conflict, AgentActionErrors.FolderNotTrusted);
+        Assert.Empty(await ActionKit.RowsAsync(api, team.TargetId));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(null)]
+    public async Task A_trusted_folder_and_one_the_agent_could_not_read_are_left_to_claude_code(bool? trusted)
+    {
+        var team = await TeamAsync();
+        await SetTrustAsync(team, Project, trusted);
+
+        Assert.Equal(HttpStatusCode.OK, (await Start(team)).StatusCode);
+    }
+
+    [Fact]
+    public async Task What_the_agent_reports_about_trust_is_stored_per_project_and_shown_on_the_machine_page()
+    {
+        var team = await TeamAsync();
+        await using (var db = api.Db())
+        {
+            var facts = new[] { new ProjectFact(Project, "shop", null, null, null, null, ProjectSources.Listed, Trusted: false), new ProjectFact("git:host/blog", "blog", null, null, null, null, ProjectSources.Listed, Trusted: true), new ProjectFact("git:host/old", "old", null, null, null, null, ProjectSources.Listed) };
+            await MachineProjects.ApplyAsync(db, team.TargetId, team.WorkspaceId, facts, api.Clock.GetUtcNow(), CancellationToken.None);
+            await db.SaveChangesAsync();
+        }
+
+        var detail = await team.User.GetJsonAsync($"/api/agents/{team.TargetId}/detail");
+        var trusted = detail.GetProperty("projects").EnumerateArray().ToDictionary(p => p.GetProperty("key").GetString()!, p => p.TryGetProperty("trusted", out var t) && t.ValueKind != JsonValueKind.Null ? t.GetBoolean() : (bool?)null);
+        Assert.Equal((false, true, (bool?)null), (trusted[Project], trusted["git:host/blog"], trusted["git:host/old"]));
+    }
+
+    [Fact]
+    public async Task A_second_start_that_asks_for_something_else_is_refused_while_one_is_open_but_the_same_click_twice_gets_the_open_one()
+    {
+        var team = await TeamAsync();
+        var first = (await (await Start(team, Project, "plan")).Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!;
+
+        var again = (await (await Start(team, Project, "plan")).Content.ReadFromJsonAsync<AgentActionView>(TestUser.Json))!;
+        Assert.Equal(first.Id, again.Id);
+
+        await RemoteKit.AssertProblemAsync(await Start(team, "git:host/other", "plan"), HttpStatusCode.Conflict, AgentActionErrors.ClaudeStartPending);
+        await RemoteKit.AssertProblemAsync(await Start(team, Project, "manual"), HttpStatusCode.Conflict, AgentActionErrors.ClaudeStartPending);
+        await RemoteKit.AssertProblemAsync(await StartWith(team, "a prompt", Project, "plan"), HttpStatusCode.Conflict, AgentActionErrors.ClaudeStartPending);
+        Assert.Single(await ActionKit.RowsAsync(api, team.TargetId));
+    }
+
     // ---- who and where --------------------------------------------------------------------------------------------
 
     [Fact]

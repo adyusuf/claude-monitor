@@ -307,6 +307,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
 
+                    b.Property<string>("FirstPrompt")
+                        .HasColumnType("text")
+                        .HasColumnName("first_prompt");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1541,6 +1545,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("branch");
+
+                    b.Property<bool?>("ClaudeTrusted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("claude_trusted");
 
                     b.Property<string>("HeadSha")
                         .HasMaxLength(64)

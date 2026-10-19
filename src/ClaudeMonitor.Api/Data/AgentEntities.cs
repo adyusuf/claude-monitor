@@ -155,6 +155,9 @@ public sealed class MachineProject
     public string? Tag { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
     public string Source { get; set; } = ProjectSources.Session;
+
+    /// <summary>ADR-0014 P2: whether Claude Code trusts the folder, as the agent read it (NULL: unknown). A remote start is refused for a folder known not to be trusted.</summary>
+    public bool? ClaudeTrusted { get; set; }
 }
 
 /// <summary>
