@@ -191,7 +191,11 @@ public sealed class DaemonTests
         Assert.Equal(TimeSpan.FromSeconds(30), config.StopWait);
         var defaults = AgentConfig.FromEnvironment(_ => null);
         Assert.Equal(AgentConfig.DefaultHome(), defaults.Home);
-        Assert.EndsWith(OperatingSystem.IsMacOS() ? "ClaudeMonitor" : ".claude-monitor", defaults.Home, StringComparison.Ordinal); // Windows and Linux: ~/.claude-monitor
+        // A machine keeps the folder it already uses (the old one), a clean one gets the aipod folder (HomeResolver): either is right here.
+        Assert.True(
+            defaults.Home.EndsWith(OperatingSystem.IsMacOS() ? "ClaudeMonitor" : ".claude-monitor", StringComparison.Ordinal)
+            || defaults.Home.EndsWith(OperatingSystem.IsMacOS() ? "aipod" : ".aipod", StringComparison.Ordinal),
+            defaults.Home);
         Assert.Equal(AgentConfig.LegacyHome(), defaults.MigrateFrom);
         Assert.Null(config.MigrateFrom);
         Assert.Equal(TimeSpan.Zero, defaults.StopWait);
