@@ -4,6 +4,7 @@ import { deTwoStep } from "./de.twoStep";
 import { deRemote } from "./de.remote";
 import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
+import { deSprints } from "./de.sprints";
 
 // German: the same keys as en.ts (the type makes a missing key a build error). "Sie" throughout.
 export const de: Dictionary = {
@@ -84,6 +85,9 @@ export const de: Dictionary = {
     limit_reached: "Die höchste hier mögliche Anzahl ist erreicht.", archived: "Das ist archiviert. Stellen Sie es zuerst wieder her.",
     invalid_parent: "Das übergeordnete Element muss ein Epic dieses Projekts sein.", invalid_application: "Wählen Sie eine Anwendung dieses Projekts.", invalid_component: "Wählen Sie eine Komponente der gewählten Anwendung.", invalid_release: "Wählen Sie ein Release der gewählten Anwendung.", bug_only: "Nur ein Fehler trägt die Fehlerdetails.", invalid_issue: "Wählen Sie einen anderen Vorgang dieses Projekts.", self_link: "Ein Vorgang kann nicht mit sich selbst verknüpft werden.", cycle: "Diese Verknüpfung würde dazu führen, dass sich die Vorgänge gegenseitig in einer Schleife blockieren.", duplicate_link: "Diese beiden Vorgänge sind bereits verknüpft.",
     released: "Ein Release, das ausgeliefert wurde, kann nicht abgebrochen werden.", cancelled: "Ein abgebrochenes Release kann nicht geändert werden.",
+    sprint_active: "Ein anderer Sprint dieses Bereichs ist bereits aktiv. Schließen Sie ihn zuerst ab.", dates_required: "Legen Sie Start- und Enddatum fest, bevor Sie den Sprint starten.",
+    invalid_sprint: "Wählen Sie einen geplanten Sprint desselben Bereichs.", wrong_scope: "Dieser Sprint gehört zu einer Anwendung: Er nimmt nur deren Vorgänge auf.",
+    closed: "Dieser Sprint ist abgeschlossen.", not_planned: "Nur ein geplanter Sprint kann gelöscht werden.",
   },
   status: { active: "Arbeitet", idle: "Untätig", waiting: "Braucht Sie", ended: "Beendet" },
   time: { now: "jetzt", s: "s", m: "min", h: "h", d: "T" },
@@ -150,9 +154,10 @@ export const de: Dictionary = {
     toolCalls: "Werkzeugaufrufe: {n}", otherEvents: "Andere Ereignisse: {n}", emptyFilter: "Mit diesem Filter gibt es nichts anzuzeigen.",
     status: { queued: "Wartet", delivered: "Zugestellt", applied: "Angewendet", failed: "Fehlgeschlagen", expired: "Abgelaufen", cancelled: "Abgebrochen" },
   },
+  machines: deMachines,
   projects: deProjects,
   issues: deIssues,
-  machines: deMachines,
+  sprints: deSprints,
   twoStep: deTwoStep,
   device: {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",
