@@ -1,7 +1,7 @@
 # ADR-0013 (proposed): moving the names left over from the rename to aipod
 
 Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1), step 2 (the tier 1 display names, section 4) and
-step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`), step 4 (the `aipod` plugin and the bridge, section 1, "As built") and step 5 (`aipod migrate-home`, section 3, "As built"); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
+step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`), step 4 (the `aipod` plugin and the bridge, section 1, "As built") step 5 (`aipod migrate-home`, section 3, "As built") and step 6 (`aipod service migrate`, section 4, "As built"); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
 designs, one item at a time, the four names ADR-0012 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
@@ -168,6 +168,21 @@ maintainer:** tier 1 yes/no, tier 2 yes/no (my recommendation: tier 1 now, tier 
 reverse-DNS prefix for launchd labels and bundle ids. ADR-0012's tray used `net.aipod.tray` as a placeholder; no domain of ours is known, so it is now `aipod.tray` (launchd needs a unique label, not a
 reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as they are, and a real prefix is only needed if tier 2 renames them.
 
+**As built (19/10/2026, step 6, on the maintainer's yes; it first read "decided against" and was corrected the same day).** Not run on any real service, nor on macOS or Windows: the tests (written, not run) drive the Linux flow on temp folders with a fake `systemctl`.
+
+- **Names.** `ServiceNames` (service/unit, unit path, launchd label, plist path, sudoers file) rides on `ServiceLayout.Names`; the old set is `ServiceNames.Legacy` (unchanged constants), the new one `ServiceNames.Aipod`: `aipod`, `aipod.service`, label `aipod.agent` (no reverse-DNS, as for the tray),
+  accounts `aipod`, `_aipod`, `NT SERVICE\aipod`, folders and policy under `aipod` names (the table in `SETUP.md`), sudoers `aipod-run`. The binary file stays `cm-agent`. `install --service` picks the aipod layout for a fresh install and keeps the old one for a service that exists;
+  `uninstall --service` removes whichever exists (both, half way through a migration).
+- **Policy path.** `AgentConfig.ExecConfigPath` is the aipod place when a policy is there, else the old one (and the approvers file follows it).
+- **`aipod service migrate [--dry-run | --undo | --finish [--now]]`** (`ServiceMigrator`). Refuses (changes nothing) unless the old service is installed and connected, the aipod names and folders are free and it runs as an administrator (a dry run needs none). Real run: stop the old service; copy the home
+  (not the bundle folder, locks, login code or the run scratch folder) and `exec.json`/`approvers.json`; install the new service with the same installer as a fresh install (account, binary copy, policy kept, unit, start); wait up to 90 s for the new database to show a contact with the server
+  (read-only; Linux and macOS); disable (not remove) the old service; write a marker with the time beside the new policy. Any failure before the disable removes what the run made and starts the old service again. `--undo` stops and disables the new service, brings its identity and database
+  (and policy) back to the old places and enables the old one. `--finish` needs seven days since the marker (or `--now`), checks every path it will delete against the new layout first, then removes the old unit/plist, account, folders, policy, sudoers drop-in.
+- **Windows is different.** The tokens are DPAPI-protected for `NT SERVICE\cm-agent` and cannot be read by `NT SERVICE\aipod`, so the home is copied after the new service exists (so the files take its ACL) without the `cred-*.bin` files, the identity loses its agent and workspace ids and keeps its
+  machine key and server, and the service logs in again: an administrator reads the code in the new home and approves it. No health wait there; the old service is disabled right after the new one starts.
+- **Not built.** The standalone (user-level) registrations keep their names (label `com.claudemonitor.agent.user`, unit `claude-monitor-agent.service`, task `ClaudeMonitorAgent`, the app bundle); a Windows service host name inside the program stays `cm-agent` (for an own-process service Windows ignores it).
+  The run account (`cm-run`, `_cmrun`) is shared by both services and is never removed.
+
 ## Order and size
 
 | Step | Items | Size | Risk | Needs |
@@ -177,7 +192,7 @@ reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as
 | 3 | Tool-name mapping and `--names` (2) | large (about 200 text sites) | medium | nothing |
 | 4 | New plugin, both catalogs, bridge (1) | large | medium | the Claude Code spike |
 | 5 | `migrate-home` (3.2) | medium | medium | test machines |
-| 6 | Tier 2 service migrate (4) | large | high | Windows and macOS machines, maintainer yes |
+| 6 | Tier 2 service migrate (4) | large | high | built 19/10/2026 on the maintainer's yes; **not run on a real service or on macOS and Windows** |
 
 Still outside this ADR: the release file names and the update manifest (`cm-agent-<os>-<arch>.zip`, `cm-agent-update/1`; a dual-publish plus a
 manifest version for old agents), the .NET namespaces and project names (internal, no compatibility cost, one large mechanical commit), and the

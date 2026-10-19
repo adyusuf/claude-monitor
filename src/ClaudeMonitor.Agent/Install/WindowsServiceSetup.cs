@@ -13,6 +13,8 @@ public static class WindowsServiceSetup
 
     public const string Description = "aipod agent: reports this machine to aipod and runs approved remote work.";
     public const string RegistryKey = @"HKLM\SYSTEM\CurrentControlSet\Services\" + ServiceLayout.ServiceName;
+
+    public static string RegistryKeyOf(string name) => @"HKLM\SYSTEM\CurrentControlSet\Services\" + name;
     public const string RestartActions = "restart/10000/restart/60000//";
     public const string ResetSeconds = "86400";
 
@@ -41,25 +43,29 @@ public static class WindowsServiceSetup
     public static IReadOnlyList<string> Create(ServiceLayout l)
     {
         ArgumentNullException.ThrowIfNull(l);
-        return ["create", ServiceLayout.ServiceName, "binPath=", $"\"{l.Binary}\" daemon", "obj=", l.Account, "start=", "delayed-auto", "DisplayName=", DisplayName];
+        return ["create", l.Names.ServiceName, "binPath=", $"\"{l.Binary}\" daemon", "obj=", l.Account, "start=", "delayed-auto", "DisplayName=", DisplayName];
     }
 
-    public static IReadOnlyList<string> Failure() =>
-        ["failure", ServiceLayout.ServiceName, "reset=", ResetSeconds, "actions=", RestartActions];
+    // The service name is the old one unless the caller names another (a service made since the rename, ADR-0013 tier 2).
+    public static IReadOnlyList<string> Failure(string name = ServiceLayout.ServiceName) =>
+        ["failure", name, "reset=", ResetSeconds, "actions=", RestartActions];
 
-    public static IReadOnlyList<string> SidType() => ["sidtype", ServiceLayout.ServiceName, "unrestricted"];
-    public static IReadOnlyList<string> Describe() => ["description", ServiceLayout.ServiceName, Description];
-    public static IReadOnlyList<string> Start() => ["start", ServiceLayout.ServiceName];
-    public static IReadOnlyList<string> Stop() => ["stop", ServiceLayout.ServiceName];
-    public static IReadOnlyList<string> Delete() => ["delete", ServiceLayout.ServiceName];
-    public static IReadOnlyList<string> Query() => ["query", ServiceLayout.ServiceName];
+    public static IReadOnlyList<string> SidType(string name = ServiceLayout.ServiceName) => ["sidtype", name, "unrestricted"];
+    public static IReadOnlyList<string> Describe(string name = ServiceLayout.ServiceName) => ["description", name, Description];
+    public static IReadOnlyList<string> Start(string name = ServiceLayout.ServiceName) => ["start", name];
+    public static IReadOnlyList<string> Stop(string name = ServiceLayout.ServiceName) => ["stop", name];
+    public static IReadOnlyList<string> Delete(string name = ServiceLayout.ServiceName) => ["delete", name];
+    public static IReadOnlyList<string> Query(string name = ServiceLayout.ServiceName) => ["query", name];
+
+    /// <summary>"sc config" for a service that is kept but must not start at boot (the old service after a migration), or starts at boot again.</summary>
+    public static IReadOnlyList<string> StartType(string name, bool disabled) => ["config", name, "start=", disabled ? "disabled" : "delayed-auto"];
 
     /// <summary>The service's environment: one REG_MULTI_SZ value under the service key (a service has no other place for it).</summary>
     public static IReadOnlyList<string> Environment(ServiceLayout l)
     {
         ArgumentNullException.ThrowIfNull(l);
         var data = string.Join(EnvironmentSeparator, l.ServiceEnvironment.Select(e => $"{e.Name}={e.Value}"));
-        return ["add", RegistryKey, "/v", "Environment", "/t", "REG_MULTI_SZ", "/s", EnvironmentSeparator, "/d", data, "/f"];
+        return ["add", RegistryKeyOf(l.Names.ServiceName), "/v", "Environment", "/t", "REG_MULTI_SZ", "/s", EnvironmentSeparator, "/d", data, "/f"];
     }
 
     /// <summary>The home: full control for the service account and SYSTEM, nothing inherited, nobody else.</summary>

@@ -282,6 +282,13 @@ down, per OS:
 | Unit / definition | `/etc/systemd/system/cm-agent.service` | `/Library/LaunchDaemons/com.claudemonitor.agent.plist` | service `aipod` (`sc query aipod`) |
 | Login code (while not connected) | `<home>/login-code.txt`, `journalctl -u aipod` | `<home>/login-code.txt` | `<home>\login-code.txt` |
 
+**The names (ADR-0013, tier 2).** The table above is what services installed before the rename have. A fresh `install --service` now uses the aipod names: service and unit `aipod` (`/etc/systemd/system/aipod.service`), accounts `aipod` / `_aipod` / `NT SERVICE\aipod`,
+launchd label `aipod.agent` (`/Library/LaunchDaemons/aipod.agent.plist`), folders `/usr/local/lib/aipod`, `/var/lib/aipod`, `/Library/Application Support/aipod/{bin,home}`, `%ProgramFiles%\aipod`, `%ProgramData%\aipod\service`, the exec policy in
+`/etc/aipod/exec.json`, `/Library/Application Support/aipod/exec.json`, `%ProgramFiles%\aipod\exec.json`, and the sudoers file `aipod-run`; the binary file inside keeps the name `cm-agent`. A service that already exists keeps its old names when it is
+upgraded with `install --service`, and `sudo aipod service migrate` moves it: `--dry-run` shows the plan; the real run stops the old service, copies its home and policy, installs the new service, waits up to 90 s for it to reach the server (Linux, macOS) and only then **disables** the old
+one, which stays for 7 days; `--undo` goes back (the data the new service kept up comes back too), `--finish` removes the old service, account, folders, policy and sudoers file (before 7 days only with `--now`). A failure before the disable puts everything back and starts the old service. On
+**Windows** the tokens are encrypted for the old service account and the new account cannot read them: the machine logs in again and an administrator approves a code. The agent reads the exec policy from the new place first and the old one second.
+
 The service units set `CM_SERVICE=1`, `CM_AGENT_HOME=<service home>` and the single-file extraction folder
 (`DOTNET_BUNDLE_EXTRACT_BASE_DIR=<home>/.net`); nobody sets them by hand. `aipod uninstall --service` removes the
 service and **keeps** the home (the login), the exec policy and the binary.

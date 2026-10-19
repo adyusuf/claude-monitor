@@ -64,40 +64,41 @@ public sealed partial class ServiceInstaller
             undo.Add(("systemd reloaded", () => Step("reload systemd", Systemctl, ["daemon-reload"]))); // runs after the unit is deleted
             WriteDefinition(SystemdUnit.Render(l));
             Step("reload systemd", Systemctl, ["daemon-reload"]);
-            undo.Add(("service enabled", () => Step("disable the service", Systemctl, ["disable", "--now", ServiceLayout.ServiceName])));
-            Step("enable and start the service", Systemctl, ["enable", "--now", ServiceLayout.ServiceName]);
-            if (upgrade) Step("restart the service on the new binary", Systemctl, ["restart", ServiceLayout.ServiceName]);
+            undo.Add(("service enabled", () => Step("disable the service", Systemctl, ["disable", "--now", l.Names.ServiceName])));
+            Step("enable and start the service", Systemctl, ["enable", "--now", l.Names.ServiceName]);
+            if (upgrade) Step("restart the service on the new binary", Systemctl, ["restart", l.Names.ServiceName]);
             return;
         }
 
-        if (upgrade) run(Launchctl, ["bootout", $"system/{LaunchdDaemon.Label}"]); // the old copy may not be loaded
+        if (upgrade) run(Launchctl, ["bootout", $"system/{l.Names.Label}"]); // the old copy may not be loaded
         WriteDefinition(LaunchdDaemon.Render(l));
-        undo.Add(("service loaded", () => Step("unload the service", Launchctl, ["bootout", $"system/{LaunchdDaemon.Label}"])));
+        undo.Add(("service loaded", () => Step("unload the service", Launchctl, ["bootout", $"system/{l.Names.Label}"])));
         Step("load the service", Launchctl, ["bootstrap", "system", Definition()]);
     }
 
     /// <summary>Windows: the virtual account exists once the service does, so the ACLs come after sc create; a running old copy is stopped first.</summary>
     private void InstallWindows(ServiceLayout l, string currentBinary, string execLevel)
     {
-        if (run(Sc(), WindowsServiceSetup.Query()) == 0)
+        var name = l.Names.ServiceName;
+        if (run(Sc(), WindowsServiceSetup.Query(name)) == 0)
         {
-            run(Sc(), WindowsServiceSetup.Stop());
-            WaitStopped(); // sc stop returns at once; the binary stays locked and delete is deferred until the process ends
-            Step("remove the old service", Sc(), WindowsServiceSetup.Delete());
+            run(Sc(), WindowsServiceSetup.Stop(name));
+            WaitStopped(name); // sc stop returns at once; the binary stays locked and delete is deferred until the process ends
+            Step("remove the old service", Sc(), WindowsServiceSetup.Delete(name));
         }
 
         InstallBinary(l, currentBinary);
         PrepareHome(l);
         Step("create the service", Sc(), WindowsServiceSetup.Create(l));
-        undo.Add(("service created", () => Step("remove the service", Sc(), WindowsServiceSetup.Delete())));
-        Step("describe the service", Sc(), WindowsServiceSetup.Describe());
-        Step("set the restart policy", Sc(), WindowsServiceSetup.Failure());
-        Step("give the service its own security identifier", Sc(), WindowsServiceSetup.SidType());
+        undo.Add(("service created", () => Step("remove the service", Sc(), WindowsServiceSetup.Delete(name))));
+        Step("describe the service", Sc(), WindowsServiceSetup.Describe(name));
+        Step("set the restart policy", Sc(), WindowsServiceSetup.Failure(name));
+        Step("give the service its own security identifier", Sc(), WindowsServiceSetup.SidType(name));
         Step("set the service environment", System32("reg.exe"), WindowsServiceSetup.Environment(l));
         Step("restrict the home to the service and SYSTEM", System32("icacls.exe"), WindowsServiceSetup.HomeAcl(l));
         Step("let the service read its binary folder", System32("icacls.exe"), WindowsServiceSetup.BinaryAcl(l));
         WritePolicy(l, execLevel);
-        Step("start the service", Sc(), WindowsServiceSetup.Start());
+        Step("start the service", Sc(), WindowsServiceSetup.Start(name));
     }
 
     private void EnsureLinuxAccount(ServiceLayout l)
@@ -158,15 +159,15 @@ public sealed partial class ServiceInstaller
         var existed = Directory.Exists(l.Home);
         EnsureDir(l.Home, Mode700);
         if (!existed) undo.Add(("home created", () => Directory.Delete(l.Home, recursive: false)));
-        if (os != OsKinds.Windows) Step("hand the home to the service account", Chown(), [$"{l.Account}:{l.Account}", l.Home]);
+        if (os != OsKinds.Windows) Step("hand the home to the service account", Chown(), ChownHomeRecursively ? ["-R", $"{l.Account}:{l.Account}", l.Home] : [$"{l.Account}:{l.Account}", l.Home]);
     }
 
     /// <summary>Waits until "sc query" no longer reports the service as running or stopping (at most stopWaitSeconds, one look a second).</summary>
-    private void WaitStopped()
+    private void WaitStopped(string name = ServiceLayout.ServiceName)
     {
         for (var i = 0; i < stopWaitSeconds; i++)
         {
-            var state = (read ?? CaptureTool)(Sc(), WindowsServiceSetup.Query()) ?? "";
+            var state = (read ?? CaptureTool)(Sc(), WindowsServiceSetup.Query(name)) ?? "";
             if (!state.Contains("RUNNING", StringComparison.Ordinal) && !state.Contains("STOP_PENDING", StringComparison.Ordinal)) return;
             (sleep ?? Thread.Sleep)(TimeSpan.FromSeconds(1));
         }

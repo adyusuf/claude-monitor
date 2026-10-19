@@ -34,7 +34,7 @@ public sealed partial record AgentConfig
     public string ClaudeWorkersPath => Path.Combine(Home, "claude-workers.json");
 
     /// <summary>The admin-owned exec policy of a service agent: level and optional ceiling (ADR-0005, "Four fail-closed keys").</summary>
-    public string ExecConfigPath { get; init; } = DefaultExecConfigPath(Os);
+    public string ExecConfigPath { get; init; } = ResolveExecConfigPath(Os, File.Exists);
 
     /// <summary>Remote runs executing at once on this target; one more is refused as busy.</summary>
     public int ExecMaxConcurrent { get; init; } = 2;
@@ -89,6 +89,22 @@ public sealed partial record AgentConfig
 
     /// <summary>The longest an MCP tool waits for a run before answering with its current status.</summary>
     public const int RemoteWaitMaxSeconds = 50;
+
+    /// <summary>Linux /etc/aipod; macOS /Library/Application Support/aipod; Windows %ProgramFiles%\aipod: where a service made since the rename (ADR-0013, tier 2) keeps its policy.</summary>
+    public static string AipodExecConfigPath(string os) => os switch
+    {
+        OsKinds.Windows => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "aipod", "exec.json"),
+        OsKinds.MacOs => "/Library/Application Support/aipod/exec.json",
+        _ => "/etc/aipod/exec.json",
+    };
+
+    /// <summary>The aipod path when a policy is there, else the old one: an agent of a migrated service reads the new place first, one that was never migrated keeps reading the old (ADR-0013, tier 2).</summary>
+    public static string ResolveExecConfigPath(string os, Func<string, bool> fileExists)
+    {
+        ArgumentNullException.ThrowIfNull(fileExists);
+        var fresh = AipodExecConfigPath(os);
+        return fileExists(fresh) ? fresh : DefaultExecConfigPath(os);
+    }
 
     /// <summary>Linux /etc/cm-agent; macOS /Library/Application Support/ClaudeMonitor; Windows %ProgramFiles%\ClaudeMonitor — all admin-owned.</summary>
     public static string DefaultExecConfigPath(string os) => os switch

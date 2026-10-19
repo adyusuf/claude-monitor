@@ -25,6 +25,9 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
     private const string Dscl = "/usr/bin/dscl";
 
 
+    /// <summary>A migration (ADR-0013, tier 2) copies files into the home before the account exists: they are handed to it one by one, not only the folder.</summary>
+    public bool ChownHomeRecursively { get; init; }
+
     private static readonly string[] PrivilegedAccounts = ["root", "system", "localsystem", @"nt authority\system"];
 
     private readonly List<(string What, Action Undo)> undo = [];
@@ -107,14 +110,14 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
             switch (os)
             {
                 case OsKinds.Windows:
-                    if (run(Sc(), WindowsServiceSetup.Query()) != 0)
+                    if (run(Sc(), WindowsServiceSetup.Query(l.Names.ServiceName)) != 0)
                     {
                         output.WriteLine("The service is not installed.");
                         return 0;
                     }
 
-                    run(Sc(), WindowsServiceSetup.Stop()); // already stopped is fine
-                    Step("remove the service", Sc(), WindowsServiceSetup.Delete());
+                    run(Sc(), WindowsServiceSetup.Stop(l.Names.ServiceName)); // already stopped is fine
+                    Step("remove the service", Sc(), WindowsServiceSetup.Delete(l.Names.ServiceName));
                     break;
                 case OsKinds.MacOs:
                 case OsKinds.Linux:
@@ -124,8 +127,8 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
                         return 0;
                     }
 
-                    if (os == OsKinds.Linux) Step("stop and disable the service", Systemctl, ["disable", "--now", ServiceLayout.ServiceName]);
-                    else run(Launchctl, ["bootout", $"system/{LaunchdDaemon.Label}"]); // not loaded is fine
+                    if (os == OsKinds.Linux) Step("stop and disable the service", Systemctl, ["disable", "--now", l.Names.ServiceName]);
+                    else run(Launchctl, ["bootout", $"system/{l.Names.Label}"]); // not loaded is fine
                     File.Delete(Definition());
                     RemoveRunAccountAccess();
                     if (os == OsKinds.Linux) Step("reload systemd", Systemctl, ["daemon-reload"]);
@@ -144,6 +147,20 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
         return 0;
     }
 
+    /// <summary>True when a service with this layout's names is registered: its unit or plist exists, or on Windows <c>sc query</c> finds it.</summary>
+    public static bool IsInstalled(string os, ServiceLayout l, Func<string, IReadOnlyList<string>, int> run, string? definitionPath = null)
+    {
+        ArgumentNullException.ThrowIfNull(l);
+        ArgumentNullException.ThrowIfNull(run);
+        return os switch
+        {
+            OsKinds.Windows => run(Sc(), WindowsServiceSetup.Query(l.Names.ServiceName)) == 0,
+            OsKinds.Linux => File.Exists(definitionPath ?? l.Names.UnitPath),
+            OsKinds.MacOs => File.Exists(definitionPath ?? l.Names.PlistPath),
+            _ => false,
+        };
+    }
+
     private string? Problem(ServiceLayout l) => os switch
     {
         OsKinds.Linux => SystemdUnit.Check(l),
@@ -158,7 +175,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
     {
         var log = os switch
         {
-            OsKinds.Linux => $"sudo journalctl -u {ServiceLayout.ServiceName}   or   sudo cat {Quote(l.LoginCodePath)}",
+            OsKinds.Linux => $"sudo journalctl -u {l.Names.ServiceName}   or   sudo cat {Quote(l.LoginCodePath)}",
             OsKinds.MacOs => $"sudo cat {Quote(l.LoginCodePath)}",
             _ => $"type \"{l.LoginCodePath}\"   (in an elevated prompt)",
         };
@@ -188,9 +205,9 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
 
     private bool Supported() => os is OsKinds.Linux or OsKinds.MacOs or OsKinds.Windows;
     private ServiceLayout Layout() => resolved ??= layout ?? ServiceLayout.For(os);
-    private string Definition() => definitionPath ?? (os == OsKinds.Linux ? SystemdUnit.UnitPath : LaunchdDaemon.PlistPath);
+    private string Definition() => definitionPath ?? (os == OsKinds.Linux ? Layout().Names.UnitPath : Layout().Names.PlistPath);
     private string Chown() => os == OsKinds.MacOs ? MacChown : LinuxChown;
-    private static string Sc() => System32("sc.exe");
+    internal static string Sc() => System32("sc.exe");
     private static string System32(string tool) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), tool);
     private static string Quote(string value) => value.Contains(' ') ? $"\"{value}\"" : value;
 }

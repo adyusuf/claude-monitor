@@ -39,6 +39,9 @@ public static partial class Cli
                                         as a second unprivileged account (Linux and macOS, through sudo; ADR-0010)
         aipod connect [--server <url>]
                                         like login, from inside Claude Code: prints the code and returns; the login finishes in the background
+        aipod service migrate [--dry-run | --undo | --finish [--now]]
+                                        (admin) move a boot service to the aipod names (cm-agent, _cmagent, com.claudemonitor.agent become aipod, _aipod, aipod.agent), keeping the old one disabled for
+                                        7 days; --undo goes back, --finish removes the old service, account, folders and policy (ADR-0013, tier 2)
         aipod restart                hand the running daemon over to this binary
         aipod migrate-home [--dry-run]
                                         move the old home folder to the aipod folder and leave a link at the old path (macOS, Linux; ADR-0013);
@@ -76,6 +79,7 @@ public static partial class Cli
         // A boot service is installed by an admin: nothing may be written to the admin's own home first (ADR-0005).
         if (args.FirstOrDefault() == "install" && ServiceCommands.IsService(args)) return ServiceCommands.Install(args, stdout, stderr);
         if (args.FirstOrDefault() == "uninstall" && ServiceCommands.IsService(args)) return ServiceCommands.Uninstall(stdout);
+        if (args.FirstOrDefault() == "service") return ServiceCommands.Service(args, stdout, stderr);
         if (args.FirstOrDefault() == "install" && StandaloneCommands.IsStandalone(args)) return await StandaloneCommands.InstallAsync(args, config, stdout, stderr, clock);
         if (args.FirstOrDefault() == "uninstall" && StandaloneCommands.IsStandalone(args)) return StandaloneCommands.Uninstall(config, stdout);
         var log = new AgentLog(config, clock);

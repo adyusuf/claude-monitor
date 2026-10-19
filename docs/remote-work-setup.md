@@ -194,7 +194,8 @@ A service agent does not update itself: its binary is admin-owned, so the opt-in
    unit and starts the new one. The exec policy keeps its `allowedExecutables` and `allowedRoots`, and its level unless
    you pass `--exec`; the login in the service home stays, so no new code is needed.
 3. Check the Machines page (the machine is seen again) and `aipod status` on the target.
-4. Remove: `sudo aipod uninstall --service` (an elevated prompt on Windows) stops and deletes the service and
+4. A service installed before the rename keeps working under its old names (`cm-agent`); `sudo aipod service migrate --dry-run` shows how it would move to the aipod names, `sudo aipod service migrate` does it ([SETUP.md](../SETUP.md), ADR-0013 section 4). Go back with `--undo`; after seven days `--finish` removes the old service.
+5. Remove: `sudo aipod uninstall --service` (an elevated prompt on Windows) stops and deletes the service and
    **keeps** the home (the login), the exec policy and the binary. To retire a machine for good, also revoke its agent
    on the web (the Machines page) and delete the home.
 
