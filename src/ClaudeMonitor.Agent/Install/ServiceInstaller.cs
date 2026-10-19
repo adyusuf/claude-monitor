@@ -3,7 +3,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// "cm-agent install --service" and "uninstall --service" (ADR-0005): registers the daemon as a boot service under a
+/// "aipod install --service" and "uninstall --service" (ADR-0005): registers the daemon as a boot service under a
 /// dedicated account, from an admin-owned copy of the binary. Stops at the first failure, says what failed and undoes
 /// what this run created. Every external tool goes through <c>run</c>, which returns its exit code.
 /// </summary>
@@ -163,7 +163,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
             _ => $"type \"{l.LoginCodePath}\"   (in an elevated prompt)",
         };
         output.WriteLine(l.Server is null
-            ? "Not connected: install again with --server https://<your Claude Monitor address> so the service can log in by itself."
+            ? "Not connected: install again with --server https://<your aipod server address> so the service can log in by itself."
             : "The service logs in by itself: it shows a code to approve on the web. Read it with:");
         if (l.Server is not null) output.WriteLine($"  {log}");
         output.WriteLine("Then approve the code on the web while signed in; the service starts reporting at once.");

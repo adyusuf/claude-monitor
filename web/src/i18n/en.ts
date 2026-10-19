@@ -6,7 +6,7 @@ import { enRemote } from "./en.remote";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
 export const en = {
-  app: { name: "Claude Monitor", tagline: "Follow your AI coding sessions, live." },
+  app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
     projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", settings: "Workspace settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
@@ -73,6 +73,9 @@ export const en = {
     invalid_tag: "Tags are key=value pairs: at most 10, letters, digits, dot, underscore and dash, 1 to 32 characters each.",
     invalid_note: "The note is at most 2000 characters and may not contain control characters.",
     invalid_kind: "Pick a kind: test, build, deploy or other.",
+    claude_control_not_accepted: "The owner of this machine has not switched on starting Claude from the web.", claude_control_environment: "Claude is started from the web only on development and test machines that an admin has set up.",
+    claude_control_service_mode: "A service agent cannot start Claude.", claude_not_installed: "No Claude Code was found on this machine.", invalid_permission_mode: "Pick a permission mode from the list.",
+    invalid_session_ref: "That is not a session id.", claude_not_started_here: "Only a session started from here can be stopped from here.",
     invalid_project: "The project key is 1 to 200 characters without control characters.",
     name_taken: "That name is already used here. Pick another.", invalid_list: "Check the list: an entry is empty, too long, repeated or not allowed, or there are too many.",
     amount_and_currency: "Give the budget amount and its currency together, or neither.", invalid_currency: "Use three capital letters, such as EUR.",
@@ -139,7 +142,7 @@ export const en = {
   },
   activity: {
     filterLabel: "Show", all: "All", inputs: "Inputs", assistant: "Assistant", tools: "Tools",
-    monitorInput: "Claude Monitor (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
+    monitorInput: "Podium (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
     sentBy: "sent by {name}", typedBy: "typed by {name}", someone: "a member",
     waiting: "Waiting", pendingTitle: "Waiting to be applied",
     deliveredWith: "delivered together with the message typed in the session",
@@ -172,8 +175,8 @@ export const en = {
     agentUpdateCheck: "Look only: agents find out that an update exists",
     agentUpdateOn: "Allowed: agents may install signed updates by themselves",
     claudeUpdate: "Allow agents to update Claude Code",
-    claudeUpdateHint: "Only when every Claude session on the machine is idle, after a countdown the person can cancel, and only with Claude Code's own update command. Each machine must also turn it on (cm-agent config claude-update on). Running sessions are never restarted.",
-    agentUpdateHint: "The most an agent may do on its own. Each machine must also turn it on (cm-agent config auto-update); the lower of the two applies. Updates are signed and verified by the agent.",
+    claudeUpdateHint: "Only when every Claude session on the machine is idle, after a countdown the person can cancel, and only with Claude Code's own update command. Each machine must also turn it on (aipod config claude-update on). Running sessions are never restarted.",
+    agentUpdateHint: "The most an agent may do on its own. Each machine must also turn it on (aipod config auto-update); the lower of the two applies. Updates are signed and verified by the agent.",
   },
   account: {
     title: "Account", providers: "Sign-in methods", linked: "Linked", link: "Link {provider}", password: "Password",
@@ -205,7 +208,7 @@ export const en = {
   approvals: {
     title: "Approval keys", intro: "A key made in this browser signs the runs you allow. A machine whose admin pinned the key and switched on signed approvals runs nothing that was not signed with it, so even a compromised server cannot start a run in your name. The private half never leaves this browser.",
     thisBrowser: "This browser", registered: "registered", notRegistered: "not registered yet", defaultName: "This browser", name: "A name for this key", make: "Make a key and register it", register: "Register this key",
-    registeredKeys: "Registered keys", retire: "Retire", pinHint: "On a machine that should trust this key, an admin pins it (compare the fingerprint first), then switches on signed approvals (cm-agent config approvals required):",
+    registeredKeys: "Registered keys", retire: "Retire", pinHint: "On a machine that should trust this key, an admin pins it (compare the fingerprint first), then switches on signed approvals (aipod config approvals required):",
     runNeedsKey: "This machine only runs what a pinned key signed: allowing signs this run with the key of this browser.", needKey: "This machine requires a signed approval, and this browser has no key. Make one on your account page first.",
   },
   schedules: {

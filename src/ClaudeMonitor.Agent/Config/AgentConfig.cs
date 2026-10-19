@@ -20,7 +20,7 @@ public sealed partial record AgentConfig
     /// </summary>
     public string? MigrateFrom { get; init; }
 
-    /// <summary>The API's origin when none is saved yet (set by "cm-agent login --server").</summary>
+    /// <summary>The API's origin when none is saved yet (set by "aipod login --server").</summary>
     public string? ServerOverride { get; init; }
 
     /// <summary>"keychain" (default: macOS Keychain / Windows Credential Manager) or "file" (tests only).</summary>
@@ -29,18 +29,18 @@ public sealed partial record AgentConfig
     public TimeSpan PermissionWait { get; init; } = TimeSpan.FromSeconds(120);
     public TimeSpan StopWait { get; init; } = TimeSpan.Zero;
 
-    /// <summary>True when CM_STOP_WAIT was set: it then wins over the value `cm-agent install --stop-wait` saved.</summary>
+    /// <summary>True when CM_STOP_WAIT was set: it then wins over the value `aipod install --stop-wait` saved.</summary>
     public bool StopWaitFromEnvironment { get; init; }
 
     /// <summary>The longest a hook may wait for the web (Claude Code's hook timeout is raised by the same amount).</summary>
     public const int WaitMaxSeconds = 590;
     /// <summary>
-    /// Push into an idle session (ADR-0003): "claude/channel" notifications from `cm-agent mcp`. Off by default; `cm-agent install
+    /// Push into an idle session (ADR-0003): "claude/channel" notifications from `aipod mcp`. Off by default; `aipod install
     /// --push on` saves it, and CM_PUSH (on/off), when set, wins.
     /// </summary>
     public bool PushEnabled { get; init; }
 
-    /// <summary>True when CM_PUSH was set: it then wins over the value `cm-agent install --push` saved.</summary>
+    /// <summary>True when CM_PUSH was set: it then wins over the value `aipod install --push` saved.</summary>
     public bool PushFromEnvironment { get; init; }
 
     /// <summary>"session" (default): only prompts addressed to this session. "machine": any prompt of this machine (see ADR-0003).</summary>
@@ -60,12 +60,12 @@ public sealed partial record AgentConfig
 
     /// <summary>
     /// How far this machine lets the agent go about updating itself (ADR-0004): "off" (default: no update call at all),
-    /// "check" (look and report) or "on" (install too). `cm-agent config auto-update` saves it, CM_AUTO_UPDATE wins when set.
-    /// The workspace has its own cap; the lower of the two applies. An explicit `cm-agent update` is not an automatic action and ignores both.
+    /// "check" (look and report) or "on" (install too). `aipod config auto-update` saves it, CM_AUTO_UPDATE wins when set.
+    /// The workspace has its own cap; the lower of the two applies. An explicit `aipod update` is not an automatic action and ignores both.
     /// </summary>
     public string AutoUpdate { get; init; } = UpdateModes.Off;
 
-    /// <summary>True when CM_AUTO_UPDATE was set: it then wins over the value `cm-agent config` saved.</summary>
+    /// <summary>True when CM_AUTO_UPDATE was set: it then wins over the value `aipod config` saved.</summary>
     public bool AutoUpdateFromEnvironment { get; init; }
 
     /// <summary>The channel this build belongs to ("test", "prod", or "dev" for an unsigned local build), set at build time.</summary>
@@ -83,12 +83,12 @@ public sealed partial record AgentConfig
     public TimeSpan UpdateProbeTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Whether this machine lets the agent update Claude Code itself (ADR-0006; off by default). `cm-agent config claude-update on|off`
+    /// Whether this machine lets the agent update Claude Code itself (ADR-0006; off by default). `aipod config claude-update on|off`
     /// saves it, CM_CLAUDE_UPDATE wins when set. The workspace must allow it too; both are needed.
     /// </summary>
     public bool ClaudeUpdateEnabled { get; init; }
 
-    /// <summary>True when CM_CLAUDE_UPDATE was set: it then wins over the value `cm-agent config` saved.</summary>
+    /// <summary>True when CM_CLAUDE_UPDATE was set: it then wins over the value `aipod config` saved.</summary>
     public bool ClaudeUpdateFromEnvironment { get; init; }
 
     /// <summary>Where Claude Code keeps its per-session files (sessions/&lt;pid&gt;.json): CLAUDE_CONFIG_DIR, else ~/.claude.</summary>
@@ -105,7 +105,7 @@ public sealed partial record AgentConfig
     /// <summary>Every live session must have been idle at least this long.</summary>
     public TimeSpan ClaudeIdleFor { get; init; } = TimeSpan.FromMinutes(10);
 
-    /// <summary>The warning before `claude update` runs; `cm-agent claude-update cancel` stops it.</summary>
+    /// <summary>The warning before `claude update` runs; `aipod claude-update cancel` stops it.</summary>
     public TimeSpan ClaudeCountdown { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>A cancelled attempt is not made again for this long.</summary>
@@ -184,7 +184,7 @@ public sealed partial record AgentConfig
     public string LogPath => Path.Combine(Home, "agent.log");
     public string BinaryPath => BinaryOverride ?? Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "cm-agent.exe" : "cm-agent");
 
-    /// <summary>What the last update check and install left behind (shown by `cm-agent status`).</summary>
+    /// <summary>What the last update check and install left behind (shown by `aipod status`).</summary>
     public string UpdateStatePath => Path.Combine(Home, "update-state.json");
     public string UpdateLockPath => Path.Combine(Home, "update.lock");
     public string UpdateDir => Path.Combine(Home, "update");
@@ -194,11 +194,14 @@ public sealed partial record AgentConfig
     public string ClaudeUpdateStatePath => Path.Combine(Home, "claude-update-state.json");
     public string ClaudeUpdateLockPath => Path.Combine(Home, "claude-update.lock");
 
-    /// <summary>Written by `cm-agent claude-update cancel`; the countdown sees it and stands down.</summary>
+    /// <summary>Written by `aipod claude-update cancel`; the countdown sees it and stands down.</summary>
     public string ClaudeCancelPath => Path.Combine(Home, "claude-update.cancel");
     public string StopRequestPath => Path.Combine(Home, "daemon.stop");
 
     public const string CredentialService = "claude-monitor-agent";
+
+    /// <summary>Which names the MCP tools go by for the processes this one starts' sessions (AIPOD_TOOL_NAMES / CM_TOOL_NAMES: "aipod"); the old names when nothing is said (ADR-0013).</summary>
+    public Mcp.ToolNameMode ToolNamesMode { get; init; } = Mcp.ToolNameMode.Legacy;
     public const string PluginName = "monitor-agent";
     public const string MarketplaceName = "monitor-agent-local";
 

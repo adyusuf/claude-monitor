@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Push;
 /// <summary>
 /// The agent's own account of the path a message takes (ADR-0003): the event outbox, the stream from the web and the
 /// push into the session. The daemon and the MCP process write these keys into the local database; `monitor_status` and
-/// `cm-agent status` read them. Only ids, counts, times and exception type names: never message content.
+/// `aipod status` read them. Only ids, counts, times and exception type names: never message content.
 /// </summary>
 public static class PushStatus
 {
@@ -17,6 +17,11 @@ public static class PushStatus
     public const string StreamFailuresKey = "stream.failures";
     public const string StreamErrorKey = "stream.last_error";
     public const string StreamCommandKey = "stream.last_command_id";
+
+    /// <summary>Counters the tray's two lights watch (orange: a message arrived here; green: a message left or reached a session).</summary>
+    public const string InCountKey = "leds.in";
+
+    public const string OutCountKey = "leds.out";
     public const string StreamCommandAtKey = "stream.last_command_at";
     public const string UploadAtKey = "relay.last_upload_at";
     public const string UploadErrorKey = "relay.last_error";
@@ -27,7 +32,7 @@ public static class PushStatus
     public const string Connected = "connected";
     public const string Reconnecting = "reconnecting";
 
-    /// <summary>The lines `monitor_status` appends after its original sentence, and `cm-agent status` prints.</summary>
+    /// <summary>The lines `monitor_status` appends after its original sentence, and `aipod status` prints.</summary>
     public static IReadOnlyList<string> Describe(AgentConfig config, LocalStore store, DateTimeOffset now, string? session, bool daemonRunning)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -41,6 +46,11 @@ public static class PushStatus
         if (store.Get(UploadErrorKey) is { Length: > 0 } uploadError)
         {
             lines.Add($"Last upload failure: {uploadError} at {Clock(Time(store.Get(UploadErrorAtKey)))}.");
+        }
+
+        if (store.Get(Auth.AuthRefusal.ReasonKey) is { Length: > 0 } refused && Auth.Identity.Peek(config)?.Connected != true)
+        {
+            lines.Add($"Connection: {Auth.AuthRefusal.Message(refused)} (refused at {Clock(Time(store.Get(Auth.AuthRefusal.AtKey)))})");
         }
 
         lines.Add(daemonRunning ? Stream(store, now) : "Web stream: the agent daemon is not running.");
@@ -68,7 +78,7 @@ public static class PushStatus
 
     private static string Push(AgentConfig config, LocalStore store, DateTimeOffset now, string? session)
     {
-        if (!config.PushEnabled) return "Push into the session: off (cm-agent install --push inbox); web messages arrive at the next prompt.";
+        if (!config.PushEnabled) return "Push into the session: off (aipod install --push inbox); web messages arrive at the next prompt.";
         if (config.InboxPushEnabled) return Inbox(store, now, session);
         var (queued, _) = store.WaitingCommands(now);
         var unconfirmed = store.UnconfirmedPushes().Count;

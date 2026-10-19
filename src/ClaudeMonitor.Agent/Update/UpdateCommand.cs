@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Update;
 
 /// <summary>
-/// "cm-agent update [--check]" and "cm-agent config [auto-update off|check|on]", and the lines `cm-agent status` adds.
+/// "aipod update [--check]" and "aipod config [auto-update off|check|on]", and the lines `aipod status` adds.
 /// An explicit update is the person's own decision and ignores the automatic setting; only the daemon's own rounds obey it.
 /// </summary>
 public static class UpdateCommand
@@ -31,14 +31,14 @@ public static class UpdateCommand
         var unknown = args.Skip(1).FirstOrDefault(a => a != "--check" && a != AutoFlag);
         if (unknown is not null || (checkOnly && auto))
         {
-            await stderr.WriteLineAsync("usage: cm-agent update [--check]");
+            await stderr.WriteLineAsync("usage: aipod update [--check]");
             return 2;
         }
 
         var identity = Identity.Load(config);
         if (!identity.Connected)
         {
-            await stderr.WriteLineAsync("not connected (cm-agent login --server <url>): the update comes from the server the agent is connected to");
+            await stderr.WriteLineAsync("not connected (aipod login --server <url>): the update comes from the server the agent is connected to");
             return 1;
         }
 
@@ -56,7 +56,7 @@ public static class UpdateCommand
         if (check.BelowMinimum) await stdout.WriteLineAsync($"this version ({AgentConfig.Version}) is below the server's minimum supported version {check.Offer.MinSupported}");
         if (checkOnly)
         {
-            await stdout.WriteLineAsync($"update available: {check.Offer.Version} (running {AgentConfig.Version}); install it with: cm-agent update");
+            await stdout.WriteLineAsync($"update available: {check.Offer.Version} (running {AgentConfig.Version}); install it with: aipod update");
             return 0;
         }
 
@@ -101,7 +101,7 @@ public static class UpdateCommand
         {
             SavedSettings.SaveInboxFormat(config, args[2]);
             await stdout.WriteLineAsync(args[2] == InboxFormats.Brief
-                ? "push-format: short (the inbox gets a one-line notice; the session reads the message with monitor_inbox_read)"
+                ? "push-format: short (the inbox gets a one-line notice; the session reads the message with its inbox tool, monitor_inbox_read or aipod_inbox_read)"
                 : "push-format: full (the inbox gets the whole message)");
             return 0;
         }
@@ -126,7 +126,7 @@ public static class UpdateCommand
             ApproversStore.SetRequired(config, args[2] == "required");
             var policy = ApproversStore.Load(config);
             await stdout.WriteLineAsync($"signed approvals: {args[2]} ({policy.Keys.Count} key(s) pinned)"
-                + (args[2] == "required" && policy.Keys.Count == 0 ? "; NOTHING can run until a key is pinned (cm-agent approvers add)" : ""));
+                + (args[2] == "required" && policy.Keys.Count == 0 ? "; NOTHING can run until a key is pinned (aipod approvers add)" : ""));
             return 0;
         }
 
@@ -135,12 +135,12 @@ public static class UpdateCommand
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
+        await stderr.WriteLineAsync("usage: aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
         return 2;
     }
 
     /// <summary>
-    /// `cm-agent config projects add|remove|list [folder]` (ADR-0008 §3a′): the project folders this machine reports facts about when no session
+    /// `aipod config projects add|remove|list [folder]` (ADR-0008 §3a′): the project folders this machine reports facts about when no session
     /// visits them. A service agent reads its list from the admin-owned policy file instead; this verb is for an interactive or standalone agent.
     /// </summary>
     private static async Task<int> ProjectsAsync(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr)
@@ -175,11 +175,11 @@ public static class UpdateCommand
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: cm-agent config projects add <folder> | remove <folder> | list");
+        await stderr.WriteLineAsync("usage: aipod config projects add <folder> | remove <folder> | list");
         return 2;
     }
 
-    /// <summary>The lines `cm-agent status` shows about updating: the mode on each side, the last verdict, and a rolled-back build.</summary>
+    /// <summary>The lines `aipod status` shows about updating: the mode on each side, the last verdict, and a rolled-back build.</summary>
     public static IEnumerable<string> Describe(AgentConfig config, LocalStore store)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -189,7 +189,7 @@ public static class UpdateCommand
         yield return $"auto-update: {UpdatePolicy.Effective(config, store)} (this machine: {config.AutoUpdate}, workspace: {workspace})";
         var state = UpdateState.Load(config);
         if (state.Phase == UpdateState.PendingHealth) yield return $"update: {state.From} -> {state.To} is being checked";
-        if (state.Available is { } available) yield return $"update available: {available} (cm-agent update)";
+        if (state.Available is { } available) yield return $"update available: {available} (aipod update)";
         if (state.Result is { } result && result != UpdateCodes.Available)
         {
             var at = DateTimeOffset.TryParse(state.CheckedAt ?? state.InstalledAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var when)

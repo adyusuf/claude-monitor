@@ -96,6 +96,11 @@ public sealed class Agent
     public DateTimeOffset? AcceptsAsksSetAt { get; set; }
     public Guid? AcceptsAsksSetBy { get; set; }
 
+    /// <summary>ADR-0014: the machine's owner lets Claude be started and stopped on it from the web; off until they say so, and reset when the machine moves workspace.</summary>
+    public bool AcceptsClaudeControl { get; set; }
+    public DateTimeOffset? AcceptsClaudeControlSetAt { get; set; }
+    public Guid? AcceptsClaudeControlSetBy { get; set; }
+
     /// <summary>The push transport the agent has on (<c>inbox</c> or <c>channel</c>), or null when it is off or the agent does not say.</summary>
     public string? PushTransport { get; set; }
 
@@ -176,6 +181,8 @@ public sealed class MachineAsk
     public string? Error { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
+    /// <summary>When the target's daemon said it holds the ask (it is still <c>queued</c> until a session takes it).</summary>
+    public DateTimeOffset? ReceivedAt { get; set; }
     public DateTimeOffset? DeliveredAt { get; set; }
     public DateTimeOffset? AnsweredAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }

@@ -11,7 +11,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>`cm-agent install --stop-wait`, the saved value the hooks then use, and the queue summary of `cm-agent status`.</summary>
+/// <summary>`aipod install --stop-wait`, the saved value the hooks then use, and the queue summary of `aipod status`.</summary>
 public sealed class StopWaitTests : IDisposable
 {
     private static readonly DateTimeOffset Start = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);

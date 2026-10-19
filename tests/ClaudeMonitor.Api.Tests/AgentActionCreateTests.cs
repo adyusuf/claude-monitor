@@ -246,11 +246,12 @@ public sealed class AgentActionCreateTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task The_closed_set_of_kinds_is_exactly_the_four_the_adr_names_and_each_can_be_queued_together()
+    public async Task The_closed_set_of_kinds_is_the_four_fixed_ones_and_the_two_for_Claude_and_each_fixed_one_can_be_queued_together()
     {
-        Assert.Equal(new[] { "restart", "update_check", "update", "status" }, AgentActionKinds.All.ToArray());
+        Assert.Equal(new[] { "restart", "update_check", "update", "status", "claude_start", "claude_stop" }, AgentActionKinds.All.ToArray());
         var team = await RemoteKit.TeamAsync(api);
-        foreach (var kind in AgentActionKinds.All) await ActionKit.CreateAsync(team.Owner, team.TargetId, kind);
-        Assert.Equal(AgentActionKinds.All.Order().ToArray(), (await ActionKit.RowsAsync(api, team.TargetId)).Select(r => r.Kind).Order().ToArray());
+        var fixedKinds = AgentActionKinds.All.Where(k => !AgentActionKinds.IsClaude(k)).ToList();
+        foreach (var kind in fixedKinds) await ActionKit.CreateAsync(team.Owner, team.TargetId, kind);
+        Assert.Equal(fixedKinds.Order().ToArray(), (await ActionKit.RowsAsync(api, team.TargetId)).Select(r => r.Kind).Order().ToArray());
     }
 }

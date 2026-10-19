@@ -28,5 +28,8 @@ public sealed partial class LocalStore
         return list;
     }
 
+    /// <summary>The folder a session of this project last worked in, or null when none did (or it was forgotten).</summary>
+    public string? FolderOf(string projectKey) => Scalar("SELECT folder FROM visited_folders WHERE project_key = $k", ("$k", projectKey)) as string;
+
     public int ForgetFolders(DateTimeOffset before) => Exec("DELETE FROM visited_folders WHERE seen_at < $t", ("$t", Iso(before)));
 }

@@ -38,6 +38,8 @@ export interface MachineView {
   tags?: Record<string, string> | null;
   /** Whether the machine's owner lets their other machines ask a Claude session here (ADR-0008 §3f). */
   acceptsAsks?: boolean | null;
+  /** Whether the machine's owner lets Claude be started and stopped on it from the web (ADR-0014). */
+  acceptsClaudeControl?: boolean | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
@@ -85,10 +87,14 @@ export interface AskView {
 }
 export interface AgentAsksView { agentId: string; accept: boolean; setAt: string | null; setBy: string | null }
 
-export type AgentActionKind = "restart" | "update_check" | "update" | "status";
+export type AgentActionKind = "restart" | "update_check" | "update" | "status" | "claude_start" | "claude_stop";
+export type ClaudePermissionMode = "manual" | "plan" | "acceptEdits";
+export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null }
 export type AgentActionStatus = "queued" | "delivered" | "succeeded" | "failed" | "expired";
 /** One fixed action its owner asked of a machine's agent (ADR-0005); the result is plain text the agent wrote, never markup. */
 export interface AgentActionView {
   id: string; agentId: string; kind: AgentActionKind; status: AgentActionStatus; result: string | null;
   createdAt: string; expiresAt: string; finishedAt: string | null;
+  /** Claude control (ADR-0014): the project and mode of a start, the short id of the session a start returned or a stop names. */
+  projectKey?: string | null; permissionMode?: ClaudePermissionMode | null; sessionRef?: string | null;
 }

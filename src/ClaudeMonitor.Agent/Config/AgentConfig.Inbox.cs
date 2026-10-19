@@ -9,7 +9,7 @@ public sealed partial record AgentConfig
     /// <summary>"short" (default): a one-line notice, the message is read with monitor_inbox_read (ADR-0007, A2). "full": the inbox gets the notice, the wrapper and the message.</summary>
     public string InboxFormat { get; init; } = InboxFormats.Brief;
 
-    /// <summary>True when CM_INBOX_FORMAT was set: it then wins over the value `cm-agent config push-format` saved.</summary>
+    /// <summary>True when CM_INBOX_FORMAT was set: it then wins over the value `aipod config push-format` saved.</summary>
     public bool InboxFormatFromEnvironment { get; init; }
 
     /// <summary>
@@ -30,7 +30,7 @@ public sealed partial record AgentConfig
     /// <summary>How long the daemon waits to connect to a session's socket; a socket that does not answer is a session that is gone.</summary>
     public TimeSpan InboxConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>How often the daemon re-reads the saved push settings, so `cm-agent install --push on` needs no daemon restart.</summary>
+    /// <summary>How often the daemon re-reads the saved push settings, so `aipod install --push on` needs no daemon restart.</summary>
     public TimeSpan PushSettingsEvery { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>True when push is on and goes through the inbox socket (the daemon's job).</summary>

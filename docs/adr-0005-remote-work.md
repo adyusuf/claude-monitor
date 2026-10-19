@@ -298,6 +298,9 @@ to run commands.
   protocol. An old agent ignores the `action` event; an action nobody takes expires, and the page says the agent needs
   the newer version to take it.
 
+*Amendment 19/10/2026 (ADR-0014):* two more kinds, `claude_start` and `claude_stop`, with fields that are keys and enums (a project key, a permission mode, a session
+id), the machine owner's own switch and the dev/test-only gate; they run Claude Code's `claude --bg` and `claude stop`. See ADR-0014 for the rules.
+
 ### Backward compatibility
 
 Old agents never report an exec level, so they are never targets; a new agent on an old API gets 404 and switches

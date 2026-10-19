@@ -93,7 +93,7 @@ public sealed class UpdateKit : IDisposable
 
     public static string Sha256(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
-    /// <summary>The installed binary, as `cm-agent install` leaves it.</summary>
+    /// <summary>The installed binary, as `aipod install` leaves it.</summary>
     public void InstallOld()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Config.BinaryPath)!);

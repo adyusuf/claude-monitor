@@ -43,6 +43,18 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("accepts_asks_set_by");
 
+                    b.Property<bool>("AcceptsClaudeControl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepts_claude_control");
+
+                    b.Property<DateTimeOffset?>("AcceptsClaudeControlSetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepts_claude_control_set_at");
+
+                    b.Property<Guid?>("AcceptsClaudeControlSetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accepts_claude_control_set_by");
+
                     b.Property<string>("AdminNote")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -218,6 +230,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.HasIndex("AcceptsAsksSetBy")
                         .HasDatabaseName("ix_agents_accepts_asks_set_by");
 
+                    b.HasIndex("AcceptsClaudeControlSetBy")
+                        .HasDatabaseName("ix_agents_accepts_claude_control_set_by");
+
                     b.HasIndex("AdminNoteSetBy")
                         .HasDatabaseName("ix_agents_admin_note_set_by");
 
@@ -297,6 +312,14 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("kind");
 
+                    b.Property<string>("PermissionMode")
+                        .HasColumnType("text")
+                        .HasColumnName("permission_mode");
+
+                    b.Property<string>("ProjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("project_key");
+
                     b.Property<Guid>("RequestedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("requested_by");
@@ -304,6 +327,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<string>("Result")
                         .HasColumnType("text")
                         .HasColumnName("result");
+
+                    b.Property<string>("SessionRef")
+                        .HasColumnType("text")
+                        .HasColumnName("session_ref");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -336,7 +363,7 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("agent_actions", t =>
                         {
-                            t.HasCheckConstraint("ck_agent_actions_kind", "kind IN ('restart', 'update_check', 'update', 'status')");
+                            t.HasCheckConstraint("ck_agent_actions_kind", "kind IN ('restart', 'update_check', 'update', 'status', 'claude_start', 'claude_stop')");
 
                             t.HasCheckConstraint("ck_agent_actions_status", "status IN ('queued', 'delivered', 'succeeded', 'failed', 'expired')");
                         });
@@ -1615,6 +1642,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<string>("Question")
                         .HasColumnType("text")
                         .HasColumnName("question");
+
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
 
                     b.Property<Guid>("RequesterAgentId")
                         .HasColumnType("uuid")
@@ -3556,6 +3587,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasForeignKey("AcceptsAsksSetBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_agents_users_accepts_asks_set_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptsClaudeControlSetBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_agents_users_accepts_claude_control_set_by");
 
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()

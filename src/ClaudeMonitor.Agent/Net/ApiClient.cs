@@ -25,6 +25,12 @@ public sealed partial class ApiClient(HttpClient http, ICredentialStore credenti
     /// <summary>Set when the API refused the refresh token: the agent must be connected again.</summary>
     public bool Disconnected { get; private set; }
 
+    /// <summary>Why the refresh was refused when <see cref="Disconnected"/> was set: the API's <c>reason</c>, else <c>http_&lt;status&gt;</c> or <see cref="NoRefreshToken"/>. Never a token.</summary>
+    public string? DisconnectReason { get; private set; }
+
+    /// <summary><see cref="DisconnectReason"/> when no refresh token was stored at all.</summary>
+    public const string NoRefreshToken = "no_refresh_token";
+
     public void Dispose() => refreshing.Dispose();
 
     /// <summary>
@@ -59,6 +65,7 @@ public sealed partial class ApiClient(HttpClient http, ICredentialStore credenti
         credentials.Write(Credentials.Access, tokens.AccessToken);
         credentials.Write(Credentials.Refresh, tokens.RefreshToken);
         Disconnected = false;
+        DisconnectReason = null;
     }
 
     // ---- device flow (no token yet) ---------------------------------------------------------------------------

@@ -89,18 +89,20 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         {
             await api.CommandStatusAsync(push.Id, CommandStatuses.Delivered, null, ct, push.PushedAt, push.Transport);
             store.MarkPushReported(push.Id);
+            store.Bump(PushStatus.OutCountKey); // the message reached a session
         }
 
         foreach (var taken in store.TakenCommands())
         {
             await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At, taken.Transport);
             store.MarkCommandReported(taken.Id);
+            if (taken.Transport == CommandTransports.Hook) store.Bump(PushStatus.OutCountKey); // a pushed one was counted when it was pushed
         }
     }
 
     public async Task SettingsAsync(CancellationToken ct)
     {
-        // The tag is the workspace agent.json names as the pass begins, not the one in the answer: a pass that `cm-agent login`
+        // The tag is the workspace agent.json names as the pass begins, not the one in the answer: a pass that `aipod login`
         // overtakes is then tagged with the old workspace and reads as off, while an agent moved to another workspace on the web
         // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
         // Stamped with the time the read BEGAN: the server answers with the switch as of some moment during the request, so a
@@ -188,7 +190,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
     }
 
-    /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
+    /// <summary>Records the state of the stream for `monitor_status` and `aipod status` (ids, times and error type names only).</summary>
     public void StreamState(string state, int failures, string? error)
     {
         store.Set(PushStatus.StreamStateKey, state);
@@ -222,7 +224,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 var c = data.Deserialize<AgentCommandMessage>(ApiClient.Json)!;
                 store.Set(PushStatus.StreamCommandKey, c.Id.ToString());
                 store.Set(PushStatus.StreamCommandAtKey, Now());
-                store.SaveCommand(new LocalCommand(c.Id.ToString(), c.SessionExternalId, c.Kind, c.Body, c.ExpiresAt));
+                if (store.SaveCommand(new LocalCommand(c.Id.ToString(), c.SessionExternalId, c.Kind, c.Body, c.ExpiresAt))) store.Bump(PushStatus.InCountKey);
                 await api.CommandStatusAsync(c.Id.ToString(), CommandStatuses.Delivered, null, ct);
                 return true;
             case AgentStreamEvents.PermissionAnswer:
@@ -253,7 +255,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 Actions?.Accept(data.Deserialize<AgentActionMessage>(ApiClient.Json)!, ct);
                 return true;
             case AgentStreamEvents.Ask:
-                store.SaveAskIn(data.Deserialize<AskMessage>(ApiClient.Json)!, clock.GetUtcNow());
+                if (store.SaveAskIn(data.Deserialize<AskMessage>(ApiClient.Json)!, clock.GetUtcNow())) store.Bump(PushStatus.InCountKey);
                 return true;
             case AgentStreamEvents.AskCancel:
                 store.CloseAsk(data.Deserialize<AskCancelMessage>(ApiClient.Json)!.Id.ToString());

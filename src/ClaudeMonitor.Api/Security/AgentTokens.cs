@@ -52,7 +52,7 @@ public static class AgentTokens
         Reused,
     }
 
-    public static async Task<(RefreshOutcome Outcome, TokenResponse? Tokens, Guid? AgentId)> RefreshAsync(
+    public static async Task<(RefreshOutcome Outcome, TokenResponse? Tokens, Guid? AgentId, string? Reason)> RefreshAsync(
         MonitorDb db, ApiConfig config, string? refreshToken, DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
@@ -60,22 +60,26 @@ public static class AgentTokens
         var row = await db.AgentTokens.FirstOrDefaultAsync(t => t.TokenHash == hash && t.Kind == AgentTokenKinds.Refresh, ct);
         if (row is null)
         {
-            return (RefreshOutcome.Invalid, null, null);
+            return (RefreshOutcome.Invalid, null, null, RefreshReasons.Unknown);
         }
 
         if (row.ReplacedBy is not null)
         {
             await RevokeAllAsync(db, row.AgentId, now, ct);
-            return (RefreshOutcome.Reused, null, row.AgentId);
+            return (RefreshOutcome.Reused, null, row.AgentId, RefreshReasons.Reused);
         }
 
         var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == row.AgentId, ct);
         if (row.RevokedAt is not null || row.ExpiresAt <= now || agent is not { Status: AgentStatuses.Active })
         {
-            return (RefreshOutcome.Invalid, null, row.AgentId);
+            // Which of the three it was is told to the holder of the token (it already holds it): the agent's log then says what to do next.
+            var reason = agent is not { Status: AgentStatuses.Active } ? RefreshReasons.AgentRevoked
+                : row.RevokedAt is not null ? RefreshReasons.Revoked
+                : RefreshReasons.Expired;
+            return (RefreshOutcome.Invalid, null, row.AgentId, reason);
         }
 
-        return (RefreshOutcome.Issued, Issue(db, config, agent, now, row), agent.Id);
+        return (RefreshOutcome.Issued, Issue(db, config, agent, now, row), agent.Id, null);
     }
 
     public static Task RevokeAllAsync(MonitorDb db, Guid agentId, DateTimeOffset now, CancellationToken ct) =>

@@ -156,7 +156,7 @@ public sealed class MachineCacheTests : IDisposable
 
         await new MachineCache(small.Home.Config, small.Store, small.Api, small.Clock).RefreshAsync(CancellationToken.None);
 
-        var text = small.Store.Get(AgentConfig.MachinesContextKey)!;
+        var text = Mcp.McpToolNames.Fill(Mcp.ToolNameMode.Legacy, small.Store.Get(AgentConfig.MachinesContextKey)!);
         Assert.Contains(" more: monitor_machines", text, StringComparison.Ordinal);
         Assert.DoesNotContain("host-19", text, StringComparison.Ordinal);
     }

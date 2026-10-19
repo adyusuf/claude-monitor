@@ -9,7 +9,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Capture;
 
 /// <summary>
-/// "cm-agent hook &lt;Event&gt;": one hook call from Claude Code. It records the payload in the local database and,
+/// "aipod hook &lt;Event&gt;": one hook call from Claude Code. It records the payload in the local database and,
 /// for the hooks that can carry an answer, hands the session what the web sent: a stop (PreToolUse, Stop), a prompt
 /// (Stop, UserPromptSubmit) or a permission decision (PermissionRequest). It never blocks a session: any failure is
 /// written to stderr and the hook exits 0 with no decision (project rule).
@@ -61,7 +61,8 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             return;
         }
 
-        if (Push.SocketInboxTransport.IsEndpoint(config.MessagingSocket)) store.SaveInbox(session, config.MessagingSocket!, config.MessagingToken?.Value, now, permissionMode is { Length: > 0 and <= 40 } ? permissionMode : null);
+        if (Push.SocketInboxTransport.IsEndpoint(config.MessagingSocket)) store.SaveInbox(session, config.MessagingSocket!, config.MessagingToken?.Value, now, permissionMode is { Length: > 0 and <= 40 } ? permissionMode : null,
+            Mcp.McpToolNames.Word(Mcp.McpToolNames.Mode)); // which names this session's tools have, so a notice written to it names its own
     }
 
     private void Record(string hookEvent, string session, JsonObject payload, ProjectInfo? project, DateTimeOffset now) =>

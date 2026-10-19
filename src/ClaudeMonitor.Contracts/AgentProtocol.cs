@@ -37,6 +37,19 @@ public sealed record DeviceTokenRequest(string DeviceCode);
 
 public sealed record RefreshRequest(string RefreshToken);
 
+/// <summary>
+/// Why the API refused a token refresh: the <c>reason</c> member of the 401 problem document (its title stays <c>invalid_refresh_token</c>). An
+/// older server sends none; the agent then reports only the status code.
+/// </summary>
+public static class RefreshReasons
+{
+    public const string Unknown = "unknown_token";
+    public const string Expired = "token_expired";
+    public const string Revoked = "token_revoked";
+    public const string Reused = "token_reused";
+    public const string AgentRevoked = "agent_revoked";
+}
+
 public sealed record TokenResponse(
     string AccessToken,
     string RefreshToken,

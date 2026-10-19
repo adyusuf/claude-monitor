@@ -51,7 +51,7 @@ public sealed partial class Updater
         if (!stopped)
         {
             // The old binary is back for every hook, but a hung process still holds the daemon's lock: no daemon can start until it ends.
-            return Record(new(UpdateCodes.RollbackStuck, $"{offer.Version} is back on {from} on disk, but its hung daemon would not stop; end the cm-agent process by hand", from, offer.Version));
+            return Record(new(UpdateCodes.RollbackStuck, $"{offer.Version} is back on {from} on disk, but its hung daemon would not stop; end the aipod process by hand", from, offer.Version));
         }
 
         daemon.Start(config.BinaryPath);

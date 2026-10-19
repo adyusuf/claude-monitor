@@ -15,7 +15,7 @@ namespace ClaudeMonitor.Agent;
 /// <summary>The commands a person runs by hand: install, restart and status.</summary>
 public static partial class Cli
 {
-    /// <summary>"cm-agent install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it. The first install, with no push choice saved yet, turns the inbox push on.</summary>
+    /// <summary>"aipod install [--stop-wait N] [--push on|off]": the values are saved, so the hooks written now and every later run agree on it. The first install, with no push choice saved yet, turns the inbox push on.</summary>
     public static int Install(string[] args, AgentConfig config, TextWriter stdout, TextWriter stderr, string sourceBinary,
         Func<string, string[], int>? run = null)
     {
@@ -91,14 +91,14 @@ public static partial class Cli
         }
         catch (Exception e)
         {
-            await stderr.WriteLineAsync($"cm-agent hook {hookEvent}: {e.GetType().Name}: {e.Message}");
+            await stderr.WriteLineAsync($"aipod hook {hookEvent}: {e.GetType().Name}: {e.Message}");
             log.Write($"hook {hookEvent} failed: {e.GetType().Name} {e.Message}");
         }
 
         return 0;
     }
 
-    /// <summary>"cm-agent restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
+    /// <summary>"aipod restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
     public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout, Update.IDaemonControl? control = null)
     {
         if (!Identity.Load(config).Connected)
@@ -125,7 +125,7 @@ public static partial class Cli
         using var store = new LocalStore(config.DatabasePath);
         using var probe = DaemonHost.TryLock(config.LockPath);
         await stdout.WriteLineAsync($"home: {config.Home}");
-        await stdout.WriteLineAsync(identity.Connected ? $"connected: {identity.Server}" : "not connected (cm-agent login --server <url>)");
+        await stdout.WriteLineAsync(identity.Connected ? $"connected: {identity.Server}" : "not connected (aipod login --server <url>)");
         await stdout.WriteLineAsync($"daemon: {(probe is null ? "running" : "not running")}");
         await stdout.WriteLineAsync($"events waiting: {store.OutboxCount()}");
         var (commands, soonest) = store.WaitingCommands((clock ?? TimeProvider.System).GetUtcNow());

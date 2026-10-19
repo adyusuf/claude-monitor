@@ -10,7 +10,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Auth;
 
 /// <summary>
-/// "cm-agent login --server &lt;url&gt;": connects this machine with the device flow (RFC 8628). The person approves the
+/// "aipod login --server &lt;url&gt;": connects this machine with the device flow (RFC 8628). The person approves the
 /// shown code on the web while signed in; the agent never sees a password.
 /// </summary>
 public sealed class Login(AgentConfig config, TextWriter output, TimeProvider clock, Func<string, bool>? openBrowser = null,
@@ -22,7 +22,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
     {
         if (os == AgentConfig.Unsupported)
         {
-            await output.WriteLineAsync("cm-agent runs on macOS, Windows and Linux.");
+            await output.WriteLineAsync("aipod runs on macOS, Windows and Linux.");
             return 2;
         }
 
@@ -30,7 +30,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         var server = (serverArg ?? config.ServerOverride ?? identity.Server)?.TrimEnd('/');
         if (server is null || !Uri.TryCreate(server, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && !uri.IsLoopback))
         {
-            await output.WriteLineAsync("Give the server: cm-agent login --server https://<your Claude Monitor address> (https, or http on localhost).");
+            await output.WriteLineAsync("Give the server: aipod login --server https://<your Claude Monitor address> (https, or http on localhost).");
             return 2;
         }
 
@@ -44,7 +44,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         }
         catch (Exception e) when (Transient(e, ct))
         {
-            await output.WriteLineAsync($"The server did not answer ({Describe(e)}). Check the address and the connection, then run cm-agent login again.");
+            await output.WriteLineAsync($"The server did not answer ({Describe(e)}). Check the address and the connection, then run aipod login again.");
             return 1;
         }
         catch (ApiException e) when (e.Status < HttpStatusCode.InternalServerError)
@@ -106,15 +106,15 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
                 default:
                     // After a lost answer the code may have been used for tokens that never arrived; it cannot be reused.
                     await output.WriteLineAsync(unanswered
-                        ? "The code expired, or it was used for an answer that did not arrive. Run cm-agent login again."
-                        : "The code expired. Run cm-agent login again.");
+                        ? "The code expired, or it was used for an answer that did not arrive. Run aipod login again."
+                        : "The code expired. Run aipod login again.");
                     return 1;
             }
         }
 
         await output.WriteLineAsync(failure is null
-            ? "The code expired. Run cm-agent login again."
-            : $"The code expired while the server did not answer ({Describe(failure)}). Check the connection, then run cm-agent login again.");
+            ? "The code expired. Run aipod login again."
+            : $"The code expired while the server did not answer ({Describe(failure)}). Check the connection, then run aipod login again.");
         return 1;
     }
 
@@ -132,10 +132,10 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
     private static string Refused(ApiException e, string server) => e.Status switch
     {
         HttpStatusCode.UpgradeRequired =>
-            $"The server no longer accepts this cm-agent ({AgentConfig.Version}). Upgrade the agent, then run cm-agent login again.",
+            $"The server no longer accepts this aipod ({AgentConfig.Version}). Upgrade the agent, then run aipod login again.",
         HttpStatusCode.TooManyRequests =>
-            "The server is limiting requests from this network. Wait a minute, then run cm-agent login again.",
-        _ => $"{server} answered {(int)e.Status}; it does not look like a Claude Monitor server. Check the address, then run cm-agent login again.",
+            "The server is limiting requests from this network. Wait a minute, then run aipod login again.",
+        _ => $"{server} answered {(int)e.Status}; it does not look like a Claude Monitor server. Check the address, then run aipod login again.",
     };
 
     private TimeSpan Backoff(TimeSpan interval) =>
@@ -143,7 +143,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         : interval + config.LoginBackoffStep > config.LoginPollMax ? config.LoginPollMax
         : interval + config.LoginBackoffStep;
 
-    /// <summary>"cm-agent logout": forgets the tokens here; the web shows the machine until it is revoked there.</summary>
+    /// <summary>"aipod logout": forgets the tokens here; the web shows the machine until it is revoked there.</summary>
     public async Task<int> LogoutAsync()
     {
         var store = Credentials.For(config);

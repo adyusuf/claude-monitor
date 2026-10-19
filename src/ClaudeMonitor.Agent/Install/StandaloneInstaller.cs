@@ -4,7 +4,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Install;
 
 /// <summary>
-/// "cm-agent install --standalone" and "uninstall --standalone" (ADR-0008 §3g): the interactive agent's install without a Claude Code plugin and
+/// "aipod install --standalone" and "uninstall --standalone" (ADR-0008 §3g): the interactive agent's install without a Claude Code plugin and
 /// without Claude Code, plus a user-level autostart in the user's own home and account, built the way the boot service is: every external tool goes
 /// through <c>run</c>, a step that fails stops the install and undoes what this run created, files are written atomically and nothing runs as root or
 /// administrator. The device login runs FIRST and the autostart is enabled only once the agent is connected, so no supervisor ever restarts an agent that
@@ -47,7 +47,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         {
             if (string.IsNullOrWhiteSpace(server))
             {
-                output.WriteLine("Not connected: give the server, cm-agent install --standalone --server https://<your Claude Monitor address>, or run cm-agent login --server <url> first.");
+                output.WriteLine("Not connected: give the server, aipod install --standalone --server https://<your aipod server address>, or run aipod login --server <url> first.");
                 return 2;
             }
 
@@ -217,7 +217,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
             output.WriteLine($"Note: without lingering the agent runs only while you are logged in. To keep it running after you log out: sudo loginctl enable-linger {l.User}");
         }
 
-        output.WriteLine("Run `cm-agent status` to check it. This machine reports no Claude Code (claude=none); other machines can still reach it as a target.");
+        output.WriteLine("Run `aipod status` to check it. This machine reports no Claude Code (claude=none); other machines can still reach it as a target.");
     }
 
     private void Step(string what, string tool, IReadOnlyList<string> args)

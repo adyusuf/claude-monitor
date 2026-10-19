@@ -132,7 +132,7 @@ public sealed class MachineContextTests
     {
         var machines = Enumerable.Range(0, 60).Select(i => View($"host-{i:00}", tools: [Tool("git"), Tool("node")], claudeKind: "native", claudeVersion: "2.1.300", idle: 0)).ToList();
 
-        var body = Body(MachineContext.Render(machines, null, 2000)!);
+        var body = Body(Mcp.McpToolNames.Fill(Mcp.ToolNameMode.Legacy, MachineContext.Render(machines, null, 2000)!)); // the slots filled with the old names, the longest
 
         var shown = body.Split('\n').Count(l => l.StartsWith("- ", StringComparison.Ordinal));
         Assert.InRange(shown, 1, 59);
@@ -156,7 +156,7 @@ public sealed class MachineContextTests
     {
         var machines = Enumerable.Range(0, 5).Select(i => View($"host-{i}")).ToList();
 
-        var lines = Body(MachineContext.Render(machines, null, 10)!).Split('\n');
+        var lines = Body(Mcp.McpToolNames.Fill(Mcp.ToolNameMode.Legacy, MachineContext.Render(machines, null, 10)!)).Split('\n');
 
         Assert.Equal(2, lines.Length);
         Assert.StartsWith("- host-0 ", lines[0], StringComparison.Ordinal);

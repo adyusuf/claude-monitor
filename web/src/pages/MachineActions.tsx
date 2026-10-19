@@ -45,6 +45,8 @@ export function MachineActions({ agentId, view, owned, agentVersion, version, on
     if (owned) void load();
   }, [owned, version, load]);
 
+  // The Claude actions have their own card (ADR-0014): they are not listed twice.
+  const shown = actions.filter((a) => a.kind !== "claude_start" && a.kind !== "claude_stop");
   const open = (kind: AgentActionKind) => actions.some((a) => a.kind === kind && (a.status === "queued" || a.status === "delivered"));
 
   const ask = async (kind: AgentActionKind) => {
@@ -75,9 +77,9 @@ export function MachineActions({ agentId, view, owned, agentVersion, version, on
         ))}
       </div>
       {error ? <Notice kind="error">{error}</Notice> : null}
-      {actions.length === 0 ? <p className="muted">{t("machines.actions.none")}</p> : (
+      {shown.length === 0 ? <p className="muted">{t("machines.actions.none")}</p> : (
         <ul className="stack">
-          {actions.map((a) => (
+          {shown.map((a) => (
             <li key={a.id} className="stack ask-row">
               <div className="row small">
                 <strong>{t(`machines.actions.kind.${a.kind}`)}</strong>

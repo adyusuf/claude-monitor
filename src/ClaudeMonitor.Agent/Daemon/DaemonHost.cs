@@ -16,7 +16,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// "cm-agent daemon": the long-running part, one per user per machine (an exclusive lock on daemon.lock). It runs
+/// "aipod daemon": the long-running part, one per user per machine (an exclusive lock on daemon.lock). It runs
 /// until the process is stopped or the agent is revoked. Started by the first hook or MCP call that finds it absent
 /// (ADR-0002: the agent starts with the harness, not with the OS).
 /// </summary>
@@ -33,7 +33,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var identity = Identity.Load(config);
         if (!identity.Connected)
         {
-            log.Write("not connected: run `cm-agent login --server <url>`");
+            log.Write("not connected: run `aipod login --server <url>`");
             return 1;
         }
 
@@ -45,6 +45,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var streamStore = new LocalStore(config.DatabasePath);
         using var http = ApiClient.CreateHttp(identity.Server!, handler);
         using var api = new ApiClient(http, Credentials.For(config), config.ApiCallTimeout) { StreamIdleTimeout = config.StreamIdleTimeout };
+        flushStore.Set(AuthRefusal.ReasonKey, ""); // connected again: an earlier refusal no longer applies
         var relay = new Relay(config, flushStore, api, clock);
         var beat = new Relay(config, beatStore, api, clock);
         var settings = new Relay(config, settingsStore, api, clock);
@@ -72,11 +73,12 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 return text.ToString();
             },
             ct => new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock).CheckAsync(ct),
-            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode);
+            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode, new ClaudeControl(config, new SystemClaudeCli(), clock));
         stream = new Relay(config, streamStore, api, clock) { Runs = runs, Actions = actions };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
         updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
+        Install.BinaryAlias.Ensure(config.BinaryPath); // the new name beside the old one, also after an update swapped the binary
         File.WriteAllText(config.PidPath, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         using (var updating = TryLock(config.UpdateLockPath))
         {
@@ -122,7 +124,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         if (api.Disconnected)
         {
             (identity with { AgentId = null, WorkspaceId = null }).Save(config);
-            log.Write("the API refused this agent (revoked or expired): run `cm-agent login` again");
+            log.Write(AuthRefusal.Message(api.DisconnectReason));
+            flushStore.Set(AuthRefusal.ReasonKey, api.DisconnectReason ?? "");
+            flushStore.Set(AuthRefusal.AtKey, clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         }
 
         return 0;

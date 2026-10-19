@@ -98,11 +98,11 @@ Both columns are cleared by account deletion and included in the export.
 `accepts_asks_set_at` and `accepts_asks_set_by` (FK users). New table `machine_asks`: `id`, `workspace_id`, `requester_agent_id`, `requester_user_id`,
 `requester_session_id` (FK sessions), `target_agent_id`, `target_user_id`, `target_session` (the Claude session that received it), `client_key`,
 `project_key`, `question` (1-8000; NULL once emptied), `status` (`queued`, `delivered`, `answered`, `no_idle_session`, `not_accepting`, `no_answer`,
-`expired`, `cancelled`; CHECK), `answer` (≤ 100 000; NULL once emptied), `answer_truncated`, `error`, `created_at`, `expires_at`, `delivered_at`,
+`expired`, `cancelled`; CHECK), `answer` (≤ 100 000; NULL once emptied), `answer_truncated`, `error`, `created_at`, `expires_at`, `received_at` (migration `AskReceivedAt`: when the target daemon said it holds the ask; the status stays `queued`), `delivered_at`,
 `answered_at`, `ended_at`; CHECKs `requester_user_id = target_user_id` and `requester_agent_id <> target_agent_id`; UNIQUE (`requester_agent_id`,
 `client_key`); indexes on (`target_agent_id`, `status`) WHERE open, (`requester_agent_id`, `created_at`) and (`workspace_id`, `created_at` DESC). The
 question and the answer are personal data like a command: exported (`asks`), emptied on account deletion and the rows deleted after `retention_days`
-past their end; the audit rows name an ask by id only. Every transition is a compare-and-set; the housekeeping loop expires a queued ask after 2 minutes
+past their end; the audit rows name an ask by id only. Every transition is a compare-and-set; the housekeeping loop expires a queued ask after 30 minutes (2 before 19/10/2026)
 and a delivered one after 15 without an answer, and member removal, an agent move or revoke, the opt-in turning off and the workspace switch turning off
 cancel the open ones.
 
@@ -242,3 +242,5 @@ business entity. The JSON the agent and the web exchange (`projectId`, `projectN
 shape; index on `next_run_at` where active). `remote_runs.schedule_id` names the schedule whose tick created a run. `workspace_settings.remote_schedules_enabled` (default false). `approval_keys` (`id`, `user_id`, `name`, `public_key` (base64 SPKI of an
 ECDSA P-256 key), `fingerprint` (SHA-256 of it, hex), `created_at`, `retired_at`; unique per user and fingerprint while live). `remote_runs.approval_key_id`, `approval_signature` and `approval_not_after` hold the owner's signature of a run;
 `agents.approvals_required` is what the agent reported (a target that only runs what a pinned key signed). The separate run account has no table: it is in the agent's admin-owned exec policy file (`runAccount`).
+
+**Claude control (ADR-0014, migration `ClaudeControl`).** `agents` gains `accepts_claude_control` (boolean, default false: the machine owner's switch for starting Claude from the web), `accepts_claude_control_set_at` and `accepts_claude_control_set_by` (FK users, indexed); it is reset when the machine moves workspace. `agent_actions` gains `project_key`, `permission_mode` and `session_ref` (all nullable text: the project and mode of a `claude_start`, the 8-character short session id a successful start returned or a `claude_stop` names), and `ck_agent_actions_kind` now allows `claude_start` and `claude_stop`. Nothing is removed or retyped.

@@ -103,7 +103,7 @@ public sealed class ClaudeUpdaterBackoffTests : IDisposable
         Assert.Equal(2, kit.State.Failures);
     }
 
-    // ---- what `cm-agent status` shows --------------------------------------------------------------------------
+    // ---- what `aipod status` shows --------------------------------------------------------------------------
 
     private List<string> StatusWith(int failures)
     {

@@ -25,5 +25,6 @@ internal static class MonitorDbModelActions
             e.HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<User>().WithMany().HasForeignKey(x => x.RequestedBy).OnDelete(DeleteBehavior.Restrict);
         });
+        b.Entity<Agent>(e => e.HasOne<User>().WithMany().HasForeignKey(x => x.AcceptsClaudeControlSetBy).OnDelete(DeleteBehavior.Restrict));
     }
 }

@@ -13,7 +13,9 @@ namespace ClaudeMonitor.Agent.Push;
 /// <c>no_idle_session</c>; push off or a machine whose own claim is strict reports <c>not_accepting</c>. On macOS and Linux the line is written
 /// WITHOUT the session's key (so Claude Code holds it for the person at the terminal instead of delivering it at once in a bypass session); on Windows
 /// the key is mandatory, so only a session whose last recorded permission mode is default or plan receives it. A delivered ask that does not show in
-/// the transcript within <see cref="AgentConfig.AskConfirmWait"/> is reported not_accepting. Nothing is queued for later and the text is never logged.
+/// the transcript within <see cref="AgentConfig.AskConfirmWait"/> is reported not_accepting. The requester is told once that this daemon holds the ask
+/// (<c>received</c>); an ask for which no session is idle is KEPT in the database, queued, and tried again on every pass until a session takes it or the
+/// API expires it (it is not given up at once). The text is never logged.
 /// </summary>
 public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInboxTransport transport, Func<string, AskStatusUpdate, CancellationToken, Task> report,
     Func<bool> strictClaim, TimeProvider clock, Func<DateTimeOffset, ISet<int>>? idlePids = null)
@@ -27,16 +29,17 @@ public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInbox
         var config = settings();
         var now = clock.GetUtcNow();
         var delivered = 0;
+        var accepting = config.InboxPushEnabled && config.AsksEnabled && !strictClaim();
+        if (accepting) await AcknowledgeAsync(now, ct); // a machine that refuses asks says so below instead, once
         foreach (var ask in store.QueuedAsks(now))
         {
-            if (!config.InboxPushEnabled || !config.AsksEnabled || strictClaim())
+            if (!accepting)
             {
                 await EndAsync(ask.Id, AskStatuses.NotAccepting, AskStatuses.NotAccepting, ct);
                 continue;
             }
 
-            if (await DeliverAsync(ask, config, now, ct)) delivered++;
-            else await EndAsync(ask.Id, AskStatuses.NoIdleSession, AskStatuses.NoIdleSession, ct);
+            if (await DeliverAsync(ask, config, now, ct)) delivered++; // no idle session now: the ask stays queued for the next pass (or the next session)
         }
 
         foreach (var ask in store.StaleQueuedAsks(now)) store.CloseAsk(ask.Id);
@@ -88,7 +91,7 @@ public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInbox
             {
                 var command = new LocalCommand(ask.Id, inbox.Session, "ask", null, ask.NotAfter);
                 var token = OperatingSystem.IsWindows() ? inbox.Token : null; // never the key where it is optional: a held message is what an ask from another machine deserves
-                await transport.SendAsync(inbox.Endpoint, InboxLines.For(command, token, AskEnvelopes.Build(ask, config.PushContentMax)), config.InboxConnectTimeout, ct);
+                await transport.SendAsync(inbox.Endpoint, InboxLines.For(command, token, AskEnvelopes.Build(ask, config.PushContentMax, Mcp.McpToolNames.Parse(inbox.Tools))), config.InboxConnectTimeout, ct);
             }
             catch (Exception e) when (!ct.IsCancellationRequested && e is IOException or SocketException or TimeoutException or InvalidOperationException
                                           or UnauthorizedAccessException or ArgumentException)
@@ -100,11 +103,33 @@ public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInbox
             }
 
             if (!store.AskDeliveredTo(ask.Id, inbox.Session, now)) return true;
+            store.Bump(PushStatus.OutCountKey);
             await ReportAsync(ask.Id, new AskStatusUpdate(AskStatuses.Delivered, SessionExternalId: inbox.Session, At: now), ct);
             return true;
         }
 
         return false;
+    }
+
+    /// <summary>Tells the requester, once per ask, that this daemon holds it; a report that did not get through is repeated on the next pass.</summary>
+    private async Task AcknowledgeAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        foreach (var ask in store.AsksToAcknowledge(now))
+        {
+            try
+            {
+                await report(ask.Id, new AskStatusUpdate(AskStatuses.Received, At: now), ct);
+                store.MarkAskAcknowledged(ask.Id);
+            }
+            catch (Net.ApiException e) when (e.Status is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
+            {
+                store.MarkAskAcknowledged(ask.Id); // the API no longer has it open: nothing to tell
+            }
+            catch (Exception e) when (!ct.IsCancellationRequested && e is Net.ApiException or HttpRequestException or TimeoutException)
+            {
+                return; // the API cannot be reached: the rest waits for the next pass
+            }
+        }
     }
 
     private async Task EndAsync(string id, string status, string error, CancellationToken ct)

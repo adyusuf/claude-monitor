@@ -29,7 +29,7 @@ public static class RemoteVerbs
         ArgumentNullException.ThrowIfNull(config);
         if (!(connected?.Invoke() ?? Identity_Connected(config)))
         {
-            await stderr.WriteLineAsync("This machine is not connected: run cm-agent login --server <url> (or install --standalone --server <url>) first.");
+            await stderr.WriteLineAsync("This machine is not connected: run aipod login --server <url> (or install --standalone --server <url>) first.");
             return 1;
         }
 
@@ -72,7 +72,7 @@ public static class RemoteVerbs
 
     private static async Task<int> DetailAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
-        if (args.Length < 2) return await Usage(stderr, "cm-agent machine <host name or agent id>");
+        if (args.Length < 2) return await Usage(stderr, "aipod machine <host name or agent id>");
         var target = await Targets.ResolveAsync(client.Requests, args[1]);
         if (target.Error is { } error) return await Say(stderr, error);
         var outcome = await client.DetailAsync(target.AgentId!.Value);
@@ -83,7 +83,7 @@ public static class RemoteVerbs
 
     private static async Task<int> MetricsAsync(RemoteRequests requests, string[] args, TextWriter stdout, TextWriter stderr)
     {
-        if (args.Length < 2) return await Usage(stderr, "cm-agent metrics <host name or agent id> [--timeout <minutes>]");
+        if (args.Length < 2) return await Usage(stderr, "aipod metrics <host name or agent id> [--timeout <minutes>]");
         var target = await Targets.ResolveAsync(requests, args[1]);
         if (target.Error is { } error) return await Say(stderr, error);
         var minutes = int.TryParse(Option(args, "--timeout"), out var m) ? Math.Clamp(m, 1, 1440) : 60;
@@ -139,7 +139,7 @@ public static class RemoteVerbs
 
     private static async Task<int> JobRunAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
-        if (args.Length < 2 || !Guid.TryParse(args[1], out var id)) return await Usage(stderr, "cm-agent job-run <job id> [--reason <why>]");
+        if (args.Length < 2 || !Guid.TryParse(args[1], out var id)) return await Usage(stderr, "aipod job-run <job id> [--reason <why>]");
         var list = await client.JobsAsync();
         if (!list.Ok) return await Failed(stderr, list.Error!);
         var job = list.Value!.FirstOrDefault(j => j.Id == id);
@@ -182,7 +182,7 @@ public static class RemoteVerbs
 
     private static async Task<int> StartRunAsync(RemoteClient client, string[] args, TextWriter stdout, TextWriter stderr)
     {
-        const string usage = "cm-agent run --machine <x> [--timeout <s>] [--reason <why>] [--project <key>] [--kind test|build|deploy|other] (--script <file> --interpreter sh|bash|python|powershell [--arg <value>]... [--file <path>=<local file>]... [--stdin <local file>] | --argv <exe> [args...])";
+        const string usage = "aipod run --machine <x> [--timeout <s>] [--reason <why>] [--project <key>] [--kind test|build|deploy|other] (--script <file> --interpreter sh|bash|python|powershell [--arg <value>]... [--file <path>=<local file>]... [--stdin <local file>] | --argv <exe> [args...])";
         if (Option(args, "--machine") is not { } machine) return await Usage(stderr, usage);
         var target = await Targets.ResolveAsync(client.Requests, machine);
         if (target.Error is { } error) return await Say(stderr, error);
@@ -219,13 +219,13 @@ public static class RemoteVerbs
         var outcome = await client.CreateRunAsync(create);
         if (outcome.Pending)
         {
-            await stdout.WriteLineAsync($"Queued as request {create.ClientKey}. Read it with: cm-agent result {create.ClientKey}");
+            await stdout.WriteLineAsync($"Queued as request {create.ClientKey}. Read it with: aipod result {create.ClientKey}");
             return 0;
         }
 
         if (!outcome.Ok) return await Failed(stderr, outcome.Error!);
         var run = outcome.Value!;
-        await stdout.WriteLineAsync($"Run {run.Id}: {run.Status}.{(run.Status == RunStatuses.PendingApproval ? " Its owner approves it on the web (until " + run.ExpiresAt.ToString("u", CultureInfo.InvariantCulture) + ")." : "")} Read it with: cm-agent result {run.Id} --wait 30");
+        await stdout.WriteLineAsync($"Run {run.Id}: {run.Status}.{(run.Status == RunStatuses.PendingApproval ? " Its owner approves it on the web (until " + run.ExpiresAt.ToString("u", CultureInfo.InvariantCulture) + ")." : "")} Read it with: aipod result {run.Id} --wait 30");
         return 0;
     }
 
@@ -233,7 +233,7 @@ public static class RemoteVerbs
     {
         if (Option(args, "--machine") is not { } machine || args.Skip(1).LastOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal) && a != machine) is not { Length: > 0 } question)
         {
-            return await Usage(stderr, "cm-agent ask --machine <x> \"<question>\"");
+            return await Usage(stderr, "aipod ask --machine <x> \"<question>\"");
         }
 
         var target = await Targets.ResolveAsync(client.Requests, machine);
@@ -242,19 +242,19 @@ public static class RemoteVerbs
         var outcome = await client.CreateAskAsync(new AskCreate(clientKey, target.AgentId!.Value, TextMask.Mask(question)));
         if (outcome.Pending)
         {
-            await stdout.WriteLineAsync($"Queued as request {clientKey}. Read it with: cm-agent result {clientKey} --wait 30");
+            await stdout.WriteLineAsync($"Queued as request {clientKey}. Read it with: aipod result {clientKey} --wait 30");
             return 0;
         }
 
         if (!outcome.Ok) return await Failed(stderr, outcome.Error!);
-        await stdout.WriteLineAsync($"Ask {outcome.Value!.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. Read the answer with: cm-agent result {outcome.Value.Id} --wait 30");
+        await stdout.WriteLineAsync($"Ask {outcome.Value!.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. Read the answer with: aipod result {outcome.Value.Id} --wait 30");
         return 0;
     }
 
     /// <summary>A run or an ask: the local rows say which (a key or an id this machine followed); anything else is looked up as an ask first and read as a run otherwise.</summary>
     private static async Task<int> ResultAsync(RemoteClient client, AgentConfig config, string[] args, TextWriter stdout, TextWriter stderr)
     {
-        if (args.Length < 2 || !Guid.TryParse(args[1], out var id)) return await Usage(stderr, "cm-agent result <run or ask id> [--wait <seconds>] [--offset <chars>]");
+        if (args.Length < 2 || !Guid.TryParse(args[1], out var id)) return await Usage(stderr, "aipod result <run or ask id> [--wait <seconds>] [--offset <chars>]");
         var wait = int.TryParse(Option(args, "--wait"), out var w) ? Math.Clamp(w, 0, AgentConfig.RemoteWaitMaxSeconds) : 0;
         var offset = int.TryParse(Option(args, "--offset"), out var o) ? Math.Max(0, o) : 0;
         string? kind;

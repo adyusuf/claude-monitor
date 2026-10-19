@@ -56,7 +56,7 @@ public sealed class ServiceCommandsTests : IDisposable
     public void A_server_that_is_not_a_plain_https_address_is_refused_with_exit_2(string server)
     {
         Assert.Equal(2, Install("--service", "--server", server));
-        Assert.Contains("takes the https address of Claude Monitor", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("takes the https address of the aipod server", stderr.ToString(), StringComparison.Ordinal);
         Assert.Empty(ran);
     }
 

@@ -1,0 +1,35 @@
+import type { Dictionary } from "./en";
+
+// German issues namespace (the backlog and the issue page): the same keys as en.issues.ts; de.ts assigns it as `issues`.
+export const deIssues: Dictionary["issues"] = {
+  backlog: "Backlog", scope: "Welche Vorgänge", addIssue: "Vorgang hinzufügen", add: "Hinzufügen", open: "Öffnen", unassigned: "Nicht zugewiesen", inEpic: "Dieser Vorgang gehört zu einem Epic",
+  scopes: { backlog: "Backlog", all: "Alle Vorgänge", archived: "Archiviert" },
+  search: "Vorgänge nach Titel durchsuchen", newTitle: "Titel des neuen Vorgangs", newType: "Art des neuen Vorgangs",
+  empty: "Hier gibt es keine Vorgänge.", emptyArchived: "Es gibt keine archivierten Vorgänge.", emptyHint: "Fügen Sie oben einen Vorgang hinzu; er öffnet sich, damit Sie den Rest ausfüllen.",
+  noMatch: "Kein Vorgang passt.", archiveConfirm: "Vorgang #{number} archivieren? Er bleibt bei den archivierten und kann wiederhergestellt werden.",
+  archivedBanner: "Dieser Vorgang ist archiviert: Er ist schreibgeschützt, bis er wiederhergestellt wird.",
+  moveUp: "Nach oben", moveDown: "Nach unten",
+  title: "Titel", type: "Art", statusLabel: "Status", priorityLabel: "Priorität", noPriority: "Keine Priorität", estimate: "Schätzung", assignee: "Zugewiesen an",
+  parent: "Epic", application: "Anwendung", component: "Komponente", release: "Release", created: "Erstellt", description: "Beschreibung",
+  descriptionHint: "Als … möchte ich … damit …", criteria: "Akzeptanzkriterien", given: "Gegeben", when: "Wenn", then: "Dann",
+  addCriterion: "Kriterium hinzufügen", technicalDesign: "Technischer Entwurf",
+  bugSection: "Fehlerdetails", bugEnvironment: "Umgebung", reproSteps: "Schritte zur Reproduktion", expectedResult: "Erwartetes Ergebnis",
+  actualResult: "Tatsächliches Ergebnis", severity: "Schweregrad",
+  status: { backlog: "Backlog", ready: "Bereit", in_progress: "In Arbeit", in_review: "In Prüfung", done: "Erledigt", cancelled: "Abgebrochen" },
+  severities: { critical: "Kritisch", major: "Schwerwiegend", minor: "Gering", trivial: "Trivial" },
+  priority: {
+    p0: "P0", p1: "P1", p2: "P2", p3: "P3", must: "Muss", should: "Soll", could: "Kann", wont: "Wird nicht", high: "Hoch", medium: "Mittel", low: "Niedrig",
+    "1": "1", "2": "2", "3": "3", "4": "4", "5": "5",
+  },
+  unitShort: { story_points: "SP", hours: "Std", days: "T" },
+  links: "Blockiert und blockiert durch", blocks: "Blockiert", blockedBy: "Blockiert durch", noLinks: "Keine.", removeLink: "Entfernen", addLink: "Verknüpfung hinzufügen",
+  linkKind: "Wie die Vorgänge verknüpft sind", linkTarget: "Vorgang zum Verknüpfen", searchToLink: "Einen Vorgang zum Verknüpfen suchen",
+  linkKinds: { blocks: "Dieser Vorgang blockiert", blocked_by: "Dieser Vorgang wird blockiert durch" },
+  testCases: "Testfälle", noTests: "Noch keine Testfälle.", testTitle: "Szenario", testSteps: "Schritte", testExpected: "Erwartetes Ergebnis",
+  addTest: "Testfall hinzufügen", deleteTest: "Löschen", deleteTestConfirm: "Den Testfall „{title}“ löschen?", resultNote: "Notiz zum Ergebnis",
+  resultBy: "Ergebnis gesetzt von {name} am {when}",
+  results: { not_run: "Nicht ausgeführt", passed: "Bestanden", failed: "Fehlgeschlagen", blocked: "Blockiert" },
+  codeLinks: "Pull Requests und Commits", noCodeLinks: "Keine Pull Requests oder Commits verknüpft.", codeKind: "Art", codeUrl: "Adresse (https)",
+  codeTitle: "Titel (optional)", addCodeLink: "Hinzufügen", automatic: "Automatisch",
+  codeKinds: { pr: "Pull Request", commit: "Commit" },
+};

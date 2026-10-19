@@ -11,7 +11,7 @@ from gate_tool_support import ToolCase
 
 SCRIPT = 'coverage.sh'
 COBERTURA = '<?xml version="1.0"?><coverage lines-covered="%d" lines-valid="%d" line-rate="0"><packages/></coverage>'
-API, AGENT = 'ClaudeMonitor.Api.Tests', 'ClaudeMonitor.Agent.Tests'
+API, AGENT, TRAY = 'ClaudeMonitor.Api.Tests', 'ClaudeMonitor.Agent.Tests', 'Aipod.Tray.Tests'
 
 
 class CoverageReuse(ToolCase):
@@ -19,7 +19,7 @@ class CoverageReuse(ToolCase):
         super().setUp()
         self.write('scripts/tests/test_ok.py',
                    'import unittest\n\nclass T(unittest.TestCase):\n    def test_ok(self):\n        pass\n')
-        for tests in (API, AGENT):
+        for tests in (API, AGENT, TRAY):
             self.write('tests/%s/%s.csproj' % (tests, tests), '<Project/>\n')
         self.write('web/package.json', '{}\n')
         self.git('add', '-A')
@@ -44,6 +44,7 @@ class CoverageReuse(ToolCase):
     def put_all(self, covered=90, total=100):
         self.put_dotnet(API, covered, total)
         self.put_dotnet(AGENT, covered, total)
+        self.put_dotnet(TRAY, covered, total)
         self.put_web(covered, total)
 
     def reuse(self, minimum=None):
@@ -66,7 +67,7 @@ class CoverageReuse(ToolCase):
         self.put_all(90, 100)
         out, code = self.reuse()
         self.assertEqual(0, code, out)
-        self.assertEqual(3, out.count('✓ at or above 80%'), out)
+        self.assertEqual(4, out.count('✓ at or above 80%'), out)
         self.assertIn('Lines: 90.00% (90/100)', out)
         self.no_test_ran()
 
@@ -83,7 +84,7 @@ class CoverageReuse(ToolCase):
         self.put_web(50, 100)
         out, code = self.reuse()
         self.assertEqual(1, code, out)
-        self.assertEqual(2, out.count('✓ at or above 80%'), out)
+        self.assertEqual(3, out.count('✓ at or above 80%'), out)
         self.assertEqual(1, out.count('✗ below 80%'), out)
 
     def test_the_threshold_is_the_minimum_given(self):
@@ -99,6 +100,13 @@ class CoverageReuse(ToolCase):
         self.assertEqual(3, code, out)
         self.assertIn('NOT MEASURED', out)
         self.no_test_ran()
+
+    def test_a_missing_tray_result_is_not_measured_and_blocks(self):
+        self.put_all()
+        os.remove(os.path.join(self.results, TRAY, 'coverage.cobertura.xml'))
+        out, code = self.reuse()
+        self.assertEqual(3, code, out)
+        self.assertIn('NOT MEASURED', out)
 
     def test_a_missing_web_result_is_not_measured(self):
         self.put_all()

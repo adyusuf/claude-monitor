@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { useSession } from "../auth/session";
 import { config } from "../config";
-import { useI18n, type Language } from "../i18n";
+import { languages, useI18n, type Language } from "../i18n";
 import { usePendingApprovals } from "../lib/pending";
 
 type Theme = "light" | "dark" | "system";
@@ -87,8 +87,7 @@ export function Layout() {
           </NavLink>
           <div className="prefs">
             <select aria-label={t("nav.language")} value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-              <option value="en">English</option>
-              <option value="tr">Türkçe</option>
+              {languages.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
             <select aria-label={t("nav.theme")} value={theme} onChange={(e) => setTheme(e.target.value as Theme)}>
               <option value="system">◐</option>

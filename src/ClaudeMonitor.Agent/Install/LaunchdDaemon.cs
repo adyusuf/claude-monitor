@@ -16,7 +16,7 @@ public static class LaunchdDaemon
     public const int LastId = 399;
 
     private const string AccountShell = "/usr/bin/false";
-    private const string AccountRealName = "Claude Monitor agent";
+    private const string AccountRealName = "aipod agent";
 
     public static string Render(ServiceLayout l)
     {

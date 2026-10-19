@@ -5,9 +5,9 @@ namespace ClaudeMonitor.Agent.Config;
 
 /// <summary>
 /// The settings a person can change after the fact without editing the environment of every hook process: how long the
-/// Stop hook waits for a prompt from the web (`cm-agent install --stop-wait`) and whether prompts are pushed into an idle
+/// Stop hook waits for a prompt from the web (`aipod install --stop-wait`) and whether prompts are pushed into an idle
 /// session (`--push`). They are kept in agent.json beside the identity. CM_STOP_WAIT and CM_PUSH, when set, win (tests and
-/// one-off overrides); the defaults stay 0 and off, except that the first `cm-agent install` saves the inbox push as on.
+/// one-off overrides); the defaults stay 0 and off, except that the first `aipod install` saves the inbox push as on.
 /// </summary>
 public static class SavedSettings
 {
@@ -72,7 +72,7 @@ public static class SavedSettings
     }
 
     /// <summary>
-    /// Saves what this machine says about itself (ADR-0008 §3a, `cm-agent config role`): an environment and a function from the closed
+    /// Saves what this machine says about itself (ADR-0008 §3a, `aipod config role`): an environment and a function from the closed
     /// sets, or null to say nothing. The claim only ever tightens the role an admin set; it never sets one.
     /// </summary>
     public static void SaveRole(AgentConfig config, string? environment, string? function)

@@ -19,7 +19,7 @@ public static class ClaudePolicy
     }
 }
 
-/// <summary>Tells the person something. Best effort: where there is no way to, it says so and the countdown still runs (log and `cm-agent status` carry it).</summary>
+/// <summary>Tells the person something. Best effort: where there is no way to, it says so and the countdown still runs (log and `aipod status` carry it).</summary>
 public interface IUserNotifier
 {
     bool Notify(string message);

@@ -37,7 +37,7 @@ public static class RemoteHousekeeping
     }
 
     /// <summary>
-    /// An ask nobody took in time expires (it is never queued for later), and a delivered one nobody answered becomes <c>no_answer</c> after the
+    /// An ask nobody took in time (the target's daemon holds it until a session is idle) expires, and a delivered one nobody answered becomes <c>no_answer</c> after the
     /// answer wait (ADR-0008 §3f); the requester's stream hears it. Each change is a compare-and-set, so an answer that arrived first stays.
     /// </summary>
     private static async Task ExpireAsksAsync(MonitorDb db, ApiConfig config, Broker broker, DateTimeOffset now, CancellationToken ct)
