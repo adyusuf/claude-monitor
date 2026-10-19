@@ -19,13 +19,18 @@ public sealed class ClaudeAutoStart(Func<AgentConfig> settings, LocalStore store
     /// <summary>The workspace-tagged switch the settings pass keeps: "on_message" or "off".</summary>
     public const string ModeKey = "settings.claude_auto_mode";
 
+    /// <summary>The project key the mode "always" keeps a session running in (workspace-tagged like <see cref="ModeKey"/>).</summary>
+    public const string ProjectKey = "settings.claude_auto_project";
+
     public const string StartsKey = "claude.auto.starts";
     public const string BackoffPrefix = "claude.auto.backoff.";
 
     private readonly Dictionary<string, DateTimeOffset> unserved = [];
 
+    private DateTimeOffset lastReconcile = DateTimeOffset.MinValue;
+
     public bool Enabled(AgentConfig config) =>
-        !config.ServiceMode && !strictClaim() && WorkspaceSettings.Get(config, store, ModeKey) == ClaudeAutoModes.OnMessage;
+        !config.ServiceMode && !strictClaim() && WorkspaceSettings.Get(config, store, ModeKey) is ClaudeAutoModes.OnMessage or ClaudeAutoModes.Always;
 
     /// <summary>One pass: returns how many sessions it started (0 or 1).</summary>
     public async Task<int> RunOnceAsync(CancellationToken ct)
@@ -38,6 +43,8 @@ public sealed class ClaudeAutoStart(Func<AgentConfig> settings, LocalStore store
             return 0;
         }
 
+        await ReconcileAsync(config, now, ct);
+        if (await KeepOneRunningAsync(config, now, ct)) return 1;
         var waiting = store.QueuedAsks(now).Where(a => a.Project is { Length: > 0 }).ToList();
         foreach (var gone in unserved.Keys.Where(id => waiting.All(a => a.Id != id)).ToList()) unserved.Remove(gone);
         foreach (var ask in waiting)
@@ -52,7 +59,7 @@ public sealed class ClaudeAutoStart(Func<AgentConfig> settings, LocalStore store
             if (control.Running().Any(w => w.ProjectKey == project)) continue; // it has one: that one takes the ask when it is idle
             if (BackoffUntil(project) > now) continue;
             if (StartsSince(now - TimeSpan.FromHours(1)).Count >= config.ClaudeAutoStartsPerHour) return 0;
-            var outcome = await control.StartAsync(project, null, ct);
+            var outcome = await control.StartAsync(project, null, ct, reason: "auto:" + ClaudeAutoModes.OnMessage);
             if (outcome.Succeeded)
             {
                 RecordStart(now);
@@ -65,6 +72,34 @@ public sealed class ClaudeAutoStart(Func<AgentConfig> settings, LocalStore store
         }
 
         return 0;
+    }
+
+    /// <summary>Asks Claude Code which of our sessions still run, at most once a minute, so one that ended on its own stops counting.</summary>
+    private async Task ReconcileAsync(AgentConfig config, DateTimeOffset now, CancellationToken ct)
+    {
+        if (now - lastReconcile < config.ClaudeAutoReconcileEvery) return;
+        lastReconcile = now;
+        if (await control.ReconcileAsync(config.ClaudeAutoWait * 4, ct) is > 0 and var ended) log.Write($"{ended} Claude session(s) started here ended on their own");
+    }
+
+    /// <summary>The mode "always": one session is kept running in the project the owner named, within the same budget and backoff as every other start. True when it started one.</summary>
+    private async Task<bool> KeepOneRunningAsync(AgentConfig config, DateTimeOffset now, CancellationToken ct)
+    {
+        if (WorkspaceSettings.Get(config, store, ModeKey) != ClaudeAutoModes.Always) return false;
+        if (WorkspaceSettings.Get(config, store, ProjectKey) is not { Length: > 0 } project) return false;
+        if (control.Running().Any(w => w.ProjectKey == project)) return false;
+        if (BackoffUntil(project) > now || StartsSince(now - TimeSpan.FromHours(1)).Count >= config.ClaudeAutoStartsPerHour) return false;
+        var outcome = await control.StartAsync(project, null, ct, reason: "auto:" + ClaudeAutoModes.Always);
+        if (outcome.Succeeded)
+        {
+            RecordStart(now);
+            log.Write($"started Claude session {outcome.SessionRef} by itself to keep one running (automatic mode {ClaudeAutoModes.Always})");
+            return true;
+        }
+
+        store.Set(BackoffPrefix + project, (now + config.ClaudeAutoBackoff).ToString("O", CultureInfo.InvariantCulture));
+        log.Write($"automatic Claude start did not happen: {outcome.Text}");
+        return false;
     }
 
     private DateTimeOffset BackoffUntil(string project) =>

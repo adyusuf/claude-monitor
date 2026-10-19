@@ -101,6 +101,9 @@ public sealed class Agent
 
     /// <summary>ADR-0014 P3: what the daemon may start by itself (<see cref="ClaudeAutoModes"/>); NULL is off. Reset with the switch when the machine moves workspace.</summary>
     public string? ClaudeAutoMode { get; set; }
+
+    /// <summary>ADR-0014 P3: the project key the mode <c>always</c> keeps a session running in; NULL for every other mode.</summary>
+    public string? ClaudeAutoProject { get; set; }
     public DateTimeOffset? AcceptsClaudeControlSetAt { get; set; }
     public Guid? AcceptsClaudeControlSetBy { get; set; }
 

@@ -77,6 +77,7 @@ export const de: Dictionary = {
     invalid_session_ref: "Das ist keine Sitzungs-ID.", claude_not_started_here: "Nur eine von hier gestartete Sitzung kann von hier gestoppt werden.",
     invalid_project: "Der Projektschlüssel hat 1 bis 200 Zeichen ohne Steuerzeichen.",
     invalid_auto_mode: "Der automatische Modus ist on_message oder off.",
+    invalid_auto_project: "Wählen Sie ein Projekt, das diese Maschine gemeldet hat und dem Claude Code vertraut.",
     invalid_first_prompt: "Die erste Eingabe ist ein Text mit 1 bis 2000 Zeichen.", claude_folder_not_trusted: "Claude Code vertraut diesem Ordner noch nicht: Öffnen Sie Claude dort einmal an der Maschine und bestätigen Sie die Vertrauensfrage.",
     claude_start_pending: "Ein anderer Start auf dieser Maschine wartet noch: Versuchen Sie es erneut, wenn er fertig ist.",
   },

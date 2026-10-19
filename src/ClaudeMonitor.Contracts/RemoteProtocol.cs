@@ -63,7 +63,7 @@ public sealed record MachineView(Guid AgentId, string Hostname, string Os, strin
     string? EffectiveEnvironment = null, string? EffectiveFunction = null, string? ClaudeKind = null, string? ClaudeVersion = null,
     int? ClaudeSessionsIdle = null, IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null,
     IReadOnlyList<string>? Capabilities = null, DateTimeOffset? PresenceAt = null,
-    IReadOnlyDictionary<string, string>? Tags = null, bool? AcceptsAsks = null, bool? AcceptsClaudeControl = null, string? ClaudeAutoMode = null, string? PluginId = null);
+    IReadOnlyDictionary<string, string>? Tags = null, bool? AcceptsAsks = null, bool? AcceptsClaudeControl = null, string? ClaudeAutoMode = null, string? PluginId = null, string? ClaudeAutoProject = null);
 
 public sealed record AlertView(Guid Id, Guid AgentId, string Hostname, string Kind, string Subject, string State,
     double ThresholdPct, double LastValue, double PeakValue, DateTimeOffset OpenedAt, DateTimeOffset? ResolvedAt);

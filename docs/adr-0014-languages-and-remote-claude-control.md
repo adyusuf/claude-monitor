@@ -185,5 +185,8 @@ Claude plan, which the page says in the sentence next to the checkbox. Not relea
   work on, the owner's switch, dev or test set by an admin, no strict claim, no service agent, `claude` present) and a recent sign-in; turning the switch off, or moving the machine, turns it off. The API tells the
   agent `on_message` only while the owner's switch and the workspace's remote-work switch are both on; the agent keeps it as a workspace-tagged switch (`settings.claude_auto_mode`), forgotten at login and logout.
 - **Page.** A checkbox at the top of the new-session part of the Claude card, with the cost and the bounds in words, in tr, en and de.
-- **Not built.** `always` (one worker kept running: it would spend without a reason on the ask, so it needs its own decision), the reason on the session ("started by policy, for an ask from X") and any trigger other
-  than an ask (messages to a session that is gone).
+- **Added after: `always`.** The owner can choose a project (one this machine reported and Claude Code does not refuse; `agents.claude_auto_project`) and the daemon keeps one session running in it, besides doing what `on_message` does: when none
+  runs there it starts one, within the same budget of three an hour and the same backoff. More automation (on, then `always`, or `always` in another project) needs the recent sign-in; less never does. The sessions the agent started are checked
+  against `claude agents --json` once a minute (a session Claude Code no longer lists, past a two-minute grace, stops counting as ours; any doubt changes nothing), so a session that ended on its own is replaced. Why a session was started is kept
+  with it in `claude-workers.json` (`auto:on_message`, `auto:always`, nothing for a start from the web) and `aipod status` counts the ones the automatic mode started; the web page does not list them (they have no action row).
+- **Not built.** Listing the automatic starts on the page, and any trigger other than an ask (messages to a session that is gone).

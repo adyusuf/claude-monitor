@@ -19,14 +19,18 @@ public sealed class ClaudeAutoStartTests : IDisposable
         public List<string[]> Runs { get; } = [];
         public bool Fail { get; set; }
 
+        /// <summary>What `claude agents --json` answers (null: it fails).</summary>
+        public string? Listing { get; set; }
+
         public Task<ClaudeRun> RunAsync(string claude, IReadOnlyList<string> args, string? workingDirectory, TimeSpan timeout, CancellationToken ct)
         {
+            if (args[0] == "agents") return Task.FromResult(Listing is null ? new ClaudeRun(1, "", "no") : new ClaudeRun(0, Listing, ""));
             Runs.Add([.. args]);
             return Task.FromResult(Fail ? new ClaudeRun(1, "", "boom") : new ClaudeRun(0, $"backgrounded · {++next:x8} · aipod-shop\n", ""));
         }
     }
 
-    private readonly TempHome home = new(c => c with { ClaudeAutoWait = TimeSpan.FromSeconds(30) });
+    private readonly TempHome home = new(c => c with { ClaudeAutoWait = TimeSpan.FromSeconds(30), ClaudeAutoReconcileEvery = TimeSpan.FromDays(365) });
     private readonly ManualClock clock = new(Start);
     private readonly FakeClaude claude = new();
     private readonly LocalStore store;
@@ -203,5 +207,100 @@ public sealed class ClaudeAutoStartTests : IDisposable
 
         Assert.DoesNotContain(claude.Runs.Single(), arg => arg.Contains("what branch", StringComparison.Ordinal));
         Assert.DoesNotContain("what branch", File.Exists(home.Config.LogPath) ? File.ReadAllText(home.Config.LogPath) : "", StringComparison.Ordinal);
+    }
+
+    // ---- the mode "always" and the reconcile --------------------------------------------------------------------------
+
+    private void Always(string? project = Project)
+    {
+        store.Set(ClaudeAutoStart.ModeKey, ClaudeAutoModes.Always);
+        store.Set(ClaudeAutoStart.ProjectKey, project ?? "");
+    }
+
+    [Fact]
+    public async Task The_mode_always_starts_one_session_in_the_named_project_with_no_ask_at_all_labels_why_and_keeps_to_one()
+    {
+        Always();
+        var auto = Auto();
+
+        Assert.Equal(1, await auto.RunOnceAsync(CancellationToken.None));
+        Assert.Equal(0, await auto.RunOnceAsync(CancellationToken.None)); // it has one
+
+        Assert.Equal(["--bg", "--name", "aipod-shop", "--permission-mode", "manual"], Assert.Single(claude.Runs));
+        Assert.Equal("auto:always", Assert.Single(new ClaudeControl(home.Config, claude, clock, () => new ClaudeInstall(ClaudeKind.Npm, "/usr/local/bin/claude", "npm")).Running()).Reason);
+    }
+
+    [Fact]
+    public async Task The_mode_always_starts_nothing_without_a_project_and_under_the_same_refusals_as_every_start()
+    {
+        Always(project: null);
+        Assert.Equal(0, await Auto().RunOnceAsync(CancellationToken.None));
+        Always();
+        strict = true;
+        Assert.Equal(0, await Auto().RunOnceAsync(CancellationToken.None));
+        strict = false;
+        Assert.Equal(0, await Auto(home.Config with { ServiceMode = true }).RunOnceAsync(CancellationToken.None));
+        Assert.Empty(claude.Runs);
+    }
+
+    [Fact]
+    public async Task When_the_session_it_kept_has_ended_the_mode_always_starts_another_within_the_budget_and_backs_off_after_a_failure()
+    {
+        var config = home.Config with { ClaudeAutoReconcileEvery = TimeSpan.FromSeconds(30), ClaudeAutoStartsPerHour = 2 };
+        Always();
+        var auto = Auto(config);
+        Assert.Equal(1, await auto.RunOnceAsync(CancellationToken.None));
+        claude.Listing = "[]"; // Claude Code no longer lists it
+
+        clock.Advance(TimeSpan.FromMinutes(3)); // past the grace and the reconcile interval
+        Assert.Equal(1, await auto.RunOnceAsync(CancellationToken.None));
+        Assert.Equal(2, claude.Runs.Count);
+
+        clock.Advance(TimeSpan.FromMinutes(3));
+        Assert.Equal(0, await auto.RunOnceAsync(CancellationToken.None)); // the budget of two an hour is used up
+        Assert.Equal(2, claude.Runs.Count);
+    }
+
+    [Fact]
+    public async Task A_failed_always_start_waits_out_the_backoff_like_any_other()
+    {
+        Always();
+        claude.Fail = true;
+        var auto = Auto();
+        Assert.Equal(0, await auto.RunOnceAsync(CancellationToken.None));
+        clock.Advance(TimeSpan.FromMinutes(5));
+        Assert.Equal(0, await auto.RunOnceAsync(CancellationToken.None));
+        Assert.Single(claude.Runs);
+
+        claude.Fail = false;
+        clock.Advance(TimeSpan.FromMinutes(6));
+        Assert.Equal(1, await auto.RunOnceAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task The_reconcile_stops_counting_a_session_claude_code_no_longer_lists_but_only_after_the_grace_and_never_on_a_doubt()
+    {
+        var control = Control();
+        var outcome = await control.StartAsync(Project, null, CancellationToken.None);
+        var id = outcome.SessionRef!;
+
+        claude.Listing = "[]";
+        Assert.Equal(0, await control.ReconcileAsync(TimeSpan.FromMinutes(2), CancellationToken.None)); // too early: the session may not be listed yet
+        clock.Advance(TimeSpan.FromMinutes(3));
+        claude.Listing = null;
+        Assert.Equal(0, await control.ReconcileAsync(TimeSpan.FromMinutes(2), CancellationToken.None)); // the command failed: unknown
+        claude.Listing = "not json";
+        Assert.Equal(0, await control.ReconcileAsync(TimeSpan.FromMinutes(2), CancellationToken.None));
+        claude.Listing = "{\"sessionId\":\"x\"}"; // not an array
+        Assert.Equal(0, await control.ReconcileAsync(TimeSpan.FromMinutes(2), CancellationToken.None));
+        Assert.Single(control.Running());
+
+        claude.Listing = "[{\"pid\":1,\"sessionId\":\"" + id + "-aaaa-bbbb\",\"name\":\"x\"}]"; // still listed: the short id is the start of the full one
+        Assert.Equal(0, await control.ReconcileAsync(TimeSpan.FromMinutes(2), CancellationToken.None));
+        Assert.Single(control.Running());
+
+        claude.Listing = "[{\"pid\":1,\"sessionId\":\"ffffffff-aaaa\"}]";
+        Assert.Equal(1, await control.ReconcileAsync(TimeSpan.FromMinutes(2), CancellationToken.None));
+        Assert.Empty(control.Running());
     }
 }

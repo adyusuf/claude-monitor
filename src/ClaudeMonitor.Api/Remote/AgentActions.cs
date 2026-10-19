@@ -216,7 +216,18 @@ public static class AgentActions
         // The automatic mode (ADR-0014 P3) only exists while the switch is on: turning the switch off turns it off, and it is never on for a machine a start would be refused on.
         var autoBefore = agent.ClaudeAutoMode ?? ClaudeAutoModes.Off;
         var autoAfter = !req.Accept ? ClaudeAutoModes.Off : req.AutoMode ?? autoBefore;
-        var turningAutoOn = autoAfter == ClaudeAutoModes.OnMessage && autoBefore != ClaudeAutoModes.OnMessage;
+        // "always" keeps a session running in a project the owner names: it must be one this machine reported and Claude Code does not refuse.
+        var projectAfter = autoAfter == ClaudeAutoModes.Always ? req.AutoProject ?? agent.ClaudeAutoProject : null;
+        if (autoAfter == ClaudeAutoModes.Always
+            && (projectAfter is not { Length: >= 1 and <= RunKinds.ProjectKeyMax } || projectAfter.Any(char.IsControl)
+                || !await db.MachineProjects.AsNoTracking().AnyAsync(p => p.AgentId == agent.Id && p.ProjectKey == projectAfter && p.ClaudeTrusted != false, http.RequestAborted)))
+        {
+            return Http.Invalid("autoProject", AgentActionErrors.InvalidAutoProject);
+        }
+
+        // More automation needs the sign-in (turning it on, going from on_message to always, or pointing always at another project); less never does.
+        static int Rank(string mode) => mode switch { ClaudeAutoModes.Always => 2, ClaudeAutoModes.OnMessage => 1, _ => 0 };
+        var turningAutoOn = Rank(autoAfter) > Rank(autoBefore) || (autoAfter == ClaudeAutoModes.Always && projectAfter != agent.ClaudeAutoProject);
         if (turningAutoOn && await MachineRefusalAsync(db, agent, requireOptIn: false, http.RequestAborted) is { } machineRefused) return machineRefused;
         if ((req.Accept && !agent.AcceptsClaudeControl || turningAutoOn) && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
         var was = agent.AcceptsClaudeControl;
@@ -225,7 +236,8 @@ public static class AgentActions
         agent.AcceptsClaudeControlSetAt = now;
         agent.AcceptsClaudeControlSetBy = userId;
         agent.ClaudeAutoMode = autoAfter == ClaudeAutoModes.Off ? null : autoAfter;
-        Audit.Add(db, http, clock, AuditActions.AgentClaudeControlChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId, detail: new { before = was, after = req.Accept, autoBefore, autoAfter });
+        agent.ClaudeAutoProject = projectAfter;
+        Audit.Add(db, http, clock, AuditActions.AgentClaudeControlChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId, detail: new { before = was, after = req.Accept, autoBefore, autoAfter, autoProject = projectAfter });
         await db.SaveChangesAsync(http.RequestAborted);
         if (was && !req.Accept)
         {
@@ -235,7 +247,7 @@ public static class AgentActions
         }
 
         broker.Publish(Broker.Workspace(agent.WorkspaceId), new StreamMessage(AgentRoleEndpoints.MachineEvent, new { agentId }));
-        return Results.Ok(new AgentClaudeView(agentId, agent.AcceptsClaudeControl, agent.AcceptsClaudeControlSetAt, agent.AcceptsClaudeControlSetBy, autoAfter));
+        return Results.Ok(new AgentClaudeView(agentId, agent.AcceptsClaudeControl, agent.AcceptsClaudeControlSetAt, agent.AcceptsClaudeControlSetBy, autoAfter, projectAfter));
     }
 
     private static Task<AgentAction?> OpenOfKindAsync(MonitorDb db, Guid agentId, string kind, CancellationToken ct) =>

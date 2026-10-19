@@ -139,36 +139,71 @@ describe("the Claude card on the machine page", () => {
     expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
   });
 
-  it("shows the automatic mode off by default, says what it costs and turns it on with the mode in the request", async () => {
+  it("shows the automatic start off by default, says what it costs and turns it on with the mode in the request", async () => {
     const calls = api({ "PUT /agents/a1/claude": { body: {} } }, dev);
     open();
-    const box = await screen.findByRole("checkbox", { name: en.machines.claudeControl.auto });
-    expect(box).not.toBeChecked();
+    const select = await screen.findByLabelText(en.machines.claudeControl.auto);
+    expect(select).toHaveValue("off");
     expect(screen.getByText(en.machines.claudeControl.autoHint.replace("{n}", String(AUTO_STARTS_PER_HOUR)))).toBeInTheDocument();
 
-    await userEvent.click(box);
+    await userEvent.selectOptions(select, "on_message");
 
     expect(await screen.findByText(en.machines.claudeControl.done.auto)).toBeInTheDocument();
     expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "on_message" });
   });
 
-  it("shows the automatic mode as on when the machine says so and turns it off with off", async () => {
+  it("shows the mode the machine says it has and turns it off with off", async () => {
     const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { ...dev, claudeAutoMode: "on_message" });
     open();
-    const box = await screen.findByRole("checkbox", { name: en.machines.claudeControl.auto });
-    expect(box).toBeChecked();
+    const select = await screen.findByLabelText(en.machines.claudeControl.auto);
+    expect(select).toHaveValue("on_message");
 
-    await userEvent.click(box);
+    await userEvent.selectOptions(select, "off");
 
     await vi.waitFor(() => expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")).toBeTruthy());
     expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "off" });
   });
 
-  it("shows no automatic mode on a machine where starting Claude is off or not allowed", async () => {
+  it("keeps a session running in a project: choosing always sends the first project that is not known untrusted, and the project can be changed", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, dev, [], [
+      project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new" }),
+    ]);
+    open();
+
+    await userEvent.selectOptions(await screen.findByLabelText(en.machines.claudeControl.auto), "always");
+
+    await vi.waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.path === "/agents/a1/claude")).toBe(true));
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "always", autoProject: "git:host/blog" });
+  });
+
+  it("shows the project of the always mode, lists only projects Claude Code may start in, and changing it sends the new one", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { ...dev, claudeAutoMode: "always", claudeAutoProject: "git:host/blog" }, [], [
+      project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new" }),
+    ]);
+    open();
+    const projectSelect = await screen.findByLabelText(en.machines.claudeControl.autoProject);
+    expect(projectSelect).toHaveValue("git:host/blog");
+    expect([...projectSelect.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["git:host/blog", "git:host/new"]);
+
+    await userEvent.selectOptions(projectSelect, "git:host/new");
+
+    await vi.waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.path === "/agents/a1/claude")).toBe(true));
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "always", autoProject: "git:host/new" });
+  });
+
+  it("does not offer always when Claude Code trusts no project, and offers no project choice for the other modes", async () => {
+    api({}, { ...dev, claudeAutoMode: "on_message" }, [], [project({ trusted: false })]);
+    open();
+    const select = await screen.findByLabelText(en.machines.claudeControl.auto);
+    expect([...select.querySelectorAll("option")].find((o) => o.getAttribute("value") === "always")).toBeDisabled();
+    expect(screen.queryByLabelText(en.machines.claudeControl.autoProject)).toBeNull();
+  });
+
+  it("shows no automatic start on a machine where starting Claude is off or not allowed", async () => {
     api({}, { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: false });
     open();
     await screen.findByText(en.machines.claudeControl.off);
-    expect(screen.queryByRole("checkbox", { name: en.machines.claudeControl.auto })).toBeNull();
+    expect(screen.queryByLabelText(en.machines.claudeControl.auto)).toBeNull();
   });
 
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
@@ -258,7 +293,9 @@ describe("the texts", () => {
       expect(dict.errors.claude_control_environment).not.toBe("");
       for (const key of ["invalid_first_prompt", "claude_folder_not_trusted", "claude_start_pending"] as const) expect(dict.errors[key]).not.toBe("");
       expect(dict.machines.claudeControl.autoHint).toContain("{n}");
-      for (const key of ["auto", "autoHint"] as const) expect(dict.machines.claudeControl[key]).not.toBe("");
+      for (const key of ["auto", "autoHint", "autoProject"] as const) expect(dict.machines.claudeControl[key]).not.toBe("");
+      expect(Object.keys(dict.machines.claudeControl.autoModes)).toEqual(["off", "on_message", "always"]);
+      expect(dict.errors.invalid_auto_project).not.toBe("");
       expect(dict.machines.claudeControl.done.auto).not.toBe("");
       expect(dict.errors.invalid_auto_mode).not.toBe("");
       expect(dict.machines.claudeControl.firstPromptCount).toContain("{n}");

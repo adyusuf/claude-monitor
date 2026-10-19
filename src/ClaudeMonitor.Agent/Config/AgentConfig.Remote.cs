@@ -18,6 +18,9 @@ public sealed partial record AgentConfig
     /// <summary>How often the daemon looks for an ask that no session can take (the automatic mode, ADR-0014 P3).</summary>
     public TimeSpan ClaudeAutoEvery { get; init; } = TimeSpan.FromSeconds(10);
 
+    /// <summary>How often the automatic mode asks Claude Code which sessions it started still run.</summary>
+    public TimeSpan ClaudeAutoReconcileEvery { get; init; } = TimeSpan.FromMinutes(1);
+
     /// <summary>An ask must have found no idle session for this long before the automatic mode starts one (a session that just finished its turn is given time to go idle).</summary>
     public TimeSpan ClaudeAutoWait { get; init; } = TimeSpan.FromSeconds(30);
 

@@ -420,10 +420,10 @@ public sealed class ClaudeControlTests(ApiFactory api)
     }
 
     [Theory]
-    [InlineData("always")]
+    [InlineData("sometimes")]
     [InlineData("ON_MESSAGE")]
     [InlineData("")]
-    public async Task Only_the_two_known_modes_are_accepted(string mode)
+    public async Task Only_the_three_known_modes_are_accepted(string mode)
     {
         var team = await TeamAsync();
         await AssertInvalidAsync(await SetAuto(team, mode), "autoMode", AgentActionErrors.InvalidAutoMode);
@@ -488,11 +488,80 @@ public sealed class ClaudeControlTests(ApiFactory api)
         Assert.Null((await db.Agents.AsNoTracking().SingleAsync(a => a.Id == team.TargetId)).ClaudeAutoMode);
     }
 
+    private static Task<HttpResponseMessage> SetAlways(AskTeam team, string? project, string? code = null) =>
+        team.User.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/claude", new { accept = true, autoMode = ClaudeAutoModes.Always, autoProject = project, code });
+
+    private static async Task<string?> AutoProjectOfAsync(AskTeam team)
+    {
+        var machines = await team.User.GetJsonAsync($"/api/workspaces/{team.WorkspaceId}/machines");
+        var machine = machines.EnumerateArray().Single(m => m.GetProperty("agentId").GetGuid() == team.TargetId);
+        return machine.TryGetProperty("claudeAutoProject", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
+    }
+
     [Fact]
-    public async Task The_database_refuses_a_mode_outside_the_two()
+    public async Task The_mode_always_needs_a_project_the_machine_has_reported_and_then_the_list_and_the_agent_both_say_which()
     {
         var team = await TeamAsync();
-        await Assert.ThrowsAsync<DbUpdateException>(() => SetAgentAsync(team.TargetId, a => a.ClaudeAutoMode = "always"));
+        await AssertInvalidAsync(await SetAlways(team, null), "autoProject", AgentActionErrors.InvalidAutoProject);
+        await AssertInvalidAsync(await SetAlways(team, Project), "autoProject", AgentActionErrors.InvalidAutoProject); // never reported
+        await SetTrustAsync(team, Project, true);
+
+        var response = await SetAlways(team, Project);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var view = (await response.Content.ReadFromJsonAsync<AgentClaudeView>(TestUser.Json))!;
+        Assert.Equal((ClaudeAutoModes.Always, Project), (view.AutoMode, view.AutoProject));
+        Assert.Equal((ClaudeAutoModes.Always, Project), (await AutoOfAsync(team), await AutoProjectOfAsync(team)));
+        var told = (await team.Target.Http.GetFromJsonAsync<AgentSettings>("/api/agent/settings", TestUser.Json))!;
+        Assert.Equal((ClaudeAutoModes.Always, Project), (told.ClaudeAutoMode, told.ClaudeAutoProject));
+    }
+
+    [Fact]
+    public async Task A_project_Claude_code_does_not_trust_cannot_be_the_one_always_keeps_a_session_in()
+    {
+        var team = await TeamAsync();
+        await SetTrustAsync(team, Project, false);
+
+        await AssertInvalidAsync(await SetAlways(team, Project), "autoProject", AgentActionErrors.InvalidAutoProject);
+        Assert.Null(await AutoOfAsync(team));
+    }
+
+    [Fact]
+    public async Task Switching_to_always_or_to_another_project_needs_a_recent_sign_in_and_leaving_it_forgets_the_project()
+    {
+        var team = await TeamAsync();
+        await SetTrustAsync(team, Project, true);
+        await SetTrustAsync(team, "git:host/blog", true);
+        await SetAlways(team, Project);
+        api.Clock.Advance(TimeSpan.FromMinutes(11));
+
+        await RemoteKit.AssertProblemAsync(await SetAlways(team, "git:host/blog"), HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
+        Assert.Equal(Project, await AutoProjectOfAsync(team));
+
+        Assert.Equal(HttpStatusCode.OK, (await SetAuto(team, ClaudeAutoModes.OnMessage)).StatusCode); // down to a lesser mode: no sign-in
+        Assert.Null(await AutoProjectOfAsync(team));
+        Assert.Equal(ClaudeAutoModes.OnMessage, await AutoToldToAgentAsync(team));
+    }
+
+    [Fact]
+    public async Task Turning_the_switch_off_or_moving_the_machine_forgets_the_always_project_too()
+    {
+        var team = await TeamAsync();
+        await SetTrustAsync(team, Project, true);
+        await SetAlways(team, Project);
+
+        await Accept(team, false);
+
+        Assert.Null(await AutoProjectOfAsync(team));
+        await using var db = api.Db();
+        Assert.Null((await db.Agents.AsNoTracking().SingleAsync(a => a.Id == team.TargetId)).ClaudeAutoProject);
+    }
+
+    [Fact]
+    public async Task The_database_refuses_a_mode_outside_the_three()
+    {
+        var team = await TeamAsync();
+        await Assert.ThrowsAsync<DbUpdateException>(() => SetAgentAsync(team.TargetId, a => a.ClaudeAutoMode = "sometimes"));
     }
 
     // ---- who and where --------------------------------------------------------------------------------------------

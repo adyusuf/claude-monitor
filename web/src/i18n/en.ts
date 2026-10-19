@@ -76,6 +76,7 @@ export const en = {
     invalid_session_ref: "That is not a session id.", claude_not_started_here: "Only a session started from here can be stopped from here.",
     invalid_project: "The project key is 1 to 200 characters without control characters.",
     invalid_auto_mode: "The automatic mode is on_message or off.",
+    invalid_auto_project: "Pick a project this machine has reported and Claude Code trusts.",
     invalid_first_prompt: "The first prompt is 1 to 2000 characters of text.", claude_folder_not_trusted: "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt.",
     claude_start_pending: "Another start on this machine is still waiting: try again when it has finished.",
   },

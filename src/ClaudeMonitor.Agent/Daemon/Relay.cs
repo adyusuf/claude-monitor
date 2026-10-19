@@ -127,7 +127,8 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
             (UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate)),
             .. MachineMonitor.Entries(s),
             (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
-            (ClaudeAutoStart.ModeKey, s.ClaudeAutoMode == ClaudeAutoModes.OnMessage ? ClaudeAutoModes.OnMessage : ClaudeAutoModes.Off),
+            (ClaudeAutoStart.ModeKey, s.ClaudeAutoMode is ClaudeAutoModes.OnMessage or ClaudeAutoModes.Always ? s.ClaudeAutoMode : ClaudeAutoModes.Off),
+            (ClaudeAutoStart.ProjectKey, s.ClaudeAutoMode == ClaudeAutoModes.Always && s.ClaudeAutoProject is { Length: > 0 and <= RunKinds.ProjectKeyMax } project ? project : ""),
         ];
         if (workspace is { } w) entries.Add(WorkspaceSettings.TagEntry(w));
         StoreRead(began, entries);

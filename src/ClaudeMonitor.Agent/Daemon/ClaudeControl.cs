@@ -58,7 +58,8 @@ public sealed class SystemClaudeCli : IClaudeCli
 }
 
 /// <summary>A background session this agent started (ADR-0014). The folder stays here, in the user-only home; the API only ever hears the project key.</summary>
-public sealed record ClaudeWorker(string Id, string ProjectKey, string Folder, string Mode, DateTimeOffset StartedAt, DateTimeOffset? StoppedAt = null);
+/// <summary>Reason: why it was started, as a short label for `aipod status`: null for a start from the web, "auto:on_message" or "auto:always" for the daemon's own (ADR-0014 P3).</summary>
+public sealed record ClaudeWorker(string Id, string ProjectKey, string Folder, string Mode, DateTimeOffset StartedAt, DateTimeOffset? StoppedAt = null, string? Reason = null);
 
 /// <summary>What a start or a stop came to: whether it worked, the text for the owner's page, and (for a start) the short id of the session.</summary>
 public sealed record ClaudeControlOutcome(bool Succeeded, string Text, string? SessionRef = null);
@@ -82,7 +83,7 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
     [GeneratedRegex(@"backgrounded\s*·\s*(?<id>[0-9a-f]{8})", RegexOptions.CultureInvariant)]
     private static partial Regex Backgrounded();
 
-    public async Task<ClaudeControlOutcome> StartAsync(string? projectKey, string? permissionMode, CancellationToken ct, string? firstPrompt = null, Guid actionId = default)
+    public async Task<ClaudeControlOutcome> StartAsync(string? projectKey, string? permissionMode, CancellationToken ct, string? firstPrompt = null, Guid actionId = default, string? reason = null)
     {
         var mode = permissionMode ?? AgentActionKinds.DefaultClaudePermissionMode;
         if (!AgentActionKinds.ClaudePermissionModes.Contains(mode)) return new(false, "refused: that permission mode is not one a remote start may ask for");
@@ -116,7 +117,7 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
 
         if (Backgrounded().Match(run.Output) is not { Success: true } match) return new(false, $"claude --bg did not say which session it started: {FirstLine(run.Output)}");
         var id = match.Groups["id"].Value;
-        Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow())).ToList());
+        Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow(), null, reason)).ToList());
         return new(true, $"started session {id} in the background ({mode} mode{(firstPrompt is null ? "" : ", with a first prompt")}); it appears in the session list", id);
     }
 
@@ -131,6 +132,40 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
         if (run.ExitCode != 0) return new(false, $"claude stop failed (exit {run.ExitCode}): {FirstLine(run.Error + run.Output)}");
         lock (gate) Save(Load().Select(w => w.Id == sessionRef ? w with { StoppedAt = clock.GetUtcNow() } : w).ToList());
         return new(true, $"stopped session {sessionRef}; its conversation is kept");
+    }
+
+    /// <summary>
+    /// Marks as stopped the sessions this agent started that Claude Code no longer lists (they ended by themselves: the person quit, the machine restarted), so a session that is gone
+    /// does not count as running. `claude agents --json` is asked; any doubt (it fails, or does not parse) changes nothing, and a session started less than <paramref name="grace"/> ago is left alone.
+    /// </summary>
+    public async Task<int> ReconcileAsync(TimeSpan grace, CancellationToken ct)
+    {
+        var running = Running();
+        if (running.Count == 0) return 0;
+        var claude = locator();
+        if (claude.Path is null) return 0;
+        var run = await RunClaudeAsync(claude.Path, ["agents", "--json"], null, ct);
+        if (run is null || run.ExitCode != 0 || ListedSessionIds(run.Output) is not { } listed) return 0;
+        var now = clock.GetUtcNow();
+        var gone = running.Where(w => now - w.StartedAt >= grace && !listed.Any(id => id.StartsWith(w.Id, StringComparison.Ordinal))).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        if (gone.Count == 0) return 0;
+        lock (gate) Save(Load().Select(w => gone.Contains(w.Id) && w.StoppedAt is null ? w with { StoppedAt = now } : w).ToList());
+        return gone.Count;
+    }
+
+    /// <summary>The full session ids in the output of `claude agents --json` (a JSON array of objects with a sessionId), or null when it is not that.</summary>
+    internal static IReadOnlyList<string>? ListedSessionIds(string output)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(output);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return null;
+            return [.. doc.RootElement.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object && e.TryGetProperty("sessionId", out var id) && id.ValueKind == JsonValueKind.String).Select(e => e.GetProperty("sessionId").GetString()!)];
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The sessions this agent started and has not stopped.</summary>

@@ -77,10 +77,10 @@ public sealed class AgentActionContractTests
     }
 
     [Fact]
-    public void The_automatic_modes_are_off_and_on_message_and_their_error_code_keeps_its_wire_value()
+    public void The_automatic_modes_are_off_on_message_and_always_and_their_error_codes_keep_their_wire_values()
     {
-        Assert.Equal(["off", "on_message"], ClaudeAutoModes.All);
-        Assert.Equal("invalid_auto_mode", AgentActionErrors.InvalidAutoMode);
+        Assert.Equal(["off", "on_message", "always"], ClaudeAutoModes.All);
+        Assert.Equal(("invalid_auto_mode", "invalid_auto_project"), (AgentActionErrors.InvalidAutoMode, AgentActionErrors.InvalidAutoProject));
     }
 
     [Fact]

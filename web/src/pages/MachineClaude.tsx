@@ -9,6 +9,7 @@ import { versionAtLeast } from "../lib/version";
 import { useCodeGate } from "./useCodeGate";
 
 const MODES: readonly ClaudePermissionMode[] = ["manual", "plan", "acceptEdits"];
+const AUTO_MODES: readonly ClaudeAutoMode[] = ["off", "on_message", "always"];
 /** The longest first prompt the API takes (AgentActionKinds.ClaudeFirstPromptMax). */
 export const FIRST_PROMPT_MAX = 2000;
 /** What the agent starts by itself at most per hour (AgentConfig.ClaudeAutoStartsPerHour): said on the page so nobody is surprised by the cost. */
@@ -42,7 +43,7 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const [mode, setMode] = useState<ClaudePermissionMode>("manual");
   const [prompt, setPrompt] = useState("");
   const accepting = view.acceptsClaudeControl === true;
-  const autoOn = view.claudeAutoMode === "on_message";
+  const autoMode: ClaudeAutoMode = view.claudeAutoMode ?? "off";
   const allowed = view.roleEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.effectiveEnvironment);
   const newEnough = versionAtLeast(agentVersion, config.claudeMinAgentVersion);
   const claudeActions = actions.filter((a) => a.kind === "claude_start" || a.kind === "claude_stop");
@@ -74,9 +75,9 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
       onChanged();
     }
   };
-  const setAuto = async (mode: ClaudeAutoMode) => {
+  const setAuto = async (mode: ClaudeAutoMode, autoProject?: string) => {
     setDone(null);
-    if (await enable.attempt((code) => api.setAgentClaude(agentId, true, code, mode).then(() => undefined))) {
+    if (await enable.attempt((code) => api.setAgentClaude(agentId, true, code, mode, autoProject).then(() => undefined))) {
       setDone("auto");
       onChanged();
     }
@@ -119,10 +120,20 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
 
       {accepting && allowed ? (
         <div className="stack">
-          <label className="row">
-            <input type="checkbox" checked={autoOn} disabled={enable.busy || !newEnough} onChange={(e) => void setAuto(e.target.checked ? "on_message" : "off")} />
-            <span>{t("machines.claudeControl.auto")}</span>
+          <label className="stack">
+            <span className="small">{t("machines.claudeControl.auto")}</span>
+            <select value={autoMode} disabled={enable.busy || !newEnough} onChange={(e) => void setAuto(e.target.value as ClaudeAutoMode, e.target.value === "always" ? (view.claudeAutoProject ?? startable[0]?.key) : undefined)}>
+              {AUTO_MODES.map((m) => <option key={m} value={m} disabled={m === "always" && startable.length === 0}>{t(`machines.claudeControl.autoModes.${m}`)}</option>)}
+            </select>
           </label>
+          {autoMode === "always" ? (
+            <label className="stack">
+              <span className="small">{t("machines.claudeControl.autoProject")}</span>
+              <select value={view.claudeAutoProject ?? ""} disabled={enable.busy} onChange={(e) => void setAuto("always", e.target.value)}>
+                {startable.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
+              </select>
+            </label>
+          ) : null}
           <p className="muted small">{t("machines.claudeControl.autoHint", { n: AUTO_STARTS_PER_HOUR })}</p>
           <h3>{t("machines.claudeControl.newTitle")}</h3>
           <p className="muted small">{t("machines.claudeControl.trustHint")}</p>

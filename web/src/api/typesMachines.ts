@@ -44,6 +44,8 @@ export interface MachineView {
   claudeAutoMode?: ClaudeAutoMode | null;
   /** The plugin the agent runs under, as name@marketplace (ADR-0013); absent for an older agent or one that is not a plugin. */
   pluginId?: string | null;
+  /** The project the mode "always" keeps a session running in (ADR-0014 P3). */
+  claudeAutoProject?: string | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
@@ -95,8 +97,8 @@ export interface AgentAsksView { agentId: string; accept: boolean; setAt: string
 
 export type AgentActionKind = "restart" | "update_check" | "update" | "status" | "claude_start" | "claude_stop";
 export type ClaudePermissionMode = "manual" | "plan" | "acceptEdits";
-export type ClaudeAutoMode = "off" | "on_message";
-export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null; autoMode?: ClaudeAutoMode | null }
+export type ClaudeAutoMode = "off" | "on_message" | "always";
+export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null; autoMode?: ClaudeAutoMode | null; autoProject?: string | null }
 export type AgentActionStatus = "queued" | "delivered" | "succeeded" | "failed" | "expired";
 /** One fixed action its owner asked of a machine's agent (ADR-0005); the result is plain text the agent wrote, never markup. */
 export interface AgentActionView {

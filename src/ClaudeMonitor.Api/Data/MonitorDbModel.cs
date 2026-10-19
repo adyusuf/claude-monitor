@@ -84,6 +84,7 @@ internal static class MonitorDbModel
         {
             e.Property(x => x.PushTransport).HasMaxLength(16);
             e.Property(x => x.PluginId).HasMaxLength(PluginIds.Max);
+            e.Property(x => x.ClaudeAutoProject).HasMaxLength(RunKinds.ProjectKeyMax);
             e.HasIndex(x => new { x.MachineId, x.UserId }).IsUnique().HasFilter("status = 'active'");
             e.HasIndex(x => x.WorkspaceId);
             e.HasIndex(x => x.UserId);
