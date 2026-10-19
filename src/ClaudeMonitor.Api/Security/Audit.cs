@@ -61,6 +61,18 @@ public static class AuditActions
     public const string ScheduleResumed = "remote.schedule_resumed";
     public const string ScheduleEnded = "remote.schedule_ended";
     public const string RemoteSettingsChanged = "remote.settings_changed";
+    public const string ProjectCreated = "project.created";
+    public const string ProjectUpdated = "project.updated";
+    public const string ProjectArchived = "project.archived";
+    public const string ProjectRestored = "project.restored";
+    public const string ProjectMemberChanged = "project.member_changed";
+    public const string ProjectMemberRemoved = "project.member_removed";
+    public const string ApplicationCreated = "application.created";
+    public const string ApplicationUpdated = "application.updated";
+    public const string ApplicationArchived = "application.archived";
+    public const string ApplicationRestored = "application.restored";
+    public const string ComponentChanged = "application.component_changed";
+    public const string ReleaseChanged = "application.release_changed";
 }
 
 public static class Audit

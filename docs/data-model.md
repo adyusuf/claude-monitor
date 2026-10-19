@@ -125,8 +125,8 @@ compare-and-set (`queued → delivered → succeeded | failed`; an open action p
 | Table | Columns | Keys and indexes |
 |---|---|---|
 | `harness_kinds` | `code` (`claude_code`, `codex_cli`, `gemini_cli`, `cursor`, ...), `display_name`, `added_at` | PK `code` |
-| `projects` | `id`, `workspace_id`, `key` (normalised git remote, or a hash of the folder name when there is none), `display_name`, `display_name_search`, `created_at` | UNIQUE (`workspace_id`, `key`) |
-| `harness_sessions` | `id`, `workspace_id`, `agent_id`, `project_id`, `harness_kind`, `external_id`, `title`, `title_search`, `model`, `git_branch`, `status` (`active`, `idle`, `waiting`, `ended`), `started_at`, `last_event_at`, `ended_at` | UNIQUE (`agent_id`, `harness_kind`, `external_id`); (`workspace_id`, `last_event_at` DESC, `id` DESC); (`project_id`, `last_event_at` DESC) |
+| `repos` | `id`, `workspace_id`, `key` (normalised git remote, or a hash of the folder name when there is none), `display_name`, `display_name_search`, `created_at` | UNIQUE (`workspace_id`, `key`) |
+| `harness_sessions` | `id`, `workspace_id`, `agent_id`, `repo_id`, `harness_kind`, `external_id`, `title`, `title_search`, `model`, `git_branch`, `status` (`active`, `idle`, `waiting`, `ended`), `started_at`, `last_event_at`, `ended_at` | UNIQUE (`agent_id`, `harness_kind`, `external_id`); (`workspace_id`, `last_event_at` DESC, `id` DESC); (`project_id`, `last_event_at` DESC) |
 | `session_tasks` | `id`, `session_id`, `external_id`, `subject`, `subject_search`, `status` (`pending`, `in_progress`, `completed`, `deleted`), `created_at`, `updated_at` | UNIQUE (`session_id`, `external_id`) |
 | `subagent_runs` | `id`, `session_id`, `external_id`, `agent_type`, `description`, `status` (`running`, `finished`, `failed`), `started_at`, `ended_at` | UNIQUE (`session_id`, `external_id`) |
 | `session_usage` | `session_id`, `model`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_usd` `numeric(12,6)` (null when the model has no known price), `updated_at` | PK (`session_id`, `model`) |
@@ -186,12 +186,35 @@ content, passwords or tokens.
 users 1-n workspace_members n-1 workspaces 1-1 workspace_settings
 users 1-n user_logins, user_tokens, login_sessions
 workspaces 1-n machines 1-n agents n-1 users          agents 1-n agent_tokens, agent_batches
-workspaces 1-n projects 1-n harness_sessions n-1 agents
+workspaces 1-n repos 1-n harness_sessions n-1 agents
+workspaces 1-n projects 1-n applications 1-n application_components, application_releases      projects 1-n project_members n-1 users
 harness_sessions 1-n session_events, session_tasks, subagent_runs, session_usage, session_commands, permission_requests
 workspaces 1-n event_archives
 agents 1-n machine_metrics, machine_alerts, machine_grants, machine_jobs
 agents 1-n remote_runs (as requester and as target) 1-n remote_run_output; remote_runs n-1 machine_grants, machine_jobs
 ```
+
+## 7. Managed projects and applications ([ADR-0011](adr-0011-project-management.md))
+
+The table of work folders that sessions report was called `projects` until migration `RenameProjectsToRepos`; it is `repos` now (rows and ids kept,
+`harness_sessions.project_id` became `repo_id`), the one rename the additive-only rule allowed (maintainer, 19/10/2026). `projects` is now the managed
+business entity. The JSON the agent and the web exchange (`projectId`, `projectName`, `projectKey`) did not change.
+
+| Table | Columns | Keys and indexes |
+|---|---|---|
+| `projects` | `id`, `workspace_id`, `name`, `name_search`, `purpose`, `owner_user_id` (FK users), `sponsor` (free text), `stakeholders` `jsonb` (`[{name, role}]`, at most 50; CHECK), `budget_amount` `numeric(14,2)`, `budget_currency` (both or neither; CHECK), `start_date`, `end_date` (`date`; end not before start; CHECK), `item_types` `text[]` (a non-empty subset of `epic`, `story`, `task`, `bug`, `spike`; CHECK), `priority_scale` (`p0_p3`, `moscow`, `high_medium_low`, `one_to_five`), `estimation_unit` (`story_points`, `hours`, `days`, `t_shirt`), `sprint_length_days` (1-42, default 14), `definition_of_ready`, `definition_of_done` (`text[]`, at most 30 each), `status` (`active`, `archived`), `created_by`, `updated_by`, `created_at`, `updated_at` | UNIQUE (`workspace_id`, `name_search`) WHERE `status = 'active'`; (`workspace_id`, `created_at` DESC, `id` DESC); (`owner_user_id`) |
+| `project_members` | `project_id`, `user_id`, `role` (`manager`, `contributor`, `reviewer`, `viewer`), `added_by`, `added_at` | PK (`project_id`, `user_id`); (`user_id`) |
+| `applications` | `id`, `workspace_id`, `project_id`, `name`, `name_search`, `description`, `kind` (`web`, `mobile`, `api`, `other`), `repo_url` (https, ssh or git link, no password), `environments` `jsonb` (`[{name, url}]`, names from `dev`, `test`, `prod`, at most 3), `tech_stack` `text[]` (at most 30), `versioning_scheme` (`semver`, `calver`, `none`), `tech_owner_user_id`, `non_functional_targets` `jsonb` (`[{kind, target}]`, at most 20), `status`, `created_by`, `updated_by`, `created_at`, `updated_at` | UNIQUE (`project_id`, `name_search`) WHERE `status = 'active'`; (`project_id`, `created_at` DESC, `id` DESC); (`workspace_id`); (`tech_owner_user_id`) |
+| `application_components` | `id`, `workspace_id`, `application_id`, `name`, `name_search`, `kind` (`component`, `module`), `status` (`active`, `archived`), `created_at` | UNIQUE (`application_id`, `name_search`) WHERE `status = 'active'`; (`workspace_id`) |
+| `application_releases` | `id`, `workspace_id`, `application_id`, `name`, `name_search`, `planned_date`, `status` (`planned`, `released`, `cancelled`), `created_at` | UNIQUE (`application_id`, `name_search`) WHERE `status <> 'cancelled'`; (`workspace_id`) |
+
+- **Nothing is deleted:** a project, an application and a component are archived, a release is cancelled (one that went out stays), and a name
+  is free again once its holder is archived. A `project_members` row is the one link row that is removed.
+- **Rights** are computed in the API (`ProjectAccess`) from the workspace role and the project role; the workspace membership check comes
+  first, so a person who left the workspace loses every project at once. A workspace `viewer` never changes anything.
+- **Caps stand in for paging** on the small lists: 100 active applications per project, 200 components and 200 releases per application.
+- **Audit** rows (`project.*`, `application.*`) name a row by id and carry no typed text. Account export and deletion for these tables are
+  not decided yet (ADR-0011 §5): the rows keep the deleted user's id and hold no personal fields of their own.
 
 ## Your data: export and account deletion
 

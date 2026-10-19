@@ -16,6 +16,7 @@ internal static class MonitorDbModel
         MonitorDbModelMachines.Configure(b);
         MonitorDbModelAsks.Configure(b);
         MonitorDbModelActions.Configure(b);
+        MonitorDbModelProjects.Configure(b);
         b.Entity<HarnessKind>().HasData(new HarnessKind
         {
             Code = "claude_code",
@@ -102,12 +103,12 @@ internal static class MonitorDbModel
                 DeviceStatuses.Approved, DeviceStatuses.Denied, DeviceStatuses.Expired, DeviceStatuses.Consumed)));
         });
         b.Entity<HarnessKind>(e => e.HasKey(x => x.Code));
-        b.Entity<Project>(e => e.HasIndex(x => new { x.WorkspaceId, x.Key }).IsUnique());
+        b.Entity<Repo>(e => e.HasIndex(x => new { x.WorkspaceId, x.Key }).IsUnique());
         b.Entity<HarnessSession>(e =>
         {
             e.HasIndex(x => new { x.AgentId, x.HarnessKind, x.ExternalId }).IsUnique();
             e.HasIndex(x => new { x.WorkspaceId, x.LastEventAt, x.Id }).IsDescending(false, true, true);
-            e.HasIndex(x => new { x.ProjectId, x.LastEventAt }).IsDescending(false, true);
+            e.HasIndex(x => new { x.RepoId, x.LastEventAt }).IsDescending(false, true);
             e.ToTable(t => t.HasCheckConstraint("ck_harness_sessions_status", In("status", SessionStatuses.Active,
                 SessionStatuses.Idle, SessionStatuses.Waiting, SessionStatuses.Ended)));
         });
@@ -192,10 +193,10 @@ internal static class MonitorDbModel
         Fk<Agent, User>(x => x.UserId);
         Fk<Agent, Workspace>(x => x.WorkspaceId);
         Fk<AgentToken, Agent>(x => x.AgentId);
-        Fk<Project, Workspace>(x => x.WorkspaceId);
+        Fk<Repo, Workspace>(x => x.WorkspaceId);
         Fk<HarnessSession, Workspace>(x => x.WorkspaceId);
         Fk<HarnessSession, Agent>(x => x.AgentId);
-        Fk<HarnessSession, Project>(x => x.ProjectId);
+        Fk<HarnessSession, Repo>(x => x.RepoId);
         Fk<HarnessSession, HarnessKind>(x => x.HarnessKind);
         Fk<SessionTask, HarnessSession>(x => x.SessionId);
         Fk<SubagentRun, HarnessSession>(x => x.SessionId);

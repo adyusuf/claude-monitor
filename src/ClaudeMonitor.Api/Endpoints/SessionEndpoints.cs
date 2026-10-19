@@ -40,7 +40,7 @@ public static class SessionEndpoints
         {
             var pattern = SearchText.ContainsPattern(q);
             query = query.Where(s => EF.Functions.Like(s.TitleSearch, pattern, "\\")
-                || db.Projects.Any(p => p.Id == s.ProjectId && EF.Functions.Like(p.DisplayNameSearch, pattern, "\\")));
+                || db.Repos.Any(p => p.Id == s.RepoId && EF.Functions.Like(p.DisplayNameSearch, pattern, "\\")));
         }
 
         if (status is { Length: > 0 }) query = query.Where(s => s.Status == status);
@@ -60,13 +60,13 @@ public static class SessionEndpoints
     {
         var ids = sessions.Select(s => s.Id).ToList();
         var agentIds = sessions.Select(s => s.AgentId).Distinct().ToList();
-        var projectIds = sessions.Where(s => s.ProjectId != null).Select(s => s.ProjectId!.Value).Distinct().ToList();
+        var projectIds = sessions.Where(s => s.RepoId != null).Select(s => s.RepoId!.Value).Distinct().ToList();
         var agents = await (from a in db.Agents.AsNoTracking()
                             join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
                             join u in db.Users.AsNoTracking() on a.UserId equals u.Id
                             where agentIds.Contains(a.Id)
                             select new { a.Id, m.Hostname, a.UserId, u.DisplayName, a.PushTransport }).ToDictionaryAsync(x => x.Id, ct);
-        var projects = await db.Projects.AsNoTracking().Where(p => projectIds.Contains(p.Id))
+        var projects = await db.Repos.AsNoTracking().Where(p => projectIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => p.DisplayName, ct);
         var usage = await db.SessionUsage.AsNoTracking().Where(u => ids.Contains(u.SessionId)).ToListAsync(ct);
         var open = await db.PermissionRequests.AsNoTracking()
@@ -78,7 +78,7 @@ public static class SessionEndpoints
             var mine = usage.Where(u => u.SessionId == s.Id).ToList();
             decimal? cost = mine.Count == 0 ? 0m : mine.Any(u => u.CostUsd is null) ? null : mine.Sum(u => u.CostUsd!.Value);
             return new SessionRow(s.Id, s.HarnessKind, s.Title, s.Model, s.GitBranch, s.Status, s.StartedAt, s.LastEventAt,
-                s.EndedAt, s.ProjectId, s.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null, s.AgentId, a.Hostname,
+                s.EndedAt, s.RepoId, s.RepoId is { } pid ? projects.GetValueOrDefault(pid) : null, s.AgentId, a.Hostname,
                 a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id), a.PushTransport);
         }).ToList();
     }
