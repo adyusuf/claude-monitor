@@ -1,3 +1,4 @@
+using ClaudeMonitor.Agent.Config;
 using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Install;
@@ -40,14 +41,14 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
         ArgumentException.ThrowIfNullOrEmpty(currentBinary);
         if (!ExecLevels.All.Contains(execLevel))
         {
-            output.WriteLine($"--exec takes off, argv or shell, not \"{execLevel}\".");
+            output.WriteLine(Strings.T(Msg.SvcExecBad, execLevel));
             return 2;
         }
 
         if (!Supported()) return Unsupported();
         if (runAccount is not null && os is not (OsKinds.Linux or OsKinds.MacOs))
         {
-            output.WriteLine("--run-account is not supported on Windows: starting a process as another local account needs a stored password or a design that was not built (ADR-0010 §5).");
+            output.WriteLine(Strings.T(Msg.SvcRunAccountWindows));
             return 2;
         }
 
@@ -57,18 +58,18 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
         {
             if (!allowRoot)
             {
-                output.WriteLine($"Refusing to run the service as {l.Account}. --allow-root does it for metrics and uploads only; remote execution stays off.");
+                output.WriteLine(Strings.T(Msg.SvcRefuseAccount, l.Account));
                 return 2;
             }
 
             execLevel = ExecLevels.Off;
-            output.WriteLine("--allow-root: the service runs privileged, so remote execution stays off.");
+            output.WriteLine(Strings.T(Msg.SvcAllowRoot));
         }
 
         var problem = Problem(l) ?? Precondition();
         if (problem is not null)
         {
-            output.WriteLine($"Not installed: {problem}");
+            output.WriteLine(Strings.T(Msg.NotInstalled, problem));
             return 1;
         }
 
@@ -89,12 +90,12 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException or System.Xml.XmlException)
         {
-            output.WriteLine($"Install failed: {e.Message}");
+            output.WriteLine(Strings.T(Msg.InstallFailed, e.Message));
             Undo();
             return 1;
         }
 
-        output.WriteLine($"The service is installed and started. Binary: {l.Binary}; home: {l.Home}; exec policy: {l.ExecConfigPath} ({execLevel}).");
+        output.WriteLine(Strings.T(Msg.SvcInstalled, l.Binary, l.Home, l.ExecConfigPath, execLevel));
         NextSteps(l);
         return 0;
     }
@@ -112,7 +113,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
                 case OsKinds.Windows:
                     if (run(Sc(), WindowsServiceSetup.Query(l.Names.ServiceName)) != 0)
                     {
-                        output.WriteLine("The service is not installed.");
+                        output.WriteLine(Strings.T(Msg.SvcNotInstalled));
                         return 0;
                     }
 
@@ -123,7 +124,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
                 case OsKinds.Linux:
                     if (!File.Exists(Definition()))
                     {
-                        output.WriteLine("The service is not installed.");
+                        output.WriteLine(Strings.T(Msg.SvcNotInstalled));
                         return 0;
                     }
 
@@ -139,11 +140,11 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
         {
-            output.WriteLine($"Uninstall failed: {e.Message}");
+            output.WriteLine(Strings.T(Msg.UninstallFailed, e.Message));
             return 1;
         }
 
-        output.WriteLine("The service is removed. Kept: the home " + l.Home + ", the exec policy " + l.ExecConfigPath + " and the binary " + l.Binary + ".");
+        output.WriteLine(Strings.T(Msg.SvcRemoved, l.Home, l.ExecConfigPath, l.Binary));
         return 0;
     }
 
@@ -169,7 +170,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
     };
 
     private string? Precondition() =>
-        os == OsKinds.Linux && !Directory.Exists(systemdRunDir ?? SystemdUnit.RunDir) ? "this machine does not run systemd; only systemd is supported on Linux." : null;
+        os == OsKinds.Linux && !Directory.Exists(systemdRunDir ?? SystemdUnit.RunDir) ? Strings.T(Msg.SvcNoSystemd) : null;
 
     private void NextSteps(ServiceLayout l)
     {
@@ -179,11 +180,9 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
             OsKinds.MacOs => $"sudo cat {Quote(l.LoginCodePath)}",
             _ => $"type \"{l.LoginCodePath}\"   (in an elevated prompt)",
         };
-        output.WriteLine(l.Server is null
-            ? "Not connected: install again with --server https://<your aipod server address> so the service can log in by itself."
-            : "The service logs in by itself: it shows a code to approve on the web. Read it with:");
+        output.WriteLine(Strings.T(l.Server is null ? Msg.SvcNotConnected : Msg.SvcLogsInItself));
         if (l.Server is not null) output.WriteLine($"  {log}");
-        output.WriteLine("Then approve the code on the web while signed in; the service starts reporting at once.");
+        output.WriteLine(Strings.T(Msg.SvcApproveCode));
     }
 
     private int NeedAdmin(string? binary, string? execLevel, bool allowRoot)
@@ -191,15 +190,13 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
         var command = binary is null
             ? $"{Quote(Environment.ProcessPath ?? "cm-agent")} uninstall --service"
             : $"{Quote(binary)} install --service --exec {execLevel}{(allowRoot ? " --allow-root" : "")}";
-        output.WriteLine(os == OsKinds.Windows
-            ? $"The service needs an administrator. Run this from an elevated prompt (Run as administrator):  {command}"
-            : $"The service needs root. Run:  sudo {command}");
+        output.WriteLine(Strings.T(os == OsKinds.Windows ? Msg.SvcNeedAdminWindows : Msg.SvcNeedRoot, command));
         return 2;
     }
 
     private int Unsupported()
     {
-        output.WriteLine($"A service is not supported on this OS ({os}).");
+        output.WriteLine(Strings.T(Msg.SvcUnsupportedOs, os));
         return 2;
     }
 

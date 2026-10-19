@@ -1,6 +1,6 @@
 # ADR-0014 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
-Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1, P2 and P3 (`on_message` only) of Part B are built (see "P1 as built", "P2 as built" and "P3 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
+Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1, P2 and P3 (`on_message` only) of Part B are built (see "P1 as built", "P2 as built" and "P3 as built").** Part A is built except the `status` detail lines of the push, update and approver modules (the web, the API mails, `users.language`, the terminal catalog); Part B beyond P3 (`on_message` and `always`) is design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
 folders, asks) and ADR-0012 (the names aipod and Podium).
 
@@ -17,13 +17,34 @@ them; they are never captured text). (3) Wire strings: API error codes (they are
 match. (4) The repository's documents (global rule: English). Dates stay `dd/mm/yyyy` in every language (global rule 12).
 
 **Still to do (design).**
-- *The agent's own words for the person at the terminal:* usage lines, `status`, `install`/`login`/`connect` messages, errors. One catalog class per
-  assembly (`Strings`: a typed key, a table of en, tr and de), the language from `AIPOD_LANG`, else the operating system's UI culture, else English;
-  a test that every key has all three and the same placeholders (the rule the web test already enforces). The tray's menu and window use the same
-  catalog. Existing tests that read English messages keep passing because English is the default; new tests cover tr and de.
+- *The agent's own words for the person at the terminal.* **Built (19/10/2026), see "Part A: the terminal catalog as built".**
 - *The user's language as a setting* (`users.language`, additive, nullable) so a mail to someone who is not signed in can still follow their
   account; until then the header is the only source. **Built (19/10/2026):** migration `UserLanguage`, `PUT /api/me/language`, `language` in `/api/me`; a registration stores the language it was made in, the menu keeps the choice on the account, and the verify, reset and invite mails follow the account's language when it has one (the header otherwise).
-- Size: medium (about 300 strings in the agent and tray). Not started.
+
+### Part A: the terminal catalog as built (19/10/2026)
+
+`Config/Strings*.cs` in the agent holds every sentence the person at the terminal reads: usage, `status`, `login`/`connect`, `update`, `install`
+(plugin, standalone, service), `migrate-home`, `service migrate`, and the tray's tooltip, menu, window and action results (the tray references the
+agent project, so one catalog serves both). 208 messages, three languages each (`Entry(Key, En, Tr, De)`); a typed key per message in `Msg`
+(`Msg.HmMoved`), a call is `Strings.T(Msg.HmMoved, from, to)` with `{0}`... placeholders filled with the invariant culture.
+The language is, in order: a scope (`Strings.Scope`, tests and flows), the process setting (`Strings.UseForProcess`), the variable `AIPOD_LANG`
+(`en`, `tr`, `de`; `tr-TR` and `de_DE.UTF-8` count), the operating system's UI language, else English. The language of the *account* (`users.language`)
+is the web's and the mail's, not the terminal's: the agent has no sign-in at the terminal to read it from.
+
+What stayed English, as the section above says, plus these terminal details: the reason inside a failure (`e.Message`, an install step's own failure
+text, an undo step's name) is data from the system and is shown as it is inside a translated frame; the `Describe` lines of `status`
+that come from the push, update and approver modules (`PushStatus`, `UpdateCommand.Describe`, `ApproversStore.Describe`, `ClaudeUpdateCommand`) are not in the
+catalog yet (they are operator lines, listed as the one remaining area).
+
+Two consequences were handled. (1) `aipod connect` reads the detached login's output file for "enter the code" and "trying again"; the file is written in the
+language of the other process, so the markers are matched in all three languages (`Strings.InAllLanguages`). (2) `migrate-home` used to decide "nothing to do"
+by the sentence starting with "Already"; the refusal now carries that as a flag, so a translation cannot change the exit code.
+
+Tests: `StringsTests` holds every key to all three languages and the same placeholders (the rule the web test enforces), formats each message with
+dummy arguments, ties the English usage to `Cli.Usage`, checks the markers are inside their lines, and checks how the language is chosen; each test assembly pins English
+at start (`PinEnglish`), so the machine's own language cannot change what the existing English assertions read. The tests were written and compile; they
+were not run (all test runs are paused at the maintainer's request, 19/10/2026). The catalog was checked once by a script (same placeholders, no empty
+text, no stray braces, no key twice) over the generated tables.
 
 ## Part B: starting and stopping Claude Code, and opening sessions, from the web
 

@@ -42,13 +42,13 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
     {
         var plan = new List<string>
         {
-            $"stop the service {from.Names.ServiceName} and copy its home {from.Home} to {to.Home}" + (os == OsKinds.Windows ? " (without its encrypted tokens: this machine logs in again)" : ""),
-            $"copy the exec policy and the approvers from {Path.GetDirectoryName(from.ExecConfigPath)} to {Path.GetDirectoryName(to.ExecConfigPath)}",
-            $"create the account {to.Account} and the service {to.Names.ServiceName} (binary {to.Binary}, home {to.Home}) and start it",
+            Strings.T(Msg.MigPlanCopy, from.Names.ServiceName, from.Home, to.Home) + (os == OsKinds.Windows ? Strings.T(Msg.MigPlanNoTokens) : ""),
+            Strings.T(Msg.MigPlanPolicy, Path.GetDirectoryName(from.ExecConfigPath), Path.GetDirectoryName(to.ExecConfigPath)),
+            Strings.T(Msg.MigPlanCreate, to.Account, to.Names.ServiceName, to.Binary, to.Home),
         };
-        if (os != OsKinds.Windows) plan.Add($"wait up to {healthWaitSeconds} s for the new service to reach the server; if it does not, put everything back");
-        plan.Add($"disable (not remove) the old service {from.Names.ServiceName}; its files stay for {KeepOld.TotalDays:0} days");
-        plan.Add("later: `service migrate --undo` goes back, `service migrate --finish` removes the old service, account, folders and policy");
+        if (os != OsKinds.Windows) plan.Add(Strings.T(Msg.MigPlanWait, healthWaitSeconds));
+        plan.Add(Strings.T(Msg.MigPlanDisable, from.Names.ServiceName, KeepOld.TotalDays));
+        plan.Add(Strings.T(Msg.MigPlanLater));
         return plan;
     }
 
@@ -61,7 +61,7 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
             return refusal.Code;
         }
 
-        output.WriteLine(dryRun ? "Dry run: nothing is changed. A real run would:" : "Migrating the service to the aipod names:");
+        output.WriteLine(Strings.T(dryRun ? Msg.MigDryRun : Msg.MigMigrating));
         foreach (var line in Plan()) output.WriteLine($"  - {line}");
         if (dryRun) return 0;
         if (!isAdmin) return NeedAdmin("service migrate");
@@ -87,17 +87,15 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
         {
-            output.WriteLine($"Migration failed: {e.Message}");
+            output.WriteLine(Strings.T(Msg.MigFailed, e.Message));
             RollBack();
-            output.WriteLine("Everything was put back: the old service runs as before and the aipod files were removed.");
+            output.WriteLine(Strings.T(Msg.MigPutBack));
             return 1;
         }
 
         undo.Clear();
-        output.WriteLine($"Migrated. The service is now {target.Names.ServiceName}; the old one is disabled and kept: its files stay for {KeepOld.TotalDays:0} days.");
-        output.WriteLine(os == OsKinds.Windows
-            ? "This machine logs in again: read the code with `type \"" + target.LoginCodePath + "\"` in an elevated prompt and approve it on the web."
-            : "To go back:  service migrate --undo     To remove the old service for good (after " + KeepOld.TotalDays.ToString("0", CultureInfo.InvariantCulture) + " days):  service migrate --finish");
+        output.WriteLine(Strings.T(Msg.MigDone, target.Names.ServiceName, KeepOld.TotalDays));
+        output.WriteLine(os == OsKinds.Windows ? Strings.T(Msg.MigLoginAgain, target.LoginCodePath) : Strings.T(Msg.MigToGoBack, KeepOld.TotalDays));
         return 0;
     }
 
@@ -108,7 +106,7 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
         if (!isAdmin) return NeedAdmin("service migrate --undo");
         if (!File.Exists(MarkerPath(to)) || !ServiceInstaller.IsInstalled(os, from, run) || !ServiceInstaller.IsInstalled(os, to, run))
         {
-            output.WriteLine("There is nothing to go back to: both the aipod service and the disabled old one, and the migration marker, are needed.");
+            output.WriteLine(Strings.T(Msg.MigNothingBack));
             return 1;
         }
 
@@ -123,11 +121,11 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
         {
-            output.WriteLine($"Going back failed: {e.Message}");
+            output.WriteLine(Strings.T(Msg.MigBackFailed, e.Message));
             return 1;
         }
 
-        output.WriteLine($"Back on the old service {from.Names.ServiceName}. The aipod service is disabled and its files are kept; `service migrate` can be run again.");
+        output.WriteLine(Strings.T(Msg.MigBackDone, from.Names.ServiceName));
         return 0;
     }
 
@@ -139,14 +137,14 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
         var marker = ReadMarker();
         if (marker is null || !ServiceInstaller.IsInstalled(os, to, run))
         {
-            output.WriteLine("There is no finished migration to clean up: the aipod service and its migration marker are needed.");
+            output.WriteLine(Strings.T(Msg.MigNoFinished));
             return 1;
         }
 
         var age = time.GetUtcNow() - marker.Value;
         if (!now && age < KeepOld)
         {
-            output.WriteLine($"The old service is kept for {KeepOld.TotalDays:0} days after the migration; {(KeepOld - age).TotalDays:0.0} days are left. `service migrate --finish --now` removes it anyway.");
+            output.WriteLine(Strings.T(Msg.MigKept, KeepOld.TotalDays, (KeepOld - age).TotalDays));
             return 1;
         }
 
@@ -157,33 +155,33 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
         {
-            output.WriteLine($"Cleaning up failed: {e.Message}");
+            output.WriteLine(Strings.T(Msg.MigCleanFailed, e.Message));
             return 1;
         }
 
-        output.WriteLine("The old service, its account, folders and policy are removed. The aipod service is all that is left.");
+        output.WriteLine(Strings.T(Msg.MigCleaned));
         return 0;
     }
 
     private (int Code, string Text)? Refusal()
     {
-        if (ServiceInstaller.IsInstalled(os, to, run)) return (0, $"Nothing to migrate: the service {to.Names.ServiceName} already exists.");
-        if (!ServiceInstaller.IsInstalled(os, from, run)) return (0, $"Nothing to migrate: no service named {from.Names.ServiceName} is installed.");
+        if (ServiceInstaller.IsInstalled(os, to, run)) return (0, Strings.T(Msg.MigAlreadyThere, to.Names.ServiceName));
+        if (!ServiceInstaller.IsInstalled(os, from, run)) return (0, Strings.T(Msg.MigNoOldService, from.Names.ServiceName));
         var problem = os switch
         {
             OsKinds.Linux => SystemdUnit.Check(to),
             OsKinds.Windows => WindowsServiceSetup.Check(to),
             _ => null,
         };
-        if (problem is not null) return (1, $"Not migrated: {problem}");
+        if (problem is not null) return (1, Strings.T(Msg.MigNotMigrated, problem));
         if (!File.Exists(Path.Combine(from.Home, "agent.json")) || IdentityOf(from) is not { Connected: true })
         {
-            return (1, $"Not migrated: the old service in {from.Home} is not connected to the server yet. Connect it first (read its login code and approve it), then migrate.");
+            return (1, Strings.T(Msg.MigNotConnected, from.Home));
         }
 
         foreach (var folder in new[] { to.Home, to.BinaryDir, Path.GetDirectoryName(to.ExecConfigPath)! }.Distinct(StringComparer.Ordinal))
         {
-            if (HasFiles(folder)) return (1, $"Not migrated: {folder} already has files. Look at it and move or remove them first.");
+            if (HasFiles(folder)) return (1, Strings.T(Msg.MigHasFiles, folder));
         }
 
         return null;
@@ -193,16 +191,14 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
     private int? Unsupported()
     {
         if (os is OsKinds.Linux or OsKinds.MacOs or OsKinds.Windows) return null;
-        output.WriteLine($"A service is not supported on this OS ({os}).");
+        output.WriteLine(Strings.T(Msg.SvcUnsupportedOs, os));
         return 2;
     }
 
     private int NeedAdmin(string verb)
     {
         var command = $"{Environment.ProcessPath ?? "cm-agent"} {verb}";
-        output.WriteLine(os == OsKinds.Windows
-            ? $"Migrating a service needs an administrator. Run this from an elevated prompt:  \"{command}\""
-            : $"Migrating a service needs root. Run:  sudo \"{command}\"");
+        output.WriteLine(Strings.T(os == OsKinds.Windows ? Msg.MigNeedAdminWindows : Msg.MigNeedRoot, command));
         return 2;
     }
 
@@ -271,11 +267,11 @@ public sealed partial class ServiceMigrator(TextWriter output, Func<string, IRea
             try
             {
                 undo[i].Undo();
-                output.WriteLine($"Undone: {undo[i].What}.");
+                output.WriteLine(Strings.T(Msg.Undone, undo[i].What));
             }
             catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
             {
-                output.WriteLine($"Could not undo \"{undo[i].What}\": {e.Message}");
+                output.WriteLine(Strings.T(Msg.CouldNotUndo, undo[i].What, e.Message));
             }
         }
 

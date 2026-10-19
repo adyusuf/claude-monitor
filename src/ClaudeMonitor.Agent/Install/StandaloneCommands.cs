@@ -23,7 +23,7 @@ public static class StandaloneCommands
         if (server is not null && (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && !uri.IsLoopback)
                                    || server.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || c is '"' or '%' or '|')))
         {
-            stderr.WriteLine($"{ServiceCommands.ServerOption} takes the https address of the aipod server, not \"{server}\".");
+            stderr.WriteLine(Strings.T(Msg.ServiceServerOption, ServiceCommands.ServerOption, server));
             return 2;
         }
 

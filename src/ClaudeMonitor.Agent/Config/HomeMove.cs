@@ -31,21 +31,20 @@ public static class HomeMove
         if (Refusal(config, setup, from, to) is { } refusal)
         {
             // "Nothing to do" is not a failure: the machine is already where it should be.
-            var ok = refusal.StartsWith("Already", StringComparison.Ordinal);
-            await (ok ? stdout : stderr).WriteLineAsync(refusal);
-            return ok ? 0 : 2;
+            await (refusal.Done ? stdout : stderr).WriteLineAsync(refusal.Text);
+            return refusal.Done ? 0 : 2;
         }
 
         if (dryRun)
         {
-            await stdout.WriteLineAsync($"Would move {from} to {to} and leave a link at {from}. Nothing was changed.");
+            await stdout.WriteLineAsync(Strings.T(Msg.HmWould, from, to));
             return 0;
         }
 
         var wasRunning = daemon.IsRunning();
         if (wasRunning && !await daemon.StopAsync(config.UpdateStopWait, CancellationToken.None) && !daemon.Kill())
         {
-            await stderr.WriteLineAsync("The daemon did not stop, so nothing was moved. Try again in a moment.");
+            await stderr.WriteLineAsync(Strings.T(Msg.HmDaemonDidNotStop));
             return 1;
         }
 
@@ -59,30 +58,30 @@ public static class HomeMove
 
         if (failure is not null)
         {
-            await stderr.WriteLineAsync($"Nothing was moved: {failure}.");
-            if (wasRunning && !daemon.Start(config.BinaryPath)) await stderr.WriteLineAsync("The daemon could not be started again: run `aipod restart`.");
+            await stderr.WriteLineAsync(Strings.T(Msg.HmNothingMoved, failure));
+            if (wasRunning && !daemon.Start(config.BinaryPath)) await stderr.WriteLineAsync(Strings.T(Msg.HmDaemonNotRestarted));
             return 1;
         }
 
-        await stdout.WriteLineAsync($"Moved {from} to {to}; {from} is now a link to it.");
-        if (wasRunning) await stdout.WriteLineAsync(daemon.Start(config.BinaryPath) ? "The daemon was started again." : "The daemon could not be started again: run `aipod restart`.");
-        await stdout.WriteLineAsync($"To undo: stop the daemon, then `rm \"{from}\"` and `mv \"{to}\" \"{from}\"`.");
+        await stdout.WriteLineAsync(Strings.T(Msg.HmMoved, from, to));
+        if (wasRunning) await stdout.WriteLineAsync(Strings.T(daemon.Start(config.BinaryPath) ? Msg.HmDaemonRestarted : Msg.HmDaemonNotRestarted));
+        await stdout.WriteLineAsync(Strings.T(Msg.HmUndo, from, to));
         return 0;
     }
 
     /// <summary>Why the move cannot or need not happen, or null when it can.</summary>
-    private static string? Refusal(AgentConfig config, Setup setup, string from, string to)
+    private static (bool Done, string Text)? Refusal(AgentConfig config, Setup setup, string from, string to)
     {
-        if (setup.Os == OsKinds.Windows) return "Not on Windows yet: it needs a junction and a test machine. The agent finds the old folder by itself, so nothing is lost by waiting.";
-        if (setup.HomeFromVariable) return "The home is named by AIPOD_AGENT_HOME or CM_AGENT_HOME; that folder is yours to move.";
-        if (config.ServiceMode) return "A boot service's home is set by the service definition (ADR-0013, section 4), not moved here.";
-        if (Same(config.Home, to)) return "Already using the aipod folder: " + to;
-        if (!Same(config.Home, from)) return $"The agent's home is {config.Home}, which is neither the old folder nor the aipod folder; nothing was moved.";
-        if (new DirectoryInfo(from).LinkTarget is not null) return $"Already moved: {from} is a link to the aipod folder.";
-        if (!Directory.Exists(from)) return $"There is no folder at {from}: nothing to move.";
-        if (Directory.Exists(to) && Directory.EnumerateFileSystemEntries(to).Any()) return $"{to} already has content; nothing was moved. Look at both folders and move one by hand.";
-        if (File.Exists(to)) return $"{to} is a file; nothing was moved.";
-        return Directory.Exists(Path.GetDirectoryName(to)) ? null : $"The folder that should hold {to} does not exist; nothing was moved.";
+        if (setup.Os == OsKinds.Windows) return (false, Strings.T(Msg.HmWindows));
+        if (setup.HomeFromVariable) return (false, Strings.T(Msg.HmFromVariable));
+        if (config.ServiceMode) return (false, Strings.T(Msg.HmServiceMode));
+        if (Same(config.Home, to)) return (true, Strings.T(Msg.HmAlreadyAipod, to));
+        if (!Same(config.Home, from)) return (false, Strings.T(Msg.HmNeitherFolder, config.Home));
+        if (new DirectoryInfo(from).LinkTarget is not null) return (true, Strings.T(Msg.HmAlreadyMoved, from));
+        if (!Directory.Exists(from)) return (false, Strings.T(Msg.HmNoFolder, from));
+        if (Directory.Exists(to) && Directory.EnumerateFileSystemEntries(to).Any()) return (false, Strings.T(Msg.HmTargetHasContent, to));
+        if (File.Exists(to)) return (false, Strings.T(Msg.HmTargetIsFile, to));
+        return Directory.Exists(Path.GetDirectoryName(to)) ? null : (false, Strings.T(Msg.HmParentMissing, to));
     }
 
     /// <summary>Renames the folder, then links the old path to it; if the link fails the rename is undone, so there is never a half-moved home.</summary>

@@ -113,7 +113,7 @@ public sealed partial class ServiceMigrator
             (sleep ?? Thread.Sleep)(TimeSpan.FromSeconds(1));
         }
 
-        output.WriteLine($"The service {l.Names.ServiceName} did not stop within 30 s; continuing.");
+        output.WriteLine(Strings.T(Msg.MigDidNotStop, l.Names.ServiceName));
     }
 
     /// <summary>Undo of the new installation: the service and its definition, the copied binary and (not the run account, which the old service shares) the account.</summary>
@@ -187,7 +187,7 @@ public sealed partial class ServiceMigrator
         {
             if (entry.LinkTarget is not null)
             {
-                output.WriteLine($"Left the link {entry.FullName} where it is.");
+                output.WriteLine(Strings.T(Msg.MigLeftLink, entry.FullName));
                 continue;
             }
 

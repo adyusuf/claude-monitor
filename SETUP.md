@@ -406,6 +406,9 @@ release, backups, restore drill, rollback) is [docs/deploy-windows.md](docs/depl
 `.env.example` lists every variable with its default and what it is for. The API reads them only in
 `src/ClaudeMonitor.Api/Config/ApiConfig.cs`.
 
+The agent and the tray speak the operating system's language when it is English, Turkish or German, and English otherwise. `AIPOD_LANG=en|tr|de` overrides
+that for one run or one machine (for example `AIPOD_LANG=de aipod status`); it is read by the agent and the tray only, never by the API (ADR-0014, Part A).
+
 ## Secret and token inventory
 
 The repository holds **no secrets**. The API's live in the server's environment (a root-only environment file

@@ -31,14 +31,14 @@ public static class UpdateCommand
         var unknown = args.Skip(1).FirstOrDefault(a => a != "--check" && a != AutoFlag);
         if (unknown is not null || (checkOnly && auto))
         {
-            await stderr.WriteLineAsync("usage: aipod update [--check]");
+            await stderr.WriteLineAsync(Strings.T(Msg.UpdateUsage));
             return 2;
         }
 
         var identity = Identity.Load(config);
         if (!identity.Connected)
         {
-            await stderr.WriteLineAsync("not connected (aipod login --server <url>): the update comes from the server the agent is connected to");
+            await stderr.WriteLineAsync(Strings.T(Msg.UpdateNotConnected));
             return 1;
         }
 
@@ -49,19 +49,19 @@ public static class UpdateCommand
         var check = await updater.CheckAsync(CancellationToken.None);
         if (check.Offer is null)
         {
-            await (check.Refused ? stderr : stdout).WriteLineAsync(check.Refused ? $"update refused: {check.Code}: {check.Message}" : $"{check.Message} ({AgentConfig.Version})");
+            await (check.Refused ? stderr : stdout).WriteLineAsync(check.Refused ? Strings.T(Msg.UpdateRefused, check.Code, check.Message) : Strings.T(Msg.UpdateCurrent, check.Message, AgentConfig.Version));
             return check.Refused ? 1 : 0;
         }
 
-        if (check.BelowMinimum) await stdout.WriteLineAsync($"this version ({AgentConfig.Version}) is below the server's minimum supported version {check.Offer.MinSupported}");
+        if (check.BelowMinimum) await stdout.WriteLineAsync(Strings.T(Msg.UpdateBelowMinimum, AgentConfig.Version, check.Offer.MinSupported));
         if (checkOnly)
         {
-            await stdout.WriteLineAsync($"update available: {check.Offer.Version} (running {AgentConfig.Version}); install it with: aipod update");
+            await stdout.WriteLineAsync(Strings.T(Msg.UpdateAvailable, check.Offer.Version, AgentConfig.Version));
             return 0;
         }
 
         var result = await updater.ApplyAsync(check.Offer, CancellationToken.None);
-        await (result.Succeeded ? stdout : stderr).WriteLineAsync(result.Succeeded ? $"updated: {result.Message}" : $"update {result.Code}: {result.Message}");
+        await (result.Succeeded ? stdout : stderr).WriteLineAsync(result.Succeeded ? Strings.T(Msg.UpdateDone, result.Message) : Strings.T(Msg.UpdateFailed, result.Code, result.Message));
         return result.Succeeded ? 0 : 1;
     }
 
@@ -72,37 +72,35 @@ public static class UpdateCommand
         ArgumentNullException.ThrowIfNull(stderr);
         if (args.Length == 1)
         {
-            await stdout.WriteLineAsync($"auto-update: {config.AutoUpdate}");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigAutoUpdate, config.AutoUpdate));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "claude-update" && args[2] is "on" or "off")
         {
             SavedSettings.SaveClaudeUpdate(config, args[2] == "on");
-            await stdout.WriteLineAsync($"claude-update: {args[2]} on this machine (the workspace must allow it too)");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigClaudeUpdate, args[2]));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "auto-update" && UpdateModes.IsValid(args[2]))
         {
             SavedSettings.SaveAutoUpdate(config, args[2]);
-            await stdout.WriteLineAsync($"auto-update: {args[2]}");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigAutoUpdate, args[2]));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "push" && (args[2] == "off" || PushTransports.Enables(args[2])))
         {
             SavedSettings.SavePush(config, args[2] != "off", args[2] == "off" ? null : PushTransports.Normalize(args[2]));
-            await stdout.WriteLineAsync(args[2] == "off" ? "push: off (web messages arrive at the next prompt)" : $"push: on through the {PushTransports.Normalize(args[2])}");
+            await stdout.WriteLineAsync(args[2] == "off" ? Strings.T(Msg.ConfigPushOff) : Strings.T(Msg.ConfigPushOn, PushTransports.Normalize(args[2])));
             return 0;
         }
 
         if (args.Length == 3 && args[1] == "push-format" && InboxFormats.IsValid(args[2]))
         {
             SavedSettings.SaveInboxFormat(config, args[2]);
-            await stdout.WriteLineAsync(args[2] == InboxFormats.Brief
-                ? "push-format: short (the inbox gets a one-line notice; the session reads the message with its inbox tool, monitor_inbox_read or aipod_inbox_read)"
-                : "push-format: full (the inbox gets the whole message)");
+            await stdout.WriteLineAsync(Strings.T(args[2] == InboxFormats.Brief ? Msg.ConfigPushFormatShort : Msg.ConfigPushFormatFull));
             return 0;
         }
 
@@ -112,12 +110,12 @@ public static class UpdateCommand
             var function = args[3] == "none" ? null : args[3];
             if (!MachineRoles.IsEnvironment(environment) || !MachineRoles.IsFunction(function))
             {
-                await stderr.WriteLineAsync($"role takes an environment ({string.Join('|', MachineEnvironments.All)}|none) and a function ({string.Join('|', MachineFunctions.All)}|none).");
+                await stderr.WriteLineAsync(Strings.T(Msg.ConfigRoleUsage, string.Join('|', MachineEnvironments.All), string.Join('|', MachineFunctions.All)));
                 return 2;
             }
 
             SavedSettings.SaveRole(config, environment, function);
-            await stdout.WriteLineAsync($"role claim: {MachineRoles.Code(environment, function)} (an admin sets the role on the web; a claim only makes it stricter)");
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigRoleClaim, MachineRoles.Code(environment, function)));
             return 0;
         }
 
@@ -125,8 +123,8 @@ public static class UpdateCommand
         {
             ApproversStore.SetRequired(config, args[2] == "required");
             var policy = ApproversStore.Load(config);
-            await stdout.WriteLineAsync($"signed approvals: {args[2]} ({policy.Keys.Count} key(s) pinned)"
-                + (args[2] == "required" && policy.Keys.Count == 0 ? "; NOTHING can run until a key is pinned (aipod approvers add)" : ""));
+            await stdout.WriteLineAsync(Strings.T(Msg.ConfigApprovals, args[2], policy.Keys.Count)
+                + (args[2] == "required" && policy.Keys.Count == 0 ? Strings.T(Msg.ConfigApprovalsNothing) : ""));
             return 0;
         }
 
@@ -135,7 +133,7 @@ public static class UpdateCommand
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
-        await stderr.WriteLineAsync("usage: aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list [<folder>]]");
+        await stderr.WriteLineAsync(Strings.T(Msg.ConfigUsage));
         return 2;
     }
 
@@ -147,7 +145,7 @@ public static class UpdateCommand
     {
         if (config.ServiceMode)
         {
-            await stderr.WriteLineAsync("a service agent reads its project folders from the policy file an administrator owns (\"projects\").");
+            await stderr.WriteLineAsync(Strings.T(Msg.ProjectsService));
             return 2;
         }
 
@@ -161,21 +159,21 @@ public static class UpdateCommand
         {
             if (ProjectFolderList.Add(config, args[3]))
             {
-                await stdout.WriteLineAsync("project folder listed (its key, branch and commit are reported; the path stays on this machine)");
+                await stdout.WriteLineAsync(Strings.T(Msg.ProjectsListed));
                 return 0;
             }
 
-            await stderr.WriteLineAsync($"not listed: give the absolute path of an existing folder that is not listed yet (at most {ProjectFolderList.Max}).");
+            await stderr.WriteLineAsync(Strings.T(Msg.ProjectsNotListed, ProjectFolderList.Max));
             return 2;
         }
 
         if (args.Length == 4 && args[2] == "remove")
         {
-            await (ProjectFolderList.Remove(config, args[3]) ? stdout.WriteLineAsync("project folder removed") : stderr.WriteLineAsync("that folder was not listed"));
+            await (ProjectFolderList.Remove(config, args[3]) ? stdout.WriteLineAsync(Strings.T(Msg.ProjectsRemoved)) : stderr.WriteLineAsync(Strings.T(Msg.ProjectsNotInList)));
             return 0;
         }
 
-        await stderr.WriteLineAsync("usage: aipod config projects add <folder> | remove <folder> | list");
+        await stderr.WriteLineAsync(Strings.T(Msg.ProjectsUsage));
         return 2;
     }
 

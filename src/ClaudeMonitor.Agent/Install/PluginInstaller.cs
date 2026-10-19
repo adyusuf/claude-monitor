@@ -55,21 +55,21 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         var installed = added == 0 ? claude("claude", ["plugin", "install", $"{AgentConfig.PluginName}@{AgentConfig.MarketplaceName}", "--scope", "user"]) : added;
         if (installed != 0)
         {
-            output.WriteLine("Claude Code could not be reached. Register the plugin yourself:");
+            output.WriteLine(Strings.T(Msg.PluginNoClaude));
             output.WriteLine($"  claude plugin marketplace add \"{config.PluginDir}\"");
             output.WriteLine($"  claude plugin install {AgentConfig.PluginName}@{AgentConfig.MarketplaceName} --scope user");
             return 1;
         }
 
-        output.WriteLine($"Installed. Claude Code starts the agent with its sessions. Binary: {BinaryPath}");
+        output.WriteLine(Strings.T(Msg.PluginInstalled, BinaryPath));
         output.WriteLine(config.StopWait > TimeSpan.Zero
-            ? $"A finished turn waits up to {(int)config.StopWait.TotalSeconds} s for a prompt from the web."
-            : "A finished turn does not wait for the web (aipod install --stop-wait <seconds> changes that).");
+            ? Strings.T(Msg.PluginWaits, (int)config.StopWait.TotalSeconds)
+            : Strings.T(Msg.PluginNoWait));
         output.WriteLine(config.ChannelPushEnabled
-            ? $"Push is ON through a channel. Start Claude Code with:  claude {ChannelFlag}  (a channel is a research preview; the agent cannot enable it for you)."
+            ? Strings.T(Msg.PluginPushChannel, ChannelFlag)
             : config.InboxPushEnabled
-                ? "Push is ON through each session's inbox: a web message starts a turn in an idle session, with no start-up flag (ADR-0007)."
-                : "Web messages reach a session at its next prompt (aipod install --push inbox delivers them into an idle session).");
+                ? Strings.T(Msg.PluginPushInbox)
+                : Strings.T(Msg.PluginPushOff));
         return 0;
     }
 
@@ -78,7 +78,7 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
         var claude = run ?? Run;
         claude("claude", ["plugin", "uninstall", $"{AgentConfig.PluginName}@{AgentConfig.MarketplaceName}"]);
         claude("claude", ["plugin", "marketplace", "remove", AgentConfig.MarketplaceName]);
-        output.WriteLine("The Claude Code plugin is removed. The agent's data stays in " + config.Home);
+        output.WriteLine(Strings.T(Msg.PluginRemoved, config.Home));
         return 0;
     }
 

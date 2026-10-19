@@ -31,7 +31,7 @@ public static class ServiceCommands
         if (server is not null && (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps
                                    || server.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || c is '"' or '%' or '|')))
         {
-            stderr.WriteLine($"{ServerOption} takes the https address of the aipod server, not \"{server}\".");
+            stderr.WriteLine(Strings.T(Msg.ServiceServerOption, ServerOption, server));
             return 2;
         }
 
@@ -43,13 +43,13 @@ public static class ServiceCommands
             runAccount = at + 1 < args.Length && !args[at + 1].StartsWith("--", StringComparison.Ordinal) ? args[at + 1] : RunAccount.DefaultName(AgentConfig.Os);
             if (runAccount is null)
             {
-                stderr.WriteLine($"{RunAccountOption} is supported on Linux and macOS only (ADR-0010 §5).");
+                stderr.WriteLine(Strings.T(Msg.ServiceRunAccountWindows, RunAccountOption));
                 return 2;
             }
 
             if (!RunAccount.IsValidName(runAccount))
             {
-                stderr.WriteLine($"{RunAccountOption} takes a plain account name (letters, digits, underscore, dash), not \"{runAccount}\".");
+                stderr.WriteLine(Strings.T(Msg.ServiceRunAccountPlain, RunAccountOption, runAccount));
                 return 2;
             }
         }
@@ -62,8 +62,8 @@ public static class ServiceCommands
         var layout = (onLegacy ? legacy : aipod) with { Server = server };
         // Without --exec a reinstall keeps the level an admin chose before; a first install starts off.
         if (Array.IndexOf(args, ExecOption) < 0) level = ExecPolicyLoader.ReadExisting(layout.ExecConfigPath)?.Level ?? ExecLevels.Off;
-        if (level == ExecLevels.Shell) stdout.WriteLine("Warning: exec level shell lets approved runs execute any shell text on this machine.");
-        if (onLegacy) stdout.WriteLine("This service still has its old names (cm-agent). It is upgraded as it is; `aipod service migrate` moves it to the aipod names.");
+        if (level == ExecLevels.Shell) stdout.WriteLine(Strings.T(Msg.ServiceShellWarning));
+        if (onLegacy) stdout.WriteLine(Strings.T(Msg.ServiceOldNames));
         return new ServiceInstaller(stdout, runner, AgentConfig.Os, isAdmin ?? ExecPolicyLoader.RunningAsRoot(), layout)
             .Install(Environment.ProcessPath!, level, Array.IndexOf(args, AllowRootFlag) >= 0, runAccount);
     }
@@ -93,7 +93,7 @@ public static class ServiceCommands
         var modes = new[] { MigrateDryRun, MigrateUndo, MigrateFinish }.Count(m => Array.IndexOf(args, m) >= 0);
         if (args.Length < 2 || args[1] != MigrateVerb || modes > 1 || args.Skip(2).Any(a => a is not (MigrateDryRun or MigrateUndo or MigrateFinish or MigrateNow)) || (Array.IndexOf(args, MigrateNow) >= 0 && Array.IndexOf(args, MigrateFinish) < 0))
         {
-            stderr.WriteLine($"usage: service {MigrateVerb} [{MigrateDryRun} | {MigrateUndo} | {MigrateFinish} [{MigrateNow}]]");
+            stderr.WriteLine(Strings.T(Msg.ServiceMigrateUsage, MigrateVerb, MigrateDryRun, MigrateUndo, MigrateFinish, MigrateNow));
             return 2;
         }
 
@@ -117,7 +117,7 @@ public static class ServiceCommands
         if (level is null) return 2;
         var identity = Identity.Load(config);
         (identity with { ExecLevel = level }).Save(config);
-        stdout.WriteLine($"Remote runs on this machine: {level} (the workspace switch and an owner's approval still apply).");
+        stdout.WriteLine(Strings.T(Msg.ServiceExecIs, level));
         return 0;
     }
 
@@ -127,7 +127,7 @@ public static class ServiceCommands
         if (Array.IndexOf(args, ExecOption) < 0) return ExecLevels.Off;
         var value = Cli.Option(args, ExecOption);
         if (value is not null && ExecLevels.All.Contains(value)) return value;
-        stderr.WriteLine($"{ExecOption} takes {string.Join(", ", ExecLevels.All)}, not \"{value}\".");
+        stderr.WriteLine(Strings.T(Msg.ServiceExecOption, ExecOption, string.Join(", ", ExecLevels.All), value));
         return null;
     }
 }

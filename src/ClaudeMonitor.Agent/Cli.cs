@@ -148,7 +148,7 @@ public static partial class Cli
                 await stdout.WriteLineAsync(AgentConfig.Version);
                 return 0;
             default:
-                await stdout.WriteLineAsync(Usage);
+                await stdout.WriteLineAsync(Strings.T(Msg.Usage));
                 return args.Length == 0 ? 0 : 2;
         }
     }

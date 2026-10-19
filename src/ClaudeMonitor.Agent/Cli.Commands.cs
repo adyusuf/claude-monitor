@@ -27,7 +27,7 @@ public static partial class Cli
             var text = Option(args, "--stop-wait") ?? "";
             if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) || seconds > AgentConfig.WaitMaxSeconds)
             {
-                stderr.WriteLine($"--stop-wait takes whole seconds from 0 to {AgentConfig.WaitMaxSeconds}, not \"{text}\".");
+                stderr.WriteLine(Strings.T(Msg.ErrStopWait, AgentConfig.WaitMaxSeconds, text));
                 return 2;
             }
 
@@ -39,7 +39,7 @@ public static partial class Cli
             var value = Option(args, "--push");
             if (value != "off" && !PushTransports.Enables(value))
             {
-                stderr.WriteLine($"--push takes on, off, inbox or channel, not \"{value}\".");
+                stderr.WriteLine(Strings.T(Msg.ErrPush, value));
                 return 2;
             }
 
@@ -51,7 +51,7 @@ public static partial class Cli
             var format = Option(args, "--push-format");
             if (!InboxFormats.IsValid(format))
             {
-                stderr.WriteLine($"--push-format takes full or short, not \"{format}\".");
+                stderr.WriteLine(Strings.T(Msg.ErrPushFormat, format));
                 return 2;
             }
 
@@ -103,18 +103,18 @@ public static partial class Cli
     {
         if (!Identity.Load(config).Connected)
         {
-            await stdout.WriteLineAsync("Not connected: there is no daemon to restart.");
+            await stdout.WriteLineAsync(Strings.T(Msg.RestartNotConnected));
             return 0;
         }
 
         var daemon = control ?? new Update.DaemonControl(config, log, clock);
         if (daemon.IsRunning() && !await daemon.StopAsync(config.UpdateStopWait, CancellationToken.None) && !daemon.Kill())
         {
-            await stdout.WriteLineAsync("The daemon did not stop; it keeps running its older version until it ends.");
+            await stdout.WriteLineAsync(Strings.T(Msg.RestartDidNotStop));
             return 1;
         }
 
-        await stdout.WriteLineAsync(daemon.Start(config.BinaryPath) ? "The daemon was restarted." : "The daemon could not be started.");
+        await stdout.WriteLineAsync(Strings.T(daemon.Start(config.BinaryPath) ? Msg.RestartDone : Msg.RestartFailed));
         return 0;
     }
 
@@ -124,24 +124,24 @@ public static partial class Cli
         var identity = Identity.Load(config);
         using var store = new LocalStore(config.DatabasePath);
         using var probe = DaemonHost.TryLock(config.LockPath);
-        await stdout.WriteLineAsync($"home: {config.Home}");
-        await stdout.WriteLineAsync(identity.Connected ? $"connected: {identity.Server}" : "not connected (aipod login --server <url>)");
-        await stdout.WriteLineAsync($"daemon: {(probe is null ? "running" : "not running")}");
-        await stdout.WriteLineAsync($"events waiting: {store.OutboxCount()}");
+        await stdout.WriteLineAsync(Strings.T(Msg.StatusHome, config.Home));
+        await stdout.WriteLineAsync(identity.Connected ? Strings.T(Msg.StatusConnected, identity.Server) : Strings.T(Msg.StatusNotConnected));
+        await stdout.WriteLineAsync(Strings.T(Msg.StatusDaemon, Strings.T(probe is null ? Msg.StatusRunning : Msg.StatusNotRunning)));
+        await stdout.WriteLineAsync(Strings.T(Msg.StatusEventsWaiting, store.OutboxCount()));
         var (commands, soonest) = store.WaitingCommands((clock ?? TimeProvider.System).GetUtcNow());
         await stdout.WriteLineAsync(soonest is { } expires
-            ? $"commands waiting: {commands} (oldest expires {expires.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)})"
-            : "commands waiting: 0");
-        await stdout.WriteLineAsync($"stop wait: {(int)config.StopWait.TotalSeconds} s");
-        await stdout.WriteLineAsync($"remote runs: {ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel))}{(config.ServiceMode ? " (service)" : "")}");
+            ? Strings.T(Msg.StatusCommandsWaiting, commands, expires.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture))
+            : Strings.T(Msg.StatusCommandsNone));
+        await stdout.WriteLineAsync(Strings.T(Msg.StatusStopWait, (int)config.StopWait.TotalSeconds));
+        await stdout.WriteLineAsync(Strings.T(Msg.StatusRemoteRuns, ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel)), config.ServiceMode ? Strings.T(Msg.StatusServiceSuffix) : ""));
         var started = new Daemon.ClaudeControl(config, new Daemon.SystemClaudeCli(), clock ?? TimeProvider.System).Running();
         var byPolicy = started.Count(w => w.Reason is not null);
-        await stdout.WriteLineAsync($"Claude from the web: {started.Count} session(s) started here running{(byPolicy > 0 ? $" ({byPolicy} by the automatic mode)" : "")}; automatic start: {Daemon.WorkspaceSettings.Get(config, store, Daemon.ClaudeAutoStart.ModeKey) ?? "off"}");
+        await stdout.WriteLineAsync(Strings.T(Msg.StatusClaudeWeb, started.Count, byPolicy > 0 ? Strings.T(Msg.StatusByAutomatic, byPolicy) : "", Daemon.WorkspaceSettings.Get(config, store, Daemon.ClaudeAutoStart.ModeKey) ?? "off"));
         await stdout.WriteLineAsync(Approvals.ApproversStore.Describe(Approvals.ApproversStore.Load(config)));
         foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
         foreach (var line in UpdateCommand.Describe(config, store)) await stdout.WriteLineAsync(line);
         foreach (var line in ClaudeUpdateCommand.Describe(config, store, clock ?? TimeProvider.System)) await stdout.WriteLineAsync(line);
-        await stdout.WriteLineAsync($"version: {AgentConfig.Version}");
+        await stdout.WriteLineAsync(Strings.T(Msg.StatusVersion, AgentConfig.Version));
         return identity.Connected ? 0 : 1;
     }
 }

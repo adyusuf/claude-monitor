@@ -1,3 +1,4 @@
+using ClaudeMonitor.Agent.Config;
 using System.Diagnostics;
 using System.Globalization;
 using ClaudeMonitor.Agent.Exec;
@@ -172,7 +173,7 @@ public sealed partial class ServiceInstaller
             (sleep ?? Thread.Sleep)(TimeSpan.FromSeconds(1));
         }
 
-        output.WriteLine($"The old service did not stop within {stopWaitSeconds} s; continuing.");
+        output.WriteLine(Strings.T(Msg.SvcOldNotStopped, stopWaitSeconds));
     }
 
     private void WritePolicy(ServiceLayout l, string execLevel, string? runAccount = null)
@@ -240,11 +241,11 @@ public sealed partial class ServiceInstaller
             try
             {
                 undo[i].Undo();
-                output.WriteLine($"Undone: {undo[i].What}.");
+                output.WriteLine(Strings.T(Msg.Undone, undo[i].What));
             }
             catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
             {
-                output.WriteLine($"Could not undo \"{undo[i].What}\": {e.Message}");
+                output.WriteLine(Strings.T(Msg.CouldNotUndo, undo[i].What, e.Message));
             }
         }
 

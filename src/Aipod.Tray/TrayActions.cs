@@ -28,23 +28,23 @@ public sealed class TrayActions(AgentConfig config, IAgentCli cli)
         switch (command)
         {
             case TrayCommand.Reconnect:
-                return await Cli("Reconnecting", ["restart"], ct);
+                return await Cli(Strings.T(Msg.TrayActReconnecting), ["restart"], ct);
             case TrayCommand.Disconnect:
-                return await Cli("Disconnected", ["logout"], ct);
+                return await Cli(Strings.T(Msg.TrayActDisconnected), ["logout"], ct);
             case TrayCommand.CheckForUpdate:
                 return await Cli("", ["update", "--check"], ct);
             case TrayCommand.UpdateNow:
                 return await Cli("", ["update"], ct);
             case TrayCommand.Login:
                 var address = (string.IsNullOrWhiteSpace(server) ? Identity.Peek(config)?.Server : server)?.Trim();
-                if (!IsWebAddress(address)) return new ActionResult(false, "Give the server's address (https://…) to log in.");
+                if (!IsWebAddress(address)) return new ActionResult(false, Strings.T(Msg.TrayActGiveServer));
                 return await Cli("", ["connect", "--server", address!], ct);
             case TrayCommand.OpenWeb:
-                return Open(Identity.Peek(config)?.Server, "No server is saved yet: log in first.");
+                return Open(Identity.Peek(config)?.Server, Strings.T(Msg.TrayActNoServer));
             case TrayCommand.OpenLog:
-                return File.Exists(config.LogPath) ? Open(config.LogPath, "") : new ActionResult(false, "There is no log yet.");
+                return File.Exists(config.LogPath) ? Open(config.LogPath, "") : new ActionResult(false, Strings.T(Msg.TrayActNoLog));
             default:
-                return new ActionResult(false, "That is not a command to run.");
+                return new ActionResult(false, Strings.T(Msg.TrayActNotCommand));
         }
     }
 
@@ -58,18 +58,18 @@ public sealed class TrayActions(AgentConfig config, IAgentCli cli)
         {
             var result = await cli.RunAsync(args, ct);
             var text = result.Output.Trim();
-            return new ActionResult(result.ExitCode == 0, text.Length > 0 ? text : result.ExitCode == 0 ? done : $"aipod {args[0]} failed (exit {result.ExitCode}).");
+            return new ActionResult(result.ExitCode == 0, text.Length > 0 ? text : result.ExitCode == 0 ? done : Strings.T(Msg.TrayActFailed, args[0], result.ExitCode));
         }
         catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException or TimeoutException)
         {
-            return new ActionResult(false, $"aipod {args[0]} could not run ({e.GetType().Name}). Is aipod installed?");
+            return new ActionResult(false, Strings.T(Msg.TrayActCouldNotRun, args[0], e.GetType().Name));
         }
     }
 
     private ActionResult Open(string? target, string missing)
     {
         if (target is null) return new ActionResult(false, missing);
-        if (target.Contains("://", StringComparison.Ordinal) && !IsWebAddress(target)) return new ActionResult(false, "Only http and https addresses are opened.");
+        if (target.Contains("://", StringComparison.Ordinal) && !IsWebAddress(target)) return new ActionResult(false, Strings.T(Msg.TrayActOnlyHttp));
         try
         {
             cli.Open(target);
@@ -77,7 +77,7 @@ public sealed class TrayActions(AgentConfig config, IAgentCli cli)
         }
         catch (Exception e) when (e is Win32Exception or IOException or InvalidOperationException)
         {
-            return new ActionResult(false, $"Could not open it ({e.GetType().Name}).");
+            return new ActionResult(false, Strings.T(Msg.TrayActCouldNotOpen, e.GetType().Name));
         }
     }
 }

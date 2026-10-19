@@ -18,7 +18,7 @@ public static class ClaudeUpdateCommand
         ArgumentNullException.ThrowIfNull(clock);
         if (args.Length != 2 || args[1] != "cancel")
         {
-            await stderr.WriteLineAsync("usage: aipod claude-update cancel");
+            await stderr.WriteLineAsync(Strings.T(Msg.ClaudeUpdateUsage));
             return 2;
         }
 
@@ -26,13 +26,13 @@ public static class ClaudeUpdateCommand
                       && until > clock.GetUtcNow();
         if (!waiting)
         {
-            await stdout.WriteLineAsync("no Claude Code update is waiting to start");
+            await stdout.WriteLineAsync(Strings.T(Msg.ClaudeUpdateNone));
             return 0;
         }
 
         config.EnsureHome();
         await File.WriteAllTextAsync(config.ClaudeCancelPath, clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture));
-        await stdout.WriteLineAsync($"the Claude Code update is cancelled; it is not tried again for {config.ClaudeSnooze.TotalHours:0} h");
+        await stdout.WriteLineAsync(Strings.T(Msg.ClaudeUpdateCancelled, config.ClaudeSnooze.TotalHours.ToString("0", System.Globalization.CultureInfo.InvariantCulture)));
         return 0;
     }
 

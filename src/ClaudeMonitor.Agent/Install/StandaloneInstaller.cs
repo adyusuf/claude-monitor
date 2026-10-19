@@ -1,3 +1,4 @@
+using ClaudeMonitor.Agent.Config;
 using System.Text;
 using ClaudeMonitor.Contracts;
 
@@ -26,19 +27,19 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         ArgumentException.ThrowIfNullOrEmpty(currentBinary);
         if (isRoot)
         {
-            output.WriteLine("A standalone agent runs as you, not as root or administrator: run this from your own account (a boot service for a server is `install --service`).");
+            output.WriteLine(Strings.T(Msg.SaNotAsRoot));
             return 2;
         }
 
         if (layout.Os == OsKinds.Linux && StandaloneUnits.CheckSystemd(layout) is { } problem)
         {
-            output.WriteLine($"Not installed: {problem}");
+            output.WriteLine(Strings.T(Msg.NotInstalled, problem));
             return 1;
         }
 
         if (layout.Os == OsKinds.Linux && run(Systemctl, ["--user", "show-environment"]) != 0)
         {
-            output.WriteLine("Not installed: this account has no systemd user session; only systemd is supported on Linux.");
+            output.WriteLine(Strings.T(Msg.SaNoSystemdUser));
             return 1;
         }
 
@@ -47,14 +48,14 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         {
             if (string.IsNullOrWhiteSpace(server))
             {
-                output.WriteLine("Not connected: give the server, aipod install --standalone --server https://<your aipod server address>, or run aipod login --server <url> first.");
+                output.WriteLine(Strings.T(Msg.SaNotConnected));
                 return 2;
             }
 
-            output.WriteLine("Connecting this machine first: approve the code on the web.");
+            output.WriteLine(Strings.T(Msg.SaConnecting));
             if (await login(server) != 0 || !connected())
             {
-                output.WriteLine("Not installed: the login did not complete, so nothing was enabled. Run the command again when you can approve the code.");
+                output.WriteLine(Strings.T(Msg.SaLoginIncomplete));
                 return 1;
             }
         }
@@ -70,12 +71,12 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException or System.Xml.XmlException or ArgumentException)
         {
-            output.WriteLine($"Install failed: {e.Message}");
+            output.WriteLine(Strings.T(Msg.InstallFailed, e.Message));
             Undo();
             return 1;
         }
 
-        output.WriteLine($"The standalone agent is installed and starts when you log in. Binary: {effective.Binary}; home: {effective.Home}.");
+        output.WriteLine(Strings.T(Msg.SaInstalled, effective.Binary, effective.Home));
         NextSteps(effective);
         return 0;
     }
@@ -96,11 +97,11 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
 
         if (!any)
         {
-            output.WriteLine("The standalone autostart is not installed.");
+            output.WriteLine(Strings.T(Msg.SaNotInstalled));
             return 0;
         }
 
-        output.WriteLine($"The standalone autostart is removed. Kept: the home {layout.Home} (the login and the queue) and the binary {layout.Binary}.");
+        output.WriteLine(Strings.T(Msg.SaRemoved, layout.Home, layout.Binary));
         return 0;
     }
 
@@ -126,7 +127,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
                     Step("stop and disable the unit", Systemctl, ["--user", "disable", "--now", l.Names.UnitName]);
                     break;
                 default:
-                    output.WriteLine($"A standalone agent is not supported on this OS ({l.Os}).");
+                    output.WriteLine(Strings.T(Msg.SaUnsupportedOs, l.Os));
                     return 2;
             }
 
@@ -138,14 +139,14 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException)
         {
-            output.WriteLine($"Uninstall failed: {e.Message}");
+            output.WriteLine(Strings.T(Msg.UninstallFailed, e.Message));
             return 1;
         }
     }
 
     private int Absent(bool report)
     {
-        if (report) output.WriteLine("The standalone autostart is not installed.");
+        if (report) output.WriteLine(Strings.T(Msg.SaNotInstalled));
         return 0;
     }
 
@@ -158,7 +159,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
         if (legacy is null || legacy.Names == layout.Names) return;
         var code = RemoveRegistration(legacy, report: false, out var found);
         if (code != 0) throw new StepFailedException("could not remove the autostart under the old names");
-        if (found) output.WriteLine("Replaced the autostart that had the old names (com.claudemonitor.agent.user / claude-monitor-agent / ClaudeMonitorAgent).");
+        if (found) output.WriteLine(Strings.T(Msg.SaReplaced));
     }
 
     /// <summary>The console binary into the home, and the application's executable (macOS) or the windowless build (Windows) beside it.</summary>
@@ -182,7 +183,7 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
                 CopyAtomic(currentBinary, layout.AutostartBinary, "copy the program for the autostart");
                 if (PeSubsystem.TrySetGui(layout.AutostartBinary)) return layout;
                 DeleteFile(layout.AutostartBinary);
-                output.WriteLine($"Note: a windowless copy could not be made, so the autostart uses the console build and Windows may show a console window at logon.");
+                output.WriteLine(Strings.T(Msg.SaConsoleBuild));
                 return layout with { AutostartBinary = layout.Binary };
             default:
                 return layout;
@@ -242,10 +243,10 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
     {
         if (l.Os == OsKinds.Linux && read(Loginctl, ["show-user", l.User, "-p", "Linger"])?.Trim() == "Linger=no")
         {
-            output.WriteLine($"Note: without lingering the agent runs only while you are logged in. To keep it running after you log out: sudo loginctl enable-linger {l.User}");
+            output.WriteLine(Strings.T(Msg.SaLinger, l.User));
         }
 
-        output.WriteLine("Run `aipod status` to check it. This machine reports no Claude Code (claude=none); other machines can still reach it as a target.");
+        output.WriteLine(Strings.T(Msg.SaCheck));
     }
 
     private void Step(string what, string tool, IReadOnlyList<string> args)
@@ -262,11 +263,11 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
             try
             {
                 undo[i].Undo();
-                output.WriteLine($"Undone: {undo[i].What}.");
+                output.WriteLine(Strings.T(Msg.Undone, undo[i].What));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                output.WriteLine($"Could not undo {undo[i].What}: {e.GetType().Name}.");
+                output.WriteLine(Strings.T(Msg.CouldNotUndo, undo[i].What, e.GetType().Name));
             }
         }
 
