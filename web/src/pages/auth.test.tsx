@@ -120,15 +120,15 @@ describe("routing", () => {
   });
 
   it("opens the first workspace, and a user without one creates one", async () => {
-    mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/sessions": { body: { items: [], next: null } } });
+    mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/projects": { body: { items: [], next: null } } });
     renderAt("/", [{ path: "*", element: <App /> }]);
-    expect(await screen.findByRole("heading", { name: "Sessions" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
   });
 
   it("shows not found inside the frame", async () => {
     mockApi({ "GET /me": { body: { ...ME, workspaces: [] } } });
     renderAt("/nowhere", [{ path: "*", element: <App /> }]);
     expect(await screen.findByText("Page not found")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("link", { name: "Go to sessions" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("link", { name: "Go to projects" })).toBeInTheDocument());
   });
 });

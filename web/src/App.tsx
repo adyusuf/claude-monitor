@@ -3,6 +3,7 @@ import { RequireAuth, useSession } from "./auth/session";
 import { Layout } from "./components/Layout";
 import { Empty } from "./components/ui";
 import { useI18n } from "./i18n";
+import { ApplicationPage } from "./pages/ApplicationPage";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./pages/AccountPages";
 import { ForgotPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./pages/AuthPages";
 import { DevicePage, MachinesPage } from "./pages/MachinesPage";
@@ -10,6 +11,8 @@ import { TwoStepPage } from "./pages/TwoStepPage";
 import { MachinePage } from "./pages/MachinePage";
 import { MembersPage } from "./pages/MembersPage";
 import { MfaPage } from "./pages/Mfa";
+import { ProjectPage } from "./pages/ProjectPage";
+import { ProjectsPage } from "./pages/ProjectsPage";
 import { SessionPage } from "./pages/SessionPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { NewWorkspacePage, WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage";
@@ -17,7 +20,7 @@ import { NewWorkspacePage, WorkspaceSettingsPage } from "./pages/WorkspaceSettin
 function Home() {
   const { me } = useSession();
   const first = me?.workspaces[0];
-  return first ? <Navigate to={`/w/${first.id}/sessions`} replace /> : <Navigate to="/workspaces/new" replace />;
+  return first ? <Navigate to={`/w/${first.id}/projects`} replace /> : <Navigate to="/workspaces/new" replace />;
 }
 
 export function NotFound() {
@@ -44,6 +47,9 @@ export function App() {
         <Route path="/download" element={<DownloadPage />} />
         <Route path="/invitations/accept" element={<AcceptInvitationPage />} />
         <Route path="/workspaces/new" element={<NewWorkspacePage />} />
+        <Route path="/w/:ws/projects" element={<ProjectsPage />} />
+        <Route path="/w/:ws/projects/:id" element={<ProjectPage />} />
+        <Route path="/w/:ws/projects/:projectId/applications/:id" element={<ApplicationPage />} />
         <Route path="/w/:ws/sessions" element={<SessionsPage />} />
         <Route path="/w/:ws/sessions/:id" element={<SessionPage />} />
         <Route path="/w/:ws/machines" element={<MachinesPage />} />

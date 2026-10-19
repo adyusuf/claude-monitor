@@ -1,5 +1,6 @@
 import type { Dictionary } from "./en";
 import { trMachines } from "./tr.machines";
+import { trProjects } from "./tr.projects";
 import { trTwoStep } from "./tr.twoStep";
 import { trRemote } from "./tr.remote";
 
@@ -7,7 +8,7 @@ import { trRemote } from "./tr.remote";
 export const tr: Dictionary = {
   app: { name: "Claude Monitor", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
-    sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", settings: "Çalışma alanı ayarları",
+    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", settings: "Çalışma alanı ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
   },
@@ -73,6 +74,11 @@ export const tr: Dictionary = {
     invalid_note: "Not en fazla 2000 karakterdir ve denetim karakteri içeremez.",
     invalid_kind: "Bir tür seçin: test, build, deploy ya da other.",
     invalid_project: "Proje anahtarı 1 ile 200 karakter olmalı, denetim karakteri içermemeli.",
+    name_taken: "Bu ad burada zaten kullanılıyor. Başka bir ad seçin.", invalid_list: "Listeyi kontrol edin: bir girdi boş, çok uzun, tekrarlı ya da geçersiz, ya da çok fazla girdi var.",
+    amount_and_currency: "Bütçe tutarını ve para birimini birlikte verin ya da ikisini de boş bırakın.", invalid_currency: "Üç büyük harf kullanın, örneğin TRY.",
+    before_start: "Bitiş tarihi başlangıç tarihinden önce olamaz.", invalid_value: "Listeden bir değer seçin.", invalid_url: "Bu adrese burada izin verilmiyor. Depo için https, ssh ya da git, ortam için http ya da https adresi kullanın; parola olmasın.",
+    limit_reached: "Buraya sığabilecek en çok sayıya ulaşıldı.", archived: "Bu arşivlendi. Önce geri yükleyin.",
+    released: "Yayımlanmış bir sürüm iptal edilemez.", cancelled: "İptal edilmiş bir sürüm değiştirilemez.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
   time: { now: "şimdi", s: "sn", m: "dk", h: "sa", d: "g" },
@@ -140,6 +146,7 @@ export const tr: Dictionary = {
     status: { queued: "Bekliyor", delivered: "İletildi", applied: "Uygulandı", failed: "Başarısız", expired: "Süresi doldu", cancelled: "İptal" },
   },
   machines: trMachines,
+  projects: trProjects,
   twoStep: trTwoStep,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
@@ -172,7 +179,8 @@ export const tr: Dictionary = {
     data: "Verileriniz", exportHint: "Sizinle ve oturumlarınızla ilgili her şey, tek bir JSON dosyası olarak.", export: "Verilerimi indir",
     deleteTitle: "Hesabı sil", deleteHint: "Adınız, adresiniz, giriş yöntemleriniz ve makinelerinizin yakaladığı her şey silinir; makinelerinizin bağlantısı kesilir. Geri alınamaz.",
     mfa: "İki adımlı giriş", mfaOn: "Açık: her girişte doğrulama uygulamanızdan bir kod da istenir.",
-    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
+    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
+
     mfaOpen: "Doğrulama uygulamasında aç", mfaEnable: "Aç", mfaRecovery: "Kurtarma kodları. Güvenli bir yerde saklayın: her biri uygulama olmadan bir kez giriş yapar. Yalnızca şimdi gösteriliyor.",
     mfaDisable: "Kapat", mfaDisabled: "İki adımlı giriş kapalı.",
     deleteConfirm: "Onaylamak için {word} yazın", deleteButton: "Hesabımı sil", deleted: "Hesabınız silindi.",
@@ -208,5 +216,5 @@ export const tr: Dictionary = {
     newHint: "Bir zamanlama onaylı bir işi kendi kendine çalıştırır. Üst üste üç başarısız çalıştırmadan sonra durur, kendi son çalıştırmasıyla çakışmaz ve burada istediğiniz an durdurabilirsiniz.",
     noJobs: "Bir zamanlama için komutunda yer tutucu olmayan etkin bir iş gerekir.",
   },
-  notFound: { title: "Sayfa bulunamadı", home: "Oturumlara git" },
+  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" },
 };

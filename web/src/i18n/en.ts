@@ -1,4 +1,5 @@
 import { enMachines } from "./en.machines";
+import { enProjects } from "./en.projects";
 import { enTwoStep } from "./en.twoStep";
 import { enRemote } from "./en.remote";
 
@@ -6,7 +7,7 @@ import { enRemote } from "./en.remote";
 export const en = {
   app: { name: "Claude Monitor", tagline: "Follow your AI coding sessions, live." },
   nav: {
-    sessions: "Sessions", machines: "Machines", members: "Members", settings: "Workspace settings",
+    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", settings: "Workspace settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
   },
@@ -72,6 +73,11 @@ export const en = {
     invalid_note: "The note is at most 2000 characters and may not contain control characters.",
     invalid_kind: "Pick a kind: test, build, deploy or other.",
     invalid_project: "The project key is 1 to 200 characters without control characters.",
+    name_taken: "That name is already used here. Pick another.", invalid_list: "Check the list: an entry is empty, too long, repeated or not allowed, or there are too many.",
+    amount_and_currency: "Give the budget amount and its currency together, or neither.", invalid_currency: "Use three capital letters, such as EUR.",
+    before_start: "The end date cannot be before the start date.", invalid_value: "Pick a value from the list.", invalid_url: "That address is not allowed here. Use an https, ssh or git address for the repository and an http or https address for an environment, without a password.",
+    limit_reached: "The most that fits here has been reached.", archived: "This is archived. Restore it first.",
+    released: "A release that went out cannot be cancelled.", cancelled: "A cancelled release cannot be changed.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", s: "s", m: "m", h: "h", d: "d" },
@@ -139,6 +145,7 @@ export const en = {
     status: { queued: "Waiting", delivered: "Delivered", applied: "Applied", failed: "Failed", expired: "Expired", cancelled: "Cancelled" },
   },
   machines: enMachines,
+  projects: enProjects,
   twoStep: enTwoStep,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
@@ -171,7 +178,8 @@ export const en = {
     data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
     deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",
     mfa: "Two-step sign-in", mfaOn: "On: every sign-in also asks for a code from your authenticator app.",
-    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
+    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
+
     mfaOpen: "Open in authenticator", mfaEnable: "Turn on", mfaRecovery: "Recovery codes. Keep them somewhere safe: each signs in once without the app. They are shown only now.",
     mfaDisable: "Turn off", mfaDisabled: "Two-step sign-in is off.",
     deleteConfirm: "Type {word} to confirm", deleteButton: "Delete my account", deleted: "Your account is deleted.",
@@ -207,7 +215,7 @@ export const en = {
     newHint: "A schedule runs an approved job by itself. It stops after three failed runs in a row, never overlaps its own last run, and you can stop it here at any time.",
     noJobs: "A schedule needs an active job without a placeholder in its command.",
   },
-  notFound: { title: "Page not found", home: "Go to sessions" },
+  notFound: { title: "Page not found", home: "Go to projects" },
 };
 
 export type Dictionary = typeof en;
