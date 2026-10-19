@@ -91,4 +91,21 @@ public sealed class IssueRunTests(ApiFactory api)
         Assert.Equal(2, rows.Count);
         Assert.All(rows, r => Assert.DoesNotContain("hush", r.Detail?.RootElement.GetRawText() ?? "", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task Retention_deletes_an_old_run_together_with_its_issue_link_and_the_sweep_does_not_fail()
+    {
+        var (team, _, issue, run) = await SetUpAsync();
+        (await team.Admin.PostAsync($"/api/issues/{issue}/runs", new { runId = run })).EnsureSuccessStatusCode();
+        (await team.Admin.SendAsync(HttpMethod.Put, $"/api/workspaces/{team.WorkspaceId}/settings", new { retentionDays = 1 })).EnsureSuccessStatusCode();
+
+        api.Clock.Advance(TimeSpan.FromDays(3));
+        await RemoteKit.HousekeepAsync(api);
+        await RemoteKit.HousekeepAsync(api);
+
+        await using var db = api.Db();
+        Assert.False(await db.RemoteRuns.AnyAsync(r => r.Id == run));
+        Assert.False(await db.IssueRuns.AnyAsync(l => l.RunId == run));
+        Assert.Empty((await team.Admin.GetJsonAsync($"/api/issues/{issue}/runs")).EnumerateArray());
+    }
 }
