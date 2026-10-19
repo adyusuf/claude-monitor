@@ -14,7 +14,7 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// Because those two end this daemon, their outcome is reported BEFORE the verb starts and says "started". Nothing here throws into the stream.
 /// </summary>
 public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> status, Func<CancellationToken, Task<UpdateCheck>> check,
-    Func<string, bool> spawn, bool serviceMode = false)
+    Func<string, bool> spawn, bool serviceMode = false, ClaudeControl? claude = null)
 {
     private readonly ConcurrentDictionary<Guid, byte> taken = new();
 
@@ -32,10 +32,10 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
         try
         {
             if (!await api.ActionStatusAsync(action.Id, AgentActionStatuses.Delivered, null, ct)) return; // taken elsewhere, finished or expired
-            var (succeeded, text, then) = await DoAsync(action.Kind, ct);
+            var (succeeded, text, then, sessionRef) = await DoAsync(action, ct);
             try
             {
-                await api.ActionStatusAsync(action.Id, succeeded ? AgentActionStatuses.Succeeded : AgentActionStatuses.Failed, Cap(text), ct);
+                await api.ActionStatusAsync(action.Id, succeeded ? AgentActionStatuses.Succeeded : AgentActionStatuses.Failed, Cap(text), ct, sessionRef);
             }
             catch (Exception e) when (then is not null && e is HttpRequestException or TimeoutException or ApiException)
             {
@@ -68,26 +68,35 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
     }
 
     /// <summary>What to do for a kind: whether it worked, the text to show, and the `aipod` verb to start once that is reported (null for none).</summary>
-    private async Task<(bool Succeeded, string Text, string? Then)> DoAsync(string kind, CancellationToken ct)
+    private async Task<(bool Succeeded, string Text, string? Then, string? SessionRef)> DoAsync(AgentActionMessage action, CancellationToken ct)
     {
-        switch (kind)
+        switch (action.Kind)
         {
+            case AgentActionKinds.ClaudeStart when claude is not null:
+                var started = await claude.StartAsync(action.ProjectKey, action.PermissionMode, ct);
+                return (started.Succeeded, started.Text, null, started.SessionRef);
+            case AgentActionKinds.ClaudeStop when claude is not null:
+                var stopped = await claude.StopAsync(action.SessionRef, ct);
+                return (stopped.Succeeded, stopped.Text, null, null);
+            case AgentActionKinds.ClaudeStart:
+            case AgentActionKinds.ClaudeStop:
+                return (false, "this agent cannot start or stop Claude here", null, null);
             case AgentActionKinds.Status:
-                return (true, await status(), null);
+                return (true, await status(), null, null);
             case AgentActionKinds.UpdateCheck:
                 var seen = await check(ct);
-                return (!seen.Refused, Describe(seen), null);
+                return (!seen.Refused, Describe(seen), null, null);
             case AgentActionKinds.Update when serviceMode:
-                return (false, "this agent runs as a service: an administrator upgrades it (its binary is not writable by the service account)", null);
+                return (false, "this agent runs as a service: an administrator upgrades it (its binary is not writable by the service account)", null, null);
             case AgentActionKinds.Update:
                 var offer = await check(ct);
                 return offer.Offer is null
-                    ? (!offer.Refused, Describe(offer), null)
-                    : (true, $"updating to {offer.Offer.Version} (running {AgentConfig.Version}); the agent restarts and reports the new version", UpdateCommand.Verb);
+                    ? (!offer.Refused, Describe(offer), null, null)
+                    : (true, $"updating to {offer.Offer.Version} (running {AgentConfig.Version}); the agent restarts and reports the new version", UpdateCommand.Verb, null);
             case AgentActionKinds.Restart:
-                return (true, "restarting the agent", "restart");
+                return (true, "restarting the agent", "restart", null);
             default:
-                return (false, "unknown action", null);
+                return (false, "unknown action", null, null);
         }
     }
 

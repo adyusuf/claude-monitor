@@ -73,7 +73,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 return text.ToString();
             },
             ct => new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock).CheckAsync(ct),
-            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode);
+            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode, new ClaudeControl(config, new SystemClaudeCli(), clock));
         stream = new Relay(config, streamStore, api, clock) { Runs = runs, Actions = actions };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
