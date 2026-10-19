@@ -74,12 +74,23 @@ public sealed record AgentActionView(Guid Id, Guid AgentId, string Kind, string 
     DateTimeOffset ExpiresAt, DateTimeOffset? FinishedAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null);
 
 /// <summary>The machine owner's switch for starting Claude from the web on this machine (ADR-0014); off until they say so. Code: a two-step code when turning it on needs one.</summary>
-public sealed record AgentClaudeRequest(bool Accept, string? Code = null);
+public sealed record AgentClaudeRequest(bool Accept, string? Code = null, string? AutoMode = null);
 
 /// <summary>The owner asks to start the test command the machine reports for a project (ADR-0011 §7a). The command is never part of the request.</summary>
 public sealed record TestRunRequest(string ProjectKey);
 
-public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy);
+public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy, string AutoMode = ClaudeAutoModes.Off);
+
+/// <summary>
+/// What the daemon does by itself with Claude on a machine (ADR-0014 P3), set by the machine's owner only. <c>on_message</c>: an ask from another machine that finds no idle session and names a project
+/// this machine knows gets a background worker in that project. The agent only ever sees a mode the API found allowed (switch on, dev or test machine, not a service).
+/// </summary>
+public static class ClaudeAutoModes
+{
+    public const string Off = "off";
+    public const string OnMessage = "on_message";
+    public static readonly IReadOnlyList<string> All = [Off, OnMessage];
+}
 
 public static class AgentActionErrors
 {
@@ -98,5 +109,6 @@ public static class AgentActionErrors
     public const string InvalidSessionRef = "invalid_session_ref";
     public const string InvalidPrompt = "invalid_prompt";
     public const string NoTestCommand = "no_test_command";
+    public const string InvalidAutoMode = "invalid_auto_mode";
     public const string NotStartedHere = "claude_not_started_here";
 }

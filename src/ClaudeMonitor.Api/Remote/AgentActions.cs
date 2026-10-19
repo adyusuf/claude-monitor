@@ -194,13 +194,19 @@ public static class AgentActions
         var userId = http.User.UserId();
         var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == agentId && a.Status == AgentStatuses.Active, http.RequestAborted);
         if (agent is null || agent.UserId != userId || await Access.MemberAsync(db, userId, agent.WorkspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        if (req.Accept && !agent.AcceptsClaudeControl && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if (req.AutoMode is not null && !ClaudeAutoModes.All.Contains(req.AutoMode)) return Http.Invalid("autoMode", AgentActionErrors.InvalidAutoMode);
+        var autoWas = agent.ClaudeAutoMode;
+        var autoNow = req.Accept ? req.AutoMode ?? autoWas : ClaudeAutoModes.Off;
+        if (autoNow != ClaudeAutoModes.Off && AutoModeRefusal(agent) is { } autoRefused) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: autoRefused);
+        var turningOn = req.Accept && !agent.AcceptsClaudeControl || autoWas == ClaudeAutoModes.Off && autoNow != ClaudeAutoModes.Off;
+        if (turningOn && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
         var was = agent.AcceptsClaudeControl;
         var now = clock.GetUtcNow();
+        agent.ClaudeAutoMode = autoNow;
         agent.AcceptsClaudeControl = req.Accept;
         agent.AcceptsClaudeControlSetAt = now;
         agent.AcceptsClaudeControlSetBy = userId;
-        Audit.Add(db, http, clock, AuditActions.AgentClaudeControlChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId, detail: new { before = was, after = req.Accept });
+        Audit.Add(db, http, clock, AuditActions.AgentClaudeControlChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId, detail: new { before = was, after = req.Accept, autoBefore = autoWas, autoAfter = autoNow });
         await db.SaveChangesAsync(http.RequestAborted);
         if (was && !req.Accept)
         {
@@ -210,7 +216,21 @@ public static class AgentActions
         }
 
         broker.Publish(Broker.Workspace(agent.WorkspaceId), new StreamMessage(AgentRoleEndpoints.MachineEvent, new { agentId }));
-        return Results.Ok(new AgentClaudeView(agentId, agent.AcceptsClaudeControl, agent.AcceptsClaudeControlSetAt, agent.AcceptsClaudeControlSetBy));
+        return Results.Ok(new AgentClaudeView(agentId, agent.AcceptsClaudeControl, agent.AcceptsClaudeControlSetAt, agent.AcceptsClaudeControlSetBy, agent.ClaudeAutoMode));
+    }
+
+    /// <summary>Why automatic mode cannot be on for this machine (ADR-0014 P3): the same places as a start from the web, never a service agent and never anything but an admin-set dev or test machine. Null when it can.</summary>
+    public static string? AutoModeRefusal(Agent agent)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        if (agent.ServiceMode) return AgentActionErrors.ClaudeServiceMode;
+        if (agent.RoleEnvironment is null || !AgentActionKinds.ClaudeEnvironments.Contains(agent.RoleEnvironment)
+            || MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(agent.RoleEnvironment, agent.ClaimedEnvironment), MachineRoles.EffectiveFunction(agent.RoleFunction, agent.ClaimedFunction)))
+        {
+            return AgentActionErrors.ClaudeEnvironment;
+        }
+
+        return null;
     }
 
     private static Task<AgentAction?> OpenOfKindAsync(MonitorDb db, Guid agentId, string kind, CancellationToken ct) =>

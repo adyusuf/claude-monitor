@@ -58,7 +58,7 @@ public sealed class SystemClaudeCli : IClaudeCli
 }
 
 /// <summary>A background session this agent started (ADR-0014). The folder stays here, in the user-only home; the API only ever hears the project key.</summary>
-public sealed record ClaudeWorker(string Id, string ProjectKey, string Folder, string Mode, DateTimeOffset StartedAt, DateTimeOffset? StoppedAt = null);
+public sealed record ClaudeWorker(string Id, string ProjectKey, string Folder, string Mode, DateTimeOffset StartedAt, DateTimeOffset? StoppedAt = null, string? Reason = null);
 
 /// <summary>What a start or a stop came to: whether it worked, the text for the owner's page, and (for a start) the short id of the session.</summary>
 public sealed record ClaudeControlOutcome(bool Succeeded, string Text, string? SessionRef = null);
@@ -81,7 +81,7 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
     [GeneratedRegex(@"backgrounded\s*·\s*(?<id>[0-9a-f]{8})", RegexOptions.CultureInvariant)]
     private static partial Regex Backgrounded();
 
-    public async Task<ClaudeControlOutcome> StartAsync(string? projectKey, string? permissionMode, string? prompt, CancellationToken ct)
+    public async Task<ClaudeControlOutcome> StartAsync(string? projectKey, string? permissionMode, string? prompt, CancellationToken ct, string? reason = null)
     {
         var mode = permissionMode ?? AgentActionKinds.DefaultClaudePermissionMode;
         if (!AgentActionKinds.ClaudePermissionModes.Contains(mode)) return new(false, "refused: that permission mode is not one a remote start may ask for");
@@ -112,7 +112,7 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
 
         if (Backgrounded().Match(run.Output) is not { Success: true } match) return new(false, $"claude --bg did not say which session it started: {FirstLine(run.Output)}");
         var id = match.Groups["id"].Value;
-        Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow())).ToList());
+        Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow(), Reason: reason)).ToList());
         return new(true, $"started session {id} in the background ({mode} mode); it appears in the session list", id);
     }
 

@@ -98,7 +98,7 @@ everything but the real check on a test machine.
 ## Decisions of the maintainer (19/10/2026) and what is still open
 
 Decided: the environment is the machine's class (dev, test, production); no repositories; no remote start on production or database machines.
-Still open: 1. Windows: a test of `claude --bg` on the Windows server (the spike ran on macOS only). 2. Automatic mode: who may turn it on (the machine's owner
+Still open (2 is decided in P3 below): 1. Windows: a test of `claude --bg` on the Windows server (the spike ran on macOS only). 2. Automatic mode: who may turn it on (the machine's owner
 only, as proposed, or also a workspace admin). 3. The permission mode of a session nobody watches (proposed: `manual`, so every risky step waits for a person on
 the web; never bypass, auto or dontAsk). 4. The cost of a session is the machine owner's plan: acceptable? 5. What the page says for a folder that is not trusted
 yet ("open Claude in that folder once at the machine and accept the trust prompt").
@@ -132,7 +132,9 @@ What shipped, on the branch with the rest of this work (not released: the agent 
 gives `claude --bg` one more argument: the same notice and fence as an inbox message (labelled as from the web, to be treated as data, defused, capped at the push limit), so the argument always
 begins with the notice and never with the web's own text. Podium shows a text box on the Claude card. Migration `ActionFirstPrompt`.
 
-Not built (P3 onward): the automatic `on_message` mode, a per-project trust pre-check in the page, and any change to how the session list marks agent-started sessions.
+**P3 as built (19/10/2026): automatic mode `on_message`.** Decision 2 (maintainer, 19/10/2026): only the machine's owner may turn it on, with the same recent sign-in as the switch itself (`PUT /api/agents/{id}/claude` takes an optional `autoMode`; turning Claude control off turns it off too). What it does, as built: when an **ask** from another machine (ADR-0008 §3f) is held because no session is idle, names a project this machine knows (the ask's `project`) and has waited one minute (`ClaudeAutoGrace`), the daemon starts a background worker in that project through the same `ClaudeControl` as a start from the web: the careful `manual` mode, no prompt (nothing the ask says reaches `claude`), never a second worker for the project, at most three starts an hour (`ClaudeAutoPerHour`), and no new start for ten minutes after a failed one (`ClaudeAutoBackoff`). The worker record carries the reason `auto:on_message`. The held ask is delivered by the usual pump once the worker is idle. **Not covered:** a message from the web to a session that has ended (web prompts are addressed to a session id, ADR-0002, so there is no project to start in), the `always` mode, and an ask that names no project. **Unverified:** that a worker started this way registers its inbox and reaches idle on a real machine (the spike showed hooks and the inbox work in a background session), and anything on Windows.
+
+Not built (P4 onward):  a per-project trust pre-check in the page, and any change to how the session list marks agent-started sessions.
 
 ## Windows: what still has to be tried (not done; this was developed on macOS)
 

@@ -93,9 +93,12 @@ public static class AgentEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
-        var share = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => a.ShareServices).FirstOrDefaultAsync(http.RequestAborted);
+        var agent = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == http.User.AgentId(), http.RequestAborted);
+        // The mode the daemon acts on is the one the owner chose only while every condition of a start from the web still holds (ADR-0014 P3).
+        var auto = agent is { AcceptsClaudeControl: true, ClaudeAutoMode: ClaudeAutoModes.OnMessage } && s.RemoteRunsEnabled && AgentActions.AutoModeRefusal(agent) is null
+            ? ClaudeAutoModes.OnMessage : ClaudeAutoModes.Off;
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
-            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, share));
+            new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, agent?.ShareServices ?? false, auto));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>

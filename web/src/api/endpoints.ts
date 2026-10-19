@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentActionKind, AgentActionView, AgentAsksView, AgentClaudeView, ClaudePermissionMode, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentActionKind, AgentActionView, AgentAsksView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
@@ -78,7 +78,7 @@ export const api = {
   requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string, extra?: { projectKey?: string; permissionMode?: ClaudePermissionMode; sessionRef?: string; prompt?: string }) =>
     request<AgentActionView>("POST", `/agents/${agentId}/actions`, { kind, code, ...extra }),
   startProjectTest: (agentId: string, projectKey: string) => request<{ id: string; status: string }>("POST", `/agents/${agentId}/test-runs`, { projectKey }),
-  setAgentClaude: (agentId: string, accept: boolean, code?: string) => request<AgentClaudeView>("PUT", `/agents/${agentId}/claude`, { accept, code }),
+  setAgentClaude: (agentId: string, accept: boolean, code?: string, autoMode?: ClaudeAutoMode) => request<AgentClaudeView>("PUT", `/agents/${agentId}/claude`, { accept, code, ...(autoMode ? { autoMode } : {}) }),
   agentAsks: (agentId: string) => request<AskView[]>("GET", `/agents/${agentId}/asks`),
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>

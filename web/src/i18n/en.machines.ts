@@ -71,6 +71,8 @@ export const enMachines = {
     prompt: "First message (optional)",
     promptHint: "At most {max} characters. The session receives it labelled as a message from the web, to be treated as data, and asks before acting on a risky request.",
     modes: { manual: "Ask before risky steps (manual)", plan: "Plan only", acceptEdits: "Accept file edits" },
+    autoTitle: "Automatic start", autoHint: "When an ask from another machine finds no idle Claude session here and names a project this machine knows, the daemon may start a background session in that project so the ask can be delivered. Only the machine's owner can switch it on; it waits a minute, starts at most three an hour, never a second one for the same project, and uses the careful manual mode. Nothing the ask says is given to Claude by this step.", autoLabel: "When to start a session by itself",
+    auto: { off: "Never (only when I press Start)", on_message: "When an ask is waiting for a session" },
     start: "Start in the background", stop: "Stop", runningTitle: "Sessions started from the web", noneRunning: "None running.",
     done: { saved: "Saved.", started: "Asked the agent to start a session; the result is below.", stopped: "Asked the agent to stop the session." },
   },

@@ -101,6 +101,9 @@ public sealed class Agent
     public DateTimeOffset? AcceptsClaudeControlSetAt { get; set; }
     public Guid? AcceptsClaudeControlSetBy { get; set; }
 
+    /// <summary>ADR-0014 P3: what the daemon does by itself with Claude (<see cref="ClaudeAutoModes"/>); off until the owner says so, and off again whenever Claude control is off or the machine moves workspace.</summary>
+    public string ClaudeAutoMode { get; set; } = ClaudeAutoModes.Off;
+
     /// <summary>The push transport the agent has on (<c>inbox</c> or <c>channel</c>), or null when it is off or the agent does not say.</summary>
     public string? PushTransport { get; set; }
 
