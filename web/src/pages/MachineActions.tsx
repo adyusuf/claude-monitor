@@ -7,7 +7,7 @@ import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
 import { versionAtLeast } from "../lib/version";
 import { isStrict } from "./MachineBadges";
-import { ExecBadge, ServiceBadge } from "./MachineBits";
+import { ExecBadge } from "./MachineBits";
 import { useCodeGate } from "./useCodeGate";
 
 /** Restart and update change the machine: they ask for a recent sign-in (a fresh two-step code on a production or database machine). */
@@ -20,7 +20,7 @@ function AipodFacts({ view, agentVersion }: { view: MachineView; agentVersion: s
   return (
     <dl className="facts row small">
       <div><dt className="muted">{t("machines.actions.version")}</dt><dd>{agentVersion || t("machines.actions.versionUnknown")}</dd></div>
-      <div><dt className="muted">{t("machines.actions.runs")}</dt><dd>{view.serviceMode ? <ServiceBadge serviceMode /> : <span className="badge">{t("machines.actions.interactive")}</span>}</dd></div>
+      <div><dt className="muted">{t("machines.actions.pod")}</dt><dd><span className="badge">{t(view.serviceMode ? "machines.actions.podServer" : "machines.actions.podDesktop")}</span></dd></div>
       <div><dt className="muted">{t("machines.actions.exec")}</dt><dd><ExecBadge level={view.execLevel} /></dd></div>
       <div><dt className="muted">{t("machines.actions.lastSeen")}</dt><dd>{view.lastSeenAt ? dateTime(view.lastSeenAt) : "–"}</dd></div>
     </dl>

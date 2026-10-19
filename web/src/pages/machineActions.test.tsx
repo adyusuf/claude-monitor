@@ -311,16 +311,17 @@ describe("the agent actions card on the machine page", () => {
     await screen.findByText(en.machines.actions.ownerOnly);
     expect(screen.getByText(en.machines.actions.version)).toBeInTheDocument();
     expect(screen.getByText("0.6.1")).toBeInTheDocument();
-    expect(screen.getByText(en.machines.actions.runs)).toBeInTheDocument();
+    expect(screen.getByText(en.machines.actions.pod)).toBeInTheDocument();
+    expect(screen.getByText(en.machines.actions.podServer)).toBeInTheDocument();
     expect(screen.getByText(en.machines.actions.exec)).toBeInTheDocument();
     expect(screen.getByText(en.machines.actions.lastSeen)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: en.machines.actions.kind.update })).toBeNull();
   });
 
-  it("says interactive when the agent does not run as a service and unknown when the version is not known", async () => {
+  it("says desktop when the agent does not run as a service and unknown when the version is not known", async () => {
     api({}, { view: { serviceMode: false }, version: "" });
     open();
-    expect(await screen.findByText(en.machines.actions.interactive)).toBeInTheDocument();
+    expect(await screen.findByText(en.machines.actions.podDesktop)).toBeInTheDocument();
     expect(screen.getByText(en.machines.actions.versionUnknown)).toBeInTheDocument();
   });
 });

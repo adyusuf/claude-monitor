@@ -125,6 +125,13 @@ describe("the Claude card on the machine page", () => {
     expect(screen.queryByLabelText(en.machines.claudeControl.autoLabel)).toBeNull();
   });
 
+  it("tells the owner in words whose Claude plan every started session uses", async () => {
+    api({}, dev);
+    open();
+    const owner = machine().userName;
+    expect(await screen.findByText(en.machines.claudeControl.cost.replace("{name}", owner))).toBeInTheDocument();
+  });
+
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
     api({}, dev);
     open();
