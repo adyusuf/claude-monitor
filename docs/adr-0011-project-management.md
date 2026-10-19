@@ -156,10 +156,21 @@ dev and test machines only, at most 3 workers); runs of kind `test | build | dep
 | Step | What | Depends on |
 |---|---|---|
 | A | The new-session form on the Claude card (ADR-0014 P2): project from the machine's reported list, permission mode, optional first prompt (wrapped, labelled as from the web, capped, never audited) | decision 3 |
-| B | "Start a test" on the machine page: project and kind `test`, the existing run approval flow, the result shown on the same card, with the link to an issue from §6 | none |
+| B | "Start a test" on the machine page: the project's test command is set at the machine, Podium only picks the project (design below); the existing run approval flow; the result on the same card, with the link to an issue from §6 | decision 9 (made) |
 | C | Automatic mode `on_message` (ADR-0014 P3): backoff after a failed start, a start budget per hour, never a second worker for one project | decision 2 |
 | D | A tool panel per machine: aipod status and update (the existing actions in one card) | decision 8 |
 | E | Claude management (sessions list, plugins, skills, limits) and per-session settings (working mode, branch policy, CI) | decisions 5, 6; needs facts and commands in the agent that do not exist yet |
+
+**Step B design (maintainer, 19/10/2026: the command is set at the machine, the web only picks the project, the approval flow stays).**
+- *At the machine:* `aipod config projects test <folder> -- <program> [args...]` sets the test command of a listed or visited folder (an argv list, no shell; at most 32
+  elements of 512 characters), `aipod config projects test <folder> --clear` removes it. It lives in `agent.json` with the folder list; a service agent has no verb for it.
+- *Reported:* for a project that has a test command, the agent adds the argv and the folder path to that project's fact. This is a narrow exception to "the folder path never
+  leaves the machine" (ADR-0008 §3a′): a run's command and working directory are shown to its approver as text anyway, and the person at the machine chose to publish this
+  one command. Projects without a test command keep reporting only the HMAC. The web gets `hasTest` for every member and the command itself only for the machine's owner (as a run's command is).
+- *Started:* `POST /api/agents/{id}/test-runs { projectKey }`, the machine's owner only, makes an ordinary argv run (kind `test`, the project key, the reported argv and folder, the
+  workspace's default timeout) with the machine as its own requester. From there nothing changes: the workspace switch, the target's execution level, grants and jobs, the owner's approval
+  (with a code or a signature where required), the output rules, retention, and the link to an issue (§6). A machine that is not accepting argv runs gets the usual refusal.
+- *Not done:* a test command chosen or edited from the web; a shell or script test; a schedule (jobs exist for that).
 
 **Decided (maintainer, 19/10/2026).**
 1. **Windows:** `claude --bg` has to be tried on the Windows server with the list in ADR-0014 ("Windows: what still has to be tried") before anything in A or C is
