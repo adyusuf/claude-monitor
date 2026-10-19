@@ -73,6 +73,14 @@ public static class AuditActions
     public const string ApplicationRestored = "application.restored";
     public const string ComponentChanged = "application.component_changed";
     public const string ReleaseChanged = "application.release_changed";
+    public const string IssueCreated = "issue.created";
+    public const string IssueUpdated = "issue.updated";
+    public const string IssueArchived = "issue.archived";
+    public const string IssueRestored = "issue.restored";
+    public const string IssueMoved = "issue.moved";
+    public const string IssueLinkChanged = "issue.link_changed";
+    public const string IssueTestCaseChanged = "issue.test_case_changed";
+    public const string IssueCodeLinkChanged = "issue.code_link_changed";
 }
 
 public static class Audit

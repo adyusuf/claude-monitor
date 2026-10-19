@@ -135,6 +135,9 @@ public static class Startup
         ProjectEndpoints.Map(api);
         ApplicationEndpoints.Map(api);
         ApplicationPartEndpoints.Map(api);
+        IssueEndpoints.Map(api);
+        IssueLinkEndpoints.Map(api);
+        IssueEvidenceEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)

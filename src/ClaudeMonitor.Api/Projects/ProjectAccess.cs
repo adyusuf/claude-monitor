@@ -46,6 +46,19 @@ public static class ProjectAccess
         return grant is null ? null : (app, grant);
     }
 
+    /// <summary>An issue and the caller's rights on its project, or null when the caller cannot see it (answer 404).</summary>
+    public static async Task<(Issue Issue, ProjectGrant Grant)?> IssueAsync(MonitorDb db, Guid userId, Guid issueId, CancellationToken ct)
+    {
+        var issue = await db.Issues.FirstOrDefaultAsync(i => i.Id == issueId, ct);
+        if (issue is null)
+        {
+            return null;
+        }
+
+        var grant = await OfAsync(db, userId, issue.ProjectId, ct);
+        return grant is null ? null : (issue, grant);
+    }
+
     /// <summary>The rules alone, so a test can walk the whole table of roles.</summary>
     public static ProjectGrant Decide(ManagedProject project, WorkspaceMember member, string? projectRole)
     {
