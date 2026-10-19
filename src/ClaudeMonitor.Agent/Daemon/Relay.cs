@@ -89,12 +89,14 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         {
             await api.CommandStatusAsync(push.Id, CommandStatuses.Delivered, null, ct, push.PushedAt, push.Transport);
             store.MarkPushReported(push.Id);
+            store.Bump(PushStatus.OutCountKey); // the message reached a session
         }
 
         foreach (var taken in store.TakenCommands())
         {
             await api.CommandStatusAsync(taken.Id, CommandStatuses.Applied, null, ct, taken.At, taken.Transport);
             store.MarkCommandReported(taken.Id);
+            if (taken.Transport == CommandTransports.Hook) store.Bump(PushStatus.OutCountKey); // a pushed one was counted when it was pushed
         }
     }
 
@@ -222,7 +224,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 var c = data.Deserialize<AgentCommandMessage>(ApiClient.Json)!;
                 store.Set(PushStatus.StreamCommandKey, c.Id.ToString());
                 store.Set(PushStatus.StreamCommandAtKey, Now());
-                store.SaveCommand(new LocalCommand(c.Id.ToString(), c.SessionExternalId, c.Kind, c.Body, c.ExpiresAt));
+                if (store.SaveCommand(new LocalCommand(c.Id.ToString(), c.SessionExternalId, c.Kind, c.Body, c.ExpiresAt))) store.Bump(PushStatus.InCountKey);
                 await api.CommandStatusAsync(c.Id.ToString(), CommandStatuses.Delivered, null, ct);
                 return true;
             case AgentStreamEvents.PermissionAnswer:
@@ -253,7 +255,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 Actions?.Accept(data.Deserialize<AgentActionMessage>(ApiClient.Json)!, ct);
                 return true;
             case AgentStreamEvents.Ask:
-                store.SaveAskIn(data.Deserialize<AskMessage>(ApiClient.Json)!, clock.GetUtcNow());
+                if (store.SaveAskIn(data.Deserialize<AskMessage>(ApiClient.Json)!, clock.GetUtcNow())) store.Bump(PushStatus.InCountKey);
                 return true;
             case AgentStreamEvents.AskCancel:
                 store.CloseAsk(data.Deserialize<AskCancelMessage>(ApiClient.Json)!.Id.ToString());

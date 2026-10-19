@@ -241,6 +241,7 @@ public sealed class AskToolsTests : IDisposable
         Assert.DoesNotContain(token, body.Text, StringComparison.Ordinal);
         using var store = new LocalStore(home.Config.DatabasePath);
         Assert.Equal(LocalStore.AskClosed, store.AskIn(id)!.State);
+        Assert.Equal(1, store.Count(Push.PushStatus.OutCountKey)); // the tray's green light: a message left
     }
 
     [Fact]

@@ -44,6 +44,7 @@ public sealed class AskTools(AgentConfig config, TimeProvider clock)
         if (outcome.Pending) return $"Queued on this machine as request {clientKey}; the agent sends it as soon as it can. Call monitor_ask_result with askId {clientKey}.";
         if (!outcome.Ok) return Refusal(outcome.Error!);
         var ask = outcome.Value!;
+        using (var store = new LocalStore(config.DatabasePath)) store.Bump(PushStatus.OutCountKey);
         return $"Ask {ask.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. If an idle Claude session there takes it, it answers within minutes; call monitor_ask_result with askId {ask.Id} to read the answer.";
     }
 
@@ -85,7 +86,12 @@ public sealed class AskTools(AgentConfig config, TimeProvider clock)
 
         var answer = await client.AnswerAsync(id, new AskAnswer(TextMask.Mask(text), session));
         if (!answer.Ok) return $"The answer was not accepted: {RemoteEnvelope.Code(answer.Error)}.";
-        using (var store = new LocalStore(config.DatabasePath)) store.CloseAsk(id.ToString());
+        using (var store = new LocalStore(config.DatabasePath))
+        {
+            store.CloseAsk(id.ToString());
+            store.Bump(PushStatus.OutCountKey);
+        }
+
         return "Answer sent.";
     }
 

@@ -81,6 +81,13 @@ public sealed partial class LocalStore : IDisposable
     public string? Get(string key) =>
         Scalar("SELECT value FROM kv WHERE key = $k", ("$k", key)) as string;
 
+    /// <summary>Adds one to a counter kept in the settings (a missing or unreadable one starts at one). The tray's lights watch these counters.</summary>
+    public void Bump(string key) =>
+        Exec("INSERT INTO kv (key, value) VALUES ($k, '1') ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)", ("$k", key));
+
+    /// <summary>A counter's value (0 when it was never bumped).</summary>
+    public long Count(string key) => long.TryParse(Get(key), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : 0;
+
     public void Set(string key, string value) =>
         Exec("INSERT INTO kv (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             ("$k", key), ("$v", value));

@@ -17,6 +17,11 @@ public static class PushStatus
     public const string StreamFailuresKey = "stream.failures";
     public const string StreamErrorKey = "stream.last_error";
     public const string StreamCommandKey = "stream.last_command_id";
+
+    /// <summary>Counters the tray's two lights watch (orange: a message arrived here; green: a message left or reached a session).</summary>
+    public const string InCountKey = "leds.in";
+
+    public const string OutCountKey = "leds.out";
     public const string StreamCommandAtKey = "stream.last_command_at";
     public const string UploadAtKey = "relay.last_upload_at";
     public const string UploadErrorKey = "relay.last_error";

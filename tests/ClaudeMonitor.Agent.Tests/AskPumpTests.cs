@@ -90,6 +90,7 @@ public sealed class AskPumpTests : IDisposable
         var report = Assert.Single(Outcomes());
         Assert.Equal((AskId(1), AskStatuses.Delivered, "s-1"), (report.Id, report.Update.Status, report.Update.SessionExternalId));
         Assert.Equal((LocalStore.AskDelivered, "s-1"), (store.AskIn(AskId(1))!.State, store.AskIn(AskId(1))!.Session));
+        Assert.Equal(1, store.Count(PushStatus.OutCountKey)); // the tray's green light
     }
 
     [Fact]

@@ -30,11 +30,12 @@ public sealed partial class LocalStore
 
     // ---- commands from the web ----------------------------------------------------------------------------------
 
-    public void SaveCommand(LocalCommand c)
+    /// <summary>Keeps a command the stream brought; false when it was already known (the API replays the waiting ones on every connection).</summary>
+    public bool SaveCommand(LocalCommand c)
     {
         ArgumentNullException.ThrowIfNull(c);
-        Exec("INSERT OR IGNORE INTO commands (id, session, kind, body, expires_at, state) VALUES ($i, $s, $k, $b, $e, 'queued')",
-            ("$i", c.Id), ("$s", c.Session), ("$k", c.Kind), ("$b", c.Body), ("$e", Iso(c.ExpiresAt)));
+        return Exec("INSERT OR IGNORE INTO commands (id, session, kind, body, expires_at, state) VALUES ($i, $s, $k, $b, $e, 'queued')",
+            ("$i", c.Id), ("$s", c.Session), ("$k", c.Kind), ("$b", c.Body), ("$e", Iso(c.ExpiresAt))) == 1;
     }
 
     /// <summary>

@@ -103,6 +103,7 @@ public sealed class AskPump(Func<AgentConfig> settings, LocalStore store, IInbox
             }
 
             if (!store.AskDeliveredTo(ask.Id, inbox.Session, now)) return true;
+            store.Bump(PushStatus.OutCountKey);
             await ReportAsync(ask.Id, new AskStatusUpdate(AskStatuses.Delivered, SessionExternalId: inbox.Session, At: now), ct);
             return true;
         }
