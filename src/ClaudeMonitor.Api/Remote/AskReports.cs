@@ -19,7 +19,7 @@ public sealed class AskReports(MonitorDb db, ApiConfig config, TimeProvider cloc
 {
     private static readonly string[] Open = [AskStatuses.Queued, AskStatuses.Delivered];
 
-    /// <summary>The target's agent: delivered (to a session), no idle session, or not accepting.</summary>
+    /// <summary>The target's agent: received (it holds the ask), delivered (to a session), no idle session, or not accepting.</summary>
     public async Task<IResult> StatusAsync(Guid id, AskStatusUpdate req, Guid agentId, HttpContext http)
     {
         ArgumentNullException.ThrowIfNull(req);
@@ -30,6 +30,15 @@ public sealed class AskReports(MonitorDb db, ApiConfig config, TimeProvider cloc
         if (AskStatuses.Final.Contains(ask.Status)) return Results.Conflict();
         var now = clock.GetUtcNow();
         int changed;
+        if (req.Status == AskStatuses.Received)
+        {
+            // A report, not a state: the ask stays queued. Said again (the daemon retries until it is heard) it is not an error.
+            changed = await db.MachineAsks.Where(a => a.Id == id && a.ReceivedAt == null && Open.Contains(a.Status))
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.ReceivedAt, now), ct);
+            if (changed == 1) Updated(ask);
+            return Results.NoContent();
+        }
+
         if (req.Status == AskStatuses.Delivered)
         {
             var session = req.SessionExternalId is { Length: > 0 and <= 200 } s && !s.Any(char.IsControl) ? s : null;

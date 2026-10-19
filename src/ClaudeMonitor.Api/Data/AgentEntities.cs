@@ -176,6 +176,8 @@ public sealed class MachineAsk
     public string? Error { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
+    /// <summary>When the target's daemon said it holds the ask (it is still <c>queued</c> until a session takes it).</summary>
+    public DateTimeOffset? ReceivedAt { get; set; }
     public DateTimeOffset? DeliveredAt { get; set; }
     public DateTimeOffset? AnsweredAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }

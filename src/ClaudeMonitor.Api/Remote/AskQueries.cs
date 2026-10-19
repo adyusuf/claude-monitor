@@ -47,6 +47,6 @@ public static class AskQueries
     public static AskView View(MachineAsk a, string hostname)
     {
         ArgumentNullException.ThrowIfNull(a);
-        return new AskView(a.Id, a.TargetAgentId, hostname, a.Status, a.Question, a.Answer, a.AnswerTruncated, a.Error, a.CreatedAt, a.ExpiresAt, a.DeliveredAt, a.AnsweredAt);
+        return new AskView(a.Id, a.TargetAgentId, hostname, a.Status, a.Question, a.Answer, a.AnswerTruncated, a.Error, a.CreatedAt, a.ExpiresAt, a.DeliveredAt, a.AnsweredAt, a.ReceivedAt);
     }
 }

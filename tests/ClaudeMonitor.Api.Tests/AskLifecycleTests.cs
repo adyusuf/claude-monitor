@@ -36,6 +36,36 @@ public sealed class AskLifecycleTests(ApiFactory api)
         Assert.NotNull(row.DeliveredAt);
     }
 
+    [Fact]
+    public async Task The_target_says_it_holds_the_ask_the_ask_stays_queued_and_the_requester_sees_when()
+    {
+        var team = await AskKit.TeamAsync(api);
+        var created = await AskKit.CreateAsync(team.Asker, AskKit.Ask(team.TargetId));
+
+        Assert.Equal(HttpStatusCode.NotFound, (await AskKit.StatusAsync(team.Asker, created.Id, new AskStatusUpdate(AskStatuses.Received))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await AskKit.StatusAsync(team.Target, created.Id, new AskStatusUpdate(AskStatuses.Received))).StatusCode);
+
+        var first = await team.Asker.Http.GetFromJsonAsync<AskView>($"/api/agent/asks/{created.Id}", TestUser.Json);
+        Assert.Equal(AskStatuses.Queued, first!.Status);
+        Assert.NotNull(first.ReceivedAt);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await AskKit.StatusAsync(team.Target, created.Id, new AskStatusUpdate(AskStatuses.Received))).StatusCode); // said again: not an error, not changed
+        var again = await team.Asker.Http.GetFromJsonAsync<AskView>($"/api/agent/asks/{created.Id}", TestUser.Json);
+        Assert.Equal(first.ReceivedAt, again!.ReceivedAt);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await AskKit.StatusAsync(team.Target, created.Id, new AskStatusUpdate(AskStatuses.Delivered, SessionExternalId: "s-target"))).StatusCode); // still deliverable
+        Assert.Equal(HttpStatusCode.NoContent, (await AskKit.AnswerAsync(team.Target, created.Id, "main")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await AskKit.StatusAsync(team.Target, created.Id, new AskStatusUpdate(AskStatuses.Received))).StatusCode); // answered: final
+    }
+
+    [Fact]
+    public async Task A_queued_ask_now_waits_half_an_hour_for_a_session_not_two_minutes()
+    {
+        var team = await AskKit.TeamAsync(api);
+        var created = await AskKit.CreateAsync(team.Asker, AskKit.Ask(team.TargetId));
+        Assert.Equal(TimeSpan.FromMinutes(30), created.ExpiresAt - api.Clock.GetUtcNow());
+    }
+
     [Theory]
     [InlineData(AskStatuses.NoIdleSession)]
     [InlineData(AskStatuses.NotAccepting)]
@@ -125,19 +155,24 @@ public sealed class AskLifecycleTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task The_housekeeping_expires_a_queued_ask_after_two_minutes_and_a_delivered_one_without_an_answer_after_fifteen()
+    public async Task The_housekeeping_keeps_a_queued_ask_for_half_an_hour_then_expires_it_and_a_delivered_one_without_an_answer_after_fifteen_minutes()
     {
         var team = await AskKit.TeamAsync(api);
         var queued = await AskKit.CreateAsync(team.Asker, AskKit.Ask(team.TargetId, question: "queued one"));
         var delivered = await AskKit.DeliveredAsync(team, "delivered-key");
         api.Clock.Advance(TimeSpan.FromMinutes(3));
         await RemoteKit.HousekeepAsync(api);
-        Assert.Equal(AskStatuses.Expired, (await RowAsync(queued.Id)).Status);
+        Assert.Equal(AskStatuses.Queued, (await RowAsync(queued.Id)).Status); // the target's daemon may hold it until a session is idle
         Assert.Equal(AskStatuses.Delivered, (await RowAsync(delivered.Id)).Status);
 
         api.Clock.Advance(TimeSpan.FromMinutes(13));
         await RemoteKit.HousekeepAsync(api);
         Assert.Equal(AskStatuses.NoAnswer, (await RowAsync(delivered.Id)).Status);
+        Assert.Equal(AskStatuses.Queued, (await RowAsync(queued.Id)).Status);
+
+        api.Clock.Advance(TimeSpan.FromMinutes(15));
+        await RemoteKit.HousekeepAsync(api);
+        Assert.Equal(AskStatuses.Expired, (await RowAsync(queued.Id)).Status);
     }
 
     [Fact]

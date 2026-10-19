@@ -154,6 +154,16 @@ public sealed class AskToolsTests : IDisposable
         Assert.DoesNotContain("ask-answer", text, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(AskStatuses.Queued, "received by the other machine; waiting there for an idle Claude session")]
+    [InlineData(AskStatuses.Expired, "received it, but no Claude session there took it in time")]
+    public async Task An_ask_the_other_machine_received_says_so_instead_of_nobody_took_it(string status, string phrase)
+    {
+        var view = View(status) with { ReceivedAt = DateTimeOffset.UtcNow };
+        Seed(view);
+        Assert.Contains(phrase, await tools.Result(view.Id.ToString(), waitSeconds: 0), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_host_name_in_the_answer_header_is_a_label_not_a_sentence()
     {

@@ -14,7 +14,7 @@ public sealed class AskRulesTests(ApiFactory api)
     private static async Task AssertRefusedAsync(HttpResponseMessage response, HttpStatusCode status, string title) => await RemoteKit.AssertProblemAsync(response, status, title);
 
     [Fact]
-    public async Task An_ask_between_two_machines_of_one_user_is_queued_with_its_text_and_expires_after_two_minutes_and_the_audit_row_has_no_text()
+    public async Task An_ask_between_two_machines_of_one_user_is_queued_with_its_text_and_expires_after_half_an_hour_and_the_audit_row_has_no_text()
     {
         var team = await AskKit.TeamAsync(api);
         var created = await AskKit.CreateAsync(team.Asker, AskKit.Ask(team.TargetId, question: "Is the SECRET-QUESTION-MARKER branch green?"));
@@ -23,7 +23,7 @@ public sealed class AskRulesTests(ApiFactory api)
         await using var db = api.Db();
         var row = await db.MachineAsks.AsNoTracking().SingleAsync(a => a.Id == created.Id);
         Assert.Equal(("Is the SECRET-QUESTION-MARKER branch green?", team.TargetId, team.User.Id), (row.Question, row.TargetAgentId, row.TargetUserId));
-        Assert.Equal(row.CreatedAt + TimeSpan.FromMinutes(2), row.ExpiresAt);
+        Assert.Equal(row.CreatedAt + TimeSpan.FromMinutes(30), row.ExpiresAt);
         var audit = await db.AuditEvents.AsNoTracking().SingleAsync(a => a.Action == "ask.created" && a.TargetId == created.Id.ToString());
         Assert.DoesNotContain("SECRET-QUESTION-MARKER", audit.Detail!.RootElement.GetRawText());
     }

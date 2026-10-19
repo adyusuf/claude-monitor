@@ -1127,6 +1127,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("question");
 
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
                     b.Property<Guid>("RequesterAgentId")
                         .HasColumnType("uuid")
                         .HasColumnName("requester_agent_id");
