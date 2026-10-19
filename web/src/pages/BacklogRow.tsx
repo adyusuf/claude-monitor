@@ -31,6 +31,7 @@ export function BacklogRow({ ws, issue, unit, canWrite, canMove, first, last, on
         <Link className="issue-title" to={`/w/${ws}/projects/${issue.projectId}/issues/${issue.id}`}>{issue.title}</Link>
         <TypeBadge type={issue.type} />
         {issue.parentId ? <span className="badge" title={t("issues.inEpic")}>↑ {t("projects.itemType.epic")}</span> : null}
+        {issue.sprintId ? <Link className="badge" to={`/w/${ws}/projects/${issue.projectId}/sprints/${issue.sprintId}`}>{t("sprints.inSprint")}</Link> : null}
         {issue.archived ? <span className="badge warn">{t("projects.archived")}</span> : null}
       </div>
       <div className="issue-meta muted small">

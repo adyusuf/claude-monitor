@@ -7,8 +7,9 @@ import type {
   ProjectSummary, ProjectView, ReleaseInput, ReleaseView,
 } from "./typesProjects";
 import type {
-  CodeLinkInput, CodeLinkView, IssueInput, IssueQuery, IssueSummary, IssueView, LinkKind, TestCaseInput, TestCaseView, TestResult,
+  CodeLinkInput, CodeLinkView, IssueInput, IssueQuery, IssueStatus, IssueSummary, IssueView, LinkKind, TestCaseInput, TestCaseView, TestResult,
 } from "./typesIssues";
+import type { SprintInput, SprintQuery, SprintSummary, SprintView } from "./typesSprints";
 
 const q = (params: Record<string, string | number | boolean | undefined | null>) => {
   const s = new URLSearchParams();
@@ -147,6 +148,17 @@ export const api = {
   codeLinks: (issueId: string) => request<CodeLinkView[]>("GET", `/issues/${issueId}/code-links`),
   addCodeLink: (issueId: string, input: CodeLinkInput) => request<CodeLinkView>("POST", `/issues/${issueId}/code-links`, input),
   deleteCodeLink: (id: string) => request<void>("DELETE", `/code-links/${id}`),
+  sprints: (projectId: string, opts: SprintQuery) => request<Page<SprintSummary>>("GET", `/projects/${projectId}/sprints${q(opts)}`),
+  createSprint: (projectId: string, input: SprintInput) => request<SprintView>("POST", `/projects/${projectId}/sprints`, input),
+  sprint: (id: string) => request<SprintView>("GET", `/sprints/${id}`),
+  updateSprint: (id: string, input: SprintInput) => request<void>("PUT", `/sprints/${id}`, input),
+  deleteSprint: (id: string) => request<void>("DELETE", `/sprints/${id}`),
+  startSprint: (id: string) => request<void>("POST", `/sprints/${id}/start`),
+  /** moveUnfinishedTo: a planned sprint of the same scope, or null for the backlog. */
+  closeSprint: (id: string, moveUnfinishedTo: string | null) => request<void>("POST", `/sprints/${id}/close`, { moveUnfinishedTo }),
+  addSprintIssues: (id: string, issueIds: string[]) => request<void>("POST", `/sprints/${id}/issues`, { issueIds }),
+  removeSprintIssue: (id: string, issueId: string) => request<void>("DELETE", `/sprints/${id}/issues/${issueId}`),
+  setIssueStatus: (id: string, status: IssueStatus) => request<void>("PUT", `/issues/${id}/status`, { status }),
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),
   approveDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/approve", { userCode, workspaceId }),
   denyDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/deny", { userCode, workspaceId }),
