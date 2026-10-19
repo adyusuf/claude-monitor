@@ -244,6 +244,23 @@ from a normal terminal, then check that `aipod status` and `monitor_status` in a
   `CM_PROJECT_FACTS_EVERY` sets how often they are read again. A run may name a `project` and a `kind` (`test`, `build`, `deploy`, `other`);
   its result, and for a `test` run the passed, failed and skipped counts of dotnet test, vitest, jest and pytest, appear under that project.
 
+## The tray app (aipod-tray)
+
+`aipod-tray` puts the agent's state in the system tray (Windows and macOS; ADR-0011): the tooltip shows the version, the state and whether an
+update is waiting; the right-click menu has Reconnect, Log in, Disconnect, Check for updates, Update, Open the web app and Show the log; the
+status window (menu: "Open the status window") shows the same with the agent's own status lines and buttons. Two lights sit side by side in the
+icon: orange blinks when a message arrives, green when one leaves or reaches a session.
+
+```bash
+dotnet build src/Aipod.Tray                    # to try it: dotnet src/Aipod.Tray/bin/Debug/net10.0/aipod-tray.dll
+AVALONIA_TELEMETRY_OPTOUT=1 dotnet publish src/Aipod.Tray -c Release -r osx-arm64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
+aipod-tray --status               # prints what the window shows, no screen needed
+aipod-tray --install-autostart    # start at login (macOS LaunchAgent, Windows Run key); --remove-autostart undoes it
+```
+
+It reads the agent's files in the same home as the agent (`CM_AGENT_HOME` / `AIPOD_AGENT_HOME`) and runs the `aipod` command line for
+the commands; it opens no port. Not covered yet: signing and notarization, an installer, a service-mode install's database.
+
 ## Service agent (boot service, remote work)
 
 `aipod install --service` registers the daemon to start at boot with no Claude session, so other machines of a

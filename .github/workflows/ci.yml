@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Avalonia's build package may send anonymous build telemetry; the tray app (ADR-0011) builds in this gate.
+  AVALONIA_TELEMETRY_OPTOUT: "1"
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
