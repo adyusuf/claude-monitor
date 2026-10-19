@@ -80,6 +80,14 @@ export interface MachineProjectView {
 export interface MachineDetail {
   machine: MachineView; note: string | null; noteSetAt: string | null; servicesShared: boolean;
   services: ServiceInfo[] | null; servicesAt: string | null; projects: MachineProjectView[];
+  /** What Claude Code has on the machine (ADR-0011 §7a, step E); sent to the machine's owner and to admins only, null for everyone else and for an older agent. */
+  inventory?: ClaudeInventory | null;
+}
+export interface InventorySession { name: string | null; projectKey: string | null; kind: string | null; status: string | null; startedAt: string | null }
+export interface InventoryPlugin { id: string; version: string | null; enabled: boolean; scope: string | null }
+export interface InventorySetting { projectKey: string; mode: string | null; modeModel: string | null; gates: Record<string, boolean> | null }
+export interface ClaudeInventory {
+  sessions: InventorySession[] | null; plugins: InventoryPlugin[] | null; skills: string[] | null; settings: InventorySetting[] | null; at: string;
 }
 export interface AgentServicesView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }
 

@@ -79,6 +79,12 @@ export const trMachines: Dictionary["machines"] = {
     start: "Arka planda başlat", stop: "Durdur", runningTitle: "Web'den başlatılan oturumlar", noneRunning: "Çalışan yok.",
     done: { saved: "Kaydedildi.", started: "Ajandan oturum başlatması istendi; sonuç aşağıda.", stopped: "Ajandan oturumu durdurması istendi." },
   },
+  inventory: {
+    title: "Bu makinedeki Claude", hint: "{at} tarihinde makineden okundu: yalnızca siz ve yöneticiler görür; burada hiçbir şey web'den değiştirilemez.", sessions: "Oturumlar", noSessions: "Çalışan Claude oturumu yok.", unnamed: "adsız oturum",
+    plugins: "Kurulu eklentiler", noPlugins: "Kurulu eklenti yok.", skills: "Skill'ler", noSkills: "Skill bulunamadı.", skillCount: "{n} skill",
+    settings: "Proje ayarları", noSettings: "Burada çalışma modu veya kapı tutan proje yok.", yes: "evet", no: "hayır", enabled: "açık", disabled: "kapalı", mode: "mod {mode}",
+    unknown: "Ajan bunu okuyamadı.",
+  },
   projects: {
     title: "Projeler", none: "Bu makinede henüz bilinen proje yok.", noneHint: "Bir oturum projede çalışınca ya da bir klasör aipod config projects add ile listelenince proje görünür.",
     listed: "listelenen klasör", session: "bir oturumdan", errors: "7 günde {n} araç hatası", noRuns: "Bu proje için henüz çalıştırma yok.", run: "çalıştırma", cut: "çıktı kesildi",

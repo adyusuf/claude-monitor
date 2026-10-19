@@ -77,6 +77,12 @@ export const enMachines = {
     start: "Start in the background", stop: "Stop", runningTitle: "Sessions started from the web", noneRunning: "None running.",
     done: { saved: "Saved.", started: "Asked the agent to start a session; the result is below.", stopped: "Asked the agent to stop the session." },
   },
+  inventory: {
+    title: "Claude on this machine", hint: "Read from the machine at {at}: only you and admins see this, and nothing here can be changed from the web.", sessions: "Sessions", noSessions: "No Claude session is running.", unnamed: "unnamed session",
+    plugins: "Installed plugins", noPlugins: "No plugin is installed.", skills: "Skills", noSkills: "No skill was found.", skillCount: "{n} skills",
+    settings: "Project settings", noSettings: "No project here keeps a working mode or gates.", yes: "yes", no: "no", enabled: "enabled", disabled: "disabled", mode: "mode {mode}",
+    unknown: "The agent could not read this.",
+  },
   projects: {
     title: "Projects", none: "No project is known on this machine yet.", noneHint: "A project appears when a session works in it, or when a folder is listed with aipod config projects add.",
     listed: "listed folder", session: "from a session", errors: "{n} tool errors in 7 days", noRuns: "No run for this project yet.", run: "run", cut: "output cut",

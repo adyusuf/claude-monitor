@@ -28,7 +28,8 @@ public static class MachineDetails
         var servicesAllowed = agent.ShareServices && (callerIsAdmin || agent.UserId == callerUserId);
         return new MachineDetail(machine, agent.AdminNote, agent.AdminNoteSetAt, agent.ShareServices,
             servicesAllowed ? MachineFacts.ServicesFrom(agent.Services) : null, servicesAllowed ? agent.ServicesAt : null,
-            await ProjectsAsync(db, workspaceId, agentId, agent.UserId == callerUserId, now, ct));
+            await ProjectsAsync(db, workspaceId, agentId, agent.UserId == callerUserId, now, ct),
+            callerIsAdmin || agent.UserId == callerUserId ? ClaudeInventoryFacts.From(agent.ClaudeInventory, agent.ClaudeInventoryAt) : null);
     }
 
     private static async Task<IReadOnlyList<MachineProjectView>> ProjectsAsync(MonitorDb db, Guid workspaceId, Guid agentId, bool owner, DateTimeOffset now,
