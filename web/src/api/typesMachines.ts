@@ -88,8 +88,13 @@ export interface MachineDetail {
 export interface InventorySession { name: string | null; projectKey: string | null; kind: string | null; status: string | null; startedAt: string | null }
 export interface InventoryPlugin { id: string; version: string | null; enabled: boolean; scope: string | null }
 export interface InventorySetting { projectKey: string; mode: string | null; modeModel: string | null; gates: Record<string, boolean> | null }
+/** One usage window of Claude Code: use in per cent (a spend limit may pass 100) and when the window resets. */
+export interface ClaudeLimitWindow { usedPercentage: number; resetsAt: string | null }
+/** The limits Claude Code last gave to `aipod statusline` (ADR-0011 §7a): they exist only for claude.ai Pro and Max logins and after a session has answered once; seenAt is when. */
+export interface ClaudeLimits { fiveHour: ClaudeLimitWindow | null; sevenDay: ClaudeLimitWindow | null; spend: ClaudeLimitWindow | null; seenAt: string }
 export interface ClaudeInventory {
   sessions: InventorySession[] | null; plugins: InventoryPlugin[] | null; skills: string[] | null; settings: InventorySetting[] | null; at: string;
+  limits?: ClaudeLimits | null;
 }
 export interface AgentInventoryView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }
 export interface AgentServicesView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }

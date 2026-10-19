@@ -62,7 +62,17 @@ public static partial class ClaudeInventoryFacts
             Text(s.ProjectKey, InventoryLimits.KeyMax)!, s.Mode is { Length: 1 } m && m[0] is >= 'A' and <= 'E' ? m : null,
             s.ModeModel is { } mm && WordShape().IsMatch(mm) ? mm : null,
             s.Gates?.Where(g => GateShape().IsMatch(g.Key)).Take(InventoryLimits.GatesMax).ToDictionary(g => g.Key, g => g.Value, StringComparer.Ordinal) is { Count: > 0 } gates ? gates : null)).ToList(),
-        now);
+        now, CleanLimits(i.Limits, now));
+
+    /// <summary>Percentages are numbers from 0 up to 1000 (a spend limit may pass 100), a reset time must be within a day behind or forty days ahead, a seen time cannot be in the future; anything else is dropped.</summary>
+    internal static ClaudeLimits? CleanLimits(ClaudeLimits? limits, DateTimeOffset now)
+    {
+        if (limits is null) return null;
+        ClaudeLimitWindow? Window(ClaudeLimitWindow? w) => w is not null && double.IsFinite(w.UsedPercentage)
+            ? new ClaudeLimitWindow(Math.Round(Math.Clamp(w.UsedPercentage, 0, 1000), 1), w.ResetsAt is { } r && r > now.AddDays(-1) && r < now.AddDays(40) ? r : null) : null;
+        var cleaned = new ClaudeLimits(Window(limits.FiveHour), Window(limits.SevenDay), Window(limits.Spend), limits.SeenAt > now.AddMinutes(5) ? now : limits.SeenAt);
+        return cleaned.FiveHour is null && cleaned.SevenDay is null && cleaned.Spend is null ? null : cleaned;
+    }
 
     private static string? Text(string? text, int max)
     {

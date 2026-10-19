@@ -88,6 +88,8 @@ export const trMachines: Dictionary["machines"] = {
     enable: "Etkinleştir", disable: "Devre dışı bırak", update: "Güncelle", install: "Kur", installLabel: "Eklenti kur (ad@pazaryeri)",
     setting: "Ayar", value: "Değer", apply: "Uygula", writesHint: "Değişiklikler ajandan istenir ve yakın zamanlı giriş ister. Sonuç aipod kartının işlem listesinde görünür. Bir ayar projenin kendi dosyalarına yazılır; commit etmek size kalır. Skill'ler eklentilerle gelir: eklentiyi etkinleştirmek, devre dışı bırakmak veya kurmak skill'leri değiştirir.", writesOff: "Eklentileri veya ayarları buradan değiştirmek için bu makinede Claude'u web'den başlatmayı açın (yalnızca geliştirme veya test makineleri) ve ajanı güncel tutun.",
     asked: "Ajandan istendi. Sonuç aipod kartının işlem listesinde görünür.", writeHint: "Claude kurulumunu değiştirmek yakın zamanlı giriş ister: doğrulama uygulamanızdan bir kod girin ya da yeniden giriş yapın.",
+    limits: "Kullanım limitleri", fiveHour: "5 saatlik pencere", sevenDay: "Haftalık pencere", spend: "Harcama limiti", used: "%{pct} kullanıldı", resets: "{at} tarihinde sıfırlanır",
+    limitsSeen: "Son görülme {at}. Claude Code bunları yalnızca bir oturum çalışırken verir; eski olabilirler.", noLimits: "Kullanım limiti görülmedi. Yalnızca claude.ai Pro ve Max girişlerinde, bir oturum en az bir kez yanıt verdikten sonra ve makinedeki kişi \"aipod config claude-statusline on\" çalıştırdıysa bulunur.",
     unknown: "Ajan bunu okuyamadı.",
   },
   projects: {

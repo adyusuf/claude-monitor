@@ -88,6 +88,8 @@ export const deMachines: Dictionary["machines"] = {
     enable: "Aktivieren", disable: "Deaktivieren", update: "Aktualisieren", install: "Installieren", installLabel: "Plugin installieren (name@marketplace)",
     setting: "Einstellung", value: "Wert", apply: "Anwenden", writesHint: "Änderungen werden beim Agent angefragt und brauchen eine aktuelle Anmeldung. Das Ergebnis erscheint in der Aktionsliste der aipod-Karte. Eine Einstellung wird in die eigenen Dateien des Projekts geschrieben, einchecken müssen Sie selbst. Skills kommen mit Plugins: Plugins zu aktivieren, zu deaktivieren oder zu installieren ändert die Skills.", writesOff: "Um Plugins oder Einstellungen von hier zu ändern, schalten Sie das Starten von Claude über das Web für diese Maschine ein (nur Entwicklungs- und Testmaschinen) und halten Sie den Agent aktuell.",
     asked: "Beim Agent angefragt. Das Ergebnis erscheint in der Aktionsliste der aipod-Karte.", writeHint: "Claude-Einrichtung zu ändern braucht eine aktuelle Anmeldung: Geben Sie einen Code Ihrer Authenticator-App ein oder melden Sie sich erneut an.",
+    limits: "Nutzungslimits", fiveHour: "5-Stunden-Fenster", sevenDay: "Wochenfenster", spend: "Ausgabenlimit", used: "{pct} % genutzt", resets: "setzt sich zurück {at}",
+    limitsSeen: "Zuletzt gesehen {at}. Claude Code liefert sie nur, solange eine Sitzung läuft, daher können sie alt sein.", noLimits: "Keine Nutzungslimits gesehen. Es gibt sie nur bei claude.ai-Pro- und Max-Anmeldungen, nachdem eine Sitzung einmal geantwortet hat, und nur wenn die Person an der Maschine \"aipod config claude-statusline on\" ausgeführt hat.",
     unknown: "Der Agent konnte das nicht lesen.",
   },
   projects: {

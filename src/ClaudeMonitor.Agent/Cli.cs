@@ -129,6 +129,8 @@ public static partial class Cli
                 return await Approvals.ApproversCommand.RunAsync(args, config, stdout, stderr);
             case "status":
                 return await StatusAsync(config, stdout, clock);
+            case "statusline":
+                return await StatusLine.StatusLineCommand.RunAsync(config, stdin, stdout, stderr, clock); // Claude Code runs this; it never fails it
             case "version":
                 await stdout.WriteLineAsync(AgentConfig.Version);
                 return 0;

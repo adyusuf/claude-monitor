@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using ClaudeMonitor.Agent.Capture;
 using ClaudeMonitor.Agent.ClaudeUpdate;
 using ClaudeMonitor.Agent.Config;
+using ClaudeMonitor.Agent.StatusLine;
 using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Daemon;
@@ -37,7 +38,19 @@ public sealed partial class ClaudeInventoryReader(AgentConfig config, IClaudeCli
         ArgumentNullException.ThrowIfNull(configDirs);
         ArgumentNullException.ThrowIfNull(projectFolders);
         var pluginState = await PluginsAsync(now, ct);
-        return new ClaudeInventory(Sessions(configDirs, alive), pluginState.Plugins, Skills(pluginState.Paths), Settings(projectFolders), now);
+        return new ClaudeInventory(Sessions(configDirs, alive), pluginState.Plugins, Skills(pluginState.Paths), Settings(projectFolders), now, Limits(now));
+    }
+
+    /// <summary>
+    /// The usage limits Claude Code last gave to `aipod statusline`, with a window dropped once its reset time has passed (Claude Code does the same); null when none was ever seen or none is left.
+    /// <see cref="ClaudeLimits.SeenAt"/> is when they were seen, so the page can say how old they are.
+    /// </summary>
+    private ClaudeLimits? Limits(DateTimeOffset now)
+    {
+        if (LimitsSnapshot.Load(config) is not { } snapshot) return null;
+        ClaudeLimitWindow? Live(ClaudeLimitWindow? w) => w is not null && (w.ResetsAt is null || w.ResetsAt > now) ? w : null;
+        var limits = new ClaudeLimits(Live(snapshot.FiveHour), Live(snapshot.SevenDay), Live(snapshot.Spend), snapshot.At);
+        return limits.FiveHour is null && limits.SevenDay is null && limits.Spend is null ? null : limits;
     }
 
     private static string? Clean(string? text, int max)

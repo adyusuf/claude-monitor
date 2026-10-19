@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/endpoints";
-import type { ClaudeInventory, InventorySetting, MachineDetail, MachineProjectView } from "../api/types";
+import type { ClaudeInventory, ClaudeLimitWindow, InventorySetting, MachineDetail, MachineProjectView } from "../api/types";
 import { Button, Notice } from "../components/ui";
 import { config } from "../config";
 import { useI18n } from "../i18n";
@@ -21,6 +21,39 @@ function Gates({ setting }: { setting: InventorySetting }) {
   );
 }
 
+/** One usage bar: the label, the share used (a meter, not a decision) and when the window resets. Numbers come from the machine and are clamped for the drawing. */
+function LimitBar({ label, window }: { label: string; window: ClaudeLimitWindow }) {
+  const { t } = useI18n();
+  const used = Math.round(window.usedPercentage);
+  return (
+    <div className="stack">
+      <div className="row small">
+        <strong>{label}</strong>
+        <span>{t("machines.inventory.used", { pct: used })}</span>
+        {window.resetsAt ? <span className="muted">{t("machines.inventory.resets", { at: dateTime(window.resetsAt) })}</span> : null}
+      </div>
+      <div className="meter" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, used)}>
+        <div className={used >= 90 ? "meter-fill warn" : "meter-fill"} style={{ width: `${Math.min(100, Math.max(0, used))}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** The limits Claude Code last showed: from a status line command the person set up at the machine, so they say when they were last seen and how to get them if there are none. */
+function Limits({ inventory }: { inventory: ClaudeInventory }) {
+  const { t } = useI18n();
+  const limits = inventory.limits;
+  if (!limits) return <p className="muted small">{t("machines.inventory.noLimits")}</p>;
+  return (
+    <div className="stack">
+      {limits.fiveHour ? <LimitBar label={t("machines.inventory.fiveHour")} window={limits.fiveHour} /> : null}
+      {limits.sevenDay ? <LimitBar label={t("machines.inventory.sevenDay")} window={limits.sevenDay} /> : null}
+      {limits.spend ? <LimitBar label={t("machines.inventory.spend")} window={limits.spend} /> : null}
+      <p className="muted small">{t("machines.inventory.limitsSeen", { at: dateTime(limits.seenAt) })}</p>
+    </div>
+  );
+}
+
 /**
  * What Claude Code has on this machine, read-only (ADR-0011 §7a, step E): its sessions, installed plugins, skill names and, for projects that keep them, the
  * adyusuf working mode, model and gates. Only the owner and admins are sent it. Every text comes from the machine and is shown as text; nothing here can be changed from the web.
@@ -32,6 +65,9 @@ function InventoryView({ inventory, projects, writes }: { inventory: ClaudeInven
   return (
     <div className="stack">
       <p className="muted small">{t("machines.inventory.hint", { at: dateTime(inventory.at) })}</p>
+
+      <h3>{t("machines.inventory.limits")}</h3>
+      <Limits inventory={inventory} />
 
       <h3>{t("machines.inventory.sessions")}</h3>
       {sessions === null ? <p className="muted">{t("machines.inventory.unknown")}</p> : sessions.length === 0 ? <p className="muted">{t("machines.inventory.noSessions")}</p> : (

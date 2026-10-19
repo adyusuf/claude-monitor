@@ -20,7 +20,9 @@ const inventory = (over: Partial<ClaudeInventory> = {}): ClaudeInventory => ({
   plugins: [{ id: "adyusuf@adyusuf-marketplace", version: "3a60fbd", enabled: true, scope: "user" }, { id: "off@m", version: null, enabled: false, scope: null }],
   skills: ["mine", "p:review"],
   settings: [{ projectKey: "git:host/shop", mode: "B", modeModel: "sonnet", gates: { "push.prod": false, "merge.dev": true } }],
-  at: new Date(2026, 9, 5, 10, 0).toISOString(), ...over,
+  at: new Date(2026, 9, 5, 10, 0).toISOString(),
+  limits: { fiveHour: { usedPercentage: 23.4, resetsAt: new Date(2026, 9, 5, 14, 30).toISOString() }, sevenDay: { usedPercentage: 93, resetsAt: null }, spend: null, seenAt: new Date(2026, 9, 5, 9, 55).toISOString() },
+  ...over,
 });
 const dev = { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: true } as const;
 const detail = (inv: ClaudeInventory | null | undefined, shared = inv != null, view: Partial<ReturnType<typeof machine>> = {}): MachineDetail => ({ machine: machine(view), note: null, noteSetAt: null, servicesShared: false, services: null, servicesAt: null, projects: [project], inventory: inv, inventoryShared: shared });
@@ -194,6 +196,44 @@ describe("the Claude inventory card on the machine page", () => {
     for (const lang of [en, tr, de]) {
       for (const kind of ["plugin_enable", "plugin_disable", "plugin_update", "plugin_install", "project_setting"] as const) expect(lang.machines.actions.kind[kind].length).toBeGreaterThan(0);
       for (const key of ["invalid_plugin", "invalid_setting", "action_busy"] as const) expect(lang.errors[key].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("shows the usage windows as meters with their percentage, when they reset and when they were last seen", async () => {
+    api(inventory());
+    open();
+    expect(await screen.findByText(en.machines.inventory.limits)).toBeInTheDocument();
+    const five = screen.getByRole("progressbar", { name: en.machines.inventory.fiveHour });
+    expect(five).toHaveAttribute("aria-valuenow", "23");
+    expect(screen.getByRole("progressbar", { name: en.machines.inventory.sevenDay })).toHaveAttribute("aria-valuenow", "93");
+    expect(screen.queryByRole("progressbar", { name: en.machines.inventory.spend })).toBeNull();
+    expect(screen.getByText(en.machines.inventory.used.replace("{pct}", "23"))).toBeInTheDocument();
+    expect(screen.getAllByText(/^resets /).length).toBe(1); // the weekly window has no reset time
+    expect(screen.getByText(/^Last seen /)).toBeInTheDocument();
+  });
+
+  it("keeps a meter inside the track when the machine reports more than 100 per cent and marks a nearly full one", async () => {
+    api(inventory({ limits: { fiveHour: null, sevenDay: null, spend: { usedPercentage: 140, resetsAt: null }, seenAt: new Date(2026, 9, 5, 9, 55).toISOString() } }));
+    const { container } = open();
+    const bar = await screen.findByRole("progressbar", { name: en.machines.inventory.spend });
+    expect(bar).toHaveAttribute("aria-valuenow", "100");
+    expect(container.querySelector(".meter-fill.warn")).not.toBeNull();
+    expect((container.querySelector(".meter-fill") as HTMLElement).style.width).toBe("100%");
+  });
+
+  it("says how to get limits when there are none", async () => {
+    api(inventory({ limits: null }));
+    open();
+    expect(await screen.findByText(en.machines.inventory.noLimits)).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("names the limit texts in all three languages with the same placeholders", () => {
+    for (const lang of [en, tr, de]) {
+      expect(lang.machines.inventory.used).toContain("{pct}");
+      expect(lang.machines.inventory.resets).toContain("{at}");
+      expect(lang.machines.inventory.limitsSeen).toContain("{at}");
+      expect(lang.machines.inventory.noLimits).toContain("aipod config claude-statusline on");
     }
   });
 });
