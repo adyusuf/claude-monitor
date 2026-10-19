@@ -42,6 +42,12 @@ describe("the project page: definition and status", () => {
     expect(screen.getByRole("link", { name: /Projects/ })).toHaveAttribute("href", "/w/w1/projects");
   });
 
+  it("links to the project's backlog, also for a reader", async () => {
+    serve({ "GET /projects/p1": { body: project({ access: { canEdit: false, canArchive: false, canEditApplications: false } }) } });
+    open();
+    expect(await screen.findByRole("link", { name: "Backlog" })).toHaveAttribute("href", "/w/w1/projects/p1/backlog");
+  });
+
   it("shows dashes for what is not filled in", async () => {
     serve({ "GET /projects/p1": { body: project({ purpose: null, ownerName: null, sponsor: null, stakeholders: [], budgetAmount: null, budgetCurrency: null,
       startDate: null, endDate: null, definitionOfReady: [], definitionOfDone: [] }) } });

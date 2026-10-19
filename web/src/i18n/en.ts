@@ -1,5 +1,6 @@
 import { enMachines } from "./en.machines";
 import { enProjects } from "./en.projects";
+import { enIssues } from "./en.issues";
 import { enTwoStep } from "./en.twoStep";
 import { enRemote } from "./en.remote";
 
@@ -77,6 +78,7 @@ export const en = {
     amount_and_currency: "Give the budget amount and its currency together, or neither.", invalid_currency: "Use three capital letters, such as EUR.",
     before_start: "The end date cannot be before the start date.", invalid_value: "Pick a value from the list.", invalid_url: "That address is not allowed here. Use an https, ssh or git address for the repository and an http or https address for an environment, without a password.",
     limit_reached: "The most that fits here has been reached.", archived: "This is archived. Restore it first.",
+    invalid_parent: "The parent must be an epic of this project.", invalid_application: "Pick an application of this project.", invalid_component: "Pick a component of the chosen application.", invalid_release: "Pick a release of the chosen application.", bug_only: "Only a bug carries the bug details.", invalid_issue: "Pick another issue of this project.", self_link: "An issue cannot be linked to itself.", cycle: "That link would make the issues block each other in a loop.", duplicate_link: "These two issues are already linked.",
     released: "A release that went out cannot be cancelled.", cancelled: "A cancelled release cannot be changed.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
@@ -146,6 +148,7 @@ export const en = {
   },
   machines: enMachines,
   projects: enProjects,
+  issues: enIssues,
   twoStep: enTwoStep,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",

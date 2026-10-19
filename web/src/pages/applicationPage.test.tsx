@@ -21,6 +21,12 @@ const serve = (over: Parameters<typeof mockApi>[0] = {}) => mockApi({
 const open = (path = "/w/w1/projects/p1/applications/a1") => renderAt(path, route);
 
 describe("the application page: definition", () => {
+  it("links to the application's own backlog", async () => {
+    serve();
+    open();
+    expect(await screen.findByRole("link", { name: "Backlog" })).toHaveAttribute("href", "/w/w1/projects/p1/applications/a1/backlog");
+  });
+
   it("shows every field, with web addresses as links and anything else as text", async () => {
     serve();
     open();
