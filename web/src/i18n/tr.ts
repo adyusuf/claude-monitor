@@ -193,6 +193,7 @@ export const tr: Dictionary = {
     plugin1: "Eklentiyi kurun. Claude Code sunucu adresini sorar, adres şudur:",
     plugin2: "Sonra Claude Code içinde bu makineyi bağlayın (bir kod çıkar; açılan sayfada onaylayın):",
     orManual: "Ya da ajanı elle kurun:",
+    pluginOld: "Bu makinede eski monitor-agent eklentisi varsa: aipod'u kurun ve /aipod:connect çalıştırın; eskisini o kaldırır, bir olay iki kez bildirilmez.",
   },
   common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
   remote: trRemote,

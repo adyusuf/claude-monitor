@@ -192,6 +192,7 @@ export const en = {
     plugin1: "Install the plugin. Claude Code asks for the server address, which is:",
     plugin2: "Then, in Claude Code, connect this machine (a code appears; approve it on the page that opens):",
     orManual: "Or install the agent by hand:",
+    pluginOld: "If this machine already has the old monitor-agent plugin: install aipod and run /aipod:connect, which removes the old one so no event is reported twice.",
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: enRemote,

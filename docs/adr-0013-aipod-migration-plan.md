@@ -68,8 +68,8 @@ the plugin's version is the agent's version (the generator takes `AgentConfig.Ve
 hooks and the MCP server while `monitor-agent@monitor-agent-releases` is enabled at 0.5.0 or older (a version it cannot read means "go on", because the bridge is the likelier
 one), and the bridge stands down when `aipod@aipod-releases` is enabled; `status`, `connect` and `logout` are never held back. The bridge says once, at a session start, that aipod
 has a new plugin. `/aipod:connect` uninstalls the old plugin and names the new permission prefix. Not built: the retire period, the heartbeat column `agents.plugin_id`,
-reading the server from `agent.json` (Claude Code asks for it once more at the first install of `aipod`: the option is required), and the web's "Get the agent" page, which still shows the
-old plugin's commands (change it after the downloads that serve `aipod-marketplace.json` are live, or the command points at a file that is not there). The git marketplace
+reading the server from `agent.json` (Claude Code asks for it once more at the first install of `aipod`: the option is required), and the git route of the web's "Get the agent" page, which still shows the old plugin's commands (the repository catalog lists only it). The site route of that page now shows the `aipod`
+commands and a note for machines on the old plugin; deploy the downloads with `aipod-marketplace.json` before that web build (`docs/release.md`), or the command points at a file that is not there). The git marketplace
 (`.claude-plugin/marketplace.json`) still lists only the old plugin: one repository has one catalog, and its name is the old id.
 
 ## 2. The MCP tool names (`monitor_*`) and the server key (`claude-monitor`)
