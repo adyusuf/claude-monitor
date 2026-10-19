@@ -130,12 +130,17 @@ public static class UpdateCommand
             return 0;
         }
 
+        if (args.Length >= 2 && args[1] == "claude-statusline")
+        {
+            return await StatusLine.StatusLineSetup.RunAsync(args, config, stdout, stderr);
+        }
+
         if (args.Length >= 2 && args[1] == "projects")
         {
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
-        await stderr.WriteLineAsync("usage: aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list|test [<folder>]]");
+        await stderr.WriteLineAsync("usage: aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel] [push-format full|short] [role <environment|none> <function|none>] [approvals required|off] [projects add|remove|list|test [<folder>]] [claude-statusline on|off|status]");
         return 2;
     }
 

@@ -20,6 +20,9 @@ public sealed partial record AgentConfig
     public TimeSpan ClaudeAutoBackoff { get; init; } = TimeSpan.FromMinutes(10);
     public int ClaudeAutoPerHour { get; init; } = 3;
 
+    /// <summary>The usage limits Claude Code last gave to `aipod statusline` (ADR-0011 §7a), in the user-only home.</summary>
+    public string ClaudeLimitsPath => Path.Combine(Home, "claude-limits.json");
+
     /// <summary>How often the daemon reads what Claude Code has on the machine (sessions, plugins, skills, project settings; ADR-0011 §7a step E) to put it in its profile.</summary>
     public TimeSpan ClaudeInventoryEvery { get; init; } = TimeSpan.FromMinutes(2);
 
