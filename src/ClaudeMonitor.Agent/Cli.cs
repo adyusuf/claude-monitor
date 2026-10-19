@@ -40,6 +40,9 @@ public static partial class Cli
         aipod connect [--server <url>]
                                         like login, from inside Claude Code: prints the code and returns; the login finishes in the background
         aipod restart                hand the running daemon over to this binary
+        aipod migrate-home [--dry-run]
+                                        move the old home folder to the aipod folder and leave a link at the old path (macOS, Linux; ADR-0013);
+                                        never done by itself, refuses when unsure
         aipod status                 connection and queue
         aipod update [--check]       install the newest signed agent build from the server (--check: only look)
         aipod config [auto-update off|check|on] [claude-update on|off] [push off|inbox|channel]
@@ -76,6 +79,14 @@ public static partial class Cli
         if (args.FirstOrDefault() == "install" && StandaloneCommands.IsStandalone(args)) return await StandaloneCommands.InstallAsync(args, config, stdout, stderr, clock);
         if (args.FirstOrDefault() == "uninstall" && StandaloneCommands.IsStandalone(args)) return StandaloneCommands.Uninstall(config, stdout);
         var log = new AgentLog(config, clock);
+        if (args.FirstOrDefault() == HomeMove.Verb)
+        {
+            // Before HomeMigration and anything else that writes in the home: the folder is about to move.
+            var setup = new HomeMove.Setup(AgentConfig.Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Environment.GetEnvironmentVariable("AIPOD_AGENT_HOME") is { Length: > 0 } || Environment.GetEnvironmentVariable("CM_AGENT_HOME") is { Length: > 0 });
+            return await HomeMove.RunAsync(args, config, setup, new DaemonControl(config, log, clock), stdout, stderr);
+        }
+
         HomeMigration.Run(config, log);
         config = SavedSettings.Apply(config);
         switch (args.FirstOrDefault())

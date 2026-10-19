@@ -1,7 +1,7 @@
 # ADR-0013 (proposed): moving the names left over from the rename to aipod
 
 Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1), step 2 (the tier 1 display names, section 4) and
-step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`) and step 4 (the `aipod` plugin and the bridge, section 1, "As built"); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
+step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`), step 4 (the `aipod` plugin and the bridge, section 1, "As built") and step 5 (`aipod migrate-home`, section 3, "As built"); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
 designs, one item at a time, the four names ADR-0012 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
@@ -130,6 +130,15 @@ maintainer:** whether the visible markers should change at all (default: no), an
 as pure functions; the move on temp folders with a held lock, a running-daemon refusal, a held file, the link; the existing home-migration
 tests stay. **Needs the maintainer:** agree that no automatic move happens in the first release (the cost of "never" is two different paths
 on a fleet, which docs and the tray handle through the resolver).
+
+**As built (19/10/2026, step 5).** `aipod migrate-home [--dry-run]` (`HomeMove`): it runs before anything else writes in the home, checks everything first, and only
+then stops the daemon (the `restart` way, a kill if it hangs), takes the daemon's own lock so none starts in between, renames the folder in one step, makes a symbolic link
+at the old path and starts the daemon again if it had been running; if the link cannot be made the folder is put back, and a daemon it stopped is started again after any
+failure. It refuses (exit 2, nothing touched) for a home named by `AIPOD_AGENT_HOME`/`CM_AGENT_HOME`, a boot service's home, a home that is neither the old nor the aipod
+folder, an aipod folder that has content (an empty one is replaced), and **Windows**, which needs a junction and test machines and stays on the resolver for now. "Already
+using the aipod folder" and "already a link" are exit 0. Tested on temp folders (move, link, no-start when it was not running, dry run, stop failure, lock taken in the
+meantime, each refusal) and run once for real against a throwaway `HOME`; never run on a real home, a launchd or systemd unit (a unit that restarts the daemon by itself can
+race the stop: the lock turns that into a refusal, not a corrupt move) or Windows. Not built: the automatic offer (3.3), a junction for Windows.
 
 ## 4. The service, unit, task and label names
 
