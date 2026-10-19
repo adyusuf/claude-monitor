@@ -13,6 +13,7 @@ const q = (params: Record<string, string | number | undefined | null>) => {
 /** Every API call the web makes, one function each. */
 export const api = {
   me: () => request<Me>("GET", "/me"),
+  setMyLanguage: (language: string) => request<void>("PUT", "/me/language", { language }),
   providers: () => request<{ available: string[] }>("GET", "/auth/providers"),
   register: (email: string, password: string, displayName: string) =>
     request<void>("POST", "/auth/register", { email, password, displayName }),

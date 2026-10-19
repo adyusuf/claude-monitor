@@ -75,10 +75,11 @@ public static class MailTemplates
     /// <summary>The languages the mails exist in.</summary>
     public static readonly IReadOnlyList<string> Languages = ["en", "tr", "de"];
 
-    public static string Language(HttpContext http)
+    /// <summary>The language of a mail: the account's own when it has one (a mail to someone who is not signed in follows their account), else the best one of the Accept-Language header.</summary>
+    public static string Language(HttpContext http, string? account = null)
     {
         ArgumentNullException.ThrowIfNull(http);
-        return LanguageOf(http.Request.Headers.AcceptLanguage.ToString());
+        return account is not null && Languages.Contains(account) ? account : LanguageOf(http.Request.Headers.AcceptLanguage.ToString());
     }
 
     /// <summary>

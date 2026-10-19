@@ -22,7 +22,7 @@ match. (4) The repository's documents (global rule: English). Dates stay `dd/mm/
   a test that every key has all three and the same placeholders (the rule the web test already enforces). The tray's menu and window use the same
   catalog. Existing tests that read English messages keep passing because English is the default; new tests cover tr and de.
 - *The user's language as a setting* (`users.language`, additive, nullable) so a mail to someone who is not signed in can still follow their
-  account; until then the header is the only source.
+  account; until then the header is the only source. **Built (19/10/2026):** migration `UserLanguage`, `PUT /api/me/language`, `language` in `/api/me`; a registration stores the language it was made in, the menu keeps the choice on the account, and the verify, reset and invite mails follow the account's language when it has one (the header otherwise).
 - Size: medium (about 300 strings in the agent and tray). Not started.
 
 ## Part B: starting and stopping Claude Code, and opening sessions, from the web

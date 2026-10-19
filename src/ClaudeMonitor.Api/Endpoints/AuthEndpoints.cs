@@ -45,6 +45,7 @@ public static class AuthEndpoints
         var now = clock.GetUtcNow();
         var user = Accounts.NewUser(db, now, req.Email!, req.DisplayName!, verified: false);
         user.PasswordHash = Secrets.HashPassword(user, req.Password!);
+        user.Language = MailTemplates.Language(http); // the language they registered in: later mails to them follow it
         var token = AddUserToken(db, user.Id, TokenPurposes.VerifyEmail, now, config.EmailTokenLifetime);
         Audit.Add(db, http, clock, AuditActions.Register, userId: user.Id);
         await db.SaveChangesAsync(http.RequestAborted);
@@ -149,7 +150,7 @@ public static class AuthEndpoints
         {
             var token = AddUserToken(db, user.Id, TokenPurposes.ResetPassword, clock.GetUtcNow(), config.EmailTokenLifetime);
             await db.SaveChangesAsync(http.RequestAborted);
-            await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http), "reset", user.Email,
+            await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
                 Http.Link(config, "/reset-password", token)), http.RequestAborted);
         }
 

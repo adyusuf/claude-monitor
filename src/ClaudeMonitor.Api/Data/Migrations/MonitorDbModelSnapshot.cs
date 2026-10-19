@@ -2385,6 +2385,11 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_sign_ins");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
                     b.Property<DateTimeOffset?>("LockedUntil")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("locked_until");
@@ -2423,6 +2428,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.ToTable("users", t =>
                         {
+                            t.HasCheckConstraint("ck_users_language", "language IS NULL OR language IN ('en', 'tr', 'de')");
+
                             t.HasCheckConstraint("ck_users_status", "status IN ('active', 'disabled', 'deleted')");
                         });
                 });
