@@ -82,6 +82,8 @@ export interface MachineDetail {
   services: ServiceInfo[] | null; servicesAt: string | null; projects: MachineProjectView[];
   /** What Claude Code has on the machine (ADR-0011 §7a, step E); sent to the machine's owner and to admins only, null for everyone else and for an older agent. */
   inventory?: ClaudeInventory | null;
+  /** The machine owner has switched the inventory on; while it is off the agent reads and sends nothing. */
+  inventoryShared?: boolean;
 }
 export interface InventorySession { name: string | null; projectKey: string | null; kind: string | null; status: string | null; startedAt: string | null }
 export interface InventoryPlugin { id: string; version: string | null; enabled: boolean; scope: string | null }
@@ -89,6 +91,7 @@ export interface InventorySetting { projectKey: string; mode: string | null; mod
 export interface ClaudeInventory {
   sessions: InventorySession[] | null; plugins: InventoryPlugin[] | null; skills: string[] | null; settings: InventorySetting[] | null; at: string;
 }
+export interface AgentInventoryView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }
 export interface AgentServicesView { agentId: string; share: boolean; setAt: string | null; setBy: string | null }
 
 export type AskStatus = "queued" | "delivered" | "answered" | "no_idle_session" | "not_accepting" | "no_answer" | "expired" | "cancelled";

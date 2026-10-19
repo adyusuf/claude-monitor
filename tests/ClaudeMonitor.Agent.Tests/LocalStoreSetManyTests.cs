@@ -53,8 +53,8 @@ public sealed class LocalStoreSetManyTests : IDisposable
     [Fact]
     public void The_remembered_settings_are_the_two_switches_the_automatic_mode_and_the_thresholds_only_when_there_are_some()
     {
-        Assert.Equal([(MachineMonitor.RemoteRunsKey, "false"), (MachineMonitor.ShareServicesKey, "false"), (MachineMonitor.ClaudeAutoKey, "off")], MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid())));
-        Assert.Equal([(MachineMonitor.RemoteRunsKey, "true"), (MachineMonitor.ShareServicesKey, "true"), (MachineMonitor.ClaudeAutoKey, "on_message"), (MachineMonitor.ThresholdsKey, "80,81,82,83")],
-            MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid(), RemoteRuns: true, Alerts: new AlertThresholds(80, 81, 82, 83), ShareServices: true, ClaudeAuto: ClaudeAutoModes.OnMessage)));
+        Assert.Equal([(MachineMonitor.RemoteRunsKey, "false"), (MachineMonitor.ShareServicesKey, "false"), (MachineMonitor.ClaudeAutoKey, "off"), (MachineMonitor.ShareInventoryKey, "false")], MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid())));
+        Assert.Equal([(MachineMonitor.RemoteRunsKey, "true"), (MachineMonitor.ShareServicesKey, "true"), (MachineMonitor.ClaudeAutoKey, "on_message"), (MachineMonitor.ShareInventoryKey, "true"), (MachineMonitor.ThresholdsKey, "80,81,82,83")],
+            MachineMonitor.Entries(new AgentSettings(true, 1000, Guid.NewGuid(), RemoteRuns: true, Alerts: new AlertThresholds(80, 81, 82, 83), ShareServices: true, ClaudeAuto: ClaudeAutoModes.OnMessage, ShareInventory: true)));
     }
 }

@@ -1,6 +1,10 @@
-import type { ClaudeInventory, InventorySetting, MachineProjectView } from "../api/types";
+import { useState } from "react";
+import { api } from "../api/endpoints";
+import type { ClaudeInventory, InventorySetting, MachineDetail, MachineProjectView } from "../api/types";
+import { Button, Notice } from "../components/ui";
 import { useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { useCodeGate } from "./useCodeGate";
 
 /** The yes/no gates of a project as short lines, "merge.dev: yes". Names and values are text from the machine, shown as text. */
 function Gates({ setting }: { setting: InventorySetting }) {
@@ -18,7 +22,7 @@ function Gates({ setting }: { setting: InventorySetting }) {
  * What Claude Code has on this machine, read-only (ADR-0011 §7a, step E): its sessions, installed plugins, skill names and, for projects that keep them, the
  * adyusuf working mode, model and gates. Only the owner and admins are sent it. Every text comes from the machine and is shown as text; nothing here can be changed from the web.
  */
-export function MachineInventory({ inventory, projects }: { inventory: ClaudeInventory; projects: MachineProjectView[] }) {
+function InventoryView({ inventory, projects }: { inventory: ClaudeInventory; projects: MachineProjectView[] }) {
   const { t } = useI18n();
   const nameOf = (key: string | null) => (key ? projects.find((p) => p.key === key)?.name ?? key : "–");
   const { sessions, plugins, skills, settings } = inventory;
@@ -78,6 +82,42 @@ export function MachineInventory({ inventory, projects }: { inventory: ClaudeInv
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * The card: the machine owner decides whether the agent reads and reports any of this (a recent sign-in to switch it on, off drops what was stored); admins see
+ * the inventory while it is on. While it is off, or on but not yet reported, the card says so instead of an empty list.
+ */
+export function MachineInventory({ agentId, detail, owned, onChanged }: { agentId: string; detail: MachineDetail; owned: boolean; onChanged: () => void }) {
+  const { t } = useI18n();
+  const gate = useCodeGate("reauth_required", "machines.inventory.enableHint");
+  const [done, setDone] = useState(false);
+  const shared = detail.inventoryShared === true;
+  const set = async (share: boolean) => {
+    setDone(false);
+    if (await gate.attempt((code) => api.setAgentInventory(agentId, share, code).then(() => undefined))) {
+      setDone(true);
+      onChanged();
+    }
+  };
+  return (
+    <div className="stack">
+      {shared && detail.inventory ? <InventoryView inventory={detail.inventory} projects={detail.projects} />
+        : shared ? <p className="muted">{t("machines.inventory.waiting")}</p> : <p className="muted">{t("machines.inventory.off")}</p>}
+      {owned ? (
+        <div className="stack">
+          {gate.field}
+          {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}
+          {done ? <Notice kind="success">{t("machines.inventory.saved")}</Notice> : null}
+          <div className="row-actions">
+            <Button variant={shared ? "subtle" : "primary"} busy={gate.busy} onClick={() => void set(!shared)}>
+              {shared ? t("machines.inventory.turnOff") : t("machines.inventory.turnOn")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

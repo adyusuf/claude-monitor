@@ -81,6 +81,7 @@ export const enMachines = {
     title: "Claude on this machine", hint: "Read from the machine at {at}: only you and admins see this, and nothing here can be changed from the web.", sessions: "Sessions", noSessions: "No Claude session is running.", unnamed: "unnamed session",
     plugins: "Installed plugins", noPlugins: "No plugin is installed.", skills: "Skills", noSkills: "No skill was found.", skillCount: "{n} skills",
     settings: "Project settings", noSettings: "No project here keeps a working mode or gates.", yes: "yes", no: "no", enabled: "enabled", disabled: "disabled", mode: "mode {mode}",
+    off: "The agent reads none of this while the switch is off. Turn it on to see this machine's Claude sessions, plugins, skills and project settings here.", waiting: "Switched on: the agent reports it with its next profile. It appears here in a few minutes.", turnOn: "Show Claude's sessions, plugins and skills", turnOff: "Stop showing them", saved: "Saved.", enableHint: "Turning this on needs a recent sign-in: enter a code from your authenticator app, or sign in again.",
     unknown: "The agent could not read this.",
   },
   projects: {

@@ -32,6 +32,7 @@ public static class AuditActions
     public const string AgentTagsChanged = "agent.tags_changed";
     public const string AgentNoteChanged = "agent.note_changed";
     public const string AgentServicesChanged = "agent.services_changed";
+    public const string AgentInventoryChanged = "agent.inventory_changed";
     public const string AgentAsksChanged = "agent.asks_changed";
     public const string AgentActionRequested = "agent.action_requested";
     public const string AgentClaudeControlChanged = "agent.claude_control_changed";

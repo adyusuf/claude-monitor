@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentActionKind, AgentActionView, AgentAsksView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
@@ -72,6 +72,7 @@ export const api = {
   machineDetail: (agentId: string) => request<MachineDetail>("GET", `/agents/${agentId}/detail`),
   setAgentTags: (agentId: string, tags: Record<string, string>) => request<{ agentId: string; tags: Record<string, string> }>("PUT", `/agents/${agentId}/tags`, { tags }),
   setAgentNote: (agentId: string, note: string | null) => request<{ agentId: string; note: string | null }>("PUT", `/agents/${agentId}/note`, { note }),
+  setAgentInventory: (agentId: string, share: boolean, code?: string) => request<AgentInventoryView>("PUT", `/agents/${agentId}/inventory`, { share, code }),
   setAgentServices: (agentId: string, share: boolean, code?: string) => request<AgentServicesView>("PUT", `/agents/${agentId}/services`, { share, code }),
   setAgentAsks: (agentId: string, accept: boolean, code?: string) => request<AgentAsksView>("PUT", `/agents/${agentId}/asks`, { accept, code }),
   agentActions: (agentId: string) => request<AgentActionView[]>("GET", `/agents/${agentId}/actions`),

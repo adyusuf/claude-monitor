@@ -83,6 +83,7 @@ export const trMachines: Dictionary["machines"] = {
     title: "Bu makinedeki Claude", hint: "{at} tarihinde makineden okundu: yalnızca siz ve yöneticiler görür; burada hiçbir şey web'den değiştirilemez.", sessions: "Oturumlar", noSessions: "Çalışan Claude oturumu yok.", unnamed: "adsız oturum",
     plugins: "Kurulu eklentiler", noPlugins: "Kurulu eklenti yok.", skills: "Skill'ler", noSkills: "Skill bulunamadı.", skillCount: "{n} skill",
     settings: "Proje ayarları", noSettings: "Burada çalışma modu veya kapı tutan proje yok.", yes: "evet", no: "hayır", enabled: "açık", disabled: "kapalı", mode: "mod {mode}",
+    off: "Anahtar kapalıyken ajan bunların hiçbirini okumaz. Bu makinedeki Claude oturumlarını, eklentilerini, skill'lerini ve proje ayarlarını burada görmek için açın.", waiting: "Açıldı: ajan bunu bir sonraki profiliyle bildirir. Birkaç dakika içinde burada görünür.", turnOn: "Claude oturumlarını, eklentilerini ve skill'lerini göster", turnOff: "Göstermeyi bırak", saved: "Kaydedildi.", enableHint: "Bunu açmak yakın zamanlı bir giriş ister: doğrulama uygulamanızdan bir kod girin ya da yeniden giriş yapın.",
     unknown: "Ajan bunu okuyamadı.",
   },
   projects: {
