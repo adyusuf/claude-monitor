@@ -4,7 +4,7 @@ namespace ClaudeMonitor.Agent.Push;
 
 /// <summary>
 /// The configuration with the saved settings applied, re-read at most every <see cref="AgentConfig.PushSettingsEvery"/>: a long-running
-/// daemon then follows `cm-agent install --push on|off` without a restart.
+/// daemon then follows `aipod install --push on|off` without a restart.
 /// </summary>
 public sealed class LiveSettings(AgentConfig config, TimeProvider clock)
 {

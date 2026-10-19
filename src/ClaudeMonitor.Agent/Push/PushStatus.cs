@@ -8,7 +8,7 @@ namespace ClaudeMonitor.Agent.Push;
 /// <summary>
 /// The agent's own account of the path a message takes (ADR-0003): the event outbox, the stream from the web and the
 /// push into the session. The daemon and the MCP process write these keys into the local database; `monitor_status` and
-/// `cm-agent status` read them. Only ids, counts, times and exception type names: never message content.
+/// `aipod status` read them. Only ids, counts, times and exception type names: never message content.
 /// </summary>
 public static class PushStatus
 {
@@ -27,7 +27,7 @@ public static class PushStatus
     public const string Connected = "connected";
     public const string Reconnecting = "reconnecting";
 
-    /// <summary>The lines `monitor_status` appends after its original sentence, and `cm-agent status` prints.</summary>
+    /// <summary>The lines `monitor_status` appends after its original sentence, and `aipod status` prints.</summary>
     public static IReadOnlyList<string> Describe(AgentConfig config, LocalStore store, DateTimeOffset now, string? session, bool daemonRunning)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -73,7 +73,7 @@ public static class PushStatus
 
     private static string Push(AgentConfig config, LocalStore store, DateTimeOffset now, string? session)
     {
-        if (!config.PushEnabled) return "Push into the session: off (cm-agent install --push inbox); web messages arrive at the next prompt.";
+        if (!config.PushEnabled) return "Push into the session: off (aipod install --push inbox); web messages arrive at the next prompt.";
         if (config.InboxPushEnabled) return Inbox(store, now, session);
         var (queued, _) = store.WaitingCommands(now);
         var unconfirmed = store.UnconfirmedPushes().Count;

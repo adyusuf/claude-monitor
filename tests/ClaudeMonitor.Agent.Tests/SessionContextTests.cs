@@ -5,7 +5,7 @@ using ClaudeMonitor.Contracts;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>"cm-agent hook SessionStart --context" (ADR-0008 §3b): the block from the local database as additionalContext, and silence on every other path, always exit 0.</summary>
+/// <summary>"aipod hook SessionStart --context" (ADR-0008 §3b): the block from the local database as additionalContext, and silence on every other path, always exit 0.</summary>
 public sealed class SessionContextTests : IDisposable
 {
     private static readonly string[] Args = ["hook", "SessionStart", "--context"];
@@ -101,7 +101,7 @@ public sealed class SessionContextTests : IDisposable
         Assert.Equal(0, code);
         Assert.Equal("", output);
         var line = Assert.Single(error.Split('\n', StringSplitOptions.RemoveEmptyEntries));
-        Assert.StartsWith("cm-agent hook SessionStart --context:", line, StringComparison.Ordinal);
+        Assert.StartsWith("aipod hook SessionStart --context:", line, StringComparison.Ordinal);
         Assert.DoesNotContain("only text", error, StringComparison.Ordinal);
     }
 

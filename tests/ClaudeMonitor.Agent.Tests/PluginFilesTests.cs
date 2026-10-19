@@ -5,7 +5,7 @@ using ClaudeMonitor.Agent.Install;
 
 namespace ClaudeMonitor.Agent.Tests;
 
-/// <summary>The files the repository publishes as the Claude Code plugin (ADR-0007) and `cm-agent connect`.</summary>
+/// <summary>The files the repository publishes as the Claude Code plugin (ADR-0007) and `aipod connect`.</summary>
 public sealed class PluginFilesTests : IDisposable
 {
     private readonly TempHome home = new(c => c with { PollEvery = TimeSpan.FromMilliseconds(10), ConnectWait = TimeSpan.FromMilliseconds(400) });
@@ -30,8 +30,8 @@ public sealed class PluginFilesTests : IDisposable
         var root = RepositoryRoot();
         foreach (var (path, content) in MarketplacePlugin.Render(AgentConfig.Version))
         {
-            Assert.True(File.Exists(Path.Combine(root, path)), $"{path} is not committed: run cm-agent plugin-files .");
-            Assert.True(content == File.ReadAllText(Path.Combine(root, path)), $"{path} is out of date: run cm-agent plugin-files . and commit it");
+            Assert.True(File.Exists(Path.Combine(root, path)), $"{path} is not committed: run aipod plugin-files .");
+            Assert.True(content == File.ReadAllText(Path.Combine(root, path)), $"{path} is out of date: run aipod plugin-files . and commit it");
         }
     }
 
@@ -111,7 +111,7 @@ public sealed class PluginFilesTests : IDisposable
         Assert.Equal((null, null), (plain.PluginId, plain.PluginDataDir));
     }
 
-    // ---- cm-agent connect --------------------------------------------------------------------------------------------
+    // ---- aipod connect --------------------------------------------------------------------------------------------
 
     private sealed class FakeStarter(AgentConfig config, string? writes) : IDetachedStarter
     {
@@ -166,8 +166,8 @@ public sealed class PluginFilesTests : IDisposable
     [Theory]
     [InlineData("Connected. This machine now reports to Claude Monitor.")]
     [InlineData("The request was denied on the web.")]
-    [InlineData("The code expired. Run cm-agent login again.")]
-    [InlineData("The server did not answer (HttpRequestException). Check the address and the connection, then run cm-agent login again.")]
+    [InlineData("The code expired. Run aipod login again.")]
+    [InlineData("The server did not answer (HttpRequestException). Check the address and the connection, then run aipod login again.")]
     public async Task A_code_whose_login_has_ended_is_not_shown_again_and_a_new_login_starts(string outcome)
     {
         Logged("https://monitor.invalid", "Open https://monitor.invalid/device and enter the code DEAD-0001\n" + outcome + "\n");

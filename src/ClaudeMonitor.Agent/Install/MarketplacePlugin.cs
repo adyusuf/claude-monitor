@@ -25,7 +25,7 @@ public static class MarketplacePlugin
 
     /// <summary>
     /// The timeout of a hook (the plugin's hooks are fixed): the permission wait of 120 s plus a margin, and for Stop the longest wait a person can set
-    /// (<see cref="AgentConfig.WaitMaxSeconds"/>) plus a margin, so `cm-agent install --stop-wait` works for a plugin-started agent too; a Stop hook waits only as long
+    /// (<see cref="AgentConfig.WaitMaxSeconds"/>) plus a margin, so `aipod install --stop-wait` works for a plugin-started agent too; a Stop hook waits only as long
     /// as the saved wait, zero by default.
     /// </summary>
     public static int Timeout(string hook, int declared) => declared > 0 ? declared : hook switch

@@ -9,7 +9,7 @@ export const trTwoStep = {
   step3: "Uygulamada + (hesap ekle) düğmesine basıp \"QR kod tara\" deyin, kamerayı ekrandaki koda tutun. Kamera yoksa \"Kurulum anahtarı gir\" deyip kodun altındaki anahtarı yazın.",
   step4: "Uygulama artık 6 haneli bir kod gösterir. Onu kutuya yazıp \"Aç\" düğmesine basın.",
   step5: "Çıkan kurtarma kodlarını saklayın. Yalnızca bir kez gösterilir; telefonu kaybederseniz girişi onlar sağlar.",
-  after: "Bundan sonra Claude Monitor doğrulama uygulamasından kod istediğinde uygulamayı açın ve o anda gösterdiği 6 haneli kodu yazın.",
+  after: "Bundan sonra aipod doğrulama uygulamasından kod istediğinde uygulamayı açın ve o anda gösterdiği 6 haneli kodu yazın.",
   on: "Hesabınızda iki adımlı giriş açık.", off: "İki adımlı giriş kapalı. Açmak için yukarıdaki adımları izleyin.",
   help: "Bu kodu nereden alırım?", qrLabel: "Doğrulama uygulamanız için QR kod", scan: "Bu kodu doğrulama uygulamanızla tarayın:",
   manual: "Tarayamıyor musunuz? Bu kurulum anahtarını uygulamaya elle girin:", guide: "Adım adım rehber",

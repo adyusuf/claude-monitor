@@ -17,7 +17,7 @@ public static class RunEnvironment
     };
 
     /// <summary>Name prefixes that must never reach a run: they load code, change the runtime or redirect tools.</summary>
-    public static readonly IReadOnlyList<string> ForbiddenPrefixes = ["CM_", "LD_", "DYLD_", "DOTNET_", "PYTHON", "GIT_"];
+    public static readonly IReadOnlyList<string> ForbiddenPrefixes = ["CM_", "AIPOD_", "LD_", "DYLD_", "DOTNET_", "PYTHON", "GIT_"];
 
     /// <summary>Whole names that must never reach a run (any letter case).</summary>
     public static readonly IReadOnlyList<string> ForbiddenNames =

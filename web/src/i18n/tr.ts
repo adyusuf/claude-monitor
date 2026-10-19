@@ -5,7 +5,7 @@ import { trRemote } from "./tr.remote";
 
 // Turkish: the same keys as en.ts (the type makes a missing key a build error).
 export const tr: Dictionary = {
-  app: { name: "Claude Monitor", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
+  app: { name: "aipod", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
     sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", settings: "Çalışma alanı ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
@@ -132,7 +132,7 @@ export const tr: Dictionary = {
   },
   activity: {
     filterLabel: "Göster", all: "Tümü", inputs: "Girdiler", assistant: "Asistan", tools: "Araçlar",
-    monitorInput: "Claude Monitor (web)", humanInput: "İnsan (Claude Code)", assistantLabel: "Claude", stopRequest: "Durdurma isteği",
+    monitorInput: "aipod (web)", humanInput: "İnsan (Claude Code)", assistantLabel: "Claude", stopRequest: "Durdurma isteği",
     sentBy: "gönderen: {name}", typedBy: "yazan: {name}", someone: "bir üye",
     waiting: "Bekliyor", pendingTitle: "Uygulanmayı bekliyor",
     deliveredWith: "oturumda yazılan mesajla birlikte teslim edildi",
@@ -172,7 +172,8 @@ export const tr: Dictionary = {
     data: "Verileriniz", exportHint: "Sizinle ve oturumlarınızla ilgili her şey, tek bir JSON dosyası olarak.", export: "Verilerimi indir",
     deleteTitle: "Hesabı sil", deleteHint: "Adınız, adresiniz, giriş yöntemleriniz ve makinelerinizin yakaladığı her şey silinir; makinelerinizin bağlantısı kesilir. Geri alınamaz.",
     mfa: "İki adımlı giriş", mfaOn: "Açık: her girişte doğrulama uygulamanızdan bir kod da istenir.",
-    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
+    mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
+
     mfaOpen: "Doğrulama uygulamasında aç", mfaEnable: "Aç", mfaRecovery: "Kurtarma kodları. Güvenli bir yerde saklayın: her biri uygulama olmadan bir kez giriş yapar. Yalnızca şimdi gösteriliyor.",
     mfaDisable: "Kapat", mfaDisabled: "İki adımlı giriş kapalı.",
     deleteConfirm: "Onaylamak için {word} yazın", deleteButton: "Hesabımı sil", deleted: "Hesabınız silindi.",

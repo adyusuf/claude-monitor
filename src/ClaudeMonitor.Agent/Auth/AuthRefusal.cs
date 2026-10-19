@@ -4,14 +4,14 @@ namespace ClaudeMonitor.Agent.Auth;
 
 /// <summary>
 /// What the daemon says when the API refuses to refresh its credentials: the reason the API gave and the next step for the person at the
-/// machine. The reason is a closed code (never a token); the daemon also keeps it in the database so `cm-agent status` can show it.
+/// machine. The reason is a closed code (never a token); the daemon also keeps it in the database so `aipod status` can show it.
 /// </summary>
 public static class AuthRefusal
 {
     public const string ReasonKey = "auth.refused_reason";
     public const string AtKey = "auth.refused_at";
 
-    private const string Login = "Run `cm-agent login --server <url>` to connect it again.";
+    private const string Login = "Run `aipod login --server <url>` to connect it again.";
 
     public static string Message(string? reason) => reason switch
     {

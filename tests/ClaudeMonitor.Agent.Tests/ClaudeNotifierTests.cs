@@ -7,7 +7,7 @@ namespace ClaudeMonitor.Agent.Tests;
 /// <summary>The desktop notice before a Claude Code update. Only macOS has one; the positive path is asserted there and never faked elsewhere.</summary>
 public sealed class ClaudeNotifierTests
 {
-    private const string Text = "Claude Code will be updated in 5 min. Cancel with: cm-agent claude-update cancel";
+    private const string Text = "Claude Code will be updated in 5 min. Cancel with: aipod claude-update cancel";
 
     private sealed class Osascript(int exit = 0) : IProcessRunner
     {
@@ -53,7 +53,7 @@ public sealed class ClaudeNotifierTests
         Assert.Equal("-e", args[0]);
         Assert.Equal(2, args.Length);
         Assert.StartsWith("display notification \"", args[1], StringComparison.Ordinal);
-        Assert.Contains("cm-agent claude-update cancel", args[1], StringComparison.Ordinal);
+        Assert.Contains("aipod claude-update cancel", args[1], StringComparison.Ordinal);
         Assert.Contains("in 5 min", args[1], StringComparison.Ordinal);
         Assert.EndsWith("\" with title \"Claude Monitor\"", args[1], StringComparison.Ordinal);
     }

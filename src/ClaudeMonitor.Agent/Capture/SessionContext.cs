@@ -7,7 +7,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Capture;
 
 /// <summary>
-/// "cm-agent hook SessionStart --context" (ADR-0008 §3b): the synchronous SessionStart entry that hands the session the machines block
+/// "aipod hook SessionStart --context" (ADR-0008 §3b): the synchronous SessionStart entry that hands the session the machines block
 /// the daemon rendered, and the prompts sent to this session from the web that no hook has handed over yet (a session resumed after its
 /// terminal closed, or one that was idle with no hook running). It reads the local database within a bounded time, prints the result as
 /// additionalContext and always exits 0; it never talks to the network and never wakes the daemon (the recording hook does that). A prompt
@@ -36,7 +36,7 @@ public static class SessionContext
         catch (Exception e)
         {
             // whatever happened (a timeout, a locked database, a native library that failed to load): the session is never blocked
-            await stderr.WriteLineAsync($"cm-agent hook SessionStart --context: {e.GetType().Name}");
+            await stderr.WriteLineAsync($"aipod hook SessionStart --context: {e.GetType().Name}");
         }
 #pragma warning restore CA1031
 

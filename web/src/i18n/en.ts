@@ -4,7 +4,7 @@ import { enRemote } from "./en.remote";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
 export const en = {
-  app: { name: "Claude Monitor", tagline: "Follow your AI coding sessions, live." },
+  app: { name: "aipod", tagline: "Follow your AI coding sessions, live." },
   nav: {
     sessions: "Sessions", machines: "Machines", members: "Members", settings: "Workspace settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
@@ -131,7 +131,7 @@ export const en = {
   },
   activity: {
     filterLabel: "Show", all: "All", inputs: "Inputs", assistant: "Assistant", tools: "Tools",
-    monitorInput: "Claude Monitor (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
+    monitorInput: "aipod (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
     sentBy: "sent by {name}", typedBy: "typed by {name}", someone: "a member",
     waiting: "Waiting", pendingTitle: "Waiting to be applied",
     deliveredWith: "delivered together with the message typed in the session",
@@ -171,7 +171,8 @@ export const en = {
     data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
     deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",
     mfa: "Two-step sign-in", mfaOn: "On: every sign-in also asks for a code from your authenticator app.",
-    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
+    mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
+
     mfaOpen: "Open in authenticator", mfaEnable: "Turn on", mfaRecovery: "Recovery codes. Keep them somewhere safe: each signs in once without the app. They are shown only now.",
     mfaDisable: "Turn off", mfaDisabled: "Two-step sign-in is off.",
     deleteConfirm: "Type {word} to confirm", deleteButton: "Delete my account", deleted: "Your account is deleted.",

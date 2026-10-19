@@ -4,7 +4,7 @@ using ClaudeMonitor.Agent.Storage;
 
 namespace ClaudeMonitor.Agent.ClaudeUpdate;
 
-/// <summary>"cm-agent claude-update cancel", "cm-agent config claude-update on|off", and the lines `cm-agent status` adds.</summary>
+/// <summary>"aipod claude-update cancel", "aipod config claude-update on|off", and the lines `aipod status` adds.</summary>
 public static class ClaudeUpdateCommand
 {
     public const string Verb = "claude-update";
@@ -18,7 +18,7 @@ public static class ClaudeUpdateCommand
         ArgumentNullException.ThrowIfNull(clock);
         if (args.Length != 2 || args[1] != "cancel")
         {
-            await stderr.WriteLineAsync("usage: cm-agent claude-update cancel");
+            await stderr.WriteLineAsync("usage: aipod claude-update cancel");
             return 2;
         }
 
@@ -49,7 +49,7 @@ public static class ClaudeUpdateCommand
         var state = ClaudeUpdateState.Load(config);
         if (DateTimeOffset.TryParse(state.CountdownUntil, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var until) && until > clock.GetUtcNow())
         {
-            yield return $"Claude Code will be updated at {until.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)} (cancel: cm-agent claude-update cancel)";
+            yield return $"Claude Code will be updated at {until.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)} (cancel: aipod claude-update cancel)";
         }
 
         if (state.Result is { } result)

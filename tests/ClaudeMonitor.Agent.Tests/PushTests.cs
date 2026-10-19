@@ -260,7 +260,7 @@ public sealed class PushTests : IDisposable
         var reported = new TaskCompletionSource<string>();
         using var stop = new CancellationTokenSource();
         var loop = PushLoop.RunAsync(config, TimeProvider.System, () => true, _ => Task.CompletedTask, "s", m => reported.TrySetResult(m), stop.Token);
-        Assert.StartsWith("cm-agent push: SqliteException", await reported.Task.WaitAsync(TimeSpan.FromSeconds(10)), StringComparison.Ordinal);
+        Assert.StartsWith("aipod push: SqliteException", await reported.Task.WaitAsync(TimeSpan.FromSeconds(10)), StringComparison.Ordinal);
         await stop.CancelAsync();
         await loop.WaitAsync(TimeSpan.FromSeconds(10));
     }

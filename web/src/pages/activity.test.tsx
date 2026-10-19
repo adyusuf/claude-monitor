@@ -63,7 +63,7 @@ describe("the activity list tells inputs from everything else", () => {
     const human = within(card).getByText("please fix the login").closest("li")!;
 
     expect(monitor).toHaveClass("act-monitor_input");
-    expect(within(monitor).getByText("Claude Monitor (web)")).toBeInTheDocument();
+    expect(within(monitor).getByText("aipod (web)")).toBeInTheDocument();
     expect(within(monitor).getByText("sent by Örnek Kişi")).toBeInTheDocument();
     expect(within(monitor).getByText("Applied")).toBeInTheDocument();
     expect(within(monitor).getByText("\u2601\uFE0E")).toBeInTheDocument();

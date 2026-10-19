@@ -7,7 +7,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Tests;
 
 /// <summary>
-/// "cm-agent mcp" over its real transport: a child process speaking JSON-RPC on stdio, as Claude Code starts it.
+/// "aipod mcp" over its real transport: a child process speaking JSON-RPC on stdio, as Claude Code starts it.
 /// The agent home is a throw-away folder with file tokens; nothing of the user's is touched.
 /// </summary>
 public sealed class McpProtocolTests : IDisposable

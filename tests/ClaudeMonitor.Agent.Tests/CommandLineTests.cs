@@ -28,7 +28,7 @@ public sealed class CommandLineTests : IDisposable
     [Fact]
     public async Task Usage_version_and_status()
     {
-        Assert.Contains("cm-agent login", (await Cli_()).Out, StringComparison.Ordinal);
+        Assert.Contains("aipod login", (await Cli_()).Out, StringComparison.Ordinal);
         Assert.Equal(2, (await Cli_("frobnicate")).Code);
         Assert.Equal(AgentConfig.Version + Environment.NewLine, (await Cli_("version")).Out);
         var (code, status) = await Cli_("status");
@@ -47,7 +47,7 @@ public sealed class CommandLineTests : IDisposable
         var stderr = new StringWriter();
         var log = new AgentLog(home.Config, clock);
         Assert.Equal(0, await Cli.HookAsync("Stop", home.Config, new StringReader("{not json"), stdout, stderr, clock, log));
-        Assert.Contains("cm-agent hook Stop", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("aipod hook Stop", stderr.ToString(), StringComparison.Ordinal);
         Assert.Contains("hook Stop failed", await File.ReadAllTextAsync(home.Config.LogPath), StringComparison.Ordinal);
 
         using (var store = new LocalStore(home.Config.DatabasePath))

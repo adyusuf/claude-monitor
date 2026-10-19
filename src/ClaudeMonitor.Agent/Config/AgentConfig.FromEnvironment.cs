@@ -7,7 +7,7 @@ public sealed partial record AgentConfig
 {
     public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null)
     {
-        read ??= Environment.GetEnvironmentVariable;
+        read = Brand.WithAliases(read ?? Environment.GetEnvironmentVariable); // AIPOD_X wins over CM_X
         legacyHome ??= LegacyHome;
         static TimeSpan Seconds(string? value, TimeSpan fallback, int max) =>
             int.TryParse(value, out var s) && s >= 0 ? TimeSpan.FromSeconds(Math.Min(s, max)) : fallback;

@@ -16,7 +16,7 @@ using ClaudeMonitor.Contracts;
 namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
-/// "cm-agent daemon": the long-running part, one per user per machine (an exclusive lock on daemon.lock). It runs
+/// "aipod daemon": the long-running part, one per user per machine (an exclusive lock on daemon.lock). It runs
 /// until the process is stopped or the agent is revoked. Started by the first hook or MCP call that finds it absent
 /// (ADR-0002: the agent starts with the harness, not with the OS).
 /// </summary>
@@ -33,7 +33,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var identity = Identity.Load(config);
         if (!identity.Connected)
         {
-            log.Write("not connected: run `cm-agent login --server <url>`");
+            log.Write("not connected: run `aipod login --server <url>`");
             return 1;
         }
 
@@ -78,6 +78,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
         updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
+        Install.BinaryAlias.Ensure(config.BinaryPath); // the new name beside the old one, also after an update swapped the binary
         File.WriteAllText(config.PidPath, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         using (var updating = TryLock(config.UpdateLockPath))
         {

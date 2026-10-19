@@ -138,7 +138,7 @@ public sealed class DaemonTests
         var log = await File.ReadAllTextAsync(home.Config.LogPath);
         Assert.Contains(phrase, log, StringComparison.Ordinal);
         Assert.Contains($"({reason})", log, StringComparison.Ordinal);
-        Assert.Contains("cm-agent login", log, StringComparison.Ordinal);
+        Assert.Contains("aipod login", log, StringComparison.Ordinal);
         using var store = new Storage.LocalStore(home.Config.DatabasePath);
         Assert.Equal(reason, store.Get(AuthRefusal.ReasonKey));
         var status = string.Join("\n", Push.PushStatus.Describe(home.Config, store, DateTimeOffset.UtcNow, null, daemonRunning: false));

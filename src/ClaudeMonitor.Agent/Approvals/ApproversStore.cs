@@ -106,7 +106,7 @@ public static class ApproversStore
 
     private static string? Clean(string? name) => name is { Length: > 0 } n ? new string([.. n.Where(c => !char.IsControl(c)).Take(64)]) : null;
 
-    /// <summary>One line for `cm-agent status`: the mode and how many keys, never a key.</summary>
+    /// <summary>One line for `aipod status`: the mode and how many keys, never a key.</summary>
     public static string Describe(ApproversPolicy policy) =>
         policy.Required ? $"signed approvals: required, {policy.Keys.Count} key(s) pinned" : $"signed approvals: off, {policy.Keys.Count} key(s) pinned";
 }

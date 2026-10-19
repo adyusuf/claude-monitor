@@ -100,7 +100,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
 
     public async Task SettingsAsync(CancellationToken ct)
     {
-        // The tag is the workspace agent.json names as the pass begins, not the one in the answer: a pass that `cm-agent login`
+        // The tag is the workspace agent.json names as the pass begins, not the one in the answer: a pass that `aipod login`
         // overtakes is then tagged with the old workspace and reads as off, while an agent moved to another workspace on the web
         // (same tokens, agent.json unchanged) keeps trusting what the server now answers for it.
         // Stamped with the time the read BEGAN: the server answers with the switch as of some moment during the request, so a
@@ -188,7 +188,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         return WorkspaceSettings.Get(config, store, MachineMonitor.RemoteRunsKey) == "true";
     }
 
-    /// <summary>Records the state of the stream for `monitor_status` and `cm-agent status` (ids, times and error type names only).</summary>
+    /// <summary>Records the state of the stream for `monitor_status` and `aipod status` (ids, times and error type names only).</summary>
     public void StreamState(string state, int failures, string? error)
     {
         store.Set(PushStatus.StreamStateKey, state);

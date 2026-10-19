@@ -88,7 +88,7 @@ public sealed partial class DaemonHost
                     failures = 0;
                     if (!await relay.OnStreamAsync(name, data, cts.Token))
                     {
-                        log.Write("revoked from the web: the API sent a revoke notice (the refresh credentials were used twice, so it revoked this agent); stop any other copy, then run `cm-agent login --server <url>`");
+                        log.Write("revoked from the web: the API sent a revoke notice (the refresh credentials were used twice, so it revoked this agent); stop any other copy, then run `aipod login --server <url>`");
                         await cts.CancelAsync();
                         return;
                     }

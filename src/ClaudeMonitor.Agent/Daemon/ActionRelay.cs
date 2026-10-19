@@ -8,8 +8,8 @@ namespace ClaudeMonitor.Agent.Daemon;
 
 /// <summary>
 /// The fixed actions its owner asked for on the web (ADR-0005, "Agent actions from the web"). An action is only a kind from a closed set and the
-/// daemon performs it with its own code, never with text from the web: <c>status</c> is what `cm-agent status` prints, <c>update_check</c> the
-/// updater's check, <c>update</c> and <c>restart</c> start the same detached `cm-agent` verb the person would type (it ends this daemon and starts
+/// daemon performs it with its own code, never with text from the web: <c>status</c> is what `aipod status` prints, <c>update_check</c> the
+/// updater's check, <c>update</c> and <c>restart</c> start the same detached `aipod` verb the person would type (it ends this daemon and starts
 /// the next). The API hands an action out once: the first report ("delivered") is a compare-and-set, so a replayed message is not performed twice.
 /// Because those two end this daemon, their outcome is reported BEFORE the verb starts and says "started". Nothing here throws into the stream.
 /// </summary>
@@ -43,7 +43,7 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
                 log.Write($"action {action.Kind} not reported: {e.GetType().Name}");
             }
 
-            if (then is not null && !spawn(then)) log.Write($"action {action.Kind}: cm-agent {then} could not be started");
+            if (then is not null && !spawn(then)) log.Write($"action {action.Kind}: aipod {then} could not be started");
         }
         catch (Exception e) when (e is HttpRequestException or TimeoutException or ApiException or OperationCanceledException)
         {
@@ -67,7 +67,7 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
         }
     }
 
-    /// <summary>What to do for a kind: whether it worked, the text to show, and the `cm-agent` verb to start once that is reported (null for none).</summary>
+    /// <summary>What to do for a kind: whether it worked, the text to show, and the `aipod` verb to start once that is reported (null for none).</summary>
     private async Task<(bool Succeeded, string Text, string? Then)> DoAsync(string kind, CancellationToken ct)
     {
         switch (kind)
