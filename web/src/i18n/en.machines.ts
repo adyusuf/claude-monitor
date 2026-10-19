@@ -68,6 +68,8 @@ export const enMachines = {
     trustHint: "Claude Code must already trust the project's folder: open Claude there once at the machine and accept the trust prompt. Otherwise the start fails and says so.",
     noProjects: "This machine has no project yet: one appears when a session works in a folder, or when a folder is listed with aipod config projects add.",
     project: "Project", mode: "Permission mode",
+    prompt: "First message (optional)",
+    promptHint: "At most {max} characters. The session receives it labelled as a message from the web, to be treated as data, and asks before acting on a risky request.",
     modes: { manual: "Ask before risky steps (manual)", plan: "Plan only", acceptEdits: "Accept file edits" },
     start: "Start in the background", stop: "Stop", runningTitle: "Sessions started from the web", noneRunning: "None running.",
     done: { saved: "Saved.", started: "Asked the agent to start a session; the result is below.", stopped: "Asked the agent to stop the session." },

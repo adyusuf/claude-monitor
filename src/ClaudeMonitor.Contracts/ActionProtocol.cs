@@ -28,6 +28,9 @@ public static class AgentActionKinds
 
     public const string DefaultClaudePermissionMode = "manual";
 
+    /// <summary>The most characters of the optional first prompt of a Claude start (ADR-0014 P2). It is text from the web: capped, wrapped and labelled by the agent.</summary>
+    public const int PromptMax = 2000;
+
     /// <summary>The environments an admin must have set on a machine before Claude may be started on it from the web (production and database machines never).</summary>
     public static readonly IReadOnlyList<string> ClaudeEnvironments = ["dev", "test"];
 
@@ -58,13 +61,13 @@ public static class AgentActionStatuses
 }
 
 /// <summary>An action for the agent to perform, sent on its stream (event <see cref="AgentStreamEvents.Action"/>).</summary>
-public sealed record AgentActionMessage(Guid Id, string Kind, DateTimeOffset ExpiresAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null);
+public sealed record AgentActionMessage(Guid Id, string Kind, DateTimeOffset ExpiresAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null, string? Prompt = null);
 
 /// <summary>The agent's report: "delivered" when it takes the action, then "succeeded" or "failed" with a short text.</summary>
 public sealed record AgentActionReport(string Status, string? Result = null, string? SessionRef = null);
 
 /// <summary>The owner's request. Code: a two-step code, when the kind needs the re-authentication and the sign-in is not recent.</summary>
-public sealed record AgentActionRequest(string Kind, string? Code = null, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null);
+public sealed record AgentActionRequest(string Kind, string? Code = null, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null, string? Prompt = null);
 
 /// <summary>An action as the owner's page shows it. Result is plain text from the agent: data, never markup.</summary>
 public sealed record AgentActionView(Guid Id, Guid AgentId, string Kind, string Status, string? Result, DateTimeOffset CreatedAt,
@@ -90,5 +93,6 @@ public static class AgentActionErrors
     public const string InvalidProject = "invalid_project";
     public const string InvalidPermissionMode = "invalid_permission_mode";
     public const string InvalidSessionRef = "invalid_session_ref";
+    public const string InvalidPrompt = "invalid_prompt";
     public const string NotStartedHere = "claude_not_started_here";
 }

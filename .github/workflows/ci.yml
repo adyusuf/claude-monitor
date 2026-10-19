@@ -6,11 +6,8 @@
 name: CI
 
 on:
-  # dev and test are switched off for now (maintainer, 19/10/2026): CI runs on prod, and on dev or test only when started by hand.
-  push:
-    branches: [prod]
-  pull_request:
-    branches: [prod]
+  # CI is switched off for now on every branch (maintainer, 19/10/2026): it runs only when started by hand. To switch it back on, restore
+  # `push: branches: [dev, test, prod]` and `pull_request:` here, and the `push: branches: [test]` and `schedule` triggers in e2e.yml.
   workflow_dispatch:
 
 permissions:

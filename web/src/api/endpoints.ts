@@ -75,7 +75,7 @@ export const api = {
   setAgentServices: (agentId: string, share: boolean, code?: string) => request<AgentServicesView>("PUT", `/agents/${agentId}/services`, { share, code }),
   setAgentAsks: (agentId: string, accept: boolean, code?: string) => request<AgentAsksView>("PUT", `/agents/${agentId}/asks`, { accept, code }),
   agentActions: (agentId: string) => request<AgentActionView[]>("GET", `/agents/${agentId}/actions`),
-  requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string, extra?: { projectKey?: string; permissionMode?: ClaudePermissionMode; sessionRef?: string }) =>
+  requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string, extra?: { projectKey?: string; permissionMode?: ClaudePermissionMode; sessionRef?: string; prompt?: string }) =>
     request<AgentActionView>("POST", `/agents/${agentId}/actions`, { kind, code, ...extra }),
   setAgentClaude: (agentId: string, accept: boolean, code?: string) => request<AgentClaudeView>("PUT", `/agents/${agentId}/claude`, { accept, code }),
   agentAsks: (agentId: string) => request<AskView[]>("GET", `/agents/${agentId}/asks`),

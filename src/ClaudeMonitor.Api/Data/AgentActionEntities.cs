@@ -20,6 +20,9 @@ public sealed class AgentAction
     public string? ProjectKey { get; set; }
     public string? PermissionMode { get; set; }
     public string? SessionRef { get; set; }
+
+    /// <summary>The optional first prompt of a Claude start (ADR-0014 P2): text from the web, kept only until the agent takes the action (or it ends), then NULL. Never listed, never audited.</summary>
+    public string? Prompt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset? DeliveredAt { get; set; }

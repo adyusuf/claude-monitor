@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { config } from "../config";
 import type { AgentActionView, MachineDetail, MachineProjectView } from "../api/types";
 import { de } from "../i18n/de";
 import { en } from "../i18n/en";
@@ -80,6 +81,22 @@ describe("the Claude card on the machine page", () => {
 
     expect(await screen.findByText(en.machines.claudeControl.done.started)).toBeInTheDocument();
     expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/blog", permissionMode: "plan" });
+  });
+
+  it("sends the first message trimmed, only when there is one, and clears it after the start", async () => {
+    const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev);
+    open();
+    await userEvent.type(await screen.findByLabelText(en.machines.claudeControl.prompt), "  look at the failing test  ");
+    await userEvent.click(screen.getByRole("button", { name: en.machines.claudeControl.start }));
+    await screen.findByText(en.machines.claudeControl.done.started);
+    expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/shop", permissionMode: "manual", prompt: "look at the failing test" });
+    expect(screen.getByLabelText(en.machines.claudeControl.prompt)).toHaveValue("");
+  });
+
+  it("limits the first message to the length the API takes", async () => {
+    api({}, dev);
+    open();
+    expect(await screen.findByLabelText(en.machines.claudeControl.prompt)).toHaveAttribute("maxlength", String(config.claudePromptMax));
   });
 
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
