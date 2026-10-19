@@ -1,6 +1,6 @@
 # ADR-0011: Project management in the web app
 
-**Status:** Phases 1 to 3 are on `dev` (19/10/2026); Phase 4a (§6) is being built. Later phases are a plan, not a decision.
+**Status:** Phases 1 to 3 are on `dev` (19/10/2026); Phase 4a (§6) is on `dev`. Later phases are a plan, not a decision (§7a plans the machine and Claude work).
 **Extends:** [ADR-0002](adr-0002-agent-platform.md) (one API for every client), [data-model.md](data-model.md).
 **Asked for (19/10/2026):** after sign-in a user sees what is theirs: projects (with applications, backlog lists, sprints and issues), the
 machines and the tools and Claude sessions on them, the AI pods of the account, the user and system administration for admins, and
@@ -139,11 +139,42 @@ need agent-side facts or commands that do not exist yet and are separate decisio
 
 ## 7. Later phases (a plan)
 
-3. **Machines and Claude:** the machine pages exist (ADR-0005, ADR-0008). Open: a per-tool panel on a machine (start, stop, update for the AI pod,
-   Claude management: sessions, plugins, skills, limits), per-session settings (working mode, branch policy, CI), starting a test and
-   following its result.
+3. **Machines and Claude:** planned in §7a (below).
 4. **AI pods** of the account: needs its own decision first (what a pod is on the server side).
 5. **Administration** (users, system settings) and **profile** pages.
+
+### 7a. Machines and Claude: a plan (19/10/2026)
+
+**Names.** The web is **Podium**; the daemon on a machine is **aipod** (ADR-0012). Texts say "Podium" for the web and "aipod" for the daemon.
+
+**Already there (not rebuilt).** The machine page (ADR-0005, ADR-0008): load, alerts, runs, grants, jobs, schedules, services, projects, asks; the fixed
+agent actions `restart`, `update_check`, `update`, `status`; Claude start and stop on demand (ADR-0014 P1: `claude_start`, `claude_stop`, a Claude card,
+dev and test machines only, at most 3 workers); runs of kind `test | build | deploy | other` and, since §6, their link to issues.
+
+**Still to build, in this order (one branch and one commit per step, each through the gate).**
+
+| Step | What | Depends on |
+|---|---|---|
+| A | The new-session form on the Claude card (ADR-0014 P2): project from the machine's reported list, permission mode, optional first prompt (wrapped, labelled as from the web, capped, never audited) | decision 3 |
+| B | "Start a test" on the machine page: project and kind `test`, the existing run approval flow, the result shown on the same card, with the link to an issue from §6 | none |
+| C | Automatic mode `on_message` (ADR-0014 P3): backoff after a failed start, a start budget per hour, never a second worker for one project | decision 2 |
+| D | A tool panel per machine: aipod status and update (the existing actions in one card) | decision 8 |
+| E | Claude management (sessions list, plugins, skills, limits) and per-session settings (working mode, branch policy, CI) | decisions 5, 6; needs facts and commands in the agent that do not exist yet |
+
+**Decided (maintainer, 19/10/2026).**
+1. **Windows:** `claude --bg` has to be tried on the Windows server with the list in ADR-0014 ("Windows: what still has to be tried") before anything in A or C is
+   called working there; until then the Claude card is documented as macOS-verified only.
+3. **Permission mode of an unwatched session:** `manual` is the default and the highest offered; `bypassPermissions`, `auto` and `dontAsk` are never offered from Podium.
+7. **A folder Claude does not trust yet:** Podium says "open Claude in that folder once at the machine and accept the trust prompt"; the page does not read
+   Claude's own trust list (no access to `~/.claude.json` for this).
+
+**Still open.**
+2. Who may turn the automatic mode on: the machine's owner only (proposed) or also a workspace admin.
+4. The cost of a started session is the machine owner's Claude plan: accepted, and does the page say so?
+5. The limit view (5-hour, weekly): where the numbers come from. Nothing in aipod reads them today; a source would have to be found and measured first, or the view dropped.
+6. Remote plugin and skill install, and changing a session's settings from Podium: a new attack surface (a command from the web that changes what runs on the machine). Only with
+   a closed set of actions and its own section here; otherwise read-only lists.
+8. What an "AI pod" is on the server side (item 4 above); step D only gathers the existing aipod actions until this is decided.
 
 ## 8. Not decided here
 
