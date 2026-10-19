@@ -40,6 +40,8 @@ export interface MachineView {
   acceptsAsks?: boolean | null;
   /** Whether the machine's owner lets Claude be started and stopped on it from the web (ADR-0014). */
   acceptsClaudeControl?: boolean | null;
+  /** What the daemon may start by itself (ADR-0014 P3): "off" or "on_message"; null or absent is off. */
+  claudeAutoMode?: ClaudeAutoMode | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
@@ -91,7 +93,8 @@ export interface AgentAsksView { agentId: string; accept: boolean; setAt: string
 
 export type AgentActionKind = "restart" | "update_check" | "update" | "status" | "claude_start" | "claude_stop";
 export type ClaudePermissionMode = "manual" | "plan" | "acceptEdits";
-export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null }
+export type ClaudeAutoMode = "off" | "on_message";
+export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null; autoMode?: ClaudeAutoMode | null }
 export type AgentActionStatus = "queued" | "delivered" | "succeeded" | "failed" | "expired";
 /** One fixed action its owner asked of a machine's agent (ADR-0005); the result is plain text the agent wrote, never markup. */
 export interface AgentActionView {

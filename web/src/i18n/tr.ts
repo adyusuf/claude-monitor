@@ -76,6 +76,7 @@ export const tr: Dictionary = {
     claude_control_service_mode: "Bir hizmet ajanı Claude'u başlatamaz.", claude_not_installed: "Bu makinede Claude Code bulunamadı.", invalid_permission_mode: "Listeden bir izin kipi seçin.",
     invalid_session_ref: "Bu bir oturum kimliği değil.", claude_not_started_here: "Yalnızca buradan başlatılan bir oturum buradan durdurulabilir.",
     invalid_project: "Proje anahtarı 1 ile 200 karakter olmalı, denetim karakteri içermemeli.",
+    invalid_auto_mode: "Otomatik mod on_message ya da off olmalı.",
     invalid_first_prompt: "İlk istem 1 ile 2000 karakterlik metin olmalı.", claude_folder_not_trusted: "Claude Code bu klasöre henüz güvenmiyor: makinede orada bir kez Claude'u açıp güven sorusunu onaylayın.",
     claude_start_pending: "Bu makinede başka bir başlatma hâlâ bekliyor: bitince yeniden deneyin.",
   },

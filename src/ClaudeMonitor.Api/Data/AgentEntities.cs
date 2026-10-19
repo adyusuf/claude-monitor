@@ -98,6 +98,9 @@ public sealed class Agent
 
     /// <summary>ADR-0014: the machine's owner lets Claude be started and stopped on it from the web; off until they say so, and reset when the machine moves workspace.</summary>
     public bool AcceptsClaudeControl { get; set; }
+
+    /// <summary>ADR-0014 P3: what the daemon may start by itself (<see cref="ClaudeAutoModes"/>); NULL is off. Reset with the switch when the machine moves workspace.</summary>
+    public string? ClaudeAutoMode { get; set; }
     public DateTimeOffset? AcceptsClaudeControlSetAt { get; set; }
     public Guid? AcceptsClaudeControlSetBy { get; set; }
 

@@ -77,6 +77,13 @@ public sealed class AgentActionContractTests
     }
 
     [Fact]
+    public void The_automatic_modes_are_off_and_on_message_and_their_error_code_keeps_its_wire_value()
+    {
+        Assert.Equal(["off", "on_message"], ClaudeAutoModes.All);
+        Assert.Equal("invalid_auto_mode", AgentActionErrors.InvalidAutoMode);
+    }
+
+    [Fact]
     public void The_action_event_is_named_action_on_the_agents_stream()
     {
         Assert.Equal("action", AgentStreamEvents.Action);

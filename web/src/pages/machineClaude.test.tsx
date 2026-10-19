@@ -7,7 +7,7 @@ import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
-import { FIRST_PROMPT_MAX, runningSessions } from "./MachineClaude";
+import { AUTO_STARTS_PER_HOUR, FIRST_PROMPT_MAX, runningSessions } from "./MachineClaude";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
 
@@ -139,6 +139,38 @@ describe("the Claude card on the machine page", () => {
     expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
   });
 
+  it("shows the automatic mode off by default, says what it costs and turns it on with the mode in the request", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, dev);
+    open();
+    const box = await screen.findByRole("checkbox", { name: en.machines.claudeControl.auto });
+    expect(box).not.toBeChecked();
+    expect(screen.getByText(en.machines.claudeControl.autoHint.replace("{n}", String(AUTO_STARTS_PER_HOUR)))).toBeInTheDocument();
+
+    await userEvent.click(box);
+
+    expect(await screen.findByText(en.machines.claudeControl.done.auto)).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "on_message" });
+  });
+
+  it("shows the automatic mode as on when the machine says so and turns it off with off", async () => {
+    const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { ...dev, claudeAutoMode: "on_message" });
+    open();
+    const box = await screen.findByRole("checkbox", { name: en.machines.claudeControl.auto });
+    expect(box).toBeChecked();
+
+    await userEvent.click(box);
+
+    await vi.waitFor(() => expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")).toBeTruthy());
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "off" });
+  });
+
+  it("shows no automatic mode on a machine where starting Claude is off or not allowed", async () => {
+    api({}, { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: false });
+    open();
+    await screen.findByText(en.machines.claudeControl.off);
+    expect(screen.queryByRole("checkbox", { name: en.machines.claudeControl.auto })).toBeNull();
+  });
+
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
     api({}, dev);
     open();
@@ -225,6 +257,10 @@ describe("the texts", () => {
       expect(dict.machines.actions.kind.claude_start).not.toBe("");
       expect(dict.errors.claude_control_environment).not.toBe("");
       for (const key of ["invalid_first_prompt", "claude_folder_not_trusted", "claude_start_pending"] as const) expect(dict.errors[key]).not.toBe("");
+      expect(dict.machines.claudeControl.autoHint).toContain("{n}");
+      for (const key of ["auto", "autoHint"] as const) expect(dict.machines.claudeControl[key]).not.toBe("");
+      expect(dict.machines.claudeControl.done.auto).not.toBe("");
+      expect(dict.errors.invalid_auto_mode).not.toBe("");
       expect(dict.machines.claudeControl.firstPromptCount).toContain("{n}");
       expect(dict.machines.claudeControl.firstPromptCount).toContain("{max}");
       for (const key of ["firstPrompt", "firstPromptHint", "untrustedOption", "trusted", "allUntrusted"] as const) expect(dict.machines.claudeControl[key]).not.toBe("");

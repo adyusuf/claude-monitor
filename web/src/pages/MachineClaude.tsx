@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/endpoints";
-import type { AgentActionView, ClaudePermissionMode, MachineProjectView, MachineView } from "../api/types";
+import type { AgentActionView, ClaudeAutoMode, ClaudePermissionMode, MachineProjectView, MachineView } from "../api/types";
 import { Button, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
@@ -11,6 +11,8 @@ import { useCodeGate } from "./useCodeGate";
 const MODES: readonly ClaudePermissionMode[] = ["manual", "plan", "acceptEdits"];
 /** The longest first prompt the API takes (AgentActionKinds.ClaudeFirstPromptMax). */
 export const FIRST_PROMPT_MAX = 2000;
+/** What the agent starts by itself at most per hour (AgentConfig.ClaudeAutoStartsPerHour): said on the page so nobody is surprised by the cost. */
+export const AUTO_STARTS_PER_HOUR = 3;
 /** The environments Claude may be started in from the web (ADR-0014): the machine's class as an admin set it. */
 const ALLOWED_ENVIRONMENTS = ["dev", "test"];
 
@@ -35,11 +37,12 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const action = useCodeGate("reauth_required", "machines.claudeControl.startHint");
   const [actions, setActions] = useState<AgentActionView[]>([]);
   const [error, setError] = useState<string | null>(null); // a stop that failed; a list that cannot be read is already said by the actions card above
-  const [done, setDone] = useState<"saved" | "started" | "stopped" | null>(null);
+  const [done, setDone] = useState<"saved" | "started" | "stopped" | "auto" | null>(null);
   const [project, setProject] = useState("");
   const [mode, setMode] = useState<ClaudePermissionMode>("manual");
   const [prompt, setPrompt] = useState("");
   const accepting = view.acceptsClaudeControl === true;
+  const autoOn = view.claudeAutoMode === "on_message";
   const allowed = view.roleEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.effectiveEnvironment);
   const newEnough = versionAtLeast(agentVersion, config.claudeMinAgentVersion);
   const claudeActions = actions.filter((a) => a.kind === "claude_start" || a.kind === "claude_stop");
@@ -68,6 +71,13 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
     setDone(null);
     if (await enable.attempt((code) => api.setAgentClaude(agentId, accept, code).then(() => undefined))) {
       setDone("saved");
+      onChanged();
+    }
+  };
+  const setAuto = async (mode: ClaudeAutoMode) => {
+    setDone(null);
+    if (await enable.attempt((code) => api.setAgentClaude(agentId, true, code, mode).then(() => undefined))) {
+      setDone("auto");
       onChanged();
     }
   };
@@ -109,6 +119,11 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
 
       {accepting && allowed ? (
         <div className="stack">
+          <label className="row">
+            <input type="checkbox" checked={autoOn} disabled={enable.busy || !newEnough} onChange={(e) => void setAuto(e.target.checked ? "on_message" : "off")} />
+            <span>{t("machines.claudeControl.auto")}</span>
+          </label>
+          <p className="muted small">{t("machines.claudeControl.autoHint", { n: AUTO_STARTS_PER_HOUR })}</p>
           <h3>{t("machines.claudeControl.newTitle")}</h3>
           <p className="muted small">{t("machines.claudeControl.trustHint")}</p>
           {projects.length === 0 ? <p className="muted">{t("machines.claudeControl.noProjects")}</p> : (

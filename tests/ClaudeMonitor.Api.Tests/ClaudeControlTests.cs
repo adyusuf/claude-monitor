@@ -359,6 +359,142 @@ public sealed class ClaudeControlTests(ApiFactory api)
         Assert.Single(await ActionKit.RowsAsync(api, team.TargetId));
     }
 
+    // ---- the automatic mode (ADR-0014 P3) --------------------------------------------------------------------------------
+
+    private static Task<HttpResponseMessage> SetAuto(AskTeam team, string? mode, bool accept = true, string? code = null) =>
+        team.User.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/claude", new { accept, autoMode = mode, code });
+
+    private static async Task<string?> AutoOfAsync(AskTeam team)
+    {
+        var machines = await team.User.GetJsonAsync($"/api/workspaces/{team.WorkspaceId}/machines");
+        var machine = machines.EnumerateArray().Single(m => m.GetProperty("agentId").GetGuid() == team.TargetId);
+        return machine.TryGetProperty("claudeAutoMode", out var mode) && mode.ValueKind == JsonValueKind.String ? mode.GetString() : null;
+    }
+
+    private static async Task<string?> AutoToldToAgentAsync(AskTeam team) =>
+        (await team.Target.Http.GetFromJsonAsync<AgentSettings>("/api/agent/settings", TestUser.Json))!.ClaudeAutoMode;
+
+    [Fact]
+    public async Task The_automatic_mode_is_off_until_the_owner_turns_it_on_and_then_the_page_the_list_and_the_agent_all_say_so()
+    {
+        var team = await TeamAsync();
+        Assert.Null(await AutoOfAsync(team));
+        Assert.Equal(ClaudeAutoModes.Off, await AutoToldToAgentAsync(team));
+
+        var response = await SetAuto(team, ClaudeAutoModes.OnMessage);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(ClaudeAutoModes.OnMessage, (await response.Content.ReadFromJsonAsync<AgentClaudeView>(TestUser.Json))!.AutoMode);
+        Assert.Equal(ClaudeAutoModes.OnMessage, await AutoOfAsync(team));
+        Assert.Equal(ClaudeAutoModes.OnMessage, await AutoToldToAgentAsync(team));
+        await using var db = api.Db();
+        var audit = await db.AuditEvents.AsNoTracking().Where(a => a.Action == AuditActions.AgentClaudeControlChanged && a.TargetId == team.TargetId.ToString()).OrderBy(a => a.Id).LastAsync();
+        Assert.Equal((ClaudeAutoModes.Off, ClaudeAutoModes.OnMessage), (audit.Detail!.RootElement.GetProperty("autoBefore").GetString(), audit.Detail.RootElement.GetProperty("autoAfter").GetString()));
+    }
+
+    [Fact]
+    public async Task Leaving_the_automatic_mode_out_keeps_it_as_it_is_and_off_turns_it_off()
+    {
+        var team = await TeamAsync();
+        await SetAuto(team, ClaudeAutoModes.OnMessage);
+
+        await SetAuto(team, null);
+        Assert.Equal(ClaudeAutoModes.OnMessage, await AutoOfAsync(team));
+
+        await SetAuto(team, ClaudeAutoModes.Off);
+        Assert.Null(await AutoOfAsync(team));
+    }
+
+    [Fact]
+    public async Task Turning_the_switch_off_turns_the_automatic_mode_off_with_it()
+    {
+        var team = await TeamAsync();
+        await SetAuto(team, ClaudeAutoModes.OnMessage);
+
+        await Accept(team, false);
+
+        Assert.Null(await AutoOfAsync(team));
+        Assert.Equal(ClaudeAutoModes.Off, await AutoToldToAgentAsync(team));
+        await Accept(team, true);
+        Assert.Null(await AutoOfAsync(team)); // turning the switch back on does not bring it back
+    }
+
+    [Theory]
+    [InlineData("always")]
+    [InlineData("ON_MESSAGE")]
+    [InlineData("")]
+    public async Task Only_the_two_known_modes_are_accepted(string mode)
+    {
+        var team = await TeamAsync();
+        await AssertInvalidAsync(await SetAuto(team, mode), "autoMode", AgentActionErrors.InvalidAutoMode);
+        Assert.Null(await AutoOfAsync(team));
+    }
+
+    [Fact]
+    public async Task Turning_it_on_needs_a_recent_sign_in_but_turning_it_off_does_not()
+    {
+        var team = await TeamAsync();
+        api.Clock.Advance(TimeSpan.FromMinutes(11));
+
+        await RemoteKit.AssertProblemAsync(await SetAuto(team, ClaudeAutoModes.OnMessage), HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
+        Assert.Null(await AutoOfAsync(team));
+
+        await SetAgentAsync(team.TargetId, a => a.ClaudeAutoMode = ClaudeAutoModes.OnMessage);
+        Assert.Equal(HttpStatusCode.OK, (await SetAuto(team, ClaudeAutoModes.Off)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("production", "application")]
+    [InlineData(null, null)]
+    public async Task It_cannot_be_turned_on_for_a_machine_a_start_would_be_refused_on(string? environment, string? function)
+    {
+        var team = await TeamAsync(optIn: false, environment: environment, function: function);
+        await SetAgentAsync(team.TargetId, a => a.AcceptsClaudeControl = true);
+
+        var response = await SetAuto(team, ClaudeAutoModes.OnMessage);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Null(await AutoOfAsync(team));
+    }
+
+    [Fact]
+    public async Task It_cannot_be_turned_on_for_a_service_agent_or_without_remote_work_and_the_agent_is_never_told_it_then()
+    {
+        var team = await TeamAsync();
+        await SetAgentAsync(team.TargetId, a => a.ServiceMode = true);
+        Assert.Equal(HttpStatusCode.Conflict, (await SetAuto(team, ClaudeAutoModes.OnMessage)).StatusCode);
+
+        await SetAgentAsync(team.TargetId, a => { a.ServiceMode = false; a.ClaudeAutoMode = ClaudeAutoModes.OnMessage; });
+        await using (var db = api.Db())
+        {
+            await db.WorkspaceSettings.Where(s => s.WorkspaceId == team.WorkspaceId).ExecuteUpdateAsync(s => s.SetProperty(x => x.RemoteRunsEnabled, false));
+        }
+
+        Assert.Equal(ClaudeAutoModes.Off, await AutoToldToAgentAsync(team)); // stored on, told off: the workspace switch comes first
+    }
+
+    [Fact]
+    public async Task Only_the_owner_sets_it_and_a_machine_moved_to_another_workspace_forgets_it()
+    {
+        var team = await TeamAsync();
+        var other = await RemoteKit.MemberAsync(api, team.User, "auto-member", "admin");
+        Assert.Equal(HttpStatusCode.NotFound, (await other.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/claude", new { accept = true, autoMode = ClaudeAutoModes.OnMessage })).StatusCode);
+
+        await SetAuto(team, ClaudeAutoModes.OnMessage);
+        var second = (await (await team.User.PostAsync("/api/workspaces", new { name = "Second" })).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await team.User.SendAsync(HttpMethod.Patch, $"/api/agents/{team.TargetId}", new { workspaceId = second })).StatusCode);
+
+        await using var db = api.Db();
+        Assert.Null((await db.Agents.AsNoTracking().SingleAsync(a => a.Id == team.TargetId)).ClaudeAutoMode);
+    }
+
+    [Fact]
+    public async Task The_database_refuses_a_mode_outside_the_two()
+    {
+        var team = await TeamAsync();
+        await Assert.ThrowsAsync<DbUpdateException>(() => SetAgentAsync(team.TargetId, a => a.ClaudeAutoMode = "always"));
+    }
+
     // ---- who and where --------------------------------------------------------------------------------------------
 
     [Fact]

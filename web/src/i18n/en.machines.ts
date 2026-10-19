@@ -71,10 +71,12 @@ export const enMachines = {
     untrustedOption: "not trusted by Claude Code", trusted: "Claude Code trusts this folder.",
     allUntrusted: "Claude Code does not trust any project of this machine yet: open Claude in one of the folders at the machine once and accept the trust prompt.",
     firstPrompt: "First prompt (optional)", firstPromptCount: "{n} / {max}",
+    auto: "Start a session by itself when an ask arrives and none is idle",
+    autoHint: "When another machine asks this one something about a project and no Claude session here is idle to take it, this machine starts one background session in that project (manual mode: every risky step waits for a person) and the ask is delivered to it. At most {n} an hour, never a second one for a project that has one. Each session uses the machine owner’s Claude account and plan. Turning it on needs a recent sign-in.",
     firstPromptHint: "Sent to the new session as a message from the web, labelled as such: the session treats it as text to read, not as an order, and asks at the machine before anything with side effects. Leave it empty to start an idle session. It is kept only until the agent has it, and is never written to the audit log.",
     modes: { manual: "Ask before risky steps (manual)", plan: "Plan only", acceptEdits: "Accept file edits" },
     start: "Start in the background", stop: "Stop", runningTitle: "Sessions started from the web", noneRunning: "None running.",
-    done: { saved: "Saved.", started: "Asked the agent to start a session; the result is below.", stopped: "Asked the agent to stop the session." },
+    done: { saved: "Saved.", auto: "Saved the automatic mode.", started: "Asked the agent to start a session; the result is below.", stopped: "Asked the agent to stop the session." },
   },
   projects: {
     title: "Projects", none: "No project is known on this machine yet.", noneHint: "A project appears when a session works in it, or when a folder is listed with aipod config projects add.",

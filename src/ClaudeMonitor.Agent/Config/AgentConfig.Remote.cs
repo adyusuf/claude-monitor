@@ -15,6 +15,18 @@ public sealed partial record AgentConfig
     /// <summary>The most Claude sessions this agent keeps running that were started from the web (ADR-0014).</summary>
     public int ClaudeWorkersMax { get; init; } = 3;
 
+    /// <summary>How often the daemon looks for an ask that no session can take (the automatic mode, ADR-0014 P3).</summary>
+    public TimeSpan ClaudeAutoEvery { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>An ask must have found no idle session for this long before the automatic mode starts one (a session that just finished its turn is given time to go idle).</summary>
+    public TimeSpan ClaudeAutoWait { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The most sessions the automatic mode starts by itself in an hour, for the whole machine.</summary>
+    public int ClaudeAutoStartsPerHour { get; init; } = 3;
+
+    /// <summary>How long a project is left alone after the automatic mode could not start a session in it.</summary>
+    public TimeSpan ClaudeAutoBackoff { get; init; } = TimeSpan.FromMinutes(10);
+
     /// <summary>The longest first prompt of a web start the agent hands to `claude` (the API caps what a person may type at ClaudeFirstPromptMax; the extra room is for the characters wrapping adds, and anything longer is cut with a marker).</summary>
     public int ClaudeFirstPromptMax { get; init; } = AgentActionKinds.ClaudeFirstPromptMax + 200;
 

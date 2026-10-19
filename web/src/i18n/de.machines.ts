@@ -73,10 +73,12 @@ export const deMachines: Dictionary["machines"] = {
     untrustedOption: "Claude Code vertraut nicht", trusted: "Claude Code vertraut diesem Ordner.",
     allUntrusted: "Claude Code vertraut noch keinem Projekt dieser Maschine: Öffnen Sie Claude an der Maschine einmal in einem der Ordner und bestätigen Sie die Vertrauensfrage.",
     firstPrompt: "Erste Eingabe (optional)", firstPromptCount: "{n} / {max}",
+    auto: "Von selbst eine Sitzung starten, wenn eine Frage eintrifft und keine frei ist",
+    autoHint: "Fragt eine andere Maschine diese zu einem Projekt und ist hier keine Claude-Sitzung frei, um sie zu übernehmen, startet diese Maschine eine Hintergrundsitzung in diesem Projekt (Modus manual: jeder riskante Schritt wartet auf eine Person) und die Frage wird ihr zugestellt. Höchstens {n} pro Stunde, nie eine zweite für ein Projekt, das schon eine hat. Jede Sitzung nutzt das Claude-Konto und den Tarif des Maschineneigentümers. Zum Einschalten ist eine aktuelle Anmeldung nötig.",
     firstPromptHint: "Wird der neuen Sitzung als Nachricht aus dem Web gesendet und so gekennzeichnet: Die Sitzung behandelt sie als Text zum Lesen, nicht als Befehl, und fragt an der Maschine nach, bevor etwas Nebenwirkungen hat. Leer lassen, um eine leerlaufende Sitzung zu starten. Sie wird nur bis zur Übernahme durch den Agent aufbewahrt und nie ins Audit-Protokoll geschrieben.",
     modes: { manual: "Vor riskanten Schritten fragen (manual)", plan: "Nur planen", acceptEdits: "Dateiänderungen akzeptieren" },
     start: "Im Hintergrund starten", stop: "Stoppen", runningTitle: "Über das Web gestartete Sitzungen", noneRunning: "Keine läuft.",
-    done: { saved: "Gespeichert.", started: "Der Agent wurde gebeten, eine Sitzung zu starten; das Ergebnis steht unten.", stopped: "Der Agent wurde gebeten, die Sitzung zu stoppen." },
+    done: { saved: "Gespeichert.", auto: "Der automatische Modus wurde gespeichert.", started: "Der Agent wurde gebeten, eine Sitzung zu starten; das Ergebnis steht unten.", stopped: "Der Agent wurde gebeten, die Sitzung zu stoppen." },
   },
   projects: {
     title: "Projekte", none: "Auf dieser Maschine ist noch kein Projekt bekannt.", noneHint: "Ein Projekt erscheint, wenn eine Sitzung darin arbeitet oder wenn ein Ordner mit aipod config projects add aufgeführt wird.",

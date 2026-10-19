@@ -66,6 +66,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         runs.Recover();
         ScriptScratch.Sweep(config.Home, _ => false); // no run is running yet: whatever a crash left in the scratch folders goes
         if (monitor.Policy().RunAccount is not null) ScriptScratch.SweepFolder(RunAccount.WorkFolder(config.Home), _ => false, onlyRunFolders: true);
+        var claudeControl = new ClaudeControl(config, new SystemClaudeCli(), clock);
         var actions = new ActionRelay(api, log, async () =>
             {
                 await using var text = new StringWriter();
@@ -73,7 +74,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
                 return text.ToString();
             },
             ct => new Updater(config, api, http, new SystemProcessRunner(), new DaemonControl(config, log, clock), log, clock).CheckAsync(ct),
-            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode, new ClaudeControl(config, new SystemClaudeCli(), clock));
+            verb => DaemonControl.Spawn(config, log, verb), config.ServiceMode, claudeControl);
         stream = new Relay(config, streamStore, api, clock) { Runs = runs, Actions = actions };
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
@@ -94,6 +95,12 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var asks = new AskPump(new LiveSettings(config, clock).Current, askStore, new SocketInboxTransport(),
             async (id, update, ct) => await api.RemoteAsync(HttpMethod.Post, $"api/agent/asks/{id}/status", JsonSerializer.SerializeToElement(update, ApiClient.Json), ct),
             () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), clock);
+        // The automatic Claude start (ADR-0014 P3) has its own connection and its own ask pump, only to ask which sessions could take an ask: the loops never share a connection.
+        using var autoStore = new LocalStore(config.DatabasePath);
+        var autoSettings = new LiveSettings(config, clock);
+        var autoAsks = new AskPump(autoSettings.Current, autoStore, new SocketInboxTransport(), (_, _, _) => Task.CompletedTask, () => false, clock);
+        var autoStart = new ClaudeAutoStart(autoSettings.Current, autoStore, claudeControl, (ask, now) => autoAsks.Candidates(ask, autoSettings.Current(), now).Count > 0,
+            () => MachineRoles.IsStrict(monitor.Policy().ClaimedEnvironment, monitor.Policy().ClaimedFunction), log, clock);
         var claudeUpdates = new ClaudeUpdater(config, claudeStore, new SystemProcessRunner(), new SystemNotifier(new SystemProcessRunner(), config.UpdateProbeTimeout), log, clock);
         log.Write($"daemon started, version {AgentConfig.Version}");
         await Task.WhenAll(
@@ -110,6 +117,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             }, api, revoked, error => relay.UploadOutcome(error)),
             Loop("inbox", config.PushPollEvery, ct => inbox.PumpAsync(ct), api, revoked),
             Loop("asks", config.PushPollEvery, ct => asks.PumpAsync(ct), api, revoked),
+            Loop("claude-auto", config.ClaudeAutoEvery, ct => autoStart.RunOnceAsync(ct), api, revoked),
             Loop("heartbeat", config.HeartbeatEvery, beat.HeartbeatAsync, api, revoked, beat.HeartbeatFailed),
             Loop("settings", config.SettingsEvery, async ct =>
             {

@@ -148,16 +148,15 @@ public static class AgentActions
     private sealed record ClaudeCheck(string? ProjectKey, string? PermissionMode, string? SessionRef, IResult? Refusal, string? FirstPrompt = null);
 
     /// <summary>
-    /// The rules of starting and stopping Claude from the web (ADR-0014), on top of the owner-only rule: the workspace's remote-work switch, the machine owner's own
-    /// opt-in, an admin-set environment of dev or test that no claim makes stricter (production and database machines never), a Claude Code on the machine, no
-    /// service agent, and fields that are keys and enums, never text. A stop names only a session this agent's earlier start returned.
+    /// The rules about the MACHINE that every Claude start, by hand or by the daemon's own policy, has to meet (ADR-0013, ADR-0014): the workspace's remote-work switch, the owner's opt-in,
+    /// no service agent, an admin-set environment of dev or test that no claim makes stricter, and a Claude Code on the machine. Null when they are all met.
     /// </summary>
-    private static async Task<ClaudeCheck> ClaudeCheckAsync(MonitorDb db, Agent agent, string kind, AgentActionRequest req, CancellationToken ct)
+    private static async Task<IResult?> MachineRefusalAsync(MonitorDb db, Agent agent, bool requireOptIn, CancellationToken ct)
     {
-        static ClaudeCheck Refuse(int status, string title) => new(null, null, null, Results.Problem(statusCode: status, title: title));
+        static IResult Refuse(int status, string title) => Results.Problem(statusCode: status, title: title);
         var settings = await db.WorkspaceSettings.AsNoTracking().FirstAsync(s => s.WorkspaceId == agent.WorkspaceId, ct);
         if (!settings.RemoteRunsEnabled) return Refuse(StatusCodes.Status409Conflict, RemoteErrors.Disabled);
-        if (!agent.AcceptsClaudeControl) return Refuse(StatusCodes.Status409Conflict, AgentActionErrors.ClaudeNotAccepted);
+        if (requireOptIn && !agent.AcceptsClaudeControl) return Refuse(StatusCodes.Status409Conflict, AgentActionErrors.ClaudeNotAccepted);
         if (agent.ServiceMode) return Refuse(StatusCodes.Status409Conflict, AgentActionErrors.ClaudeServiceMode);
         if (agent.RoleEnvironment is null) return Refuse(StatusCodes.Status409Conflict, RemoteErrors.RoleNotSet);
         var environment = MachineRoles.EffectiveEnvironment(agent.RoleEnvironment, agent.ClaimedEnvironment);
@@ -167,7 +166,18 @@ public static class AgentActions
             return Refuse(StatusCodes.Status409Conflict, AgentActionErrors.ClaudeEnvironment);
         }
 
-        if (agent.ClaudeKind is null or ClaudeKinds.None) return Refuse(StatusCodes.Status409Conflict, AgentActionErrors.ClaudeNotInstalled);
+        return agent.ClaudeKind is null or ClaudeKinds.None ? Refuse(StatusCodes.Status409Conflict, AgentActionErrors.ClaudeNotInstalled) : null;
+    }
+
+    /// <summary>
+    /// The rules of starting and stopping Claude from the web (ADR-0014), on top of the owner-only rule: the workspace's remote-work switch, the machine owner's own
+    /// opt-in, an admin-set environment of dev or test that no claim makes stricter (production and database machines never), a Claude Code on the machine, no
+    /// service agent, and fields that are keys and enums, never text. A stop names only a session this agent's earlier start returned.
+    /// </summary>
+    private static async Task<ClaudeCheck> ClaudeCheckAsync(MonitorDb db, Agent agent, string kind, AgentActionRequest req, CancellationToken ct)
+    {
+        static ClaudeCheck Refuse(int status, string title) => new(null, null, null, Results.Problem(statusCode: status, title: title));
+        if (await MachineRefusalAsync(db, agent, requireOptIn: true, ct) is { } machineRefused) return new(null, null, null, machineRefused);
         if (kind == AgentActionKinds.ClaudeStart)
         {
             if (req.ProjectKey is not { Length: >= 1 and <= RunKinds.ProjectKeyMax } project || project.Any(char.IsControl)) return new(null, null, null, Http.Invalid("projectKey", AgentActionErrors.InvalidProject));
@@ -202,13 +212,20 @@ public static class AgentActions
         var userId = http.User.UserId();
         var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == agentId && a.Status == AgentStatuses.Active, http.RequestAborted);
         if (agent is null || agent.UserId != userId || await Access.MemberAsync(db, userId, agent.WorkspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        if (req.Accept && !agent.AcceptsClaudeControl && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if (req.AutoMode is not null && !ClaudeAutoModes.All.Contains(req.AutoMode)) return Http.Invalid("autoMode", AgentActionErrors.InvalidAutoMode);
+        // The automatic mode (ADR-0014 P3) only exists while the switch is on: turning the switch off turns it off, and it is never on for a machine a start would be refused on.
+        var autoBefore = agent.ClaudeAutoMode ?? ClaudeAutoModes.Off;
+        var autoAfter = !req.Accept ? ClaudeAutoModes.Off : req.AutoMode ?? autoBefore;
+        var turningAutoOn = autoAfter == ClaudeAutoModes.OnMessage && autoBefore != ClaudeAutoModes.OnMessage;
+        if (turningAutoOn && await MachineRefusalAsync(db, agent, requireOptIn: false, http.RequestAborted) is { } machineRefused) return machineRefused;
+        if ((req.Accept && !agent.AcceptsClaudeControl || turningAutoOn) && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
         var was = agent.AcceptsClaudeControl;
         var now = clock.GetUtcNow();
         agent.AcceptsClaudeControl = req.Accept;
         agent.AcceptsClaudeControlSetAt = now;
         agent.AcceptsClaudeControlSetBy = userId;
-        Audit.Add(db, http, clock, AuditActions.AgentClaudeControlChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId, detail: new { before = was, after = req.Accept });
+        agent.ClaudeAutoMode = autoAfter == ClaudeAutoModes.Off ? null : autoAfter;
+        Audit.Add(db, http, clock, AuditActions.AgentClaudeControlChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId, detail: new { before = was, after = req.Accept, autoBefore, autoAfter });
         await db.SaveChangesAsync(http.RequestAborted);
         if (was && !req.Accept)
         {
@@ -218,7 +235,7 @@ public static class AgentActions
         }
 
         broker.Publish(Broker.Workspace(agent.WorkspaceId), new StreamMessage(AgentRoleEndpoints.MachineEvent, new { agentId }));
-        return Results.Ok(new AgentClaudeView(agentId, agent.AcceptsClaudeControl, agent.AcceptsClaudeControlSetAt, agent.AcceptsClaudeControlSetBy));
+        return Results.Ok(new AgentClaudeView(agentId, agent.AcceptsClaudeControl, agent.AcceptsClaudeControlSetAt, agent.AcceptsClaudeControlSetBy, autoAfter));
     }
 
     private static Task<AgentAction?> OpenOfKindAsync(MonitorDb db, Guid agentId, string kind, CancellationToken ct) =>

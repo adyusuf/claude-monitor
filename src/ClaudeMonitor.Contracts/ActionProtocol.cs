@@ -82,10 +82,24 @@ public sealed record AgentActionRequest(string Kind, string? Code = null, string
 public sealed record AgentActionView(Guid Id, Guid AgentId, string Kind, string Status, string? Result, DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt, DateTimeOffset? FinishedAt, string? ProjectKey = null, string? PermissionMode = null, string? SessionRef = null);
 
-/// <summary>The machine owner's switch for starting Claude from the web on this machine (ADR-0014); off until they say so. Code: a two-step code when turning it on needs one.</summary>
-public sealed record AgentClaudeRequest(bool Accept, string? Code = null);
+/// <summary>
+/// The machine owner's switch for starting Claude from the web on this machine (ADR-0014); off until they say so. Code: a two-step code when turning it on needs one.
+/// AutoMode (P3): null leaves the automatic mode as it is, one of <see cref="ClaudeAutoModes"/> sets it; turning it on needs the same sign-in as the switch.
+/// </summary>
+public sealed record AgentClaudeRequest(bool Accept, string? Code = null, string? AutoMode = null);
 
-public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy);
+public sealed record AgentClaudeView(Guid AgentId, bool Accepts, DateTimeOffset? SetAt, Guid? SetBy, string? AutoMode = null);
+
+/// <summary>
+/// What the daemon may do about a Claude session by itself (ADR-0014 P3), set per machine by its owner. Off by default. <c>on_message</c>: when an ask from another machine names a project
+/// and no session there is idle to take it, start one session in that project (bounded: a budget per hour, backoff after a failure, never a second one for a project that has one).
+/// </summary>
+public static class ClaudeAutoModes
+{
+    public const string Off = "off";
+    public const string OnMessage = "on_message";
+    public static readonly IReadOnlyList<string> All = [Off, OnMessage];
+}
 
 public static class AgentActionErrors
 {
@@ -107,6 +121,7 @@ public static class AgentActionErrors
 
     /// <summary>Another start of this machine is still open (queued or running its start): wait for it, then ask again.</summary>
     public const string ClaudeStartPending = "claude_start_pending";
+    public const string InvalidAutoMode = "invalid_auto_mode";
 
     /// <summary>The machine's agent read Claude Code's own trust record and the folder is not in it: a start would only be refused there (ADR-0014 P2).</summary>
     public const string FolderNotTrusted = "claude_folder_not_trusted";

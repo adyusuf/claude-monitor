@@ -73,10 +73,12 @@ export const trMachines: Dictionary["machines"] = {
     untrustedOption: "Claude Code güvenmiyor", trusted: "Claude Code bu klasöre güveniyor.",
     allUntrusted: "Claude Code bu makinedeki hiçbir projeye henüz güvenmiyor: makinede klasörlerden birinde bir kez Claude'u açıp güven sorusunu onaylayın.",
     firstPrompt: "İlk istem (isteğe bağlı)", firstPromptCount: "{n} / {max}",
+    auto: "Bir soru geldiğinde boşta oturum yoksa kendiliğinden bir oturum başlat",
+    autoHint: "Başka bir makine bu makineye bir proje hakkında soru sorduğunda ve burada soruyu alacak boşta bir Claude oturumu yoksa, bu makine o projede bir arka plan oturumu başlatır (manual kip: riskli her adım bir kişiyi bekler) ve soru ona iletilir. Saatte en fazla {n}, oturumu olan projeye ikincisi hiç. Her oturum makine sahibinin Claude hesabını ve planını kullanır. Açmak için yakın zamanda giriş yapılmış olmalı.",
     firstPromptHint: "Yeni oturuma web'den gelen bir mesaj olarak, öyle etiketlenerek gönderilir: oturum onu emir değil okunacak metin sayar ve yan etkisi olan bir şeyden önce makinede sorar. Boş bırakırsanız boşta bir oturum açılır. Ajan alana dek saklanır, denetim kaydına hiç yazılmaz.",
     modes: { manual: "Riskli adımlardan önce sor (manual)", plan: "Yalnızca plan", acceptEdits: "Dosya düzenlemelerini kabul et" },
     start: "Arka planda başlat", stop: "Durdur", runningTitle: "Web'den başlatılan oturumlar", noneRunning: "Çalışan yok.",
-    done: { saved: "Kaydedildi.", started: "Ajandan oturum başlatması istendi; sonuç aşağıda.", stopped: "Ajandan oturumu durdurması istendi." },
+    done: { saved: "Kaydedildi.", auto: "Otomatik mod kaydedildi.", started: "Ajandan oturum başlatması istendi; sonuç aşağıda.", stopped: "Ajandan oturumu durdurması istendi." },
   },
   projects: {
     title: "Projeler", none: "Bu makinede henüz bilinen proje yok.", noneHint: "Bir oturum projede çalışınca ya da bir klasör aipod config projects add ile listelenince proje görünür.",

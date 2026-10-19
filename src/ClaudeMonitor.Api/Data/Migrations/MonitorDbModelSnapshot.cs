@@ -84,6 +84,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("claimed_function");
 
+                    b.Property<string>("ClaudeAutoMode")
+                        .HasColumnType("text")
+                        .HasColumnName("claude_auto_mode");
+
                     b.Property<string>("ClaudeKind")
                         .HasColumnType("text")
                         .HasColumnName("claude_kind");
@@ -261,6 +265,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
                             t.HasCheckConstraint("ck_agents_claimed_environment", "claimed_environment IS NULL OR claimed_environment IN ('dev', 'test', 'stage', 'preprod', 'production', 'other')");
 
                             t.HasCheckConstraint("ck_agents_claimed_function", "claimed_function IS NULL OR claimed_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
+
+                            t.HasCheckConstraint("ck_agents_claude_auto_mode", "claude_auto_mode IS NULL OR claude_auto_mode IN ('off', 'on_message')");
 
                             t.HasCheckConstraint("ck_agents_claude_kind", "claude_kind IS NULL OR claude_kind IN ('none', 'npm', 'native', 'unsupported')");
 

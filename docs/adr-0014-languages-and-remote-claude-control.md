@@ -1,6 +1,6 @@
 # ADR-0014 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
-Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1 and P2 of Part B are built (see "P1 as built" and "P2 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
+Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below); P1, P2 and P3 (`on_message` only) of Part B are built (see "P1 as built", "P2 as built" and "P3 as built").** Part A is partly built (the web, the API mails); the rest of A and P2 onward of B are design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
 folders, asks) and ADR-0012 (the names aipod and Podium).
 
@@ -169,3 +169,21 @@ Built with the defaults proposed above; not released (the agent is still 0.5.0).
 - **Decisions applied.** Open item 3 (`manual` for a session nobody watches) stays the default and the only list is manual, plan and acceptEdits; item 5 (what the page says for an untrusted folder) is the text above.
   Still open: 1 (Windows), 2 (who may turn on automatic mode, P3), 4 (the cost).
 - **Not built:** P3, the automatic `on_message` mode; a way to see the first prompt again after sending (deliberate: it is not kept).
+
+## P3 as built (19/10/2026): the automatic mode `on_message`
+
+Built with the defaults proposed above, so open items 2 and 4 are applied rather than answered: **the machine's owner alone** turns it on (a recent sign-in or a code, like the switch it depends on) and the cost is the owner's
+Claude plan, which the page says in the sentence next to the checkbox. Not released; the tests are written and compile but were **not run** (all runs are paused, `docs/release.md`).
+
+- **What it does.** When an ask from another machine names a project and no session here is idle to take it, and that has been true for 30 seconds, the daemon starts ONE session in that project with the same fixed
+  `claude --bg ... --permission-mode manual` command as a start from the web, no prompt. The ask stays queued as before and the usual pump delivers it once the new session is idle and has registered its inbox.
+  It only looks at asks, not at the messages typed to a particular session (those name a session, not a project).
+- **Bounded.** At most 3 sessions an hour for the machine (kept in the local database, so a restart does not reset it), no second session for a project that already has one this agent started and has not stopped,
+  10 minutes of backoff for a project after a refused or failed start, and the existing cap of 3 running sessions started by the agent. Every refusal of a web start applies (no service agent, nothing on a production
+  or database claim, a folder Claude Code does not trust, no `claude`).
+- **Where it is set.** `agents.claude_auto_mode` (`off`, `on_message`), through the owner's `PUT /api/agents/{id}/claude` (`autoMode`, ignored when absent). Turning it on needs the same gate as a start (workspace remote
+  work on, the owner's switch, dev or test set by an admin, no strict claim, no service agent, `claude` present) and a recent sign-in; turning the switch off, or moving the machine, turns it off. The API tells the
+  agent `on_message` only while the owner's switch and the workspace's remote-work switch are both on; the agent keeps it as a workspace-tagged switch (`settings.claude_auto_mode`), forgotten at login and logout.
+- **Page.** A checkbox at the top of the new-session part of the Claude card, with the cost and the bounds in words, in tr, en and de.
+- **Not built.** `always` (one worker kept running: it would spend without a reason on the ask, so it needs its own decision), the reason on the session ("started by policy, for an ask from X") and any trigger other
+  than an ask (messages to a session that is gone).
