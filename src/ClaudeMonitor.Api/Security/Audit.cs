@@ -34,6 +34,7 @@ public static class AuditActions
     public const string AgentServicesChanged = "agent.services_changed";
     public const string AgentAsksChanged = "agent.asks_changed";
     public const string AgentActionRequested = "agent.action_requested";
+    public const string AgentClaudeControlChanged = "agent.claude_control_changed";
     public const string AskCreated = "ask.created";
     public const string AskAnswered = "ask.answered";
     public const string AskCancelled = "ask.cancelled";

@@ -8,9 +8,10 @@ namespace ClaudeMonitor.Api.Tests;
 public sealed class AgentActionContractTests
 {
     [Fact]
-    public void The_kinds_are_the_four_the_agent_and_the_web_already_speak_and_in_this_order()
+    public void The_kinds_are_the_four_the_agent_and_the_web_already_speak_in_this_order_then_the_two_for_Claude()
     {
-        Assert.Equal(new[] { "restart", "update_check", "update", "status" }, AgentActionKinds.All.ToArray());
+        Assert.Equal(new[] { "restart", "update_check", "update", "status", "claude_start", "claude_stop" }, AgentActionKinds.All.ToArray());
+        Assert.Equal(("claude_start", "claude_stop"), (AgentActionKinds.ClaudeStart, AgentActionKinds.ClaudeStop));
         Assert.Equal(("restart", "update_check", "update", "status"),
             (AgentActionKinds.Restart, AgentActionKinds.UpdateCheck, AgentActionKinds.Update, AgentActionKinds.Status));
     }
