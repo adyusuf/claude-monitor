@@ -42,7 +42,7 @@ public static class AgentActions
 
         var now = clock.GetUtcNow();
         await ExpireStaleAsync(db, agentId, now, http.RequestAborted);
-        if (await OpenOfKindAsync(db, agentId, kind, http.RequestAborted) is { } open) return Results.Ok(View(open));
+        if (await OpenOfKindAsync(db, agentId, kind, http.RequestAborted) is { } open) return SameOrBusy(open, claude);
 
         var action = new AgentAction
         {
@@ -54,12 +54,14 @@ public static class AgentActions
             PermissionMode = claude?.PermissionMode,
             SessionRef = claude?.SessionRef,
             Prompt = claude?.Prompt,
+            Target = claude?.Target,
+            Value = claude?.Value,
             CreatedAt = now,
             ExpiresAt = now + AgentActionKinds.QueueTtl,
         };
         db.AgentActions.Add(action);
         Audit.Add(db, http, clock, AuditActions.AgentActionRequested, agent.WorkspaceId, userId, targetType: "agent", targetId: agentId,
-            detail: claude is null ? new { kind } : (object)new { kind, projectKey = claude.ProjectKey, permissionMode = claude.PermissionMode, sessionRef = claude.SessionRef, hasPrompt = claude.Prompt is not null });
+            detail: claude is null ? new { kind } : (object)new { kind, projectKey = claude.ProjectKey, permissionMode = claude.PermissionMode, sessionRef = claude.SessionRef, hasPrompt = claude.Prompt is not null, target = claude.Target, value = claude.Value });
         try
         {
             await db.SaveChangesAsync(http.RequestAborted);
@@ -68,11 +70,11 @@ public static class AgentActions
         {
             // Another request of the same kind won the one-open-action index: that one is the answer.
             db.ChangeTracker.Clear();
-            return await OpenOfKindAsync(db, agentId, kind, http.RequestAborted) is { } won ? Results.Ok(View(won)) : throw new InvalidOperationException("agent action not stored");
+            return await OpenOfKindAsync(db, agentId, kind, http.RequestAborted) is { } won ? SameOrBusy(won, claude) : throw new InvalidOperationException("agent action not stored");
         }
 
         Changed(broker, action);
-        broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Action, new AgentActionMessage(action.Id, action.Kind, action.ExpiresAt, action.ProjectKey, action.PermissionMode, action.SessionRef, action.Prompt)));
+        broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Action, new AgentActionMessage(action.Id, action.Kind, action.ExpiresAt, action.ProjectKey, action.PermissionMode, action.SessionRef, action.Prompt, action.Target, action.Value)));
         return Results.Ok(View(action));
     }
 
@@ -101,7 +103,7 @@ public static class AgentActions
         await ExpireStaleAsync(db, agentId, now, ct);
         return await db.AgentActions.AsNoTracking()
             .Where(a => a.AgentId == agentId && a.Status == AgentActionStatuses.Queued && a.ExpiresAt > now)
-            .OrderBy(a => a.CreatedAt).Select(a => new AgentActionMessage(a.Id, a.Kind, a.ExpiresAt, a.ProjectKey, a.PermissionMode, a.SessionRef, a.Prompt)).ToListAsync(ct);
+            .OrderBy(a => a.CreatedAt).Select(a => new AgentActionMessage(a.Id, a.Kind, a.ExpiresAt, a.ProjectKey, a.PermissionMode, a.SessionRef, a.Prompt, a.Target, a.Value)).ToListAsync(ct);
     }
 
     /// <summary>
@@ -135,10 +137,15 @@ public static class AgentActions
     }
 
     public static AgentActionView View(AgentAction a) =>
-        new(a.Id, a.AgentId, a.Kind, a.Status, a.Result, a.CreatedAt, a.ExpiresAt, a.FinishedAt, a.ProjectKey, a.PermissionMode, a.SessionRef);
+        new(a.Id, a.AgentId, a.Kind, a.Status, a.Result, a.CreatedAt, a.ExpiresAt, a.FinishedAt, a.ProjectKey, a.PermissionMode, a.SessionRef, a.Target, a.Value);
+
+    /// <summary>The open action of the same kind is the answer to a repeated request, unless it is a remote write for something else: then the machine is busy with that one.</summary>
+    private static IResult SameOrBusy(AgentAction open, ClaudeCheck? asked) =>
+        AgentActionKinds.IsConfig(open.Kind) && asked is not null && (open.Target != asked.Target || open.Value != asked.Value || open.ProjectKey != asked.ProjectKey)
+            ? Results.Problem(statusCode: StatusCodes.Status409Conflict, title: AgentActionErrors.ActionBusy) : Results.Ok(View(open));
 
     /// <summary>What a Claude request was checked to be: its (cleaned) fields, or why it is refused.</summary>
-    private sealed record ClaudeCheck(string? ProjectKey, string? PermissionMode, string? SessionRef, IResult? Refusal, string? Prompt = null);
+    private sealed record ClaudeCheck(string? ProjectKey, string? PermissionMode, string? SessionRef, IResult? Refusal, string? Prompt = null, string? Target = null, string? Value = null);
 
     /// <summary>
     /// The rules of starting and stopping Claude from the web (ADR-0014), on top of the owner-only rule: the workspace's remote-work switch, the machine owner's own
@@ -161,6 +168,12 @@ public static class AgentActions
         }
 
         if (agent.ClaudeKind is null or ClaudeKinds.None) return Refuse(StatusCodes.Status409Conflict, AgentActionErrors.ClaudeNotInstalled);
+        if (AgentActionKinds.IsConfig(kind))
+        {
+            var checkedConfig = await ConfigActions.CheckAsync(db, agent.Id, kind, req, ct);
+            return new(checkedConfig.ProjectKey, null, null, checkedConfig.Refusal, null, checkedConfig.Target, checkedConfig.Value);
+        }
+
         if (kind == AgentActionKinds.ClaudeStart)
         {
             if (req.ProjectKey is not { Length: >= 1 and <= RunKinds.ProjectKeyMax } project || project.Any(char.IsControl)) return new(null, null, null, Http.Invalid("projectKey", AgentActionErrors.InvalidProject));
@@ -210,7 +223,7 @@ public static class AgentActions
         await db.SaveChangesAsync(http.RequestAborted);
         if (was && !req.Accept)
         {
-            await db.AgentActions.Where(a => a.AgentId == agentId && (a.Kind == AgentActionKinds.ClaudeStart || a.Kind == AgentActionKinds.ClaudeStop)
+            await db.AgentActions.Where(a => a.AgentId == agentId && (a.Kind == AgentActionKinds.ClaudeStart || a.Kind == AgentActionKinds.ClaudeStop || AgentActionKinds.Config.Contains(a.Kind))
                     && (a.Status == AgentActionStatuses.Queued || a.Status == AgentActionStatuses.Delivered))
                 .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, AgentActionStatuses.Expired).SetProperty(a => a.FinishedAt, now).SetProperty(a => a.Prompt, (string?)null), http.RequestAborted);
         }

@@ -102,7 +102,8 @@ export interface AskView {
 }
 export interface AgentAsksView { agentId: string; accept: boolean; setAt: string | null; setBy: string | null }
 
-export type AgentActionKind = "restart" | "update_check" | "update" | "status" | "claude_start" | "claude_stop";
+export type AgentActionKind = "restart" | "update_check" | "update" | "status" | "claude_start" | "claude_stop"
+  | "plugin_enable" | "plugin_disable" | "plugin_update" | "plugin_install" | "project_setting";
 export type ClaudePermissionMode = "manual" | "plan" | "acceptEdits";
 export type ClaudeAutoMode = "off" | "on_message";
 export interface AgentClaudeView { agentId: string; accepts: boolean; setAt: string | null; setBy: string | null; autoMode?: ClaudeAutoMode }
@@ -113,4 +114,6 @@ export interface AgentActionView {
   createdAt: string; expiresAt: string; finishedAt: string | null;
   /** Claude control (ADR-0014): the project and mode of a start, the short id of the session a start returned or a stop names. */
   projectKey?: string | null; permissionMode?: ClaudePermissionMode | null; sessionRef?: string | null;
+  /** A remote write (ADR-0011 §7a): the plugin id or the setting name, and the setting's value. */
+  target?: string | null; value?: string | null;
 }

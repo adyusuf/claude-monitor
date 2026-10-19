@@ -14,7 +14,7 @@ namespace ClaudeMonitor.Agent.Daemon;
 /// Because those two end this daemon, their outcome is reported BEFORE the verb starts and says "started". Nothing here throws into the stream.
 /// </summary>
 public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> status, Func<CancellationToken, Task<UpdateCheck>> check,
-    Func<string, bool> spawn, bool serviceMode = false, ClaudeControl? claude = null)
+    Func<string, bool> spawn, bool serviceMode = false, ClaudeControl? claude = null, ClaudeConfigControl? claudeConfig = null)
 {
     private readonly ConcurrentDictionary<Guid, byte> taken = new();
 
@@ -81,6 +81,14 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
             case AgentActionKinds.ClaudeStart:
             case AgentActionKinds.ClaudeStop:
                 return (false, "this agent cannot start or stop Claude here", null, null);
+            case AgentActionKinds.PluginEnable or AgentActionKinds.PluginDisable or AgentActionKinds.PluginUpdate or AgentActionKinds.PluginInstall when claudeConfig is not null:
+                var plugin = await claudeConfig.PluginAsync(action.Kind, action.Target, ct);
+                return (plugin.Succeeded, plugin.Text, null, null);
+            case AgentActionKinds.ProjectSetting when claudeConfig is not null:
+                var setting = claudeConfig.Setting(action.ProjectKey, action.Target, action.Value);
+                return (setting.Succeeded, setting.Text, null, null);
+            case AgentActionKinds.PluginEnable or AgentActionKinds.PluginDisable or AgentActionKinds.PluginUpdate or AgentActionKinds.PluginInstall or AgentActionKinds.ProjectSetting:
+                return (false, "this agent cannot change Claude's setup here", null, null);
             case AgentActionKinds.Status:
                 return (true, await status(), null, null);
             case AgentActionKinds.UpdateCheck:

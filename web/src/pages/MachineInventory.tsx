@@ -2,8 +2,11 @@ import { useState } from "react";
 import { api } from "../api/endpoints";
 import type { ClaudeInventory, InventorySetting, MachineDetail, MachineProjectView } from "../api/types";
 import { Button, Notice } from "../components/ui";
+import { config } from "../config";
 import { useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { versionAtLeast } from "../lib/version";
+import { type Ask, InstallPlugin, PluginButtons, SettingForm } from "./InventoryWrites";
 import { useCodeGate } from "./useCodeGate";
 
 /** The yes/no gates of a project as short lines, "merge.dev: yes". Names and values are text from the machine, shown as text. */
@@ -22,7 +25,7 @@ function Gates({ setting }: { setting: InventorySetting }) {
  * What Claude Code has on this machine, read-only (ADR-0011 §7a, step E): its sessions, installed plugins, skill names and, for projects that keep them, the
  * adyusuf working mode, model and gates. Only the owner and admins are sent it. Every text comes from the machine and is shown as text; nothing here can be changed from the web.
  */
-function InventoryView({ inventory, projects }: { inventory: ClaudeInventory; projects: MachineProjectView[] }) {
+function InventoryView({ inventory, projects, writes }: { inventory: ClaudeInventory; projects: MachineProjectView[]; writes: { ask: Ask; busy: boolean } | null }) {
   const { t } = useI18n();
   const nameOf = (key: string | null) => (key ? projects.find((p) => p.key === key)?.name ?? key : "–");
   const { sessions, plugins, skills, settings } = inventory;
@@ -54,10 +57,12 @@ function InventoryView({ inventory, projects }: { inventory: ClaudeInventory; pr
               {p.version ? <span className="muted">{p.version}</span> : null}
               <span className={p.enabled ? "badge status-active" : "badge"}>{p.enabled ? t("machines.inventory.enabled") : t("machines.inventory.disabled")}</span>
               {p.scope ? <span className="badge">{p.scope}</span> : null}
+              {writes ? <PluginButtons plugin={p} ask={writes.ask} busy={writes.busy} /> : null}
             </li>
           ))}
         </ul>
       )}
+      {writes ? <InstallPlugin ask={writes.ask} busy={writes.busy} /> : null}
 
       <h3>{t("machines.inventory.skills")}</h3>
       {skills === null ? <p className="muted">{t("machines.inventory.unknown")}</p> : skills.length === 0 ? <p className="muted">{t("machines.inventory.noSkills")}</p> : (
@@ -78,6 +83,7 @@ function InventoryView({ inventory, projects }: { inventory: ClaudeInventory; pr
                 {s.modeModel ? <span className="badge">{s.modeModel}</span> : null}
               </div>
               <Gates setting={s} />
+              {writes ? <SettingForm setting={s} ask={writes.ask} busy={writes.busy} /> : null}
             </li>
           ))}
         </ul>
@@ -90,11 +96,24 @@ function InventoryView({ inventory, projects }: { inventory: ClaudeInventory; pr
  * The card: the machine owner decides whether the agent reads and reports any of this (a recent sign-in to switch it on, off drops what was stored); admins see
  * the inventory while it is on. While it is off, or on but not yet reported, the card says so instead of an empty list.
  */
-export function MachineInventory({ agentId, detail, owned, onChanged }: { agentId: string; detail: MachineDetail; owned: boolean; onChanged: () => void }) {
+export function MachineInventory({ agentId, detail, owned, agentVersion, onChanged }: { agentId: string; detail: MachineDetail; owned: boolean; agentVersion: string | null; onChanged: () => void }) {
   const { t } = useI18n();
   const gate = useCodeGate("reauth_required", "machines.inventory.enableHint");
+  const writeGate = useCodeGate("reauth_required", "machines.inventory.writeHint");
   const [done, setDone] = useState(false);
+  const [asked, setAsked] = useState(false);
   const shared = detail.inventoryShared === true;
+  const view = detail.machine;
+  const environments = ["dev", "test"];
+  const canWrite = owned && shared && view.acceptsClaudeControl === true && view.online && versionAtLeast(agentVersion, config.claudeMinAgentVersion)
+    && view.roleEnvironment != null && environments.includes(view.roleEnvironment) && view.effectiveEnvironment != null && environments.includes(view.effectiveEnvironment);
+  const ask: Ask = async (kind, extra) => {
+    setAsked(false);
+    if (await writeGate.attempt((code) => api.requestAgentAction(agentId, kind, code, extra).then(() => undefined))) {
+      setAsked(true);
+      onChanged();
+    }
+  };
   const set = async (share: boolean) => {
     setDone(false);
     if (await gate.attempt((code) => api.setAgentInventory(agentId, share, code).then(() => undefined))) {
@@ -104,8 +123,17 @@ export function MachineInventory({ agentId, detail, owned, onChanged }: { agentI
   };
   return (
     <div className="stack">
-      {shared && detail.inventory ? <InventoryView inventory={detail.inventory} projects={detail.projects} />
+      {shared && detail.inventory ? <InventoryView inventory={detail.inventory} projects={detail.projects} writes={canWrite ? { ask, busy: writeGate.busy } : null} />
         : shared ? <p className="muted">{t("machines.inventory.waiting")}</p> : <p className="muted">{t("machines.inventory.off")}</p>}
+      {owned && shared && detail.inventory && !canWrite ? <p className="muted small">{t("machines.inventory.writesOff")}</p> : null}
+      {canWrite ? (
+        <div className="stack">
+          <p className="muted small">{t("machines.inventory.writesHint")}</p>
+          {writeGate.field}
+          {writeGate.error ? <Notice kind="error">{writeGate.error}</Notice> : null}
+          {asked ? <Notice kind="success">{t("machines.inventory.asked")}</Notice> : null}
+        </div>
+      ) : null}
       {owned ? (
         <div className="stack">
           {gate.field}

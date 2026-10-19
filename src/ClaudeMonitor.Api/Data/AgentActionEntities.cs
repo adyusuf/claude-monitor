@@ -23,6 +23,10 @@ public sealed class AgentAction
 
     /// <summary>The optional first prompt of a Claude start (ADR-0014 P2): text from the web, kept only until the agent takes the action (or it ends), then NULL. Never listed, never audited.</summary>
     public string? Prompt { get; set; }
+
+    /// <summary>A remote write (ADR-0011 §7a): the plugin id or the setting name, and the value of a setting. Closed shapes (<see cref="ClaudeConfigRules"/>), never free text; NULL for the other kinds.</summary>
+    public string? Target { get; set; }
+    public string? Value { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset? DeliveredAt { get; set; }

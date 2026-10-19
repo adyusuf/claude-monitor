@@ -2,7 +2,9 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClaudeInventory, MachineDetail, MachineProjectView } from "../api/types";
+import { de } from "../i18n/de";
 import { en } from "../i18n/en";
+import { tr } from "../i18n/tr";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
@@ -20,19 +22,20 @@ const inventory = (over: Partial<ClaudeInventory> = {}): ClaudeInventory => ({
   settings: [{ projectKey: "git:host/shop", mode: "B", modeModel: "sonnet", gates: { "push.prod": false, "merge.dev": true } }],
   at: new Date(2026, 9, 5, 10, 0).toISOString(), ...over,
 });
-const detail = (inv: ClaudeInventory | null | undefined, shared = inv != null): MachineDetail => ({ machine: machine(), note: null, noteSetAt: null, servicesShared: false, services: null, servicesAt: null, projects: [project], inventory: inv, inventoryShared: shared });
+const dev = { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: true } as const;
+const detail = (inv: ClaudeInventory | null | undefined, shared = inv != null, view: Partial<ReturnType<typeof machine>> = {}): MachineDetail => ({ machine: machine(view), note: null, noteSetAt: null, servicesShared: false, services: null, servicesAt: null, projects: [project], inventory: inv, inventoryShared: shared });
 
-function api(inv: ClaudeInventory | null | undefined, over: Parameters<typeof mockApi>[0] = {}, shared?: boolean, owner = "u1") {
+function api(inv: ClaudeInventory | null | undefined, over: Parameters<typeof mockApi>[0] = {}, shared?: boolean, owner = "u1", view: Partial<ReturnType<typeof machine>> = {}) {
   return mockApi({
     "GET /me": { body: ME },
-    "GET /workspaces/w1/machines": { body: [machine()] },
-    "GET /workspaces/w1/agents": { body: [agent({ userId: owner })] },
+    "GET /workspaces/w1/machines": { body: [machine(view)] },
+    "GET /workspaces/w1/agents": { body: [agent({ userId: owner, version: "0.6.0" })] },
     "GET /workspaces/w1/alerts": { body: [] },
     "GET /workspaces/w1/runs": { body: [] },
     "GET /agents/a1/grants": { body: [] },
     "GET /agents/a1/jobs": { body: [] },
     "GET /agents/a1/metrics": { body: [] },
-    "GET /agents/a1/detail": { body: detail(inv, shared) },
+    "GET /agents/a1/detail": { body: detail(inv, shared, view) },
     "GET /agents/a1/asks": { body: [] },
     "GET /agents/a1/actions": { body: [] },
     ...over,
@@ -106,5 +109,91 @@ describe("the Claude inventory card on the machine page", () => {
     const { container } = open();
     expect(await screen.findByText("<img src=x onerror=alert(1)>")).toBeInTheDocument();
     expect(container.querySelector("img[src='x']")).toBeNull();
+  });
+
+  const posts = (calls: ReturnType<typeof mockApi>) => calls.filter((c) => c.method === "POST" && c.path === "/agents/a1/actions").map((c) => c.body);
+
+  it("lets the owner enable, disable and update a plugin and install one by id, each asked as a closed action", async () => {
+    const calls = api(inventory(), { "POST /agents/a1/actions": { body: { id: "x", status: "queued" } } }, true, "u1", dev);
+    open();
+    await screen.findByText("adyusuf@adyusuf-marketplace");
+    const buttons = await screen.findAllByRole("button", { name: en.machines.inventory.disable });
+    await userEvent.click(buttons[0]!);
+    await screen.findByText(en.machines.inventory.asked);
+    await userEvent.click(screen.getByRole("button", { name: en.machines.inventory.enable }));
+    await userEvent.click(within(screen.getByText("adyusuf@adyusuf-marketplace").closest("li")!).getByRole("button", { name: en.machines.inventory.update }));
+    await userEvent.type(screen.getByLabelText(en.machines.inventory.installLabel), "new-one@market");
+    await userEvent.click(screen.getByRole("button", { name: en.machines.inventory.install }));
+    expect(posts(calls)).toEqual([
+      { kind: "plugin_disable", target: "adyusuf@adyusuf-marketplace" },
+      { kind: "plugin_enable", target: "off@m" },
+      { kind: "plugin_update", target: "adyusuf@adyusuf-marketplace" },
+      { kind: "plugin_install", target: "new-one@market" },
+    ]);
+  });
+
+  it("keeps the install button off until the id has the name@marketplace shape", async () => {
+    api(inventory(), {}, true, "u1", dev);
+    open();
+    const field = await screen.findByLabelText(en.machines.inventory.installLabel);
+    const button = screen.getByRole("button", { name: en.machines.inventory.install });
+    await userEvent.type(field, "no-marketplace");
+    expect(button).toBeDisabled();
+    await userEvent.type(field, "@m");
+    expect(button).toBeEnabled();
+  });
+
+  it("asks for a project setting with the project, the name and a value from the lists", async () => {
+    const calls = api(inventory(), { "POST /agents/a1/actions": { body: { id: "x", status: "queued" } } }, true, "u1", dev);
+    open();
+    await screen.findByText("adyusuf@adyusuf-marketplace");
+    await userEvent.selectOptions(await screen.findByLabelText(en.machines.inventory.setting), "push.prod");
+    await userEvent.selectOptions(screen.getByLabelText(en.machines.inventory.value), "false");
+    await userEvent.click(screen.getByRole("button", { name: en.machines.inventory.apply }));
+    await screen.findByText(en.machines.inventory.asked);
+    expect(posts(calls)).toEqual([{ kind: "project_setting", projectKey: "git:host/shop", target: "push.prod", value: "false" }]);
+  });
+
+  it("offers only the closed values: modes A to E, four models, yes or no", async () => {
+    api(inventory(), {}, true, "u1", dev);
+    open();
+    await screen.findByText("adyusuf@adyusuf-marketplace");
+    const value = await screen.findByLabelText(en.machines.inventory.value);
+    const values = () => [...value.querySelectorAll("option")].map((o) => o.getAttribute("value"));
+    expect(values()).toEqual(["A", "B", "C", "D", "E"]);
+    await userEvent.selectOptions(screen.getByLabelText(en.machines.inventory.setting), "mode_model");
+    expect(values()).toEqual(["keep", "sonnet", "haiku", "fable"]);
+    await userEvent.selectOptions(screen.getByLabelText(en.machines.inventory.setting), "merge.dev");
+    expect(values()).toEqual(["true", "false"]);
+  });
+
+  it("shows no write control and says what is needed when starting Claude from the web is off or the machine is not dev or test", async () => {
+    api(inventory(), {}, true, "u1", { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: false });
+    open();
+    expect(await screen.findByText(en.machines.inventory.writesOff)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.machines.inventory.install })).toBeNull();
+  });
+
+  it("shows an admin who is not the owner no write control", async () => {
+    api(inventory(), {}, true, "someone-else", dev);
+    open();
+    await screen.findByText("fix the login");
+    expect(screen.queryByRole("button", { name: en.machines.inventory.install })).toBeNull();
+    expect(screen.queryByText(en.machines.inventory.writesOff)).toBeNull();
+  });
+
+  it("shows the reason in words when the API refuses a change", async () => {
+    api(inventory(), { "POST /agents/a1/actions": { status: 409, body: { title: "action_busy" } } }, true, "u1", dev);
+    open();
+    await screen.findAllByRole("button", { name: en.machines.inventory.disable });
+    await userEvent.click(within(screen.getByText("adyusuf@adyusuf-marketplace").closest("li")!).getByRole("button", { name: en.machines.inventory.update }));
+    expect(await screen.findByText(en.errors.action_busy)).toBeInTheDocument();
+  });
+
+  it("names the five new kinds and the new errors in all three languages", () => {
+    for (const lang of [en, tr, de]) {
+      for (const kind of ["plugin_enable", "plugin_disable", "plugin_update", "plugin_install", "project_setting"] as const) expect(lang.machines.actions.kind[kind].length).toBeGreaterThan(0);
+      for (const key of ["invalid_plugin", "invalid_setting", "action_busy"] as const) expect(lang.errors[key].length).toBeGreaterThan(0);
+    }
   });
 });

@@ -145,7 +145,9 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
     }
 
     /// <summary>The folder of a project key: the one a session visited, else a listed folder whose project this is.</summary>
-    private string? FolderOf(string projectKey)
+    private string? FolderOf(string projectKey) => FolderOf(config, projectKey);
+
+    internal static string? FolderOf(AgentConfig config, string projectKey)
     {
         using (var store = new LocalStore(config.DatabasePath))
         {

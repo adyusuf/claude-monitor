@@ -48,7 +48,7 @@ export const trMachines: Dictionary["machines"] = {
     strictHint: "Bu makine canlı ya da veritabanı: yeniden başlatma ve güncelleme her seferinde doğrulama uygulamasından yeni bir kod ister.",
     sent: "İstendi: {action}. Ajanın cevabı aşağıda.", none: "Henüz istenen işlem yok.",
     version: "Sürüm", versionUnknown: "bilinmiyor", pod: "AI pod", podServer: "sunucu (hizmet olarak çalışır)", podDesktop: "masaüstü (bir kişinin oturumunda çalışır)", exec: "Çalıştırabilir", lastSeen: "Son görülme",
-    kind: { status: "Durum", update_check: "Güncelleme var mı?", update: "Güncelle", restart: "Yeniden başlat", claude_start: "Claude'u başlat", claude_stop: "Claude'u durdur" },
+    kind: { status: "Durum", update_check: "Güncelleme var mı?", update: "Güncelle", restart: "Yeniden başlat", claude_start: "Claude'u başlat", claude_stop: "Claude'u durdur", plugin_enable: "Eklentiyi etkinleştir", plugin_disable: "Eklentiyi devre dışı bırak", plugin_update: "Eklentiyi güncelle", plugin_install: "Eklenti kur", project_setting: "Proje ayarını değiştir" },
     status: { queued: "ajanı bekliyor", delivered: "ajanda", succeeded: "tamam", failed: "başarısız", expired: "zamanında alınmadı" },
   },
   asks: {
@@ -85,6 +85,9 @@ export const trMachines: Dictionary["machines"] = {
     plugins: "Kurulu eklentiler", noPlugins: "Kurulu eklenti yok.", skills: "Skill'ler", noSkills: "Skill bulunamadı.", skillCount: "{n} skill",
     settings: "Proje ayarları", noSettings: "Burada çalışma modu veya kapı tutan proje yok.", yes: "evet", no: "hayır", enabled: "açık", disabled: "kapalı", mode: "mod {mode}",
     off: "Anahtar kapalıyken ajan bunların hiçbirini okumaz. Bu makinedeki Claude oturumlarını, eklentilerini, skill'lerini ve proje ayarlarını burada görmek için açın.", waiting: "Açıldı: ajan bunu bir sonraki profiliyle bildirir. Birkaç dakika içinde burada görünür.", turnOn: "Claude oturumlarını, eklentilerini ve skill'lerini göster", turnOff: "Göstermeyi bırak", saved: "Kaydedildi.", enableHint: "Bunu açmak yakın zamanlı bir giriş ister: doğrulama uygulamanızdan bir kod girin ya da yeniden giriş yapın.",
+    enable: "Etkinleştir", disable: "Devre dışı bırak", update: "Güncelle", install: "Kur", installLabel: "Eklenti kur (ad@pazaryeri)",
+    setting: "Ayar", value: "Değer", apply: "Uygula", writesHint: "Değişiklikler ajandan istenir ve yakın zamanlı giriş ister. Sonuç aipod kartının işlem listesinde görünür. Bir ayar projenin kendi dosyalarına yazılır; commit etmek size kalır. Skill'ler eklentilerle gelir: eklentiyi etkinleştirmek, devre dışı bırakmak veya kurmak skill'leri değiştirir.", writesOff: "Eklentileri veya ayarları buradan değiştirmek için bu makinede Claude'u web'den başlatmayı açın (yalnızca geliştirme veya test makineleri) ve ajanı güncel tutun.",
+    asked: "Ajandan istendi. Sonuç aipod kartının işlem listesinde görünür.", writeHint: "Claude kurulumunu değiştirmek yakın zamanlı giriş ister: doğrulama uygulamanızdan bir kod girin ya da yeniden giriş yapın.",
     unknown: "Ajan bunu okuyamadı.",
   },
   projects: {
