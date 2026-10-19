@@ -102,6 +102,22 @@ describe("i18n", () => {
 });
 
 describe("api client", () => {
+  it("sends the language picked in the menu with every call, so the API's mails come in it, and none before one is picked", async () => {
+    const seen: (string | undefined)[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      seen.push((init?.headers as Record<string, string>)["Accept-Language"]);
+      return new Response("{}", { status: 200 });
+    });
+    localStorage.removeItem("cm.language");
+    await request("GET", "/me");
+    localStorage.setItem("cm.language", "de");
+    await request("GET", "/me");
+    localStorage.setItem("cm.language", "not a language");
+    await request("GET", "/me");
+    localStorage.removeItem("cm.language");
+    expect(seen).toEqual([undefined, "de", undefined]);
+  });
+
   it("sends the CSRF header on changes only and parses JSON", async () => {
     const calls = mockApi({ "GET /me": { body: { id: "1" } }, "POST /auth/logout": { status: 204 } });
     expect(await request("GET", "/me")).toEqual({ id: "1" });

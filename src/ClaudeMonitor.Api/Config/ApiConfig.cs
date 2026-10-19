@@ -47,7 +47,7 @@ public sealed record ApiConfig
 
     /// <summary>How fresh a sign-in must be to delete an account that has neither a password nor two-step sign-in.</summary>
     public TimeSpan ReauthWindow { get; init; } = TimeSpan.FromMinutes(10);
-    public const string MfaIssuer = "Claude Monitor";
+    public const string MfaIssuer = "Podium";
 
     public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);
     public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromHours(24);
