@@ -24,3 +24,20 @@
 .bullets { margin: 0; padding-left: 18px; }
 .pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .members-add { margin-top: 14px; }
+
+/* Issues and the backlog (ADR-0011 phase 2). */
+.filters { align-items: center; }
+.filters .filter { flex: 0 1 170px; width: auto; }
+.issue-list { gap: 8px; }
+.issue-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.issue-row.dim { opacity: 0.7; }
+.issue-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.issue-number { color: var(--muted); font-variant-numeric: tabular-nums; }
+.issue-title { font-weight: 600; }
+.issue-meta { grid-column: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.issue-actions { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: 6px; }
+.type-pick, .kind-pick { flex: 0 0 150px !important; }
+.criterion { align-items: flex-start; }
+.subhead { margin: 12px 0 6px; font-size: 14px; }
+.test-case { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.test-case p { margin: 4px 0; }

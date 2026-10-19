@@ -3,6 +3,8 @@ import { RequireAuth, useSession } from "./auth/session";
 import { Layout } from "./components/Layout";
 import { Empty } from "./components/ui";
 import { useI18n } from "./i18n";
+import { BacklogPage } from "./pages/BacklogPage";
+import { IssuePage } from "./pages/IssuePage";
 import { ApplicationPage } from "./pages/ApplicationPage";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./pages/AccountPages";
 import { ForgotPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./pages/AuthPages";
@@ -50,6 +52,9 @@ export function App() {
         <Route path="/w/:ws/projects" element={<ProjectsPage />} />
         <Route path="/w/:ws/projects/:id" element={<ProjectPage />} />
         <Route path="/w/:ws/projects/:projectId/applications/:id" element={<ApplicationPage />} />
+        <Route path="/w/:ws/projects/:projectId/backlog" element={<BacklogPage />} />
+        <Route path="/w/:ws/projects/:projectId/applications/:appId/backlog" element={<BacklogPage />} />
+        <Route path="/w/:ws/projects/:projectId/issues/:id" element={<IssuePage />} />
         <Route path="/w/:ws/sessions" element={<SessionsPage />} />
         <Route path="/w/:ws/sessions/:id" element={<SessionPage />} />
         <Route path="/w/:ws/machines" element={<MachinesPage />} />

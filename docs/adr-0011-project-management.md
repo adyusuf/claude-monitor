@@ -1,6 +1,6 @@
 # ADR-0011: Project management in the web app
 
-**Status:** Phase 1 built on `claude/project-management-system-08c9cc` (19/10/2026), not yet merged. Phases 2 onwards are a plan, not a decision.
+**Status:** Phase 1 is on `dev` (19/10/2026); Phase 2 (§4) is being built. Later phases are a plan, not a decision.
 **Extends:** [ADR-0002](adr-0002-agent-platform.md) (one API for every client), [data-model.md](data-model.md).
 **Asked for (19/10/2026):** after sign-in a user sees what is theirs: projects (with applications, backlog lists, sprints and issues), the
 machines and the tools and Claude sessions on them, the AI pods of the account, the user and system administration for admins, and
@@ -70,11 +70,36 @@ Text a person types (names, purposes, notes, links) is shown as text only and ne
 
 Lists are paged by key (newest first). Error codes are i18n keys. Changes write audit rows that name the row by id, never its text.
 
-## 4. Later phases (a plan)
+## 4. Phase 2: issues and the backlog
 
-2. **Backlog and issues:** issues with every field the maintainer listed (type, priority, estimate, assignee, parent epic, component,
-   status, sprint, release; story-form description; Given/When/Then criteria; blocks and blocked by; bug fields; attachments; test
-   scenarios), with a backlog on a project or on an application.
+An issue belongs to a project and, optionally, to one of its applications, so a backlog exists with or without an application. The backlog is
+the list of issues of a project (or of one application) that are in no sprint yet, in the order people give them; sprints come in Phase 3,
+which adds the sprint column to `issues` (additive).
+
+**`issues`:** `number` (per project, shown as `#12`), title, type (one of the project's enabled item types), priority (a value of the
+project's priority scale), estimate (a number in the project's unit, or `xs`-`xl` for T-shirt sizes), assignee (a workspace member who
+can work), parent epic (an `epic` of the same project), application, component and release (of that application), status (`backlog`,
+`ready`, `in_progress`, `in_review`, `done`, `cancelled`), description (user-story form is a hint in the form, not enforced),
+Given/When/Then criteria (at most 30), a technical design note, and for a `bug` only: environment, steps to reproduce, expected result,
+actual result and severity (`critical`, `major`, `minor`, `trivial`); another type may not carry them. `position` orders the backlog.
+Deleting archives. Reading needs any workspace role; creating and changing need the right to work on applications (`ProjectAccess`:
+owner, manager, contributor, workspace admin).
+
+**`issue_links`:** `blocks` between two issues of the same project; "blocked by" is the same row seen from the other end. No self-link, no
+loop of any length, no duplicate. **`issue_test_cases`:** scenario title, steps, expected result, and the latest result (`not_run`, `passed`,
+`failed`, `blocked`) with who set it and when. **`issue_code_links`:** a pull request or commit link (https, no password) added by hand;
+the automatic fill from the agent's branch and commit names is a later step.
+
+| Call | Needs |
+|---|---|
+| `GET /api/projects/{id}/issues` (filters `q`, `type`, `status`, `assignee`, `application`, `component`, `parent`, `release`, `scope=backlog`) and `POST` | read / work |
+| `GET /api/issues/{id}`, `PUT`, `DELETE` (archive), `POST /restore`, `PUT /position` | read / work |
+| `POST /api/issues/{id}/links`, `DELETE /api/issue-links/{id}` | work |
+| `GET`, `POST /api/issues/{id}/test-cases`, `PUT`, `DELETE /api/test-cases/{id}`, `POST /api/test-cases/{id}/result` | read / work |
+| `GET`, `POST /api/issues/{id}/code-links`, `DELETE /api/code-links/{id}` | read / work |
+
+## 5. Later phases (a plan)
+
 3. **Sprints:** number, dates, goal, capacity, state, team, release; start from a project or an application; add existing or new issues;
    the issues of a sprint by status.
 4. **Machines:** the machine pages exist (ADR-0005, ADR-0008). Open: a per-tool panel on a machine (start, stop, update for the AI pod,
@@ -83,7 +108,7 @@ Lists are paged by key (newest first). Error codes are i18n keys. Changes write 
 5. **AI pods** of the account: needs its own decision first (what a pod is on the server side).
 6. **Administration** (users, system settings) and **profile** pages.
 
-## 5. Not decided here
+## 6. Not decided here
 
 Whether the `repos` rows should link to an application by its repository link; account export and deletion for the new tables (the rows
-keep the deleted user's id, like other records, and carry no personal fields of their own); attachments storage.
+keep the deleted user's id, like other records, and carry no personal fields of their own); attachments storage (mockups, screenshots, logs, screen recordings: needs a decision on where files live, so Phase 2 has none).

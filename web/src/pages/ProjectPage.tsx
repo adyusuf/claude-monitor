@@ -69,6 +69,7 @@ export function ProjectPage() {
       <header className="page-head">
         <h1>{project.name} {archived ? <span className="badge warn">{t("projects.archived")}</span> : <span className="badge ok">{t("projects.active")}</span>}</h1>
         <div className="row-actions">
+          <Link className="btn btn-ghost" to={`/w/${ws}/projects/${id}/backlog`}>{t("issues.backlog")}</Link>
           {access.canEdit && !archived && !editing ? <Button variant="ghost" onClick={() => setEditing(true)}>{t("projects.edit")}</Button> : null}
           {access.canArchive && !archived ? <Button variant="ghost" onClick={archive}>{t("projects.archive")}</Button> : null}
         </div>

@@ -6,8 +6,11 @@ import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
   ProjectSummary, ProjectView, ReleaseInput, ReleaseView,
 } from "./typesProjects";
+import type {
+  CodeLinkInput, CodeLinkView, IssueInput, IssueQuery, IssueSummary, IssueView, LinkKind, TestCaseInput, TestCaseView, TestResult,
+} from "./typesIssues";
 
-const q = (params: Record<string, string | number | undefined | null>) => {
+const q = (params: Record<string, string | number | boolean | undefined | null>) => {
   const s = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") s.set(k, String(v));
   const text = s.toString();
@@ -127,6 +130,23 @@ export const api = {
   addRelease: (applicationId: string, input: ReleaseInput) => request<ReleaseView>("POST", `/applications/${applicationId}/releases`, input),
   putRelease: (id: string, input: ReleaseInput) => request<void>("PUT", `/releases/${id}`, input),
   cancelRelease: (id: string) => request<void>("DELETE", `/releases/${id}`),
+  issues: (projectId: string, opts: IssueQuery) => request<Page<IssueSummary>>("GET", `/projects/${projectId}/issues${q(opts)}`),
+  createIssue: (projectId: string, input: IssueInput) => request<IssueView>("POST", `/projects/${projectId}/issues`, input),
+  issue: (id: string) => request<IssueView>("GET", `/issues/${id}`),
+  updateIssue: (id: string, input: IssueInput) => request<void>("PUT", `/issues/${id}`, input),
+  archiveIssue: (id: string) => request<void>("DELETE", `/issues/${id}`),
+  restoreIssue: (id: string) => request<void>("POST", `/issues/${id}/restore`),
+  moveIssue: (id: string, afterIssueId: string | null) => request<void>("PUT", `/issues/${id}/position`, { afterIssueId }),
+  addIssueLink: (id: string, otherIssueId: string, kind: LinkKind) => request<void>("POST", `/issues/${id}/links`, { otherIssueId, kind }),
+  removeIssueLink: (linkId: string) => request<void>("DELETE", `/issue-links/${linkId}`),
+  testCases: (issueId: string) => request<TestCaseView[]>("GET", `/issues/${issueId}/test-cases`),
+  addTestCase: (issueId: string, input: TestCaseInput) => request<TestCaseView>("POST", `/issues/${issueId}/test-cases`, input),
+  putTestCase: (id: string, input: TestCaseInput) => request<void>("PUT", `/test-cases/${id}`, input),
+  deleteTestCase: (id: string) => request<void>("DELETE", `/test-cases/${id}`),
+  setTestResult: (id: string, result: TestResult, note: string | null) => request<void>("POST", `/test-cases/${id}/result`, { result, note }),
+  codeLinks: (issueId: string) => request<CodeLinkView[]>("GET", `/issues/${issueId}/code-links`),
+  addCodeLink: (issueId: string, input: CodeLinkInput) => request<CodeLinkView>("POST", `/issues/${issueId}/code-links`, input),
+  deleteCodeLink: (id: string) => request<void>("DELETE", `/code-links/${id}`),
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),
   approveDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/approve", { userCode, workspaceId }),
   denyDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/deny", { userCode, workspaceId }),

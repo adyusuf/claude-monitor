@@ -25,7 +25,7 @@ export default defineConfig({
       include: ["src/**/*.{ts,tsx}"],
       // The only exclusions (global #29): the tests and their helpers, the entry point that only mounts the app,
       // and type-only declarations.
-      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/main.tsx", "src/api/types.ts", "src/api/typesMachines.ts", "src/api/typesProjects.ts", "src/vite-env.d.ts"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/main.tsx", "src/api/types.ts", "src/api/typesMachines.ts", "src/api/typesProjects.ts", "src/api/typesIssues.ts", "src/vite-env.d.ts"],
       thresholds: { lines: 80 },
       reporter: ["text-summary", "text"],
       ...(coverageDir

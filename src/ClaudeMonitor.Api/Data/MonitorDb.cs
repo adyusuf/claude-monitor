@@ -47,6 +47,10 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<ManagedApplication> Applications => Set<ManagedApplication>();
     public DbSet<ApplicationComponent> ApplicationComponents => Set<ApplicationComponent>();
     public DbSet<ApplicationRelease> ApplicationReleases => Set<ApplicationRelease>();
+    public DbSet<Issue> Issues => Set<Issue>();
+    public DbSet<IssueLink> IssueLinks => Set<IssueLink>();
+    public DbSet<IssueTestCase> IssueTestCases => Set<IssueTestCase>();
+    public DbSet<IssueCodeLink> IssueCodeLinks => Set<IssueCodeLink>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -1,6 +1,7 @@
 import type { Dictionary } from "./en";
 import { trMachines } from "./tr.machines";
 import { trProjects } from "./tr.projects";
+import { trIssues } from "./tr.issues";
 import { trTwoStep } from "./tr.twoStep";
 import { trRemote } from "./tr.remote";
 
@@ -78,6 +79,7 @@ export const tr: Dictionary = {
     amount_and_currency: "Bütçe tutarını ve para birimini birlikte verin ya da ikisini de boş bırakın.", invalid_currency: "Üç büyük harf kullanın, örneğin TRY.",
     before_start: "Bitiş tarihi başlangıç tarihinden önce olamaz.", invalid_value: "Listeden bir değer seçin.", invalid_url: "Bu adrese burada izin verilmiyor. Depo için https, ssh ya da git, ortam için http ya da https adresi kullanın; parola olmasın.",
     limit_reached: "Buraya sığabilecek en çok sayıya ulaşıldı.", archived: "Bu arşivlendi. Önce geri yükleyin.",
+    invalid_parent: "Üst iş, bu projenin bir epic'i olmalı.", invalid_application: "Bu projenin bir uygulamasını seçin.", invalid_component: "Seçilen uygulamanın bir bileşenini seçin.", invalid_release: "Seçilen uygulamanın bir sürümünü seçin.", bug_only: "Hata ayrıntılarını yalnızca bir hata taşıyabilir.", invalid_issue: "Bu projeden başka bir iş seçin.", self_link: "Bir iş kendisine bağlanamaz.", cycle: "Bu bağlantı, işlerin birbirini döngü içinde engellemesine yol açar.", duplicate_link: "Bu iki iş zaten bağlı.",
     released: "Yayımlanmış bir sürüm iptal edilemez.", cancelled: "İptal edilmiş bir sürüm değiştirilemez.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
@@ -147,6 +149,7 @@ export const tr: Dictionary = {
   },
   machines: trMachines,
   projects: trProjects,
+  issues: trIssues,
   twoStep: trTwoStep,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
