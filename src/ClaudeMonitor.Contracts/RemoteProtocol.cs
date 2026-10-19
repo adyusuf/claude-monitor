@@ -14,9 +14,11 @@ public sealed record ServiceInfo(int Port, string Proto, string? Process);
 
 /// <summary>
 /// What the agent read from one project folder's <c>.git</c> files (ADR-0008 §3a′): the key and name, an HMAC of the folder path (never the path),
-/// the branch, the commit and the tag that points at it. Reported for admin-listed folders and for folders a session visited.
+/// the branch, the commit and the tag that points at it. Reported for admin-listed folders and for folders a session visited. When the person at the machine set
+/// a test command for the folder (ADR-0011 §7a), its argv and the folder path are reported too, so the owner can approve exactly what Podium starts.
 /// </summary>
-public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source);
+public sealed record ProjectFact(string Key, string Name, string? PathHmac, string? Branch, string? HeadSha, string? Tag, string Source,
+    IReadOnlyList<string>? TestArgv = null, string? TestCwd = null);
 
 /// <summary>
 /// Claude Code on the agent's machine (ADR-0008 §3e): how it is installed (<see cref="ClaudeKinds"/>), where (home-relative, never
@@ -121,7 +123,7 @@ public sealed record ProjectRunSummary(string? Kind, string Status, int? ExitCod
 
 /// <summary>A project on a machine: what the agent read from its folder, the last runs per kind and the tool failures sessions had in it recently.</summary>
 public sealed record MachineProjectView(string Key, string Name, string? Branch, string? HeadSha, string? Tag, DateTimeOffset LastSeenAt,
-    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors);
+    string Source, IReadOnlyList<ProjectRunSummary> LastRuns, int RecentErrors, bool HasTest = false, IReadOnlyList<string>? TestArgv = null, string? TestCwd = null);
 
 /// <summary>
 /// Everything about one machine (ADR-0008 §3a′): its list entry, the admin's note (untrusted text), the listening services when the caller may
@@ -129,3 +131,17 @@ public sealed record MachineProjectView(string Key, string Name, string? Branch,
 /// </summary>
 public sealed record MachineDetail(MachineView Machine, string? Note, DateTimeOffset? NoteSetAt, bool ServicesShared,
     IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects);
+
+/// <summary>The limits of a project's test command (ADR-0011 §7a), shared by the agent that takes it and the API that stores it.</summary>
+public static class ProjectTestRules
+{
+    public const int MaxElements = 32;
+    public const int MaxElementLength = 512;
+    public const int CwdMax = 1024;
+
+    /// <summary>An argv list: 1 to 32 elements, the first not empty, none over 512 characters or with a control character.</summary>
+    public static bool IsValid(IReadOnlyList<string>? argv) =>
+        argv is { Count: >= 1 and <= MaxElements } && !string.IsNullOrEmpty(argv[0]) && argv.All(a => a is { Length: <= MaxElementLength } && !a.Any(char.IsControl));
+
+    public static bool IsValidCwd(string? cwd) => cwd is { Length: > 0 and <= CwdMax } && !cwd.Any(char.IsControl);
+}

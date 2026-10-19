@@ -2103,6 +2103,14 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("tag");
 
+                    b.PrimitiveCollection<List<string>>("TestArgv")
+                        .HasColumnType("text[]")
+                        .HasColumnName("test_argv");
+
+                    b.Property<string>("TestCwd")
+                        .HasColumnType("text")
+                        .HasColumnName("test_cwd");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
                         .HasColumnName("workspace_id");

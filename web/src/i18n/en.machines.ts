@@ -77,6 +77,8 @@ export const enMachines = {
   projects: {
     title: "Projects", none: "No project is known on this machine yet.", noneHint: "A project appears when a session works in it, or when a folder is listed with aipod config projects add.",
     listed: "listed folder", session: "from a session", errors: "{n} tool errors in 7 days", noRuns: "No run for this project yet.", run: "run", cut: "output cut",
+    testCommand: "Test command:", testIn: "in {dir}", startTest: "Start the test",
+    testAsked: "The test is waiting for your approval in the list of runs below. Check the command, then allow it.",
     passed: "{n} passed", failed: "{n} failed", skipped: "{n} skipped", kind: { test: "test", build: "build", deploy: "deploy", other: "other" },
   },
 };

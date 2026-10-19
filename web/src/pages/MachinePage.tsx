@@ -90,7 +90,7 @@ export function MachinePage() {
             <MachineClaude agentId={agentId} view={m} owned={data.owned} projects={data.detail.projects} agentVersion={data.agentVersion} version={version} onChanged={() => void reload()} />
           </Card>
           <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
-          <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} /></Card>
+          <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} agentId={agentId} owned={data.owned} onStarted={() => void reload()} /></Card>
         </>
       ) : null}
 

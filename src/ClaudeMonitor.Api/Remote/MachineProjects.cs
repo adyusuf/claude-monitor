@@ -53,6 +53,9 @@ public static partial class MachineProjects
             row.HeadSha = fact.HeadSha is { Length: > 0 and <= 64 } sha && Hex().IsMatch(sha) ? sha : null;
             row.Tag = fact.Tag is { Length: > 0 } t ? MachineReports.Clean(t, 64) : null;
             row.Source = ProjectSources.All.Contains(fact.Source) ? fact.Source : ProjectSources.Listed;
+            var testOk = ProjectTestRules.IsValid(fact.TestArgv) && ProjectTestRules.IsValidCwd(fact.TestCwd);
+            row.TestArgv = testOk ? [.. fact.TestArgv!] : null;
+            row.TestCwd = testOk ? fact.TestCwd : null;
             row.LastSeenAt = now;
         }
     }

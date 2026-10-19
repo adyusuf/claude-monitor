@@ -155,6 +155,10 @@ public sealed class MachineProject
     public string? Tag { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
     public string Source { get; set; } = ProjectSources.Session;
+
+    /// <summary>The test command the person at the machine set for this folder and the folder path it runs in (ADR-0011 §7a); both NULL when there is none.</summary>
+    public List<string>? TestArgv { get; set; }
+    public string? TestCwd { get; set; }
 }
 
 /// <summary>

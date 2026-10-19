@@ -79,6 +79,8 @@ export const trMachines: Dictionary["machines"] = {
   projects: {
     title: "Projeler", none: "Bu makinede henüz bilinen proje yok.", noneHint: "Bir oturum projede çalışınca ya da bir klasör aipod config projects add ile listelenince proje görünür.",
     listed: "listelenen klasör", session: "bir oturumdan", errors: "7 günde {n} araç hatası", noRuns: "Bu proje için henüz çalıştırma yok.", run: "çalıştırma", cut: "çıktı kesildi",
+    testCommand: "Test komutu:", testIn: "{dir} klasöründe", startTest: "Testi başlat",
+    testAsked: "Test, aşağıdaki çalıştırmalar listesinde onayınızı bekliyor. Komutu kontrol edin, sonra izin verin.",
     passed: "{n} geçti", failed: "{n} kaldı", skipped: "{n} atlandı", kind: { test: "test", build: "derleme", deploy: "dağıtım", other: "diğer" },
   },
 };

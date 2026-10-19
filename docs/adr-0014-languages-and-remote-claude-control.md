@@ -127,7 +127,12 @@ What shipped, on the branch with the rest of this work (not released: the agent 
 - **Decisions applied.** Environment = the machine's class; no repositories; no start on production or database machines. The workspace-level switch is the existing
   remote-work switch (`remote_runs_enabled`), not a new one.
 
-Not built (P2 onward): the automatic `on_message` mode, a per-project trust pre-check in the page, and any change to how the session list marks agent-started sessions.
+**P2 as built (19/10/2026): the first message.** The project picker and the permission mode were already in P1. P2 adds the optional first message of a start: the API takes `prompt`
+(trimmed, at most 2000 characters, no control characters except new lines and tabs; refused on a stop), keeps it only until the agent takes the action, and never lists or audits it. The agent
+gives `claude --bg` one more argument: the same notice and fence as an inbox message (labelled as from the web, to be treated as data, defused, capped at the push limit), so the argument always
+begins with the notice and never with the web's own text. Podium shows a text box on the Claude card. Migration `ActionFirstPrompt`.
+
+Not built (P3 onward): the automatic `on_message` mode, a per-project trust pre-check in the page, and any change to how the session list marks agent-started sessions.
 
 ## Windows: what still has to be tried (not done; this was developed on macOS)
 

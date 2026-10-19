@@ -100,7 +100,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         if (extras is { } cached && cached.Share == share && now - extrasAt < config.ProjectFactsEvery && now >= extrasAt) return (cached.Services, cached.Projects);
         store.ForgetFolders(now - 2 * VisitedFor);
         var services = share ? servicesSource?.Invoke() ?? ListeningServices.Live() : null;
-        var read = projectsSource?.Invoke() ?? new ProjectFacts(config).Read(policy.ProjectFolders, store.VisitedFolders(now - VisitedFor));
+        var read = projectsSource?.Invoke() ?? new ProjectFacts(config).Read(policy.ProjectFolders, store.VisitedFolders(now - VisitedFor), ProjectTestCommands.Saved(config));
         extras = (services, read.Count > 0 ? read : null, share);
         extrasAt = now;
         return (extras.Value.Services, extras.Value.Projects);

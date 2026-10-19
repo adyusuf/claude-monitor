@@ -28,10 +28,10 @@ public static class MachineDetails
         var servicesAllowed = agent.ShareServices && (callerIsAdmin || agent.UserId == callerUserId);
         return new MachineDetail(machine, agent.AdminNote, agent.AdminNoteSetAt, agent.ShareServices,
             servicesAllowed ? MachineFacts.ServicesFrom(agent.Services) : null, servicesAllowed ? agent.ServicesAt : null,
-            await ProjectsAsync(db, workspaceId, agentId, now, ct));
+            await ProjectsAsync(db, workspaceId, agentId, agent.UserId == callerUserId, now, ct));
     }
 
-    private static async Task<IReadOnlyList<MachineProjectView>> ProjectsAsync(MonitorDb db, Guid workspaceId, Guid agentId, DateTimeOffset now,
+    private static async Task<IReadOnlyList<MachineProjectView>> ProjectsAsync(MonitorDb db, Guid workspaceId, Guid agentId, bool owner, DateTimeOffset now,
         CancellationToken ct)
     {
         var rows = await db.MachineProjects.AsNoTracking().Where(p => p.AgentId == agentId)
@@ -54,6 +54,7 @@ public static class MachineDetails
             runs.Where(x => x.ProjectKey == r.ProjectKey).GroupBy(x => x.Kind).SelectMany(g => g.Take(RunsPerKind))
                 .Select(x => new ProjectRunSummary(x.Kind, x.Status, x.ExitCode, x.EndedAt ?? x.CreatedAt, x.OutputTruncated, x.TestsPassed, x.TestsFailed, x.TestsSkipped))
                 .OrderByDescending(x => x.At).ToList(),
-            errors.FirstOrDefault(e => e.Key == r.ProjectKey)?.Count ?? 0)).ToList();
+            errors.FirstOrDefault(e => e.Key == r.ProjectKey)?.Count ?? 0,
+            r.TestArgv is not null && now - r.LastSeenAt <= TestRuns.FactsMaxAge, owner && r.TestArgv is not null ? r.TestArgv : null, owner ? r.TestCwd : null)).ToList();
     }
 }

@@ -79,6 +79,8 @@ export const deMachines: Dictionary["machines"] = {
   projects: {
     title: "Projekte", none: "Auf dieser Maschine ist noch kein Projekt bekannt.", noneHint: "Ein Projekt erscheint, wenn eine Sitzung darin arbeitet oder wenn ein Ordner mit aipod config projects add aufgeführt wird.",
     listed: "aufgeführter Ordner", session: "aus einer Sitzung", errors: "{n} Werkzeugfehler in 7 Tagen", noRuns: "Für dieses Projekt noch keine Ausführung.", run: "Ausführung", cut: "Ausgabe gekürzt",
+    testCommand: "Testbefehl:", testIn: "in {dir}", startTest: "Test starten",
+    testAsked: "Der Test wartet in der Liste der Läufe unten auf Ihre Freigabe. Prüfen Sie den Befehl und erlauben Sie ihn dann.",
     passed: "{n} bestanden", failed: "{n} fehlgeschlagen", skipped: "{n} übersprungen", kind: { test: "Test", build: "Build", deploy: "Deploy", other: "Sonstiges" },
   },
 };
