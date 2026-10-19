@@ -36,3 +36,12 @@ public sealed record TestCaseView(Guid Id, Guid IssueId, string Title, string? S
 public sealed record CodeLinkInput(string? Kind, string? Url, string? Title);
 
 public sealed record CodeLinkView(Guid Id, Guid IssueId, string Kind, string Url, string? Title, string Source, DateTimeOffset CreatedAt);
+
+public sealed record IssueRunInput(Guid? RunId);
+
+/// <summary>A remote run linked to an issue: what ran where and how it ended, never its command or output.</summary>
+public sealed record IssueRunView(Guid RunId, string? Kind, string Status, int? ExitCode, int? TestsPassed, int? TestsFailed, int? TestsSkipped,
+    string TargetHostname, string? ProjectKey, DateTimeOffset CreatedAt, DateTimeOffset? EndedAt, DateTimeOffset LinkedAt);
+
+/// <summary>An issue a run is linked to, seen from the run.</summary>
+public sealed record RunIssueView(Guid IssueId, Guid ProjectId, int Number, string Title, string Status);

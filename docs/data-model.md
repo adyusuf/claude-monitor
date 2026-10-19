@@ -215,6 +215,9 @@ business entity. The JSON the agent and the web exchange (`projectId`, `projectN
 | `sprint_members` | `sprint_id`, `user_id`, `added_at` | PK (`sprint_id`, `user_id`); (`user_id`) |
 
 `issues` gains `sprint_id` (null while the issue is in the backlog; an issue is in at most one sprint; index). The counts and the committed and done sums of a sprint are read from its issues each time, never stored. Closing a sprint moves its unfinished issues to a planned sprint of the same scope, or to the backlog where `in_progress` and `in_review` become `ready`. A planned sprint is deleted by archiving it (its issues return to the backlog); a closed sprint is read-only.
+| `issue_runs` | `issue_id`, `run_id`, `linked_by`, `linked_at` | PK (`issue_id`, `run_id`); (`run_id`) |
+
+An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a link, removed outright, and shows the run's outcome counts, never its command or output.
 
 - **Nothing is deleted:** a project, an application, a component and an issue are archived, a release is cancelled (one that went out stays), and a name
   is free again once its holder is archived. A `project_members` row, an `issue_links` row, a test case and a code link are removed outright (they are links, not records).

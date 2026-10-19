@@ -129,3 +129,12 @@ public sealed class IssueCodeLink
     public Guid? CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+/// <summary>A remote run (a test, a build) the team attached to an issue, so its result follows the work.</summary>
+public sealed class IssueRun
+{
+    public Guid IssueId { get; set; }
+    public Guid RunId { get; set; }
+    public Guid LinkedBy { get; set; }
+    public DateTimeOffset LinkedAt { get; set; }
+}

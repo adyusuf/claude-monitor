@@ -1236,6 +1236,36 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueRun", b =>
+                {
+                    b.Property<Guid>("IssueId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issue_id");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<DateTimeOffset>("LinkedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("linked_at");
+
+                    b.Property<Guid>("LinkedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_by");
+
+                    b.HasKey("IssueId", "RunId")
+                        .HasName("pk_issue_runs");
+
+                    b.HasIndex("LinkedBy")
+                        .HasDatabaseName("ix_issue_runs_linked_by");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_issue_runs_run_id");
+
+                    b.ToTable("issue_runs");
+                });
+
             modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueTestCase", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4047,6 +4077,30 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_issue_links_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueRun", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.Issue", null)
+                        .WithMany()
+                        .HasForeignKey("IssueId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_issue_runs_issues_issue_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("LinkedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_issue_runs_users_linked_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.RemoteRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_issue_runs_remote_runs_run_id");
                 });
 
             modelBuilder.Entity("ClaudeMonitor.Api.Data.IssueTestCase", b =>
