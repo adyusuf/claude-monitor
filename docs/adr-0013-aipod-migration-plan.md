@@ -1,7 +1,7 @@
 # ADR-0013 (proposed): moving the names left over from the rename to aipod
 
 Status: **proposed 19/10/2026. Built so far (19/10/2026): step 1 (the home resolver, section 3.1), step 2 (the tier 1 display names, section 4) and
-step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`), step 4 (the `aipod` plugin and the bridge, section 1, "As built") and step 5 (`aipod migrate-home`, section 3, "As built"); the rest is not built.** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
+step 3 (the tool names, section 2: `McpToolNames`, `ToolRegistry`, `aipod mcp --names`), step 4 (the `aipod` plugin and the bridge, section 1, "As built") and step 5 (`aipod migrate-home`, section 3, "As built"); **step 6 (tier 2) is decided against (19/10/2026, maintainer): nothing else is planned.**** Follows ADR-0012 (the name people see is aipod; the old names keep working). This ADR
 designs, one item at a time, the four names ADR-0012 left alone: the plugin id, the MCP tool names, the home folder, and the service names.
 Each section says what exists, what depends on it, the proposed way across, how to go back, what is tested, and what needs the maintainer.
 
@@ -168,6 +168,11 @@ maintainer:** tier 1 yes/no, tier 2 yes/no (my recommendation: tier 1 now, tier 
 reverse-DNS prefix for launchd labels and bundle ids. ADR-0012's tray used `net.aipod.tray` as a placeholder; no domain of ours is known, so it is now `aipod.tray` (launchd needs a unique label, not a
 reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as they are, and a real prefix is only needed if tier 2 renames them.
 
+**Decision (19/10/2026, maintainer): tier 2 is not done.** Only tier 1 stays: the names people see (the Windows service's display name and description, the Login Items entry, the unit and task
+descriptions) say aipod, and the identifiers the system keys on keep their names for good: the service, unit and task names, the accounts (`cm-agent`, `_cmagent`, `NT SERVICE\cm-agent`), the launchd labels
+(`com.claudemonitor.agent*`), the service folders, the exec policy path and the sudoers file. No `aipod service migrate` is built, and no reverse-DNS prefix is needed. If a name ever becomes a real problem
+(a clash, a policy of an organisation), this section is the design to reopen, with the Windows Server and macOS test machines it asks for.
+
 ## Order and size
 
 | Step | Items | Size | Risk | Needs |
@@ -177,7 +182,7 @@ reverse-DNS name). The existing identifiers (`com.claudemonitor.agent*`) stay as
 | 3 | Tool-name mapping and `--names` (2) | large (about 200 text sites) | medium | nothing |
 | 4 | New plugin, both catalogs, bridge (1) | large | medium | the Claude Code spike |
 | 5 | `migrate-home` (3.2) | medium | medium | test machines |
-| 6 | Tier 2 service migrate (4) | large | high | Windows and macOS machines, maintainer yes |
+| 6 | Tier 2 service migrate (4) | large | high | **Not done, by decision (19/10/2026)** |
 
 Still outside this ADR: the release file names and the update manifest (`cm-agent-<os>-<arch>.zip`, `cm-agent-update/1`; a dual-publish plus a
 manifest version for old agents), the .NET namespaces and project names (internal, no compatibility cost, one large mechanical commit), and the
