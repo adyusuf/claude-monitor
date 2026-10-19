@@ -1,6 +1,6 @@
 # ADR-0013 (proposed): languages across the system, and starting and stopping Claude Code from the web
 
-Status: **proposed 19/10/2026.** Part A is partly built (the web, the API mails); the rest of A and all of B are design only. Builds on ADR-0005
+Status: **proposed 19/10/2026; the spike of Part B ran the same day on macOS (results below).** Part A is partly built (the web, the API mails); the rest of A and all of B are design only. Builds on ADR-0005
 (remote work, fixed agent actions), ADR-0006 (Claude Code is never ended, restarted or resumed by the agent), ADR-0008 (machine roles, project
 folders, asks) and ADR-0011 (the names aipod and Podium).
 
@@ -36,23 +36,37 @@ role (environment and function) and a list of project folders the agent reports 
 (restart, update, status) that carry no text, are owner-only and need a recent sign-in or a two-step code. **ADR-0006 decided that the agent never
 ends, restarts or resumes a session.** This part changes that only for sessions the agent started itself.
 
-**What "open Claude" can mean.** Three models; they need a spike on a real machine (the flags of the installed Claude Code decide):
+**What "open Claude" can mean.** The spike (below) found that the installed Claude Code (2.1.294) already has background sessions of its own:
+`claude --bg` starts a session in the background under Claude Code's own daemon and prints its id; `claude agents --json [--all]` lists sessions
+(interactive and background) with pid, folder, name, status and state; `claude stop <id>` ends one cleanly (its SessionEnd hook runs, the conversation
+is kept); `claude attach`, `logs`, `respawn` and `rm` exist too. That replaces the three models considered before (a worker the agent builds, a visible
+terminal, an unknown remote control): **aipod does not build a worker; it calls Claude Code's own commands** (`claude --bg`, `claude agents --json`,
+`claude stop`), the same way ADR-0006 calls `claude update`. "Close" ends **only a session aipod started** (its id is written to a file when it starts);
+a session the person started themselves, background or not, is never touched.
 
-| | How | Good for | Cost |
-|---|---|---|---|
-| M1 background worker | the agent starts `claude` without a terminal (non-interactive, streamed input) in a chosen folder, as the user who runs the agent; the web drives it with prompts; the plugin's hooks report it like any session | servers and machines nobody sits at (the Windows server of this project) | the person has no terminal on it; permission questions go to the web |
-| M2 visible terminal | the agent opens a terminal window running `claude` in the folder | a desktop someone is at | needs a logged-in desktop session; not for servers |
-| M3 Claude Code's own remote control | whatever Claude Code offers for attaching to a running session | the best fit if it exists | unknown: needs the spike |
+**Spike results (macOS, Claude Code 2.1.294, 19/10/2026; isolated settings so nothing reached the real server).**
+- `claude --bg [--name n] [--permission-mode m] ["prompt"]` returns in about 2 s with a short id (`34a6ea9d`), which is the first eight characters of the
+  full session id (`claude agents --json` prints both). Without a prompt the session starts **idle** ("send a prompt to start"); with one it runs it.
+- The session is a **full interactive session inside a terminal host** under Claude Code's daemon (`claude daemon run`, a pty host per session); `claude logs`
+  prints raw terminal frames (escape sequences), not text: not parseable and not to be used. aipod keeps reading sessions the way it does today (hooks and the
+  transcript). The daemon and its processes disappear when the last background session is removed.
+- **Hooks fire in a background session** (SessionStart, UserPromptSubmit, PreToolUse, Stop, SessionEnd, PermissionRequest), with the usual payload, and the
+  **messaging socket and token are in the hooks' environment** (`CLAUDE_CODE_MESSAGING_SOCKET`, `..._TOKEN`). So everything aipod does for a session works
+  unchanged: the web sees it, a prompt written to its inbox socket reaches it while idle (measured: UserPromptSubmit fired for the pushed line), and a
+  permission question reaches the PermissionRequest hook (measured: a hook that denied stopped a `touch` outside the project), which is how the web answers permissions today.
+- **Trust is per exact folder and cannot be given remotely.** `--bg` in a folder the person never trusted prints "Workspace not trusted. Run `claude` in <dir> once and
+  accept the trust prompt" and starts nothing; trust in a parent does not cover its children. This is the right gate: a remote start can only open a folder the person
+  already trusted by hand. The agent can read the flag (`hasTrustDialogAccepted` in Claude's own `~/.claude.json`, read-only) to offer only folders that will work.
+- `claude stop <id>` leaves `state: stopped`; `claude --bg --resume <short id>` starts a **copy** (a new id), while the full session id continues the same conversation.
+- The session runs with the **person's own Claude login and plan** (the spike ran on a Max plan): the cost is theirs.
+- `--permission-mode` takes `acceptEdits | auto | bypassPermissions | manual | dontAsk | plan`; a session started with `manual` reported `default` in its hooks.
+- **Not verified:** Windows (the daemon uses Unix sockets on macOS; whether and how `--bg` works on Windows, the platform of the server this project runs on, needs a
+  test on that machine); a logged-out Claude; what happens to a background session when the person logs out of the machine.
 
-Recommendation: M1 first. "Close" means ending **only a worker the agent started** (a pid file with the session id); a session the person
-started in their own terminal or desktop app is never ended by aipod.
-
-**Choosing where a session starts.** *Folder:* only a project the machine has reported (the web sends a project key, the agent maps it to the path).
-*Environment:* needs the maintainer's meaning: either the machine's environment class (dev, test, production; then it is the choice of machine and
-production and database machines are refused by default, as for asks) or Claude's own settings (permission mode, model). *Repository:* a clone is
-code from the network on the machine, and a repository can carry git hooks and configuration that run code. So: phase 4, only from an allowlist an
-admin keeps per workspace, cloned into a folder aipod manages, with hooks off (`core.hooksPath` empty), no recursive submodules, and the new folder
-then becomes a reported project like any other.
+**Choosing where a session starts.** *Folder:* only a project the machine has reported **and** Claude Code trusts (the web sends a project key, the agent maps it to the path and checks the trust flag).
+*Environment:* decided by the maintainer (19/10/2026): it is the machine's environment class (dev, test, production). So choosing the environment is choosing
+among the machines of that class, and **production and database machines get no remote start at all** (as for asks). *Repository:* decided: none. No clone, no
+repository field; a folder has to exist and be trusted already.
 
 **Keys (fail-closed, additive).** New closed action kinds with no free text: `claude_start`, `claude_stop`, `session_start`. The fields they carry
 are enums and keys: a project key, a permission mode from a closed list (default `default`, never bypass), and optionally a first prompt, which is
@@ -76,14 +90,15 @@ newer version.
 **The page.** On the machine's page, a Claude card: what runs (agent-started and other sessions), Start and Stop, "New session" (project from
 the machine's list, permission mode, optional first prompt), and the automatic-mode choice; in the three languages of Part A.
 
-**Phases.** P0 spike (the flags and the hooks of the installed Claude Code on macOS and Windows; whether the hooks fire for a background session;
-what a stop does) · P1 start and stop a worker in a known project, on demand, owner only · P2 the new-session form and the project picker · P3
-automatic `on_message` · P4 repository allowlist · P5 the visible-terminal variant for desktops. Tests: a fake `claude` program for everything but
-P0; the real thing only on a test machine.
+**Phases.** P0 spike: done on macOS (above); **Windows still to do** · P1 start and stop on demand for a reported, trusted folder on a dev or test machine, owner
+only, through `claude --bg` and `claude stop` · P2 the new-session form and the project picker · P3 automatic `on_message` · (P4, the repository allowlist, is
+dropped by decision; P5, the visible terminal, is not needed: `claude attach` exists for a person at the machine). Tests: a fake `claude` program for
+everything but the real check on a test machine.
 
-## Open questions for the maintainer
+## Decisions of the maintainer (19/10/2026) and what is still open
 
-1. M1, M2 or M3 (or: do the spike first and decide on its result)? 2. What "environment" means in "choose the environment". 3. Repositories: not at all,
-only from an admin allowlist, or any? 4. Automatic mode: who may turn it on (the machine's owner, or also a workspace admin)? 5. Production and
-database machines: no remote start at all (proposed), or only with a fresh two-step code? 6. The permission mode of a worker nobody watches (proposed:
-`default`, so every risky step waits for a person on the web). 7. The cost of a worker is the machine owner's: is that acceptable?
+Decided: the environment is the machine's class (dev, test, production); no repositories; no remote start on production or database machines.
+Still open: 1. Windows: a test of `claude --bg` on the Windows server (the spike ran on macOS only). 2. Automatic mode: who may turn it on (the machine's owner
+only, as proposed, or also a workspace admin). 3. The permission mode of a session nobody watches (proposed: `manual`, so every risky step waits for a person on
+the web; never bypass, auto or dontAsk). 4. The cost of a session is the machine owner's plan: acceptable? 5. What the page says for a folder that is not trusted
+yet ("open Claude in that folder once at the machine and accept the trust prompt").
