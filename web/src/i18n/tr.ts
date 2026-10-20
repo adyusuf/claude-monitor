@@ -28,6 +28,7 @@ export const tr: Dictionary = {
     mfaTitle: "İki adımlı giriş", mfaCode: "Doğrulama uygulamasındaki kod (ya da bir kurtarma kodu)", mfaVerify: "Doğrula",
   },
   errors: {
+    jira_changed: "Siz baktıktan sonra Jira'da değişti. Yenileyip tekrar deneyin.", jira_transition_unavailable: "Jira'da bu durumdan şuna geçiş yok.", jira_no_board: "Jira alanında sprint açılacak bir board yok.", mirrored_scope: "Bir issue ile sprint ya ikisi de Jira'dan ya ikisi de Podium'dan olmalı.", mirrored_type_locked: "Jira'dan gelen issue'nun türü Jira'da tutulur.", mirrored_no_archive: "Jira'dan gelen bir issue burada arşivlenemez. Bunun yerine iptal edin.", mirrored_field_locked: "Jira projesinin adı ve amacı Jira'da tutulur.", mirrored_detached: "Bu Jira'dan alınmıştı ve bağlantı yok. Siteyi yeniden bağlayın.", assignee_not_in_jira: "Podium bu kişinin Jira hesabını bilmiyor. Entegrasyonlar sayfasında bağlayın.",
     invalid_site: "Jira alt alan adınızı girin; acme.atlassian.net için acme.", integration_unavailable: "Jira bu sunucuda kurulu değil.",
     reauthorize: "Bağlantı için Atlassian'da yeniden oturum açılmalı.", jira_account_required: "Önce kendi Atlassian hesabınızı bağlayın.",
     tracker_unauthorized: "Atlassian oturum açmayı reddetti. Yeniden bağlanın.", tracker_forbidden: "Jira bu hesaba buna izin vermiyor.",

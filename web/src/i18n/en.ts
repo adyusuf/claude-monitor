@@ -27,6 +27,7 @@ export const en = {
     mfaTitle: "Two-step sign-in", mfaCode: "Code from your authenticator app (or a recovery code)", mfaVerify: "Verify",
   },
   errors: {
+    jira_changed: "It changed in Jira since you last looked. Reload and try again.", jira_transition_unavailable: "Jira has no step from this status to that one.", jira_no_board: "The Jira space has no board to make a sprint on.", mirrored_scope: "An issue and a sprint must both come from Jira, or both from Podium.", mirrored_type_locked: "The type of an issue from Jira is kept in Jira.", mirrored_no_archive: "An issue from Jira cannot be archived here. Cancel it instead.", mirrored_field_locked: "The name and purpose of a Jira project are kept in Jira.", mirrored_detached: "This was imported from Jira and the connection is gone. Connect the site again.", assignee_not_in_jira: "That person has no Jira account Podium knows. Link them in the Integrations page.",
     invalid_site: "Enter your Jira sub-domain, such as acme for acme.atlassian.net.", integration_unavailable: "Jira is not set up on this server.",
     reauthorize: "The connection needs a new sign-in at Atlassian.", jira_account_required: "Link your own Atlassian account first.",
     tracker_unauthorized: "Atlassian refused the sign-in. Connect again.", tracker_forbidden: "Jira does not allow that for this account.",

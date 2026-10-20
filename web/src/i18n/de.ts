@@ -28,6 +28,7 @@ export const de: Dictionary = {
     mfaTitle: "Anmeldung in zwei Schritten", mfaCode: "Code aus Ihrer Authenticator-App (oder ein Wiederherstellungscode)", mfaVerify: "Bestätigen",
   },
   errors: {
+    jira_changed: "Es hat sich in Jira geändert, seit Sie nachgesehen haben. Neu laden und erneut versuchen.", jira_transition_unavailable: "Jira kennt keinen Schritt von diesem Status zu jenem.", jira_no_board: "Der Jira-Bereich hat kein Board, auf dem ein Sprint angelegt werden könnte.", mirrored_scope: "Ein Issue und ein Sprint müssen beide aus Jira oder beide aus Podium stammen.", mirrored_type_locked: "Der Typ eines Jira-Issues wird in Jira geführt.", mirrored_no_archive: "Ein Jira-Issue kann hier nicht archiviert werden. Brechen Sie es stattdessen ab.", mirrored_field_locked: "Name und Zweck eines Jira-Projekts werden in Jira geführt.", mirrored_detached: "Dies wurde aus Jira importiert und die Verbindung besteht nicht mehr. Verbinden Sie die Site erneut.", assignee_not_in_jira: "Podium kennt kein Jira-Konto dieser Person. Verknüpfen Sie es auf der Seite Integrationen.",
     invalid_site: "Geben Sie Ihre Jira-Subdomain ein, etwa acme für acme.atlassian.net.", integration_unavailable: "Jira ist auf diesem Server nicht eingerichtet.",
     reauthorize: "Die Verbindung braucht eine neue Anmeldung bei Atlassian.", jira_account_required: "Verknüpfen Sie zuerst Ihr eigenes Atlassian-Konto.",
     tracker_unauthorized: "Atlassian hat die Anmeldung abgelehnt. Verbinden Sie erneut.", tracker_forbidden: "Jira erlaubt das diesem Konto nicht.",
