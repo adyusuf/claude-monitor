@@ -95,6 +95,12 @@ public static class ProjectEndpoints
         if (grant.Project.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (ProjectRules.Check(req) is { } invalid) return invalid;
         var project = grant.Project;
+        // A mirrored project's name and purpose are the tool's (ADR-0015 §7); everything else about it is Podium's to edit.
+        if (project.SourceConnectionId is not null && (req.Name?.Trim() != project.Name || ProjectRules.Clean(req.Purpose) != project.Purpose))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ClaudeMonitor.Api.Integrations.MirrorGate.FieldLocked);
+        }
+
         if (req.OwnerUserId is { } owner && owner != project.OwnerUserId)
         {
             if (!grant.CanArchive) return Results.Forbid();

@@ -19,7 +19,7 @@ internal static class SprintViews
             return new SprintSummary(s.Id, s.ProjectId, s.ApplicationId, s.Number, s.Name, s.Goal, s.StartDate, s.EndDate, s.Capacity, s.Status, s.ReleaseId,
                 s.ReleaseId is { } r ? releases.GetValueOrDefault(r) : null, mine.Count,
                 mine.Where(i => i.Status != IssueStatuses.Cancelled).Sum(i => SprintRules.Number(i.Estimate)),
-                mine.Where(i => i.Status == IssueStatuses.Done).Sum(i => SprintRules.Number(i.Estimate)), s.StartedAt, s.ClosedAt, s.CreatedAt);
+                mine.Where(i => i.Status == IssueStatuses.Done).Sum(i => SprintRules.Number(i.Estimate)), s.StartedAt, s.ClosedAt, s.CreatedAt, s.SourceConnectionId);
         }).ToList();
     }
 

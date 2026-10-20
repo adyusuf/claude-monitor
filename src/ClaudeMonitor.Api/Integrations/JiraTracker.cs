@@ -197,6 +197,10 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
         return fieldCache[ctx.SiteId] = new JiraFields(sprint, points);
     }
 
+    /// <summary>The first board of a space, which a new sprint is made on; null when the space has none.</summary>
+    public async Task<string?> FirstBoardIdAsync(TrackerContext ctx, string containerKey, CancellationToken ct) =>
+        (await BoardsAsync(ctx, containerKey, ct)).FirstOrDefault();
+
     private async Task<List<string>> BoardsAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
     {
         var boards = new List<string>();

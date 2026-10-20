@@ -44,6 +44,10 @@ public static class Startup
         services.AddScoped<ClaudeMonitor.Api.Integrations.JiraTracker>();
         services.AddScoped<ClaudeMonitor.Api.Integrations.IWorkTracker>(sp => sp.GetRequiredService<ClaudeMonitor.Api.Integrations.JiraTracker>());
         services.AddScoped<ClaudeMonitor.Api.Integrations.WebhookManager>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IWorkWriter, ClaudeMonitor.Api.Integrations.JiraWriter>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.MirrorGate>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IssueWrites>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.SprintWrites>();
         services.AddScoped<ClaudeMonitor.Api.Integrations.ProjectMirror>();
         services.AddScoped<ClaudeMonitor.Api.Integrations.IssueMirror>();
         services.AddScoped<ClaudeMonitor.Api.Integrations.SprintMirror>();
