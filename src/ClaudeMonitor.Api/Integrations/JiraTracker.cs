@@ -132,6 +132,30 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
         return await SearchAsync(ctx, $"project in ({keys}) AND updated >= \"{from}\" ORDER BY updated ASC", fields, null, ct);
     }
 
+    public async Task<IReadOnlySet<string>> ListItemIdsAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        string? token = null;
+        for (var page = 0; page < PageCap; page++)
+        {
+            var body = new Dictionary<string, object?> { ["jql"] = $"project = \"{Jql(containerKey)}\" ORDER BY key ASC", ["maxResults"] = 100, ["fields"] = new[] { "summary" } };
+            if (token is not null) body["nextPageToken"] = token;
+            using var doc = await api.PostAsync(ctx, "/rest/api/3/search/jql", body, ct);
+            if (doc.RootElement.TryGetProperty("issues", out var issues) && issues.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var issue in issues.EnumerateArray())
+                {
+                    if (JiraParse.Str(issue, "id") is { } id) ids.Add(id);
+                }
+            }
+
+            token = JiraParse.Str(doc.RootElement, "nextPageToken");
+            if (token is null) break;
+        }
+
+        return ids;
+    }
+
     public async Task<IReadOnlyList<ExternalPerson>> ListPeopleAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
     {
         var people = new Dictionary<string, ExternalPerson>();

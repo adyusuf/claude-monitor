@@ -83,5 +83,8 @@ public interface IWorkTracker
     Task<IReadOnlyList<ExternalItem>> ListChangedAsync(TrackerContext ctx, IReadOnlyList<string> containerKeys, DateTimeOffset since,
         CancellationToken ct);
 
+    /// <summary>The tool's ids of every issue of the containers that still exist (to find the ones that were deleted).</summary>
+    Task<IReadOnlySet<string>> ListItemIdsAsync(TrackerContext ctx, string containerKey, CancellationToken ct);
+
     Task<IReadOnlyList<ExternalPerson>> ListPeopleAsync(TrackerContext ctx, string containerKey, CancellationToken ct);
 }
