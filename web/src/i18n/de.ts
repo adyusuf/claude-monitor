@@ -5,12 +5,13 @@ import { deRemote } from "./de.remote";
 import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
 import { deSprints } from "./de.sprints";
+import { deIntegrations } from "./de.integrations";
 
 // German: the same keys as en.ts (the type makes a missing key a build error). "Sie" throughout.
 export const de: Dictionary = {
   app: { name: "Podium", tagline: "Verfolgen Sie Ihre KI-Programmiersitzungen live." },
   nav: {
-    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", members: "Mitglieder", settings: "Arbeitsbereich-Einstellungen",
+    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen",
     account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
   },
@@ -27,6 +28,12 @@ export const de: Dictionary = {
     mfaTitle: "Anmeldung in zwei Schritten", mfaCode: "Code aus Ihrer Authenticator-App (oder ein Wiederherstellungscode)", mfaVerify: "Bestätigen",
   },
   errors: {
+    invalid_site: "Geben Sie Ihre Jira-Subdomain ein, etwa acme für acme.atlassian.net.", integration_unavailable: "Jira ist auf diesem Server nicht eingerichtet.",
+    reauthorize: "Die Verbindung braucht eine neue Anmeldung bei Atlassian.", jira_account_required: "Verknüpfen Sie zuerst Ihr eigenes Atlassian-Konto.",
+    tracker_unauthorized: "Atlassian hat die Anmeldung abgelehnt. Verbinden Sie erneut.", tracker_forbidden: "Jira erlaubt das diesem Konto nicht.",
+    tracker_not_found: "Jira kennt das nicht.", tracker_rate_limited: "Jira bittet um weniger Tempo. Versuchen Sie es in einer Minute erneut.",
+    tracker_unavailable: "Jira ist gerade nicht erreichbar.", tracker_rejected: "Jira hat das nicht akzeptiert.", tracker_changed: "In Jira hat sich das geändert. Sehen Sie es sich erneut an.",
+    space_not_found: "Dieser Bereich ist nicht in Jira (oder dieses Konto sieht ihn nicht).",
     invalid_email: "Das sieht nicht nach einer E-Mail-Adresse aus.", weak_password: "Verwenden Sie mindestens 10 Zeichen.",
     invalid_name: "Geben Sie einen Namen ein (bis zu 100 Zeichen).", invalid_credentials: "Die E-Mail oder das Passwort ist falsch. Nach zu vielen Versuchen wird das Konto für eine Weile gesperrt; ein Zurücksetzen des Passworts öffnet es sofort.",
     email_not_verified: "Bestätigen Sie zuerst Ihre Adresse: Öffnen Sie den Link aus unserer E-Mail.", invalid_token: "Dieser Link ist ungültig oder abgelaufen.",
@@ -165,6 +172,7 @@ export const de: Dictionary = {
   projects: deProjects,
   issues: deIssues,
   sprints: deSprints,
+  integrations: deIntegrations,
   twoStep: deTwoStep,
   device: {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",

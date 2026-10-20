@@ -2,6 +2,7 @@ import { enMachines } from "./en.machines";
 import { enProjects } from "./en.projects";
 import { enIssues } from "./en.issues";
 import { enSprints } from "./en.sprints";
+import { enIntegrations } from "./en.integrations";
 import { enTwoStep } from "./en.twoStep";
 import { enRemote } from "./en.remote";
 
@@ -9,7 +10,7 @@ import { enRemote } from "./en.remote";
 export const en = {
   app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
-    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", settings: "Workspace settings",
+    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", integrations: "Integrations", settings: "Workspace settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
   },
@@ -26,6 +27,12 @@ export const en = {
     mfaTitle: "Two-step sign-in", mfaCode: "Code from your authenticator app (or a recovery code)", mfaVerify: "Verify",
   },
   errors: {
+    invalid_site: "Enter your Jira sub-domain, such as acme for acme.atlassian.net.", integration_unavailable: "Jira is not set up on this server.",
+    reauthorize: "The connection needs a new sign-in at Atlassian.", jira_account_required: "Link your own Atlassian account first.",
+    tracker_unauthorized: "Atlassian refused the sign-in. Connect again.", tracker_forbidden: "Jira does not allow that for this account.",
+    tracker_not_found: "Jira does not have that.", tracker_rate_limited: "Jira asks to slow down. Try again in a minute.",
+    tracker_unavailable: "Jira cannot be reached right now.", tracker_rejected: "Jira did not accept that.", tracker_changed: "It changed in Jira. Look at it again.",
+    space_not_found: "That space is not in Jira (or this account cannot see it).",
     invalid_email: "That does not look like an e-mail address.", weak_password: "Use at least 10 characters.",
     invalid_name: "Enter a name (up to 100 characters).", invalid_credentials: "The e-mail or the password is wrong. After too many attempts the account is locked for a while; resetting the password opens it at once.",
     email_not_verified: "Confirm your address first: open the link we mailed you.", invalid_token: "This link is invalid or has expired.",
@@ -164,6 +171,7 @@ export const en = {
   projects: enProjects,
   issues: enIssues,
   sprints: enSprints,
+  integrations: enIntegrations,
   twoStep: enTwoStep,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",

@@ -3,6 +3,7 @@ import { trMachines } from "./tr.machines";
 import { trProjects } from "./tr.projects";
 import { trIssues } from "./tr.issues";
 import { trSprints } from "./tr.sprints";
+import { trIntegrations } from "./tr.integrations";
 import { trTwoStep } from "./tr.twoStep";
 import { trRemote } from "./tr.remote";
 
@@ -10,7 +11,7 @@ import { trRemote } from "./tr.remote";
 export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
-    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", settings: "Çalışma alanı ayarları",
+    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
   },
@@ -27,6 +28,12 @@ export const tr: Dictionary = {
     mfaTitle: "İki adımlı giriş", mfaCode: "Doğrulama uygulamasındaki kod (ya da bir kurtarma kodu)", mfaVerify: "Doğrula",
   },
   errors: {
+    invalid_site: "Jira alt alan adınızı girin; acme.atlassian.net için acme.", integration_unavailable: "Jira bu sunucuda kurulu değil.",
+    reauthorize: "Bağlantı için Atlassian'da yeniden oturum açılmalı.", jira_account_required: "Önce kendi Atlassian hesabınızı bağlayın.",
+    tracker_unauthorized: "Atlassian oturum açmayı reddetti. Yeniden bağlanın.", tracker_forbidden: "Jira bu hesaba buna izin vermiyor.",
+    tracker_not_found: "Jira'da bu yok.", tracker_rate_limited: "Jira yavaşlamanızı istiyor. Bir dakika sonra deneyin.",
+    tracker_unavailable: "Jira'ya şu anda ulaşılamıyor.", tracker_rejected: "Jira bunu kabul etmedi.", tracker_changed: "Jira'da değişti. Yeniden bakın.",
+    space_not_found: "Bu alan Jira'da yok (ya da bu hesap göremiyor).",
     invalid_email: "Bu bir e-posta adresine benzemiyor.", weak_password: "En az 10 karakter kullanın.",
     invalid_name: "Bir ad girin (en çok 100 karakter).", invalid_credentials: "E-posta ya da parola yanlış. Çok fazla denemeden sonra hesap bir süre kilitlenir; parolayı sıfırlamak kilidi hemen açar.",
     email_not_verified: "Önce adresinizi doğrulayın: gönderdiğimiz bağlantıyı açın.", invalid_token: "Bu bağlantı geçersiz ya da süresi dolmuş.",
@@ -165,6 +172,7 @@ export const tr: Dictionary = {
   projects: trProjects,
   issues: trIssues,
   sprints: trSprints,
+  integrations: trIntegrations,
   twoStep: trTwoStep,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
