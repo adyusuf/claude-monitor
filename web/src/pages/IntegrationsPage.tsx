@@ -19,7 +19,9 @@ export function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
   const admin = role === "owner" || role === "admin";
-  const result = params.get("result");
+  // The result of the Atlassian round trip is read once, shown, and only then taken out of the address.
+  const incoming = params.get("result");
+  const [result] = useState(incoming); // the round trip is a full page load, so the first value is the one
 
   const load = useCallback(async () => {
     try {
@@ -36,10 +38,9 @@ export function IntegrationsPage() {
     void load();
   }, [load]);
 
-  // The result of the Atlassian round trip is shown once and then taken out of the address.
   useEffect(() => {
-    if (result) setParams({}, { replace: true });
-  }, [result, setParams]);
+    if (incoming) setParams({}, { replace: true });
+  }, [incoming, setParams]);
 
   return (
     <div className="page">

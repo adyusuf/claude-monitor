@@ -87,7 +87,7 @@ export function IssuePage() {
         <Notice>
           <span className="spread">
             <span>{t("issues.archivedBanner")}</span>
-            {canWrite ? <Button variant="ghost" onClick={() => void act(() => api.restoreIssue(id))}>{t("projects.restore")}</Button> : null}
+            {canWrite && !mirrored ? <Button variant="ghost" onClick={() => void act(() => api.restoreIssue(id))}>{t("projects.restore")}</Button> : null}
           </span>
         </Notice>
       ) : null}
