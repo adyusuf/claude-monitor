@@ -125,7 +125,7 @@ public sealed class JiraWriter(JiraApi api, JiraTracker tracker) : IWorkWriter
         return body;
     }
 
-    private static string Stamp(DateOnly d) => d.ToString("yyyy-MM-dd'T'00:00:00.000'Z'", CultureInfo.InvariantCulture);
+    private static string Stamp(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T00:00:00.000Z";
 
     /// <summary>The Jira type name for a Podium type; a spike is a task there.</summary>
     public static string TypeName(string podiumType) => podiumType switch

@@ -88,7 +88,7 @@ public sealed class FakeWebhook(long id, string url, IReadOnlyList<string> event
 }
 
 /// <summary>One Jira Cloud site: its cloud id, host, spaces, sprints and registered webhooks. A test makes its own, so tests do not meet.</summary>
-public sealed class FakeSite
+public sealed partial class FakeSite
 {
     public FakeSite(FakeJira jira, string subdomain)
     {

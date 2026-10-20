@@ -43,6 +43,7 @@ public sealed class JiraClients : IDisposable
         Api = new JiraApi(clients, Config);
         OAuth = new JiraOAuth(clients, Config);
         Tracker = new JiraTracker(Api);
+        Writer = new JiraWriter(Api, Tracker);
     }
 
     public FakeJira Jira { get; }
@@ -50,6 +51,7 @@ public sealed class JiraClients : IDisposable
     public JiraApi Api { get; }
     public JiraOAuth OAuth { get; }
     public JiraTracker Tracker { get; }
+    public JiraWriter Writer { get; }
 
     /// <summary>A tracker context for the site that calls with the account's own (fake) access token.</summary>
     public TrackerContext Context(FakeSite site, FakeAccount account)

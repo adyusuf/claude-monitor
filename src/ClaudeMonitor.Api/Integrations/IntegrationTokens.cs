@@ -10,7 +10,7 @@ namespace ClaudeMonitor.Api.Integrations;
 /// Holds the sealed Atlassian tokens: gives a valid access token (refreshing under a lock, because a refresh token rotates and a second
 /// parallel refresh would burn the new one) and marks an account for sign-in again when Atlassian refuses it (ADR-0015 §5).
 /// </summary>
-public sealed class IntegrationTokens(MonitorDb db, ApiConfig config, JiraOAuth oauth, TimeProvider clock)
+public sealed class IntegrationTokens(MonitorDb db, IServiceScopeFactory scopes, ApiConfig config, JiraOAuth oauth, TimeProvider clock)
 {
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> Locks = new();
     private static readonly TimeSpan Skew = TimeSpan.FromSeconds(60);
@@ -37,11 +37,14 @@ public sealed class IntegrationTokens(MonitorDb db, ApiConfig config, JiraOAuth 
         await gate.WaitAsync(ct);
         try
         {
+            // The token rows are read and saved in a context of their own: saving them must never carry along what the caller
+            // has changed and not yet decided to keep (an edit that the tool is about to refuse).
+            await using var scope = scopes.CreateAsyncScope();
+            var own = scope.ServiceProvider.GetRequiredService<MonitorDb>();
             // Read again under the lock: another request may have refreshed while this one waited.
-            var account = await db.IntegrationAccounts.FirstOrDefaultAsync(a => a.Id == accountId, ct)
+            var account = await own.IntegrationAccounts.FirstOrDefaultAsync(a => a.Id == accountId, ct)
                           ?? throw new TrackerException(TrackerException.Codes.Unauthorized);
             if (account.Status != AccountStatuses.Active) throw new TrackerException(TrackerException.Codes.Unauthorized);
-            await db.Entry(account).ReloadAsync(ct);
             var now = clock.GetUtcNow();
             if (account.AccessExpiresAt - now > Skew) return Open(config, account.AccessToken);
             try
@@ -51,12 +54,12 @@ public sealed class IntegrationTokens(MonitorDb db, ApiConfig config, JiraOAuth 
                 account.RefreshToken = Seal(config, tokens.Refresh);
                 account.AccessExpiresAt = now.AddSeconds(tokens.ExpiresInSeconds);
                 account.UpdatedAt = now;
-                await db.SaveChangesAsync(ct);
+                await own.SaveChangesAsync(ct);
                 return tokens.Access;
             }
             catch (TrackerException e) when (e.Code == TrackerException.Codes.Unauthorized)
             {
-                await MarkReauthorizeAsync(account, now, ct);
+                await MarkReauthorizeAsync(own, account, now, ct);
                 throw;
             }
         }
@@ -66,7 +69,7 @@ public sealed class IntegrationTokens(MonitorDb db, ApiConfig config, JiraOAuth 
         }
     }
 
-    private async Task MarkReauthorizeAsync(IntegrationAccount account, DateTimeOffset now, CancellationToken ct)
+    private static async Task MarkReauthorizeAsync(MonitorDb db, IntegrationAccount account, DateTimeOffset now, CancellationToken ct)
     {
         account.Status = AccountStatuses.Reauthorize;
         account.UpdatedAt = now;

@@ -89,7 +89,8 @@ public sealed class IssueWrites(MonitorDb db, IWorkWriter writer, MirrorGate gat
         try
         {
             var (id, key) = await writer.CreateItemAsync(open.Ctx, new NewItem(space, issue.Type, change), ct);
-            if (issue.Status is not (IssueStatuses.Backlog or IssueStatuses.Ready)) await writer.TransitionItemAsync(open.Ctx, key, issue.Status, ct);
+            // A new issue starts in the tool's first status; if the workflow has no step to the wanted one, the row says what the tool says.
+            if (issue.Status is not (IssueStatuses.Backlog or IssueStatuses.Ready) && !await writer.TransitionItemAsync(open.Ctx, key, issue.Status, ct)) issue.Status = IssueStatuses.Backlog;
             issue.ExternalKey = key;
             issue.ExternalUrl = $"https://{open.Connection.SiteHost}/browse/{Uri.EscapeDataString(key)}";
             db.IntegrationLinks.Add(new IntegrationLink

@@ -67,6 +67,7 @@ public sealed partial class FakeJiraHandler(FakeJira jira) : HttpMessageHandler
     {
         var start = int.TryParse(query["startAt"], out var s) ? s : 0;
         var size = int.TryParse(query["maxResults"], out var m) ? m : DefaultPage;
+        if (Written(site, method, rest, body) is { } written) return written;
         if (rest == "/rest/api/3/myself")
         {
             return Json(new JsonObject { ["accountId"] = account.Id, ["displayName"] = account.DisplayName, ["emailAddress"] = account.Email });
