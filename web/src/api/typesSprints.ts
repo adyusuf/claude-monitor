@@ -36,6 +36,7 @@ export interface SprintSummary {
   startedAt: string | null;
   closedAt: string | null;
   createdAt: string;
+  sourceConnectionId: string | null;
 }
 
 export interface SprintMemberView { userId: string; displayName: string }

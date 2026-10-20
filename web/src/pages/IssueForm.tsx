@@ -18,12 +18,14 @@ interface Props {
   project: ProjectView;
   members: Member[];
   applications: ApplicationSummary[];
+  /** An issue that mirrors one in a work tracker keeps its type there (ADR-0015 §7). */
+  mirrored?: boolean;
   onSubmit: (input: IssueInput) => Promise<void>;
   onCancel: () => void;
 }
 
 /** Every field of an issue. Checks on the client first; the API's refusal is shown as a notice. The priority and the estimate follow the project's scale and unit. */
-export function IssueForm({ initial, issueId, project, members, applications, onSubmit, onCancel }: Props) {
+export function IssueForm({ initial, issueId, project, members, applications, mirrored = false, onSubmit, onCancel }: Props) {
   const { t, tx } = useI18n();
   const errorText = useErrorText();
   const [draft, setDraft] = useState(initial);
@@ -59,7 +61,7 @@ export function IssueForm({ initial, issueId, project, members, applications, on
       <div className="form-grid">
         <Labeled label={t("issues.type")} error={err("type")}>
           {(id) => (
-            <select id={id} className="input" value={draft.type} onChange={(e) => change({ type: e.target.value as ItemType })}>
+            <select id={id} className="input" value={draft.type} disabled={mirrored} onChange={(e) => change({ type: e.target.value as ItemType })}>
               {types.map((x) => <option key={x} value={x}>{t(`projects.itemType.${x}`)}</option>)}
             </select>
           )}

@@ -46,6 +46,8 @@ export interface ProjectSummary {
   status: ProjectStatus;
   applicationCount: number;
   createdAt: string;
+  /** The work tracker connection the project mirrors (ADR-0015); null for a project made in Podium. */
+  sourceConnectionId: string | null;
 }
 
 export interface ProjectView {
@@ -71,6 +73,7 @@ export interface ProjectView {
   createdAt: string;
   updatedAt: string;
   access: ProjectAccess;
+  sourceConnectionId: string | null;
 }
 
 export interface ProjectMemberView { userId: string; displayName: string; email: string | null; role: ProjectRole; addedAt: string }

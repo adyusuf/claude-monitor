@@ -3,7 +3,7 @@ import type { CodeLinkView, IssueLinkView, IssueRunView, IssueSummary, IssueView
 export const issueSummary = (over: Partial<IssueSummary> = {}): IssueSummary => ({
   id: "i1", projectId: "p1", applicationId: null, number: 1, title: "Pay with a card", type: "story", priority: "must", estimate: "5", status: "backlog",
   assigneeUserId: "u2", assigneeName: "Deniz", parentId: null, componentId: null, releaseId: null, position: 1, archived: false,
-  createdAt: "2026-02-01T10:00:00Z", updatedAt: "2026-02-02T10:00:00Z", sprintId: null, ...over,
+  createdAt: "2026-02-01T10:00:00Z", updatedAt: "2026-02-02T10:00:00Z", sprintId: null, externalKey: null, externalUrl: null, ...over,
 });
 
 /** Three issues in backlog order: #1, #2, #3. */

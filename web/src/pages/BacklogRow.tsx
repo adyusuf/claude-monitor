@@ -3,6 +3,7 @@ import type { IssueSummary } from "../api/typesIssues";
 import type { EstimationUnit } from "../api/typesProjects";
 import { Button } from "../components/ui";
 import { useI18n } from "../i18n";
+import { ExternalBadge } from "./ExternalBadge";
 import { StatusBadge, TypeBadge, useEstimateText, usePriorityText } from "./IssueBits";
 
 interface Props {
@@ -30,6 +31,7 @@ export function BacklogRow({ ws, issue, unit, canWrite, canMove, first, last, on
         <span className="issue-number">{mark}</span>
         <Link className="issue-title" to={`/w/${ws}/projects/${issue.projectId}/issues/${issue.id}`}>{issue.title}</Link>
         <TypeBadge type={issue.type} />
+        <ExternalBadge externalKey={issue.externalKey} externalUrl={issue.externalUrl} />
         {issue.parentId ? <span className="badge" title={t("issues.inEpic")}>↑ {t("projects.itemType.epic")}</span> : null}
         {issue.sprintId ? <Link className="badge" to={`/w/${ws}/projects/${issue.projectId}/sprints/${issue.sprintId}`}>{t("sprints.inSprint")}</Link> : null}
         {issue.archived ? <span className="badge warn">{t("projects.archived")}</span> : null}
@@ -48,7 +50,7 @@ export function BacklogRow({ ws, issue, unit, canWrite, canMove, first, last, on
             <Button variant="ghost" disabled={last} aria-label={`${t("issues.moveDown")} ${mark}`} onClick={() => onMove(1)}>↓</Button>
           </>
         ) : null}
-        {canWrite ? (
+        {canWrite && !issue.externalKey ? (
           issue.archived
             ? <Button variant="ghost" aria-label={`${t("projects.restore")} ${mark}`} onClick={onRestore}>{t("projects.restore")}</Button>
             : <Button variant="ghost" aria-label={`${t("projects.archive")} ${mark}`} onClick={onArchive}>{t("projects.archive")}</Button>

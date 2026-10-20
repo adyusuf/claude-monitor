@@ -88,7 +88,7 @@ export function ProjectPage() {
       ) : null}
       {editing && access.canEdit && !archived ? (
         <Card title={t("projects.editTitle")}>
-          <ProjectForm initial={draftOfProject(project)} members={members} canChangeOwner={access.canArchive} submitLabel={t("common.save")}
+          <ProjectForm initial={draftOfProject(project)} members={members} canChangeOwner={access.canArchive} submitLabel={t("common.save")} mirrored={project.sourceConnectionId !== null}
             onSubmit={save} onCancel={() => setEditing(false)} />
         </Card>
       ) : <ProjectDefinition project={project} />}
