@@ -10,7 +10,7 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
     private const int PageCap = 200; // 10 000 rows: a ceiling against a runaway loop, not a limit anybody should reach
     private readonly Dictionary<string, JiraFields> fieldCache = [];
 
-    public string Provider => Providers.Jira;
+    public string Provider => TrackerProviders.Jira;
 
     public async Task<IReadOnlyList<ExternalContainer>> ListContainersAsync(TrackerContext ctx, CancellationToken ct)
     {

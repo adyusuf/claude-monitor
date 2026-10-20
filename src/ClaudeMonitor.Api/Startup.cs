@@ -37,6 +37,13 @@ public static class Startup
         services.AddScoped<ClaudeMonitor.Api.Remote.GrantService>();
         services.AddScoped<ClaudeMonitor.Api.Remote.JobService>();
         services.AddScoped<ClaudeMonitor.Api.Remote.ScheduleService>();
+        services.AddHttpClient(ClaudeMonitor.Api.Integrations.JiraApi.ClientName, c => c.Timeout = TimeSpan.FromSeconds(30));
+        services.AddScoped<ClaudeMonitor.Api.Integrations.JiraApi>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.JiraOAuth>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IntegrationTokens>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.JiraTracker>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IWorkTracker>(sp => sp.GetRequiredService<ClaudeMonitor.Api.Integrations.JiraTracker>());
+        services.AddScoped<ClaudeMonitor.Api.Integrations.WebhookManager>();
         if (config.BackgroundJobs)
         {
             services.AddHostedService<Housekeeper>();
@@ -141,6 +148,7 @@ public static class Startup
         SprintEndpoints.Map(api);
         SprintIssueEndpoints.Map(api);
         IssueRunEndpoints.Map(api);
+        IntegrationEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)

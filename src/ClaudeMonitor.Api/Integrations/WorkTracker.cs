@@ -3,7 +3,7 @@ namespace ClaudeMonitor.Api.Integrations;
 // The one view of a project tool that the import and sync code knows (ADR-0015 §2). A new tool is one new IWorkTracker.
 
 /// <summary>A tool a connection can be made to. A closed set stored as text (global #11).</summary>
-public static class Providers
+public static class TrackerProviders
 {
     public const string Jira = "jira";
     public static readonly IReadOnlyList<string> All = [Jira];
