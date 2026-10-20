@@ -8,7 +8,7 @@ public sealed record SprintInput(string? Name, string? Goal, DateOnly? StartDate
 
 public sealed record SprintSummary(Guid Id, Guid ProjectId, Guid? ApplicationId, int Number, string? Name, string? Goal, DateOnly? StartDate,
     DateOnly? EndDate, decimal? Capacity, string Status, Guid? ReleaseId, string? ReleaseName, int IssueCount, decimal Committed, decimal Done,
-    DateTimeOffset? StartedAt, DateTimeOffset? ClosedAt, DateTimeOffset CreatedAt);
+    DateTimeOffset? StartedAt, DateTimeOffset? ClosedAt, DateTimeOffset CreatedAt, Guid? SourceConnectionId = null);
 
 public sealed record SprintMemberView(Guid UserId, string DisplayName);
 

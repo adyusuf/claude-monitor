@@ -33,6 +33,26 @@ public sealed record ApiConfig
 
     /// <summary>32 bytes that seal the TOTP secrets at rest (MONITOR_MFA_KEY, base64url).</summary>
     public required byte[] MfaKey { get; init; }
+
+    /// <summary>
+    /// 32 bytes that seal the work tracker tokens at rest (MONITOR_INTEGRATION_KEY, base64url). Null outside development when it is
+    /// not set: the integrations are then simply not offered (ADR-0015), so existing deployments start unchanged.
+    /// </summary>
+    public byte[]? IntegrationKey { get; init; }
+
+    /// <summary>The Atlassian OAuth 2.0 (3LO) app (MONITOR_JIRA_CLIENT_ID / _SECRET).</summary>
+    public OAuthClient? Jira { get; init; }
+
+    /// <summary>Jira is offered only when the app is registered and tokens can be sealed.</summary>
+    public bool JiraAvailable => Jira is not null && IntegrationKey is not null;
+
+    /// <summary>Atlassian's fixed endpoints (ADR-0015 §3); here so that no other file holds an address (global #2).</summary>
+    public string AtlassianAuthBase { get; init; } = "https://auth.atlassian.com";
+    public string AtlassianApiBase { get; init; } = "https://api.atlassian.com";
+
+    /// <summary>How often the reconciliation pass runs per connection, and how far back each pass looks past the last one.</summary>
+    public TimeSpan IntegrationPassEvery { get; init; } = TimeSpan.FromMinutes(10);
+    public TimeSpan IntegrationPassOverlap { get; init; } = TimeSpan.FromMinutes(5);
     public bool SecureCookies { get; init; } = true;
     public bool BackgroundJobs { get; init; } = true;
     public bool TrustProxy { get; init; }
@@ -194,7 +214,10 @@ public sealed record ApiConfig
             WebRoot = env["MONITOR_WEB_ROOT"],
             DownloadsUrl = DownloadsBase(env["MONITOR_DOWNLOADS_URL"]),
             Commit = env["MONITOR_COMMIT"] is { Length: > 0 } c ? c : "dev",
-            MfaKey = Key32(Required("MONITOR_MFA_KEY", "ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyLWJ5dGU")),
+            MfaKey = Key32("MONITOR_MFA_KEY", Required("MONITOR_MFA_KEY", "ZGV2ZWxvcG1lbnQtb25seS1tZmEta2V5LTMyLWJ5dGU")),
+            IntegrationKey = env["MONITOR_INTEGRATION_KEY"] is { Length: > 0 } ik ? Key32("MONITOR_INTEGRATION_KEY", ik)
+                : development ? System.Security.Cryptography.SHA256.HashData("development-only-integration-key"u8) : null,
+            Jira = Client("MONITOR_JIRA"),
             MinimumAgentVersion = Version.Parse(env["MONITOR_MIN_AGENT_VERSION"] is { Length: > 0 } m ? m : "0.1.0"),
             SecureCookies = origin.StartsWith("https://", StringComparison.Ordinal),
             BackgroundJobs = env["MONITOR_BACKGROUND_JOBS"] != "off",
@@ -209,11 +232,11 @@ public sealed record ApiConfig
         : UpdateUrls.TryParseBase(value, out var b) ? b
         : throw new InvalidOperationException("MONITOR_DOWNLOADS_URL must be an https address with a host name, without credentials, query or fragment (see .env.example)");
 
-    private static byte[] Key32(string base64Url)
+    private static byte[] Key32(string name, string base64Url)
     {
         var text = base64Url.Replace('-', '+').Replace('_', '/');
         var key = Convert.FromBase64String(text.PadRight(text.Length + ((4 - (text.Length % 4)) % 4), '='));
-        return key.Length == 32 ? key : throw new InvalidOperationException("MONITOR_MFA_KEY must be 32 bytes (base64url)");
+        return key.Length == 32 ? key : throw new InvalidOperationException($"{name} must be 32 bytes (base64url)");
     }
 
     /// <summary>The price for a model id: the longest configured prefix wins ("claude-haiku-4-5-20251001" -> "claude-haiku-4-5").</summary>

@@ -13,7 +13,7 @@ public sealed record IssueInput(string? Title, string? Type, string? Priority, s
 
 public sealed record IssueSummary(Guid Id, Guid ProjectId, Guid? ApplicationId, int Number, string Title, string Type, string? Priority,
     string? Estimate, string Status, Guid? AssigneeUserId, string? AssigneeName, Guid? ParentId, Guid? ComponentId, Guid? ReleaseId,
-    double Position, bool Archived, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, Guid? SprintId = null);
+    double Position, bool Archived, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, Guid? SprintId = null, string? ExternalKey = null, string? ExternalUrl = null);
 
 public sealed record IssueLinkView(Guid LinkId, Guid IssueId, int Number, string Title, string Status);
 

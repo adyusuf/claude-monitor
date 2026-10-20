@@ -9,6 +9,7 @@ import { useErrorText, useI18n } from "../i18n";
 import { draftOfIssue } from "../lib/issueForm";
 import { IssueCodeLinks } from "./IssueCodeLinks";
 import { IssueDetails } from "./IssueDetails";
+import { ExternalBadge } from "./ExternalBadge";
 import { IssueForm } from "./IssueForm";
 import { IssueLinks } from "./IssueLinks";
 import { IssueRuns } from "./IssueRuns";
@@ -67,6 +68,7 @@ export function IssuePage() {
   const { issue } = view;
   const canWrite = view.canEdit && project.access.canEditApplications;
   const writable = canWrite && !issue.archived;
+  const mirrored = issue.externalKey !== null;
   const archive = () => {
     if (window.confirm(t("issues.archiveConfirm", { number: issue.number }))) void act(() => api.archiveIssue(id));
   };
@@ -74,10 +76,10 @@ export function IssuePage() {
     <div className="page">
       <Link className="back" to={`/w/${ws}/projects/${projectId}/backlog`}>← {t("issues.backlog")}</Link>
       <header className="page-head">
-        <h1>#{issue.number} {issue.title} <StatusBadge status={issue.status} /> {issue.archived ? <span className="badge warn">{t("projects.archived")}</span> : null}</h1>
+        <h1>#{issue.number} {issue.title} <StatusBadge status={issue.status} /> <ExternalBadge externalKey={issue.externalKey} externalUrl={issue.externalUrl} /> {issue.archived ? <span className="badge warn">{t("projects.archived")}</span> : null}</h1>
         <div className="row-actions">
           {writable && !editing ? <Button variant="ghost" onClick={() => setEditing(true)}>{t("projects.edit")}</Button> : null}
-          {writable ? <Button variant="ghost" onClick={archive}>{t("projects.archive")}</Button> : null}
+          {writable && !mirrored ? <Button variant="ghost" onClick={archive}>{t("projects.archive")}</Button> : null}
         </div>
       </header>
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -85,13 +87,13 @@ export function IssuePage() {
         <Notice>
           <span className="spread">
             <span>{t("issues.archivedBanner")}</span>
-            {canWrite ? <Button variant="ghost" onClick={() => void act(() => api.restoreIssue(id))}>{t("projects.restore")}</Button> : null}
+            {canWrite && !mirrored ? <Button variant="ghost" onClick={() => void act(() => api.restoreIssue(id))}>{t("projects.restore")}</Button> : null}
           </span>
         </Notice>
       ) : null}
       {editing && writable ? (
         <Card title={t("projects.editTitle")}>
-          <IssueForm initial={draftOfIssue(view)} issueId={id} project={project} members={members} applications={applications} onSubmit={save} onCancel={() => setEditing(false)} />
+          <IssueForm initial={draftOfIssue(view)} issueId={id} project={project} members={members} applications={applications} mirrored={mirrored} onSubmit={save} onCancel={() => setEditing(false)} />
         </Card>
       ) : <IssueDetails ws={ws} view={view} project={project} applications={applications} />}
       <IssueLinks ws={ws} projectId={projectId} issueId={id} blocks={view.blocks} blockedBy={view.blockedBy} canWrite={writable} onChanged={load} />

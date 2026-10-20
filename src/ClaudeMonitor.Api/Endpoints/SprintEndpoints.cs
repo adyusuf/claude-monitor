@@ -1,5 +1,6 @@
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Integrations;
 using ClaudeMonitor.Api.Projects;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Text;
@@ -37,7 +38,7 @@ public static class SprintEndpoints
         return Results.Ok(new Page<SprintSummary>(rows, page.Count > take ? shown[^1].Number.ToString(System.Globalization.CultureInfo.InvariantCulture) : null));
     }
 
-    private static async Task<IResult> Create(Guid id, SprintInput req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Create(Guid id, SprintInput req, HttpContext http, MonitorDb db, TimeProvider clock, SprintWrites writes)
     {
         var userId = http.User.UserId();
         var grant = await ProjectAccess.OfAsync(db, userId, id, http.RequestAborted);
@@ -57,6 +58,7 @@ public static class SprintEndpoints
         var now = clock.GetUtcNow();
         var sprint = new Sprint { WorkspaceId = project.WorkspaceId, ProjectId = id, ApplicationId = req.ApplicationId, CreatedBy = userId, CreatedAt = now };
         Fill(sprint, req, userId, now);
+        if (await writes.CreateAsync(userId, project, sprint, http.RequestAborted) is { } refused) return refused;
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
         sprint.Number = (await db.Sprints.Where(s => s.ProjectId == id).MaxAsync(s => (int?)s.Number, http.RequestAborted) ?? 0) + 1;
@@ -75,7 +77,7 @@ public static class SprintEndpoints
     }
 
     /// <summary>Replaces the definition (see the note in SprintModels). A closed sprint is read-only; the scope never changes.</summary>
-    private static async Task<IResult> Update(Guid id, SprintInput req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Update(Guid id, SprintInput req, HttpContext http, MonitorDb db, TimeProvider clock, SprintWrites writes)
     {
         var userId = http.User.UserId();
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
@@ -85,6 +87,7 @@ public static class SprintEndpoints
         if (SprintRules.Check(req) is { } invalid) return invalid;
         if (await SprintRules.CheckReferencesAsync(db, f.Grant.Project, sprint.ApplicationId, req, http.RequestAborted) is { } bad) return bad;
         var now = clock.GetUtcNow();
+        if (await writes.UpdateAsync(userId, sprint, ProjectRules.Clean(req.Name), ProjectRules.Clean(req.Goal), req.StartDate, req.EndDate, http.RequestAborted) is { } refused) return refused;
         Fill(sprint, req, userId, now);
         var current = await db.SprintMembers.Where(m => m.SprintId == id).ToListAsync(http.RequestAborted);
         SetTeam(db, id, current, req.TeamUserIds, now);
@@ -94,13 +97,14 @@ public static class SprintEndpoints
     }
 
     /// <summary>A planned sprint is archived and its issues go back to the backlog.</summary>
-    private static async Task<IResult> Delete(Guid id, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Delete(Guid id, HttpContext http, MonitorDb db, TimeProvider clock, SprintWrites writes)
     {
         var userId = http.User.UserId();
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
         if (sprint.Status != SprintStatuses.Planned) return Http.Invalid("status", "not_planned");
+        if (await writes.DeleteAsync(userId, sprint, http.RequestAborted) is { } refused) return refused;
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var now = clock.GetUtcNow();
         await db.Issues.Where(i => i.SprintId == id).ExecuteUpdateAsync(s => s.SetProperty(i => i.SprintId, (Guid?)null).SetProperty(i => i.UpdatedAt, now), http.RequestAborted);
@@ -113,7 +117,7 @@ public static class SprintEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Start(Guid id, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Start(Guid id, HttpContext http, MonitorDb db, TimeProvider clock, SprintWrites writes)
     {
         var userId = http.User.UserId();
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
@@ -123,9 +127,11 @@ public static class SprintEndpoints
         if (sprint.StartDate is null || sprint.EndDate is null) return Http.Invalid("startDate", "dates_required");
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await IssueEndpoints.LockProjectAsync(db, sprint.ProjectId, http.RequestAborted);
-        var taken = await db.Sprints.AnyAsync(s => s.ProjectId == sprint.ProjectId && s.Status == SprintStatuses.Active && s.ArchivedAt == null
+        // A sprint mirrored from a tool may run next to others, as the tool allows (ADR-0015 §4).
+        var taken = sprint.SourceConnectionId is null && await db.Sprints.AnyAsync(s => s.ProjectId == sprint.ProjectId && s.Status == SprintStatuses.Active && s.ArchivedAt == null
             && s.ApplicationId == sprint.ApplicationId, http.RequestAborted);
         if (taken) return Http.Invalid("status", "sprint_active");
+        if (await writes.StartAsync(userId, sprint, http.RequestAborted) is { } refused) return refused;
         var now = clock.GetUtcNow();
         sprint.Status = SprintStatuses.Active;
         sprint.StartedAt = now;
@@ -146,7 +152,7 @@ public static class SprintEndpoints
     }
 
     /// <summary>Closes an active sprint. Its unfinished issues go to a planned sprint of the same scope, or back to the backlog.</summary>
-    private static async Task<IResult> Close(Guid id, CloseSprintInput req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Close(Guid id, CloseSprintInput req, HttpContext http, MonitorDb db, TimeProvider clock, SprintWrites writes)
     {
         var userId = http.User.UserId();
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
@@ -164,6 +170,8 @@ public static class SprintEndpoints
         var now = clock.GetUtcNow();
         var unfinished = await db.Issues.Where(i => i.SprintId == id && i.ArchivedAt == null && i.Status != IssueStatuses.Done && i.Status != IssueStatuses.Cancelled)
             .ToListAsync(http.RequestAborted);
+        var moveTo = req.MoveUnfinishedTo is { } moveId ? await db.Sprints.AsNoTracking().FirstAsync(s => s.Id == moveId, http.RequestAborted) : null;
+        if (await writes.CloseAsync(userId, sprint, unfinished, moveTo, http.RequestAborted) is { } refused) return refused;
         foreach (var issue in unfinished)
         {
             SprintIssueEndpoints.Release(issue, req.MoveUnfinishedTo, userId, now);

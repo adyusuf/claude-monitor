@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One release package for the Windows server (ADR-0002 phase 4): out/claude-monitor-<commit>.zip with
 #   api/   the API, self-contained for win-x64, with the web.config IIS needs
-#   web/   the built web app, and web/downloads/ the agent zips (from scripts/build-agent.sh, when present)
+#   web/   the built web app. The agent builds are NOT in it: they are served from the download host (an R2 bucket, MONITOR_DOWNLOADS_URL,
+#          docs/release.md "Download host"), published by scripts/publish_agent_downloads.sh
 #   release.json   {"commit": "<sha>"}, which deploy.ps1 checks against /api/version after the switch
 # The package holds no secret: deploy.ps1 adds the environment's values on the server.
 #
@@ -30,10 +31,6 @@ echo "▶ web"
 npm --prefix web ci --silent
 npm --prefix web run build >/dev/null
 cp -R web/dist "$stage/web"
-if [ -d "$out/downloads" ]; then
-  mkdir -p "$stage/web/downloads"
-  cp "$out/downloads/"* "$stage/web/downloads/"
-fi
 
 echo "▶ api (win-x64)"
 dotnet publish src/ClaudeMonitor.Api -c Release -r win-x64 --self-contained true -o "$stage/api" --nologo -v q \

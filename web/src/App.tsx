@@ -11,6 +11,7 @@ import { ForgotPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage
 import { DevicePage, MachinesPage } from "./pages/MachinesPage";
 import { TwoStepPage } from "./pages/TwoStepPage";
 import { MachinePage } from "./pages/MachinePage";
+import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { MembersPage } from "./pages/MembersPage";
 import { MfaPage } from "./pages/Mfa";
 import { ProjectPage } from "./pages/ProjectPage";
@@ -65,6 +66,7 @@ export function App() {
         <Route path="/w/:ws/machines" element={<MachinesPage />} />
         <Route path="/w/:ws/machines/:agentId" element={<MachinePage />} />
         <Route path="/w/:ws/members" element={<MembersPage />} />
+        <Route path="/w/:ws/integrations" element={<IntegrationsPage />} />
         <Route path="/w/:ws/settings" element={<WorkspaceSettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>

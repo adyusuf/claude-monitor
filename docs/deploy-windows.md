@@ -49,12 +49,12 @@ bash scripts/build-release.sh                      # out/claude-monitor-<commit>
 ```
 
 For agents that update themselves (ADR-0004, SETUP.md "Updating the agent"), add `AGENT_UPDATE_CHANNEL=test` or `prod` to the first command: it signs
-`manifest.json` into `out/downloads`, which the package carries. The server offers whatever its `downloads/` holds, so a `test` package goes to test and a `prod` package to prod.
+`manifest.json` into `out/downloads`. **The package carries none of it:** the agent builds, `SHA256SUMS` and `manifest.json` are published to the download host (R2) with `scripts/publish_agent_downloads.sh test|prod` (`docs/release.md`, "Download host"), and each server's `monitor.env` names its channel there with `MONITOR_DOWNLOADS_URL`, so a `test` build reaches test and a `prod` build prod.
 
 The packages reach the server as **GitHub releases**, one per channel: `test-DD-MM-YYYY` (pre-release) for test and
 `prod-DD-MM-YYYY` for prod, each with the package, `PACKAGE.sha256`, `deploy-windows-scripts.zip`, the six agents,
 `SHA256SUMS` and the channel's signed `manifest.json`. On the server, deploy from the release, never from a package
-built there: a Windows build has no signed macOS agents and no manifest, so the macOS downloads go missing and
+built there (the package is the same either way, it holds no agent builds): publish the release's agents to the download host from the macOS build, because only that one has the signed macOS agents and the manifest, and
 agents cannot update themselves.
 
 ```powershell
@@ -69,7 +69,7 @@ Deploy, test first (Windows PowerShell 5.1 again, elevated):
 ```
 
 The script applies the migrations, switches the site, and checks `/api/version` reports the commit; if not, it
-switches back and fails. Afterwards `/downloads/manifest.json` must equal the release's `manifest.json`. The
+switches back and fails. Afterwards `/downloads/manifest.json` (a 302 to the download host) must equal the release's `manifest.json`. The
 `test -> prod` gate does not require the test deploy (#33); to check it, run the gate with `GATE_CHECK_TEST_DEPLOY=1`
 (and `GATE_RUN_E2E=1` for the e2e suite) and `E2E_BASE_URL=https://<test host>`. Only a green gate deploys to prod,
 with the **prod** release's package (`-Environment prod -LoopbackPort 8080`): a test package on prod would offer

@@ -979,6 +979,436 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AccessExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("access_expires_at");
+
+                    b.Property<string>("AccessToken")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("access_token");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("ExternalAccountId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("external_account_id");
+
+                    b.Property<string>("RefreshToken")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("refresh_token");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("active")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_integration_accounts");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_integration_accounts_user_id");
+
+                    b.HasIndex("ConnectionId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_integration_accounts_connection_id_user_id");
+
+                    b.ToTable("integration_accounts", t =>
+                        {
+                            t.HasCheckConstraint("ck_integration_accounts_status", "status IN ('active', 'reauthorize')");
+                        });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AutoInvite")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_invite");
+
+                    b.Property<string>("CloudId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cloud_id");
+
+                    b.Property<Guid>("ConnectorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connector_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LastPassAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_pass_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("SiteHost")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("site_host");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("active")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("WebhookExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("webhook_expires_at");
+
+                    b.Property<string>("WebhookIds")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("webhook_ids");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_integration_connections");
+
+                    b.HasIndex("ConnectorUserId")
+                        .HasDatabaseName("ix_integration_connections_connector_user_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_integration_connections_created_by");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("ix_integration_connections_workspace_id");
+
+                    b.HasIndex("WorkspaceId", "Provider", "SiteHost")
+                        .IsUnique()
+                        .HasDatabaseName("ux_integration_connections_site")
+                        .HasFilter("status <> 'disconnected'");
+
+                    b.ToTable("integration_connections", t =>
+                        {
+                            t.HasCheckConstraint("ck_integration_connections_provider", "provider IN ('jira')");
+
+                            t.HasCheckConstraint("ck_integration_connections_status", "status IN ('active', 'reauthorize', 'disconnected')");
+                        });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("ExternalKey")
+                        .HasColumnType("text")
+                        .HasColumnName("external_key");
+
+                    b.Property<string>("ExternalUpdated")
+                        .HasColumnType("text")
+                        .HasColumnName("external_updated");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("LocalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("local_id");
+
+                    b.Property<DateTimeOffset>("SyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("synced_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_integration_links");
+
+                    b.HasIndex("LocalId")
+                        .HasDatabaseName("ix_integration_links_local_id");
+
+                    b.HasIndex("ConnectionId", "Kind", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_integration_links_connection_id_kind_external_id");
+
+                    b.ToTable("integration_links", t =>
+                        {
+                            t.HasCheckConstraint("ck_integration_links_kind", "kind IN ('project', 'issue', 'sprint')");
+                        });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationOAuthState", b =>
+                {
+                    b.Property<string>("StateHash")
+                        .HasColumnType("text")
+                        .HasColumnName("state_hash");
+
+                    b.Property<Guid?>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("SiteHost")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("site_host");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Verifier")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("verifier");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("StateHash")
+                        .HasName("pk_integration_oauth_states");
+
+                    b.HasIndex("ConnectionId")
+                        .HasDatabaseName("ix_integration_oauth_states_connection_id");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_integration_oauth_states_expires_at");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_integration_oauth_states_user_id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("ix_integration_oauth_states_workspace_id");
+
+                    b.ToTable("integration_oauth_states", t =>
+                        {
+                            t.HasCheckConstraint("ck_integration_oauth_states_purpose", "purpose IN ('connect', 'account')");
+                        });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationPerson", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<string>("EmailNormalized")
+                        .HasColumnType("text")
+                        .HasColumnName("email_normalized");
+
+                    b.Property<string>("ExternalAccountId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("external_account_id");
+
+                    b.Property<DateTimeOffset>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<DateTimeOffset?>("InvitedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("invited_at");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_integration_people");
+
+                    b.HasIndex("EmailNormalized")
+                        .HasDatabaseName("ix_integration_people_email_normalized");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_integration_people_user_id");
+
+                    b.HasIndex("ConnectionId", "ExternalAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_integration_people_connection_id_external_account_id");
+
+                    b.ToTable("integration_people");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationSyncRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Archived")
+                        .HasColumnType("integer")
+                        .HasColumnName("archived");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<int>("Created")
+                        .HasColumnType("integer")
+                        .HasColumnName("created");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("People")
+                        .HasColumnType("integer")
+                        .HasColumnName("people");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Updated")
+                        .HasColumnType("integer")
+                        .HasColumnName("updated");
+
+                    b.HasKey("Id")
+                        .HasName("pk_integration_sync_runs");
+
+                    b.HasIndex("ConnectionId", "StartedAt")
+                        .HasDatabaseName("ix_integration_sync_runs_connection_id_started_at");
+
+                    b.ToTable("integration_sync_runs", t =>
+                        {
+                            t.HasCheckConstraint("ck_integration_sync_runs_kind", "kind IN ('import', 'webhook', 'pass')");
+
+                            t.HasCheckConstraint("ck_integration_sync_runs_status", "status IN ('running', 'ok', 'partial', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationWebhookReceipt", b =>
+                {
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<string>("DeliveryId")
+                        .HasColumnType("text")
+                        .HasColumnName("delivery_id");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.HasKey("ConnectionId", "DeliveryId")
+                        .HasName("pk_integration_webhook_receipts");
+
+                    b.HasIndex("ReceivedAt")
+                        .HasDatabaseName("ix_integration_webhook_receipts_received_at");
+
+                    b.ToTable("integration_webhook_receipts");
+                });
+
             modelBuilder.Entity("ClaudeMonitor.Api.Data.Issue", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1001,6 +1431,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<DateTimeOffset?>("ArchivedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("archived_at");
+
+                    b.Property<Guid?>("AssigneePersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignee_person_id");
 
                     b.Property<Guid?>("AssigneeUserId")
                         .HasColumnType("uuid")
@@ -1033,6 +1467,14 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.Property<string>("ExpectedResult")
                         .HasColumnType("text")
                         .HasColumnName("expected_result");
+
+                    b.Property<string>("ExternalKey")
+                        .HasColumnType("text")
+                        .HasColumnName("external_key");
+
+                    b.Property<string>("ExternalUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("external_url");
 
                     b.Property<int>("Number")
                         .HasColumnType("integer")
@@ -1114,6 +1556,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.HasIndex("ApplicationId")
                         .HasDatabaseName("ix_issues_application_id");
 
+                    b.HasIndex("AssigneePersonId")
+                        .HasDatabaseName("ix_issues_assignee_person_id");
+
                     b.HasIndex("AssigneeUserId")
                         .HasDatabaseName("ix_issues_assignee_user_id");
 
@@ -1122,6 +1567,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.HasIndex("CreatedBy")
                         .HasDatabaseName("ix_issues_created_by");
+
+                    b.HasIndex("ExternalKey")
+                        .HasDatabaseName("ix_issues_external_key");
 
                     b.HasIndex("ParentId")
                         .HasDatabaseName("ix_issues_parent_id");
@@ -1153,6 +1601,8 @@ namespace ClaudeMonitor.Api.Data.Migrations
                             t.HasCheckConstraint("ck_issues_bug_fields", "type = 'bug' OR (bug_environment IS NULL AND repro_steps IS NULL AND expected_result IS NULL AND actual_result IS NULL AND severity IS NULL)");
 
                             t.HasCheckConstraint("ck_issues_criteria", "acceptance_criteria IS NULL OR (jsonb_typeof(acceptance_criteria) = 'array' AND jsonb_array_length(acceptance_criteria) <= 30)");
+
+                            t.HasCheckConstraint("ck_issues_external_url", "external_url IS NULL OR external_url LIKE 'https://%'");
 
                             t.HasCheckConstraint("ck_issues_number", "number > 0");
 
@@ -2379,6 +2829,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("purpose");
 
+                    b.Property<Guid?>("SourceConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_connection_id");
+
                     b.Property<string>("Sponsor")
                         .HasColumnType("text")
                         .HasColumnName("sponsor");
@@ -2424,6 +2878,9 @@ namespace ClaudeMonitor.Api.Data.Migrations
 
                     b.HasIndex("OwnerUserId")
                         .HasDatabaseName("ix_projects_owner_user_id");
+
+                    b.HasIndex("SourceConnectionId")
+                        .HasDatabaseName("ix_projects_source_connection_id");
 
                     b.HasIndex("UpdatedBy")
                         .HasDatabaseName("ix_projects_updated_by");
@@ -3236,6 +3693,10 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<Guid?>("SourceConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_connection_id");
+
                     b.Property<DateOnly?>("StartDate")
                         .HasColumnType("date")
                         .HasColumnName("start_date");
@@ -3269,7 +3730,7 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.HasIndex("ApplicationId")
                         .IsUnique()
                         .HasDatabaseName("ux_sprints_active_application")
-                        .HasFilter("status = 'active' AND application_id IS NOT NULL");
+                        .HasFilter("status = 'active' AND application_id IS NOT NULL AND source_connection_id IS NULL");
 
                     b.HasIndex("CreatedBy")
                         .HasDatabaseName("ix_sprints_created_by");
@@ -3277,10 +3738,13 @@ namespace ClaudeMonitor.Api.Data.Migrations
                     b.HasIndex("ProjectId")
                         .IsUnique()
                         .HasDatabaseName("ux_sprints_active_project")
-                        .HasFilter("status = 'active' AND application_id IS NULL");
+                        .HasFilter("status = 'active' AND application_id IS NULL AND source_connection_id IS NULL");
 
                     b.HasIndex("ReleaseId")
                         .HasDatabaseName("ix_sprints_release_id");
+
+                    b.HasIndex("SourceConnectionId")
+                        .HasDatabaseName("ix_sprints_source_connection_id");
 
                     b.HasIndex("UpdatedBy")
                         .HasDatabaseName("ix_sprints_updated_by");
@@ -4027,6 +4491,116 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasConstraintName("fk_harness_sessions_workspaces_workspace_id");
                 });
 
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationAccount", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_accounts_integration_connections_connection_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_accounts_users_user_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationConnection", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_connections_users_connector_user_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_connections_users_created_by");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_connections_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationLink", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_links_integration_connections_connection_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationOAuthState", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_integration_oauth_states_integration_connections_connection~");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_oauth_states_users_user_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_oauth_states_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationPerson", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_people_integration_connections_connection_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_integration_people_users_user_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationSyncRun", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_sync_runs_integration_connections_connection_id");
+                });
+
+            modelBuilder.Entity("ClaudeMonitor.Api.Data.IntegrationWebhookReceipt", b =>
+                {
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_integration_webhook_receipts_integration_connections_connec~");
+                });
+
             modelBuilder.Entity("ClaudeMonitor.Api.Data.Issue", b =>
                 {
                     b.HasOne("ClaudeMonitor.Api.Data.ManagedApplication", null)
@@ -4034,6 +4608,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasForeignKey("ApplicationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_issues_applications_application_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationPerson", null)
+                        .WithMany()
+                        .HasForeignKey("AssigneePersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_issues_integration_people_assignee_person_id");
 
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()
@@ -4499,6 +5079,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_projects_users_owner_user_id");
 
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("SourceConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_projects_integration_connections_source_connection_id");
+
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
@@ -4710,6 +5296,12 @@ namespace ClaudeMonitor.Api.Data.Migrations
                         .HasForeignKey("ReleaseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sprints_application_releases_release_id");
+
+                    b.HasOne("ClaudeMonitor.Api.Data.IntegrationConnection", null)
+                        .WithMany()
+                        .HasForeignKey("SourceConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sprints_integration_connections_source_connection_id");
 
                     b.HasOne("ClaudeMonitor.Api.Data.User", null)
                         .WithMany()

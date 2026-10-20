@@ -119,6 +119,8 @@ public sealed class ManagedProject
     public string[] DefinitionOfReady { get; set; } = [];
     public string[] DefinitionOfDone { get; set; } = [];
     public string Status { get; set; } = ManagedStatuses.Active;
+    /// <summary>The work tracker connection this project mirrors (ADR-0015); null for a project made in Podium.</summary>
+    public Guid? SourceConnectionId { get; set; }
     public Guid CreatedBy { get; set; }
     public Guid UpdatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

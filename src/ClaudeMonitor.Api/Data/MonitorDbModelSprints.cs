@@ -10,9 +10,9 @@ internal static class MonitorDbModelSprints
         b.Entity<Sprint>(e =>
         {
             e.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();
-            // One active sprint per scope: the whole project, or one application.
-            e.HasIndex(x => x.ProjectId).IsUnique().HasFilter("status = 'active' AND application_id IS NULL").HasDatabaseName("ux_sprints_active_project");
-            e.HasIndex(x => x.ApplicationId).IsUnique().HasFilter("status = 'active' AND application_id IS NOT NULL").HasDatabaseName("ux_sprints_active_application");
+            // One active sprint per scope: the whole project, or one application. A mirrored sprint is left out (a tool may run parallel sprints, ADR-0015 §4).
+            e.HasIndex(x => x.ProjectId).IsUnique().HasFilter("status = 'active' AND application_id IS NULL AND source_connection_id IS NULL").HasDatabaseName("ux_sprints_active_project");
+            e.HasIndex(x => x.ApplicationId).IsUnique().HasFilter("status = 'active' AND application_id IS NOT NULL AND source_connection_id IS NULL").HasDatabaseName("ux_sprints_active_application");
             e.HasIndex(x => x.WorkspaceId);
             e.HasIndex(x => x.ReleaseId);
             e.Property(x => x.StartDate).HasColumnType("date");
