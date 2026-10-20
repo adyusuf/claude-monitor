@@ -30,6 +30,8 @@ public sealed class Sprint
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? ClosedAt { get; set; }
     public DateTimeOffset? ArchivedAt { get; set; }
+    /// <summary>The work tracker connection this sprint mirrors (ADR-0015); null for a sprint made in Podium.</summary>
+    public Guid? SourceConnectionId { get; set; }
     public Guid CreatedBy { get; set; }
     public Guid UpdatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

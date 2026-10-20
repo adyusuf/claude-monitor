@@ -83,6 +83,11 @@ public sealed class Issue
     public string? Severity { get; set; }
     /// <summary>The order in the backlog, ascending; a move writes the middle of its two neighbours.</summary>
     public double Position { get; set; }
+    /// <summary>The tool's own key and address when the issue mirrors one (ADR-0015), such as ABC-12.</summary>
+    public string? ExternalKey { get; set; }
+    public string? ExternalUrl { get; set; }
+    /// <summary>The tool's person it is assigned to, who need not be a Podium member.</summary>
+    public Guid? AssigneePersonId { get; set; }
     public DateTimeOffset? ArchivedAt { get; set; }
     public Guid CreatedBy { get; set; }
     public Guid UpdatedBy { get; set; }

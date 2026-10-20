@@ -15,6 +15,7 @@ export function ProjectCard({ ws, project: p, canWork, onArchive, onRestore }: {
       <h2 className="tile-title">
         <Link className="stretch" to={`/w/${ws}/projects/${p.id}`}>{p.name}</Link>
         {archived ? <span className="badge warn">{t("projects.archived")}</span> : null}
+        {p.sourceConnectionId ? <span className="badge">{t("integrations.fromJira")}</span> : null}
       </h2>
       {p.purpose ? <p className="tile-text">{p.purpose}</p> : null}
       <p className="muted small tile-meta">

@@ -1,5 +1,6 @@
 using ClaudeMonitor.Api.Config;
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Integrations;
 using ClaudeMonitor.Api.Projects;
 using ClaudeMonitor.Api.Security;
 using ClaudeMonitor.Api.Text;
@@ -48,13 +49,13 @@ public static class IssueEndpoints
 
         var page = await query.OrderBy(i => i.Position).ThenBy(i => i.Id).Take(take + 1).ToListAsync(http.RequestAborted);
         var shown = page.Take(take).ToList();
-        var names = await IssueViews.NamesAsync(db, shown.Select(i => i.AssigneeUserId), http.RequestAborted);
-        var rows = shown.Select(i => IssueViews.Summary(i, i.AssigneeUserId is { } who ? names.GetValueOrDefault(who) : null)).ToList();
+        var assigneeName = await IssueViews.AssigneeNamesAsync(db, shown, http.RequestAborted);
+        var rows = shown.Select(i => IssueViews.Summary(i, assigneeName(i))).ToList();
         var next = page.Count > take ? PositionCursor.Of(shown[^1].Position, shown[^1].Id) : null;
         return Results.Ok(new Page<IssueSummary>(rows, next));
     }
 
-    private static async Task<IResult> Create(Guid id, IssueInput req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Create(Guid id, IssueInput req, HttpContext http, MonitorDb db, TimeProvider clock, IssueWrites writes)
     {
         var userId = http.User.UserId();
         var grant = await ProjectAccess.OfAsync(db, userId, id, http.RequestAborted);
@@ -70,6 +71,7 @@ public static class IssueEndpoints
         var issue = new Issue { WorkspaceId = project.WorkspaceId, ProjectId = id, CreatedBy = userId, CreatedAt = now };
         Fill(issue, req, project, type, userId, now);
         if (await IssueRules.CheckReferencesAsync(db, project, issue, type, http.RequestAborted) is { } bad) return bad;
+        if (await writes.CreateAsync(userId, project, issue, http.RequestAborted) is { } refused) return refused;
 
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await LockProjectAsync(db, id, http.RequestAborted);
@@ -89,7 +91,7 @@ public static class IssueEndpoints
     }
 
     /// <summary>Replaces the issue (see the note in IssueModels; an empty priority or estimate clears it).</summary>
-    private static async Task<IResult> Update(Guid id, IssueInput req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Update(Guid id, IssueInput req, HttpContext http, MonitorDb db, TimeProvider clock, IssueWrites writes)
     {
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
@@ -105,8 +107,11 @@ public static class IssueEndpoints
             return Http.Invalid("type", "invalid_value");
         }
 
+        var before = IssueFacts.Of(issue);
         Fill(issue, req, project, type, userId, clock.GetUtcNow());
         if (await IssueRules.CheckReferencesAsync(db, project, issue, type, http.RequestAborted) is { } bad) return bad;
+        if (await writes.UpdateAsync(userId, project, before, issue, http.RequestAborted) is { } refused) return refused;
+
         Audit.Add(db, http, clock, AuditActions.IssueUpdated, issue.WorkspaceId, userId, targetType: "issue", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
@@ -121,6 +126,7 @@ public static class IssueEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Issue.ExternalKey is not null) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.NoArchive);
         var now = clock.GetUtcNow();
         f.Issue.ArchivedAt = archive ? now : null;
         f.Issue.UpdatedAt = now;
@@ -131,12 +137,15 @@ public static class IssueEndpoints
     }
 
     /// <summary>Puts the issue after another one of its project, or at the top. The position is the middle of the two neighbours.</summary>
-    private static async Task<IResult> Move(Guid id, PositionInput req, HttpContext http, MonitorDb db, TimeProvider clock)
+    private static async Task<IResult> Move(Guid id, PositionInput req, HttpContext http, MonitorDb db, TimeProvider clock, IssueWrites writes)
     {
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var issue = f.Issue;
+        var anchor = req.AfterIssueId is { } anchorId ? await db.Issues.AsNoTracking().FirstOrDefaultAsync(i => i.Id == anchorId && i.ProjectId == issue.ProjectId, http.RequestAborted) : null;
+        if (req.AfterIssueId is not null && anchor is null) return Http.Invalid("afterIssueId", "invalid_issue");
+        if (await writes.RankAsync(userId, f.Grant.Project, issue, anchor, http.RequestAborted) is { } refused) return refused;
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await LockProjectAsync(db, issue.ProjectId, http.RequestAborted);
         await db.Entry(issue).ReloadAsync(http.RequestAborted);

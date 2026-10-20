@@ -54,6 +54,13 @@ public sealed class MonitorDb(DbContextOptions<MonitorDb> options) : DbContext(o
     public DbSet<IssueRun> IssueRuns => Set<IssueRun>();
     public DbSet<Sprint> Sprints => Set<Sprint>();
     public DbSet<SprintMember> SprintMembers => Set<SprintMember>();
+    public DbSet<IntegrationConnection> IntegrationConnections => Set<IntegrationConnection>();
+    public DbSet<IntegrationAccount> IntegrationAccounts => Set<IntegrationAccount>();
+    public DbSet<IntegrationOAuthState> IntegrationOAuthStates => Set<IntegrationOAuthState>();
+    public DbSet<IntegrationLink> IntegrationLinks => Set<IntegrationLink>();
+    public DbSet<IntegrationPerson> IntegrationPeople => Set<IntegrationPerson>();
+    public DbSet<IntegrationSyncRun> IntegrationSyncRuns => Set<IntegrationSyncRun>();
+    public DbSet<IntegrationWebhookReceipt> IntegrationWebhookReceipts => Set<IntegrationWebhookReceipt>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

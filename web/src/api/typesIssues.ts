@@ -57,6 +57,9 @@ export interface IssueSummary {
   updatedAt: string;
   /** The sprint the issue is in, if any. */
   sprintId: string | null;
+  /** The key and address of the issue in the work tracker it mirrors (ADR-0015); null for an issue made in Podium. */
+  externalKey: string | null;
+  externalUrl: string | null;
 }
 
 export interface IssueLinkView { linkId: string; issueId: string; number: number; title: string; status: IssueStatus }

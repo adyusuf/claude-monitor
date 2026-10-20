@@ -15,12 +15,14 @@ interface Props {
   /** Only the owner and workspace admins may hand a project to somebody else. */
   canChangeOwner: boolean;
   submitLabel: string;
+  /** A project that mirrors a space in a work tracker keeps its name and purpose there (ADR-0015 §7). */
+  mirrored?: boolean;
   onSubmit: (input: ProjectInput) => Promise<void>;
   onCancel: () => void;
 }
 
 /** The definition of a project: shared by "New project" and "Edit". Checks on the client first; the API's refusal is shown as a notice. */
-export function ProjectForm({ initial, members, canChangeOwner, submitLabel, onSubmit, onCancel }: Props) {
+export function ProjectForm({ initial, members, canChangeOwner, submitLabel, mirrored = false, onSubmit, onCancel }: Props) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [draft, setDraft] = useState(initial);
@@ -49,9 +51,9 @@ export function ProjectForm({ initial, members, canChangeOwner, submitLabel, onS
   return (
     <form className="stack" onSubmit={(e) => void submit(e)} noValidate>
       {failure ? <Notice kind="error">{failure}</Notice> : null}
-      <Field label={t("projects.name")} value={draft.name} maxLength={projectLimits.nameMax} error={err("name")} onChange={(e) => change({ name: e.target.value })} />
+      <Field label={t("projects.name")} value={draft.name} maxLength={projectLimits.nameMax} error={err("name")} disabled={mirrored} onChange={(e) => change({ name: e.target.value })} />
       <Labeled label={t("projects.purpose")} error={err("purpose")}>
-        {(id) => <textarea id={id} className="input" rows={3} value={draft.purpose} onChange={(e) => change({ purpose: e.target.value })} />}
+        {(id) => <textarea id={id} className="input" rows={3} value={draft.purpose} disabled={mirrored} onChange={(e) => change({ purpose: e.target.value })} />}
       </Labeled>
       <div className="form-grid">
         <Labeled label={t("projects.owner")} error={err("ownerUserId")}>

@@ -11,6 +11,9 @@ import type {
   TestResult,
 } from "./typesIssues";
 import type { SprintInput, SprintQuery, SprintSummary, SprintView } from "./typesSprints";
+import type {
+  IntegrationsView, PersonView, SpaceImportResult, SpaceView, SprintChoice, SprintImportResult, SyncRunView,
+} from "./typesIntegrations";
 
 const q = (params: Record<string, string | number | boolean | undefined | null>) => {
   const s = new URLSearchParams();
@@ -173,6 +176,22 @@ export const api = {
   lookupDevice: (code: string) => request<DeviceLookup>("GET", `/device/lookup/${encodeURIComponent(code)}`),
   approveDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/approve", { userCode, workspaceId }),
   denyDevice: (userCode: string, workspaceId: string) => request<void>("POST", "/device/deny", { userCode, workspaceId }),
+
+  integrations: (ws: string) => request<IntegrationsView>("GET", `/workspaces/${ws}/integrations`),
+  connectJira: (ws: string, subdomain: string, code?: string) =>
+    request<{ authorizeUrl: string }>("POST", `/workspaces/${ws}/integrations/jira/connect`, { subdomain, code }),
+  linkMyAccount: (id: string) => request<{ authorizeUrl: string }>("POST", `/integrations/${id}/account/connect`),
+  setIntegration: (id: string, autoInvite: boolean) => request<void>("PUT", `/integrations/${id}`, { autoInvite }),
+  disconnectIntegration: (id: string) => request<void>("DELETE", `/integrations/${id}`),
+  integrationSpaces: (id: string) => request<SpaceView[]>("GET", `/integrations/${id}/spaces`),
+  importSpaces: (id: string, keys: string[]) => request<SpaceImportResult[]>("POST", `/integrations/${id}/spaces/import`, { keys }),
+  integrationSprints: (id: string, key: string) => request<SprintChoice[]>("GET", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints`),
+  importSprints: (id: string, key: string, sprintIds: string[]) =>
+    request<SprintImportResult[]>("POST", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints/import`, { sprintIds }),
+  integrationPeople: (id: string) => request<PersonView[]>("GET", `/integrations/${id}/people`),
+  setIntegrationPerson: (personId: string, input: { email?: string; userId?: string }) => request<void>("PUT", `/integrations/people/${personId}`, input),
+  syncIntegration: (id: string) => request<SyncRunView>("POST", `/integrations/${id}/sync`),
+  integrationRuns: (id: string) => request<SyncRunView[]>("GET", `/integrations/${id}/runs`),
 };
 
 /** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */

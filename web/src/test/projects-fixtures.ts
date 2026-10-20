@@ -6,7 +6,7 @@ import { ME } from "./helpers";
 
 export const summary = (over: Partial<ProjectSummary> = {}): ProjectSummary => ({
   id: "p1", name: "Checkout", purpose: "Sell things", ownerUserId: "u1", ownerName: "Örnek Kişi", startDate: "2026-01-05", endDate: "2026-12-31",
-  status: "active", applicationCount: 2, createdAt: "2026-01-01T10:00:00Z", ...over,
+  status: "active", applicationCount: 2, createdAt: "2026-01-01T10:00:00Z", sourceConnectionId: null, ...over,
 });
 
 export const project = (over: Partial<ProjectView> = {}): ProjectView => ({
@@ -14,7 +14,7 @@ export const project = (over: Partial<ProjectView> = {}): ProjectView => ({
   stakeholders: [{ name: "Dana", role: "Finance" }], budgetAmount: 1500, budgetCurrency: "EUR", startDate: "2026-01-05", endDate: "2026-12-31",
   itemTypes: ["story", "bug"], priorityScale: "moscow", estimationUnit: "hours", sprintLengthDays: 10, definitionOfReady: ["Has criteria"],
   definitionOfDone: ["Reviewed", "Tested"], status: "active", createdAt: "2026-01-01T10:00:00Z", updatedAt: "2026-01-02T10:00:00Z",
-  access: { canEdit: true, canArchive: true, canEditApplications: true }, ...over,
+  access: { canEdit: true, canArchive: true, canEditApplications: true }, sourceConnectionId: null, ...over,
 });
 
 export const appSummary = (over: Partial<ApplicationSummary> = {}): ApplicationSummary => ({
