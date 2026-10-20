@@ -49,6 +49,21 @@ class PublishTests(unittest.TestCase):
             'b/daemons/prod/cm-agent-macos-arm64.zip', 'b/daemons/prod/cm-agent-windows-x64.zip',
             'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
 
+    def test_the_plugin_files_go_up_before_the_checksums_and_the_manifest_when_the_build_has_them(self):
+        with tempfile.TemporaryDirectory() as folder:
+            build(folder)
+            for name in ('aipod-plugin.zip', 'monitor-agent-plugin.zip', 'aipod-marketplace.json', 'marketplace.json'):
+                with open(os.path.join(folder, name), 'wb') as handle:
+                    handle.write(name.encode())
+            result = run('prod', folder, {'AGENT_R2_BUCKET': 'b'}, ['--dry-run'])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        keys = [line.split()[1] for line in result.stdout.splitlines() if line.startswith('put b/daemons/prod/')]
+        self.assertEqual(keys, [
+            'b/daemons/prod/cm-agent-macos-arm64.zip', 'b/daemons/prod/cm-agent-windows-x64.zip',
+            'b/daemons/prod/aipod-plugin.zip', 'b/daemons/prod/monitor-agent-plugin.zip',
+            'b/daemons/prod/aipod-marketplace.json', 'b/daemons/prod/marketplace.json',
+            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
+
     def test_the_prefix_can_be_changed(self):
         with tempfile.TemporaryDirectory() as folder:
             build(folder, channel='test')
