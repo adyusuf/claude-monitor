@@ -180,7 +180,12 @@ public sealed partial class FakeJiraHandler
         if (sprint is { State: "closed" }) return Bad("the sprint is closed");
         var issues = keys.Select(site.Find).ToList();
         if (issues.Contains(null)) return Bad("an issue does not exist");
-        foreach (var issue in issues) issue!.SprintId = sprint?.Id;
+        foreach (var issue in issues)
+        {
+            issue!.SprintId = sprint?.Id;
+            site.Jira.Touch(issue); // Jira's "updated" moves with the sprint field
+        }
+
         return Status(HttpStatusCode.NoContent);
     }
 

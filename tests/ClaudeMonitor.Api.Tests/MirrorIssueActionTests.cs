@@ -28,6 +28,20 @@ public sealed class MirrorIssueActionTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task The_quick_status_change_meets_a_change_made_in_jira_since_the_last_sync_as_a_conflict()
+    {
+        var w = await JiraWriteKit.OpenAsync(api);
+        var id = await w.IdAsync("WRT-2");
+        w.ChangeInJira("WRT-2", i => i.Summary = "Jira's own title");
+
+        var response = await Quick(w.Member, id, "in_review");
+
+        await JiraWriteKit.AssertRefusedAsync(response, HttpStatusCode.Conflict, "jira_changed");
+        Assert.Empty(w.Jira.Writes(w.Site));
+        Assert.Equal(("backlog", "To Do"), ((await w.RowAsync("WRT-2")).Status, w.Site.Find("WRT-2")!.Status));
+    }
+
+    [Fact]
     public async Task The_quick_status_change_to_the_status_it_already_has_calls_jira_not_at_all()
     {
         var w = await JiraWriteKit.OpenAsync(api);

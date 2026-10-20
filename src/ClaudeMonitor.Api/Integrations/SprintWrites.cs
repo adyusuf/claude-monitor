@@ -65,6 +65,7 @@ public sealed class SprintWrites(MonitorDb db, IWorkWriter writer, MirrorGate ga
             if (keys.Count > 0 && target is not null) await writer.AddToIterationAsync(ctx, target.ExternalId, keys, ct);
             else if (keys.Count > 0) await writer.MoveToBacklogAsync(ctx, keys, ct);
             await writer.CloseIterationAsync(ctx, id, ct);
+            await RefreshStampsAsync(ctx, unfinished, ct);
         }, ct);
     }
 
@@ -82,7 +83,11 @@ public sealed class SprintWrites(MonitorDb db, IWorkWriter writer, MirrorGate ga
         if (sprint.SourceConnectionId is null) return mirroredIssues == 0 ? null : MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         if (mirroredIssues != issues.Count) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         var keys = issues.Select(i => i.ExternalKey!).ToList();
-        return await RunAsync(user, sprint, (ctx, id) => writer.AddToIterationAsync(ctx, id, keys, ct), ct);
+        return await RunAsync(user, sprint, async (ctx, id) =>
+        {
+            await writer.AddToIterationAsync(ctx, id, keys, ct);
+            await RefreshStampsAsync(ctx, issues, ct);
+        }, ct);
     }
 
     public async Task<IResult?> RemoveIssueAsync(Guid user, Sprint sprint, Issue issue, CancellationToken ct)
@@ -91,7 +96,23 @@ public sealed class SprintWrites(MonitorDb db, IWorkWriter writer, MirrorGate ga
         ArgumentNullException.ThrowIfNull(issue);
         if (sprint.SourceConnectionId is null || issue.ExternalKey is null) return null;
         var key = issue.ExternalKey;
-        return await RunAsync(user, sprint, (ctx, _) => writer.MoveToBacklogAsync(ctx, [key], ct), ct);
+        return await RunAsync(user, sprint, async (ctx, _) =>
+        {
+            await writer.MoveToBacklogAsync(ctx, [key], ct);
+            await RefreshStampsAsync(ctx, [issue], ct);
+        }, ct);
+    }
+
+    /// <summary>Moving an issue changes it in the tool; the stamps stored here follow, so the next edit is not met with a conflict it caused itself.</summary>
+    private async Task RefreshStampsAsync(TrackerContext ctx, IEnumerable<Issue> moved, CancellationToken ct)
+    {
+        var ids = moved.Where(i => i.ExternalKey is not null).Select(i => i.Id).ToList();
+        if (ids.Count == 0) return;
+        var links = await db.IntegrationLinks.Where(l => l.Kind == LinkKinds.Issue && ids.Contains(l.LocalId)).ToListAsync(ct);
+        foreach (var link in links)
+        {
+            if (link.ExternalKey is { } key) link.ExternalUpdated = await writer.ItemStampAsync(ctx, key, ct);
+        }
     }
 
     private async Task<IResult?> RunAsync(Guid user, Sprint sprint, Func<TrackerContext, string, Task> work, CancellationToken ct)

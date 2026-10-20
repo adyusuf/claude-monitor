@@ -85,7 +85,8 @@ public static class SprintIssueEndpoints
     internal static void Release(Issue issue, Guid? toSprint, Guid userId, DateTimeOffset now)
     {
         issue.SprintId = toSprint;
-        if (toSprint is null && issue.Status is IssueStatuses.InProgress or IssueStatuses.InReview)
+        // An issue that mirrors the tool's keeps the tool's status: leaving a sprint does not change it there.
+        if (toSprint is null && issue.ExternalKey is null && issue.Status is IssueStatuses.InProgress or IssueStatuses.InReview)
         {
             issue.Status = IssueStatuses.Ready;
         }

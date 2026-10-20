@@ -61,6 +61,7 @@ public sealed class IssueWrites(MonitorDb db, IWorkWriter writer, MirrorGate gat
         var link = await gate.LinkOfAsync(LinkKinds.Issue, issue.Id, ct);
         try
         {
+            if (link?.ExternalUpdated is { } known && await writer.ItemStampAsync(open.Ctx, issue.ExternalKey, ct) != known) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Changed);
             if (!await writer.TransitionItemAsync(open.Ctx, issue.ExternalKey, newStatus, ct)) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.TransitionUnavailable);
             if (link is not null) link.ExternalUpdated = await writer.ItemStampAsync(open.Ctx, issue.ExternalKey, ct);
         }

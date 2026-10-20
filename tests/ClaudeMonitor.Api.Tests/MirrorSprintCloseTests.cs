@@ -32,16 +32,30 @@ public sealed class MirrorSprintCloseTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task Closing_without_a_target_moves_the_unfinished_issues_to_the_jira_backlog_and_work_in_flight_becomes_ready_here()
+    public async Task Closing_without_a_target_moves_the_unfinished_issues_to_the_jira_backlog_and_keeps_their_status_which_jira_keeps_too()
     {
         var s = await JiraWriteSprintKit.OpenAsync(api);
+        var before = (await s.W.RowAsync("WRT-7")).Status;
 
         Assert.Equal(HttpStatusCode.NoContent, (await SprintKit.CloseAsync(s.W.Member, await s.IdAsync("Now"))).StatusCode);
 
         Assert.Equal(["POST /rest/agile/1.0/backlog/issue", "POST " + Route(s.Now)], s.W.Jira.Writes(s.W.Site));
         Assert.Equal(["WRT-6", "WRT-7"], Keys(s.W.Jira.Sent(s.W.Site, HttpMethod.Post, "/rest/agile/1.0/backlog/issue")));
         Assert.Equal((null, null), (s.W.Site.Find("WRT-6")!.SprintId, s.W.Site.Find("WRT-7")!.SprintId));
-        Assert.Equal((null, null, "ready"), (await s.SprintOfAsync("WRT-6"), await s.SprintOfAsync("WRT-7"), (await s.W.RowAsync("WRT-7")).Status));
+        Assert.Equal((null, null), (await s.SprintOfAsync("WRT-6"), await s.SprintOfAsync("WRT-7")));
+        Assert.Equal(before, (await s.W.RowAsync("WRT-7")).Status); // the status is Jira's, and Jira keeps it
+    }
+
+    [Fact]
+    public async Task Moving_issues_into_a_sprint_keeps_the_stored_stamps_in_step_so_the_next_edit_is_no_conflict()
+    {
+        var s = await JiraWriteSprintKit.OpenAsync(api);
+        var id = await s.W.IdAsync("WRT-2");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await SprintKit.AddAsync(s.W.Member, await s.IdAsync("Plan B"), id)).StatusCode);
+
+        Assert.Equal(FakeJira.Stamp(s.W.Site.Find("WRT-2")!.Updated), (await s.W.LinkAsync(id)).ExternalUpdated);
+        Assert.Equal(HttpStatusCode.NoContent, (await JiraWriteKit.EditAsync(s.W.Member, id, new { title = "Edited right after the move" })).StatusCode);
     }
 
     [Fact]
