@@ -2,7 +2,9 @@
 # Publishes a signed agent build to the download host (an R2 bucket behind a public domain), where the API's MONITOR_DOWNLOADS_URL points
 # (docs/release.md, "Download host"). One folder per channel holds what the update check reads; every version is also kept under its own folder:
 #
-#   <prefix>/<channel>/                 the current build: the six zips, SHA256SUMS and manifest.json (overwritten each release)
+#   <prefix>/<channel>/                 the current build: the six zips, SHA256SUMS and manifest.json (overwritten each release), and the plugin
+#                                       files when the build wrote them (AGENT_SITE_URL: aipod-marketplace.json, aipod-plugin.zip, marketplace.json,
+#                                       monitor-agent-plugin.zip), because the site no longer carries any zip itself
 #   <prefix>/<version>/<channel>/       the same files, kept
 #
 #   AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <test|prod> [downloads-dir] [--dry-run]
@@ -47,6 +49,12 @@ put() { # <key> <file> <content-type> <cache-control>
 upload() { # <folder> <cache-control>
   local file
   for file in "$dir"/cm-agent-*.zip; do put "$1/$(basename "$file")" "$file" application/zip "$2"; done
+  for file in "$dir"/aipod-plugin.zip "$dir"/monitor-agent-plugin.zip; do
+    if [ -f "$file" ]; then put "$1/$(basename "$file")" "$file" application/zip "$2"; fi
+  done
+  for file in "$dir"/aipod-marketplace.json "$dir"/marketplace.json; do
+    if [ -f "$file" ]; then put "$1/$(basename "$file")" "$file" application/json "$2"; fi
+  done
   put "$1/SHA256SUMS" "$dir/SHA256SUMS" text/plain "$2"
   put "$1/manifest.json" "$dir/manifest.json" application/json "$2"
 }

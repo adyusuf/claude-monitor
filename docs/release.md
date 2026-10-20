@@ -47,7 +47,7 @@ A second promotion on the same day appends `-2`. A hotfix says so in the tag mes
 ## Agent artifacts and verification
 
 `bash scripts/build-agent.sh [out-dir]` (default `out/downloads`) writes one zip per platform plus `SHA256SUMS`, the
-manifest the deploy copies to the web root's `/downloads`:
+manifest that `scripts/publish_agent_downloads.sh` puts on the download host (the release package and the site's web root carry no zip):
 
 | File | Platform | Code-signed | In the update `manifest.json` (ADR-0004) |
 |---|---|---|---|
@@ -112,9 +112,9 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
 
 ## Download host
 
-The agent builds can be published on a download host instead of each server's own `/downloads`: an R2 bucket behind a public domain (the domain is a deployment value, never in the repository).
+The agent builds (and the plugin files, when the build wrote them) are served from a download host, an R2 bucket behind a public domain (the domain is a deployment value, never in the repository). **Since 20/10/2026 this is the only way: the release package (`scripts/build-release.sh`) carries no agent zip, `SHA256SUMS` or `manifest.json`, and a server's web root holds none after its next deploy.** A server that still has files in an old `web/downloads` keeps serving them until it is deployed again, because a file the server holds wins over the redirect.
 
-- **Publish:** `AGENT_UPDATE_CHANNEL=<channel> bash scripts/build-agent.sh`, then `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <channel>` (wrangler, the maintainer's own login). It checks `SHA256SUMS` and that the manifest is signed for that channel,
+- **Publish:** `AGENT_UPDATE_CHANNEL=<channel> bash scripts/build-agent.sh` (with `AGENT_SITE_URL` set, the plugin files too), then `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <channel>` (wrangler, the maintainer's own login). It checks `SHA256SUMS` and that the manifest is signed for that channel,
   uploads the files to `daemons/<version>/<channel>/` (kept, cached for good) and then to `daemons/<channel>/` (`no-cache`), and the manifest last.
 - **Point a server at it:** `MONITOR_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>` in that server's `monitor.env` (test: `.../daemons/test`, prod: `.../daemons/prod`). The API reads `manifest.json` from there once a minute, keeps the last good copy when the host is down, and
   offers `<url>/<file>`. `/downloads/<file>` on the server answers 302 to the host when the server does not hold the file itself, so the web's "Get the agent" page, old links and the plugin's bootstrap keep working. Unset, nothing changes.
