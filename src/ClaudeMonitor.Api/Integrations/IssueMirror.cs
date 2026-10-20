@@ -19,7 +19,10 @@ public sealed class IssueMirror(MonitorDb db, TimeProvider clock)
         Issue issue;
         if (state.IssueLinks.TryGetValue(item.Id, out var link) && state.Issues.TryGetValue(link.LocalId, out var existing))
         {
-            if (link.ExternalUpdated == item.UpdatedStamp && existing.ArchivedAt is null) return null;
+            // Unchanged in the tool and still placed where it belongs here: nothing to do. A sprint or an epic imported after the issue
+            // changes where it belongs without changing the issue, so those are compared too.
+            if (link.ExternalUpdated == item.UpdatedStamp && existing.ArchivedAt is null
+                && existing.SprintId == SprintOf(state, item)?.Id && existing.ParentId == ParentOf(state, item, existing.Id)) return null;
             issue = existing;
             counts.Updated++;
         }
@@ -82,12 +85,16 @@ public sealed class IssueMirror(MonitorDb db, TimeProvider clock)
         issue.ExternalUrl = $"https://{siteHost}/browse/{Uri.EscapeDataString(item.Key)}";
         issue.AssigneePersonId = item.Assignee is { } a && people.TryGetValue(a.Id, out var person) ? person.Id : null;
         issue.AssigneeUserId = item.Assignee is { } b && people.TryGetValue(b.Id, out var who) ? who.UserId : null;
-        issue.ParentId = item.ParentKey is { } parentKey && item.ParentTypeName is { } pt && pt.Equals("Epic", StringComparison.OrdinalIgnoreCase)
-            && state.IssueOfKey(parentKey) is { Type: WorkItemTypes.Epic } epic && epic.Id != issue.Id ? epic.Id : null;
+        issue.ParentId = ParentOf(state, item, issue.Id);
         issue.ArchivedAt = null;
         issue.UpdatedBy = state.Connection.ConnectorUserId;
         issue.UpdatedAt = now;
     }
+
+    /// <summary>The epic the issue hangs under, when the tool says so and that epic is here.</summary>
+    private static Guid? ParentOf(MirrorState state, ExternalItem item, Guid self) =>
+        item.ParentKey is { } parentKey && "Epic".Equals(item.ParentTypeName, StringComparison.OrdinalIgnoreCase)
+        && state.IssueOfKey(parentKey) is { Type: WorkItemTypes.Epic } epic && epic.Id != self ? epic.Id : null;
 
     /// <summary>The sprint the issue sits in, when that sprint is imported and the issue still belongs to it (an unfinished issue of a closed sprint is back in the backlog).</summary>
     private static Sprint? SprintOf(MirrorState state, ExternalItem item)

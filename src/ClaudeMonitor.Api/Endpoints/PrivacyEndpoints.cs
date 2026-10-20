@@ -201,6 +201,12 @@ public static class PrivacyEndpoints
         await db.UserTokens.Where(t => t.UserId == userId && t.UsedAt == null).ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
         await db.UserLogins.Where(l => l.UserId == userId).ExecuteDeleteAsync(ct);
         await db.UserRecoveryCodes.Where(r => r.UserId == userId).ExecuteDeleteAsync(ct);
+        // Work tracker sign-ins of the person go with them (ADR-0015); a connection they alone could read with now needs a new sign-in.
+        await db.IntegrationOAuthStates.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.IntegrationAccounts.Where(a => a.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.IntegrationPeople.Where(p => p.UserId == userId).ExecuteUpdateAsync(s => s.SetProperty(p => p.UserId, (Guid?)null), ct);
+        await db.IntegrationConnections.Where(c => c.ConnectorUserId == userId && c.Status == ConnectionStatuses.Active)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, ConnectionStatuses.Reauthorize).SetProperty(c => c.UpdatedAt, now), ct);
         if (email is not null)
         {
             await db.WorkspaceInvitations.Where(i => i.EmailNormalized == email && i.AcceptedAt == null && i.RevokedAt == null)
