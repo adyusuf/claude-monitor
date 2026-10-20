@@ -1,6 +1,6 @@
 # ADR-0015: Work tracker integrations (Jira first)
 
-**Status:** Plan approved by the maintainer (20/10/2026). Part 1 (read path) and Part 2 (write path) are built in this order; each part goes through the gate once.
+**Status:** Plan approved by the maintainer (20/10/2026). Built in two parts on one branch, merged together: Part 1 the read path (§4, §6, §8), Part 2 the write path (§7). Not run against a real Atlassian site yet (§3, last point).
 **Extends:** [ADR-0011](adr-0011-project-management.md) (projects, issues, sprints), [data-model.md](data-model.md) §8.
 **Asked for (20/10/2026):** connect a Jira Cloud site by its sub-domain; list its spaces and import chosen ones as projects, with their backlog; list the
 sprints of an imported space and import chosen ones, with their issues; bring the people of an imported space along; keep all of it up to date
@@ -108,9 +108,20 @@ A change in Podium to a mirrored row is sent to Jira with the acting user's own 
 | `POST /api/integrations/{id}/spaces/{key}/sprints/import { sprintIds[] }` | project manager |
 | `GET /api/integrations/{id}/people`, `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |
 | `POST /api/integrations/{id}/sync` (a pass now) | admin |
+| `GET /api/integrations/{id}/runs` | any member |
+| `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |
 | `POST /api/integrations/jira/webhook/{connectionId}` | the JWT only |
 
 Errors are i18n keys. Audit rows (`integration.*`) name ids and counts, never Jira text or tokens.
+
+## 8a. Built differently from the plan
+
+- `MONITOR_INTEGRATION_KEY` is optional outside development: without it (or without the Jira app values) the integration is off and existing deployments start unchanged.
+- A webhook delivery is checked by its HS256 token against the app's client secret and queued in memory (`SyncInbox`); the receipt table stops a repeat. Webhook registration needs
+  a public `https` origin and is skipped (live updates off) otherwise.
+- Closing a mirrored sprint first moves its unfinished issues in Jira (to the chosen sprint or the backlog), then closes it. A failed step after another succeeded is repaired by the next webhook or pass.
+- A person who is assigned in Jira but is no Podium member shows as the assignee by name; the form cannot clear that assignment by sending "nobody".
+- Account deletion removes the person's Atlassian sign-ins and their links to Jira people; a connection they alone read with goes to "sign in again".
 
 ## 9. Not decided here
 
