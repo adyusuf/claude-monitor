@@ -228,6 +228,25 @@ An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a li
 - **Audit** rows (`project.*`, `application.*`) name a row by id and carry no typed text. Account export and deletion for these tables are
   not decided yet (ADR-0011 §5): the rows keep the deleted user's id and hold no personal fields of their own.
 
+## 8. Work tracker integrations ([ADR-0015](adr-0015-work-tracker-integrations.md))
+
+| Table | Columns | Keys and indexes |
+|---|---|---|
+| `integration_connections` | `id`, `workspace_id`, `provider` (`jira`; CHECK), `site_host` (`<label>.atlassian.net`, ≤ 100), `cloud_id` (≤ 64), `connector_user_id` (FK users: whose account reads and syncs), `auto_invite` (default false), `status` (`active`, `reauthorize`, `disconnected`), `webhook_ids` `jsonb` (ids Jira returned, ≤ 5), `webhook_expires_at`, `last_pass_at`, `last_error` (a code), `created_by`, `created_at`, `updated_at` | UNIQUE (`workspace_id`, `provider`, `site_host`) WHERE `status <> 'disconnected'`; (`workspace_id`) |
+| `integration_accounts` | `id`, `connection_id`, `user_id`, `external_account_id` (≤ 128), `display_name` (≤ 200), `refresh_token` (sealed), `access_token` (sealed), `access_expires_at`, `status` (`active`, `reauthorize`), `created_at`, `updated_at` | UNIQUE (`connection_id`, `user_id`); (`user_id`) |
+| `integration_oauth_states` | `state_hash` (SHA-256), `user_id`, `workspace_id`, `connection_id` (null for a first connect), `purpose` (`connect`, `account`), `site_host`, `verifier` (sealed PKCE verifier), `created_at`, `expires_at` (10 minutes) | PK `state_hash`; (`expires_at`) |
+| `integration_links` | `id`, `connection_id`, `kind` (`project`, `issue`, `sprint`, `board`), `external_id` (≤ 64), `external_key` (≤ 64, null), `local_id` (uuid), `external_updated` (the tool's own change value, text ≤ 64), `synced_at` | UNIQUE (`connection_id`, `kind`, `external_id`); (`local_id`) |
+| `integration_people` | `id`, `connection_id`, `external_account_id`, `display_name` (≤ 200), `email` (≤ 254, null), `email_normalized`, `user_id` (FK users, null: the matched or invited member), `invited_at`, `active` (false for an app or an inactive account), `first_seen_at`, `last_seen_at` | UNIQUE (`connection_id`, `external_account_id`); (`user_id`); (`email_normalized`) |
+| `integration_sync_runs` | `id`, `connection_id`, `kind` (`import`, `webhook`, `pass`), `status` (`running`, `ok`, `partial`, `failed`), `created`, `updated`, `archived`, `people` (counts), `error` (a code), `started_at`, `ended_at` | (`connection_id`, `started_at` DESC) |
+| `integration_webhook_receipts` | `connection_id`, `delivery_id` (≤ 100), `received_at` | PK (`connection_id`, `delivery_id`); (`received_at`) |
+
+`projects` gains `source_connection_id`; `sprints` gains `source_connection_id`; `issues` gains `external_key` (≤ 64), `external_url` (https, ≤ 500), `assignee_person_id` (FK `integration_people`, null).
+`ux_sprints_active_project` and `ux_sprints_active_application` now also require `source_connection_id IS NULL` (a mirrored space may run parallel sprints, as Jira allows). Nothing is removed or retyped.
+
+- **Secrets:** `refresh_token`, `access_token` and `verifier` are sealed with `MONITOR_INTEGRATION_KEY`; they are never exported, logged or audited. Disconnecting a connection or an account clears them.
+- **Retention:** `integration_webhook_receipts` are deleted after 7 days, `integration_oauth_states` after expiry, `integration_sync_runs` after `retention_days`.
+- **Account deletion:** the user's `integration_accounts` rows are deleted; the connections they made stay (an admin can reassign the connector by connecting again); their `integration_people.user_id` links are cleared.
+
 ## Your data: export and account deletion
 
 - **Export** (`GET /api/me/export`): one JSON file, streamed: the profile, sign-in providers, memberships, machines,

@@ -90,6 +90,13 @@ public static class AuditActions
     public const string SprintClosed = "sprint.closed";
     public const string SprintArchived = "sprint.archived";
     public const string SprintIssuesChanged = "sprint.issues_changed";
+    public const string IntegrationConnected = "integration.connected";
+    public const string IntegrationAccountLinked = "integration.account_linked";
+    public const string IntegrationDisconnected = "integration.disconnected";
+    public const string IntegrationChanged = "integration.changed";
+    public const string IntegrationImported = "integration.imported";
+    public const string IntegrationInvited = "integration.person_invited";
+    public const string IntegrationPersonLinked = "integration.person_linked";
 }
 
 public static class Audit

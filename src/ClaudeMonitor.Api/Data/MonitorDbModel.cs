@@ -19,6 +19,7 @@ internal static class MonitorDbModel
         MonitorDbModelProjects.Configure(b);
         MonitorDbModelIssues.Configure(b);
         MonitorDbModelSprints.Configure(b);
+        MonitorDbModelIntegrations.Configure(b);
         b.Entity<HarnessKind>().HasData(new HarnessKind
         {
             Code = "claude_code",

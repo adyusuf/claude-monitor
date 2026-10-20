@@ -57,3 +57,43 @@ class Guard(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PackageHoldsNoAgentBuilds(unittest.TestCase):
+    """The agent builds are served from the download host, so the release package carries no zip of them (and nothing else from out/downloads)."""
+
+    def test_out_downloads_is_not_copied_into_the_package(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, True)
+        os.makedirs(os.path.join(root, 'src', 'ClaudeMonitor.Api'))
+        with open(os.path.join(root, 'src', 'ClaudeMonitor.Api', 'appsettings.json'), 'w', encoding='utf-8') as handle:
+            handle.write('{}\n')
+        with open(os.path.join(root, '.gitignore'), 'w', encoding='utf-8') as handle:
+            handle.write('out/\n')
+        for command in (['init', '-q'], ['config', 'user.email', 't@t'], ['config', 'user.name', 't'], ['add', '-A'], ['commit', '-qm', 'init']):
+            subprocess.run(['git', *command], cwd=root, check=True)
+        downloads = os.path.join(root, 'out', 'downloads')
+        os.makedirs(downloads)
+        for name in ('cm-agent-linux-x64.zip', 'SHA256SUMS', 'manifest.json', 'aipod-plugin.zip'):
+            with open(os.path.join(downloads, name), 'w', encoding='utf-8') as handle:
+                handle.write(name)
+        # npm "builds" web/dist and dotnet "publishes" its -o folder: enough for the script to reach the packing step.
+        bin_dir = os.path.join(root, 'fakebin')
+        os.makedirs(bin_dir)
+        fakes = {
+            'npm': 'mkdir -p web/dist && echo app > web/dist/index.html\n',
+            'dotnet': 'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then mkdir -p "$2"; echo dll > "$2/Api.dll"; fi; shift; done\n',
+        }
+        for tool, body in fakes.items():
+            path = os.path.join(bin_dir, tool)
+            with open(path, 'w', encoding='utf-8') as handle:
+                handle.write('#!/bin/sh\n' + body)
+            os.chmod(path, 0o700)
+        env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ['PATH'])
+        result = subprocess.run(['bash', SCRIPT], cwd=root, capture_output=True, text=True, env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        package = [f for f in os.listdir(os.path.join(root, 'out')) if f.startswith('claude-monitor-') and f.endswith('.zip')]
+        self.assertEqual(len(package), 1)
+        listing = subprocess.run(['unzip', '-Z1', os.path.join(root, 'out', package[0])], capture_output=True, text=True, check=True).stdout.split()
+        self.assertIn('web/index.html', listing)
+        self.assertEqual([f for f in listing if 'downloads' in f or f.endswith('.zip')], [])

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using ClaudeMonitor.Api.Data;
+using ClaudeMonitor.Api.Integrations;
 using ClaudeMonitor.Api.Mail;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -22,7 +23,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string Origin = "http://monitor.test.invalid";
     private readonly PostgreSqlContainer db = new PostgreSqlBuilder("postgres:18").Build();
 
+    public ApiFactory()
+    {
+        Jira = new FakeJira(() => Clock.GetUtcNow());
+    }
+
     public FakeMailer Mail { get; } = new();
+    /// <summary>A scripted Atlassian behind the API's "atlassian" HTTP client (ADR-0015): no test reaches a real account.</summary>
+    public FakeJira Jira { get; }
     // Starts at the real time: cookies carry expiry dates and the test client's cookie jar judges them by the wall clock.
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
     public string WebRoot { get; } = Path.Combine(Path.GetTempPath(), "cm-web-" + Guid.NewGuid().ToString("N"));
@@ -46,6 +54,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("MONITOR_GITHUB_CLIENT_SECRET", "gh-secret");
         Environment.SetEnvironmentVariable("MONITOR_GOOGLE_CLIENT_ID", "g-id");
         Environment.SetEnvironmentVariable("MONITOR_GOOGLE_CLIENT_SECRET", "g-secret");
+        Environment.SetEnvironmentVariable("MONITOR_JIRA_CLIENT_ID", FakeJira.ClientId);
+        Environment.SetEnvironmentVariable("MONITOR_JIRA_CLIENT_SECRET", FakeJira.ClientSecret);
         await using var scope = Services.CreateAsyncScope();
         var monitorDb = scope.ServiceProvider.GetRequiredService<MonitorDb>();
         await monitorDb.Database.MigrateAsync();
@@ -69,6 +79,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             services.AddSingleton<IMailer>(Mail);
             services.AddSingleton<TimeProvider>(Clock);
+            services.AddHttpClient(JiraApi.ClientName).ConfigurePrimaryHttpMessageHandler(Jira.Handler);
             services.PostConfigure<AuthenticationOptions>(o =>
             {
                 if (o.SchemeMap.TryGetValue(Security.Schemes.External, out var external))

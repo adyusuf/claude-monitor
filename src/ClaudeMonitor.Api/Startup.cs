@@ -37,10 +37,33 @@ public static class Startup
         services.AddScoped<ClaudeMonitor.Api.Remote.GrantService>();
         services.AddScoped<ClaudeMonitor.Api.Remote.JobService>();
         services.AddScoped<ClaudeMonitor.Api.Remote.ScheduleService>();
+        services.AddHttpClient(ClaudeMonitor.Api.Integrations.JiraApi.ClientName, c => c.Timeout = TimeSpan.FromSeconds(30));
+        services.AddScoped<ClaudeMonitor.Api.Integrations.JiraApi>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.JiraOAuth>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IntegrationTokens>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.JiraTracker>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IWorkTracker>(sp => sp.GetRequiredService<ClaudeMonitor.Api.Integrations.JiraTracker>());
+        services.AddScoped<ClaudeMonitor.Api.Integrations.WebhookManager>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IWorkWriter, ClaudeMonitor.Api.Integrations.JiraWriter>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.MirrorGate>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IssueWrites>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.SprintWrites>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.ProjectMirror>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.IssueMirror>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.SprintMirror>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.PeopleMirror>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.ImportService>();
+        services.AddScoped<ClaudeMonitor.Api.Integrations.SyncService>();
+        services.AddSingleton<ClaudeMonitor.Api.Integrations.SyncInbox>();
         if (config.BackgroundJobs)
         {
             services.AddHostedService<Housekeeper>();
             services.AddHostedService<Archiver>();
+            if (config.JiraAvailable)
+            {
+                services.AddHostedService<ClaudeMonitor.Api.Integrations.SyncWorker>();
+                services.AddHostedService<ClaudeMonitor.Api.Integrations.Reconciler>();
+            }
         }
 
         services.AddAuthentication(Schemes.Session)
@@ -141,6 +164,9 @@ public static class Startup
         SprintEndpoints.Map(api);
         SprintIssueEndpoints.Map(api);
         IssueRunEndpoints.Map(api);
+        IntegrationEndpoints.Map(api);
+        IntegrationImportEndpoints.Map(api);
+        IntegrationWebhookEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)

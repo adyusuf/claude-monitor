@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the agent for every platform and packs one zip each into an output folder (default: out/downloads), which
-# the deploy copies into the web root's /downloads (ADR-0002 phase 4).
+# scripts/publish_agent_downloads.sh puts on the download host (R2) that MONITOR_DOWNLOADS_URL names; the release package carries none of it.
 #
 #   bash scripts/build-agent.sh [out-dir]
 #

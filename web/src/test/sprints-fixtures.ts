@@ -6,7 +6,7 @@ import { issueSummary } from "./issues-fixtures";
 export const sprintSummary = (over: Partial<SprintSummary> = {}): SprintSummary => ({
   id: "s1", projectId: "p1", applicationId: null, number: 1, name: "Launch", goal: "Ship the checkout", startDate: "2026-03-02", endDate: "2026-03-13",
   capacity: 20, status: "planned", releaseId: null, releaseName: null, issueCount: 3, committed: 12, done: 4, startedAt: null, closedAt: null,
-  createdAt: "2026-02-20T10:00:00Z", ...over,
+  createdAt: "2026-02-20T10:00:00Z", sourceConnectionId: null, ...over,
 });
 
 export const sprintView = (over: Partial<SprintView> = {}, sprint: Partial<SprintSummary> = {}): SprintView => ({
