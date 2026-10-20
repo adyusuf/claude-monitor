@@ -73,6 +73,8 @@ public sealed class WebhookManager(ApiConfig config, JiraApi api, IntegrationTok
         }
         catch (TrackerException)
         {
+            // Jira may still hold them (a 503 says nothing about expiry): remove them first, then register afresh, so the 5-webhook limit is not eaten.
+            await TryRemoveAsync(connection, ct);
             Clear(connection);
             await EnsureAsync(connection, spaceKeys, ct);
         }

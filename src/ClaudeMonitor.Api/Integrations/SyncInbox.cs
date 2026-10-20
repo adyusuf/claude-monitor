@@ -20,7 +20,7 @@ public sealed class SyncInbox
     public const int Capacity = 1000;
     private readonly Channel<SyncRequest> channel = Channel.CreateBounded<SyncRequest>(new BoundedChannelOptions(Capacity)
     {
-        FullMode = BoundedChannelFullMode.DropWrite,
+        FullMode = BoundedChannelFullMode.Wait, // TryWrite then answers false when full, and nothing is dropped unseen
         SingleReader = true,
     });
     private readonly ConcurrentDictionary<SyncRequest, byte> waiting = new();

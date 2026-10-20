@@ -54,7 +54,7 @@ public sealed class SyncService(MonitorDb db, ApiConfig config, IWorkTracker tra
             else
             {
                 sprints.Upsert(state, it, counts);
-                foreach (var item in items) issues.Upsert(state, item, persons, connection.SiteHost, counts);
+                foreach (var item in ImportService.EpicsFirst(items)) issues.Upsert(state, item, persons, connection.SiteHost, counts);
             }
 
             await db.SaveChangesAsync(ct);
@@ -130,7 +130,7 @@ public sealed class SyncService(MonitorDb db, ApiConfig config, IWorkTracker tra
             foreach (var it in iterations.Where(i => state.SprintLinks.ContainsKey(i.Id))) sprints.Upsert(state, it, counts);
             var gone = state.SprintLinks.Where(l => iterations.All(i => i.Id != l.Key)).Select(l => l.Value).ToList();
             foreach (var g in gone) sprints.Archive(state, g);
-            foreach (var item in epics.Concat(changed)) issues.Upsert(state, item, persons, connection.SiteHost, counts);
+            foreach (var item in ImportService.EpicsFirst(epics.Concat(changed))) issues.Upsert(state, item, persons, connection.SiteHost, counts);
             counts.Archived += issues.ArchiveMissing(state, alive.ToHashSet(StringComparer.Ordinal));
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);

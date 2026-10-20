@@ -87,7 +87,7 @@ public sealed class ImportService(MonitorDb db, IWorkTracker tracker, Integratio
         var project = await projects.UpsertAsync(connection, space, actor, counts, ct);
         var persons = await people.UpsertAsync(connection, everyone, counts, ct);
         var state = await MirrorState.LoadAsync(db, connection, project, ct);
-        foreach (var item in epics.Concat(backlog)) issues.Upsert(state, item, persons, connection.SiteHost, counts);
+        foreach (var item in EpicsFirst(epics.Concat(backlog))) issues.Upsert(state, item, persons, connection.SiteHost, counts);
         await AddLeadAsync(project, space.Lead, persons, ct);
         WriteAudit(connection, actor, "space", space.Key, counts);
         await db.SaveChangesAsync(ct);
@@ -112,7 +112,7 @@ public sealed class ImportService(MonitorDb db, IWorkTracker tracker, Integratio
         var persons = await people.UpsertAsync(connection, PeopleOf(all.Concat(epics)), counts, ct);
         var state = await MirrorState.LoadAsync(db, connection, project, ct);
         foreach (var id in chosen) sprints.Upsert(state, available[id], counts); // first, so that an issue finds the sprint it sits in
-        foreach (var item in epics.Concat(all)) issues.Upsert(state, item, persons, connection.SiteHost, counts);
+        foreach (var item in EpicsFirst(epics.Concat(all))) issues.Upsert(state, item, persons, connection.SiteHost, counts);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return [.. sprintIds.Select(s => new SprintImportResult(s, chosen.Contains(s) ? Ok : NotFound, 0, 0))];
@@ -132,6 +132,10 @@ public sealed class ImportService(MonitorDb db, IWorkTracker tracker, Integratio
 
         return epics;
     }
+
+    /// <summary>Epics before the issues under them, so a child finds its parent in the same run; otherwise the order of the tool is kept.</summary>
+    internal static List<ExternalItem> EpicsFirst(IEnumerable<ExternalItem> items) =>
+        [.. items.OrderBy(i => JiraMapping.Type(i.TypeName, i.IsSubtask) == Data.WorkItemTypes.Epic ? 0 : 1)];
 
     internal static List<ExternalPerson> PeopleOf(IEnumerable<ExternalItem> items) =>
         [.. items.SelectMany(i => new[] { i.Assignee, i.Reporter }).Where(p => p is not null).Select(p => p!)];

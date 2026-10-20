@@ -84,7 +84,7 @@ public sealed class IssueMirror(MonitorDb db, TimeProvider clock)
         issue.ExternalKey = item.Key;
         issue.ExternalUrl = $"https://{siteHost}/browse/{Uri.EscapeDataString(item.Key)}";
         issue.AssigneePersonId = item.Assignee is { } a && people.TryGetValue(a.Id, out var person) ? person.Id : null;
-        issue.AssigneeUserId = item.Assignee is { } b && people.TryGetValue(b.Id, out var who) ? who.UserId : null;
+        issue.AssigneeUserId = item.Assignee is { } b && people.TryGetValue(b.Id, out var who) && who.UserId is { } member && state.Workers.Contains(member) ? member : null;
         issue.ParentId = ParentOf(state, item, issue.Id);
         issue.ArchivedAt = null;
         issue.UpdatedBy = state.Connection.ConnectorUserId;

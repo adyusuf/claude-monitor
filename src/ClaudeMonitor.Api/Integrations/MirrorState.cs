@@ -25,6 +25,9 @@ public sealed class MirrorState
     public Dictionary<string, IntegrationLink> SprintLinks { get; } = [];
     public Dictionary<Guid, Issue> Issues { get; } = [];
     public Dictionary<Guid, Sprint> Sprints { get; } = [];
+
+    /// <summary>Members who may be given work (member role or above); a viewer can be matched to a person but never be an assignee.</summary>
+    public HashSet<Guid> Workers { get; } = [];
     public int NextIssueNumber { get; set; } = 1;
     public int NextSprintNumber { get; set; } = 1;
     public double NextPosition { get; set; } = IssueEndpoints.Step;
@@ -37,6 +40,9 @@ public sealed class MirrorState
         var links = await db.IntegrationLinks.Where(l => l.ConnectionId == connection.Id && (l.Kind == LinkKinds.Issue || l.Kind == LinkKinds.Sprint)).ToListAsync(ct);
         var issues = await db.Issues.Where(i => i.ProjectId == project.Id).ToListAsync(ct);
         var sprints = await db.Sprints.Where(s => s.ProjectId == project.Id).ToListAsync(ct);
+        var workers = await db.WorkspaceMembers.AsNoTracking().Where(m => m.WorkspaceId == project.WorkspaceId && m.RemovedAt == null
+            && (m.Role == Roles.Owner || m.Role == Roles.Admin || m.Role == Roles.Member)).Select(m => m.UserId).ToListAsync(ct);
+        state.Workers.UnionWith(workers);
         foreach (var i in issues) state.Issues[i.Id] = i;
         foreach (var s in sprints) state.Sprints[s.Id] = s;
         foreach (var l in links)
