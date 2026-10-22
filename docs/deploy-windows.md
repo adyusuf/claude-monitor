@@ -79,6 +79,9 @@ agents signed for the wrong channel.
 
 - `setup-server.ps1` registers `Podium-backup-<env>`, daily at 03:30: the database and the event archives,
   encrypted, 30 days locally and a copy in `AIPOD_BACKUP_OFFSITE`.
+- A task stores the full path of its script and its `-Root`. After the scripts or the server folder move (for example `C:\ClaudeMonitor` to `C:\iis\Podium`) run
+  `repair-tasks.ps1 -Environment <env> -LoopbackPort <port>` (add `-WhatIf` first) as Administrator from the folder that holds the current scripts: it finds each task by its
+  current name or the name from before the rename (`ClaudeMonitor-backup-<env>`, `ClaudeMonitor-health-<env>`), changes only its action and keeps the name.
 - A failed backup writes an **error** to the Application event log (source `Podium`, event 1001).
 - **The alarm:** `Podium-health-<env>` runs `check-health.ps1` every hour and mails `AIPOD_ALERT_EMAIL` when
   the API does not answer, no backup succeeded in 26 hours (a backup that never ran, global #18), a backup or drill
