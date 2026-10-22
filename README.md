@@ -1,4 +1,4 @@
-# claude-monitor
+# Podium
 
 Follow your AI coding sessions from the web. A small agent on each machine (macOS and Windows) collects
 what [Claude Code](https://claude.com/claude-code) and other harnesses report and sends it to a central

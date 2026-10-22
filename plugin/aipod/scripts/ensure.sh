@@ -11,9 +11,9 @@ root="${CLAUDE_PLUGIN_ROOT:-}"
 pins="$root/agent-release.txt"
 server="${CLAUDE_PLUGIN_OPTION_SERVER:-}"
 server="${server%/}"
-# The option is not required: a machine that is already connected has a server in its identity file, which is asked instead (AIPOD_AGENT_HOME, CM_AGENT_HOME, then the two default homes).
+# The option is not required: a machine that is already connected has a server in its identity file, which is asked instead (AP_AGENT_HOME, then the two default homes).
 if [ -z "$server" ]; then
-  for home in "${AIPOD_AGENT_HOME:-}" "${CM_AGENT_HOME:-}" "$HOME/Library/Application Support/aipod" "$HOME/.aipod" "$HOME/Library/Application Support/ClaudeMonitor" "$HOME/.claude-monitor"; do
+  for home in "${AP_AGENT_HOME:-}" "$HOME/Library/Application Support/aipod" "$HOME/.aipod"; do
     [ -n "$home" ] && [ -f "$home/agent.json" ] || continue
     server="$(sed -n 's/.*"server": *"\([^"]*\)".*/\1/p' "$home/agent.json" 2>/dev/null | head -n 1)"
     server="${server%/}"
@@ -36,24 +36,14 @@ valid_server() { case "$1" in *"
 # Kept for `status` and `connect` run from a session's Bash tool, which has no plugin options in its environment.
 if valid_server "$server"; then printf '%s\n' "$server" > "$data/server.txt"; fi
 
-# The old local plugin (cm-agent install) would report every event a second time.
-if grep -q '"monitor-agent@monitor-agent-local": *true' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null; then
-  msg="aipod: the old local plugin is still enabled and would report every event twice. Run /aipod:connect, which removes it."
-fi
-
-# The old plugin of the same agent (monitor-agent): until /aipod:connect removes it, it reports too, or this plugin stands down for it.
-if grep -q '"monitor-agent@monitor-agent-releases": *true' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" 2>/dev/null; then
-  msg="${msg:+$msg }aipod: the old monitor-agent plugin is still enabled. Run /aipod:connect, which replaces it."
-fi
-
 case "$(uname -s)" in
   Darwin) os=macos ;;
   Linux) os=linux ;;
   MINGW* | MSYS* | CYGWIN*) os=windows ;;
   *) finish ;;
 esac
-exe=cm-agent
-[ "$os" = windows ] && exe=cm-agent.exe
+exe=aipod
+[ "$os" = windows ] && exe=aipod.exe
 machine="$(uname -m)"
 [ "$os" = windows ] && machine="${PROCESSOR_ARCHITEW6432:-${PROCESSOR_ARCHITECTURE:-$machine}}"
 if [ "$os" = macos ] && [ "$machine" = x86_64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = 1 ]; then machine=arm64; fi
@@ -81,7 +71,7 @@ if [ -z "$shas" ] || [ -z "$file" ]; then
   msg="${msg:+$msg }aipod: this plugin has no published build for $os-$arch yet. /aipod:status has the details."
   finish
 fi
-printf '%s' "$file" | grep -Eq '^cm-agent-(macos|windows|linux)-(arm64|x64)\.zip$' || { say "refused: $file is not a build file name"; finish; }
+printf '%s' "$file" | grep -Eq '^aipod-(macos|windows|linux)-(arm64|x64)\.zip$' || { say "refused: $file is not a build file name"; finish; }
 if ! valid_server "$server"; then
   say "no https server address is set for this plugin; nothing was installed"
   msg="${msg:+$msg }aipod: set the server address in the plugin's options (/plugin, aipod agent, Configure options)."

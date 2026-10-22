@@ -16,7 +16,7 @@ class Guard(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.root, True)
-        api = os.path.join(self.root, 'src', 'ClaudeMonitor.Api')
+        api = os.path.join(self.root, 'src', 'Podium.Api')
         os.makedirs(api)
         with open(os.path.join(api, 'appsettings.json'), 'w', encoding='utf-8') as handle:
             handle.write('{}\n')
@@ -40,7 +40,7 @@ class Guard(unittest.TestCase):
         return subprocess.run(['bash', SCRIPT], cwd=self.root, capture_output=True, text=True, env=env)
 
     def test_a_local_production_settings_file_stops_the_build_before_anything_runs(self):
-        with open(os.path.join(self.root, 'src', 'ClaudeMonitor.Api', 'appsettings.Production.json'), 'w',
+        with open(os.path.join(self.root, 'src', 'Podium.Api', 'appsettings.Production.json'), 'w',
                   encoding='utf-8') as handle:
             handle.write('{"Smtp": {"Password": "x"}}\n')
         result = self.build()
@@ -65,8 +65,8 @@ class PackageHoldsNoAgentBuilds(unittest.TestCase):
     def test_out_downloads_is_not_copied_into_the_package(self):
         root = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, root, True)
-        os.makedirs(os.path.join(root, 'src', 'ClaudeMonitor.Api'))
-        with open(os.path.join(root, 'src', 'ClaudeMonitor.Api', 'appsettings.json'), 'w', encoding='utf-8') as handle:
+        os.makedirs(os.path.join(root, 'src', 'Podium.Api'))
+        with open(os.path.join(root, 'src', 'Podium.Api', 'appsettings.json'), 'w', encoding='utf-8') as handle:
             handle.write('{}\n')
         with open(os.path.join(root, '.gitignore'), 'w', encoding='utf-8') as handle:
             handle.write('out/\n')
@@ -74,7 +74,7 @@ class PackageHoldsNoAgentBuilds(unittest.TestCase):
             subprocess.run(['git', *command], cwd=root, check=True)
         downloads = os.path.join(root, 'out', 'downloads')
         os.makedirs(downloads)
-        for name in ('cm-agent-linux-x64.zip', 'SHA256SUMS', 'manifest.json', 'aipod-plugin.zip'):
+        for name in ('aipod-linux-x64.zip', 'SHA256SUMS', 'manifest.json', 'aipod-plugin.zip'):
             with open(os.path.join(downloads, name), 'w', encoding='utf-8') as handle:
                 handle.write(name)
         # npm "builds" web/dist and dotnet "publishes" its -o folder: enough for the script to reach the packing step.
@@ -92,7 +92,7 @@ class PackageHoldsNoAgentBuilds(unittest.TestCase):
         env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ['PATH'])
         result = subprocess.run(['bash', SCRIPT], cwd=root, capture_output=True, text=True, env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
-        package = [f for f in os.listdir(os.path.join(root, 'out')) if f.startswith('claude-monitor-') and f.endswith('.zip')]
+        package = [f for f in os.listdir(os.path.join(root, 'out')) if f.startswith('podium-') and f.endswith('.zip')]
         self.assertEqual(len(package), 1)
         listing = subprocess.run(['unzip', '-Z1', os.path.join(root, 'out', package[0])], capture_output=True, text=True, check=True).stdout.split()
         self.assertIn('web/index.html', listing)

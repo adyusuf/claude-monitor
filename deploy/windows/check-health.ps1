@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   The hourly health check of one environment, and its alarm (global #18: a failed backup and a backup that never ran
-  are alarmed separately). Registered by setup-server.ps1. Mails MONITOR_ALERT_EMAIL through the environment's own
+  are alarmed separately). Registered by setup-server.ps1. Mails AIPOD_ALERT_EMAIL through the environment's own
   SMTP settings when anything is wrong, and always writes the result to the event log.
 
 .DESCRIPTION
@@ -17,14 +17,14 @@
 param(
   [Parameter(Mandatory)] [ValidateSet("test", "prod")] [string] $Environment,
   [Parameter(Mandatory)] [int] $LoopbackPort,
-  [string] $Root = "C:\ClaudeMonitor"
+  [string] $Root = "C:\Podium"
 )
 $ErrorActionPreference = "Stop"
-$source = "ClaudeMonitor"
+$source = "Podium"
 if (-not [Diagnostics.EventLog]::SourceExists($source)) { New-EventLog -LogName Application -Source $source }
 $home_ = Join-Path $Root $Environment
 $values = @{}
-foreach ($line in Get-Content (Join-Path $home_ "monitor.env")) { if ($line -match '^([A-Z_]+)=(.*)$') { $values[$Matches[1]] = $Matches[2] } }
+foreach ($line in Get-Content (Join-Path $home_ "aipod.env")) { if ($line -match '^([A-Z_]+)=(.*)$') { $values[$Matches[1]] = $Matches[2] } }
 $stateFile = Join-Path $home_ "last-health-check.txt"
 $since = if (Test-Path $stateFile) { [DateTime]::Parse((Get-Content $stateFile -Raw).Trim()) } else { (Get-Date).AddHours(-1) }
 $now = Get-Date
@@ -64,14 +64,14 @@ if ($problems.Count -eq 0) {
   return
 }
 
-$text = "Claude Monitor $Environment needs attention:`n`n- " + ($problems -join "`n- ")
+$text = "Podium $Environment needs attention:`n`n- " + ($problems -join "`n- ")
 Write-EventLog -LogName Application -Source $source -EventId 1020 -EntryType Error -Message $text
 try {
-  if (-not $values["MONITOR_ALERT_EMAIL"]) { throw "MONITOR_ALERT_EMAIL is not set" }
-  $smtp = New-Object Net.Mail.SmtpClient($values["MONITOR_SMTP_HOST"], [int]$values["MONITOR_SMTP_PORT"])
-  $smtp.EnableSsl = $values["MONITOR_SMTP_TLS"] -ne "false"
-  if ($values["MONITOR_SMTP_USER"]) { $smtp.Credentials = New-Object Net.NetworkCredential($values["MONITOR_SMTP_USER"], $values["MONITOR_SMTP_PASSWORD"]) }
-  $smtp.Send($values["MONITOR_SMTP_FROM"], $values["MONITOR_ALERT_EMAIL"], "Claude Monitor ${Environment}: $($problems.Count) problem(s)", $text)
+  if (-not $values["AIPOD_ALERT_EMAIL"]) { throw "AIPOD_ALERT_EMAIL is not set" }
+  $smtp = New-Object Net.Mail.SmtpClient($values["AIPOD_SMTP_HOST"], [int]$values["AIPOD_SMTP_PORT"])
+  $smtp.EnableSsl = $values["AIPOD_SMTP_TLS"] -ne "false"
+  if ($values["AIPOD_SMTP_USER"]) { $smtp.Credentials = New-Object Net.NetworkCredential($values["AIPOD_SMTP_USER"], $values["AIPOD_SMTP_PASSWORD"]) }
+  $smtp.Send($values["AIPOD_SMTP_FROM"], $values["AIPOD_ALERT_EMAIL"], "Podium ${Environment}: $($problems.Count) problem(s)", $text)
 } catch {
   Write-EventLog -LogName Application -Source $source -EventId 1021 -EntryType Error -Message "health alarm mail for $Environment could not be sent: $($_.Exception.Message)"
 }

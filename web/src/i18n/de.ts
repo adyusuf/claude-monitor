@@ -162,7 +162,7 @@ export const de: Dictionary = {
   },
   activity: {
     filterLabel: "Anzeigen", all: "Alle", inputs: "Eingaben", assistant: "Assistent", tools: "Werkzeuge",
-    monitorInput: "Podium (Web)", humanInput: "Mensch (Claude Code)", assistantLabel: "Claude", stopRequest: "Stoppanforderung",
+    podiumInput: "Podium (Web)", humanInput: "Mensch (Claude Code)", assistantLabel: "Claude", stopRequest: "Stoppanforderung",
     sentBy: "gesendet von {name}", typedBy: "getippt von {name}", someone: "ein Mitglied",
     waiting: "Wartet", pendingTitle: "Wartet auf Anwendung",
     deliveredWith: "zusammen mit der in der Sitzung getippten Nachricht zugestellt",
@@ -224,7 +224,6 @@ export const de: Dictionary = {
     plugin1: "Installieren Sie das Plugin. Claude Code fragt nach der Serveradresse, sie lautet:",
     plugin2: "Verbinden Sie dann in Claude Code diese Maschine (ein Code erscheint; geben Sie ihn auf der sich öffnenden Seite frei):",
     orManual: "Oder installieren Sie den Agent von Hand:",
-    pluginOld: "Hat diese Maschine schon das alte Plugin monitor-agent: Installieren Sie aipod und führen Sie /aipod:connect aus; das entfernt das alte, damit kein Ereignis doppelt gemeldet wird.",
   },
   common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert" },
   remote: deRemote,

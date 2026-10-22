@@ -16,8 +16,8 @@
   --danger: #d6453d;
   --danger-soft: #fcebea;
   --idle: #8a8a9a;
-  --monitor: #5b5bd6;
-  --monitor-soft: #ececfd;
+  --podium: #5b5bd6;
+  --podium-soft: #ececfd;
   --human: #0e7490;
   --human-soft: #e0f4f8;
   --radius: 12px;
@@ -32,7 +32,7 @@
     --bg: #0e0e14; --surface: #16161f; --surface-2: #1d1d29; --border: #2a2a39; --text: #ececf3; --muted: #9a9aad;
     --accent: #8b8bf5; --accent-ink: #0e0e14; --accent-soft: #23234a; --ok: #3ccf91; --ok-soft: #12352a;
     --warn: #f2b54a; --warn-soft: #3a2c12; --danger: #ff6b62; --danger-soft: #3d1a19; --idle: #7d7d92;
-    --monitor: #8b8bf5; --monitor-soft: #23234a; --human: #4cc4de; --human-soft: #123540;
+    --podium: #8b8bf5; --podium-soft: #23234a; --human: #4cc4de; --human-soft: #123540;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4); color-scheme: dark;
   }
 }
@@ -40,7 +40,7 @@
   --bg: #0e0e14; --surface: #16161f; --surface-2: #1d1d29; --border: #2a2a39; --text: #ececf3; --muted: #9a9aad;
   --accent: #8b8bf5; --accent-ink: #0e0e14; --accent-soft: #23234a; --ok: #3ccf91; --ok-soft: #12352a;
   --warn: #f2b54a; --warn-soft: #3a2c12; --danger: #ff6b62; --danger-soft: #3d1a19; --idle: #7d7d92;
-  --monitor: #8b8bf5; --monitor-soft: #23234a; --human: #4cc4de; --human-soft: #123540;
+  --podium: #8b8bf5; --podium-soft: #23234a; --human: #4cc4de; --human-soft: #123540;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4); color-scheme: dark;
 }
 
@@ -277,7 +277,7 @@ textarea.input { resize: vertical; }
 .act-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .act { min-width: 0; }
 .act-input { border: 1px solid var(--act-tone); border-left-width: 5px; background: var(--act-soft); border-radius: var(--radius-sm); padding: 10px 12px; }
-.act-monitor_input { --act-tone: var(--monitor); --act-soft: var(--monitor-soft); }
+.act-podium_input { --act-tone: var(--podium); --act-soft: var(--podium-soft); }
 .act-human_input { --act-tone: var(--human); --act-soft: var(--human-soft); }
 .act-pending { border-style: dashed dashed dashed solid; }
 .act-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12.5px; }

@@ -18,8 +18,7 @@ import unittest
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLUGIN = os.path.normpath(os.path.join(HERE, '..', '..', 'plugin', 'monitor-agent'))
-AIPOD = os.path.normpath(os.path.join(HERE, '..', '..', 'plugin', 'aipod'))
+PLUGIN = os.path.normpath(os.path.join(HERE, '..', '..', 'plugin', 'aipod'))
 RUN, ENSURE = os.path.join(PLUGIN, 'scripts', 'run.sh'), os.path.join(PLUGIN, 'scripts', 'ensure.sh')
 
 OS = {'Darwin': 'macos', 'Linux': 'linux'}.get(platform.system())
@@ -36,14 +35,14 @@ def native_machine():
 
 
 ARCH = {'arm64': 'arm64', 'aarch64': 'arm64', 'x86_64': 'x64', 'amd64': 'x64'}.get(native_machine())
-FILE = f'cm-agent-{OS}-{ARCH}.zip'
-FAKE = '#!/bin/sh\ncase "$1" in\n  version) echo "{version}" ;;\n  restart) echo "restarted id=$CM_PLUGIN_ID bin=$CM_BINARY push=$CM_PUSH server=$CM_SERVER" >> "$(dirname "$0")/restarts" ;;\n  *) echo "args: $*"; echo "BIN=$CM_BINARY ID=$CM_PLUGIN_ID SERVER=$CM_SERVER" ;;\nesac\n'
+FILE = f'aipod-{OS}-{ARCH}.zip'
+FAKE = '#!/bin/sh\ncase "$1" in\n  version) echo "{version}" ;;\n  restart) echo "restarted id=$AP_PLUGIN_ID bin=$AP_BINARY push=$AP_PUSH server=$AP_SERVER" >> "$(dirname "$0")/restarts" ;;\n  *) echo "args: $*"; echo "BIN=$AP_BINARY ID=$AP_PLUGIN_ID SERVER=$AP_SERVER" ;;\nesac\n'
 
 
 def zip_of(version):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, 'w') as z:
-        info = zipfile.ZipInfo('cm-agent')
+        info = zipfile.ZipInfo('aipod')
         info.external_attr = 0o700 << 16
         z.writestr(info, FAKE.format(version=version))
     return buffer.getvalue()
@@ -78,15 +77,15 @@ class Server:
 
 
 class PluginScriptsCase(unittest.TestCase):
-    plugin_folder = PLUGIN  # the aipod plugin's cases set AIPOD
+    plugin_folder = PLUGIN
 
     def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix='cm-plugin-test-')
+        self.tmp = tempfile.mkdtemp(prefix='ap-plugin-test-')
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.data = os.path.join(self.tmp, 'data')
         self.root = os.path.join(self.tmp, 'root')
         shutil.copytree(self.plugin_folder, self.root)
-        self.bin = os.path.join(self.data, 'bin', 'cm-agent')
+        self.bin = os.path.join(self.data, 'bin', 'aipod')
         self.log = os.path.join(self.data, 'install.log')
 
     def pins(self, version, archive=None, extra=''):

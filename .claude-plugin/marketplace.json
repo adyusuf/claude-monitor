@@ -1,15 +1,10 @@
 {
-  "name": "monitor-agent-releases",
+  "name": "aipod-releases",
   "owner": {
-    "name": "Claude Monitor"
+    "name": "Podium"
   },
-  "description": "The Claude Monitor agent as a Claude Code plugin: it installs, connects and stops the agent, which reports this machine's sessions and carries web messages back.",
+  "description": "The Podium agent as a Claude Code plugin: it installs, connects and stops the agent, which reports this machine's sessions and carries web messages back.",
   "plugins": [
-    {
-      "name": "monitor-agent",
-      "source": "./plugin/monitor-agent",
-      "description": "The old plugin of the aipod agent, kept as a bridge: install aipod instead."
-    },
     {
       "name": "aipod",
       "source": "./plugin/aipod",

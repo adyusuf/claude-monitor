@@ -51,14 +51,14 @@ manifest that `scripts/publish_agent_downloads.sh` puts on the download host (th
 
 | File | Platform | Code-signed | In the update `manifest.json` (ADR-0004) |
 |---|---|---|---|
-| `cm-agent-macos-arm64.zip`, `cm-agent-macos-x64.zip` | macOS | Developer ID, hardened runtime, notarised (when `AGENT_SIGN_IDENTITY` / `AGENT_NOTARY_PROFILE` name them) | yes |
-| `cm-agent-windows-x64.zip`, `cm-agent-windows-arm64.zip` | Windows | **no** | yes |
-| `cm-agent-linux-x64.zip`, `cm-agent-linux-arm64.zip` | Linux (systemd) | **no** | yes |
+| `aipod-macos-arm64.zip`, `aipod-macos-x64.zip` | macOS | Developer ID, hardened runtime, notarised (when `AGENT_SIGN_IDENTITY` / `AGENT_NOTARY_PROFILE` name them) | yes |
+| `aipod-windows-x64.zip`, `aipod-windows-arm64.zip` | Windows | **no** | yes |
+| `aipod-linux-x64.zip`, `aipod-linux-arm64.zip` | Linux (systemd) | **no** | yes |
 
 With `AGENT_UPDATE_CHANNEL` set, `scripts/sign_manifest.py` signs an update entry for every one of these six zips, so
 an interactive agent on any of the three systems can update itself. A service agent cannot (below).
 
-Every zip holds the one single-file `aipod` (`cm-agent.exe` on Windows), published uncompressed: never switch
+Every zip holds the one single-file `aipod` (`aipod.exe` on Windows), published uncompressed: never switch
 `EnableCompressionInSingleFile` on (it crashes the daemon on macOS, see the csproj). The published-agent smoke test
 (`scripts/agent_smoke.py`) runs the binary of the host it runs on: the macOS build on a Mac, the Linux build on a
 Linux host. The Windows and Linux builds are only smoke-tested on a host of their own OS.
@@ -74,7 +74,7 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
 ```
 
 ```powershell
-(Get-FileHash .\cm-agent-windows-x64.zip -Algorithm SHA256).Hash   # compare with the line in SHA256SUMS
+(Get-FileHash .\aipod-windows-x64.zip -Algorithm SHA256).Hash   # compare with the line in SHA256SUMS
 ```
 
 ## Agent releases: notes
@@ -83,14 +83,14 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   `os=linux` and the Linux zips are signed into `manifest.json`. Deploy the API first: an older API answers a Linux
   agent's check with 400 (`invalid_os`), which the agent records as `unreachable` and installs nothing.
 
-- **Linux agent and service mode** (`feature/remote-work`, ADR-0005): `cm-agent-linux-x64.zip` and
-  `cm-agent-linux-arm64.zip` join the downloads (and the web's "Get the agent" page); `aipod install --service`
+- **Linux agent and service mode** (`feature/remote-work`, ADR-0005): `aipod-linux-x64.zip` and
+  `aipod-linux-arm64.zip` join the downloads (and the web's "Get the agent" page); `aipod install --service`
   registers a boot service on Linux, macOS and Windows Server. Old agents keep working but never report an exec level,
   so they are never a target of remote work. The API needs the usual deploy to test, then prod, **before** the agents:
   a new agent on an old API gets 404 and switches the feature off.
 
-- **Windows agent home moved** (`fix/agent-home-outside-appdata`): the default is now `%USERPROFILE%\.claude-monitor`,
-  not `%LOCALAPPDATA%\ClaudeMonitor` (the Claude desktop app's MSIX packaging redirects AppData, ADR-0002). On first
+- **Windows agent home moved** (`fix/agent-home-outside-appdata`): the default is now `%USERPROFILE%\.aipod`,
+  not `%LOCALAPPDATA%\Podium` (the Claude desktop app's MSIX packaging redirects AppData, ADR-0002). On first
   start the new agent copies `agent.json`; nothing else moves, and events not yet uploaded are lost. **Installs made
   before this release keep using the old binary and folder until `aipod install` is run again** (SETUP.md, "The
   agent"). `aipod status` now prints `home:`. A new agent version also needs a deploy to test, then prod
@@ -102,11 +102,11 @@ sha256sum --check --ignore-missing SHA256SUMS      # Linux  (macOS: shasum -a 25
   (0-590, default 0; re-run `install` to rewrite the hooks) and `aipod status` prints `commands waiting` and
   `stop wait`. No API change. Web and agent both need the usual deploy to test, then prod.
 
-- **Claude Code plugin** (`feature/inbox-push`, ADR-0007): `bash scripts/build-agent.sh` now also writes `plugin/monitor-agent/agent-release.txt`
+- **Claude Code plugin** (`feature/inbox-push`, ADR-0007): `bash scripts/build-agent.sh` now also writes `plugin/aipod/agent-release.txt`
   (the version and the SHA-256 of every zip; the digests of one version accumulate across environments, `scripts/write_plugin_pins.py <dir> <version> --replace` starts over).
   **Commit that file with the release**: the plugin's bootstrap installs exactly the zips it pins and refuses
   anything else, so a plugin published before its pins names no build and installs nothing. Order: build -> commit the pins -> promote; the zips must be in the
-  environment's `/downloads` before the plugin version that pins them is published. To serve the plugin from the environment's own site instead of the repository, set `AGENT_SITE_URL=https://<site>` for `build-agent.sh` (it writes `aipod-marketplace.json` + `aipod-plugin.zip` and the old pair `marketplace.json` + `monitor-agent-plugin.zip` into `/downloads`, ADR-0007 section 9.2 and ADR-0013 section 1; the pins file is written for both plugin folders) and `VITE_PLUGIN_FROM_SERVER=1` for the web build. **Order (ADR-0013 section 1): publish the `/downloads` that hold `aipod-marketplace.json` and `aipod-plugin.zip` before the web build with `VITE_PLUGIN_FROM_SERVER=1` goes out, because the "Get the agent" page now shows the `aipod` commands (the git marketplace path still shows the old plugin: that catalog lists only it).** Otherwise set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
+  environment's `/downloads` before the plugin version that pins them is published. To serve the plugin from the environment's own site instead of the repository, set `AGENT_SITE_URL=https://<site>` for `build-agent.sh` (it writes `aipod-marketplace.json` + `aipod-plugin.zip` into `/downloads`, ADR-0007 section 9.2 and ADR-0013 section 1; the pins file is written for plugin/aipod) and `VITE_PLUGIN_FROM_SERVER=1` for the web build. **Order (ADR-0013 section 1): publish the `/downloads` that hold `aipod-marketplace.json` and `aipod-plugin.zip` before the web build with `VITE_PLUGIN_FROM_SERVER=1` goes out, because the "Get the agent" page now shows the `aipod` commands.** Otherwise set `VITE_PLUGIN_MARKETPLACE` for the web build of the environment
   (`<owner>/<repo>#test` or `#prod`). When a hook is added or changed in the agent, run `aipod plugin-files .` and commit the result (a test fails otherwise).
   `--push inbox` pushes through the session's inbox (no start-up flag); `--push on` and `--push channel` are the old channel, unchanged.
 
@@ -116,7 +116,7 @@ The agent builds (and the plugin files, when the build wrote them) are served fr
 
 - **Publish:** `AGENT_UPDATE_CHANNEL=<channel> bash scripts/build-agent.sh` (with `AGENT_SITE_URL` set, the plugin files too), then `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <channel>` (wrangler, the maintainer's own login). It checks `SHA256SUMS` and that the manifest is signed for that channel,
   uploads the files to `daemons/<version>/<channel>/` (kept, cached for good) and then to `daemons/<channel>/` (`no-cache`), and the manifest last.
-- **Point a server at it:** `MONITOR_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>` in that server's `monitor.env` (test: `.../daemons/test`, prod: `.../daemons/prod`). The API reads `manifest.json` from there once a minute, keeps the last good copy when the host is down, and
+- **Point a server at it:** `AIPOD_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>` in that server's `aipod.env` (test: `.../daemons/test`, prod: `.../daemons/prod`). The API reads `manifest.json` from there once a minute, keeps the last good copy when the host is down, and
   offers `<url>/<file>`. `/downloads/<file>` on the server answers 302 to the host when the server does not hold the file itself, so the web's "Get the agent" page, old links and the plugin's bootstrap keep working. Unset, nothing changes.
 - **Trust:** the address is not what makes a build trusted; the agent still verifies the signed SHA-256 against its built-in channel key. It will fetch from the server's own `/downloads/` or from an https address on a public host name (default port, no credentials or query, a plain file name, no redirect); anything else is refused (`bad_url`).
 - Channels stay apart by folder: a test agent carries the test key and only the `test` manifest is signed for it. Never point the prod server at `daemons/test`.

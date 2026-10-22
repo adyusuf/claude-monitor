@@ -60,14 +60,14 @@ describe("the activity list tells inputs from everything else", () => {
   it("shows a web command and a typed prompt apart, each with a label, an icon and a status, in text and not by colour alone", async () => {
     await open({ events: mixed, commands: [command()] });
     const card = await activityCard();
-    const monitor = (await within(card).findByText("run the tests")).closest("li")!;
+    const webItem = (await within(card).findByText("run the tests")).closest("li")!;
     const human = within(card).getByText("please fix the login").closest("li")!;
 
-    expect(monitor).toHaveClass("act-monitor_input");
-    expect(within(monitor).getByText("Podium (web)")).toBeInTheDocument();
-    expect(within(monitor).getByText("sent by Örnek Kişi")).toBeInTheDocument();
-    expect(within(monitor).getByText("Applied")).toBeInTheDocument();
-    expect(within(monitor).getByText("\u2601\uFE0E")).toBeInTheDocument();
+    expect(webItem).toHaveClass("act-podium_input");
+    expect(within(webItem).getByText("Podium (web)")).toBeInTheDocument();
+    expect(within(webItem).getByText("sent by Örnek Kişi")).toBeInTheDocument();
+    expect(within(webItem).getByText("Applied")).toBeInTheDocument();
+    expect(within(webItem).getByText("\u2601\uFE0E")).toBeInTheDocument();
 
     expect(human).toHaveClass("act-human_input");
     expect(within(human).getByText("Human (Claude Code)")).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe("the activity list tells inputs from everything else", () => {
   it("shows a stop request with its own icon and no text of its own", async () => {
     await open({ commands: [command({ kind: "stop", body: null })] });
     const item = (await screen.findByText("Stop request")).closest("li")!;
-    expect(item).toHaveClass("act-monitor_input");
+    expect(item).toHaveClass("act-podium_input");
     expect(within(item).getByText("■")).toBeInTheDocument();
   });
 
@@ -142,7 +142,7 @@ describe("what is not a human input", () => {
     await within(card).findByText("run the tests");
     expect(card.textContent).not.toContain("anything wrapped around");
     const inputs = [...card.querySelectorAll(".act-input")].map((li) => li.className);
-    expect(inputs[0]).toContain("act-monitor_input");
+    expect(inputs[0]).toContain("act-podium_input");
     expect(inputs[1]).toContain("act-human_input");
     expect(within(card).getByText("delivered together with the message typed in the session")).toBeInTheDocument();
   });
@@ -270,7 +270,7 @@ describe("the dictionaries", () => {
       for (const key of keys(dict.activity)) expect(key.length).toBeGreaterThan(0);
       for (const value of Object.values(dict.activity.status)) expect(value.trim()).not.toBe("");
     }
-    expect(tr.activity.monitorInput).not.toBe("");
+    expect(tr.activity.podiumInput).not.toBe("");
     expect(tr.activity.humanInput).not.toBe(en.activity.humanInput);
   });
 });

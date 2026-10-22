@@ -244,8 +244,8 @@ describe("workspace settings and account", () => {
   it("gives the download page this site's own address in the login command", async () => {
     mockApi({ "GET /me": { body: ME } });
     renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
-    expect(await screen.findByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "macOS · Apple silicon" })).toHaveAttribute("href", "/downloads/cm-agent-macos-arm64.zip");
+    expect(await screen.findByText(`aipod login --server ${window.location.origin}`)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "macOS · Apple silicon" })).toHaveAttribute("href", "/downloads/aipod-macos-arm64.zip");
     expect(screen.queryByText(/Install as a Claude Code plugin/)).not.toBeInTheDocument(); // no marketplace configured: the zips only
   });
 
@@ -259,7 +259,7 @@ describe("workspace settings and account", () => {
       expect(screen.getByText("claude plugin install aipod --marketplace owner/repo#prod")).toBeInTheDocument();
       expect(screen.getByText(window.location.origin)).toBeInTheDocument();
       expect(screen.getByText("/aipod:connect")).toBeInTheDocument();
-      expect(screen.getByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument(); // the manual way stays
+      expect(screen.getByText(`aipod login --server ${window.location.origin}`)).toBeInTheDocument(); // the manual way stays
     } finally {
       settable.pluginMarketplace = "";
     }
@@ -275,8 +275,7 @@ describe("workspace settings and account", () => {
       expect(screen.getByText(`claude plugin marketplace add ${window.location.origin}/downloads/aipod-marketplace.json`)).toBeInTheDocument();
       expect(screen.getByText("claude plugin install aipod@aipod-releases")).toBeInTheDocument();
       expect(screen.getByText("/aipod:connect")).toBeInTheDocument();
-      expect(screen.getByText(/already has the old monitor-agent plugin/)).toBeInTheDocument(); // the order for a machine that is on the old plugin
-      expect(screen.getByText(`cm-agent login --server ${window.location.origin}`)).toBeInTheDocument();
+      expect(screen.getByText(`aipod login --server ${window.location.origin}`)).toBeInTheDocument();
     } finally {
       settable.pluginFromServer = false;
     }

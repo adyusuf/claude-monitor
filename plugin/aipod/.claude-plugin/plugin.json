@@ -1,6 +1,6 @@
 {
   "name": "aipod",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "aipod agent: installs itself, connects to your server, reports sessions and delivers web messages.",
   "author": {
     "name": "aipod"
@@ -9,7 +9,7 @@
     "server": {
       "type": "string",
       "title": "Server address",
-      "description": "The https address of your aipod server: the address you open in the browser.",
+      "description": "The https address of your Podium server: the address you open in the browser.",
       "required": false
     },
     "push": {

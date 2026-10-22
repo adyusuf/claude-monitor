@@ -116,7 +116,7 @@ function noteOf(e: EventRow): { tone: "notification" | "subagent_start" | "subag
   }
 }
 
-const WEB_HEADER = "Messages sent to this session from Claude Monitor (the web):";
+const WEB_HEADER = "Messages sent to this session from Podium (the web):";
 
 /** A message sent from the web while the user typed one reaches Claude as hook context; the transcript keeps it as an attachment. */
 function fromWeb(p: Obj): string | null {

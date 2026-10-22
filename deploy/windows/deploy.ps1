@@ -3,7 +3,7 @@
   Deploys a release package (scripts/build-release.sh) to one environment, with an automatic rollback.
 
 .DESCRIPTION
-  1. unpacks the package into C:\ClaudeMonitor\<env>\releases\<commit>;
+  1. unpacks the package into C:\Podium\<env>\releases\<commit>;
   2. writes the environment file's values into that release's web.config (environmentVariables of the ASP.NET Core
      module), so secrets stay on the server and out of the package;
   3. applies the database migrations (they only add, global #4, so the release still running is not broken);
@@ -13,20 +13,20 @@
   Run as Administrator.
 
 .EXAMPLE
-  .\deploy.ps1 -Environment test -Package C:\Temp\claude-monitor-<commit>.zip -LoopbackPort 8081
+  .\deploy.ps1 -Environment test -Package C:\Temp\podium-<commit>.zip -LoopbackPort 8081
 #>
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)] [ValidateSet("test", "prod")] [string] $Environment,
   [Parameter(Mandatory)] [string] $Package,
   [Parameter(Mandatory)] [int] $LoopbackPort,
-  [string] $Root = "C:\ClaudeMonitor"
+  [string] $Root = "C:\Podium"
 )
 $ErrorActionPreference = "Stop"
 Import-Module WebAdministration
-$site = "ClaudeMonitor-$Environment"
+$site = "Podium-$Environment"
 $home_ = Join-Path $Root $Environment
-$envFile = Join-Path $home_ "monitor.env"
+$envFile = Join-Path $home_ "aipod.env"
 
 $staging = Join-Path $home_ "releases\incoming"
 Remove-Item -Recurse -Force $staging -ErrorAction SilentlyContinue
@@ -44,8 +44,8 @@ foreach ($line in Get-Content $envFile) {
   if ($line -match '^\s*#' -or $line -notmatch '=') { continue }
   $k, $v = $line.Split("=", 2); if ($v -ne "") { $values[$k.Trim()] = $v }
 }
-$values["MONITOR_WEB_ROOT"] = Join-Path $target "web"
-$values["MONITOR_COMMIT"] = $commit
+$values["AIPOD_WEB_ROOT"] = Join-Path $target "web"
+$values["AIPOD_COMMIT"] = $commit
 $config = [xml](Get-Content (Join-Path $api "web.config"))
 $module = $config.SelectSingleNode("//aspNetCore")
 $vars = $config.CreateElement("environmentVariables")
@@ -58,7 +58,7 @@ $config.Save((Join-Path $api "web.config"))
 Write-Host "2. migrations"
 $old = @{}; foreach ($k in $values.Keys) { $old[$k] = [Environment]::GetEnvironmentVariable($k, "Process"); [Environment]::SetEnvironmentVariable($k, $values[$k], "Process") }
 try {
-  & (Join-Path $api "ClaudeMonitor.Api.exe") --migrate
+  & (Join-Path $api "Podium.Api.exe") --migrate
   if ($LASTEXITCODE -ne 0) { throw "migrations failed ($LASTEXITCODE)" }
 } finally { foreach ($k in $old.Keys) { [Environment]::SetEnvironmentVariable($k, $old[$k], "Process") } }
 

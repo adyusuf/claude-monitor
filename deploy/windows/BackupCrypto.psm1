@@ -2,7 +2,7 @@
   Backup encryption shared by backup.ps1 and restore-drill.ps1. Streaming, so a dump of any size never sits in memory,
   and it runs on Windows PowerShell 5.1 as well as PowerShell 7.
   Format: IV (16) | AES-256-CBC ciphertext | HMAC-SHA256 (32) over IV and ciphertext (encrypt-then-MAC).
-  The two keys are derived from MONITOR_BACKUP_KEY (base64url of 32 random bytes); a wrong key or a changed file fails
+  The two keys are derived from AIPOD_BACKUP_KEY (base64url of 32 random bytes); a wrong key or a changed file fails
   the MAC check before anything is decrypted.
 #>
 
@@ -53,7 +53,7 @@ function Unprotect-BackupFile([string] $Source, [string] $Destination, [string] 
   try {
     $tail = New-Object byte[] 32; [void]$in.Seek($length - 32, [IO.SeekOrigin]::Begin); [void]$in.Read($tail, 0, 32)
     $diff = 0; for ($i = 0; $i -lt 32; $i++) { $diff = $diff -bor ($tail[$i] -bxor $expected[$i]) }
-    if ($diff -ne 0) { throw "the backup's authentication failed: wrong MONITOR_BACKUP_KEY, or the file was changed" }
+    if ($diff -ne 0) { throw "the backup's authentication failed: wrong AIPOD_BACKUP_KEY, or the file was changed" }
     [void]$in.Seek(0, [IO.SeekOrigin]::Begin)
     $iv = New-Object byte[] 16; [void]$in.Read($iv, 0, 16)
     $aes = [Security.Cryptography.Aes]::Create(); $aes.Key = $keys.Enc; $aes.IV = $iv

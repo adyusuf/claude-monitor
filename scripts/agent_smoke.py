@@ -6,7 +6,7 @@ ReadyToRun). That gap hid a crash: with `EnableCompressionInSingleFile` on, the 
 seconds with System.AccessViolationException inside System.Net.Http (docs/adr-0002-agent-platform.md, "Published build").
 
 This script publishes the agent for the host the way scripts/build-agent.sh does (or takes --binary), starts
-`cm-agent daemon` against a fake API on 127.0.0.1 in a throw-away home (file credentials, never the user's home,
+`aipod daemon` against a fake API on 127.0.0.1 in a throw-away home (file credentials, never the user's home,
 keychain or Claude Code configuration), lets it run, and checks that:
   1. the process is still alive after --seconds, and
   2. it reached the API: a heartbeat, the settings call and the open event stream.
@@ -28,7 +28,7 @@ import threading
 import time
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-PROJECT = os.path.join('src', 'ClaudeMonitor.Agent')
+PROJECT = os.path.join('src', 'Podium.Agent')
 WORKSPACE = '00000000-0000-0000-0000-000000000001'
 AGENT = '00000000-0000-0000-0000-000000000002'
 
@@ -112,7 +112,7 @@ def publish(rid, out):
     if done.returncode != 0:
         print(done.stdout[-2000:] + done.stderr[-2000:])
         return None
-    name = 'cm-agent.exe' if rid.startswith('win') else 'cm-agent'
+    name = 'aipod.exe' if rid.startswith('win') else 'aipod'
     return os.path.join(out, name)
 
 
@@ -130,10 +130,10 @@ def run_daemon(binary, seconds):
     """Returns (problems, calls): what is wrong with the daemon after `seconds`, and what the fake API saw."""
     api = FakeApi()
     threading.Thread(target=api.serve_forever, daemon=True).start()
-    home = tempfile.mkdtemp(prefix='cm-agent-smoke-')
+    home = tempfile.mkdtemp(prefix='aipod-smoke-')
     try:
         write_home(home, api.server_address[1])
-        env = dict(os.environ, CM_AGENT_HOME=home, CM_CREDENTIALS='file')
+        env = dict(os.environ, AP_AGENT_HOME=home, AP_CREDENTIALS='file')
         child = subprocess.Popen([binary, 'daemon'], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             code = child.wait(timeout=seconds)
@@ -156,7 +156,7 @@ def run_daemon(binary, seconds):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    parser.add_argument('--binary', help='the published cm-agent to test; default: publish the host build')
+    parser.add_argument('--binary', help='the published aipod to test; default: publish the host build')
     parser.add_argument('--seconds', type=int, default=10)
     args = parser.parse_args(argv)
 
@@ -171,7 +171,7 @@ def main(argv=None):
             if shutil.which('dotnet') is None:
                 print('agent smoke: NOT RUN — dotnet is not installed')
                 return 3
-            out = tempfile.mkdtemp(prefix='cm-agent-publish-')
+            out = tempfile.mkdtemp(prefix='aipod-publish-')
             print(f'agent smoke: publishing {rid} (Release)')
             binary = publish(rid, out)
             if binary is None:

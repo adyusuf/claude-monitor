@@ -44,7 +44,7 @@ export const config = {
   commandPairSeconds: 10,
   /** A transcript line that repeats a web command's text is its echo when it is this close to the command's moment (seconds). */
   commandEchoSeconds: 120,
-  activityFilterKey: "cm.activityFilter",
+  activityFilterKey: "ap.activityFilter",
   /** Remote work (ADR-0005): a machine's metrics window and refresh, run history pages, the output page, the countdown tick. */
   metricsMinutes: 60,
   metricsRefreshMs: 60_000,
@@ -68,6 +68,6 @@ export const config = {
    * section 9.2): the download page then offers `claude plugin marketplace add <this site>/downloads/marketplace.json` and needs no repository coordinates.
    */
   pluginFromServer: import.meta.env.VITE_PLUGIN_FROM_SERVER === "1",
-  languageKey: "cm.language",
-  themeKey: "cm.theme",
+  languageKey: "ap.language",
+  themeKey: "ap.theme",
 } as const;

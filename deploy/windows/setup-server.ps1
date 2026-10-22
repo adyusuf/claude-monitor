@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-  One-time set-up of a Windows Server for Claude Monitor (ADR-0002 phase 4). Run as Administrator, once per
+  One-time set-up of a Windows Server for Podium (ADR-0002 phase 4). Run as Administrator, once per
   environment ("test" and "prod" share one server; each gets its own site, app pool, database and folder).
 
 .DESCRIPTION
   Before running: install the .NET 10 ASP.NET Core Hosting Bundle and PostgreSQL 18 (SETUP.md, "Server"), and import
   the Cloudflare Origin certificate into LocalMachine\My. The script then:
     1. installs the IIS role if missing and checks the ASP.NET Core module is there;
-    2. creates C:\ClaudeMonitor\<env>\ (releases, archive, backups) and its environment file monitor.env, readable by
+    2. creates C:\Podium\<env>\ (releases, archive, backups) and its environment file aipod.env, readable by
        Administrators and the site's app pool only;
-    3. creates the PostgreSQL role and database for the environment with a random password (written only to monitor.env);
+    3. creates the PostgreSQL role and database for the environment with a random password (written only to aipod.env);
     4. creates the app pool (no managed code, always running: the API has background jobs) and the HTTPS site bound to
        the host name with SNI, plus a loopback HTTP binding the deploy uses to check /api/version;
-    5. registers the daily backup and the hourly health check (which mails MONITOR_ALERT_EMAIL) as scheduled tasks.
+    5. registers the daily backup and the hourly health check (which mails AIPOD_ALERT_EMAIL) as scheduled tasks.
   Nothing secret is printed. Re-running is safe: what exists is left as it is.
 
 .EXAMPLE
@@ -24,16 +24,16 @@ param(
   [Parameter(Mandatory)] [string] $HostName,
   [Parameter(Mandatory)] [string] $CertThumbprint,
   [Parameter(Mandatory)] [int] $LoopbackPort,
-  [string] $Root = "C:\ClaudeMonitor",
+  [string] $Root = "C:\Podium",
   [string] $PgBin = "C:\Program Files\PostgreSQL\18\bin",
   [string] $SmtpUser = "",
   [string] $SmtpFrom = ""
 )
 $ErrorActionPreference = "Stop"
-$site = "ClaudeMonitor-$Environment"
-$pool = "ClaudeMonitor-$Environment"
+$site = "Podium-$Environment"
+$pool = "Podium-$Environment"
 $home_ = Join-Path $Root $Environment
-$envFile = Join-Path $home_ "monitor.env"
+$envFile = Join-Path $home_ "aipod.env"
 
 function New-Secret([int] $bytes = 24) {
   # RandomNumberGenerator::Fill is .NET Core only; this script runs on Windows PowerShell 5.1 (.NET Framework).
@@ -72,27 +72,27 @@ if (-not (Test-Path $envFile)) {
   $cloudflare = (((Invoke-RestMethod "https://www.cloudflare.com/ips-v4") + "`n" + (Invoke-RestMethod "https://www.cloudflare.com/ips-v6")) -split "`n" |
     ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ","
   @(
-    "# Claude Monitor $Environment - read by deploy.ps1 into the site's web.config. Never commit this file.",
+    "# Podium $Environment - read by deploy.ps1 into the site's web.config. Never commit this file.",
     "ASPNETCORE_ENVIRONMENT=Production",
-    "MONITOR_DB=Host=127.0.0.1;Port=5432;Database=monitor_$Environment;Username=monitor_$Environment;Password=$dbPassword",
-    "MONITOR_PUBLIC_ORIGIN=$origin",
-    "MONITOR_SMTP_HOST=smtp.gmail.com",
-    "MONITOR_SMTP_PORT=587",
-    "MONITOR_SMTP_TLS=true",
-    "MONITOR_SMTP_USER=$SmtpUser",
-    "MONITOR_SMTP_PASSWORD=",
-    "MONITOR_SMTP_FROM=$SmtpFrom",
-    "MONITOR_GITHUB_CLIENT_ID=",
-    "MONITOR_GITHUB_CLIENT_SECRET=",
-    "MONITOR_GOOGLE_CLIENT_ID=",
-    "MONITOR_GOOGLE_CLIENT_SECRET=",
-    "MONITOR_ARCHIVE_DIR=$(Join-Path $home_ 'archive')",
-    "MONITOR_TRUST_PROXY=true",
-    "MONITOR_PROXY_NETWORKS=$cloudflare",
-    "MONITOR_BACKUP_KEY=$(New-Secret 32)",
-    "MONITOR_MFA_KEY=$(New-Secret 32)",
-    "MONITOR_BACKUP_OFFSITE=",
-    "MONITOR_ALERT_EMAIL="
+    "AIPOD_DB=Host=127.0.0.1;Port=5432;Database=aipod_$Environment;Username=aipod_$Environment;Password=$dbPassword",
+    "AIPOD_PUBLIC_ORIGIN=$origin",
+    "AIPOD_SMTP_HOST=smtp.gmail.com",
+    "AIPOD_SMTP_PORT=587",
+    "AIPOD_SMTP_TLS=true",
+    "AIPOD_SMTP_USER=$SmtpUser",
+    "AIPOD_SMTP_PASSWORD=",
+    "AIPOD_SMTP_FROM=$SmtpFrom",
+    "AIPOD_GITHUB_CLIENT_ID=",
+    "AIPOD_GITHUB_CLIENT_SECRET=",
+    "AIPOD_GOOGLE_CLIENT_ID=",
+    "AIPOD_GOOGLE_CLIENT_SECRET=",
+    "AIPOD_ARCHIVE_DIR=$(Join-Path $home_ 'archive')",
+    "AIPOD_TRUST_PROXY=true",
+    "AIPOD_PROXY_NETWORKS=$cloudflare",
+    "AIPOD_BACKUP_KEY=$(New-Secret 32)",
+    "AIPOD_MFA_KEY=$(New-Secret 32)",
+    "AIPOD_BACKUP_OFFSITE=",
+    "AIPOD_ALERT_EMAIL="
   ) | Set-Content -Path $envFile -Encoding UTF8
   Write-Host "   wrote $envFile - fill in the SMTP password and the OAuth client secrets"
 }
@@ -102,10 +102,10 @@ if ($dbPassword) {
   $su = Read-Host "PostgreSQL superuser (postgres) password" -AsSecureString
   $env:PGPASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($su))
   try {
-    & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE monitor_$Environment LOGIN PASSWORD '$dbPassword';" | Out-Null
-    & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE monitor_$Environment OWNER monitor_$Environment;" | Out-Null
+    & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE aipod_$Environment LOGIN PASSWORD '$dbPassword';" | Out-Null
+    & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE aipod_$Environment OWNER aipod_$Environment;" | Out-Null
   } finally { Remove-Item Env:PGPASSWORD }
-} else { Write-Host "   monitor.env already existed: the database is assumed to exist" }
+} else { Write-Host "   aipod.env already existed: the database is assumed to exist" }
 
 Write-Host "4. Site and bindings"
 if (-not (Get-Website -Name $site)) {
@@ -116,16 +116,16 @@ if (-not (Get-Website -Name $site)) {
 }
 
 Write-Host "5. Daily backup task (03:30)"
-$task = "ClaudeMonitor-backup-$Environment"
+$task = "Podium-backup-$Environment"
 if (-not (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)) {
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\backup.ps1`" -Environment $Environment -Root `"$Root`" -PgBin `"$PgBin`""
   Register-ScheduledTask -TaskName $task -Action $action -Trigger (New-ScheduledTaskTrigger -Daily -At 03:30) -User "SYSTEM" -RunLevel Highest | Out-Null
 }
 Write-Host "6. Hourly health check and alarm"
-$check = "ClaudeMonitor-health-$Environment"
+$check = "Podium-health-$Environment"
 if (-not (Get-ScheduledTask -TaskName $check -ErrorAction SilentlyContinue)) {
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\check-health.ps1`" -Environment $Environment -LoopbackPort $LoopbackPort -Root `"$Root`""
   $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 1)
   Register-ScheduledTask -TaskName $check -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest | Out-Null
 }
-Write-Host "Done. Next: fill in $envFile (with MONITOR_ALERT_EMAIL), then deploy a release with deploy.ps1."
+Write-Host "Done. Next: fill in $envFile (with AIPOD_ALERT_EMAIL), then deploy a release with deploy.ps1."

@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using ClaudeMonitor.Agent.Auth;
-using ClaudeMonitor.Agent.Config;
+using Podium.Agent.Auth;
+using Podium.Agent.Config;
 
 namespace Aipod.Tray;
 
@@ -90,8 +90,7 @@ public sealed class ProcessCli(AgentConfig config, TimeSpan? timeout = null) : I
     public async Task<CliResult> RunAsync(IReadOnlyList<string> args, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(args);
-        var alias = Path.Combine(Path.GetDirectoryName(config.BinaryPath)!, Brand.Name + Path.GetExtension(config.BinaryPath));
-        var info = new ProcessStartInfo(File.Exists(alias) ? alias : config.BinaryPath)
+        var info = new ProcessStartInfo(config.BinaryPath)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,

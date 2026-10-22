@@ -7,7 +7,7 @@ import { ME, mockApi, renderAt } from "../test/helpers";
 import { AccountPage } from "./AccountPages";
 import { TwoStepPage } from "./TwoStepPage";
 
-const SETUP = { secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/Claude%20Monitor:ayse?secret=JBSWY3DPEHPK3PXP&issuer=Claude%20Monitor" };
+const SETUP = { secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/Podium:ayse?secret=JBSWY3DPEHPK3PXP&issuer=Podium" };
 const route = [{ path: "/two-step", element: <TwoStepPage /> }];
 const off = { ...ME, mfaEnabled: false };
 const on = { ...ME, mfaEnabled: true };

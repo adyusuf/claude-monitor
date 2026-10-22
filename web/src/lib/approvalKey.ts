@@ -12,7 +12,7 @@ export interface KeyStore {
 }
 
 export const SIGNING = { name: "ECDSA", namedCurve: "P-256" } as const;
-export const TAG = "cm-approval-v1";
+export const TAG = "ap-approval-v1";
 
 const toBase64 = (bytes: ArrayBuffer): string => {
   let text = "";
@@ -64,7 +64,7 @@ export function memoryStore(): KeyStore {
   return { get: async () => held, put: async (k) => { held = k; }, clear: async () => { held = null; } };
 }
 
-const DB = "cm-approval";
+const DB = "ap-approval";
 const OBJECT = "keys";
 const SLOT = "current";
 

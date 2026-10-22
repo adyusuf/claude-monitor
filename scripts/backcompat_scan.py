@@ -7,9 +7,9 @@ Compared with the base, the change must not:
   1. drop, rename or retype anything in a NEW migration's Up() (DropTable, DropColumn, RenameTable, RenameColumn,
      AlterColumn), nor edit or delete a migration the base already has (merged migrations are history);
   2. remove a record, or remove, reorder or retype a positional parameter of a record, or change the value of a
-     public constant, in the contract (src/ClaudeMonitor.Contracts) or in the API's request/response records
-     (src/ClaudeMonitor.Api/Endpoints); new parameters may only be added at the end;
-  3. remove a route the API maps (MapGet/MapPost/... string literals in src/ClaudeMonitor.Api/Endpoints).
+     public constant, in the contract (src/Podium.Contracts) or in the API's request/response records
+     (src/Podium.Api/Endpoints); new parameters may only be added at the end;
+  3. remove a route the API maps (MapGet/MapPost/... string literals in src/Podium.Api/Endpoints).
 
 Exit codes: 0 additive only · 1 a breaking change (listed) · 2 the base could not be read (NOT RUN, blocks).
 """
@@ -20,9 +20,9 @@ import re
 import subprocess
 import sys
 
-MIGRATIONS = "src/ClaudeMonitor.Api/Data/Migrations/"
-CONTRACT_DIRS = ("src/ClaudeMonitor.Contracts/", "src/ClaudeMonitor.Api/Endpoints/")
-ROUTE_DIR = "src/ClaudeMonitor.Api/Endpoints/"
+MIGRATIONS = "src/Podium.Api/Data/Migrations/"
+CONTRACT_DIRS = ("src/Podium.Contracts/", "src/Podium.Api/Endpoints/")
+ROUTE_DIR = "src/Podium.Api/Endpoints/"
 DESTRUCTIVE = re.compile(r"\.(DropTable|DropColumn|RenameTable|RenameColumn|AlterColumn)\b|\bDROP\s+(TABLE|COLUMN)\b|\bRENAME\b",
                          re.IGNORECASE)
 RECORD = re.compile(r"record\s+(\w+)\s*\(([^)]*)\)", re.S)
