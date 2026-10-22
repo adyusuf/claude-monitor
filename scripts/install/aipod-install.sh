@@ -79,7 +79,7 @@ act() { # <description> <command...>: runs the command, or only says so in a dry
   _what="$1"
   shift
   if [ "$dry" = 1 ]; then say "  [dry run] $_what"; return 0; fi
-  "$@"
+  "$@" > /dev/null 2>&1
 }
 
 can_prompt() { ( : < /dev/tty ) 2> /dev/null; }
@@ -209,17 +209,17 @@ remove_old() {
   fi
   if [ -n "$(old_autostart)" ]; then
     if [ -n "$first" ]; then
-      act "run: cm-agent uninstall --standalone" "$first" uninstall --standalone > /dev/null 2>&1 && did "  removed the old autostart"
+      act "run: cm-agent uninstall --standalone" "$first" uninstall --standalone && did "  removed the old autostart"
     else
       warn "  an old autostart is still registered ($(old_autostart | head -n 1)) and no old binary is left to remove it with"
     fi
   fi
   if have_claude; then
     for id in $(old_plugin_ids); do
-      act "claude plugin uninstall $id" claude plugin uninstall "$id" > /dev/null 2>&1 && did "  uninstalled the Claude Code plugin $id"
+      act "claude plugin uninstall $id" claude plugin uninstall "$id" && did "  uninstalled the Claude Code plugin $id"
     done
     for m in $(old_marketplaces); do
-      act "claude plugin marketplace remove $m" claude plugin marketplace remove "$m" > /dev/null 2>&1 && did "  removed the marketplace $m"
+      act "claude plugin marketplace remove $m" claude plugin marketplace remove "$m" && did "  removed the marketplace $m"
     done
   fi
   if [ "$dry" = 1 ]; then
@@ -237,7 +237,7 @@ remove_old() {
       if [ "$old_home" != "$new_home" ] && [ -d "$old_home" ]; then act "delete $old_home" rm -rf "$old_home" && did "  deleted $old_home"; fi
       for a in $accounts; do
         if [ "$os" = macos ] && command -v security > /dev/null 2>&1; then
-          act "delete keychain entry $old_service/$a" security delete-generic-password -s "$old_service" -a "$a" > /dev/null 2>&1
+          act "delete keychain entry $old_service/$a" security delete-generic-password -s "$old_service" -a "$a"
         elif [ "$old_home" != "$new_home" ]; then
           act "delete $old_home/cred-$a" rm -f "$old_home/cred-$a"
         fi
@@ -382,21 +382,21 @@ if [ "$want_plugin" = 1 ]; then
   else
     say "Setting up the Claude Code plugin"
     if claude plugin marketplace list --json 2> /dev/null | grep -q '"name": *"aipod-releases"'; then
-      act "claude plugin marketplace update aipod-releases" claude plugin marketplace update aipod-releases > /dev/null 2>&1
+      act "claude plugin marketplace update aipod-releases" claude plugin marketplace update aipod-releases
     else
-      act "claude plugin marketplace add $from/aipod-marketplace.json" claude plugin marketplace add "$from/aipod-marketplace.json" > /dev/null 2>&1 \
+      act "claude plugin marketplace add $from/aipod-marketplace.json" claude plugin marketplace add "$from/aipod-marketplace.json" \
         || warn "  could not add the marketplace $from/aipod-marketplace.json"
     fi
     if claude plugin list --json 2> /dev/null | grep -q '"id": *"aipod@aipod-releases"'; then
-      act "claude plugin update aipod@aipod-releases" claude plugin update aipod@aipod-releases > /dev/null 2>&1 && did "  the aipod plugin is up to date"
+      act "claude plugin update aipod@aipod-releases" claude plugin update aipod@aipod-releases && did "  the aipod plugin is up to date"
     else
       # The server option lets the plugin download its own copy of the agent; without it the plugin finds the server in agent.json.
       if [ -n "$server" ]; then
-        act "claude plugin install aipod@aipod-releases --config server=$server" claude plugin install aipod@aipod-releases --config "server=$server" > /dev/null 2>&1 \
-          || act "claude plugin install aipod@aipod-releases" claude plugin install aipod@aipod-releases > /dev/null 2>&1 \
+        act "claude plugin install aipod@aipod-releases --config server=$server" claude plugin install aipod@aipod-releases --config "server=$server" \
+          || act "claude plugin install aipod@aipod-releases" claude plugin install aipod@aipod-releases \
           || warn "  the plugin was not installed; run: claude plugin install aipod@aipod-releases"
       else
-        act "claude plugin install aipod@aipod-releases" claude plugin install aipod@aipod-releases > /dev/null 2>&1 \
+        act "claude plugin install aipod@aipod-releases" claude plugin install aipod@aipod-releases \
           || warn "  the plugin was not installed; run: claude plugin install aipod@aipod-releases"
       fi
       did "  installed the aipod plugin"

@@ -262,6 +262,8 @@ class InstallScript(unittest.TestCase):
         result = self.run_script('--yes', '--dry-run')
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn('[dry run]', result.stdout)
+        self.assertIn('[dry run] claude plugin uninstall monitor-agent@monitor-agent-local', result.stdout)  # what would happen is shown
+        self.assertIn('[dry run] claude plugin install aipod@aipod-releases', result.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.old_home, 'bin', 'cm-agent')))
         self.assertFalse(os.path.exists(self.new_home))
         self.assertEqual('', self.calls().replace('plugin list --json\n', '').replace('plugin marketplace list --json\n', ''))
