@@ -10,7 +10,7 @@ clean worktrees), so every item below is still open.
 
 | Item | What to do |
 |---|---|
-| Try it locally | `dotnet publish src/ClaudeMonitor.Agent -c Release -r osx-arm64 -o out/osx-arm64`, `cm-agent login --server <server>`, `cm-agent install --push inbox`, restart Claude Code, send a prompt from the web, read `cm-agent status` (line "Push into the session", and "Last inbox failure" if it fails). Expect a turn in an idle session in about 1 s. |
+| Try it locally | `dotnet publish src/Podium.Agent -c Release -r osx-arm64 -o out/osx-arm64`, `aipod login --server <server>`, `aipod install --push inbox`, restart Claude Code, send a prompt from the web, read `aipod status` (line "Push into the session", and "Last inbox failure" if it fails). Expect a turn in an idle session in about 1 s. |
 | Real release | Build, write the SHA-256 pins into `plugin/monitor-agent/agent-release.txt` (`scripts/build-agent.sh` calls `scripts/write_plugin_pins.py`), sign the manifest (ADR-0004). The pins file is a placeholder, so the marketplace plugin downloads no binary yet. Order: `docs/release.md`. |
 | Marketplace address | Set `VITE_PLUGIN_MARKETPLACE` (`owner/repo#branch`) per environment so the download page shows the install card. |
 | Push default | Stays off (opt-in rule). Turning it on by default is the maintainer's call. |

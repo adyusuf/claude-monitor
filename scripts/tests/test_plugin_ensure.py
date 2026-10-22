@@ -1,4 +1,4 @@
-"""scripts/ensure.sh of the Claude Monitor plugin (ADR-0007): the bootstrap that installs the agent, hermetically (loopback server, fake agent)."""
+"""scripts/ensure.sh of the Podium plugin (ADR-0007): the bootstrap that installs the agent, hermetically (loopback server, fake agent)."""
 import hashlib
 import json
 import os
@@ -29,7 +29,7 @@ class EnsureScript(PluginScriptsCase):
         self.pins('0.3.0')
         result = self.run_script(ENSURE, server=server.url)
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(json.loads(result.stdout)['systemMessage'].startswith('Claude Monitor: installing the agent (version 0.3.0)'), True)
+        self.assertEqual(json.loads(result.stdout)['systemMessage'].startswith('Podium: installing the agent (version 0.3.0)'), True)
         self.assertTrue(self.wait_for('installed version 0.3.0'), open(self.log).read() if os.path.exists(self.log) else 'no log')
         self.assertTrue(os.access(self.bin, os.X_OK))
         self.assertEqual(subprocess.run([self.bin, 'version'], capture_output=True, text=True).stdout.strip(), '0.3.0')
@@ -87,7 +87,7 @@ class EnsureScript(PluginScriptsCase):
         server = Server({f'/downloads/{FILE}': zip_of('0.3.0')})
         self.addCleanup(server.close)
         self.pins('0.3.0')
-        refused = self.run_script(ENSURE, server='http://monitor.invalid')
+        refused = self.run_script(ENSURE, server='http://aipod.invalid')
         self.assertIn('set the server address', json.loads(refused.stdout)['systemMessage'])
         self.assertFalse(os.path.exists(self.bin))
         with open(os.path.join(self.root, 'agent-release.txt'), 'w') as f:
@@ -100,7 +100,7 @@ class EnsureScript(PluginScriptsCase):
     def test_a_hostile_file_name_in_the_pins_is_refused(self):
         server = Server({})
         self.addCleanup(server.close)
-        for name in ('../../etc/passwd', 'cm-agent-../../x-y.zip', f'cm-agent-{OS}-{ARCH}.zip/../x'):
+        for name in ('../../etc/passwd', 'aipod-../../x-y.zip', f'aipod-{OS}-{ARCH}.zip/../x'):
             with open(os.path.join(self.root, 'agent-release.txt'), 'w') as f:
                 f.write(f'0.3.0\n{OS}-{ARCH} {"a" * 64} {name}\n')
             self.run_script(ENSURE, server=server.url)
@@ -110,11 +110,11 @@ class EnsureScript(PluginScriptsCase):
     def test_a_server_address_that_only_starts_like_a_local_one_is_refused(self):
         self.pins('0.3.0')
         for address in ('http://localhost.attacker.example', 'http://127.0.0.1.attacker.example', 'http://localhost@attacker.example',
-                        'http://localhostx:80', 'http://attacker.example', 'ftp://monitor.invalid', 'https://a b', "https://x'y", 'https://x$(id)'):
+                        'http://localhostx:80', 'http://attacker.example', 'ftp://aipod.invalid', 'https://a b', "https://x'y", 'https://x$(id)'):
             result = self.run_script(ENSURE, server=address)
             self.assertIn('set the server address', json.loads(result.stdout)['systemMessage'], address)
             self.assertFalse(os.path.exists(os.path.join(self.data, 'server.txt')), address)
-        for address in ('http://localhost', 'http://localhost:5080', 'http://127.0.0.1:9872/', 'https://monitor.invalid', 'https://monitor.invalid/base'):
+        for address in ('http://localhost', 'http://localhost:5080', 'http://127.0.0.1:9872/', 'https://aipod.invalid', 'https://aipod.invalid/base'):
             self.run_script(ENSURE, server=address)
             self.assertEqual(open(os.path.join(self.data, 'server.txt')).read().strip(), address.rstrip('/'))
 
@@ -183,7 +183,7 @@ class EnsureScript(PluginScriptsCase):
         os.makedirs(self.data, exist_ok=True)
         with open(self.log, 'w') as f:
             f.write(''.join(f'line {i} ' + 'x' * 100 + '\n' for i in range(3000)))
-        self.run_script(ENSURE, server='https://monitor.invalid')
+        self.run_script(ENSURE, server='https://aipod.invalid')
         lines = open(self.log).read().splitlines()
         self.assertLess(len(lines), 400)
         self.assertTrue(any('line 2999' in l for l in lines))
@@ -194,7 +194,7 @@ class EnsureScript(PluginScriptsCase):
             json.dump({'enabledPlugins': {'monitor-agent@monitor-agent-local': True}}, f)
         self.install_fake('0.3.0')
         self.pins('0.3.0')
-        result = self.run_script(ENSURE, server='https://monitor.invalid')
+        result = self.run_script(ENSURE, server='https://aipod.invalid')
         self.assertIn('old local plugin is still enabled', json.loads(result.stdout)['systemMessage'])
 
     def test_every_path_exits_0_even_without_the_plugin_variables(self):

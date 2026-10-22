@@ -162,7 +162,7 @@ export const de: Dictionary = {
   },
   activity: {
     filterLabel: "Anzeigen", all: "Alle", inputs: "Eingaben", assistant: "Assistent", tools: "Werkzeuge",
-    monitorInput: "Podium (Web)", humanInput: "Mensch (Claude Code)", assistantLabel: "Claude", stopRequest: "Stoppanforderung",
+    podiumInput: "Podium (Web)", humanInput: "Mensch (Claude Code)", assistantLabel: "Claude", stopRequest: "Stoppanforderung",
     sentBy: "gesendet von {name}", typedBy: "getippt von {name}", someone: "ein Mitglied",
     waiting: "Wartet", pendingTitle: "Wartet auf Anwendung",
     deliveredWith: "zusammen mit der in der Sitzung getippten Nachricht zugestellt",

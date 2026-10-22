@@ -1,13 +1,13 @@
 {
   "mcpServers": {
-    "claude-monitor": {
+    "aipod": {
       "command": "sh",
       "args": [
         "${CLAUDE_PLUGIN_ROOT}/scripts/run.sh",
         "mcp"
       ],
       "env": {
-        "CM_SERVER": "${user_config.server}"
+        "AP_SERVER": "${user_config.server}"
       }
     }
   }

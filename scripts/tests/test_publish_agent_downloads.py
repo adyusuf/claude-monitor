@@ -8,7 +8,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, '..', 'publish_agent_downloads.sh')
-ZIPS = ['cm-agent-macos-arm64.zip', 'cm-agent-windows-x64.zip']
+ZIPS = ['aipod-macos-arm64.zip', 'aipod-windows-x64.zip']
 
 
 def build(root, channel='prod', version='0.4.0', tamper=False):
@@ -24,7 +24,7 @@ def build(root, channel='prod', version='0.4.0', tamper=False):
     with open(os.path.join(root, 'SHA256SUMS'), 'w') as handle:
         handle.write('\n'.join(sums) + '\n')
     with open(os.path.join(root, 'manifest.json'), 'w') as handle:
-        json.dump({'format': 'cm-agent-update/1', 'entries': entries}, handle)
+        json.dump({'format': 'aipod-update/1', 'entries': entries}, handle)
     if tamper:
         with open(os.path.join(root, ZIPS[0]), 'wb') as handle:
             handle.write(b'changed')
@@ -44,9 +44,9 @@ class PublishTests(unittest.TestCase):
         lines = [line for line in result.stdout.splitlines() if line.startswith('put ')]
         keys = [line.split()[1] for line in lines]
         self.assertEqual(keys, [
-            'b/daemons/0.4.0/prod/cm-agent-macos-arm64.zip', 'b/daemons/0.4.0/prod/cm-agent-windows-x64.zip',
+            'b/daemons/0.4.0/prod/aipod-macos-arm64.zip', 'b/daemons/0.4.0/prod/aipod-windows-x64.zip',
             'b/daemons/0.4.0/prod/SHA256SUMS', 'b/daemons/0.4.0/prod/manifest.json',
-            'b/daemons/prod/cm-agent-macos-arm64.zip', 'b/daemons/prod/cm-agent-windows-x64.zip',
+            'b/daemons/prod/aipod-macos-arm64.zip', 'b/daemons/prod/aipod-windows-x64.zip',
             'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
 
     def test_the_plugin_files_go_up_before_the_checksums_and_the_manifest_when_the_build_has_them(self):
@@ -59,7 +59,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         keys = [line.split()[1] for line in result.stdout.splitlines() if line.startswith('put b/daemons/prod/')]
         self.assertEqual(keys, [
-            'b/daemons/prod/cm-agent-macos-arm64.zip', 'b/daemons/prod/cm-agent-windows-x64.zip',
+            'b/daemons/prod/aipod-macos-arm64.zip', 'b/daemons/prod/aipod-windows-x64.zip',
             'b/daemons/prod/aipod-plugin.zip', 'b/daemons/prod/monitor-agent-plugin.zip',
             'b/daemons/prod/aipod-marketplace.json', 'b/daemons/prod/marketplace.json',
             'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])

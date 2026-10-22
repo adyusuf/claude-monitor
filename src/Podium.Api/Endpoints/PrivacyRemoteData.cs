@@ -1,0 +1,215 @@
+using System.IO.Pipelines;
+using System.Text.Json;
+using Podium.Api.Data;
+using Podium.Api.Remote;
+using Podium.Api.Streaming;
+using Podium.Contracts;
+using Microsoft.EntityFrameworkCore;
+
+namespace Podium.Api.Endpoints;
+
+/// <summary>
+/// The remote-work part of a user's own data (ADR-0005; docs/data-model.md §3b). Export: runs they asked for or own as
+/// target, with their output, their grants and jobs, and the alerts and metrics of their machines. Deletion: open
+/// runs are cancelled, then commands, templates, working directories and output of those runs and the user's grants
+/// and jobs are emptied (the rows stay, other people's records point at them), and their machines' metrics and alerts go.
+/// </summary>
+public static class PrivacyRemoteData
+{
+    private const int ChunkSize = 500;
+
+    public static async Task ExportAsync(Utf8JsonWriter w, PipeWriter body, PodiumDb db, Guid userId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(w);
+        ArgumentNullException.ThrowIfNull(db);
+        var runs = await db.RemoteRuns.AsNoTracking().Where(r => r.RequesterUserId == userId || r.TargetUserId == userId)
+            .OrderBy(r => r.CreatedAt).ThenBy(r => r.Id).ToListAsync(ct);
+        w.WriteStartArray("remoteRuns");
+        foreach (var r in runs)
+        {
+            w.WriteStartObject();
+            w.WriteString("id", r.Id);
+            w.WriteString("mode", r.Mode);
+            PrivacyEndpoints.Write(w, "argv", r.Argv);
+            w.WriteString("shellCommand", r.ShellCommand);
+            w.WriteString("scriptInterpreter", r.ScriptInterpreter);
+            w.WriteString("scriptBody", r.ScriptBody);
+            PrivacyEndpoints.Write(w, "scriptArgs", r.ScriptArgs);
+            w.WriteString("scriptFiles", r.ScriptFilesJson);
+            w.WriteString("scriptStdin", r.ScriptStdin);
+            w.WriteString("cwd", r.Cwd);
+            w.WriteString("status", r.Status);
+            w.WriteString("projectKey", r.ProjectKey);
+            w.WriteString("kind", r.Kind);
+            w.WriteString("createdAt", r.CreatedAt);
+            WriteTime(w, "startedAt", r.StartedAt);
+            WriteTime(w, "endedAt", r.EndedAt);
+            if (r.ExitCode is { } exit) w.WriteNumber("exitCode", exit);
+            else w.WriteNull("exitCode");
+            w.WriteStartArray("output");
+            var after = -1;
+            while (true)
+            {
+                var chunk = await db.RemoteRunOutput.AsNoTracking().Where(o => o.RunId == r.Id && o.Seq > after)
+                    .OrderBy(o => o.Seq).Take(ChunkSize).ToListAsync(ct);
+                if (chunk.Count == 0) break;
+                foreach (var o in chunk) JsonSerializer.Serialize(w, new { o.Seq, o.Stream, o.Body, o.GapBefore }, PrivacyEndpoints.Json);
+                after = chunk[^1].Seq;
+                await Flush(w, body, ct);
+            }
+
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+
+        w.WriteEndArray();
+        PrivacyEndpoints.Write(w, "grants", await db.MachineGrants.AsNoTracking().Where(g => g.OwnerUserId == userId || g.GranteeUserId == userId)
+            .OrderBy(g => g.CreatedAt).Select(g => new
+            {
+                g.Id,
+                g.TargetAgentId,
+                g.OwnerUserId,
+                g.GranteeUserId,
+                g.Template,
+                g.Cwd,
+                g.MaxTimeoutSeconds,
+                g.Reason,
+                g.Status,
+                g.CreatedAt,
+                g.ExpiresAt,
+                g.DecidedAt,
+                g.RevokedAt,
+                g.UseCount,
+                g.LastUsedAt,
+            }).ToListAsync(ct));
+        PrivacyEndpoints.Write(w, "jobs", await db.MachineJobs.AsNoTracking().Where(j => j.OwnerUserId == userId || j.ProposedByUserId == userId)
+            .OrderBy(j => j.CreatedAt).Select(j => new
+            {
+                j.Id,
+                j.TargetAgentId,
+                j.OwnerUserId,
+                j.ProposedByUserId,
+                j.Name,
+                j.Argv,
+                j.Cwd,
+                j.TimeoutSeconds,
+                j.Reason,
+                j.Status,
+                j.CreatedAt,
+                j.DecidedAt,
+                j.RetiredAt,
+            }).ToListAsync(ct));
+
+        var agentIds = db.Agents.AsNoTracking().Where(a => a.UserId == userId).Select(a => a.Id);
+        PrivacyEndpoints.Write(w, "alerts", await db.MachineAlerts.AsNoTracking().Where(a => agentIds.Contains(a.AgentId)).OrderBy(a => a.OpenedAt)
+            .Select(a => new { a.Id, a.AgentId, a.Kind, a.Subject, a.State, a.ThresholdPct, a.LastValue, a.PeakValue, a.OpenedAt, a.ResolvedAt })
+            .ToListAsync(ct));
+        PrivacyEndpoints.Write(w, "asks", await db.MachineAsks.AsNoTracking().Where(a => a.RequesterUserId == userId).OrderBy(a => a.CreatedAt)
+            .Select(a => new { a.Id, a.RequesterAgentId, a.TargetAgentId, a.Question, a.Status, a.Answer, a.AnswerTruncated, a.Error, a.CreatedAt, a.DeliveredAt, a.AnsweredAt }).ToListAsync(ct));
+        PrivacyEndpoints.Write(w, "agentActions", await db.AgentActions.AsNoTracking().Where(a => a.RequestedBy == userId).OrderBy(a => a.CreatedAt)
+            .Select(a => new { a.Id, a.AgentId, a.Kind, a.Status, a.Result, a.CreatedAt, a.FinishedAt }).ToListAsync(ct));
+        PrivacyEndpoints.Write(w, "machineProjects", await db.MachineProjects.AsNoTracking().Where(p => agentIds.Contains(p.AgentId)).OrderBy(p => p.AgentId).ThenBy(p => p.ProjectKey)
+            .Select(p => new { p.AgentId, p.ProjectKey, p.Name, p.Branch, p.HeadSha, p.Tag, p.LastSeenAt, p.Source }).ToListAsync(ct));
+        w.WriteStartArray("metrics");
+        foreach (var agentId in await agentIds.ToListAsync(ct))
+        {
+            var since = DateTimeOffset.MinValue;
+            while (true)
+            {
+                var chunk = await db.MachineMetrics.AsNoTracking().Where(m => m.AgentId == agentId && m.SampledAt > since)
+                    .OrderBy(m => m.SampledAt).Take(ChunkSize).ToListAsync(ct);
+                if (chunk.Count == 0) break;
+                foreach (var m in chunk)
+                {
+                    using var disks = JsonDocument.Parse(m.Disks);
+                    JsonSerializer.Serialize(w, new { m.AgentId, m.SampledAt, m.CpuPct, m.MemUsedBytes, m.MemTotalBytes, Disks = disks.RootElement },
+                        PrivacyEndpoints.Json);
+                }
+
+                since = chunk[^1].SampledAt;
+                await Flush(w, body, ct);
+            }
+        }
+
+        w.WriteEndArray();
+    }
+
+    /// <summary>
+    /// First in the deletion's transaction: for each workspace the user belongs to, in workspace-id order, its owners and the
+    /// user (<see cref="RemoteLocks.MembersAsync"/>, user-id order within the workspace), then the user's active agents (by id),
+    /// before any row of remote work is touched (<see cref="RemoteLocks"/>). Remove and ChangeRole lock one workspace's members
+    /// in that same user-id order and a run creation locks one workspace's too, so every transaction takes member rows in
+    /// the one order (workspace id, user id) and two of them cannot hold each other's rows.
+    /// </summary>
+    public static async Task LockAsync(PodiumDb db, Guid userId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        var workspaces = await db.WorkspaceMembers.AsNoTracking().Where(m => m.UserId == userId && m.RemovedAt == null)
+            .OrderBy(m => m.WorkspaceId).Select(m => m.WorkspaceId).ToListAsync(ct);
+        foreach (var workspaceId in workspaces)
+        {
+            await RemoteLocks.MembersAsync(db, workspaceId, [userId], ct);
+        }
+
+        await RemoteLocks.AgentsAsync(db, await db.Agents.AsNoTracking().Where(a => a.UserId == userId && a.Status == AgentStatuses.Active)
+            .Select(a => a.Id).ToListAsync(ct), ct);
+    }
+
+    /// <summary>Inside the deletion's transaction, before the user row changes: cancel, then empty. Jobs, grants, then runs, as the cascades lock them.</summary>
+    public static async Task DeleteAsync(PodiumDb db, Broker broker, Guid userId, List<Guid> agentIds, DateTimeOffset now,
+        CancellationToken ct, List<Action>? after = null)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(agentIds);
+        await RemoteLocks.JobsAsync(db, j => j.OwnerUserId == userId || j.ProposedByUserId == userId, ct);
+        await RemoteLocks.GrantsAsync(db, g => g.OwnerUserId == userId || g.GranteeUserId == userId, ct);
+        await RemoteLocks.AlertsAsync(db, a => agentIds.Contains(a.AgentId), ct);
+        await db.MachineJobs.Where(j => (j.OwnerUserId == userId || j.ProposedByUserId == userId)
+                                        && (j.Status == JobStatuses.Active || j.Status == JobStatuses.Proposed))
+            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Retired).SetProperty(j => j.RetiredAt, now), ct);
+        await db.MachineJobs.Where(j => j.OwnerUserId == userId || j.ProposedByUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Argv, (List<string>?)null).SetProperty(j => j.Cwd, (string?)null)
+                .SetProperty(j => j.Reason, (string?)null), ct);
+        await db.MachineGrants.Where(g => (g.OwnerUserId == userId || g.GranteeUserId == userId)
+                                          && (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested))
+            .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Revoked).SetProperty(g => g.RevokedAt, now)
+                .SetProperty(g => g.RevokedBy, userId), ct);
+        await db.MachineGrants.Where(g => g.OwnerUserId == userId || g.GranteeUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(g => g.Template, (List<string>?)null).SetProperty(g => g.Cwd, (string?)null)
+                .SetProperty(g => g.Reason, (string?)null), ct);
+        await RemoteLocks.RunsAsync(db, r => r.RequesterUserId == userId || r.TargetUserId == userId, ct);
+        await RunDecisions.CancelOpenAsync(db, broker, now, null, null, userId, ct, after);
+        var runIds = db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId).Select(r => r.Id);
+        await db.RemoteRunOutput.Where(o => runIds.Contains(o.RunId)).ExecuteDeleteAsync(ct);
+        await db.RemoteRuns.Where(r => r.RequesterUserId == userId || r.TargetUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Argv, (List<string>?)null).SetProperty(r => r.ShellCommand, (string?)null)
+                .SetProperty(r => r.Cwd, (string?)null).SetProperty(r => r.Reason, (string?)null)
+                .SetProperty(r => r.ResolvedExe, (string?)null).SetProperty(r => r.Error, (string?)null).SetProperty(r => r.ProjectKey, (string?)null).SetProperty(r => r.ScriptBody, (string?)null)
+                .SetProperty(r => r.ScriptArgs, (List<string>?)null).SetProperty(r => r.ScriptFilesJson, (string?)null).SetProperty(r => r.ScriptStdin, (string?)null), ct);
+        // ADR-0008 §3f: an ask is personal data like a command: the open ones are cancelled above, and the text of every one is emptied (the rows stay for the audit).
+        await AskReports.CancelOpenAsync(db, broker, now, a => a.RequesterUserId == userId || a.TargetUserId == userId, ct, after);
+        await db.MachineAsks.Where(a => a.RequesterUserId == userId || a.TargetUserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Question, (string?)null).SetProperty(a => a.Answer, (string?)null), ct);
+        // ADR-0005 (agent actions): the result text of an action can name the machine's folders; it is emptied (the rows stay for the audit).
+        await db.AgentActions.Where(a => a.RequestedBy == userId || agentIds.Contains(a.AgentId)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Result, (string?)null), ct);
+        // ADR-0008 §3a′: the user's machines' project rows and listening services are captured facts, and the project key of an emptied run goes too.
+        await db.MachineProjects.Where(p => agentIds.Contains(p.AgentId)).ExecuteDeleteAsync(ct);
+        await db.Agents.Where(a => agentIds.Contains(a.Id)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Services, (string?)null)
+            .SetProperty(a => a.ServicesAt, (DateTimeOffset?)null).SetProperty(a => a.ShareServices, false)
+            .SetProperty(a => a.ClaudeInventory, (string?)null).SetProperty(a => a.ClaudeInventoryAt, (DateTimeOffset?)null).SetProperty(a => a.ShareInventory, false), ct);
+        await db.MachineMetrics.Where(m => agentIds.Contains(m.AgentId)).ExecuteDeleteAsync(ct);
+        await db.MachineAlerts.Where(a => agentIds.Contains(a.AgentId)).ExecuteDeleteAsync(ct);
+    }
+
+    private static void WriteTime(Utf8JsonWriter w, string name, DateTimeOffset? value)
+    {
+        if (value is { } at) w.WriteString(name, at);
+        else w.WriteNull(name);
+    }
+
+    private static async Task Flush(Utf8JsonWriter w, PipeWriter body, CancellationToken ct)
+    {
+        await w.FlushAsync(ct);
+        await body.FlushAsync(ct);
+    }
+}

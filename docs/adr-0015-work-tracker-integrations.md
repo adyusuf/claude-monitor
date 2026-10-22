@@ -11,14 +11,14 @@ automatically (use Jira's webhooks where they exist). Other project tools will f
 | # | Decision |
 |---|---|
 | 1 | **Two-way.** A change in Podium to a mirrored project, issue or sprint is written to Jira first and kept locally only when Jira accepts it (Part 2). |
-| 2 | **OAuth 2.0 (3LO) app**, not an API token. One Atlassian app per deployment (`MONITOR_JIRA_CLIENT_ID` / `_SECRET`). |
+| 2 | **OAuth 2.0 (3LO) app**, not an API token. One Atlassian app per deployment (`AIPOD_JIRA_CLIENT_ID` / `_SECRET`). |
 | 3 | **Every user writes with their own Atlassian account.** A person who has not linked one cannot write to Jira (409 `jira_account_required`); reading and syncing use the account of whoever connected the site (the *connector*). |
 | 4 | **People: automatic invitation.** A Jira person whose e-mail is visible and not yet a member gets one workspace invitation, as `viewer`; a person who already is a member is linked without mail. A person with no visible e-mail is listed as "no e-mail" and an admin can type one. Per-connection switch `auto_invite` (default **off** until an admin turns it on, because a test environment connected to a real site would send real mail). |
 | 5 | **New Jira sprints are not imported by themselves.** The sprint list shows them as "not imported"; an issue that moves into an unimported sprint is shown as belonging to a sprint that is not in Podium. |
 
 ## 2. Shape: one adapter per tool
 
-`IWorkTracker` (namespace `ClaudeMonitor.Api.Integrations`) is the only thing the import and sync code knows. It lists *containers* (a Jira space), *iterations*
+`IWorkTracker` (namespace `Podium.Api.Integrations`) is the only thing the import and sync code knows. It lists *containers* (a Jira space), *iterations*
 (a sprint), *items* (an issue, the backlog of a container or the items of an iteration), *people*, and verifies and parses the tool's webhook. It returns plain records
 (`ExternalContainer`, `ExternalIteration`, `ExternalItem`, `ExternalPerson`) with the tool's own ids as strings. `ImportService`, `SyncService` and the web
 talk only to those records and to `integration_links`. A second tool is one new `IWorkTracker` plus its mapping table. `provider` is a closed text set (`jira`).
@@ -68,7 +68,7 @@ Podium's one-active-sprint-per-scope index; the index is **narrowed** (an additi
 `integration_sync_runs` (counts, status, error code; no text), `integration_webhook_receipts` (delivery id, 7 days). Added columns: `projects.source_connection_id`, `issues.external_key`,
 `issues.external_url`, `issues.assignee_person_id`, `sprints.source_connection_id`. All additive; nothing is dropped or retyped.
 
-Tokens are sealed with `MONITOR_INTEGRATION_KEY` (AES-GCM, the same `SecretBox` as the two-step secrets, a different key), never logged, never sent to the web, never part of an audit row.
+Tokens are sealed with `AIPOD_INTEGRATION_KEY` (AES-GCM, the same `SecretBox` as the two-step secrets, a different key), never logged, never sent to the web, never part of an audit row.
 A refresh token rotates on every use; the new one is stored in the same transaction as the use. A token that Atlassian refuses marks the account `reauthorize` and the page says so.
 
 ## 6. Keeping up to date
@@ -116,7 +116,7 @@ Errors are i18n keys. Audit rows (`integration.*`) name ids and counts, never Ji
 
 ## 8a. Built differently from the plan
 
-- `MONITOR_INTEGRATION_KEY` is optional outside development: without it (or without the Jira app values) the integration is off and existing deployments start unchanged.
+- `AIPOD_INTEGRATION_KEY` is optional outside development: without it (or without the Jira app values) the integration is off and existing deployments start unchanged.
 - A webhook delivery is checked by its HS256 token against the app's client secret and queued in memory (`SyncInbox`); the receipt table stops a repeat. Webhook registration needs
   a public `https` origin and is skipped (live updates off) otherwise.
 - Closing a mirrored sprint first moves its unfinished issues in Jira (to the chosen sprint or the backlog), then closes it. A failed step after another succeeded is repaired by the next webhook or pass.

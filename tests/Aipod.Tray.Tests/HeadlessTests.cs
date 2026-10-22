@@ -50,7 +50,7 @@ public sealed class WindowTests
     public async Task The_window_shows_the_version_the_update_line_the_status_lines_and_the_server_it_knows()
     {
         TestHost.Home.Connect("https://aipod.example.test");
-        ClaudeMonitor.Agent.Update.UpdateState.Change(TestHost.Home.Config, s => s with { Available = "0.9.0" });
+        Podium.Agent.Update.UpdateState.Change(TestHost.Home.Config, s => s with { Available = "0.9.0" });
         await TestHost.Run(() =>
         {
             TestHost.Controller.Refresh();
@@ -128,9 +128,9 @@ public sealed class WindowTests
             Assert.Equal(2, leds.Count);
             var dimOrange = ((Avalonia.Media.SolidColorBrush)leds[0].Fill!).Color;
 
-            using (var store = new ClaudeMonitor.Agent.Storage.LocalStore(TestHost.Home.Config.DatabasePath))
+            using (var store = new Podium.Agent.Storage.LocalStore(TestHost.Home.Config.DatabasePath))
             {
-                store.Bump(ClaudeMonitor.Agent.Push.PushStatus.InCountKey);
+                store.Bump(Podium.Agent.Push.PushStatus.InCountKey);
             }
 
             TestHost.Controller.RefreshLights();
@@ -220,9 +220,9 @@ public sealed class AppTests
             app.Lights(); // same lights: the same icon
             Assert.Same(before, app.Icon.Icon);
 
-            using (var store = new ClaudeMonitor.Agent.Storage.LocalStore(TestHost.Home.Config.DatabasePath))
+            using (var store = new Podium.Agent.Storage.LocalStore(TestHost.Home.Config.DatabasePath))
             {
-                store.Bump(ClaudeMonitor.Agent.Push.PushStatus.OutCountKey);
+                store.Bump(Podium.Agent.Push.PushStatus.OutCountKey);
             }
 
             TestHost.Controller.RefreshLights();

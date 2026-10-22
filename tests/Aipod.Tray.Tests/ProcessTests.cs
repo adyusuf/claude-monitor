@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
 using Aipod.Tray;
-using ClaudeMonitor.Agent.Config;
+using Podium.Agent.Config;
 
 namespace Aipod.Tray.Tests;
 
@@ -13,7 +13,7 @@ public sealed class ProcessTests : IDisposable
 
     public void Dispose() => Directory.Delete(dir, recursive: true);
 
-    private AgentConfig Config(string binary) => AgentConfig.FromEnvironment(k => k switch { "CM_AGENT_HOME" => dir, "CM_BINARY" => binary, _ => null });
+    private AgentConfig Config(string binary) => AgentConfig.FromEnvironment(k => k switch { "AP_AGENT_HOME" => dir, "AP_BINARY" => binary, _ => null });
 
     [Fact]
     public async Task The_output_and_the_exit_code_of_the_installed_binary_come_back()
@@ -30,7 +30,7 @@ public sealed class ProcessTests : IDisposable
     public async Task The_aipod_name_beside_the_installed_binary_is_preferred_when_it_is_there()
     {
         if (OperatingSystem.IsWindows()) return;
-        var old = Path.Combine(dir, "cm-agent");
+        var old = Path.Combine(dir, "aipod");
         File.WriteAllText(old, "#!/bin/sh\necho old\n");
         File.WriteAllText(Path.Combine(dir, "aipod"), "#!/bin/sh\necho new\n");
         File.SetUnixFileMode(old, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """End-to-end check of the push into an idle session (ADR-0003), with timestamps.
 
-REAL: the API and PostgreSQL (start them with e2e/serve-local.sh), the agent daemon and its stream, `cm-agent hook`, `cm-agent mcp`.
-STAND-IN: Claude Code. A scripted MCP client starts `cm-agent mcp` the way Claude Code does, sends initialize and only listens; a
+REAL: the API and PostgreSQL (start them with e2e/serve-local.sh), the agent daemon and its stream, `aipod hook`, `aipod mcp`.
+STAND-IN: Claude Code. A scripted MCP client starts `aipod mcp` the way Claude Code does, sends initialize and only listens; a
 transcript line is appended by hand where Claude Code would write one. Nothing here proves what Claude Code's own screen does.
 
-  E2E_EMAIL_BASE=<account>@gmail.com CM_AGENT_BIN=<published cm-agent> python3 scripts/push-check.py
+  E2E_EMAIL_BASE=<account>@gmail.com AP_AGENT_BIN=<published aipod> python3 scripts/push-check.py
 
-Needs: the local e2e stack up, a published agent (dotnet publish src/ClaudeMonitor.Agent -c Release -r <rid>), Python 3.
+Needs: the local e2e stack up, a published agent (dotnet publish src/Podium.Agent -c Release -r <rid>), Python 3.
 On macOS the ReadyToRun build may crash the daemon (see the follow-up task); set DOTNET_ReadyToRun=0 for this run if it does.
 Everything lives in a throw-away agent home; the user's own agent, credentials and Claude Code configuration are not touched.
 """
@@ -18,7 +18,7 @@ ORIGIN = f"http://localhost:{PORT}"                       # the API's public ori
 BASE = f"http://127.0.0.1:{PORT}"
 MAIL = os.environ.get("E2E_MAILPIT_URL", "http://127.0.0.1:8125")
 EMAIL_BASE = os.environ.get("E2E_EMAIL_BASE", "")          # <account>@gmail.com -> <account>+<tag>@gmail.com (global #30)
-AGENT_BIN = os.environ.get("CM_AGENT_BIN", "")
+AGENT_BIN = os.environ.get("AP_AGENT_BIN", "")
 PASSWORD = secrets.token_urlsafe(24) + "-Aa1"             # random per run, for a throw-away local account; never stored
 SESSION = "push-check-session"
 
@@ -65,10 +65,10 @@ def sign_up(email):
 
 def main():
     if not EMAIL_BASE or "@" not in EMAIL_BASE or not os.path.isfile(AGENT_BIN):
-        sys.exit("set E2E_EMAIL_BASE (<account>@gmail.com) and CM_AGENT_BIN (a published cm-agent); see the docstring")
+        sys.exit("set E2E_EMAIL_BASE (<account>@gmail.com) and AP_AGENT_BIN (a published aipod); see the docstring")
     work = tempfile.mkdtemp(prefix="push-check-")
     home = os.path.join(work, "home")
-    env = dict(os.environ, CM_AGENT_HOME=home, CM_CREDENTIALS="file", DOTNET_SYSTEM_NET_DISABLEIPV6="1", CLAUDE_CODE_SESSION_ID=SESSION)
+    env = dict(os.environ, AP_AGENT_HOME=home, AP_CREDENTIALS="file", DOTNET_SYSTEM_NET_DISABLEIPV6="1", CLAUDE_CODE_SESSION_ID=SESSION)
     shim = os.path.join(work, "shim"); os.makedirs(shim)  # a `claude` that does nothing: `install` must not register anything in the real Claude Code
     open(os.path.join(shim, "claude"), "w").write("#!/bin/sh\nexit 0\n"); os.chmod(os.path.join(shim, "claude"), 0o700)
     agent = lambda *args, **kw: subprocess.run([AGENT_BIN, *args], text=True, capture_output=True, env=env, timeout=60, **kw)
@@ -121,12 +121,12 @@ def main():
                     say(f"CHANNEL NOTIFICATION {json.dumps(m['params']['meta'])} content={m['params']['content']!r}")
                     seen.append(m)
                 elif m.get("id") == 9:
-                    say("monitor_status -> " + m["result"]["content"][0]["text"])
+                    say("aipod_status -> " + m["result"]["content"][0]["text"])
         threading.Thread(target=listen, daemon=True).start()
         send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {},
                                                                               "clientInfo": {"name": "claude-code-standin", "version": "1"}}})
         time.sleep(5)
-        send({"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "monitor_status", "arguments": {}}})
+        send({"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "aipod_status", "arguments": {}}})
         time.sleep(1.5)
         say("idle with the channel connected; NOW the web sends a message")
         started = time.time()

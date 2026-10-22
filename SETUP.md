@@ -17,7 +17,7 @@ phase that adds a codebase adds its tools, variables and secrets here in the sam
 ## Install
 
 ```bash
-git clone https://github.com/adyusuf/claude-monitor.git ~/ClaudeCode/claude-monitor
+git clone https://github.com/adyusuf/podium.git ~/ClaudeCode/podium
 ```
 
 ## Commit hooks
@@ -46,8 +46,8 @@ format of the map is described in `scripts/real-name-check.sh`. A deliberate exc
 
 ```bash
 docker compose -f deploy/dev-services.yml up -d          # PostgreSQL 18 on 127.0.0.1:55432, Mailpit on :1025 (UI :8025)
-ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/ClaudeMonitor.Api -- --migrate   # apply migrations
-ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/ClaudeMonitor.Api                # the API
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Podium.Api -- --migrate   # apply migrations
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Podium.Api                # the API
 dotnet test                                                # all .NET tests (Docker must be running)
 bash scripts/quick-check.sh [--tests]                      # the fast local look before a merge (not the gate)
 bash scripts/merge-gate.sh dev                             # the whole gate locally, when you want it (CI runs it for you)
@@ -55,7 +55,7 @@ bash scripts/merge-gate.sh dev                             # the whole gate loca
 
 In Development every variable has a default (`.env.example`); sign-up mails land in Mailpit
 (http://localhost:8025). A new migration: `dotnet ef migrations add <Name> -o Data/Migrations --project
-src/ClaudeMonitor.Api`. Migrations only add (global #4); `scripts/backcompat_scan.py` blocks a drop, rename or
+src/Podium.Api`. Migrations only add (global #4); `scripts/backcompat_scan.py` blocks a drop, rename or
 retype, an edited merged migration, a removed route and a removed or reordered contract field.
 
 ## CI
@@ -79,17 +79,17 @@ the tests itself.
 ## The agent (aipod)
 
 ```bash
-dotnet run --project src/ClaudeMonitor.Agent -- version                # from source
-dotnet publish src/ClaudeMonitor.Agent -c Release -r osx-arm64 -o out/osx-arm64   # one self-contained binary (also osx-x64, win-x64, win-arm64, linux-x64, linux-arm64)
-out/osx-arm64/cm-agent login --server http://localhost:5080            # shows a code; approve it on the web (/device)
-out/osx-arm64/cm-agent install                                         # copies itself to the agent home and registers the Claude Code plugin
-out/osx-arm64/cm-agent status
+dotnet run --project src/Podium.Agent -- version                # from source
+dotnet publish src/Podium.Agent -c Release -r osx-arm64 -o out/osx-arm64   # one self-contained binary (also osx-x64, win-x64, win-arm64, linux-x64, linux-arm64)
+out/osx-arm64/aipod login --server http://localhost:5080            # shows a code; approve it on the web (/device)
+out/osx-arm64/aipod install                                         # copies itself to the agent home and registers the Claude Code plugin
+out/osx-arm64/aipod status
 ```
 
 `install` registers a local plugin marketplace (`monitor-agent-local`) whose hooks and MCP server run the
 installed binary, so Claude Code starts the agent with its sessions; nothing is registered with the OS. Without
 the `claude` CLI on `PATH` it prints the two `claude plugin` commands to run. The agent's tokens are in the macOS
-Keychain / Windows Credential Manager (service `claude-monitor-agent`); on Linux, which has no credential store, in
+Keychain / Windows Credential Manager (service `aipod`); on Linux, which has no credential store, in
 user-only (0600) `cred-*` files in the agent home. Its log is `agent.log` in the agent home.
 
 A prompt sent from the web enters a session only when something is typed in it or a turn ends; an idle session takes
@@ -124,24 +124,24 @@ then `/aipod:connect` (which removes the old `monitor-agent` plugin; the skills 
 quiet once `aipod` is enabled, and `aipod` goes quiet while a pre-bridge (0.5.0 or older) `monitor-agent` is still enabled, so no event is reported twice. Everything above applies to either name.
 
 A maintainer renders the plugin's manifest, hooks and MCP file (for both plugins) from the one list of hooks in the agent with
-`dotnet run --project src/ClaudeMonitor.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
-plugin-started agent from the plugin version whose wrapper exports `CM_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
+`dotnet run --project src/Podium.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
+plugin-started agent from the plugin version whose wrapper exports `AP_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
 
 ### Pushing web messages into an idle session
 
-On after the first `aipod install`, through the **inbox** (the maintainer's decision of 17/10/2026, after the channel proved late in the desktop app): nothing was saved about push yet, so the install saves `inbox`, which needs no start-up flag and works in the terminal, the desktop app and VS Code. The channel is the other choice (`aipod install --push channel`) and needs Claude Code started with the flag `install` prints (below); the desktop app and VS Code cannot pass it, so there a message sent through the channel only arrives at the next prompt. A machine that saved `channel` before (0.4.1) switches with `aipod config push inbox`. A later choice is kept as it is: `aipod install --push off` or `aipod config push off` turns it off and a reinstall does not turn it back on; `CM_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `aipod config push inbox` (or `aipod install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
+On after the first `aipod install`, through the **inbox** (the maintainer's decision of 17/10/2026, after the channel proved late in the desktop app): nothing was saved about push yet, so the install saves `inbox`, which needs no start-up flag and works in the terminal, the desktop app and VS Code. The channel is the other choice (`aipod install --push channel`) and needs Claude Code started with the flag `install` prints (below); the desktop app and VS Code cannot pass it, so there a message sent through the channel only arrives at the next prompt. A machine that saved `channel` before (0.4.1) switches with `aipod config push inbox`. A later choice is kept as it is: `aipod install --push off` or `aipod config push off` turns it off and a reinstall does not turn it back on; `AP_PUSH` set in the environment is never overridden. Service agents have no sessions, so it changes nothing for them. `aipod config push inbox` (or `aipod install --push inbox`, or the plugin's *push* option set to `inbox`) makes a prompt
 sent from the web start a turn in an idle session within about a second, **with no start-up flag**: every Claude Code session (terminal, desktop app, VS Code) has an *inbox socket*, its hooks learn
 where it is (`CLAUDE_CODE_MESSAGING_SOCKET`), and the daemon writes the prompt there (ADR-0007). The text is wrapped, labelled as
 coming from the web and capped; the session is told to treat it as data and to ask you before any request with side effects. A
 session that refuses messages (`crossSessionInbound: refuse`) or has none is not an error: the prompt goes back to the hooks.
 `aipod status` shows `Push into the session: on through the inbox socket`, whether this session's inbox is known and the last
-failure. The older **channel** (`--push on`, also `--push channel`, below) stays exactly as it was: `on`, `CM_PUSH=on` and a push saved before the
+failure. The older **channel** (`--push on`, also `--push channel`, below) stays exactly as it was: `on`, `AP_PUSH=on` and a push saved before the
 inbox existed all still mean the channel. A prompt written to a session that never shows it in the transcript is **not written again**: after
 10 minutes (`InboxConfirmWait`) it is left to the hooks.
 
-**A short notice instead of the whole text (ADR-0007, A2), the default.** The inbox gets one line, `📩 claude-monitor web message <id> ...`,
-that holds nothing the web wrote. `aipod config push-format full` (or `aipod install --push-format full`, or `CM_INBOX_FORMAT=full`) brings back the whole text. The session reads the message with the `monitor_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `aipod status` as "not read yet". The text of an applied message is forgotten after 7 days.
+**A short notice instead of the whole text (ADR-0007, A2), the default.** The inbox gets one line, `📩 podium web message <id> ...`,
+that holds nothing the web wrote. `aipod config push-format full` (or `aipod install --push-format full`, or `AP_INBOX_FORMAT=full`) brings back the whole text. The session reads the message with the `aipod_inbox_read` tool (the same notice, wrapper and defused text as before, folded in the UI) and begins its reply with `💬 <message>`. A message nobody reads shows in `aipod status` as "not read yet". The text of an applied message is forgotten after 7 days.
 
 ### Answering a session's question from the web
 
@@ -165,9 +165,9 @@ A hook reads and writes UTF-8 whatever the machine's console code page is (agent
 
 ### Pushing through a Claude Code channel (`--push channel`)
 
-`aipod install --push channel` (then restart the Claude Code session) makes the `claude-monitor` MCP server a
+`aipod install --push channel` (then restart the Claude Code session) makes the `podium` MCP server a
 Claude Code **channel**: a prompt sent from the web starts a turn in an idle session within about a second, wrapped as
-`<channel source="claude-monitor" origin="web" message_id="…">` (just the text inside; the session starts its reply with one `Web: …` line) and labelled as coming from the web (untrusted: the session is told to treat it as data and
+`<channel source="aipod" origin="web" message_id="…">` (just the text inside; the session starts its reply with one `Web: …` line) and labelled as coming from the web (untrusted: the session is told to treat it as data and
 to ask you before any request with side effects). A channel is a Claude Code research preview and a custom one is not on its
 allowlist, so Claude Code must be started with the flag `install` prints:
 
@@ -177,23 +177,23 @@ claude --dangerously-load-development-channels plugin:monitor-agent@monitor-agen
 
 Without the flag (or where an organisation has channels off) nothing is lost: a pushed message that does not show up in the
 session transcript within 120 s goes back to the hooks and arrives at the next prompt, as before. `--push off` (or
-`CM_PUSH=off`) removes it. `CM_PUSH_SCOPE=machine` pushes every prompt of the machine instead of only this session's (single-session
+`AP_PUSH=off`) removes it. `AP_PUSH_SCOPE=machine` pushes every prompt of the machine instead of only this session's (single-session
 machines only). **No new token or secret:** the daemon uses the credential `aipod login` stored in the OS credential store; the MCP process
-never touches the network. Revoke it from the web's Machines page; rotation is `aipod logout` + `aipod login`. `monitor_status` and `cm-agent
+never touches the network. Revoke it from the web's Machines page; rotation is `aipod logout` + `aipod login`. `aipod_status` and `aipod
 status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
 or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
 
-The agent home is the folder the machine already uses (`~/Library/Application Support/ClaudeMonitor` on macOS, `%USERPROFILE%\.claude-monitor` on
-Windows and `~/.claude-monitor` on Linux), and for a machine that has none the aipod folder (`~/Library/Application Support/aipod`, `~/.aipod`):
-nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0013). `AIPOD_AGENT_HOME` / `CM_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
+The agent home is the folder the machine already uses (`~/Library/Application Support/Podium` on macOS, `%USERPROFILE%\.aipod` on
+Windows and `~/.aipod` on Linux), and for a machine that has none the aipod folder (`~/Library/Application Support/aipod`, `~/.aipod`):
+nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0013). `AP_AGENT_HOME` / `AP_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
 redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
 (ADR-0002, "Home outside AppData").
 
-**Upgrading a Windows machine** that used the old default (`%LOCALAPPDATA%\ClaudeMonitor`): the first start of the new
+**Upgrading a Windows machine** that used the old default (`%LOCALAPPDATA%\Podium`): the first start of the new
 `aipod` copies `agent.json` to the new home (no new login; `agent.db` is not moved, so events not yet uploaded are
 lost). The old plugin keeps running the old binary until you run `aipod install` again with the new one; do that
-from a normal terminal, then check that `aipod status` and `monitor_status` in a new Claude session show the same
+from a normal terminal, then check that `aipod status` and `aipod_status` in a new Claude session show the same
 `home:`. The old folder is left in place and can be deleted afterwards.
 
 ### Machine roles, the tool inventory and the session-start block (ADR-0008)
@@ -204,41 +204,41 @@ from a normal terminal, then check that `aipod status` and `monitor_status` in a
   <function|none>`; a service agent: `environment` and `function` in its admin-owned `exec.json`); a claim only makes the role stricter.
 - **What the agent reports.** Whether Claude Code is installed and how many sessions are idle, and a tool inventory (git, dotnet, node,
   npm, python3, pwsh, docker, psql, java, claude and the shell interpreters) probed by absolute path, each marked trusted or not; the
-  agent runs `--version` only for a trusted or self-owned binary. `CM_PRESENCE_PROBE_EVERY` sets the probe interval.
+  agent runs `--version` only for a trusted or self-owned binary. `AP_PRESENCE_PROBE_EVERY` sets the probe interval.
 - **The block every session gets.** The plugin's `SessionStart` hooks now include a synchronous `hook SessionStart --context` entry: it
   prints the workspace's machines (role, online, Claude, tools) with the rules for treating them, from a cache the daemon refreshes every
-  `CM_MACHINE_CACHE_EVERY` seconds. It is empty while remote runs are off for the workspace or this is the only machine;
-  `CM_MACHINES_CONTEXT=off` turns it off on one machine. The hook reads the local database only and always exits 0.
+  `AP_MACHINE_CACHE_EVERY` seconds. It is empty while remote runs are off for the workspace or this is the only machine;
+  `AP_MACHINES_CONTEXT=off` turns it off on one machine. The hook reads the local database only and always exits 0.
 - **Tags and the note.** A workspace admin sets a machine's tags (`key=value`, at most ten) and a runbook note on its page; both are untrusted
-  text for Claude, which gets the tags as labels in the machines list and the note only through `monitor_machine`, marked as written by an admin.
+  text for Claude, which gets the tags as labels in the machines list and the note only through `aipod_machine`, marked as written by an admin.
 - **Listening services (off by default).** The machine's owner turns on "Report listening ports" on its page (a recent sign-in or a code is
   needed). The agent then reads the TCP ports it listens on, with the process name where the system shows it (on Linux for the account's own
   processes), and sends them; only the owner and admins see them. Turning it off drops what was stored. Nothing is started to read them.
-- **A machine without Claude Code (standalone agent).** `aipod install --standalone --server https://<your Claude Monitor address>` (run as your own user, never
+- **A machine without Claude Code (standalone agent).** `aipod install --standalone --server https://<your Podium address>` (run as your own user, never
   as root or administrator) logs in first (approve the code on the web), copies the binary into the agent home and then starts the agent at your login: a
   LaunchAgent that runs an application bundle on macOS (no window, no Dock icon), a logon task that runs a windowless copy of the program on Windows, a
   `systemd --user` unit on Linux (without `loginctl enable-linger` it runs only while you are logged in; the installer says so). `uninstall --standalone`
-  removes the autostart (under the aipod names `aipod.agent.user`, `aipod.service`, `AipodAgent`, `Aipod.app`, or the old ones, `com.claudemonitor.agent.user`, `claude-monitor-agent.service`, `ClaudeMonitorAgent`, `ClaudeMonitorAgent.app`) and keeps the data; running the install again on a machine that has the old names replaces them. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
+  removes the autostart (under the aipod names `aipod.agent.user`, `aipod.service`, `AipodAgent`, `Aipod.app`, or the old ones, `com.aipod.agent.user`, `aipod.service`, `Aipod`, `Aipod.app`) and keeps the data; running the install again on a machine that has the old names replaces them. The daemon of such an agent does not exit when it has no login: it waits and reads its identity again every 30
   seconds. It reports `claude=none`; another machine's ask to it is refused (`no_claude`), but it is a normal target for runs. From it, `aipod machines`,
   `machine <x>`, `metrics <x>`, `alerts`, `jobs`, `job-run <id>`, `run --machine <x> (--script <file> --interpreter <i> | --argv ...)`, `result <id> --wait 30` and
   `ask --machine <x> "<question>"` reach the other machines without the web; an approval is still the owner's, on the web.
-- **Asks across your machines.** A Claude session can ask a Claude session on ANOTHER machine of the same user a question (`monitor_ask`, then
-  `monitor_ask_result`; the other session answers with `monitor_answer`). It works only when: the push through the inbox is on on the target (`cm-agent
+- **Asks across your machines.** A Claude session can ask a Claude session on ANOTHER machine of the same user a question (`aipod_ask`, then
+  `aipod_ask_result`; the other session answers with `aipod_answer`). It works only when: the push through the inbox is on on the target (`aipod
   install --push inbox`), its owner turned "Allow asks" on its machine page (a recent sign-in is needed), an admin set its environment, it is not a
   production or database machine, a session there has been idle for 30 seconds and the workspace allows remote runs. An ask goes to one idle session
   (the one working in the same project first); nothing is queued for later. On macOS and Linux the message is written without the session's key, so Claude
   Code holds it for the person at that terminal; on Windows it goes only to a session in default or plan mode. A machine asked a moment ago may not ask on,
-  a machine that was asked may not ask back, and an agent is limited to 30 asks an hour (5 per session in 10 minutes). `CM_ASKS=off` turns asks off on one
+  a machine that was asked may not ask back, and an agent is limited to 30 asks an hour (5 per session in 10 minutes). `AP_ASKS=off` turns asks off on one
   machine. The question and the answer are masked, never logged, and deleted after the retention period.
-- **Script runs.** `monitor_run_script` asks a machine to run a script (sh, bash, python or powershell). It needs exec level `shell` on the target
+- **Script runs.** `aipod_run_script` asks a machine to run a script (sh, bash, python or powershell). It needs exec level `shell` on the target
   without a ceiling, an environment an admin set on the machine's page (a machine's own claim does not count) and a trusted interpreter in its
   inventory. The owner approves the exact text on the web (every line numbered, non-ASCII made visible, Allow only after the script was
   scrolled to its end and three seconds later); a production or database machine also needs the approver's two-step code, and an approver
-  without two-step sign-in cannot approve there. A script never matches a grant or a job. A script run may also carry up to 8 small text files (64 KiB each, 256 KiB together, relative paths of letters, digits, dot, underscore and dash, at most 4 levels) that are written next to it, and a text for its standard input (64 KiB); the owner reads each one on the approval card (Allow waits until every box was read to its end) and the approval covers them all. `aipod run --script main.py --interpreter python --file helper.py=./helper.py --stdin ./input.txt` and `monitor_run_script` send them. A Python script with files runs with `-E -s -B` (its own folder on the module path) instead of `-I -B`. Binary files and archives are not supported (ADR-0010). The agent writes it to `<home>/runs/<run>/script.<ext>`
+  without two-step sign-in cannot approve there. A script never matches a grant or a job. A script run may also carry up to 8 small text files (64 KiB each, 256 KiB together, relative paths of letters, digits, dot, underscore and dash, at most 4 levels) that are written next to it, and a text for its standard input (64 KiB); the owner reads each one on the approval card (Allow waits until every box was read to its end) and the approval covers them all. `aipod run --script main.py --interpreter python --file helper.py=./helper.py --stdin ./input.txt` and `aipod_run_script` send them. A Python script with files runs with `-E -s -B` (its own folder on the module path) instead of `-I -B`. Binary files and archives are not supported (ADR-0010). The agent writes it to `<home>/runs/<run>/script.<ext>`
   (private, never executable), starts it with the interpreter's safe flags and the scratch folder as working directory, with an empty
   environment and `PATH=/usr/bin:/bin:/usr/sbin:/sbin` (set your own PATH inside the script for a user-installed tool), and removes the folder
-  afterwards. The workspace's "Output limit for script runs" (1 to 64 MB, default 8) is frozen on each run; `CM_EXEC_SCRIPT_OUTPUT_CEILING`
-  caps it on one machine. `monitor_run_result` says "output complete" or exactly what is missing and why. On a production or database
+  afterwards. The workspace's "Output limit for script runs" (1 to 64 MB, default 8) is frozen on each run; `AP_EXEC_SCRIPT_OUTPUT_CEILING`
+  caps it on one machine. `aipod_run_result` says "output complete" or exactly what is missing and why. On a production or database
   machine a shell command, an argv run of an interpreter, and every grant or job approval need the approver's two-step code too (a recent
   sign-in does not replace it), and an approver without two-step sign-in cannot approve there; a plain argv run of another program does not
   (ADR-0008 §9.13).
@@ -246,7 +246,7 @@ from a normal terminal, then check that `aipod status` and `monitor_status` in a
   visits, list the folder: `aipod config projects add <folder>` (interactive or standalone agent) or `"projects": ["/srv/shop"]` in the
   admin-owned `exec.json` (service agent). The agent reads the branch, the commit and the tag from the `.git` files without running git and
   sends them with an HMAC of the path (the key is generated here and kept in the credential store; the path never leaves the machine).
-  `CM_PROJECT_FACTS_EVERY` sets how often they are read again. A run may name a `project` and a `kind` (`test`, `build`, `deploy`, `other`);
+  `AP_PROJECT_FACTS_EVERY` sets how often they are read again. A run may name a `project` and a `kind` (`test`, `build`, `deploy`, `other`);
   its result, and for a `test` run the passed, failed and skipped counts of dotnet test, vitest, jest and pytest, appear under that project.
   **Usage limits for Podium (ADR-0011 §7a):** `aipod config claude-statusline on` sets `statusLine` in Claude Code's user settings to `aipod statusline` (your own status line, if you had one, is kept and still printed;
   `off` puts it back; `status` shows what was seen). Claude Code gives the 5-hour and weekly limits only to a status line command, and only for claude.ai Pro and Max logins after a session has answered once, so Podium
@@ -269,7 +269,7 @@ aipod-tray --status               # prints what the window shows, no screen need
 aipod-tray --install-autostart    # start at login (macOS LaunchAgent, Windows Run key); --remove-autostart undoes it
 ```
 
-It reads the agent's files in the same home as the agent (`CM_AGENT_HOME` / `AIPOD_AGENT_HOME`) and runs the `aipod` command line for
+It reads the agent's files in the same home as the agent (`AP_AGENT_HOME` / `AP_AGENT_HOME`) and runs the `aipod` command line for
 the commands; it opens no port. Not covered yet: signing and notarization, an installer, a service-mode install's database.
 
 ## Service agent (boot service, remote work)
@@ -281,21 +281,21 @@ down, per OS:
 
 | | Linux (systemd) | macOS (LaunchDaemon) | Windows Server (service) |
 |---|---|---|---|
-| Service account | `aipod` (system, no login shell) | `_cmagent` (hidden role account) | `NT SERVICE\cm-agent` (virtual) |
-| Binary (admin-owned) | `/usr/local/lib/cm-agent/cm-agent` | `/Library/Application Support/ClaudeMonitor/bin/cm-agent` | `%ProgramFiles%\ClaudeMonitor\cm-agent.exe` |
-| Service home (account only) | `/var/lib/cm-agent` | `/Library/Application Support/ClaudeMonitor/home` | `%ProgramData%\ClaudeMonitor\service` |
-| Exec policy file (admin-owned) | `/etc/cm-agent/exec.json` | `/Library/Application Support/ClaudeMonitor/exec.json` | `%ProgramFiles%\ClaudeMonitor\exec.json` |
-| Unit / definition | `/etc/systemd/system/cm-agent.service` | `/Library/LaunchDaemons/com.claudemonitor.agent.plist` | service `aipod` (`sc query aipod`) |
+| Service account | `aipod` (system, no login shell) | `_cmagent` (hidden role account) | `NT SERVICE\aipod` (virtual) |
+| Binary (admin-owned) | `/usr/local/lib/aipod/aipod` | `/Library/Application Support/Podium/bin/aipod` | `%ProgramFiles%\Podium\aipod.exe` |
+| Service home (account only) | `/var/lib/aipod` | `/Library/Application Support/Podium/home` | `%ProgramData%\Podium\service` |
+| Exec policy file (admin-owned) | `/etc/aipod/exec.json` | `/Library/Application Support/Podium/exec.json` | `%ProgramFiles%\Podium\exec.json` |
+| Unit / definition | `/etc/systemd/system/aipod.service` | `/Library/LaunchDaemons/com.aipod.agent.plist` | service `aipod` (`sc query aipod`) |
 | Login code (while not connected) | `<home>/login-code.txt`, `journalctl -u aipod` | `<home>/login-code.txt` | `<home>\login-code.txt` |
 
 **The names (ADR-0013, tier 2).** The table above is what services installed before the rename have. A fresh `install --service` now uses the aipod names: service and unit `aipod` (`/etc/systemd/system/aipod.service`), accounts `aipod` / `_aipod` / `NT SERVICE\aipod`,
 launchd label `aipod.agent` (`/Library/LaunchDaemons/aipod.agent.plist`), folders `/usr/local/lib/aipod`, `/var/lib/aipod`, `/Library/Application Support/aipod/{bin,home}`, `%ProgramFiles%\aipod`, `%ProgramData%\aipod\service`, the exec policy in
-`/etc/aipod/exec.json`, `/Library/Application Support/aipod/exec.json`, `%ProgramFiles%\aipod\exec.json`, and the sudoers file `aipod-run`; the binary file inside keeps the name `cm-agent`. A service that already exists keeps its old names when it is
+`/etc/aipod/exec.json`, `/Library/Application Support/aipod/exec.json`, `%ProgramFiles%\aipod\exec.json`, and the sudoers file `aipod-run`; the binary file inside keeps the name `aipod`. A service that already exists keeps its old names when it is
 upgraded with `install --service`, and `sudo aipod service migrate` moves it: `--dry-run` shows the plan; the real run stops the old service, copies its home and policy, installs the new service, waits up to 90 s for it to reach the server (Linux, macOS) and only then **disables** the old
 one, which stays for 7 days; `--undo` goes back (the data the new service kept up comes back too), `--finish` removes the old service, account, folders, policy and sudoers file (before 7 days only with `--now`). A failure before the disable puts everything back and starts the old service. On
 **Windows** the tokens are encrypted for the old service account and the new account cannot read them: the machine logs in again and an administrator approves a code. The agent reads the exec policy from the new place first and the old one second.
 
-The service units set `CM_SERVICE=1`, `CM_AGENT_HOME=<service home>` and the single-file extraction folder
+The service units set `AP_SERVICE=1`, `AP_AGENT_HOME=<service home>` and the single-file extraction folder
 (`DOTNET_BUNDLE_EXTRACT_BASE_DIR=<home>/.net`); nobody sets them by hand. `aipod uninstall --service` removes the
 service and **keeps** the home (the login), the exec policy and the binary.
 
@@ -328,21 +328,21 @@ apply either way. A relative path makes the whole file invalid, hence `off`. The
   (copy the key from the account page and compare the fingerprint it prints), then `aipod config approvals required`. From then on the machine runs only what a pinned key signed; it takes no job, grant or schedule (each run needs its own signature),
   and it refuses everything until a key is pinned. `aipod approvers list|remove <fingerprint>` and `aipod status` show what is pinned. The file is `approvers.json` beside `exec.json` on a service (root-owned: the agent distrusts it otherwise) and in the
   agent's home for an interactive one. Off by default; nothing changes for a machine that does not turn it on.
-- **A separate run account (Linux and macOS service agents).** `sudo aipod install --service --server <url> --exec argv --run-account [<name>]` (default `cm-run` on Linux, `_cmrun` on macOS) creates a non-login account, adds the service account to its
-  group, makes `<home>/run-work` (setgid, shared by the two accounts) and writes `/etc/sudoers.d/cm-agent-run` (checked with `visudo -cf` first) so that only the service account may start commands, and only as the run account. Remote runs then start as that account, with
+- **A separate run account (Linux and macOS service agents).** `sudo aipod install --service --server <url> --exec argv --run-account [<name>]` (default `ap-run` on Linux, `_cmrun` on macOS) creates a non-login account, adds the service account to its
+  group, makes `<home>/run-work` (setgid, shared by the two accounts) and writes `/etc/sudoers.d/aipod-run` (checked with `visudo -cf` first) so that only the service account may start commands, and only as the run account. Remote runs then start as that account, with
   `run-work` as their home and working directory. `uninstall --service` removes the sudoers file and keeps the accounts. Windows is refused. Not verified on a real host (ADR-0010 §5).
 
 ## Jira integration (ADR-0015)
 
 Podium can connect a Jira Cloud site, import chosen spaces and sprints, and keep them current. Nothing is offered until the maintainer has registered an
-Atlassian app; without `MONITOR_JIRA_CLIENT_ID` and `MONITOR_JIRA_CLIENT_SECRET` (and `MONITOR_INTEGRATION_KEY`) the Integrations page says Jira is not set up.
+Atlassian app; without `AIPOD_JIRA_CLIENT_ID` and `AIPOD_JIRA_CLIENT_SECRET` (and `AIPOD_INTEGRATION_KEY`) the Integrations page says Jira is not set up.
 
 1. **Register the app (once per environment; only the maintainer can).** developer.atlassian.com, Developer console, Create, OAuth 2.0 integration. Under
    Authorization add the callback `https://<host>/api/integrations/jira/callback` (one app per environment, so the callbacks of dev, test and prod are not mixed up).
    Under Permissions add Jira API with the scopes `read:jira-work`, `write:jira-work`, `read:jira-user`, `manage:jira-webhook` and the Jira Software scopes for
    boards and sprints (classic or granular; if Atlassian offers `offline_access` as a setting, enable it so refresh tokens are issued).
-2. **Give the server the secrets.** `MONITOR_INTEGRATION_KEY` (32 random bytes, base64url, for example `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`),
-   `MONITOR_JIRA_CLIENT_ID` and `MONITOR_JIRA_CLIENT_SECRET` in the server's environment file, then restart the API. See the secret inventory below.
+2. **Give the server the secrets.** `AIPOD_INTEGRATION_KEY` (32 random bytes, base64url, for example `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`),
+   `AIPOD_JIRA_CLIENT_ID` and `AIPOD_JIRA_CLIENT_SECRET` in the server's environment file, then restart the API. See the secret inventory below.
 3. **Connect.** A workspace admin opens Integrations, enters the Jira sub-domain (for `acme.atlassian.net`: `acme`), signs in at Atlassian and allows the app.
    Every person who should write to Jira from Podium links their own Atlassian account on the same page; without one they can read, but their changes are refused.
 4. **Webhooks.** Jira delivers only to a public `https` address, so live updates work on test and production. Podium registers the webhooks itself after the first
@@ -371,13 +371,13 @@ aipod config auto-update off|check|on # what the daemon may do by itself (defaul
 
 - `aipod update` and `--check` are your own decision and ignore both settings below. The agent must be logged in (the build comes from its own
   server) and installed (`aipod install`); the installed binary in the agent home is what is replaced. Exit code 0 = installed or up to date, 1 = refused or failed, 2 = usage.
-- **Machine setting:** `aipod config auto-update off|check|on` (saved in `agent.json`) or `CM_AUTO_UPDATE` (wins when set). `check` looks every 6 h and reports; `on` also installs.
+- **Machine setting:** `aipod config auto-update off|check|on` (saved in `agent.json`) or `AP_AUTO_UPDATE` (wins when set). `check` looks every 6 h and reports; `on` also installs.
 - **Workspace setting** `agentUpdate` (`off` default, `check`, `on`): the cap an owner or admin sets in the workspace settings on the web. **The lower of the two applies.**
   While the effective mode is `off` the daemon makes no update call at all.
 - `aipod status` shows `auto-update: <effective> (this machine: <m>, workspace: <w>)`, `update available: <version>`, `update: <from> -> <to> is being checked` while a new
   daemon is on probation, and `last update check: <code> (<reason>) <dd/mm/yyyy HH:mm>`. After a refused update the code says why (for example `bad-signature`, `channel`,
   `downgrade`, `hash-mismatch`, `no-key`); after a rolled-back one `status` also prints `update <version> was rolled back and is not retried by itself`. The same lines are in `agent.log`.
-- **Replacement:** the new binary is staged as `cm-agent.new`, the old one is kept as `cm-agent.prev` (one version back), the daemon is stopped through a `daemon.stop`
+- **Replacement:** the new binary is staged as `aipod.new`, the old one is kept as `aipod.prev` (one version back), the daemon is stopped through a `daemon.stop`
   file and started again from the new binary. If it does not report its version and get an answer from the API within 90 s, the previous binary is put back automatically.
 - **MCP processes** (one per Claude Code session) keep running the old version until their session ends; they are not killed. Hooks use the new binary at once.
 - **From the web** (agent 0.5.0 and later, [ADR-0005](docs/adr-0005-remote-work.md) "Agent actions from the web"): the machine page has an **Agent actions** card with four buttons for the machine's owner: **Status** (what `aipod status` prints), **Check for update**, **Update** (the same as `aipod update`) and **Restart** (the same as `aipod restart`). It is a fixed set, not a way to run commands: it needs no exec level and no workspace switch. Restart and Update ask for a recent sign-in (a fresh two-step code on a production or database machine). An action the agent has not taken within 10 minutes is dropped; an agent older than 0.5.0 ignores it, so update that one by hand once. A service agent cannot replace its own binary, so Update there reports the refusal and an administrator upgrades it.
@@ -386,12 +386,12 @@ aipod config auto-update off|check|on # what the daemon may do by itself (defaul
 
 ### Releasing an agent build (maintainer, macOS)
 
-1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `cm-agent-update-<channel>`) and is never written to a file; the public half is printed:
+1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `aipod-update-<channel>`) and is never written to a file; the public half is printed:
    `python3 scripts/sign_manifest.py keygen --channel test` and `... --channel prod`. Save the printed line as `deploy/update-keys/<channel>.pub` and commit it (it is public by design).
 2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SITE_URL=https://<site>` also writes `marketplace.json` and `monitor-agent-plugin.zip` so the site serves the plugin itself (with `VITE_PLUGIN_FROM_SERVER=1` in the web build); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
    The channel's public key is built into the agent; `out/downloads` gets the six zips (macOS, Windows, Linux), `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
 3. **Publish them on the download host** (an R2 bucket behind a public domain; the release package carries no agent zip any more, and a file the server holds itself would win over the host, so none must stay in a web root): `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh test|prod` uploads the build to `daemons/<channel>/` (and keeps it under `daemons/<version>/<channel>/`),
-   and the server's `monitor.env` gets `MONITOR_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>`. The update check then reads `manifest.json` there and offers addresses there; `/downloads/<file>` on the server redirects to the host (`docs/release.md`, "Download host").
+   and the server's `aipod.env` gets `AIPOD_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>`. The update check then reads `manifest.json` there and offers addresses there; `/downloads/<file>` on the server redirects to the host (`docs/release.md`, "Download host").
 4. Agents already installed at that channel take it when a person runs `aipod update` or when `auto-update` allows it.
 
 ## Updating Claude Code (optional, off by default)
@@ -431,10 +431,10 @@ release, backups, restore drill, rollback) is [docs/deploy-windows.md](docs/depl
 ## Environment variables
 
 `.env.example` lists every variable with its default and what it is for. The API reads them only in
-`src/ClaudeMonitor.Api/Config/ApiConfig.cs`.
+`src/Podium.Api/Config/ApiConfig.cs`.
 
-The agent and the tray speak the operating system's language when it is English, Turkish or German, and English otherwise. `AIPOD_LANG=en|tr|de` overrides
-that for one run or one machine (for example `AIPOD_LANG=de aipod status`); it is read by the agent and the tray only, never by the API (ADR-0014, Part A).
+The agent and the tray speak the operating system's language when it is English, Turkish or German, and English otherwise. `AP_LANG=en|tr|de` overrides
+that for one run or one machine (for example `AP_LANG=de aipod status`); it is read by the agent and the tray only, never by the API (ADR-0014, Part A).
 
 ## Secret and token inventory
 
@@ -444,23 +444,23 @@ secrets.
 
 | Secret | What it is | Where to get it | Stored | Owner | Rotation |
 |---|---|---|---|---|---|
-| `MONITOR_DB` password | the API's PostgreSQL role | created with the database (`deploy/`) | server environment file | the maintainer | yearly, or on any leak: `ALTER ROLE ... PASSWORD`, update the file, restart |
-| `MONITOR_SMTP_PASSWORD` | an app password of the sending Google account | Google Account, Security, App passwords (2-step verification on) | server environment file, or the `Smtp` node of the server-only `appsettings.Production.json` (git-ignored; `build-release.sh` refuses to package it) | the maintainer | revoke and create a new one yearly or on any leak |
-| `MONITOR_GITHUB_CLIENT_SECRET` | the GitHub OAuth app's secret; callback `https://<host>/api/auth/callback/github` | GitHub, Settings, Developer settings, OAuth Apps (one app per environment) | server environment file | the maintainer | generate a new secret, deploy, delete the old one |
-| `MONITOR_MFA_KEY` | seals every user's two-step sign-in secret in the database; lost or changed, every user's authenticator stops working | generated by `deploy/windows/setup-server.ps1` | server environment file **and** the maintainer's password manager | the maintainer | only with a re-seal of the stored secrets (no rotation tool yet): treat as long-lived; on a leak, users turn two-step sign-in off and on again |
-| `MONITOR_INTEGRATION_KEY` | seals every Atlassian access and refresh token in the database (ADR-0015); optional: without it (and the Jira app values) the integrations are off; lost or changed, every connection must be made again | `openssl rand -base64 32 \| tr '+/' '-_' \| tr -d '='` (like the MFA key) | server environment file **and** the maintainer's password manager | the maintainer | only by connecting again (no re-seal tool): treat as long-lived; on a leak, disconnect the connections, rotate the key, connect again |
-| `MONITOR_JIRA_CLIENT_SECRET` | the Atlassian OAuth 2.0 (3LO) app's secret; callback `https://<host>/api/integrations/jira/callback`; scopes `read:jira-work write:jira-work read:jira-user manage:jira-webhook offline_access` plus the Jira Software scopes for boards and sprints; it also verifies Jira's webhook calls | developer.atlassian.com, Developer console, Create, OAuth 2.0 integration (one app per environment; the maintainer creates it, Claude cannot) | server environment file | the maintainer | Developer console, Settings, rotate the secret, deploy, then check a webhook arrives |
-| `MONITOR_BACKUP_KEY` | the key the backups are encrypted with; without it no backup restores | generated by `deploy/windows/setup-server.ps1` | server environment file **and** the maintainer's password manager | the maintainer | never silently: a new key only for new backups; keep the old one until its backups expire |
+| `AIPOD_DB` password | the API's PostgreSQL role | created with the database (`deploy/`) | server environment file | the maintainer | yearly, or on any leak: `ALTER ROLE ... PASSWORD`, update the file, restart |
+| `AIPOD_SMTP_PASSWORD` | an app password of the sending Google account | Google Account, Security, App passwords (2-step verification on) | server environment file, or the `Smtp` node of the server-only `appsettings.Production.json` (git-ignored; `build-release.sh` refuses to package it) | the maintainer | revoke and create a new one yearly or on any leak |
+| `AIPOD_GITHUB_CLIENT_SECRET` | the GitHub OAuth app's secret; callback `https://<host>/api/auth/callback/github` | GitHub, Settings, Developer settings, OAuth Apps (one app per environment) | server environment file | the maintainer | generate a new secret, deploy, delete the old one |
+| `AIPOD_MFA_KEY` | seals every user's two-step sign-in secret in the database; lost or changed, every user's authenticator stops working | generated by `deploy/windows/setup-server.ps1` | server environment file **and** the maintainer's password manager | the maintainer | only with a re-seal of the stored secrets (no rotation tool yet): treat as long-lived; on a leak, users turn two-step sign-in off and on again |
+| `AIPOD_INTEGRATION_KEY` | seals every Atlassian access and refresh token in the database (ADR-0015); optional: without it (and the Jira app values) the integrations are off; lost or changed, every connection must be made again | `openssl rand -base64 32 \| tr '+/' '-_' \| tr -d '='` (like the MFA key) | server environment file **and** the maintainer's password manager | the maintainer | only by connecting again (no re-seal tool): treat as long-lived; on a leak, disconnect the connections, rotate the key, connect again |
+| `AIPOD_JIRA_CLIENT_SECRET` | the Atlassian OAuth 2.0 (3LO) app's secret; callback `https://<host>/api/integrations/jira/callback`; scopes `read:jira-work write:jira-work read:jira-user manage:jira-webhook offline_access` plus the Jira Software scopes for boards and sprints; it also verifies Jira's webhook calls | developer.atlassian.com, Developer console, Create, OAuth 2.0 integration (one app per environment; the maintainer creates it, Claude cannot) | server environment file | the maintainer | Developer console, Settings, rotate the secret, deploy, then check a webhook arrives |
+| `AIPOD_BACKUP_KEY` | the key the backups are encrypted with; without it no backup restores | generated by `deploy/windows/setup-server.ps1` | server environment file **and** the maintainer's password manager | the maintainer | never silently: a new key only for new backups; keep the old one until its backups expire |
 | the Cloudflare Origin certificate and key | TLS between Cloudflare and the server | Cloudflare, SSL/TLS, Origin Server | the server's `LocalMachine\My` store (key not exportable) | the maintainer | before it expires (15 years), or on any leak: revoke in Cloudflare, issue a new one |
 | the PostgreSQL `postgres` password | the database superuser (set-up and restore drills only) | chosen at the PostgreSQL install | the maintainer's password manager only | the maintainer | yearly |
-| `MONITOR_GOOGLE_CLIENT_SECRET` | the Google OAuth client's secret; redirect `https://<host>/api/auth/callback/google` | Google Cloud Console, APIs and Services, Credentials (one client per environment) | server environment file | the maintainer | add a new secret, deploy, disable the old one |
+| `AIPOD_GOOGLE_CLIENT_SECRET` | the Google OAuth client's secret; redirect `https://<host>/api/auth/callback/google` | Google Cloud Console, APIs and Services, Credentials (one client per environment) | server environment file | the maintainer | add a new secret, deploy, disable the old one |
 
 A **service agent** (ADR-0005) holds one more secret, on each machine that runs one. It is never in the repository,
 never in a log and never leaves the machine except in the `Authorization` header to the API:
 
 | Secret | What it is | Where to get it | Stored | Owner | Rotation |
 |---|---|---|---|---|---|
-| a service agent's credentials (`cred-access-token`, `cred-refresh-token`) | the access and refresh tokens of that machine's service agent, issued when its login code is approved on the web | `aipod` service's own first login (the code is in its log and `login-code.txt`, approved on the web) | Linux and macOS: 0600 files `cred-*` in the service home (`/var/lib/cm-agent`, `/Library/Application Support/ClaudeMonitor/home`), refused if their owner or mode is wrong; Windows: DPAPI **CurrentUser** blobs `cred-*.bin` in `%ProgramData%\ClaudeMonitor\service` (never LocalMachine scope) | the machine's admin | on any doubt: revoke the agent on the web (Machines page), then log the service in again. Refresh tokens rotate on every use, so there is nothing else to rotate on a schedule |
+| a service agent's credentials (`cred-access-token`, `cred-refresh-token`) | the access and refresh tokens of that machine's service agent, issued when its login code is approved on the web | `aipod` service's own first login (the code is in its log and `login-code.txt`, approved on the web) | Linux and macOS: 0600 files `cred-*` in the service home (`/var/lib/aipod`, `/Library/Application Support/Podium/home`), refused if their owner or mode is wrong; Windows: DPAPI **CurrentUser** blobs `cred-*.bin` in `%ProgramData%\Podium\service` (never LocalMachine scope) | the machine's admin | on any doubt: revoke the agent on the web (Machines page), then log the service in again. Refresh tokens rotate on every use, so there is nothing else to rotate on a schedule |
 
 A remote run that executes as the service account can read that account's files, these tokens included
 (ADR-0005, "Consequences"); that is why the exec level is local, admin-owned and `off` by default.
@@ -473,10 +473,10 @@ keychain, never in the repository, the shell environment or CI):
 
 | Secret | What it is | Where to get it | Stored | Owner | Rotation |
 |---|---|---|---|---|---|
-| the `claude-monitor-notary` keychain profile | the stored App Store Connect API credentials `notarytool` uses | created by `xcrun notarytool store-credentials` | the macOS keychain | the maintainer | revoke the API key in App Store Connect and store a new profile |
+| the `podium-notary` keychain profile | the stored App Store Connect API credentials `notarytool` uses | created by `xcrun notarytool store-credentials` | the macOS keychain | the maintainer | revoke the API key in App Store Connect and store a new profile |
 | the Developer ID Application certificate | signs the agent binary | Apple Developer account, Certificates | the macOS keychain (its name is not secret) | the maintainer | when it expires or is revoked |
-| `cm-agent-update-test` signing key | the ECDSA P-256 private key that signs `test` agent builds for self-update (ADR-0004) | `python3 scripts/sign_manifest.py keygen --channel test`, once | the maintainer's macOS keychain, service `cm-agent-update-test` (never a file, the repository, CI or a server); the public half is `deploy/update-keys/test.pub` | the maintainer | new key + a new build installed by hand on every `test` agent: installed agents trust only the key built into them. `keygen` never overwrites an existing key |
-| `cm-agent-update-prod` signing key | the same, for `prod` agent builds | `python3 scripts/sign_manifest.py keygen --channel prod`, once | the maintainer's macOS keychain, service `cm-agent-update-prod`; public half `deploy/update-keys/prod.pub` | the maintainer | as above; **lost or leaked, installed prod agents cannot be updated and must be reinstalled by hand** |
+| `aipod-update-test` signing key | the ECDSA P-256 private key that signs `test` agent builds for self-update (ADR-0004) | `python3 scripts/sign_manifest.py keygen --channel test`, once | the maintainer's macOS keychain, service `aipod-update-test` (never a file, the repository, CI or a server); the public half is `deploy/update-keys/test.pub` | the maintainer | new key + a new build installed by hand on every `test` agent: installed agents trust only the key built into them. `keygen` never overwrites an existing key |
+| `aipod-update-prod` signing key | the same, for `prod` agent builds | `python3 scripts/sign_manifest.py keygen --channel prod`, once | the maintainer's macOS keychain, service `aipod-update-prod`; public half `deploy/update-keys/prod.pub` | the maintainer | as above; **lost or leaked, installed prod agents cannot be updated and must be reinstalled by hand** |
 
 ## Backup
 

@@ -70,12 +70,12 @@ export function DownloadPage() {
   const origin = window.location.origin;
   const hasPlugin = config.pluginMarketplace !== "" || config.pluginFromServer;
   const files = [
-    { os: t("download.macos"), file: "cm-agent-macos-arm64.zip", label: "Apple silicon" },
-    { os: t("download.macos"), file: "cm-agent-macos-x64.zip", label: "Intel" },
-    { os: t("download.windows"), file: "cm-agent-windows-x64.zip", label: "x64" },
-    { os: t("download.windows"), file: "cm-agent-windows-arm64.zip", label: "ARM64" },
-    { os: t("download.linux"), file: "cm-agent-linux-x64.zip", label: "x64" },
-    { os: t("download.linux"), file: "cm-agent-linux-arm64.zip", label: "ARM64" },
+    { os: t("download.macos"), file: "aipod-macos-arm64.zip", label: "Apple silicon" },
+    { os: t("download.macos"), file: "aipod-macos-x64.zip", label: "Intel" },
+    { os: t("download.windows"), file: "aipod-windows-x64.zip", label: "x64" },
+    { os: t("download.windows"), file: "aipod-windows-arm64.zip", label: "ARM64" },
+    { os: t("download.linux"), file: "aipod-linux-x64.zip", label: "x64" },
+    { os: t("download.linux"), file: "aipod-linux-arm64.zip", label: "ARM64" },
   ];
   return (
     <div className="page narrow">
@@ -100,8 +100,8 @@ export function DownloadPage() {
           {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`/downloads/${f.file}`}>{f.os} · {f.label}</a></li>)}
         </ul>
       </Card>
-      <Card title={`2. ${t("download.step2")}`}><CopyText text={`cm-agent login --server ${origin}`} /></Card>
-      <Card title={`3. ${t("download.step3")}`}><CopyText text="cm-agent install" /></Card>
+      <Card title={`2. ${t("download.step2")}`}><CopyText text={`aipod login --server ${origin}`} /></Card>
+      <Card title={`3. ${t("download.step3")}`}><CopyText text="aipod install" /></Card>
       <p className="muted"><Link to="/">{t("notFound.home")}</Link></p>
     </div>
   );

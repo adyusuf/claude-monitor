@@ -76,13 +76,13 @@ describe("classifying events", () => {
 describe("one timeline for events and web commands", () => {
   it("shows a web command as a monitor input and a typed prompt as a human input", () => {
     const { items } = buildTimeline([ev("hook:UserPromptSubmit", { prompt: "typed" }, 100)], [cmd({ appliedAt: at(10) })], false);
-    expect(items.map((i) => [i.cls, i.text])).toEqual([[ActivityClass.HumanInput, "typed"], [ActivityClass.MonitorInput, "run the tests"]]);
+    expect(items.map((i) => [i.cls, i.text])).toEqual([[ActivityClass.HumanInput, "typed"], [ActivityClass.PodiumInput, "run the tests"]]);
   });
 
   it("shows a stop request as a monitor input without text", () => {
     const { items } = buildTimeline([], [cmd({ kind: "stop", body: null })], false);
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ cls: ActivityClass.MonitorInput, text: "" });
+    expect(items[0]).toMatchObject({ cls: ActivityClass.PodiumInput, text: "" });
     expect(items[0]!.command?.kind).toBe("stop");
   });
 
@@ -131,10 +131,10 @@ describe("one timeline for events and web commands", () => {
 
   it("drops the attachments Claude Code really writes for a hook's context (shapes seen in real transcripts)", () => {
     const body = "run the tests";
-    const context = `Messages sent to this session from Claude Monitor (the web):\n- ${body}`;
+    const context = `Messages sent to this session from Podium (the web):\n- ${body}`;
     const hookOutput = JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: context } });
     const added = transcript({ type: "attachment", attachment: { type: "hook_additional_context", content: [context], hookName: "UserPromptSubmit", hookEvent: "UserPromptSubmit", toolUseID: "t" } }, 1);
-    const success = transcript({ type: "attachment", attachment: { type: "hook_success", content: "", stdout: hookOutput, stderr: "", exitCode: 0, command: "cm-agent hook", hookEvent: "UserPromptSubmit", hookName: "UserPromptSubmit", toolUseID: "t", durationMs: 12 } }, 2);
+    const success = transcript({ type: "attachment", attachment: { type: "hook_success", content: "", stdout: hookOutput, stderr: "", exitCode: 0, command: "aipod hook", hookEvent: "UserPromptSubmit", hookName: "UserPromptSubmit", toolUseID: "t", durationMs: 12 } }, 2);
     const { items } = buildTimeline([added, success], [cmd({ body })], false);
     expect(items.map((i) => i.key)).toEqual(["cc1"]);
   });
@@ -240,7 +240,7 @@ describe("filtering and grouping", () => {
 
   it("shows the right subset for each filter", () => {
     expect(classesOf(ActivityFilter.All)).toEqual(Object.values(ActivityClass).sort());
-    expect(classesOf(ActivityFilter.Inputs)).toEqual([ActivityClass.HumanInput, ActivityClass.MonitorInput].sort());
+    expect(classesOf(ActivityFilter.Inputs)).toEqual([ActivityClass.HumanInput, ActivityClass.PodiumInput].sort());
     expect(classesOf(ActivityFilter.Assistant)).toEqual([ActivityClass.Assistant]);
     expect(classesOf(ActivityFilter.Tools)).toEqual([ActivityClass.Meta, ActivityClass.Tool].sort());
   });

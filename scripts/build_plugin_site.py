@@ -3,12 +3,10 @@
 
     python3 scripts/build_plugin_site.py <downloads-dir> --base-url https://<site>
 
-Four files land in the folder the deploy serves at /downloads (ADR-0013 section 1: both plugins, side by side, from the same agent builds):
+Two files land in the folder that is published to the download host (scripts/publish_agent_downloads.sh), which the site's /downloads answers for:
   aipod-plugin.zip           plugin/aipod, with its pins (agent-release.txt) as they are in the working tree; reproducible
   aipod-marketplace.json     a URL catalog named aipod-releases (the name the plugin's wrapper expects) whose one plugin is an
                              "archive" source: <base-url>/downloads/aipod-plugin.zip with its sha256, which Claude Code checks
-  monitor-agent-plugin.zip   plugin/monitor-agent (the bridge to aipod), the same way
-  marketplace.json           its catalog, named monitor-agent-releases: the file the machines already on the old plugin follow
 
 A person then runs `claude plugin marketplace add <base-url>/downloads/aipod-marketplace.json` and `claude plugin install aipod@aipod-releases`.
 Claude Code refuses an archive over http or on a loopback, link-local or cloud-metadata host, so this refuses them too. The site's address is a
@@ -25,10 +23,9 @@ import sys
 import zipfile
 from urllib.parse import urlsplit
 
-# (plugin folder and name, catalog name, zip, catalog file): the old plugin keeps the names it has had, so machines that follow its catalog keep working.
+# (plugin folder and name, catalog name, zip, catalog file)
 PLUGINS = [
     ('aipod', 'aipod-releases', 'aipod-plugin.zip', 'aipod-marketplace.json'),
-    ('monitor-agent', 'monitor-agent-releases', 'monitor-agent-plugin.zip', 'marketplace.json'),
 ]
 FIXED_TIME = (2026, 1, 1, 0, 0, 0)  # the same files give the same zip, so the same sha256
 HOST = re.compile(r'^[A-Za-z0-9.-]+$')
@@ -92,14 +89,12 @@ def catalog(base, sha256, spec):
     plugin, name, zip_name, _ = spec
     return {
         'name': name,
-        'owner': {'name': 'aipod' if plugin == 'aipod' else 'Claude Monitor'},
-        'description': 'The aipod agent as a Claude Code plugin, served by this site.' if plugin == 'aipod'
-        else 'The old plugin of the aipod agent (a bridge: install the aipod plugin instead), served by this site.',
+        'owner': {'name': 'aipod'},
+        'description': 'The aipod agent as a Claude Code plugin, served by this site.',
         'plugins': [{
             'name': plugin,
             'source': {'source': 'archive', 'url': f'{base}/downloads/{zip_name}', 'sha256': sha256},
-            'description': 'Installs the aipod agent, connects it to your server and starts it with your Claude Code sessions.' if plugin == 'aipod'
-            else 'Replaced by the aipod plugin: install that one and run /aipod:connect.',
+            'description': 'Installs the aipod agent, connects it to your server and starts it with your Claude Code sessions.',
         }],
     }
 
@@ -108,26 +103,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('downloads')
     parser.add_argument('--base-url', required=True)
-    parser.add_argument('--plugin-dir', default=None, help='build only the old plugin (monitor-agent) from this folder')
-    parser.add_argument('--without-old', action='store_true', help='retire the old plugin: build only aipod and remove the old zip and catalog from the folder (ADR-0013: 90 days after the bridge, and when the web shows no machine on the old plugin)')
-    parser.add_argument('--aipod-dir', default=None, help='build the aipod plugin from this folder (with --plugin-dir: both)')
+    parser.add_argument('--aipod-dir', default=None, help='build the aipod plugin from this folder')
     args = parser.parse_args(argv)
     base = check_base(args.base_url)
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    given = {'monitor-agent': args.plugin_dir, 'aipod': args.aipod_dir}
-    only_given = args.plugin_dir is not None or args.aipod_dir is not None
-    jobs = [(spec, given[spec[0]] or os.path.join(root, 'plugin', spec[0])) for spec in PLUGINS if (not only_given or given[spec[0]]) and not (args.without_old and spec[0] == 'monitor-agent')]
+    jobs = [(spec, args.aipod_dir or os.path.join(root, 'plugin', spec[0])) for spec in PLUGINS]
     for _, folder in jobs:
         if not os.path.isdir(folder):
             refuse(f'plugin folder {folder} not found')
     os.makedirs(args.downloads, exist_ok=True)
-    if args.without_old:
-        for spec in PLUGINS:
-            if spec[0] == 'monitor-agent':
-                for name in (spec[2], spec[3]):
-                    path = os.path.join(args.downloads, name)
-                    if os.path.exists(path):
-                        os.remove(path)
     for spec, folder in jobs:
         sha256 = write_zip(folder, os.path.join(args.downloads, spec[2]))
         with open(os.path.join(args.downloads, spec[3]), 'w', encoding='utf-8') as handle:

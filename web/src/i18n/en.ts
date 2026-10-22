@@ -161,7 +161,7 @@ export const en = {
   },
   activity: {
     filterLabel: "Show", all: "All", inputs: "Inputs", assistant: "Assistant", tools: "Tools",
-    monitorInput: "Podium (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
+    podiumInput: "Podium (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
     sentBy: "sent by {name}", typedBy: "typed by {name}", someone: "a member",
     waiting: "Waiting", pendingTitle: "Waiting to be applied",
     deliveredWith: "delivered together with the message typed in the session",

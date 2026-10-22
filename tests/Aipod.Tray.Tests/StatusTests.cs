@@ -1,9 +1,9 @@
 using Aipod.Tray;
-using ClaudeMonitor.Agent.Auth;
-using ClaudeMonitor.Agent.Daemon;
-using ClaudeMonitor.Agent.Push;
-using ClaudeMonitor.Agent.Storage;
-using ClaudeMonitor.Agent.Update;
+using Podium.Agent.Auth;
+using Podium.Agent.Daemon;
+using Podium.Agent.Push;
+using Podium.Agent.Storage;
+using Podium.Agent.Update;
 
 namespace Aipod.Tray.Tests;
 

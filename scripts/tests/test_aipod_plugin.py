@@ -41,20 +41,20 @@ class AipodPlugin(AipodCase):
         manifest = json.load(open(os.path.join(AIPOD, '.claude-plugin', 'plugin.json')))
         self.assertEqual(manifest['name'], 'aipod')
         self.install_fake('0.6.0')
-        result = self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://monitor.invalid')
-        self.assertIn(f'BIN={self.bin} ID={NEW_ID} SERVER=https://monitor.invalid', result.stdout)
+        result = self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://aipod.invalid')
+        self.assertIn(f'BIN={self.bin} ID={NEW_ID} SERVER=https://aipod.invalid', result.stdout)
 
     def test_the_id_is_the_one_of_the_marketplace_the_plugin_is_enabled_from(self):
         self.install_fake('0.6.0')
         self.enable('aipod@monitor-agent-releases')  # installed from the repository catalog
-        result = self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://monitor.invalid')
+        result = self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://aipod.invalid')
         self.assertIn('ID=aipod@monitor-agent-releases', result.stdout)
         self.enable(NEW_ID)  # both: the URL catalog wins
-        self.assertIn(f'ID={NEW_ID}', self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://monitor.invalid').stdout)
+        self.assertIn(f'ID={NEW_ID}', self.run_script(NEW_RUN, 'hook', 'PreToolUse', server='https://aipod.invalid').stdout)
 
     def test_an_option_nobody_set_is_not_taken_for_an_address(self):
         self.install_fake('0.6.0')
-        result = self.run_script(NEW_RUN, 'mcp', CM_SERVER='${user_config.server}')
+        result = self.run_script(NEW_RUN, 'mcp', AP_SERVER='${user_config.server}')
         self.assertIn('SERVER=\n', result.stdout + '\n')  # unset, not the literal text
         self.assertNotIn('user_config', result.stdout)
 
@@ -62,11 +62,11 @@ class AipodPlugin(AipodCase):
         home = os.path.join(self.tmp, 'agent-home')
         os.makedirs(home)
         with open(os.path.join(home, 'agent.json'), 'w') as f:
-            f.write('{\n  "machineKey": "k",\n  "server": "https://monitor.invalid/",\n  "agentId": "x"\n}\n')
+            f.write('{\n  "machineKey": "k",\n  "server": "https://aipod.invalid/",\n  "agentId": "x"\n}\n')
         self.pins('0.6.0')
-        self.run_script(NEW_ENSURE, server='', AIPOD_AGENT_HOME=home)
+        self.run_script(NEW_ENSURE, server='', AP_AGENT_HOME=home)
         with open(os.path.join(self.data, 'server.txt')) as f:
-            self.assertEqual(f.read().strip(), 'https://monitor.invalid')
+            self.assertEqual(f.read().strip(), 'https://aipod.invalid')
 
     def test_a_pre_bridge_old_plugin_keeps_reporting_and_aipod_stands_down_for_hooks_and_mcp_only(self):
         self.install_fake('0.6.0')
@@ -123,7 +123,7 @@ class BridgePlugin(AipodCase):
         if os.path.exists(self.log):
             os.remove(self.log)  # what the earlier runs wrote
         self.enable(NEW_ID, '0.5.1')
-        result = self.run_script(ensure, server='https://monitor.invalid')
+        result = self.run_script(ensure, server='https://aipod.invalid')
         self.assertEqual((result.returncode, result.stdout), (0, ''))
         self.assertFalse(os.path.exists(self.log))  # nothing was attempted
 

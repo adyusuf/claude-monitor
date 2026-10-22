@@ -15,7 +15,7 @@ spec = importlib.util.spec_from_file_location('build_plugin_site', os.path.join(
 site = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(site)
 
-BASE = 'https://monitor.example.net'
+BASE = 'https://podium.example.net'
 
 
 def make_plugin(root):
@@ -82,17 +82,17 @@ class PluginSite(unittest.TestCase):
             self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), first)
 
     def test_an_address_claude_code_would_refuse_is_refused_before_anything_is_written(self):
-        for base in ['http://monitor.example.net', 'https://localhost', 'https://app.localhost', 'https://127.0.0.1', 'https://[::1]',
-                     'https://169.254.169.254', 'https://0.0.0.0', 'https://monitor.example.net/downloads', 'https://u:p@monitor.example.net',
-                     'https://monitor.example.net?x=1', 'monitor.example.net', '']:
+        for base in ['http://podium.example.net', 'https://localhost', 'https://app.localhost', 'https://127.0.0.1', 'https://[::1]',
+                     'https://169.254.169.254', 'https://0.0.0.0', 'https://podium.example.net/downloads', 'https://u:p@podium.example.net',
+                     'https://podium.example.net?x=1', 'podium.example.net', '']:
             with self.subTest(base=base):
                 self.refused(base)
         self.assertFalse(os.path.exists(self.out))
 
     def test_a_trailing_slash_and_a_port_are_fine_and_a_folder_that_is_not_a_plugin_is_refused(self):
-        self.assertEqual(self.build('https://monitor.example.net:8443/'), 0)
+        self.assertEqual(self.build('https://podium.example.net:8443/'), 0)
         with open(os.path.join(self.out, 'marketplace.json'), encoding='utf-8') as handle:
-            self.assertEqual(json.load(handle)['plugins'][0]['source']['url'], 'https://monitor.example.net:8443/downloads/monitor-agent-plugin.zip')
+            self.assertEqual(json.load(handle)['plugins'][0]['source']['url'], 'https://podium.example.net:8443/downloads/monitor-agent-plugin.zip')
         empty = os.path.join(self.tmp.name, 'empty')
         os.makedirs(empty)
         self.assertIn('not a plugin folder', self.refused(BASE, empty))

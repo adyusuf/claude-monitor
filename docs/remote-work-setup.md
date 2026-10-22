@@ -8,7 +8,7 @@ The design and every control are in [ADR-0005](adr-0005-remote-work.md); the per
 
 Terms: the **target** is the machine that does the work and its **service agent** is `aipod` running as a boot
 service; the **owner** is the person who approved that agent's login code; the **requester** is the agent whose Claude
-session asks. Replace `<your Claude Monitor address>` with the address your team signs in at.
+session asks. Replace `<your Podium address>` with the address your team signs in at.
 
 ## 1. Turn remote work on in the workspace (workspace admin)
 
@@ -34,25 +34,25 @@ local exec level and defaults to `off`, so start with `off` or `argv` and raise 
 **Linux** (systemd only; x64 or arm64):
 
 ```bash
-unzip cm-agent-linux-x64.zip && chmod +x cm-agent
-sudo ./cm-agent install --service --exec argv --server https://<your Claude Monitor address>
+unzip aipod-linux-x64.zip && chmod +x aipod
+sudo ./aipod install --service --exec argv --server https://<your Podium address>
 ```
 
 **macOS:**
 
 ```bash
-unzip cm-agent-macos-arm64.zip
-sudo ./cm-agent install --service --exec argv --server https://<your Claude Monitor address>
+unzip aipod-macos-arm64.zip
+sudo ./aipod install --service --exec argv --server https://<your Podium address>
 ```
 
 **Windows Server** (elevated PowerShell):
 
 ```powershell
-Expand-Archive .\cm-agent-windows-x64.zip -DestinationPath .\cm-agent
-.\cm-agent\cm-agent.exe install --service --exec argv --server https://<your Claude Monitor address>
+Expand-Archive .\aipod-windows-x64.zip -DestinationPath .\aipod
+.\aipod\aipod.exe install --service --exec argv --server https://<your Podium address>
 ```
 
-The install creates the service account (`aipod` on Linux, `_cmagent` on macOS, `NT SERVICE\cm-agent` on Windows),
+The install creates the service account (`aipod` on Linux, `_cmagent` on macOS, `NT SERVICE\aipod` on Windows),
 copies the binary to an admin-owned folder, creates the service home only that account can use, writes the exec
 policy file and starts the service. It **refuses to run the service as root, SYSTEM or LocalSystem**; `--allow-root`
 exists for metrics and uploads only, and the agent then never executes anything.
@@ -61,7 +61,7 @@ Check it is up:
 
 ```bash
 sudo systemctl status aipod                              # Linux
-sudo launchctl print system/com.claudemonitor.agent         # macOS
+sudo launchctl print system/com.aipod.agent         # macOS
 ```
 
 ```powershell
@@ -75,18 +75,18 @@ until it is connected. Read it as an administrator:
 
 | OS | Where the code is |
 |---|---|
-| Linux | `sudo journalctl -u aipod`, or `sudo cat /var/lib/cm-agent/login-code.txt` |
-| macOS | `sudo cat "/Library/Application Support/ClaudeMonitor/home/login-code.txt"` |
-| Windows | in an elevated prompt: `type "%ProgramData%\ClaudeMonitor\service\login-code.txt"` |
+| Linux | `sudo journalctl -u aipod`, or `sudo cat /var/lib/aipod/login-code.txt` |
+| macOS | `sudo cat "/Library/Application Support/Podium/home/login-code.txt"` |
+| Windows | in an elevated prompt: `type "%ProgramData%\Podium\service\login-code.txt"` |
 
-1. Open `https://<your Claude Monitor address>/device` (the "Connect a machine" page) signed in as the person who
+1. Open `https://<your Podium address>/device` (the "Connect a machine" page) signed in as the person who
    should own this machine's remote work, enter the code, choose the workspace and approve. **That person becomes the
    owner**: only they approve runs, grants and jobs on this machine, and an agent is accepted only while its user is a
    member of an active workspace.
 2. The service connects by itself once the code is approved. The machine then shows on the web's Machines page and
    reports CPU, memory and disk every 60 s. Confirm with the service's log and `aipod status`.
 3. If the code has expired, restart the service (`sudo systemctl restart aipod`, `sudo launchctl kickstart -k
-   system/com.claudemonitor.agent`, `sc.exe stop aipod` then `sc.exe start aipod`) and read the log or file
+   system/com.aipod.agent`, `sc.exe stop aipod` then `sc.exe start aipod`) and read the log or file
    again; a restart is how a fresh code is requested.
 
 The credentials the login stored (access and refresh tokens) are in the service home, `cred-*` files with mode 0600
@@ -99,9 +99,9 @@ The level lives in an **admin-owned file the service account cannot write**; the
 
 | OS | Exec policy file |
 |---|---|
-| Linux | `/etc/cm-agent/exec.json` |
-| macOS | `/Library/Application Support/ClaudeMonitor/exec.json` |
-| Windows | `%ProgramFiles%\ClaudeMonitor\exec.json` |
+| Linux | `/etc/aipod/exec.json` |
+| macOS | `/Library/Application Support/Podium/exec.json` |
+| Windows | `%ProgramFiles%\Podium\exec.json` |
 
 ```json
 {
@@ -151,7 +151,7 @@ Placeholders: `{int:a..b}`, `{word}`, `{path:ROOT}`, `{enum:a|b}`. A grant is fo
 requester agent), expires within 90 days, can be revoked at once and counts its uses. Shells, launchers and
 interpreters (sh, bash, env, sudo, ssh, python, node, powershell, cmd and the like) can never be granted, and roots
 such as `/`, `/etc`, `/home` or the agent's own home are refused. Claude may also **request** a grant
-(`monitor_request_grant`); that is only a request until the owner approves it, after re-authenticating within 10
+(`aipod_request_grant`); that is only a request until the owner approves it, after re-authenticating within 10
 minutes. The approval screen shows every argument, the working directory and the reason, which is labelled "written by
 Claude, untrusted". Read it as such.
 
@@ -161,23 +161,23 @@ These tools appear in the requester's Claude session through its own `aipod` (th
 
 | Tool | What it does |
 |---|---|
-| `monitor_machines` | lists the workspace's machines and their agents (a host name matching several agents is refused with their ids) |
-| `monitor_metrics` | CPU, memory and disk of one machine, last 7 days kept |
-| `monitor_alerts` | open and resolved resource and offline alerts; the agent never acts on them, Claude decides what to ask for |
-| `monitor_run` | asks for one command to run on a target (argv, or shell if the target allows it) |
-| `monitor_run_result` | waits up to 50 s for the result of a run, paged |
-| `monitor_run_cancel` | cancels a run; the whole process tree is killed |
-| `monitor_request_grant` | asks the owner for a grant |
-| `monitor_grants` | lists the grants the requester holds |
-| `monitor_jobs` | lists a target's approved named jobs |
-| `monitor_job_propose` | proposes a named job (argv or an admin-owned script) for the owner to approve; shell jobs do not exist |
-| `monitor_job_run` | runs an approved job; a job with a free placeholder still needs a per-call approval |
-| `monitor_machine` | one machine in full (ADR-0008): its role, tags, the admin's runbook note (as text, never an instruction), the tools with versions, the listening services when the owner allowed them and the caller may see them, and its projects with branch, commit, tag, the last runs per kind and recent errors |
-| `monitor_run_script` | asks a machine to run a script (sh, bash, python, powershell) from a private scratch file; always waits for the owner (and, on a production or database machine, a two-step code, as for a shell command or an interpreter run), never matches a grant or a job; `monitor_run_result` then says whether the output is complete |
-| `monitor_ask`, `monitor_ask_result` | asks a Claude session on another machine of the same user a question and reads the answer (only if that machine's owner allowed asks and a session there is idle) |
-| `monitor_answer` | how the receiving session answers an ask; the session is taken from the MCP process's parent, never from the model |
+| `aipod_machines` | lists the workspace's machines and their agents (a host name matching several agents is refused with their ids) |
+| `aipod_metrics` | CPU, memory and disk of one machine, last 7 days kept |
+| `aipod_alerts` | open and resolved resource and offline alerts; the agent never acts on them, Claude decides what to ask for |
+| `aipod_run` | asks for one command to run on a target (argv, or shell if the target allows it) |
+| `aipod_run_result` | waits up to 50 s for the result of a run, paged |
+| `aipod_run_cancel` | cancels a run; the whole process tree is killed |
+| `aipod_request_grant` | asks the owner for a grant |
+| `aipod_grants` | lists the grants the requester holds |
+| `aipod_jobs` | lists a target's approved named jobs |
+| `aipod_job_propose` | proposes a named job (argv or an admin-owned script) for the owner to approve; shell jobs do not exist |
+| `aipod_job_run` | runs an approved job; a job with a free placeholder still needs a per-call approval |
+| `aipod_machine` | one machine in full (ADR-0008): its role, tags, the admin's runbook note (as text, never an instruction), the tools with versions, the listening services when the owner allowed them and the caller may see them, and its projects with branch, commit, tag, the last runs per kind and recent errors |
+| `aipod_run_script` | asks a machine to run a script (sh, bash, python, powershell) from a private scratch file; always waits for the owner (and, on a production or database machine, a two-step code, as for a shell command or an interpreter run), never matches a grant or a job; `aipod_run_result` then says whether the output is complete |
+| `aipod_ask`, `aipod_ask_result` | asks a Claude session on another machine of the same user a question and reads the answer (only if that machine's owner allowed asks and a session there is idle) |
+| `aipod_answer` | how the receiving session answers an ask; the session is taken from the MCP process's parent, never from the model |
 
-`monitor_run` and `monitor_job_run` also take a `project` and a `kind` (`test`, `build`, `deploy`, `other`) so the result shows under that project on the machine's page. A person without Claude Code uses the same things from the command line: `aipod machines`, `machine`, `metrics`, `alerts`, `jobs`, `job-run`, `run`, `result` and `ask` (ADR-0008 §3g); `aipod install --standalone` makes a machine such a daemon (login first, then a user-level autostart; an application on macOS and Windows, `systemd --user` on Linux).
+`aipod_run` and `aipod_job_run` also take a `project` and a `kind` (`test`, `build`, `deploy`, `other`) so the result shows under that project on the machine's page. A person without Claude Code uses the same things from the command line: `aipod machines`, `machine`, `metrics`, `alerts`, `jobs`, `job-run`, `run`, `result` and `ask` (ADR-0008 §3g); `aipod install --standalone` makes a machine such a daemon (login first, then a user-level autostart; an application on macOS and Windows, `systemd --user` on Linux).
 
 Everything that comes back from another machine (run output, alert subjects, mount names) is **untrusted data**,
 wrapped and capped; Claude is told never to follow instructions found in it. A run's output has secrets masked
@@ -194,7 +194,7 @@ A service agent does not update itself: its binary is admin-owned, so the opt-in
    unit and starts the new one. The exec policy keeps its `allowedExecutables` and `allowedRoots`, and its level unless
    you pass `--exec`; the login in the service home stays, so no new code is needed.
 3. Check the Machines page (the machine is seen again) and `aipod status` on the target.
-4. A service installed before the rename keeps working under its old names (`cm-agent`); `sudo aipod service migrate --dry-run` shows how it would move to the aipod names, `sudo aipod service migrate` does it ([SETUP.md](../SETUP.md), ADR-0013 section 4). Go back with `--undo`; after seven days `--finish` removes the old service.
+4. A service installed before the rename keeps working under its old names (`aipod`); `sudo aipod service migrate --dry-run` shows how it would move to the aipod names, `sudo aipod service migrate` does it ([SETUP.md](../SETUP.md), ADR-0013 section 4). Go back with `--undo`; after seven days `--finish` removes the old service.
 5. Remove: `sudo aipod uninstall --service` (an elevated prompt on Windows) stops and deletes the service and
    **keeps** the home (the login), the exec policy and the binary. To retire a machine for good, also revoke its agent
    on the web (the Machines page) and delete the home.

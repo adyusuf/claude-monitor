@@ -7,30 +7,30 @@
   The drill fails, loudly (event log error), when there is no backup from the last 26 hours (the backup did not run),
   when the file cannot be decrypted, when pg_restore fails, or when the restored database has no users or no
   workspaces. The record goes to <env>\backups\restore-drills.log: date, file, row counts, result.
-  Only the scratch database monitor_restore_drill is created and dropped; the live database is never touched.
+  Only the scratch database aipod_restore_drill is created and dropped; the live database is never touched.
 #>
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)] [ValidateSet("test", "prod")] [string] $Environment,
-  [string] $Root = "C:\ClaudeMonitor",
+  [string] $Root = "C:\Podium",
   [string] $PgBin = "C:\Program Files\PostgreSQL\18\bin"
 )
 $ErrorActionPreference = "Stop"
 Import-Module (Join-Path $PSScriptRoot "BackupCrypto.psm1")
-$source = "ClaudeMonitor"
+$source = "Podium"
 if (-not [Diagnostics.EventLog]::SourceExists($source)) { New-EventLog -LogName Application -Source $source }
 $home_ = Join-Path $Root $Environment
 $log = Join-Path $home_ "backups\restore-drills.log"
 $values = @{}
-foreach ($line in Get-Content (Join-Path $home_ "monitor.env")) { if ($line -match '^([A-Z_]+)=(.*)$') { $values[$Matches[1]] = $Matches[2] } }
-$scratch = "monitor_restore_drill"
+foreach ($line in Get-Content (Join-Path $home_ "aipod.env")) { if ($line -match '^([A-Z_]+)=(.*)$') { $values[$Matches[1]] = $Matches[2] } }
+$scratch = "aipod_restore_drill"
 
 try {
   $latest = Get-ChildItem (Join-Path $home_ "backups") -Filter "*.cmbak" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
   if (-not $latest -or $latest.LastWriteTime -lt (Get-Date).AddHours(-26)) { throw "no backup from the last 26 hours: the backup did not run" }
 
-  $work = Join-Path $env:TEMP "cm-drill-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory -Path $work | Out-Null
-  Unprotect-BackupFile -Source $latest.FullName -Destination "$work\backup.zip" -Secret $values["MONITOR_BACKUP_KEY"]
+  $work = Join-Path $env:TEMP "ap-drill-$([guid]::NewGuid().ToString('N'))"; New-Item -ItemType Directory -Path $work | Out-Null
+  Unprotect-BackupFile -Source $latest.FullName -Destination "$work\backup.zip" -Secret $values["AIPOD_BACKUP_KEY"]
   Expand-Archive "$work\backup.zip" -DestinationPath $work
 
   $su = Read-Host "PostgreSQL superuser (postgres) password" -AsSecureString

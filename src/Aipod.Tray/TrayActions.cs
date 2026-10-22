@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using ClaudeMonitor.Agent.Auth;
-using ClaudeMonitor.Agent.Config;
+using Podium.Agent.Auth;
+using Podium.Agent.Config;
 
 namespace Aipod.Tray;
 

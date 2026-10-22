@@ -1,4 +1,4 @@
-// The API's response shapes (src/ClaudeMonitor.Api/Endpoints). Type-only.
+// The API's response shapes (src/Podium.Api/Endpoints). Type-only.
 
 export type Role = "owner" | "admin" | "member" | "viewer";
 export type SessionStatus = "active" | "idle" | "waiting" | "ended";

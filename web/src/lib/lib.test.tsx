@@ -78,8 +78,8 @@ describe("i18n", () => {
   it("names the site Podium in every language and the agent aipod, never the old names", () => {
     for (const dict of [en, tr, de]) {
       expect(dict.app.name).toBe("Podium");
-      expect(dict.activity.monitorInput).toMatch(/^Podium \(web\)$/i); // German writes "Web" with a capital
-      expect(JSON.stringify(dict)).not.toMatch(/cm-agent|Claude Monitor/);
+      expect(dict.activity.podiumInput).toMatch(/^Podium \(web\)$/i); // German writes "Web" with a capital
+      expect(JSON.stringify(dict)).not.toMatch(/aipod|Podium/);
     }
   });
 
@@ -108,13 +108,13 @@ describe("api client", () => {
       seen.push((init?.headers as Record<string, string>)["Accept-Language"]);
       return new Response("{}", { status: 200 });
     });
-    localStorage.removeItem("cm.language");
+    localStorage.removeItem("ap.language");
     await request("GET", "/me");
-    localStorage.setItem("cm.language", "de");
+    localStorage.setItem("ap.language", "de");
     await request("GET", "/me");
-    localStorage.setItem("cm.language", "not a language");
+    localStorage.setItem("ap.language", "not a language");
     await request("GET", "/me");
-    localStorage.removeItem("cm.language");
+    localStorage.removeItem("ap.language");
     expect(seen).toEqual([undefined, "de", undefined]);
   });
 

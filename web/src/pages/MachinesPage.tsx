@@ -121,7 +121,7 @@ export function MachinesPage() {
   );
 }
 
-/** /device: the page "cm-agent login" opens; the signed-in person approves the code for a workspace. */
+/** /device: the page "aipod login" opens; the signed-in person approves the code for a workspace. */
 export function DevicePage() {
   const { t } = useI18n();
   const errorText = useErrorText();

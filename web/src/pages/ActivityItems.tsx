@@ -46,10 +46,10 @@ function Pressable({ item, open, onToggle, className, children }: Pick<LineProps
 /** A message that entered the session: sent from the web (a command) or typed in the harness. Closed to a short preview; pressed, the whole text and the payload. */
 export function InputLine({ item, who, open, onToggle }: LineProps) {
   const { t, dict } = useI18n();
-  const monitor = item.cls === ActivityClass.MonitorInput;
+  const monitor = item.cls === ActivityClass.PodiumInput;
   const command = item.command;
   const stop = command?.kind === CommandKind.Stop;
-  const label = monitor ? t("activity.monitorInput") : t("activity.humanInput");
+  const label = monitor ? t("activity.podiumInput") : t("activity.humanInput");
   const by = monitor
     ? t("activity.sentBy", { name: command?.createdBy === who.ownerId ? who.ownerName : t("activity.someone") })
     : t("activity.typedBy", { name: who.ownerName });

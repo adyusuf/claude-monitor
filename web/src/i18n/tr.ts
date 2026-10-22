@@ -162,7 +162,7 @@ export const tr: Dictionary = {
   },
   activity: {
     filterLabel: "Göster", all: "Tümü", inputs: "Girdiler", assistant: "Asistan", tools: "Araçlar",
-    monitorInput: "Podium (web)", humanInput: "İnsan (Claude Code)", assistantLabel: "Claude", stopRequest: "Durdurma isteği",
+    podiumInput: "Podium (web)", humanInput: "İnsan (Claude Code)", assistantLabel: "Claude", stopRequest: "Durdurma isteği",
     sentBy: "gönderen: {name}", typedBy: "yazan: {name}", someone: "bir üye",
     waiting: "Bekliyor", pendingTitle: "Uygulanmayı bekliyor",
     deliveredWith: "oturumda yazılan mesajla birlikte teslim edildi",
