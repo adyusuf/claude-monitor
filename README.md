@@ -12,43 +12,58 @@ keeps its settings and login.
 
 | Environment | Web site (`--server`) | Download host (`--from`) |
 |---|---|---|
-| Test | `https://pods.bitreka.com` | `https://testaipods.bitreka.com/pods/test` |
-| Live | `https://testpods.bitreka.com` | `https://aipods.bitreka.com/pods/prod` |
+| Test | `https://testpods.bitreka.com` | `https://testaipods.bitreka.com/pods/test` |
+| Live | `https://pods.bitreka.com` | `https://aipods.bitreka.com/pods/prod` |
 
 **macOS, test**
 
 ```bash
-curl -fsSL https://testaipods.bitreka.com/pods/test/aipod-install.sh | sh -s -- --server https://pods.bitreka.com --from https://testaipods.bitreka.com/pods/test
+curl -fsSL https://testaipods.bitreka.com/pods/test/aipod-install.sh | sh -s -- --server https://testpods.bitreka.com --from https://testaipods.bitreka.com/pods/test
 ```
 
 **macOS, live**
 
 ```bash
-curl -fsSL https://aipods.bitreka.com/pods/prod/aipod-install.sh | sh -s -- --server https://testpods.bitreka.com --from https://aipods.bitreka.com/pods/prod
+curl -fsSL https://aipods.bitreka.com/pods/prod/aipod-install.sh | sh -s -- --server https://pods.bitreka.com --from https://aipods.bitreka.com/pods/prod
 ```
 
 **Linux, test** (the same script as macOS; `curl`, `unzip` and `sh` are needed)
 
 ```bash
-curl -fsSL https://testaipods.bitreka.com/pods/test/aipod-install.sh | sh -s -- --server https://pods.bitreka.com --from https://testaipods.bitreka.com/pods/test
+curl -fsSL https://testaipods.bitreka.com/pods/test/aipod-install.sh | sh -s -- --server https://testpods.bitreka.com --from https://testaipods.bitreka.com/pods/test
 ```
 
 **Linux, live**
 
 ```bash
-curl -fsSL https://aipods.bitreka.com/pods/prod/aipod-install.sh | sh -s -- --server https://testpods.bitreka.com --from https://aipods.bitreka.com/pods/prod
+curl -fsSL https://aipods.bitreka.com/pods/prod/aipod-install.sh | sh -s -- --server https://pods.bitreka.com --from https://aipods.bitreka.com/pods/prod
 ```
 
 **Windows, test** (PowerShell, no administrator needed)
 
 ```powershell
-irm https://testaipods.bitreka.com/pods/test/aipod-install.ps1 -OutFile "$env:TEMP\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server https://pods.bitreka.com -From https://testaipods.bitreka.com/pods/test
+irm https://testaipods.bitreka.com/pods/test/aipod-install.ps1 -OutFile "$env:TEMP\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server https://testpods.bitreka.com -From https://testaipods.bitreka.com/pods/test
 ```
 
 **Windows, live**
 
 ```powershell
-irm https://aipods.bitreka.com/pods/prod/aipod-install.ps1 -OutFile "$env:TEMP\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server https://testpods.bitreka.com -From https://aipods.bitreka.com/pods/prod
+irm https://aipods.bitreka.com/pods/prod/aipod-install.ps1 -OutFile "$env:TEMP\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server https://pods.bitreka.com -From https://aipods.bitreka.com/pods/prod
+```
+
+**Template** (any environment: fill in your two addresses)
+
+```bash
+SERVER=https://your-site                                  # the web address you open in the browser
+DOWNLOADS=https://your-download-host/your-folder          # the download host's folder for this environment (R2)
+curl -fsSL "$DOWNLOADS/aipod-install.sh" | sh -s -- --server "$SERVER" --from "$DOWNLOADS"
+```
+
+```powershell
+$Server = 'https://your-site'
+$Downloads = 'https://your-download-host/your-folder'
+irm "$Downloads/aipod-install.ps1" -OutFile "$env:TEMP\aipod-install.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server $Server -From $Downloads
 ```
 
 Add `--dry-run` (Windows: `-DryRun`) to see what it would do without changing anything. Then restart Claude Code (or open a new session);
