@@ -68,6 +68,7 @@ export function AcceptInvitationPage() {
 export function DownloadPage() {
   const { t } = useI18n();
   const origin = window.location.origin;
+  const downloads = config.downloadsUrl || `${origin}/downloads`; // the download host itself when the build names it
   const hasPlugin = config.pluginMarketplace !== "" || config.pluginFromServer;
   const files = [
     { os: t("download.macos"), file: "aipod-macos-arm64.zip", label: "Apple silicon" },
@@ -81,13 +82,20 @@ export function DownloadPage() {
     <div className="page narrow">
       <h1>{t("download.title")}</h1>
       <p className="lead">{t("download.intro")}</p>
+      <Card title={t("download.installerTitle")}>
+        <p>{t("download.installerIntro")}</p>
+        <p className="muted">{t("download.installerUnix")}</p>
+        <CopyText text={`curl -fsSL ${downloads}/aipod-install.sh | sh -s -- --server ${origin} --from ${downloads}`} />
+        <p className="muted">{t("download.installerWindows")}</p>
+        <CopyText text={`irm ${downloads}/aipod-install.ps1 -OutFile "$env:TEMP\\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\aipod-install.ps1" -Server ${origin} -From ${downloads}`} />
+      </Card>
       {hasPlugin && (
         <Card title={t("download.pluginTitle")}>
           <p>{t("download.pluginIntro")}</p>
           <p className="muted">1. {t("download.plugin1")}</p>
           {config.pluginMarketplace
             ? <CopyText text={`claude plugin install aipod --marketplace ${config.pluginMarketplace}`} />
-            : <><CopyText text={`claude plugin marketplace add ${origin}/downloads/aipod-marketplace.json`} /><CopyText text="claude plugin install aipod@aipod-releases" /></>}
+            : <><CopyText text={`claude plugin marketplace add ${downloads}/aipod-marketplace.json`} /><CopyText text="claude plugin install aipod@aipod-releases" /></>}
           <CopyText text={origin} />
           <p className="muted">2. {t("download.plugin2")}</p>
           <CopyText text="/aipod:connect" />
@@ -96,7 +104,7 @@ export function DownloadPage() {
       {hasPlugin && <p className="muted">{t("download.orManual")}</p>}
       <Card title={`1. ${t("download.step1")}`}>
         <ul className="downloads">
-          {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`/downloads/${f.file}`}>{f.os} · {f.label}</a></li>)}
+          {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`${config.downloadsUrl || "/downloads"}/${f.file}`}>{f.os} · {f.label}</a></li>)}
         </ul>
       </Card>
       <Card title={`2. ${t("download.step2")}`}><CopyText text={`aipod login --server ${origin}`} /></Card>
