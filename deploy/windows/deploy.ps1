@@ -3,7 +3,7 @@
   Deploys a release package (scripts/build-release.sh) to one environment, with an automatic rollback.
 
 .DESCRIPTION
-  1. unpacks the package into C:\Podium\<env>\releases\<commit>;
+  1. unpacks the package into C:\iis\Podium\<env>\releases\<commit>;
   2. writes the environment file's values into that release's web.config (environmentVariables of the ASP.NET Core
      module), so secrets stay on the server and out of the package;
   3. applies the database migrations (they only add, global #4, so the release still running is not broken);
@@ -20,7 +20,7 @@ param(
   [Parameter(Mandatory)] [ValidateSet("test", "prod")] [string] $Environment,
   [Parameter(Mandatory)] [string] $Package,
   [Parameter(Mandatory)] [int] $LoopbackPort,
-  [string] $Root = "C:\Podium"
+  [string] $Root = "C:\iis\Podium"
 )
 $ErrorActionPreference = "Stop"
 Import-Module WebAdministration

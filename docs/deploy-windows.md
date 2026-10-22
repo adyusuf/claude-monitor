@@ -1,7 +1,7 @@
 # Running test and production on Windows Server
 
 The maintainer's server runs Windows Server without Docker (ADR-0002). Both environments live on it, each with its own
-IIS site, app pool, PostgreSQL database and folder under `C:\Podium\<env>`. Cloudflare proxies both host names
+IIS site, app pool, PostgreSQL database and folder under `C:\iis\Podium\<env>`. Cloudflare proxies both host names
 (orange cloud); the server holds a Cloudflare Origin certificate. The host names are not in this repository.
 
 ## Once per server
@@ -29,7 +29,7 @@ IIS site, app pool, PostgreSQL database and folder under `C:\Podium\<env>`. Clou
    .\setup-server.ps1 -Environment prod -HostName <prod host> -CertThumbprint <thumbprint> -LoopbackPort 8080 -SmtpUser <sender> -SmtpFrom <sender>
    ```
 
-   Then fill in `C:\Podium\<env>\aipod.env`: the Gmail app password, the GitHub and Google OAuth client
+   Then fill in `C:\iis\Podium\<env>\aipod.env`: the Gmail app password, the GitHub and Google OAuth client
    ids and secrets (one OAuth app per environment; callbacks `https://<host>/api/auth/callback/github` and
    `.../google`), and `AIPOD_BACKUP_OFFSITE` (a folder on another machine). Copy `AIPOD_BACKUP_KEY` into the
    password manager: without it no backup can be restored.

@@ -17,7 +17,7 @@
 param(
   [Parameter(Mandatory)] [ValidateSet("test", "prod")] [string] $Environment,
   [Parameter(Mandatory)] [int] $LoopbackPort,
-  [string] $Root = "C:\Podium"
+  [string] $Root = "C:\iis\Podium"
 )
 $ErrorActionPreference = "Stop"
 $source = "Podium"
