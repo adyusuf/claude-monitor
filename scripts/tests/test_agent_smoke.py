@@ -20,12 +20,12 @@ spec = importlib.util.spec_from_file_location('agent_smoke', SCRIPT)
 smoke = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(smoke)
 
-# A stand-in daemon that does what the real one does first: read its identity from CM_AGENT_HOME and call the API.
+# A stand-in daemon that does what the real one does first: read its identity from AP_AGENT_HOME and call the API.
 HEALTHY = textwrap.dedent('''\
     import json, os, time, urllib.request
-    home = os.environ['CM_AGENT_HOME']
+    home = os.environ['AP_AGENT_HOME']
     identity = json.load(open(os.path.join(home, 'agent.json')))
-    assert os.environ['CM_CREDENTIALS'] == 'file'
+    assert os.environ['AP_CREDENTIALS'] == 'file'
     token = open(os.path.join(home, 'cred-access-token')).read()
     assert '\\n' not in token and token
     base = identity['server']
@@ -44,7 +44,7 @@ class Smoke(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.dir, True)
 
     def binary(self, body):
-        path = os.path.join(self.dir, f'cm-agent-{len(os.listdir(self.dir))}')
+        path = os.path.join(self.dir, f'aipod-{len(os.listdir(self.dir))}')
         with open(path, 'w', encoding='utf-8') as handle:
             handle.write(body)
         os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR)
@@ -152,8 +152,8 @@ class Smoke(unittest.TestCase):
             return mock.Mock(returncode=0, stdout='', stderr='')
 
         with mock.patch.object(smoke.subprocess, 'run', fake_run):
-            self.assertEqual(os.path.join('out', 'cm-agent'), smoke.publish('osx-arm64', 'out'))
-            self.assertEqual(os.path.join('out', 'cm-agent.exe'), smoke.publish('win-x64', 'out'))
+            self.assertEqual(os.path.join('out', 'aipod'), smoke.publish('osx-arm64', 'out'))
+            self.assertEqual(os.path.join('out', 'aipod.exe'), smoke.publish('win-x64', 'out'))
         self.assertIn('Release', ran[0])
         self.assertIn('osx-arm64', ran[0])
         with mock.patch.object(smoke.subprocess, 'run', return_value=mock.Mock(returncode=1, stdout='boom', stderr='')), \

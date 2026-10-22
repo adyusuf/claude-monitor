@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Podium.Agent/Podium.Agent.csproj" />
+    <Project Path="src/Podium.Api/Podium.Api.csproj" />
+    <Project Path="src/Aipod.Tray/Aipod.Tray.csproj" />
+    <Project Path="src/Podium.Contracts/Podium.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Aipod.Tray.Tests/Aipod.Tray.Tests.csproj" />
+    <Project Path="tests/Podium.Agent.Tests/Podium.Agent.Tests.csproj" />
+    <Project Path="tests/Podium.Api.Tests/Podium.Api.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -12,7 +12,7 @@ export const e2e = {
 
 /** Test addresses (global #30): <account>+<tag>@<domain> from E2E_EMAIL_BASE, unique per call. */
 export function email(tag: string): string {
-  const configured = process.env.E2E_EMAIL_BASE ?? "monitor.e2e@gmail.com";
+  const configured = process.env.E2E_EMAIL_BASE ?? "aipod.e2e@gmail.com";
   const [account, domain] = configured.split("@");
   return `${account}+${tag}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@${domain}`;
 }

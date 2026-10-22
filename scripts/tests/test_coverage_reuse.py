@@ -11,7 +11,7 @@ from gate_tool_support import ToolCase
 
 SCRIPT = 'coverage.sh'
 COBERTURA = '<?xml version="1.0"?><coverage lines-covered="%d" lines-valid="%d" line-rate="0"><packages/></coverage>'
-API, AGENT, TRAY = 'ClaudeMonitor.Api.Tests', 'ClaudeMonitor.Agent.Tests', 'Aipod.Tray.Tests'
+API, AGENT, TRAY = 'Podium.Api.Tests', 'Podium.Agent.Tests', 'Aipod.Tray.Tests'
 
 
 class CoverageReuse(ToolCase):

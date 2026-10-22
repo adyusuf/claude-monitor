@@ -26,7 +26,7 @@ export const ACTIVITY_FILTERS: readonly ActivityFilterName[] = Object.values(Act
 /** Which classes each filter shows. "Tools" also covers the quiet background events (usage, notices, subagents). */
 const FILTER_CLASSES: Record<ActivityFilterName, readonly ActivityClassName[]> = {
   [ActivityFilter.All]: Object.values(ActivityClass),
-  [ActivityFilter.Inputs]: [ActivityClass.MonitorInput, ActivityClass.HumanInput],
+  [ActivityFilter.Inputs]: [ActivityClass.PodiumInput, ActivityClass.HumanInput],
   [ActivityFilter.Assistant]: [ActivityClass.Assistant],
   [ActivityFilter.Tools]: [ActivityClass.Tool, ActivityClass.Meta],
 };
@@ -117,7 +117,7 @@ export function buildTimeline(events: EventRow[], commands: CommandRow[], hasOld
     const pending = isPending(c);
     const at = ms(c.appliedAt ?? c.createdAt);
     const item: TimelineItem = {
-      key: `c${c.id}`, cls: ActivityClass.MonitorInput, at, tie: 0, pending, withHuman: false,
+      key: `c${c.id}`, cls: ActivityClass.PodiumInput, at, tie: 0, pending, withHuman: false,
       text: c.kind === CommandKind.Stop ? "" : c.body ?? "", command: c,
     };
     if (pending) {

@@ -1,6 +1,6 @@
 using Aipod.Tray;
-using ClaudeMonitor.Agent.Push;
-using ClaudeMonitor.Agent.Storage;
+using Podium.Agent.Push;
+using Podium.Agent.Storage;
 
 namespace Aipod.Tray.Tests;
 

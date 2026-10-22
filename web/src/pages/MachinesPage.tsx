@@ -8,7 +8,7 @@ import { Button, Card, Empty, Field, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime, percent } from "../lib/format";
 import { debounce, isCatchUp, useLive } from "../lib/live";
-import { ClaudeBadge, PluginBadge, RoleBadge, TagChips } from "./MachineBadges";
+import { ClaudeBadge, RoleBadge, TagChips } from "./MachineBadges";
 import { ExecBadge, maxDiskPct, memoryPct, OnlineDot, ServiceBadge } from "./MachineBits";
 
 /** One machine: the agent's facts, and (when the API reports remote work) its exec level, load and open alerts. */
@@ -24,7 +24,7 @@ function MachineRow({ ws, agent: a, view: v, canRevoke, onRevoke }: {
         <span className="muted small">{a.os} {a.arch}</span>
       </td>
       <td>{a.userName}</td>
-      <td>{v ? <><RoleBadge view={v} /> <ClaudeBadge view={v} /> <PluginBadge view={v} /> <TagChips view={v} /></> : null}</td>
+      <td>{v ? <><RoleBadge view={v} /> <ClaudeBadge view={v} /> <TagChips view={v} /></> : null}</td>
       <td>{v ? <><ExecBadge level={v.execLevel} /> <ServiceBadge serviceMode={v.serviceMode} /></> : null}</td>
       <td>{v ? percent(v.latest?.cpuPct) : ""}</td>
       <td>{v ? percent(memoryPct(v.latest)) : ""}</td>
@@ -121,7 +121,7 @@ export function MachinesPage() {
   );
 }
 
-/** /device: the page "cm-agent login" opens; the signed-in person approves the code for a workspace. */
+/** /device: the page "aipod login" opens; the signed-in person approves the code for a workspace. */
 export function DevicePage() {
   const { t } = useI18n();
   const errorText = useErrorText();

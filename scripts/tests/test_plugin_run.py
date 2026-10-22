@@ -1,4 +1,4 @@
-"""scripts/run.sh of the Claude Monitor plugin (ADR-0007): silent without a binary, the environment it gives the agent."""
+"""scripts/run.sh of the aipod plugin (ADR-0007): silent without a binary, the environment it gives the agent."""
 import subprocess
 import unittest
 
@@ -21,10 +21,10 @@ class RunScript(PluginScriptsCase):
 
     def test_run_executes_the_installed_binary_with_the_plugin_environment(self):
         self.install_fake('0.3.0')
-        result = self.run_script(RUN, 'hook', 'PreToolUse', server='https://monitor.invalid')
+        result = self.run_script(RUN, 'hook', 'PreToolUse', server='https://aipod.invalid')
         self.assertEqual(result.returncode, 0)
         self.assertIn('args: hook PreToolUse', result.stdout)
-        self.assertIn(f'BIN={self.bin} ID=monitor-agent@monitor-agent-releases SERVER=https://monitor.invalid', result.stdout)
+        self.assertIn(f'BIN={self.bin} ID=aipod@aipod-releases SERVER=https://aipod.invalid', result.stdout)
 
     def test_run_hands_the_context_entry_only_to_a_binary_at_least_as_new_as_the_pin(self):
         # ADR-0008: an older binary (still installed while ensure.sh downloads the pinned one) would read `--context` as a second recording hook.
@@ -50,14 +50,14 @@ class RunScript(PluginScriptsCase):
         with open(os.path.join(self.data, 'server.txt'), 'w') as f:
             f.write('https://kept.invalid\n')
         self.assertIn('SERVER=https://kept.invalid', self.run_script(RUN, 'status').stdout)  # a Bash tool has neither of the others
-        self.assertIn('SERVER=https://mcp.invalid', self.run_script(RUN, 'mcp', CM_SERVER='https://mcp.invalid').stdout)
-        self.assertIn('SERVER=https://option.invalid', self.run_script(RUN, 'hook', 'Stop', server='https://option.invalid', CM_SERVER='https://mcp.invalid').stdout)
+        self.assertIn('SERVER=https://mcp.invalid', self.run_script(RUN, 'mcp', AP_SERVER='https://mcp.invalid').stdout)
+        self.assertIn('SERVER=https://option.invalid', self.run_script(RUN, 'hook', 'Stop', server='https://option.invalid', AP_SERVER='https://mcp.invalid').stdout)
 
     def test_run_turns_push_on_only_for_the_inbox_option(self):
         self.install_fake('0.3.0')
         for option, expected in (('inbox', 'PUSH=inbox'), ('', 'PUSH=')):
             with open(self.bin, 'w') as f:
-                f.write('#!/bin/sh\necho "PUSH=$CM_PUSH"\n')
+                f.write('#!/bin/sh\necho "PUSH=$AP_PUSH"\n')
             result = self.run_script(RUN, 'x', CLAUDE_PLUGIN_OPTION_PUSH=option)
             self.assertEqual(result.stdout.strip(), expected)
         self.assertEqual(self.run_script(RUN, 'x', CLAUDE_PLUGIN_OPTION_PUSH='channel').stdout.strip(), 'PUSH=')  # an option cannot ask for anything else

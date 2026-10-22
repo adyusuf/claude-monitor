@@ -116,8 +116,8 @@ if [ -z "$(git ls-files --cached --others --exclude-standard '*.csproj')" ]; the
   echo "▶ .NET"
   echo "  n/a: no .NET project yet"
 else
-  dotnet_codebase "API" tests/ClaudeMonitor.Api.Tests
-  dotnet_codebase "agent" tests/ClaudeMonitor.Agent.Tests
+  dotnet_codebase "API" tests/Podium.Api.Tests
+  dotnet_codebase "agent" tests/Podium.Agent.Tests
   dotnet_codebase "tray" tests/Aipod.Tray.Tests
 fi
 

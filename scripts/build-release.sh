@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# One release package for the Windows server (ADR-0002 phase 4): out/claude-monitor-<commit>.zip with
+# One release package for the Windows server (ADR-0002 phase 4): out/podium-<commit>.zip with
 #   api/   the API, self-contained for win-x64, with the web.config IIS needs
-#   web/   the built web app. The agent builds are NOT in it: they are served from the download host (an R2 bucket, MONITOR_DOWNLOADS_URL,
+#   web/   the built web app. The agent builds are NOT in it: they are served from the download host (an R2 bucket, AIPOD_DOWNLOADS_URL,
 #          docs/release.md "Download host"), published by scripts/publish_agent_downloads.sh
 #   release.json   {"commit": "<sha>"}, which deploy.ps1 checks against /api/version after the switch
 # The package holds no secret: deploy.ps1 adds the environment's values on the server.
@@ -33,11 +33,11 @@ npm --prefix web run build >/dev/null
 cp -R web/dist "$stage/web"
 
 echo "▶ api (win-x64)"
-dotnet publish src/ClaudeMonitor.Api -c Release -r win-x64 --self-contained true -o "$stage/api" --nologo -v q \
+dotnet publish src/Podium.Api -c Release -r win-x64 --self-contained true -o "$stage/api" --nologo -v q \
   -p:SourceRevisionId="$commit"
 
 printf '{"commit":"%s"}\n' "$commit" > "$stage/release.json"
 mkdir -p "$out"
-rm -f "$out/claude-monitor-$commit.zip"
-(cd "$stage" && zip -q -r -X "$out/claude-monitor-$commit.zip" api web release.json)
-echo "✓ $out/claude-monitor-$commit.zip"
+rm -f "$out/podium-$commit.zip"
+(cd "$stage" && zip -q -r -X "$out/podium-$commit.zip" api web release.json)
+echo "✓ $out/podium-$commit.zip"

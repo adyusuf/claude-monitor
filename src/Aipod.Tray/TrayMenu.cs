@@ -1,4 +1,4 @@
-using ClaudeMonitor.Agent.Config;
+using Podium.Agent.Config;
 namespace Aipod.Tray;
 
 /// <summary>Everything the menu and the window's buttons can ask for.</summary>

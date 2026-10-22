@@ -1,9 +1,9 @@
 using System.Globalization;
-using ClaudeMonitor.Agent.Auth;
-using ClaudeMonitor.Agent.Config;
-using ClaudeMonitor.Agent.Push;
-using ClaudeMonitor.Agent.Storage;
-using ClaudeMonitor.Agent.Update;
+using Podium.Agent.Auth;
+using Podium.Agent.Config;
+using Podium.Agent.Push;
+using Podium.Agent.Storage;
+using Podium.Agent.Update;
 using Microsoft.Data.Sqlite;
 
 namespace Aipod.Tray;

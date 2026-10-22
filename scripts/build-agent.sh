@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the agent for every platform and packs one zip each into an output folder (default: out/downloads), which
-# scripts/publish_agent_downloads.sh puts on the download host (R2) that MONITOR_DOWNLOADS_URL names; the release package carries none of it.
+# scripts/publish_agent_downloads.sh puts on the download host (R2) that AIPOD_DOWNLOADS_URL names; the release package carries none of it.
 #
 #   bash scripts/build-agent.sh [out-dir]
 #
@@ -12,7 +12,7 @@
 # Windows and Linux builds are not signed (ADR-0002, open item: the signing route; ADR-0005): an admin verifies the
 # SHA-256 in SHA256SUMS before a service upgrade (docs/release.md). Single file, never compressed (see the csproj).
 #
-# The plugin's pins (ADR-0007): the SHA-256 of every zip is written to plugin/aipod/agent-release.txt and plugin/monitor-agent/agent-release.txt for the release commit.
+# The plugin's pins (ADR-0007): the SHA-256 of every zip is written to plugin/aipod/agent-release.txt for the release commit.
 #
 # Self-update (ADR-0004): AGENT_UPDATE_CHANNEL=test|prod builds the channel's public key (deploy/update-keys/<channel>.pub)
 # into the agent and signs a manifest.json for the zips with the channel's PRIVATE key, which lives only in the
@@ -22,7 +22,7 @@ set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
 out="${1:-$root/out/downloads}"
-project="$root/src/ClaudeMonitor.Agent"
+project="$root/src/Podium.Agent"
 entitlements="$root/deploy/agent.entitlements"
 mkdir -p "$out"
 channel="${AGENT_UPDATE_CHANNEL:-}"
@@ -39,14 +39,14 @@ for rid in osx-arm64 osx-x64 win-x64 win-arm64 linux-x64 linux-arm64; do
   echo "▶ $rid"
   dotnet publish "$project" -c Release -r "$rid" -o "$work/$rid" --nologo -v q ${channel_args[@]+"${channel_args[@]}"}
   case "$rid" in
-    osx-arm64) name="cm-agent-macos-arm64" ;;
-    osx-x64) name="cm-agent-macos-x64" ;;
-    win-x64) name="cm-agent-windows-x64" ;;
-    win-arm64) name="cm-agent-windows-arm64" ;;
-    linux-x64) name="cm-agent-linux-x64" ;;
-    linux-arm64) name="cm-agent-linux-arm64" ;;
+    osx-arm64) name="aipod-macos-arm64" ;;
+    osx-x64) name="aipod-macos-x64" ;;
+    win-x64) name="aipod-windows-x64" ;;
+    win-arm64) name="aipod-windows-arm64" ;;
+    linux-x64) name="aipod-linux-x64" ;;
+    linux-arm64) name="aipod-linux-arm64" ;;
   esac
-  binary="$work/$rid/cm-agent"
+  binary="$work/$rid/aipod"
   [ -f "$binary.exe" ] && binary="$binary.exe"
   if [[ "$rid" == osx-* && -n "${AGENT_SIGN_IDENTITY:-}" ]]; then
     codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$AGENT_SIGN_IDENTITY" "$binary"
@@ -63,7 +63,7 @@ done
 
 mv "$work/SHA256SUMS" "$out/SHA256SUMS"
 rm -f "$out/manifest.json"
-version="$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' "$project/ClaudeMonitor.Agent.csproj" | head -1)"
+version="$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' "$project/Podium.Agent.csproj" | head -1)"
 # The Claude Code plugin pins these zips by SHA-256 (ADR-0007): commit both plugins' agent-release.txt files with the release.
 python3 "$root/scripts/write_plugin_pins.py" "$out" "$version"
 if [ -n "$channel" ]; then

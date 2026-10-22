@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes plugin/aipod/agent-release.txt and plugin/monitor-agent/agent-release.txt (the same pins: both plugins install the same builds) from a build's SHA256SUMS (ADR-0007).
+"""Writes plugin/aipod/agent-release.txt from a build's SHA256SUMS (ADR-0007).
 
     python3 scripts/write_plugin_pins.py <downloads-dir> <version> [--replace]
 
@@ -12,10 +12,10 @@ import os
 import re
 import sys
 
-NAME = re.compile(r'^cm-agent-(macos|windows|linux)-(arm64|x64)\.zip$')
+NAME = re.compile(r'^aipod-(macos|windows|linux)-(arm64|x64)\.zip$')
 HEX = re.compile(r'^[0-9a-f]{64}$')
 VERSION = re.compile(r'^\d+\.\d+\.\d+$')
-PLUGIN_FOLDERS = ('aipod', 'monitor-agent')
+PLUGIN_FOLDERS = ('aipod',)
 
 
 def pins(sums_text):
@@ -72,7 +72,7 @@ def main(argv):
         print(f'cannot read {sums}: {error}', file=sys.stderr)
         return 2
     if not found:
-        print(f'no cm-agent zip in {sums}', file=sys.stderr)
+        print(f'no aipod zip in {sums}', file=sys.stderr)
         return 2
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     targets = [os.path.join(root, 'plugin', name, 'agent-release.txt') for name in PLUGIN_FOLDERS]

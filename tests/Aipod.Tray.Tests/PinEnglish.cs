@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using ClaudeMonitor.Agent.Config;
+using Podium.Agent.Config;
 
 namespace Aipod.Tray.Tests;
 
