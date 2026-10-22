@@ -1,5 +1,6 @@
 <#
-  Backup encryption shared by backup.ps1 and restore-drill.ps1. Streaming, so a dump of any size never sits in memory,
+  Backup encryption shared by backup.ps1 and restore-drill.ps1, and backup.ps1's scratch folder (New-BackupWork,
+  Remove-BackupWork). Streaming, so a dump of any size never sits in memory,
   and it runs on Windows PowerShell 5.1 as well as PowerShell 7.
   Format: IV (16) | AES-256-CBC ciphertext | HMAC-SHA256 (32) over IV and ciphertext (encrypt-then-MAC).
   The two keys are derived from AIPOD_BACKUP_KEY (base64url of 32 random bytes); a wrong key or a changed file fails
@@ -70,4 +71,20 @@ function Unprotect-BackupFile([string] $Source, [string] $Destination, [string] 
   } finally { $in.Dispose() }
 }
 
-Export-ModuleMember -Function Protect-BackupFile, Unprotect-BackupFile
+# The scratch folder (and the zip beside it) of one backup run. The environment and a random part keep runs apart: the
+# test and prod tasks run as the same account and can start in the same second, and a name made of the time alone
+# made the second run fail on the first one's folder (22/10/2026).
+function New-BackupWork([string] $Environment, [string] $Stamp, [string] $Temp = $env:TEMP) {
+  $folder = Join-Path $Temp "ap-backup-$Environment-$Stamp-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+  New-Item -ItemType Directory -Path $folder | Out-Null
+  [pscustomobject]@{ Folder = $folder; Zip = "$folder.zip" }
+}
+
+# Removes a run's scratch files, after a failure too: the folder holds the database dump in plain form.
+function Remove-BackupWork($Work) {
+  foreach ($path in $Work.Folder, $Work.Zip) {
+    if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
+  }
+}
+
+Export-ModuleMember -Function Protect-BackupFile, Unprotect-BackupFile, New-BackupWork, Remove-BackupWork
