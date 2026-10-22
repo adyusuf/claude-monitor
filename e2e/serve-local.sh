@@ -13,11 +13,14 @@ export ASPNETCORE_URLS="http://127.0.0.1:${port}"
 export AIPOD_DB="Host=127.0.0.1;Port=55433;Database=aipod_e2e;Username=aipod;Password=aipod"
 export AIPOD_PUBLIC_ORIGIN="http://localhost:${port}"
 export AIPOD_SMTP_HOST=127.0.0.1 AIPOD_SMTP_PORT=1125 AIPOD_SMTP_FROM=aipod-e2e@localhost AIPOD_SMTP_TLS=false
-export AIPOD_ARCHIVE_DIR="$(mktemp -d)"
+AIPOD_ARCHIVE_DIR="$(mktemp -d)"
+export AIPOD_ARCHIVE_DIR
 export AIPOD_WEB_ROOT="$root/web/dist"
-export AIPOD_COMMIT="$(git -C "$root" rev-parse HEAD)"
+AIPOD_COMMIT="$(git -C "$root" rev-parse HEAD)"
+export AIPOD_COMMIT
 export AIPOD_AUTH_RATE_PER_MINUTE=1000
-export AIPOD_MFA_KEY="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')"
+AIPOD_MFA_KEY="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')"
+export AIPOD_MFA_KEY
 dotnet build "$root/src/Podium.Api" -c Release --nologo -v q >/dev/null
 dotnet run --project "$root/src/Podium.Api" -c Release --no-build --no-launch-profile -- --migrate
 exec dotnet run --project "$root/src/Podium.Api" -c Release --no-build --no-launch-profile
