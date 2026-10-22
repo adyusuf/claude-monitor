@@ -4,7 +4,7 @@
 #
 #   <prefix>/<channel>/                 the current build: the six zips, SHA256SUMS and manifest.json (overwritten each release), and the plugin
 #                                       files when the build wrote them (AGENT_SITE_URL: aipod-marketplace.json, aipod-plugin.zip), because the site no
-#                                       longer carries any zip itself
+#                                       longer carries any zip itself, and the installers (aipod-install.sh, aipod-install.ps1: README, "Install aipod")
 #   <prefix>/<version>/<channel>/       the same files, kept
 #
 #   AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <test|prod> [downloads-dir] [--dry-run]
@@ -54,6 +54,9 @@ upload() { # <folder> <cache-control>
   done
   if [ -f "$dir/aipod-plugin.zip" ]; then put "$1/aipod-plugin.zip" "$dir/aipod-plugin.zip" application/zip "$2"; fi
   if [ -f "$dir/aipod-marketplace.json" ]; then put "$1/aipod-marketplace.json" "$dir/aipod-marketplace.json" application/json "$2"; fi
+  for file in aipod-install.sh aipod-install.ps1; do # the installers (README), when the build copied them
+    if [ -f "$dir/$file" ]; then put "$1/$file" "$dir/$file" "text/plain; charset=utf-8" "$2"; fi
+  done
   put "$1/SHA256SUMS" "$dir/SHA256SUMS" text/plain "$2"
   put "$1/manifest.json" "$dir/manifest.json" application/json "$2"
 }

@@ -119,6 +119,8 @@ not there yet); the transcript is read later, so nothing of it is lost. **Uninst
 unknown shape it falls back to the data directory and the settings alone). The local plugin (`aipod install`, `aipod-local`) reports
 every event a second time if it stays enabled next to this one: `/aipod:connect` removes it, and the bootstrap says so while it is there.
 
+`scripts/install/aipod-install.sh` (macOS, Linux) and `aipod-install.ps1` (Windows) do all of this in one run, replace an older `cm-agent` install while keeping its settings and login, and are published beside the zips (README, "Install aipod").
+
 The plugin is called `aipod` (ADR-0016): `claude plugin marketplace add <site>/downloads/aipod-marketplace.json`, `claude plugin install aipod@aipod-releases`, then `/aipod:connect` (the skills are `/aipod:connect|status|disconnect`).
 
 A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
