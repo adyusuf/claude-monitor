@@ -1,6 +1,6 @@
 {
   "name": "monitor-agent",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Replaced by the aipod plugin (run /aipod:connect). Claude Monitor agent: installs itself, connects to your server, reports sessions and delivers web messages.",
   "author": {
     "name": "Claude Monitor"
