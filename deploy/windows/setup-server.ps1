@@ -7,7 +7,7 @@
   Before running: install the .NET 10 ASP.NET Core Hosting Bundle and PostgreSQL 18 (SETUP.md, "Server"), and import
   the Cloudflare Origin certificate into LocalMachine\My. The script then:
     1. installs the IIS role if missing and checks the ASP.NET Core module is there;
-    2. creates C:\Podium\<env>\ (releases, archive, backups) and its environment file aipod.env, readable by
+    2. creates C:\iis\Podium\<env>\ (releases, archive, backups) and its environment file aipod.env, readable by
        Administrators and the site's app pool only;
     3. creates the PostgreSQL role and database for the environment with a random password (written only to aipod.env);
     4. creates the app pool (no managed code, always running: the API has background jobs) and the HTTPS site bound to
@@ -24,7 +24,7 @@ param(
   [Parameter(Mandatory)] [string] $HostName,
   [Parameter(Mandatory)] [string] $CertThumbprint,
   [Parameter(Mandatory)] [int] $LoopbackPort,
-  [string] $Root = "C:\Podium",
+  [string] $Root = "C:\iis\Podium",
   [string] $PgBin = "C:\Program Files\PostgreSQL\18\bin",
   [string] $SmtpUser = "",
   [string] $SmtpFrom = ""
