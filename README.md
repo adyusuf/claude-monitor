@@ -6,29 +6,45 @@ team follow the sessions live in the browser and can send them a prompt or stop 
 
 ## Install
 
-`<your server>` is the address you open Podium at in the browser. Run the block for your system; it installs the agent and the Claude Code
-plugin and connects the machine. If an older agent (`cm-agent`) is installed it asks before removing it, and keeps its settings and login.
+Run the block for your system and environment. It installs the agent and the Claude Code plugin and connects the machine; everything is
+downloaded from the download host (R2), not from the web site. If an older agent (`cm-agent`) is installed it asks before removing it, and
+keeps its settings and login.
 
-**macOS**
+| Environment | Web site (`--server`) | Download host (`--from`) |
+|---|---|---|
+| Test | `https://pods.bitreka.com` | `https://testaipods.bitreka.com/pods/test` |
+| Live | `https://testpods.bitreka.com` | `https://aipods.bitreka.com/pods/prod` |
+
+**macOS, test**
 
 ```bash
-SERVER=https://your-server
-curl -fsSL "$SERVER/downloads/aipod-install.sh" | sh -s -- --server "$SERVER"
+curl -fsSL https://testaipods.bitreka.com/pods/test/aipod-install.sh | sh -s -- --server https://pods.bitreka.com --from https://testaipods.bitreka.com/pods/test
 ```
 
-**Windows** (PowerShell, no administrator needed)
+**macOS, live**
+
+```bash
+curl -fsSL https://aipods.bitreka.com/pods/prod/aipod-install.sh | sh -s -- --server https://testpods.bitreka.com --from https://aipods.bitreka.com/pods/prod
+```
+
+**Windows, test** (PowerShell, no administrator needed)
 
 ```powershell
-$Server = 'https://your-server'
-irm "$Server/downloads/aipod-install.ps1" -OutFile "$env:TEMP\aipod-install.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server $Server
+irm https://testaipods.bitreka.com/pods/test/aipod-install.ps1 -OutFile "$env:TEMP\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server https://pods.bitreka.com -From https://testaipods.bitreka.com/pods/test
 ```
 
-Then restart Claude Code (or open a new session); `/aipod:status` shows how it is doing.
+**Windows, live**
+
+```powershell
+irm https://aipods.bitreka.com/pods/prod/aipod-install.ps1 -OutFile "$env:TEMP\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\aipod-install.ps1" -Server https://testpods.bitreka.com -From https://aipods.bitreka.com/pods/prod
+```
+
+Add `--dry-run` (Windows: `-DryRun`) to see what it would do without changing anything. Then restart Claude Code (or open a new session);
+`/aipod:status` shows how it is doing.
 
 What the script does, in order:
 
-1. Reads the newest build for this OS and CPU from the download host (`<your server>/downloads`, which is the R2 bucket).
+1. Reads the newest build for this OS and CPU from the download host (`manifest.json`).
 2. Finds an older agent (`cm-agent`, the old `monitor-agent` plugin, an old autostart, a running old daemon). If there is one it asks
    **"Remove the old agent and install aipod `<version>`?"** (default no; "no" changes nothing).
 3. Copies the old `agent.json` (server, machine identity, saved settings) and the two tokens (macOS Keychain, Windows Credential Manager)
@@ -43,7 +59,7 @@ If aipod is already installed the script only offers the update (default yes) an
 | Option (macOS / Windows) | Meaning |
 |---|---|
 | `--server` / `-Server` | The server address (https). Optional on a machine that was connected before. |
-| `--from` / `-From` | Another download base than `<your server>/downloads`. |
+| `--from` / `-From` | The download host's folder for the environment (above). Without it the script asks the web site's `/downloads`, which redirects there. |
 | `--yes` / `-Yes` | Answer yes to the questions. |
 | `--dry-run` / `-DryRun` | Say what would happen; change nothing. |
 | `--remove-old` / `-RemoveOld` | Only remove the old agent; install nothing. Keeps the old data folder; `--purge` / `-Purge` deletes it too, after copying the settings. |
