@@ -78,4 +78,6 @@ if [ -n "${AGENT_SITE_URL:-}" ]; then
 else
   echo "! no AGENT_SITE_URL: no marketplace.json and no plugin zip for this site (the plugin comes from the repository's marketplace)"
 fi
+# The installers (README, "Install aipod"): the same two files for every build, served from the download host beside the zips.
+cp "$root/scripts/install/aipod-install.sh" "$root/scripts/install/aipod-install.ps1" "$out/"
 echo "✓ $(find "$out" -type f | wc -l | tr -d ' ') files in $out"
