@@ -27,22 +27,6 @@ public sealed class ProcessTests : IDisposable
     }
 
     [Fact]
-    public async Task The_aipod_name_beside_the_installed_binary_is_preferred_when_it_is_there()
-    {
-        if (OperatingSystem.IsWindows()) return;
-        var old = Path.Combine(dir, "aipod");
-        File.WriteAllText(old, "#!/bin/sh\necho old\n");
-        File.WriteAllText(Path.Combine(dir, "aipod"), "#!/bin/sh\necho new\n");
-        File.SetUnixFileMode(old, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        File.SetUnixFileMode(Path.Combine(dir, "aipod"), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-
-        Assert.Equal("new\n", (await new ProcessCli(Config(old)).RunAsync([], CancellationToken.None)).Output);
-
-        File.Delete(Path.Combine(dir, "aipod"));
-        Assert.Equal("old\n", (await new ProcessCli(Config(old)).RunAsync([], CancellationToken.None)).Output);
-    }
-
-    [Fact]
     public async Task A_binary_that_is_missing_throws_a_win32_exception_the_actions_can_report()
     {
         if (OperatingSystem.IsWindows()) return;

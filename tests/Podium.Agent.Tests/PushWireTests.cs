@@ -182,7 +182,7 @@ public sealed class PushWireTests : IDisposable
     {
         var source = Path.Combine(home.Dir, "aipod-src");
         File.WriteAllText(source, "binary");
-        string Manifest() => File.ReadAllText(Path.Combine(home.Config.PluginDir, "monitor-agent", ".claude-plugin", "plugin.json"));
+        string Manifest() => File.ReadAllText(Path.Combine(home.Config.PluginDir, "aipod", ".claude-plugin", "plugin.json"));
         (int Code, string Out, string Err) Install(params string[] extra)
         {
             var o = new StringWriter();
@@ -196,10 +196,10 @@ public sealed class PushWireTests : IDisposable
         Assert.DoesNotContain("channels", Manifest(), StringComparison.Ordinal);
 
         var on = Install("--push", "channel");
-        Assert.Contains("--dangerously-load-development-channels plugin:monitor-agent@monitor-agent-local", on.Out, StringComparison.Ordinal);
+        Assert.Contains("--dangerously-load-development-channels plugin:aipod@aipod-local", on.Out, StringComparison.Ordinal);
         var channel = JsonNode.Parse(Manifest())!["channels"]![0]!;
         Assert.Equal(("aipod", "Podium"), (channel["server"]!.GetValue<string>(), channel["displayName"]!.GetValue<string>()));
-        Assert.Equal(["aipod"], JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "monitor-agent", ".mcp.json")))!["mcpServers"]!.AsObject().Select(p => p.Key));
+        Assert.Equal(["aipod"], JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "aipod", ".mcp.json")))!["mcpServers"]!.AsObject().Select(p => p.Key));
 
         Assert.Equal(0, Install().Code); // a later plain install keeps the choice
         Assert.Contains("channels", Manifest(), StringComparison.Ordinal);

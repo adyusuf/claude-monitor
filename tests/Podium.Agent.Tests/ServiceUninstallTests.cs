@@ -55,7 +55,7 @@ public sealed class ServiceUninstallTests : IDisposable
         Assert.Equal(0, mac.Installer().Install(mac.Current, ExecLevels.Argv, allowRoot: false));
         mac.Calls.Clear();
         Assert.Equal(0, mac.Installer().Uninstall());
-        Assert.Equal([$"/bin/launchctl bootout system/{LaunchdDaemon.Label}"], mac.Calls);
+        Assert.Equal([$"/bin/launchctl bootout system/{ServiceNames.Default.Label}"], mac.Calls);
         Assert.False(File.Exists(mac.Definition));
     }
 

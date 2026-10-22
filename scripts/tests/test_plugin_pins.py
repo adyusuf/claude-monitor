@@ -38,9 +38,8 @@ class Pins(unittest.TestCase):
         with tempfile.TemporaryDirectory() as downloads:
             sums = os.path.join(downloads, 'SHA256SUMS')
             open(sums, 'w').write('1' * 64 + '  aipod-linux-x64.zip\n')
-            targets = [os.path.join(os.path.dirname(HERE), '..', 'plugin', name, 'agent-release.txt') for name in ('monitor-agent', 'aipod')]
-            target = targets[0]
-            before = [open(t).read() for t in targets]
+            target = os.path.join(os.path.dirname(HERE), '..', 'plugin', 'aipod', 'agent-release.txt')
+            before = open(target).read()
             try:
                 self.assertEqual(pins_module.main(['x', downloads, '1.2.3', '--replace']), 0)
                 open(sums, 'w').write('2' * 64 + '  aipod-linux-x64.zip\n')
@@ -48,10 +47,8 @@ class Pins(unittest.TestCase):
                 self.assertEqual(len(open(target).read().splitlines()), 3)  # both builds accumulated
                 self.assertEqual(pins_module.main(['x', downloads, '1.2.3', '--replace']), 0)
                 self.assertEqual(open(target).read().splitlines(), ['1.2.3', 'linux-x64 ' + '2' * 64 + ' aipod-linux-x64.zip'])
-                self.assertEqual(open(targets[1]).read(), open(target).read())  # the aipod plugin pins the same builds
             finally:
-                for t, text in zip(targets, before):
-                    open(t, 'w').write(text)  # the committed files are not the test's to change
+                open(target, 'w').write(before)  # the committed file is not the test's to change
 
     def test_a_bad_version_or_a_missing_sums_file_is_refused(self):
         with tempfile.TemporaryDirectory() as empty:

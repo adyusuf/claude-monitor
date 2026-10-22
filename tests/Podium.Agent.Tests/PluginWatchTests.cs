@@ -10,7 +10,7 @@ namespace Podium.Agent.Tests;
 /// <summary>The daemon stops when the Claude Code plugin that started it is uninstalled or switched off (ADR-0007).</summary>
 public sealed class PluginWatchTests : IDisposable
 {
-    private const string Id = "monitor-agent@monitor-agent-releases";
+    private const string Id = "aipod@aipod-releases";
     private readonly string claudeDir = Path.Combine(Path.GetTempPath(), "ap-claude-" + Guid.NewGuid().ToString("N"));
     private readonly string pluginData = Path.Combine(Path.GetTempPath(), "ap-plugin-data-" + Guid.NewGuid().ToString("N"));
     private readonly TempHome home;
@@ -93,18 +93,6 @@ public sealed class PluginWatchTests : IDisposable
         Assert.Null(PluginWatch.Gone(home.Config, dataExistedAtStart: false));
         Assert.False(PluginWatch.DataExists(home.Config));
         Assert.Null(PluginWatch.Gone(home.Config with { PluginId = null, PluginDataDir = null }, true)); // not started by the plugin
-    }
-
-    [Fact]
-    public void The_aipod_plugin_id_is_watched_the_same_way_and_the_old_ones_state_means_nothing_to_it()
-    {
-        // ADR-0013 section 1: the agent takes the id from the wrapper, so the new plugin needs nothing special; and the old plugin being on or off is not its business.
-        const string aipod = "aipod@aipod-releases";
-        var config = home.Config with { PluginId = aipod };
-        Settings("{\"enabledPlugins\":{\"" + Id + "\":false,\"" + aipod + "\":true}}");
-        Assert.Null(PluginWatch.Gone(config, dataExistedAtStart: true));
-        Settings("{\"enabledPlugins\":{\"" + Id + "\":true,\"" + aipod + "\":false}}");
-        Assert.Contains("switched off", PluginWatch.Gone(config, true), StringComparison.Ordinal);
     }
 
     // ---- Claude Code's plugin list and the scopes ----------------------------------------------------------------------

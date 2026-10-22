@@ -126,22 +126,22 @@ public sealed class CommandLineTests : IDisposable
         File.WriteAllText(source, "binary");
         Assert.Equal(0, installer.Install(source));
         Assert.Equal("binary", File.ReadAllText(installer.BinaryPath));
-        Assert.Equal(["claude plugin marketplace add " + home.Config.PluginDir, "claude plugin install monitor-agent@monitor-agent-local --scope user"], calls);
+        Assert.Equal(["claude plugin marketplace add " + home.Config.PluginDir, "claude plugin install aipod@aipod-local --scope user"], calls);
 
-        var hooks = JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "monitor-agent", "hooks", "hooks.json")))!["hooks"]!;
+        var hooks = JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "aipod", "hooks", "hooks.json")))!["hooks"]!;
         var permission = hooks["PermissionRequest"]![0]!["hooks"]![0]!;
         Assert.Equal(installer.BinaryPath, permission["command"]!.GetValue<string>());
         Assert.Equal(17, permission["timeout"]!.GetValue<int>()); // 2 s wait in the test home + 15
         Assert.Null(permission["async"]);
         Assert.True(hooks["PostToolUse"]![0]!["hooks"]![0]!["async"]!.GetValue<bool>());
-        var mcp = JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "monitor-agent", ".mcp.json")))!;
+        var mcp = JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "aipod", ".mcp.json")))!;
         Assert.Equal("mcp", mcp["mcpServers"]!["aipod"]!["args"]![0]!.GetValue<string>());
         var marketplace = JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, ".claude-plugin", "marketplace.json")))!;
-        Assert.Equal("monitor-agent-local", marketplace["name"]!.GetValue<string>());
+        Assert.Equal("aipod-local", marketplace["name"]!.GetValue<string>());
         Assert.False(string.IsNullOrWhiteSpace(marketplace["description"]?.GetValue<string>()));
 
         Assert.Equal(0, installer.Uninstall());
-        Assert.Contains("claude plugin uninstall monitor-agent@monitor-agent-local", calls);
+        Assert.Contains("claude plugin uninstall aipod@aipod-local", calls);
     }
 
     [Fact]

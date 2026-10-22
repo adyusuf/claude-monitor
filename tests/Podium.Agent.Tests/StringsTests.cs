@@ -87,14 +87,14 @@ public sealed partial class StringsTests
     public void This_test_assembly_speaks_English_and_a_scope_changes_one_flow_only()
     {
         Assert.Equal("en", Strings.Language);
-        Assert.Equal("Nothing was moved: x.", Strings.T(Msg.HmNothingMoved, "x"));
+        Assert.Equal("The standalone autostart is removed. Kept: the home h (the login and the queue) and the binary b.", Strings.T(Msg.SaRemoved, "h", "b"));
         using (Strings.Scope("tr"))
         {
             Assert.Equal("tr", Strings.Language);
-            Assert.Equal("Hiçbir şey taşınmadı: x.", Strings.T(Msg.HmNothingMoved, "x"));
+            Assert.Equal("Bağımsız otomatik başlatma kaldırıldı. Korunanlar: ev dizini h (giriş ve kuyruk) ve ikili dosya b.", Strings.T(Msg.SaRemoved, "h", "b"));
         }
 
-        using (Strings.Scope("de")) Assert.Equal("Nichts wurde verschoben: x.", Strings.T(Msg.HmNothingMoved, "x"));
+        using (Strings.Scope("de")) Assert.Equal("Der Autostart des eigenständigen Agents ist entfernt. Erhalten bleiben: der Heimatordner h (die Anmeldung und die Warteschlange) und das Programm b.", Strings.T(Msg.SaRemoved, "h", "b"));
         Assert.Equal("en", Strings.Language);
     }
 

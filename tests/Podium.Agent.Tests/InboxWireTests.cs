@@ -33,7 +33,7 @@ public sealed class InboxWireTests : IDisposable
     // ---- the real transport ------------------------------------------------------------------------------------------
 
     /// <summary>A short path: a Unix socket path is limited to about 100 characters.</summary>
-    private static string SocketPath() => Path.Combine("/tmp", "cmt-" + Guid.NewGuid().ToString("N")[..10] + ".sock");
+    private static string SocketPath() => Path.Combine("/tmp", "apt-" + Guid.NewGuid().ToString("N")[..10] + ".sock");
 
     [Fact]
     public async Task The_real_transport_writes_both_lines_to_a_socket_in_order_and_closes()
@@ -235,7 +235,7 @@ public sealed class InboxWireTests : IDisposable
     public async Task A_plugin_started_agent_takes_the_stop_wait_only_as_far_as_its_plugin_versions_hook_timeout_allows()
     {
         var sixty = TimeSpan.FromSeconds(60);
-        var id = "monitor-agent@monitor-agent-releases";
+        var id = "aipod@aipod-releases";
         // An older plugin version's wrapper says nothing about a long Stop timeout: its fixed 15 s would cut a wait off, so the wait is zero.
         Assert.Equal(TimeSpan.Zero, SavedSettings.Apply(home.Config with { PluginId = id, StopWait = sixty }).StopWait);
         // A version with the long timeout says how long a wait fits.
@@ -297,7 +297,7 @@ public sealed class InboxWireTests : IDisposable
             return (Cli.Install(["install", .. extra], plain, o, new StringWriter(), source, (_, _) => 0), o.ToString());
         }
 
-        string Manifest() => File.ReadAllText(Path.Combine(plain.PluginDir, "monitor-agent", ".claude-plugin", "plugin.json"));
+        string Manifest() => File.ReadAllText(Path.Combine(plain.PluginDir, "aipod", ".claude-plugin", "plugin.json"));
         var on = Install("--push", "inbox");
         Assert.Contains("through each session's inbox", on.Out, StringComparison.Ordinal);
         Assert.DoesNotContain("--dangerously-load-development-channels", on.Out, StringComparison.Ordinal);

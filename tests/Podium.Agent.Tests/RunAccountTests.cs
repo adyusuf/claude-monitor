@@ -11,7 +11,7 @@ public sealed class RunAccountTests
 {
     [Theory]
     [InlineData("ap-run", true)]
-    [InlineData("_cmrun", true)]
+    [InlineData("_aprun", true)]
     [InlineData("runner_1", true)]
     [InlineData("", false)]
     [InlineData("root", false)]
@@ -34,7 +34,7 @@ public sealed class RunAccountTests
         Assert.False(RunAccount.IsValidName(new string('a', 33)));
         Assert.True(RunAccount.IsValidName(new string('a', 32)));
         Assert.False(RunAccount.IsValidName(null));
-        Assert.Equal(("ap-run", "_cmrun", null), (RunAccount.DefaultName(OsKinds.Linux), RunAccount.DefaultName(OsKinds.MacOs), RunAccount.DefaultName(OsKinds.Windows)));
+        Assert.Equal(("ap-run", "_aprun", null), (RunAccount.DefaultName(OsKinds.Linux), RunAccount.DefaultName(OsKinds.MacOs), RunAccount.DefaultName(OsKinds.Windows)));
     }
 
     [Fact]
@@ -235,11 +235,11 @@ public sealed class RunAccountTests
         using var fx = new ServiceInstallerFixture(OsKinds.MacOs);
         fx.Answer = line => line.StartsWith("/usr/bin/dscl . -read /Users/_", StringComparison.Ordinal) || line.Contains("-read /Users/", StringComparison.Ordinal) ? 1 : 0;
 
-        Assert.Equal(0, With(fx).Install(fx.Current, ExecLevels.Argv, allowRoot: false, runAccount: "_cmrun"));
+        Assert.Equal(0, With(fx).Install(fx.Current, ExecLevels.Argv, allowRoot: false, runAccount: "_aprun"));
 
-        Assert.True(fx.Called("/usr/bin/dscl . -create /Users/_cmrun"));
-        Assert.True(fx.Called("/usr/sbin/dseditgroup -o edit -a _cmagent -t user _cmrun"));
-        Assert.True(fx.Called($"/usr/sbin/chown _cmagent:_cmrun {fx.Layout.Home}/run-work"));
+        Assert.True(fx.Called("/usr/bin/dscl . -create /Users/_aprun"));
+        Assert.True(fx.Called("/usr/sbin/dseditgroup -o edit -a _aipod -t user _aprun"));
+        Assert.True(fx.Called($"/usr/sbin/chown _aipod:_aprun {fx.Layout.Home}/run-work"));
         Assert.True(File.Exists($"{fx.Dir}/sudoers.d/aipod-run"));
     }
 

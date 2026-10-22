@@ -52,7 +52,7 @@ Expand-Archive .\aipod-windows-x64.zip -DestinationPath .\aipod
 .\aipod\aipod.exe install --service --exec argv --server https://<your Podium address>
 ```
 
-The install creates the service account (`aipod` on Linux, `_cmagent` on macOS, `NT SERVICE\aipod` on Windows),
+The install creates the service account (`aipod` on Linux, `_aipod` on macOS, `NT SERVICE\aipod` on Windows),
 copies the binary to an admin-owned folder, creates the service home only that account can use, writes the exec
 policy file and starts the service. It **refuses to run the service as root, SYSTEM or LocalSystem**; `--allow-root`
 exists for metrics and uploads only, and the agent then never executes anything.
@@ -76,8 +76,8 @@ until it is connected. Read it as an administrator:
 | OS | Where the code is |
 |---|---|
 | Linux | `sudo journalctl -u aipod`, or `sudo cat /var/lib/aipod/login-code.txt` |
-| macOS | `sudo cat "/Library/Application Support/Podium/home/login-code.txt"` |
-| Windows | in an elevated prompt: `type "%ProgramData%\Podium\service\login-code.txt"` |
+| macOS | `sudo cat "/Library/Application Support/aipod/home/login-code.txt"` |
+| Windows | in an elevated prompt: `type "%ProgramData%\aipod\service\login-code.txt"` |
 
 1. Open `https://<your Podium address>/device` (the "Connect a machine" page) signed in as the person who
    should own this machine's remote work, enter the code, choose the workspace and approve. **That person becomes the
@@ -100,8 +100,8 @@ The level lives in an **admin-owned file the service account cannot write**; the
 | OS | Exec policy file |
 |---|---|
 | Linux | `/etc/aipod/exec.json` |
-| macOS | `/Library/Application Support/Podium/exec.json` |
-| Windows | `%ProgramFiles%\Podium\exec.json` |
+| macOS | `/Library/Application Support/aipod/exec.json` |
+| Windows | `%ProgramFiles%\aipod\exec.json` |
 
 ```json
 {

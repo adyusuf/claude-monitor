@@ -201,7 +201,6 @@ public sealed class MachineMonitorTests : IDisposable
 
     [Theory]
     [InlineData("aipod@aipod-releases", "aipod@aipod-releases")]
-    [InlineData("monitor-agent@monitor-agent-releases", "monitor-agent@monitor-agent-releases")]
     [InlineData("not a plugin id", null)]
     [InlineData("a@", null)]
     [InlineData(null, null)]

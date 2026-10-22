@@ -213,10 +213,10 @@ public sealed class ServiceInstallerTests : IDisposable
 
         Assert.Equal(0, mac.Installer().Install(mac.Current, ExecLevels.Argv, allowRoot: false));
 
-        Assert.Contains("/usr/bin/dscl . -create /Users/_cmagent UniqueID 397", mac.Calls);
-        Assert.Contains("/usr/bin/dscl . -create /Groups/_cmagent PrimaryGroupID 397", mac.Calls);
+        Assert.Contains("/usr/bin/dscl . -create /Users/_aipod UniqueID 397", mac.Calls);
+        Assert.Contains("/usr/bin/dscl . -create /Groups/_aipod PrimaryGroupID 397", mac.Calls);
         Assert.Contains($"/usr/sbin/chown root:wheel {mac.Layout.BinaryDir}", mac.Calls);
-        Assert.Contains($"/usr/sbin/chown _cmagent:_cmagent {mac.Layout.Home}", mac.Calls);
+        Assert.Contains($"/usr/sbin/chown _aipod:_aipod {mac.Layout.Home}", mac.Calls);
         Assert.Equal($"/bin/launchctl bootstrap system {mac.Definition}", mac.Calls.Last());
         Assert.Equal(LaunchdDaemon.Render(mac.Layout), File.ReadAllText(mac.Definition));
         Assert.False(mac.Called("/bin/launchctl bootout"), "a first install has no old copy to unload");
@@ -229,7 +229,7 @@ public sealed class ServiceInstallerTests : IDisposable
         mac.Calls.Clear();
         Assert.Equal(0, mac.Installer().Install(mac.Current, ExecLevels.Argv, allowRoot: false));
         var calls = mac.Calls.ToList();
-        Assert.True(calls.IndexOf($"/bin/launchctl bootout system/{LaunchdDaemon.Label}") < calls.IndexOf($"/bin/launchctl bootstrap system {mac.Definition}"));
+        Assert.True(calls.IndexOf($"/bin/launchctl bootout system/{ServiceNames.Default.Label}") < calls.IndexOf($"/bin/launchctl bootstrap system {mac.Definition}"));
         Assert.DoesNotContain(calls, c => c.Contains("-create /Users", StringComparison.Ordinal));
     }
 
@@ -253,7 +253,7 @@ public sealed class ServiceInstallerTests : IDisposable
         mac.Answer = line => line.StartsWith("/usr/bin/dscl . -read", StringComparison.Ordinal) ? 1 : line.StartsWith("/bin/launchctl bootstrap", StringComparison.Ordinal) ? 1 : 0;
         Assert.Equal(1, mac.Installer().Install(mac.Current, ExecLevels.Argv, allowRoot: false));
         Assert.False(File.Exists(mac.Definition));
-        Assert.Contains("/usr/bin/dscl . -delete /Users/_cmagent", mac.Calls);
-        Assert.Contains("/usr/bin/dscl . -delete /Groups/_cmagent", mac.Calls);
+        Assert.Contains("/usr/bin/dscl . -delete /Users/_aipod", mac.Calls);
+        Assert.Contains("/usr/bin/dscl . -delete /Groups/_aipod", mac.Calls);
     }
 }

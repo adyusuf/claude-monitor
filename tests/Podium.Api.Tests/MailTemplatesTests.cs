@@ -34,7 +34,7 @@ public sealed class MailTemplatesTests
             Assert.False(string.IsNullOrWhiteSpace(mail.Subject));
             Assert.Contains("https://link.example/x", mail.Body, StringComparison.Ordinal);
             Assert.DoesNotContain("{0}", mail.Body, StringComparison.Ordinal);
-            Assert.DoesNotContain("Podium", mail.Body, StringComparison.Ordinal);
+            Assert.DoesNotContain("Monitor", mail.Body, StringComparison.Ordinal);
         }
 
         Assert.Contains("Podium", MailTemplates.Build(language, "verify", "a@b.co", "https://x").Body, StringComparison.Ordinal);

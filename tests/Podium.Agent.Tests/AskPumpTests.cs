@@ -94,7 +94,7 @@ public sealed class AskPumpTests : IDisposable
     }
 
     [Fact]
-    public async Task The_ask_names_the_answer_tool_of_the_session_it_is_written_to()
+    public async Task The_ask_names_the_answer_tool_whether_or_not_the_inbox_row_kept_the_tool_word()
     {
         Session("s-new", 100);
         store.SaveInbox("s-new", "/tmp/s-new.sock", Token, Start.AddSeconds(100), tools: "aipod");
@@ -104,7 +104,6 @@ public sealed class AskPumpTests : IDisposable
 
         var content = JsonDocument.Parse(Assert.Single(Assert.Single(transport.Sent).Lines)).RootElement.GetProperty("message").GetProperty("content").GetString()!;
         Assert.Contains("the aipod_answer tool", content, StringComparison.Ordinal);
-        Assert.DoesNotContain("aipod_answer", content, StringComparison.Ordinal);
     }
 
     [Fact]

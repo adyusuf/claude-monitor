@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Tests;
 
-/// <summary>ADR-0013: the plugin an agent runs under is told with its profile, kept only when it is a plugin id, and shown to the workspace so the old plugin can be retired when none is left.</summary>
+/// <summary>ADR-0013: the plugin an agent runs under is told with its profile, kept only when it is a plugin id, and shown to the workspace.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class PluginIdTests(ApiFactory api)
 {
@@ -22,8 +22,8 @@ public sealed class PluginIdTests(ApiFactory api)
 
     [Theory]
     [InlineData("aipod@aipod-releases")]
-    [InlineData("aipod@monitor-agent-releases")]
-    [InlineData("monitor-agent@monitor-agent-releases")]
+    [InlineData("aipod@other-releases")]
+    [InlineData("other-plugin@other-releases")]
     public async Task A_plugin_id_is_stored_and_the_machine_list_shows_it(string id)
     {
         var team = await AskKit.TeamAsync(api);

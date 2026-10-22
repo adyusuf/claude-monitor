@@ -181,7 +181,7 @@ never touches the network. Revoke it from the web's Machines page; rotation is `
 status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
 or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
 
-The agent home is the folder the machine already uses (`~/Library/Application Support/Podium` on macOS, `%USERPROFILE%\.aipod` on
+The agent home is the folder the machine already uses (`~/Library/Application Support/aipod` on macOS, `%USERPROFILE%\.aipod` on
 Windows and `~/.aipod` on Linux), and for a machine that has none the aipod folder (`~/Library/Application Support/aipod`, `~/.aipod`):
 nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0013). `AP_AGENT_HOME` / `AP_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
@@ -280,9 +280,9 @@ down, per OS:
 | | Linux (systemd) | macOS (LaunchDaemon) | Windows Server (service) |
 |---|---|---|---|
 | Service account | `aipod` (system, no login shell) | `_cmagent` (hidden role account) | `NT SERVICE\aipod` (virtual) |
-| Binary (admin-owned) | `/usr/local/lib/aipod/aipod` | `/Library/Application Support/Podium/bin/aipod` | `%ProgramFiles%\Podium\aipod.exe` |
-| Service home (account only) | `/var/lib/aipod` | `/Library/Application Support/Podium/home` | `%ProgramData%\Podium\service` |
-| Exec policy file (admin-owned) | `/etc/aipod/exec.json` | `/Library/Application Support/Podium/exec.json` | `%ProgramFiles%\Podium\exec.json` |
+| Binary (admin-owned) | `/usr/local/lib/aipod/aipod` | `/Library/Application Support/aipod/bin/aipod` | `%ProgramFiles%\aipod\aipod.exe` |
+| Service home (account only) | `/var/lib/aipod` | `/Library/Application Support/aipod/home` | `%ProgramData%\aipod\service` |
+| Exec policy file (admin-owned) | `/etc/aipod/exec.json` | `/Library/Application Support/aipod/exec.json` | `%ProgramFiles%\aipod\exec.json` |
 | Unit / definition | `/etc/systemd/system/aipod.service` | `/Library/LaunchDaemons/com.aipod.agent.plist` | service `aipod` (`sc query aipod`) |
 | Login code (while not connected) | `<home>/login-code.txt`, `journalctl -u aipod` | `<home>/login-code.txt` | `<home>\login-code.txt` |
 
@@ -458,7 +458,7 @@ never in a log and never leaves the machine except in the `Authorization` header
 
 | Secret | What it is | Where to get it | Stored | Owner | Rotation |
 |---|---|---|---|---|---|
-| a service agent's credentials (`cred-access-token`, `cred-refresh-token`) | the access and refresh tokens of that machine's service agent, issued when its login code is approved on the web | `aipod` service's own first login (the code is in its log and `login-code.txt`, approved on the web) | Linux and macOS: 0600 files `cred-*` in the service home (`/var/lib/aipod`, `/Library/Application Support/Podium/home`), refused if their owner or mode is wrong; Windows: DPAPI **CurrentUser** blobs `cred-*.bin` in `%ProgramData%\Podium\service` (never LocalMachine scope) | the machine's admin | on any doubt: revoke the agent on the web (Machines page), then log the service in again. Refresh tokens rotate on every use, so there is nothing else to rotate on a schedule |
+| a service agent's credentials (`cred-access-token`, `cred-refresh-token`) | the access and refresh tokens of that machine's service agent, issued when its login code is approved on the web | `aipod` service's own first login (the code is in its log and `login-code.txt`, approved on the web) | Linux and macOS: 0600 files `cred-*` in the service home (`/var/lib/aipod`, `/Library/Application Support/aipod/home`), refused if their owner or mode is wrong; Windows: DPAPI **CurrentUser** blobs `cred-*.bin` in `%ProgramData%\aipod\service` (never LocalMachine scope) | the machine's admin | on any doubt: revoke the agent on the web (Machines page), then log the service in again. Refresh tokens rotate on every use, so there is nothing else to rotate on a schedule |
 
 A remote run that executes as the service account can read that account's files, these tokens included
 (ADR-0005, "Consequences"); that is why the exec level is local, admin-owned and `off` by default.

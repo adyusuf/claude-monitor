@@ -14,12 +14,12 @@ public sealed class RunEnvironmentTests
     [Fact]
     public void A_windows_run_environment_is_the_system_folders_the_profile_and_a_temp_folder_inside_the_home()
     {
-        var env = RunEnvironment.Build(@"C:\ProgramData\Podium\service", windows: true, systemRoot: @"C:\Windows");
+        var env = RunEnvironment.Build(@"C:\ProgramData\aipod\service", windows: true, systemRoot: @"C:\Windows");
         Assert.Equal(@"C:\Windows\System32;C:\Windows", env["PATH"]);
         Assert.Equal(@"C:\Windows", env["SystemRoot"]);
-        Assert.Equal(@"C:\ProgramData\Podium\service", env["USERPROFILE"]);
+        Assert.Equal(@"C:\ProgramData\aipod\service", env["USERPROFILE"]);
         Assert.Equal(env["TEMP"], env["TMP"]);
-        Assert.StartsWith(@"C:\ProgramData\Podium\service", env["TEMP"], StringComparison.Ordinal);
+        Assert.StartsWith(@"C:\ProgramData\aipod\service", env["TEMP"], StringComparison.Ordinal);
         Assert.Equal(5, env.Count);
     }
 

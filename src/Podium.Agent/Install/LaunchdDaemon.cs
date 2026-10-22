@@ -7,8 +7,6 @@ namespace Podium.Agent.Install;
 /// <summary>The LaunchDaemon of the macOS service (ADR-0005) and the dscl calls that create its hidden role account.</summary>
 public static class LaunchdDaemon
 {
-    public const string Label = "com.aipod.agent";
-    public const string PlistPath = "/Library/LaunchDaemons/" + Label + ".plist";
     public const int Umask = 63; // 0077
 
     /// <summary>The range Apple leaves to third-party daemons; below 500, where ordinary users start.</summary>

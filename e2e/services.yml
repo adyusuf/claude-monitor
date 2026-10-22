@@ -4,10 +4,10 @@ name: podium-e2e
 services:
   postgres:
     image: postgres:18
-    environment: { POSTGRES_DB: aipod_e2e, POSTGRES_USER: monitor, POSTGRES_PASSWORD: monitor }
+    environment: { POSTGRES_DB: aipod_e2e, POSTGRES_USER: aipod, POSTGRES_PASSWORD: aipod }
     ports: ["127.0.0.1:55433:5432"]
     tmpfs: ["/var/lib/postgresql"]
-    healthcheck: { test: ["CMD", "pg_isready", "-U", "monitor", "-d", "aipod_e2e"], interval: 1s, retries: 30 }
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "aipod", "-d", "aipod_e2e"], interval: 1s, retries: 30 }
   mailpit:
     image: axllent/mailpit:latest
     ports: ["127.0.0.1:1125:1025", "127.0.0.1:8125:8025"]

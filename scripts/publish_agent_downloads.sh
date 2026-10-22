@@ -48,7 +48,10 @@ put() { # <key> <file> <content-type> <cache-control>
 }
 upload() { # <folder> <cache-control>
   local file
-  for file in "$dir"/aipod-*.zip; do put "$1/$(basename "$file")" "$file" application/zip "$2"; done
+  # The agent builds only: "aipod-*.zip" would also take the plugin zip (aipod-plugin.zip), which goes up on its own below.
+  for file in "$dir"/aipod-macos-*.zip "$dir"/aipod-windows-*.zip "$dir"/aipod-linux-*.zip; do
+    if [ -f "$file" ]; then put "$1/$(basename "$file")" "$file" application/zip "$2"; fi
+  done
   if [ -f "$dir/aipod-plugin.zip" ]; then put "$1/aipod-plugin.zip" "$dir/aipod-plugin.zip" application/zip "$2"; fi
   if [ -f "$dir/aipod-marketplace.json" ]; then put "$1/aipod-marketplace.json" "$dir/aipod-marketplace.json" application/json "$2"; fi
   put "$1/SHA256SUMS" "$dir/SHA256SUMS" text/plain "$2"

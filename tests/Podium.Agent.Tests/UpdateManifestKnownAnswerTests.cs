@@ -8,8 +8,8 @@ namespace Podium.Agent.Tests;
 /// </summary>
 public sealed class UpdateManifestKnownAnswerTests
 {
-    private const string PublicKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPtM+Ht1ipSoyuRJ1RsyxPYimS5gy9Ca+F0I1Pf62BjFMLN9GYo3tBVlKeMrzK8N8HfKTJJpGTLITBB34NOlPVw==";
-    private const string Signature = "MEYCIQD32fNyXMpM9WDuergFhD9kFYLbbKaW8PvmQyERB6R13QIhAP6oPcQja8twE0SiRI96pWj/7dBZSK0/EwTf6MbOYqNY";
+    private const string PublicKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWjBpXJdMkKae1guyEKKfKuNal0QImejbW9WGTUPGI3lhPjQee779trSqja066V8W8hAk7rZ/PeUgUxxvDggK1w==";
+    private const string Signature = "MEYCIQCyVXSM9VG1YKNJxtzE5xOHNS9Tvq3wrJvVE8RqibSIsAIhAOMsCKFw9jjn9ymXsPsRxd4NcYFc/h37NdVSmwXkmdeU";
     private static readonly string Sha = string.Concat(Enumerable.Repeat("ab", 32));
 
     private static string Payload(string channel = "test", string version = "0.3.1", string os = "macos", string arch = "arm64", string? sha = null,

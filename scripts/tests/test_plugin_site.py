@@ -15,14 +15,14 @@ spec = importlib.util.spec_from_file_location('build_plugin_site', os.path.join(
 site = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(site)
 
-BASE = 'https://podium.example.net'
+BASE = 'https://aipod.invalid'
 
 
 def make_plugin(root):
     os.makedirs(os.path.join(root, '.claude-plugin'))
     os.makedirs(os.path.join(root, 'scripts'))
     with open(os.path.join(root, '.claude-plugin', 'plugin.json'), 'w') as handle:
-        handle.write('{"name": "monitor-agent"}')
+        handle.write('{"name": "aipod"}')
     with open(os.path.join(root, 'scripts', 'run.sh'), 'w') as handle:
         handle.write('#!/bin/sh\n')
     os.chmod(os.path.join(root, 'scripts', 'run.sh'), 0o700)  # owner-only execute: all the build reads is S_IXUSR
@@ -43,29 +43,29 @@ class PluginSite(unittest.TestCase):
         self.tmp.cleanup()
 
     def build(self, base=BASE):
-        return site.main([self.out, '--base-url', base, '--plugin-dir', self.plugin])
+        return site.main([self.out, '--base-url', base, '--aipod-dir', self.plugin])
 
     def refused(self, base, plugin_dir=None):
         with redirect_stderr(io.StringIO()) as err, self.assertRaises(SystemExit) as raised:
-            site.main([self.out, '--base-url', base, '--plugin-dir', plugin_dir or self.plugin])
+            site.main([self.out, '--base-url', base, '--aipod-dir', plugin_dir or self.plugin])
         self.assertEqual(raised.exception.code, 2)
         return err.getvalue()
 
     def test_the_catalog_names_the_archive_with_the_hash_of_the_zip_it_wrote(self):
         self.assertEqual(self.build(), 0)
-        with open(os.path.join(self.out, 'marketplace.json'), encoding='utf-8') as handle:
+        with open(os.path.join(self.out, 'aipod-marketplace.json'), encoding='utf-8') as handle:
             catalog = json.load(handle)
-        self.assertEqual(catalog['name'], 'monitor-agent-releases')
+        self.assertEqual(catalog['name'], 'aipod-releases')
         entry = catalog['plugins'][0]
-        self.assertEqual(entry['name'], 'monitor-agent')
+        self.assertEqual(entry['name'], 'aipod')
         self.assertEqual(entry['source']['source'], 'archive')
-        self.assertEqual(entry['source']['url'], BASE + '/downloads/monitor-agent-plugin.zip')
-        with open(os.path.join(self.out, 'monitor-agent-plugin.zip'), 'rb') as handle:
+        self.assertEqual(entry['source']['url'], BASE + '/downloads/aipod-plugin.zip')
+        with open(os.path.join(self.out, 'aipod-plugin.zip'), 'rb') as handle:
             self.assertEqual(entry['source']['sha256'], hashlib.sha256(handle.read()).hexdigest())
 
     def test_the_zip_has_the_plugin_at_its_root_keeps_the_executable_bit_and_leaves_junk_out(self):
         self.build()
-        with zipfile.ZipFile(os.path.join(self.out, 'monitor-agent-plugin.zip')) as archive:
+        with zipfile.ZipFile(os.path.join(self.out, 'aipod-plugin.zip')) as archive:
             names = sorted(archive.namelist())
             self.assertEqual(names, ['.claude-plugin/plugin.json', 'agent-release.txt', 'scripts/run.sh'])
             mode = archive.getinfo('scripts/run.sh').external_attr >> 16
@@ -74,58 +74,42 @@ class PluginSite(unittest.TestCase):
 
     def test_the_same_files_give_the_same_hash(self):
         self.build()
-        with open(os.path.join(self.out, 'monitor-agent-plugin.zip'), 'rb') as handle:
+        with open(os.path.join(self.out, 'aipod-plugin.zip'), 'rb') as handle:
             first = hashlib.sha256(handle.read()).hexdigest()
         os.utime(os.path.join(self.plugin, 'agent-release.txt'), (1, 1))
         self.build()
-        with open(os.path.join(self.out, 'monitor-agent-plugin.zip'), 'rb') as handle:
+        with open(os.path.join(self.out, 'aipod-plugin.zip'), 'rb') as handle:
             self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), first)
 
     def test_an_address_claude_code_would_refuse_is_refused_before_anything_is_written(self):
-        for base in ['http://podium.example.net', 'https://localhost', 'https://app.localhost', 'https://127.0.0.1', 'https://[::1]',
-                     'https://169.254.169.254', 'https://0.0.0.0', 'https://podium.example.net/downloads', 'https://u:p@podium.example.net',
-                     'https://podium.example.net?x=1', 'podium.example.net', '']:
+        for base in ['http://aipod.invalid', 'https://localhost', 'https://app.localhost', 'https://127.0.0.1', 'https://[::1]',
+                     'https://169.254.169.254', 'https://0.0.0.0', 'https://aipod.invalid/downloads', 'https://u:p@aipod.invalid',
+                     'https://aipod.invalid?x=1', 'aipod.invalid', '']:
             with self.subTest(base=base):
                 self.refused(base)
         self.assertFalse(os.path.exists(self.out))
 
     def test_a_trailing_slash_and_a_port_are_fine_and_a_folder_that_is_not_a_plugin_is_refused(self):
-        self.assertEqual(self.build('https://podium.example.net:8443/'), 0)
-        with open(os.path.join(self.out, 'marketplace.json'), encoding='utf-8') as handle:
-            self.assertEqual(json.load(handle)['plugins'][0]['source']['url'], 'https://podium.example.net:8443/downloads/monitor-agent-plugin.zip')
+        self.assertEqual(self.build('https://aipod.invalid:8443/'), 0)
+        with open(os.path.join(self.out, 'aipod-marketplace.json'), encoding='utf-8') as handle:
+            self.assertEqual(json.load(handle)['plugins'][0]['source']['url'], 'https://aipod.invalid:8443/downloads/aipod-plugin.zip')
         empty = os.path.join(self.tmp.name, 'empty')
         os.makedirs(empty)
         self.assertIn('not a plugin folder', self.refused(BASE, empty))
         self.assertIn('not found', self.refused(BASE, os.path.join(self.tmp.name, 'missing')))
 
-    def test_the_repository_plugins_build_side_by_side_each_with_its_own_catalog(self):
+    def test_the_repository_plugin_builds_with_its_own_catalog(self):
         self.assertEqual(site.main([self.out, '--base-url', BASE]), 0)
-        for zip_name, catalog_file, catalog_name, plugin in (('monitor-agent-plugin.zip', 'marketplace.json', 'monitor-agent-releases', 'monitor-agent'),
-                                                             ('aipod-plugin.zip', 'aipod-marketplace.json', 'aipod-releases', 'aipod')):
-            with self.subTest(plugin=plugin):
-                with zipfile.ZipFile(os.path.join(self.out, zip_name)) as archive:
-                    self.assertIn('hooks/hooks.json', archive.namelist())
-                    self.assertEqual(json.loads(archive.read('.claude-plugin/plugin.json'))['name'], plugin)
-                with open(os.path.join(self.out, catalog_file), encoding='utf-8') as handle:
-                    catalog = json.load(handle)
-                with open(os.path.join(self.out, zip_name), 'rb') as handle:
-                    digest = hashlib.sha256(handle.read()).hexdigest()
-                self.assertEqual((catalog['name'], catalog['plugins'][0]['name']), (catalog_name, plugin))
-                self.assertEqual(catalog['plugins'][0]['source'], {'source': 'archive', 'url': f'{BASE}/downloads/{zip_name}', 'sha256': digest})
-
-    def test_retiring_the_old_plugin_builds_only_aipod_and_removes_the_old_files_from_the_folder(self):
-        self.assertEqual(site.main([self.out, '--base-url', BASE]), 0)
-        self.assertTrue(os.path.exists(os.path.join(self.out, 'marketplace.json')))
-        self.assertEqual(site.main([self.out, '--base-url', BASE, '--without-old']), 0)
         self.assertEqual(sorted(os.listdir(self.out)), ['aipod-marketplace.json', 'aipod-plugin.zip'])
-
-    def test_the_aipod_folder_alone_or_with_the_old_one_is_built_from_the_folders_given(self):
-        other = os.path.join(self.tmp.name, 'aipod-plugin')
-        make_plugin(other)
-        self.assertEqual(site.main([self.out, '--base-url', BASE, '--aipod-dir', other]), 0)
-        self.assertEqual(sorted(os.listdir(self.out)), ['aipod-marketplace.json', 'aipod-plugin.zip'])
-        self.assertEqual(site.main([self.out, '--base-url', BASE, '--aipod-dir', other, '--plugin-dir', self.plugin]), 0)
-        self.assertEqual(sorted(os.listdir(self.out)), ['aipod-marketplace.json', 'aipod-plugin.zip', 'marketplace.json', 'monitor-agent-plugin.zip'])
+        with zipfile.ZipFile(os.path.join(self.out, 'aipod-plugin.zip')) as archive:
+            self.assertIn('hooks/hooks.json', archive.namelist())
+            self.assertEqual(json.loads(archive.read('.claude-plugin/plugin.json'))['name'], 'aipod')
+        with open(os.path.join(self.out, 'aipod-marketplace.json'), encoding='utf-8') as handle:
+            catalog = json.load(handle)
+        with open(os.path.join(self.out, 'aipod-plugin.zip'), 'rb') as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        self.assertEqual((catalog['name'], catalog['plugins'][0]['name']), ('aipod-releases', 'aipod'))
+        self.assertEqual(catalog['plugins'][0]['source'], {'source': 'archive', 'url': f'{BASE}/downloads/aipod-plugin.zip', 'sha256': digest})
 
 
 if __name__ == '__main__':

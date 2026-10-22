@@ -57,10 +57,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("AIPOD_JIRA_CLIENT_ID", FakeJira.ClientId);
         Environment.SetEnvironmentVariable("AIPOD_JIRA_CLIENT_SECRET", FakeJira.ClientSecret);
         await using var scope = Services.CreateAsyncScope();
-        var monitorDb = scope.ServiceProvider.GetRequiredService<PodiumDb>();
-        await monitorDb.Database.MigrateAsync();
+        var podiumDb = scope.ServiceProvider.GetRequiredService<PodiumDb>();
+        await podiumDb.Database.MigrateAsync();
         // As at a real start: the housekeeper creates the monthly partitions before any event arrives.
-        await Background.Housekeeper.EnsurePartitionsAsync(monitorDb, Clock.GetUtcNow(), CancellationToken.None);
+        await Background.Housekeeper.EnsurePartitionsAsync(podiumDb, Clock.GetUtcNow(), CancellationToken.None);
     }
 
     public new async Task DisposeAsync()

@@ -13,7 +13,7 @@ public sealed class ServiceInstallerFixture : IDisposable
         // /tmp, not the per-user temp folder: its random name may hold characters a systemd unit refuses.
         Dir = Path.Combine(Path.GetTempPath().StartsWith("/var/folders", StringComparison.Ordinal) ? "/tmp" : Path.GetTempPath(), "ap-svc-" + Guid.NewGuid().ToString("N")[..12]);
         Directory.CreateDirectory(Dir);
-        Layout = new ServiceLayout(os, $"{Dir}/bin", $"{Dir}/bin/aipod", $"{Dir}/home", os == OsKinds.Linux ? "aipod" : "_cmagent", $"{Dir}/etc/exec.json");
+        Layout = new ServiceLayout(os, $"{Dir}/bin", $"{Dir}/bin/aipod", $"{Dir}/home", os == OsKinds.Linux ? "aipod" : "_aipod", $"{Dir}/etc/exec.json");
         Definition = $"{Dir}/definition";
         RunDir = $"{Dir}/run-systemd";
         Directory.CreateDirectory(RunDir);

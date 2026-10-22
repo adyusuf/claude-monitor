@@ -38,7 +38,7 @@ public static class ServiceCommands
         string? runAccount = null;
         if (Array.IndexOf(args, RunAccountOption) >= 0)
         {
-            // The name is optional: the next argument when it is not another option, else the default of this OS (ap-run, _cmrun).
+            // The name is optional: the next argument when it is not another option, else the default of this OS (ap-run, _aprun).
             var at = Array.IndexOf(args, RunAccountOption);
             runAccount = at + 1 < args.Length && !args[at + 1].StartsWith("--", StringComparison.Ordinal) ? args[at + 1] : RunAccount.DefaultName(AgentConfig.Os);
             if (runAccount is null)

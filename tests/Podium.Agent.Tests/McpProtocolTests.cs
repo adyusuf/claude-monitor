@@ -88,58 +88,25 @@ public sealed class McpProtocolTests : IDisposable
         Assert.Equal("milestone reached", e.Payload.GetProperty("text").GetString());
     }
 
-    private static async Task<(List<string> Names, JsonNode Old, JsonNode New)> Probe(Process p)
+    [Fact]
+    public async Task The_server_serves_the_aipod_names_only_and_does_not_know_the_names_it_had_before_the_rename()
     {
-        await CallAsync(p, 1, "initialize", new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "test", version = "1" } });
-        await p.StandardInput.WriteLineAsync("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
-        var list = await CallAsync(p, 2, "tools/list", new { });
-        var names = list["result"]!["tools"]!.AsArray().Select(t => t!["name"]!.GetValue<string>()).Order().ToList();
-        var old = await CallAsync(p, 3, "tools/call", new { name = "aipod_status", arguments = new { } });
-        var renamed = await CallAsync(p, 4, "tools/call", new { name = "aipod_status", arguments = new { } });
-        return (names, old, renamed);
-    }
-
-    [Theory]
-    [InlineData("flag")]
-    [InlineData("environment")]
-    public async Task With_the_new_names_the_server_lists_aipod_tools_only_and_answers_them_and_not_the_old_ones(string how)
-    {
-        using var p = how == "flag" ? Start(["--names", "aipod"]) : Start(environment: ("AP_TOOL_NAMES", "aipod"));
+        using var p = Start();
         try
         {
-            var (names, old, renamed) = await Probe(p);
+            await CallAsync(p, 1, "initialize", new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "test", version = "1" } });
+            await p.StandardInput.WriteLineAsync("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
+            var list = await CallAsync(p, 2, "tools/list", new { });
+            var names = list["result"]!["tools"]!.AsArray().Select(t => t!["name"]!.GetValue<string>()).ToList();
+            var old = await CallAsync(p, 3, "tools/call", new { name = "monitor_status", arguments = new { } });
 
             Assert.Equal(19, names.Count);
             Assert.All(names, n => Assert.StartsWith("aipod_", n, StringComparison.Ordinal));
-            Assert.Contains("aipod_status", names);
-            Assert.StartsWith("Not connected", renamed["result"]!["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
             Assert.True(old["error"] is not null || old["result"]!["isError"]?.GetValue<bool>() == true, "the old name must not be a tool of this server");
         }
         finally
         {
             p.Kill(entireProcessTree: true);
-        }
-    }
-
-    [Fact]
-    public async Task With_no_names_given_or_the_word_legacy_the_old_names_are_served_exactly_as_before()
-    {
-        foreach (var args in new[] { Array.Empty<string>(), ["--names", "legacy"] })
-        {
-            using var p = Start(args);
-            try
-            {
-                var (names, old, renamed) = await Probe(p);
-
-                Assert.Equal(19, names.Count);
-                Assert.All(names, n => Assert.StartsWith("monitor_", n, StringComparison.Ordinal));
-                Assert.StartsWith("Not connected", old["result"]!["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
-                Assert.True(renamed["error"] is not null || renamed["result"]!["isError"]?.GetValue<bool>() == true);
-            }
-            finally
-            {
-                p.Kill(entireProcessTree: true);
-            }
         }
     }
 }

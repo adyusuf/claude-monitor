@@ -15,7 +15,7 @@ public sealed class StandaloneUnitsTests
     [Fact]
     public void Everything_lives_in_the_users_own_home_and_account()
     {
-        Assert.Equal(("/Users/ayse/.aipod/bin/aipod", "/Users/ayse/.aipod/Aipod.app/Contents/MacOS/aipod", "/Users/ayse/Library/LaunchAgents/com.aipod.agent.user.plist"),
+        Assert.Equal(("/Users/ayse/.aipod/bin/aipod", "/Users/ayse/.aipod/Aipod.app/Contents/MacOS/aipod", "/Users/ayse/Library/LaunchAgents/aipod.agent.user.plist"),
             (Mac().Binary, Mac().AutostartBinary, Mac().DefinitionPath));
         Assert.Equal(("/home/ayse/.aipod/bin/aipod", "/home/ayse/.config/systemd/user/aipod.service"), (Linux().AutostartBinary, Linux().DefinitionPath));
         Assert.Equal((@"C:\Users\ayse\.aipod\bin\aipod.exe", @"C:\Users\ayse\.aipod\bin\aipodw.exe"), (Windows().Binary, Windows().AutostartBinary));
@@ -29,7 +29,7 @@ public sealed class StandaloneUnitsTests
         var xml = StandaloneUnits.RenderLaunchAgent(Mac());
         var doc = System.Xml.Linq.XDocument.Parse(xml[(xml.IndexOf("<plist", StringComparison.Ordinal))..]);
         Assert.NotNull(doc.Root);
-        Assert.Contains("<key>Label</key><string>com.aipod.agent.user</string>", xml, StringComparison.Ordinal);
+        Assert.Contains("<key>Label</key><string>aipod.agent.user</string>", xml, StringComparison.Ordinal);
         Assert.Contains("<string>/Users/ayse/.aipod/Aipod.app/Contents/MacOS/aipod</string><string>daemon</string>", xml, StringComparison.Ordinal);
         Assert.Contains("<key>RunAtLoad</key><true/>", xml, StringComparison.Ordinal);
         Assert.Contains("<dict><key>SuccessfulExit</key><false/></dict>", xml, StringComparison.Ordinal);

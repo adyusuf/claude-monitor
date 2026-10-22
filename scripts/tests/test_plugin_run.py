@@ -1,4 +1,4 @@
-"""scripts/run.sh of the Podium plugin (ADR-0007): silent without a binary, the environment it gives the agent."""
+"""scripts/run.sh of the aipod plugin (ADR-0007): silent without a binary, the environment it gives the agent."""
 import subprocess
 import unittest
 
@@ -24,7 +24,7 @@ class RunScript(PluginScriptsCase):
         result = self.run_script(RUN, 'hook', 'PreToolUse', server='https://aipod.invalid')
         self.assertEqual(result.returncode, 0)
         self.assertIn('args: hook PreToolUse', result.stdout)
-        self.assertIn(f'BIN={self.bin} ID=monitor-agent@monitor-agent-releases SERVER=https://aipod.invalid', result.stdout)
+        self.assertIn(f'BIN={self.bin} ID=aipod@aipod-releases SERVER=https://aipod.invalid', result.stdout)
 
     def test_run_hands_the_context_entry_only_to_a_binary_at_least_as_new_as_the_pin(self):
         # ADR-0008: an older binary (still installed while ensure.sh downloads the pinned one) would read `--context` as a second recording hook.

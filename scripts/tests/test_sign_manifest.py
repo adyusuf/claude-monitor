@@ -42,6 +42,9 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(sm.payload('test', '0.3.1', 'macos', 'arm64', SHA, '0.2.0'),
                          'aipod-update/1\nchannel=test\nversion=0.3.1\nos=macos\narch=arm64\n' + f'sha256={SHA}\nminSupported=0.2.0\n')
 
+    def test_the_keychain_item_of_a_channel_key_is_named_after_the_channel(self):
+        self.assertEqual([sm.service(channel) for channel in ('test', 'prod')], ['aipod-update-test', 'aipod-update-prod'])
+
     def test_a_field_with_a_line_break_or_nothing_is_refused(self):
         for bad in ('', 'x\ny', 'x\ry'):
             with self.assertRaises(ValueError):

@@ -1,4 +1,4 @@
-"""scripts/ensure.sh of the Podium plugin (ADR-0007): the bootstrap that installs the agent, hermetically (loopback server, fake agent)."""
+"""scripts/ensure.sh of the aipod plugin (ADR-0007): the bootstrap that installs the agent, hermetically (loopback server, fake agent)."""
 import hashlib
 import json
 import os
@@ -18,18 +18,13 @@ PluginScriptsCase, OS, ARCH, FILE, RUN, ENSURE, Server, zip_of = (support.Plugin
 
 @unittest.skipUnless(OS and ARCH, 'the scripts run on macOS and Linux here')
 class EnsureScript(PluginScriptsCase):
-    def setUp(self):
-        super().setUp()
-        os.makedirs(self.data)  # the bridge's one-time notice (ADR-0013) has been said: these cases are about the install
-        open(os.path.join(self.data, 'bridge.said'), 'w').close()
-
     def test_a_missing_binary_is_downloaded_checked_installed_and_the_daemon_handed_over(self):
         server = Server({f'/downloads/{FILE}': zip_of('0.3.0')})
         self.addCleanup(server.close)
         self.pins('0.3.0')
         result = self.run_script(ENSURE, server=server.url)
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(json.loads(result.stdout)['systemMessage'].startswith('Podium: installing the agent (version 0.3.0)'), True)
+        self.assertEqual(json.loads(result.stdout)['systemMessage'].startswith('aipod: installing the agent (version 0.3.0)'), True)
         self.assertTrue(self.wait_for('installed version 0.3.0'), open(self.log).read() if os.path.exists(self.log) else 'no log')
         self.assertTrue(os.access(self.bin, os.X_OK))
         self.assertEqual(subprocess.run([self.bin, 'version'], capture_output=True, text=True).stdout.strip(), '0.3.0')
@@ -39,7 +34,7 @@ class EnsureScript(PluginScriptsCase):
             time.sleep(0.1)
         self.assertTrue(os.path.exists(restarts), 'the daemon was not handed over to the new binary')
         # The restarted daemon must know it belongs to the plugin, or it would never notice the plugin being switched off.
-        self.assertIn(f'id=monitor-agent@monitor-agent-releases bin={self.bin}', open(restarts).read())
+        self.assertIn(f'id=aipod@aipod-releases bin={self.bin}', open(restarts).read())
         self.assertFalse(os.path.exists(os.path.join(self.data, 'install.lock')))
 
     def test_the_restart_after_an_install_keeps_the_push_option_and_the_server_the_wrapper_gives_every_other_run(self):
@@ -54,7 +49,7 @@ class EnsureScript(PluginScriptsCase):
         text = open(restarts).read()
         self.assertIn('push=inbox', text)  # or the daemon the upgrade starts would silently stop pushing
         self.assertIn(f'server={server.url}', text)
-        self.assertIn('id=monitor-agent@monitor-agent-releases', text)
+        self.assertIn('id=aipod@aipod-releases', text)
 
     def test_a_download_that_does_not_match_the_pin_is_refused_and_nothing_is_installed(self):
         server = Server({f'/downloads/{FILE}': zip_of('9.9.9')})
@@ -187,15 +182,6 @@ class EnsureScript(PluginScriptsCase):
         lines = open(self.log).read().splitlines()
         self.assertLess(len(lines), 400)
         self.assertTrue(any('line 2999' in l for l in lines))
-
-    def test_the_old_local_plugin_still_enabled_is_pointed_out(self):
-        os.makedirs(os.path.join(self.tmp, 'claude'))
-        with open(os.path.join(self.tmp, 'claude', 'settings.json'), 'w') as f:
-            json.dump({'enabledPlugins': {'monitor-agent@monitor-agent-local': True}}, f)
-        self.install_fake('0.3.0')
-        self.pins('0.3.0')
-        result = self.run_script(ENSURE, server='https://aipod.invalid')
-        self.assertIn('old local plugin is still enabled', json.loads(result.stdout)['systemMessage'])
 
     def test_every_path_exits_0_even_without_the_plugin_variables(self):
         result = subprocess.run(['sh', ENSURE], env={'PATH': os.environ['PATH']}, capture_output=True, text=True, timeout=30)

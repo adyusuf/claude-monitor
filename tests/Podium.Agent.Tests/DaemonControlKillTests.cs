@@ -92,14 +92,14 @@ public sealed class DaemonControlKillTests : IDisposable
         using var child = Process.Start(new ProcessStartInfo(fake, "120") { UseShellExecute = false, CreateNoWindow = true })!;
         try
         {
-            var isCmAgent = child.ProcessName.StartsWith("aipod", StringComparison.Ordinal);
+            var isAgent = child.ProcessName.StartsWith("aipod", StringComparison.Ordinal);
             File.WriteAllText(home.Config.PidPath, child.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
             using var held = DaemonHost.TryLock(home.Config.LockPath); // the test stands in for the hung daemon's lock
 
             var released = Control().Kill();
 
             Assert.False(released, "the lock is still held by this test, so Kill must not claim it is free");
-            if (isCmAgent)
+            if (isAgent)
             {
                 Assert.True(child.WaitForExit(10_000), "an aipod process is ended");
                 Assert.Contains($"killing the daemon (pid {child.Id})", Log, StringComparison.Ordinal);

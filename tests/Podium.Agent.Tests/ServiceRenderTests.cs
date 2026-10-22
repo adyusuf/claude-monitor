@@ -92,10 +92,10 @@ public sealed class ServiceRenderTests
         var dict = doc.Root!.Element("dict")!;
         var values = dict.Elements().Chunk(2).ToDictionary(p => p[0].Value, p => p[1]);
 
-        Assert.Equal("_cmagent", values["UserName"].Value);
-        Assert.Equal("_cmagent", values["GroupName"].Value);
+        Assert.Equal("_aipod", values["UserName"].Value);
+        Assert.Equal("_aipod", values["GroupName"].Value);
         Assert.Equal("63", values["Umask"].Value);
-        Assert.Equal("com.aipod.agent", values["Label"].Value);
+        Assert.Equal("aipod.agent", values["Label"].Value);
         Assert.Equal([Mac.Binary, "daemon"], values["ProgramArguments"].Elements("string").Select(e => e.Value));
         Assert.Equal("true", values["RunAtLoad"].Name.LocalName);
         Assert.Equal(["SuccessfulExit", "false"], values["KeepAlive"].Elements().Select(e => e.Name.LocalName == "key" ? e.Value : e.Name.LocalName)); // restart only after a failure
@@ -118,15 +118,15 @@ public sealed class ServiceRenderTests
     public void The_hidden_role_account_and_its_group_get_the_same_id_a_locked_password_and_the_service_home()
     {
         var commands = LaunchdDaemon.AccountCommands(Mac, 301).Select(c => string.Join(' ', c)).ToList();
-        Assert.Contains(". -create /Groups/_cmagent PrimaryGroupID 301", commands);
-        Assert.Contains(". -create /Users/_cmagent UniqueID 301", commands);
-        Assert.Contains(". -create /Users/_cmagent PrimaryGroupID 301", commands);
-        Assert.Contains(". -create /Users/_cmagent IsHidden 1", commands);
-        Assert.Contains(". -create /Users/_cmagent Password *", commands);
-        Assert.Contains(". -create /Users/_cmagent UserShell /usr/bin/false", commands);
-        Assert.Contains($". -create /Users/_cmagent NFSHomeDirectory {Mac.Home}", commands);
-        Assert.Equal([".", "-read", "/Users/_cmagent"], LaunchdDaemon.AccountExistsArgs(Mac));
-        Assert.Equal([[".", "-delete", "/Users/_cmagent"], [".", "-delete", "/Groups/_cmagent"]], LaunchdDaemon.AccountDeleteCommands(Mac));
+        Assert.Contains(". -create /Groups/_aipod PrimaryGroupID 301", commands);
+        Assert.Contains(". -create /Users/_aipod UniqueID 301", commands);
+        Assert.Contains(". -create /Users/_aipod PrimaryGroupID 301", commands);
+        Assert.Contains(". -create /Users/_aipod IsHidden 1", commands);
+        Assert.Contains(". -create /Users/_aipod Password *", commands);
+        Assert.Contains(". -create /Users/_aipod UserShell /usr/bin/false", commands);
+        Assert.Contains($". -create /Users/_aipod NFSHomeDirectory {Mac.Home}", commands);
+        Assert.Equal([".", "-read", "/Users/_aipod"], LaunchdDaemon.AccountExistsArgs(Mac));
+        Assert.Equal([[".", "-delete", "/Users/_aipod"], [".", "-delete", "/Groups/_aipod"]], LaunchdDaemon.AccountDeleteCommands(Mac));
     }
 
     // ---- Windows ----------------------------------------------------------------------------------------------
@@ -134,7 +134,7 @@ public sealed class ServiceRenderTests
     [Fact]
     public void The_service_is_created_under_the_virtual_account_with_a_quoted_binary_path_and_a_delayed_start()
     {
-        Assert.Equal(["create", "aipod", "binPath=", "\"C:\\Program Files\\Podium\\aipod.exe\" daemon", "obj=", @"NT SERVICE\aipod", "start=", "delayed-auto", "DisplayName=", "aipod agent"],
+        Assert.Equal(["create", "aipod", "binPath=", "\"C:\\Program Files\\aipod\\aipod.exe\" daemon", "obj=", @"NT SERVICE\aipod", "start=", "delayed-auto", "DisplayName=", "aipod agent"],
             WindowsServiceSetup.Create(Windows));
         Assert.Equal(["failure", "aipod", "reset=", "86400", "actions=", "restart/10000/restart/60000//"], WindowsServiceSetup.Failure());
         Assert.Equal(["sidtype", "aipod", "unrestricted"], WindowsServiceSetup.SidType());
@@ -144,9 +144,9 @@ public sealed class ServiceRenderTests
     public void The_home_acl_gives_the_service_and_system_full_control_and_administrators_read_only_with_nothing_inherited()
     {
         var acl = WindowsServiceSetup.HomeAcl(Windows);
-        Assert.Equal([@"C:\ProgramData\Podium\service", "/inheritance:r", "/grant:r", @"NT SERVICE\aipod:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)R"], acl);
+        Assert.Equal([@"C:\ProgramData\aipod\service", "/inheritance:r", "/grant:r", @"NT SERVICE\aipod:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)R"], acl);
         Assert.DoesNotContain(acl, a => a.StartsWith("*S-1-5-32-544", StringComparison.Ordinal) && a.EndsWith('F'));
-        Assert.Equal([@"C:\Program Files\Podium", "/grant", @"NT SERVICE\aipod:(OI)(CI)RX"], WindowsServiceSetup.BinaryAcl(Windows));
+        Assert.Equal([@"C:\Program Files\aipod", "/grant", @"NT SERVICE\aipod:(OI)(CI)RX"], WindowsServiceSetup.BinaryAcl(Windows));
     }
 
     [Fact]
@@ -179,11 +179,11 @@ public sealed class ServiceRenderTests
     public void Each_os_keeps_the_binary_where_only_an_admin_can_write_and_never_in_a_users_home()
     {
         Assert.Equal(("/usr/local/lib/aipod/aipod", "/var/lib/aipod", "aipod", "/etc/aipod/exec.json"), (Linux.Binary, Linux.Home, Linux.Account, Linux.ExecConfigPath));
-        Assert.Equal(("/Library/Application Support/Podium/bin/aipod", "_cmagent", "/Library/Application Support/Podium/exec.json"), (Mac.Binary, Mac.Account, Mac.ExecConfigPath));
-        Assert.Equal((@"C:\Program Files\Podium\aipod.exe", @"NT SERVICE\aipod", @"C:\ProgramData\Podium\service"), (Windows.Binary, Windows.Account, Windows.Home));
+        Assert.Equal(("/Library/Application Support/aipod/bin/aipod", "_aipod", "/Library/Application Support/aipod/exec.json"), (Mac.Binary, Mac.Account, Mac.ExecConfigPath));
+        Assert.Equal((@"C:\Program Files\aipod\aipod.exe", @"NT SERVICE\aipod", @"C:\ProgramData\aipod\service"), (Windows.Binary, Windows.Account, Windows.Home));
         Assert.DoesNotContain("/Users/", Mac.Binary, StringComparison.Ordinal);
         Assert.Throws<ArgumentOutOfRangeException>(() => ServiceLayout.For("plan9", "", ""));
-        Assert.Equal(@"C:\Program Files\Podium", ServiceLayout.For(OsKinds.Windows, "", "").BinaryDir); // an unreadable folder falls back to the default
+        Assert.Equal(@"C:\Program Files\aipod", ServiceLayout.For(OsKinds.Windows, "", "").BinaryDir); // an unreadable folder falls back to the default
     }
 
     [Fact]
@@ -192,6 +192,6 @@ public sealed class ServiceRenderTests
         Assert.Equal(["AP_SERVICE", "AP_AGENT_HOME", "DOTNET_BUNDLE_EXTRACT_BASE_DIR"], Linux.ServiceEnvironment.Select(e => e.Name));
         Assert.Equal("AP_SERVER", (Linux with { Server = "https://m.invalid" }).ServiceEnvironment[^1].Name);
         Assert.Equal("/var/lib/aipod/login-code.txt", Linux.LoginCodePath);
-        Assert.Equal(@"C:\ProgramData\Podium\service\login-code.txt", Windows.LoginCodePath);
+        Assert.Equal(@"C:\ProgramData\aipod\service\login-code.txt", Windows.LoginCodePath);
     }
 }

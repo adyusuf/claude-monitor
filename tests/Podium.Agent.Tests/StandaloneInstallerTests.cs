@@ -30,9 +30,7 @@ public sealed class StandaloneInstallerTests : IDisposable
 
     private StandaloneLayout Layout(string os) => StandaloneLayout.For(os, Profile, Home, "ayse");
 
-    private StandaloneLayout AipodLayout(string os) => StandaloneLayout.ForAipod(os, Profile, Home, "ayse");
-
-    private StandaloneInstaller Installer(string os, bool isRoot = false, StandaloneLayout? layout = null, StandaloneLayout? legacy = null)
+    private StandaloneInstaller Installer(string os, bool isRoot = false, StandaloneLayout? layout = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Current)!);
         File.WriteAllText(Current, "binary");
@@ -45,7 +43,7 @@ public sealed class StandaloneInstallerTests : IDisposable
             logins.Add(server);
             if (loginSucceeds) connected = true;
             return loginSucceeds ? 0 : 1;
-        }, () => 501u, "0.3.0", legacy);
+        }, () => 501u, "0.3.0");
     }
 
     private string Out => output.ToString();
@@ -87,9 +85,9 @@ public sealed class StandaloneInstallerTests : IDisposable
         var l = Layout(OsKinds.MacOs);
         Assert.Equal("binary", File.ReadAllText(l.AutostartBinary));
         Assert.Contains("LSUIElement", File.ReadAllText(l.InfoPlistPath), StringComparison.Ordinal);
-        Assert.Contains("com.aipod.agent.user", File.ReadAllText(l.DefinitionPath), StringComparison.Ordinal);
+        Assert.Contains("aipod.agent.user", File.ReadAllText(l.DefinitionPath), StringComparison.Ordinal);
         Assert.True(Called("launchctl", "bootstrap", "gui/501", l.DefinitionPath));
-        Assert.True(Called("launchctl", "kickstart", "-k", "gui/501/com.aipod.agent.user"));
+        Assert.True(Called("launchctl", "kickstart", "-k", "gui/501/aipod.agent.user"));
     }
 
     [Fact]
@@ -219,7 +217,7 @@ public sealed class StandaloneInstallerTests : IDisposable
         Assert.Equal(0, Installer(OsKinds.MacOs).Uninstall());
 
         var l = Layout(OsKinds.MacOs);
-        Assert.True(Called("launchctl", "bootout", "gui/501/com.aipod.agent.user"));
+        Assert.True(Called("launchctl", "bootout", "gui/501/aipod.agent.user"));
         Assert.False(File.Exists(l.DefinitionPath));
         Assert.False(Directory.Exists(l.BundlePath!));
         Assert.True(File.Exists(l.Binary));
@@ -244,90 +242,51 @@ public sealed class StandaloneInstallerTests : IDisposable
         Assert.Equal(0, await again.InstallAsync(Current, null));
 
         Assert.Equal("newer binary", File.ReadAllText(Layout(OsKinds.MacOs).AutostartBinary));
-        Assert.True(Called("launchctl", "bootout", "gui/501/com.aipod.agent.user")); // what was loaded is replaced
+        Assert.True(Called("launchctl", "bootout", "gui/501/aipod.agent.user")); // what was loaded is replaced
         Assert.True(Called("launchctl", "bootstrap", "gui/501"));
     }
 
-    // ---- the aipod names (ADR-0013, tier 2) -------------------------------------------------------------------------
+    // ---- the names (ADR-0016) -----------------------------------------------------------------------------------------
 
     [Fact]
-    public void The_aipod_layout_has_its_own_label_unit_task_bundle_and_definition_paths_and_the_old_one_is_what_it_was()
+    public void The_layout_has_its_own_label_unit_task_bundle_and_definition_paths()
     {
-        Assert.Equal(("com.aipod.agent.user", "aipod.service", "Aipod", "Aipod.app"), (Layout(OsKinds.MacOs).Names.Label, Layout(OsKinds.Linux).Names.UnitName, Layout(OsKinds.Windows).Names.TaskName, Layout(OsKinds.MacOs).Names.BundleName));
-        var mac = AipodLayout(OsKinds.MacOs);
+        Assert.Equal(("aipod.agent.user", "aipod.service", "AipodAgent", "Aipod.app"), (Layout(OsKinds.MacOs).Names.Label, Layout(OsKinds.Linux).Names.UnitName, Layout(OsKinds.Windows).Names.TaskName, Layout(OsKinds.MacOs).Names.BundleName));
+        var mac = Layout(OsKinds.MacOs);
         Assert.Equal(("aipod.agent.user", "Aipod.app", "aipod.agent.app"), (mac.Names.Label, mac.Names.BundleName, mac.Names.BundleId));
         Assert.Equal($"{Profile}/Library/LaunchAgents/aipod.agent.user.plist", mac.DefinitionPath);
         Assert.Equal($"{Home}/Aipod.app/Contents/MacOS/aipod", mac.AutostartBinary);
-        Assert.Equal($"{Profile}/.config/systemd/user/aipod.service", AipodLayout(OsKinds.Linux).DefinitionPath);
-        Assert.Equal($@"{Home}\AipodAgent.task.xml", AipodLayout(OsKinds.Windows).DefinitionPath);
-        Assert.Equal(Layout(OsKinds.Linux).Binary, AipodLayout(OsKinds.Linux).Binary); // the binary copy keeps its place and its name
+        Assert.Equal($"{Profile}/.config/systemd/user/aipod.service", Layout(OsKinds.Linux).DefinitionPath);
+        Assert.Equal($@"{Home}\AipodAgent.task.xml", Layout(OsKinds.Windows).DefinitionPath);
     }
 
     [Fact]
-    public async Task An_install_with_the_aipod_names_registers_under_them_on_linux_and_macos()
+    public async Task An_install_registers_under_the_aipod_names_on_linux_and_macos()
     {
-        Assert.Equal(0, await Installer(OsKinds.Linux, layout: AipodLayout(OsKinds.Linux)).InstallAsync(Current, null));
+        Assert.Equal(0, await Installer(OsKinds.Linux).InstallAsync(Current, null));
         Assert.True(Called("systemctl", "--user", "enable", "--now", "aipod.service"));
-        Assert.True(File.Exists(AipodLayout(OsKinds.Linux).DefinitionPath));
+        Assert.True(File.Exists(Layout(OsKinds.Linux).DefinitionPath));
 
         calls.Clear();
-        Assert.Equal(0, await Installer(OsKinds.MacOs, layout: AipodLayout(OsKinds.MacOs)).InstallAsync(Current, null));
-        var l = AipodLayout(OsKinds.MacOs);
+        Assert.Equal(0, await Installer(OsKinds.MacOs).InstallAsync(Current, null));
+        var l = Layout(OsKinds.MacOs);
         Assert.Contains("<key>Label</key><string>aipod.agent.user</string>", File.ReadAllText(l.DefinitionPath), StringComparison.Ordinal);
         Assert.Contains("aipod.agent.app", File.ReadAllText(l.InfoPlistPath), StringComparison.Ordinal);
         Assert.True(Called("launchctl", "kickstart", "-k", "gui/501/aipod.agent.user"));
     }
 
     [Fact]
-    public async Task An_install_since_the_rename_replaces_a_registration_under_the_old_names_before_it_enables_the_new_one()
+    public async Task Uninstall_removes_the_registration_and_says_nothing_is_installed_when_there_is_none()
     {
-        await Installer(OsKinds.Linux).InstallAsync(Current, null); // an agent installed before the rename
-        Assert.True(File.Exists(Layout(OsKinds.Linux).DefinitionPath));
+        await Installer(OsKinds.Linux).InstallAsync(Current, null);
         calls.Clear();
-        output.GetStringBuilder().Clear();
-
-        Assert.Equal(0, await Installer(OsKinds.Linux, layout: AipodLayout(OsKinds.Linux), legacy: Layout(OsKinds.Linux)).InstallAsync(Current, null));
-
-        Assert.False(File.Exists(Layout(OsKinds.Linux).DefinitionPath));
-        Assert.True(File.Exists(AipodLayout(OsKinds.Linux).DefinitionPath));
-        var order = calls.Select(c => string.Join(' ', c.Args)).ToList();
-        Assert.True(order.IndexOf("--user disable --now aipod.service") < order.IndexOf("--user enable --now aipod.service"));
-        Assert.Contains("Replaced the autostart that had the old names", Out, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task On_macos_the_old_launch_agent_and_bundle_are_unloaded_and_removed_when_the_new_ones_replace_them()
-    {
-        await Installer(OsKinds.MacOs).InstallAsync(Current, null);
-        var old = Layout(OsKinds.MacOs);
-        calls.Clear();
-
-        Assert.Equal(0, await Installer(OsKinds.MacOs, layout: AipodLayout(OsKinds.MacOs), legacy: old).InstallAsync(Current, null));
-
-        Assert.True(Called("launchctl", "bootout", "gui/501/com.aipod.agent.user"));
-        Assert.False(File.Exists(old.DefinitionPath));
-        Assert.False(Directory.Exists(old.BundlePath!));
-        Assert.True(Directory.Exists(AipodLayout(OsKinds.MacOs).BundlePath!));
-    }
-
-    [Fact]
-    public async Task Uninstall_removes_the_registration_under_either_set_of_names_and_says_nothing_is_installed_only_when_neither_is()
-    {
-        await Installer(OsKinds.Linux, layout: AipodLayout(OsKinds.Linux)).InstallAsync(Current, null);
-        calls.Clear();
-        Assert.Equal(0, Installer(OsKinds.Linux, layout: AipodLayout(OsKinds.Linux), legacy: Layout(OsKinds.Linux)).Uninstall());
-        Assert.True(Called("systemctl", "--user", "disable", "--now", "aipod.service"));
-        Assert.False(File.Exists(AipodLayout(OsKinds.Linux).DefinitionPath));
-
-        await Installer(OsKinds.Linux).InstallAsync(Current, null); // an old one only
-        calls.Clear();
-        Assert.Equal(0, Installer(OsKinds.Linux, layout: AipodLayout(OsKinds.Linux), legacy: Layout(OsKinds.Linux)).Uninstall());
+        Assert.Equal(0, Installer(OsKinds.Linux).Uninstall());
         Assert.True(Called("systemctl", "--user", "disable", "--now", "aipod.service"));
         Assert.False(File.Exists(Layout(OsKinds.Linux).DefinitionPath));
 
         output.GetStringBuilder().Clear();
         calls.Clear();
-        Assert.Equal(0, Installer(OsKinds.Linux, layout: AipodLayout(OsKinds.Linux), legacy: Layout(OsKinds.Linux)).Uninstall());
+        Assert.Equal(0, Installer(OsKinds.Linux).Uninstall());
         Assert.Contains("is not installed", Out, StringComparison.Ordinal);
         Assert.DoesNotContain(calls, c => c.Args.Contains("disable"));
     }

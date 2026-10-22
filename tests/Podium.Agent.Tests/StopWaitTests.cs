@@ -37,7 +37,7 @@ public sealed class StopWaitTests : IDisposable
     }
 
     private int HookTimeout(string hook) =>
-        JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "monitor-agent", "hooks", "hooks.json")))!["hooks"]![hook]![0]!["hooks"]![0]!["timeout"]!.GetValue<int>();
+        JsonNode.Parse(File.ReadAllText(Path.Combine(home.Config.PluginDir, "aipod", "hooks", "hooks.json")))!["hooks"]![hook]![0]!["hooks"]![0]!["timeout"]!.GetValue<int>();
 
     private static AgentConfig FromEnvironment(string? stopWait, string home) =>
         AgentConfig.FromEnvironment(k => k switch { "AP_AGENT_HOME" => home, "AP_STOP_WAIT" => stopWait, _ => null });
