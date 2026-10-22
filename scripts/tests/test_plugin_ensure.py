@@ -37,6 +37,27 @@ class EnsureScript(PluginScriptsCase):
         self.assertIn(f'id=aipod@aipod-releases bin={self.bin}', open(restarts).read())
         self.assertFalse(os.path.exists(os.path.join(self.data, 'install.lock')))
 
+    def test_a_plugin_built_for_a_download_host_installs_from_it_without_any_server_address(self):
+        server = Server({f'/pods/prod/{FILE}': zip_of('0.3.0')})
+        self.addCleanup(server.close)
+        self.pins('0.3.0')
+        with open(os.path.join(self.root, 'download-base.txt'), 'w') as handle:
+            handle.write(f'{server.url}/pods/prod\n')
+        result = self.run_script(ENSURE)  # no server option, no agent.json
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(self.wait_for('installed version 0.3.0'), open(self.log).read() if os.path.exists(self.log) else 'no log')
+        self.assertEqual(server.requests, [f'/pods/prod/{FILE}'])  # never the server's /downloads
+
+    def test_a_download_base_that_is_not_an_address_is_ignored_and_the_server_is_asked(self):
+        server = Server({f'/downloads/{FILE}': zip_of('0.3.0')})
+        self.addCleanup(server.close)
+        self.pins('0.3.0')
+        with open(os.path.join(self.root, 'download-base.txt'), 'w') as handle:
+            handle.write('ftp://nowhere.invalid/x\n')
+        self.run_script(ENSURE, server=server.url)
+        self.assertTrue(self.wait_for('installed version 0.3.0'), open(self.log).read() if os.path.exists(self.log) else 'no log')
+        self.assertIn('download-base.txt does not hold an https address', open(self.log).read())
+
     def test_the_restart_after_an_install_keeps_the_push_option_and_the_server_the_wrapper_gives_every_other_run(self):
         server = Server({f'/downloads/{FILE}': zip_of('0.3.0')})
         self.addCleanup(server.close)
