@@ -249,6 +249,32 @@ describe("workspace settings and account", () => {
     expect(screen.queryByText(/Install as a Claude Code plugin/)).not.toBeInTheDocument(); // no marketplace configured: the zips only
   });
 
+  it("offers the one-step installer, from this site's /downloads until the build names the download host", async () => {
+    mockApi({ "GET /me": { body: ME } });
+    renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
+    const origin = window.location.origin;
+    expect(await screen.findByText("Install in one step (recommended)")).toBeInTheDocument();
+    expect(screen.getByText(`curl -fsSL ${origin}/downloads/aipod-install.sh | sh -s -- --server ${origin} --from ${origin}/downloads`)).toBeInTheDocument();
+    expect(screen.getByText(/^irm .*\/downloads\/aipod-install\.ps1 -OutFile/)).toBeInTheDocument();
+  });
+
+  it("links straight to the download host when the build names it", async () => {
+    const settable = config as { downloadsUrl: string; pluginFromServer: boolean };
+    settable.downloadsUrl = "https://downloads.example.net/pods/prod";
+    settable.pluginFromServer = true;
+    try {
+      mockApi({ "GET /me": { body: ME } });
+      renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
+      const origin = window.location.origin;
+      expect(await screen.findByText(`curl -fsSL https://downloads.example.net/pods/prod/aipod-install.sh | sh -s -- --server ${origin} --from https://downloads.example.net/pods/prod`)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "macOS · Apple silicon" })).toHaveAttribute("href", "https://downloads.example.net/pods/prod/aipod-macos-arm64.zip");
+      expect(screen.getByText("claude plugin marketplace add https://downloads.example.net/pods/prod/aipod-marketplace.json")).toBeInTheDocument();
+    } finally {
+      settable.downloadsUrl = "";
+      settable.pluginFromServer = false;
+    }
+  });
+
   it("offers the plugin first when the environment names its marketplace, with this site's address as the server", async () => {
     const settable = config as { pluginMarketplace: string };
     settable.pluginMarketplace = "owner/repo#prod";

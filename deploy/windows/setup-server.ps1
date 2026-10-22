@@ -117,13 +117,14 @@ if (-not (Get-Website -Name $site)) {
 
 Write-Host "5. Daily backup task (03:30)"
 $task = "Podium-backup-$Environment"
-if (-not (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)) {
+# A task from before the rename (ClaudeMonitor-backup-<env>) counts as existing; repair-tasks.ps1 corrects its paths.
+if (-not (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue) -and -not (Get-ScheduledTask -TaskName "ClaudeMonitor-backup-$Environment" -ErrorAction SilentlyContinue)) {
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\backup.ps1`" -Environment $Environment -Root `"$Root`" -PgBin `"$PgBin`""
   Register-ScheduledTask -TaskName $task -Action $action -Trigger (New-ScheduledTaskTrigger -Daily -At 03:30) -User "SYSTEM" -RunLevel Highest | Out-Null
 }
 Write-Host "6. Hourly health check and alarm"
 $check = "Podium-health-$Environment"
-if (-not (Get-ScheduledTask -TaskName $check -ErrorAction SilentlyContinue)) {
+if (-not (Get-ScheduledTask -TaskName $check -ErrorAction SilentlyContinue) -and -not (Get-ScheduledTask -TaskName "ClaudeMonitor-health-$Environment" -ErrorAction SilentlyContinue)) {
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\check-health.ps1`" -Environment $Environment -LoopbackPort $LoopbackPort -Root `"$Root`""
   $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 1)
   Register-ScheduledTask -TaskName $check -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest | Out-Null
