@@ -62,11 +62,6 @@ export const config = {
    * Where the Claude Code plugin is published, as `claude plugin install --marketplace` takes it ("owner/repo#branch", or a git URL),
    * set per environment at build time (ADR-0007). Empty: the download page offers the zips only.
    */
-  /**
-   * The download host's folder for this environment (the R2 bucket, the same address as the server's AIPOD_DOWNLOADS_URL), a build-time deployment value.
-   * The download page links to it directly; empty, it falls back to this site's own /downloads, which redirects there.
-   */
-  downloadsUrl: ((import.meta.env.VITE_DOWNLOADS_URL as string | undefined) ?? "").replace(/\/+$/, ""),
   pluginMarketplace: import.meta.env.VITE_PLUGIN_MARKETPLACE ?? "",
   /**
    * "1" when this site serves the plugin itself (`AGENT_DOWNLOADS_URL` at build time wrote marketplace.json and the plugin zip into /downloads, ADR-0007

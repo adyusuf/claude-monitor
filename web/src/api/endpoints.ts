@@ -25,6 +25,8 @@ const q = (params: Record<string, string | number | boolean | undefined | null>)
 /** Every API call the web makes, one function each. */
 export const api = {
   me: () => request<Me>("GET", "/me"),
+  /** The commit this server runs and, when it has one, the download host's folder (the R2 bucket) the agent builds and installers come from. */
+  version: () => request<{ commit: string; downloadsUrl: string | null }>("GET", "/version"),
   setMyLanguage: (language: string) => request<void>("PUT", "/me/language", { language }),
   providers: () => request<{ available: string[] }>("GET", "/auth/providers"),
   register: (email: string, password: string, displayName: string) =>
