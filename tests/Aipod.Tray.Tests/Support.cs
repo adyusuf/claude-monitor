@@ -1,6 +1,6 @@
 using Aipod.Tray;
-using ClaudeMonitor.Agent.Auth;
-using ClaudeMonitor.Agent.Config;
+using Podium.Agent.Auth;
+using Podium.Agent.Config;
 
 namespace Aipod.Tray.Tests;
 
@@ -19,7 +19,7 @@ public sealed class AgentHome : IDisposable
     public AgentHome(Func<string, string?>? extra = null)
     {
         Path = Directory.CreateTempSubdirectory("aipod-tray-").FullName;
-        Config = AgentConfig.FromEnvironment(k => k == "CM_AGENT_HOME" ? Path : extra?.Invoke(k));
+        Config = AgentConfig.FromEnvironment(k => k == "AP_AGENT_HOME" ? Path : extra?.Invoke(k));
     }
 
     public string Path { get; }

@@ -21,13 +21,6 @@ export function RoleBadge({ view: m }: { view: MachineView }) {
   return <span className="badge" title={claim}>{code}</span>;
 }
 
-/** Shown only for a machine whose agent still runs under the old plugin (ADR-0013): the retire period depends on how many are left. */
-export function PluginBadge({ view: m }: { view: MachineView }) {
-  const { t } = useI18n();
-  if (!m.pluginId?.startsWith("monitor-agent@")) return null;
-  return <span className="badge status-failed" title={m.pluginId}>{t("machines.plugin.old")}</span>;
-}
-
 /** Whether Claude Code is there: "unknown" for an agent that reported nothing (older), "not installed", or the kind, version and idle sessions. */
 export function ClaudeBadge({ view: m }: { view: MachineView }) {
   const { t } = useI18n();

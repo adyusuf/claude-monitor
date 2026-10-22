@@ -1,6 +1,6 @@
 import type { EventRow } from "../api/types";
 
-// What the Activity list knows about the events the agent reports (src/ClaudeMonitor.Contracts/Codes.cs EventKinds and
+// What the Activity list knows about the events the agent reports (src/Podium.Contracts/Codes.cs EventKinds and
 // Claude Code's own hook and transcript field names). One place, so the list never matches on a bare string (global #11).
 
 export const EventKind = {
@@ -24,7 +24,7 @@ export const CommandStatus = { Queued: "queued", Delivered: "delivered", Applied
 
 /** What a line of the Activity list is, for how it looks and how the filter treats it. */
 export const ActivityClass = {
-  MonitorInput: "monitor_input",
+  PodiumInput: "podium_input",
   HumanInput: "human_input",
   Assistant: "assistant",
   Tool: "tool",

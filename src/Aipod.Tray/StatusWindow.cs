@@ -1,4 +1,4 @@
-using ClaudeMonitor.Agent.Config;
+using Podium.Agent.Config;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;

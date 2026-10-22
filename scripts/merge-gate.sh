@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Merge gate for claude-monitor: the project's orchestrator. It calls the shared core (scripts/gate-core.sh) and adds
+# Merge gate for podium: the project's orchestrator. It calls the shared core (scripts/gate-core.sh) and adds
 # one step of its own at the test -> prod gate: the OWASP ZAP baseline scan (global #19), after the core is green.
 #
 # Usage: scripts/merge-gate.sh <dev|test|prod> [--list]

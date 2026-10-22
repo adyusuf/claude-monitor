@@ -38,7 +38,7 @@ export async function signIn(page: Page, address: string) {
   await expect(page.getByRole("heading", { name: "Sessions" })).toBeVisible();
 }
 
-/** A stand-in for cm-agent: the same HTTP calls, made from the test. */
+/** A stand-in for aipod: the same HTTP calls, made from the test. */
 export class FakeAgent {
   token = "";
   private seq = 0;

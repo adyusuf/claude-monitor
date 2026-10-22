@@ -161,7 +161,7 @@ export const en = {
   },
   activity: {
     filterLabel: "Show", all: "All", inputs: "Inputs", assistant: "Assistant", tools: "Tools",
-    monitorInput: "Podium (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
+    podiumInput: "Podium (web)", humanInput: "Human (Claude Code)", assistantLabel: "Claude", stopRequest: "Stop request",
     sentBy: "sent by {name}", typedBy: "typed by {name}", someone: "a member",
     waiting: "Waiting", pendingTitle: "Waiting to be applied",
     deliveredWith: "delivered together with the message typed in the session",
@@ -223,7 +223,6 @@ export const en = {
     plugin1: "Install the plugin. Claude Code asks for the server address, which is:",
     plugin2: "Then, in Claude Code, connect this machine (a code appears; approve it on the page that opens):",
     orManual: "Or install the agent by hand:",
-    pluginOld: "If this machine already has the old monitor-agent plugin: install aipod and run /aipod:connect, which removes the old one so no event is reported twice.",
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: enRemote,

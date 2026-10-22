@@ -34,7 +34,7 @@ test("the account page downloads the user's data and deletes the account", async
   const address = await signUp(page, "privacy");
   await page.goto("/account");
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download my data" }).click()]);
-  expect(download.suggestedFilename()).toMatch(/^claude-monitor-export-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^podium-export-\d{4}-\d{2}-\d{2}\.json$/);
   const exported = JSON.parse(await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString("utf8")));
   expect(exported.user.email).toBe(address);
 

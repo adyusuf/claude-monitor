@@ -1,7 +1,7 @@
 # Running test and production on Windows Server
 
 The maintainer's server runs Windows Server without Docker (ADR-0002). Both environments live on it, each with its own
-IIS site, app pool, PostgreSQL database and folder under `C:\ClaudeMonitor\<env>`. Cloudflare proxies both host names
+IIS site, app pool, PostgreSQL database and folder under `C:\Podium\<env>`. Cloudflare proxies both host names
 (orange cloud); the server holds a Cloudflare Origin certificate. The host names are not in this repository.
 
 ## Once per server
@@ -17,7 +17,7 @@ IIS site, app pool, PostgreSQL database and folder under `C:\ClaudeMonitor\<env>
      and import them into `LocalMachine\My` on the server (as a .pfx: `certutil -mergepfx` or the Certificates MMC).
      Note its thumbprint.
    - The server's firewall accepts 443 only from Cloudflare's address ranges (cloudflare.com/ips). The same ranges
-     go into `MONITOR_PROXY_NETWORKS` (the set-up script writes them): forwarded client addresses are believed only from
+     go into `AIPOD_PROXY_NETWORKS` (the set-up script writes them): forwarded client addresses are believed only from
      there. Cloudflare changes the list rarely; when it does, update both and recycle the app pool.
    - Turn on BitLocker for the drive that holds PostgreSQL's data, the archives and the backups (encryption at rest).
 3. **Per environment**, from an elevated **Windows PowerShell 5.1** (`powershell.exe`, not `pwsh`: PowerShell 7 loads
@@ -29,27 +29,27 @@ IIS site, app pool, PostgreSQL database and folder under `C:\ClaudeMonitor\<env>
    .\setup-server.ps1 -Environment prod -HostName <prod host> -CertThumbprint <thumbprint> -LoopbackPort 8080 -SmtpUser <sender> -SmtpFrom <sender>
    ```
 
-   Then fill in `C:\ClaudeMonitor\<env>\monitor.env`: the Gmail app password, the GitHub and Google OAuth client
+   Then fill in `C:\Podium\<env>\aipod.env`: the Gmail app password, the GitHub and Google OAuth client
    ids and secrets (one OAuth app per environment; callbacks `https://<host>/api/auth/callback/github` and
-   `.../google`), and `MONITOR_BACKUP_OFFSITE` (a folder on another machine). Copy `MONITOR_BACKUP_KEY` into the
+   `.../google`), and `AIPOD_BACKUP_OFFSITE` (a folder on another machine). Copy `AIPOD_BACKUP_KEY` into the
    password manager: without it no backup can be restored.
 
    SMTP can also be given as an `"Smtp"` node (`Host`, `Port`, `User`, `Password`, `From`, `StartTls`) in
-   `releases\<commit>\api\appsettings.Production.json` on the server. A non-empty `MONITOR_SMTP_*` value in
-   `monitor.env` wins over it, an empty one does not hide it. The file is not in the package, so a new release folder
-   starts without it: copy it into each release, or keep the values in `monitor.env`, which every deploy carries over.
+   `releases\<commit>\api\appsettings.Production.json` on the server. A non-empty `AIPOD_SMTP_*` value in
+   `aipod.env` wins over it, an empty one does not hide it. The file is not in the package, so a new release folder
+   starts without it: copy it into each release, or keep the values in `aipod.env`, which every deploy carries over.
 
 ## Every release
 
 On the Mac, from a clean checkout of the commit to ship:
 
 ```bash
-AGENT_SIGN_IDENTITY="<Developer ID Application identity>" AGENT_NOTARY_PROFILE=claude-monitor-notary bash scripts/build-agent.sh
-bash scripts/build-release.sh                      # out/claude-monitor-<commit>.zip
+AGENT_SIGN_IDENTITY="<Developer ID Application identity>" AGENT_NOTARY_PROFILE=podium-notary bash scripts/build-agent.sh
+bash scripts/build-release.sh                      # out/podium-<commit>.zip
 ```
 
 For agents that update themselves (ADR-0004, SETUP.md "Updating the agent"), add `AGENT_UPDATE_CHANNEL=test` or `prod` to the first command: it signs
-`manifest.json` into `out/downloads`. **The package carries none of it:** the agent builds, `SHA256SUMS` and `manifest.json` are published to the download host (R2) with `scripts/publish_agent_downloads.sh test|prod` (`docs/release.md`, "Download host"), and each server's `monitor.env` names its channel there with `MONITOR_DOWNLOADS_URL`, so a `test` build reaches test and a `prod` build prod.
+`manifest.json` into `out/downloads`. **The package carries none of it:** the agent builds, `SHA256SUMS` and `manifest.json` are published to the download host (R2) with `scripts/publish_agent_downloads.sh test|prod` (`docs/release.md`, "Download host"), and each server's `aipod.env` names its channel there with `AIPOD_DOWNLOADS_URL`, so a `test` build reaches test and a `prod` build prod.
 
 The packages reach the server as **GitHub releases**, one per channel: `test-DD-MM-YYYY` (pre-release) for test and
 `prod-DD-MM-YYYY` for prod, each with the package, `PACKAGE.sha256`, `deploy-windows-scripts.zip`, the six agents,
@@ -58,14 +58,14 @@ built there (the package is the same either way, it holds no agent builds): publ
 agents cannot update themselves.
 
 ```powershell
-gh release download test-<DD-MM-YYYY> -D C:\Temp\cm-test -p "claude-monitor-*.zip" -p PACKAGE.sha256
-(Get-FileHash C:\Temp\cm-test\claude-monitor-<commit>.zip -Algorithm SHA256).Hash   # must equal PACKAGE.sha256
+gh release download test-<DD-MM-YYYY> -D C:\Temp\ap-test -p "podium-*.zip" -p PACKAGE.sha256
+(Get-FileHash C:\Temp\ap-test\podium-<commit>.zip -Algorithm SHA256).Hash   # must equal PACKAGE.sha256
 ```
 
 Deploy, test first (Windows PowerShell 5.1 again, elevated):
 
 ```powershell
-.\deploy.ps1 -Environment test -Package C:\Temp\cm-test\claude-monitor-<commit>.zip -LoopbackPort 8081
+.\deploy.ps1 -Environment test -Package C:\Temp\ap-test\podium-<commit>.zip -LoopbackPort 8081
 ```
 
 The script applies the migrations, switches the site, and checks `/api/version` reports the commit; if not, it
@@ -77,10 +77,10 @@ agents signed for the wrong channel.
 
 ## Backups and the restore drill
 
-- `setup-server.ps1` registers `ClaudeMonitor-backup-<env>`, daily at 03:30: the database and the event archives,
-  encrypted, 30 days locally and a copy in `MONITOR_BACKUP_OFFSITE`.
-- A failed backup writes an **error** to the Application event log (source `ClaudeMonitor`, event 1001).
-- **The alarm:** `ClaudeMonitor-health-<env>` runs `check-health.ps1` every hour and mails `MONITOR_ALERT_EMAIL` when
+- `setup-server.ps1` registers `Podium-backup-<env>`, daily at 03:30: the database and the event archives,
+  encrypted, 30 days locally and a copy in `AIPOD_BACKUP_OFFSITE`.
+- A failed backup writes an **error** to the Application event log (source `Podium`, event 1001).
+- **The alarm:** `Podium-health-<env>` runs `check-health.ps1` every hour and mails `AIPOD_ALERT_EMAIL` when
   the API does not answer, no backup succeeded in 26 hours (a backup that never ran, global #18), a backup or drill
   failed, the ASP.NET Core module logged an error, or no restore drill succeeded in 35 days. Results are events 1019
   (ok) and 1020 (problems); a mail that cannot be sent is 1021.

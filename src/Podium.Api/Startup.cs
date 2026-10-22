@@ -1,0 +1,259 @@
+using System.Threading.RateLimiting;
+using Podium.Api.Background;
+using Podium.Api.Config;
+using Podium.Api.Data;
+using Podium.Api.Endpoints;
+using Podium.Api.Ingest;
+using Podium.Api.Mail;
+using Podium.Api.Security;
+using Podium.Api.Streaming;
+using Podium.Api.Update;
+using Podium.Contracts;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Primitives;
+
+namespace Podium.Api;
+
+public static class Startup
+{
+    public static IServiceCollection AddPodiumServices(this IServiceCollection services, ApiConfig config)
+    {
+        services.AddSingleton(config);
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<Broker>();
+        services.AddSingleton(new UpdateCatalog(config));
+        if (config.DownloadsUrl is not null) services.AddHostedService<UpdateCatalogRefresher>();
+        services.AddDbContext<PodiumDb>(o => o.UseNpgsql(config.DatabaseUrl));
+        services.AddSingleton<IMailer, SmtpMailer>();
+        services.AddScoped<BatchIngestor>();
+        services.AddScoped<Podium.Api.Remote.RunCreator>();
+        services.AddScoped<Podium.Api.Remote.RunDecisions>();
+        services.AddScoped<Podium.Api.Remote.RunReports>();
+        services.AddScoped<Podium.Api.Remote.AskCreator>();
+        services.AddScoped<Podium.Api.Remote.AskReports>();
+        services.AddScoped<Podium.Api.Remote.GrantService>();
+        services.AddScoped<Podium.Api.Remote.JobService>();
+        services.AddScoped<Podium.Api.Remote.ScheduleService>();
+        services.AddHttpClient(Podium.Api.Integrations.JiraApi.ClientName, c => c.Timeout = TimeSpan.FromSeconds(30));
+        services.AddScoped<Podium.Api.Integrations.JiraApi>();
+        services.AddScoped<Podium.Api.Integrations.JiraOAuth>();
+        services.AddScoped<Podium.Api.Integrations.IntegrationTokens>();
+        services.AddScoped<Podium.Api.Integrations.JiraTracker>();
+        services.AddScoped<Podium.Api.Integrations.IWorkTracker>(sp => sp.GetRequiredService<Podium.Api.Integrations.JiraTracker>());
+        services.AddScoped<Podium.Api.Integrations.WebhookManager>();
+        services.AddScoped<Podium.Api.Integrations.IWorkWriter, Podium.Api.Integrations.JiraWriter>();
+        services.AddScoped<Podium.Api.Integrations.MirrorGate>();
+        services.AddScoped<Podium.Api.Integrations.IssueWrites>();
+        services.AddScoped<Podium.Api.Integrations.SprintWrites>();
+        services.AddScoped<Podium.Api.Integrations.ProjectMirror>();
+        services.AddScoped<Podium.Api.Integrations.IssueMirror>();
+        services.AddScoped<Podium.Api.Integrations.SprintMirror>();
+        services.AddScoped<Podium.Api.Integrations.PeopleMirror>();
+        services.AddScoped<Podium.Api.Integrations.ImportService>();
+        services.AddScoped<Podium.Api.Integrations.SyncService>();
+        services.AddSingleton<Podium.Api.Integrations.SyncInbox>();
+        if (config.BackgroundJobs)
+        {
+            services.AddHostedService<Housekeeper>();
+            services.AddHostedService<Archiver>();
+            if (config.JiraAvailable)
+            {
+                services.AddHostedService<Podium.Api.Integrations.SyncWorker>();
+                services.AddHostedService<Podium.Api.Integrations.Reconciler>();
+            }
+        }
+
+        services.AddAuthentication(Schemes.Session)
+            .AddScheme<AuthenticationSchemeOptions, SessionAuthHandler>(Schemes.Session, null)
+            .AddScheme<AuthenticationSchemeOptions, AgentAuthHandler>(Schemes.Agent, null)
+            .AddExternalProviders(config);
+        services.AddAuthorizationBuilder()
+            .AddPolicy(Schemes.Session, p => p.AddAuthenticationSchemes(Schemes.Session).RequireAuthenticatedUser())
+            .AddPolicy(Schemes.Agent, p => p.AddAuthenticationSchemes(Schemes.Agent).RequireAuthenticatedUser());
+        services.AddRateLimiter(o =>
+        {
+            o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            o.AddPolicy(AuthEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = config.AuthRequestsPerMinute, Window = TimeSpan.FromMinutes(1) }));
+        });
+        services.AddProblemDetails();
+        services.Configure<ForwardedHeadersOptions>(o =>
+        {
+            o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            // Forwarded headers count only when they come from these networks (Cloudflare's, on the servers).
+            o.KnownIPNetworks.Clear();
+            o.KnownProxies.Clear();
+            foreach (var network in config.ProxyNetworks) o.KnownIPNetworks.Add(network);
+        });
+        return services;
+    }
+
+    public static void UseMonitorPipeline(this WebApplication app, ApiConfig config)
+    {
+        if (config.TrustProxy) app.UseForwardedHeaders();
+        app.UseExceptionHandler();
+        app.Use(SecurityHeaders);
+        app.Use((http, next) => Csrf(http, next, config));
+        var files = config.WebRoot is { Length: > 0 } root && Directory.Exists(root)
+            ? new PhysicalFileProvider(Path.GetFullPath(root))
+            : null;
+        if (files is not null)
+        {
+            // Before routing: once the SPA fallback below has matched a path, the static-file middleware stands
+            // aside, and the built scripts would be answered with index.html.
+            app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
+            app.UseStaticFiles(new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
+            // The agent builds and their checksums. An extension-less file (SHA256SUMS) is an "unknown type" to the
+            // default mount, would fall through to the SPA and come back as index.html: the download could not be
+            // verified. Here every file is served as what it is, and a missing one is a 404, never the page.
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new SubFolderProvider(files, ApiConfig.DownloadsFolder),
+                RequestPath = DownloadsPath,
+                ServeUnknownFileTypes = true,
+                DefaultContentType = "application/octet-stream",
+                ContentTypeProvider = new DownloadContentTypes(),
+                OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+            });
+        }
+
+        app.UseRouting();
+        app.UseRateLimiter();
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        var api = app.MapGroup("/api");
+        api.MapGet("/version", () => Results.Ok(new { commit = config.Commit }));
+        AuthEndpoints.Map(api);
+        ExternalAuthEndpoints.Map(api);
+        MeEndpoints.Map(api);
+        PrivacyEndpoints.Map(api);
+        MfaEndpoints.Map(api);
+        WorkspaceEndpoints.Map(api);
+        InvitationEndpoints.Map(api);
+        DeviceEndpoints.Map(api);
+        AgentEndpoints.Map(api);
+        MachineEndpoints.Map(api);
+        SessionEndpoints.Map(api);
+        CommandEndpoints.Map(api);
+        AgentRunEndpoints.Map(api);
+        RunEndpoints.Map(api);
+        AgentMachineEndpoints.Map(api);
+        MachineMetricsEndpoints.Map(api);
+        RemoteSettingsEndpoints.Map(api);
+        AgentRoleEndpoints.Map(api);
+        AgentFactsEndpoints.Map(api);
+        AgentActionEndpoints.Map(api);
+        AskEndpoints.Map(api);
+        AgentGrantEndpoints.Map(api);
+        GrantEndpoints.Map(api);
+        AgentJobEndpoints.Map(api);
+        JobEndpoints.Map(api);
+        ScheduleEndpoints.Map(api);
+        ApprovalKeyEndpoints.Map(api);
+        ProjectEndpoints.Map(api);
+        ApplicationEndpoints.Map(api);
+        ApplicationPartEndpoints.Map(api);
+        IssueEndpoints.Map(api);
+        IssueLinkEndpoints.Map(api);
+        IssueEvidenceEndpoints.Map(api);
+        SprintEndpoints.Map(api);
+        SprintIssueEndpoints.Map(api);
+        IssueRunEndpoints.Map(api);
+        IntegrationEndpoints.Map(api);
+        IntegrationImportEndpoints.Map(api);
+        IntegrationWebhookEndpoints.Map(api);
+        api.MapFallback(() => Results.NotFound());
+        if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
+        if (files is not null)
+        {
+            // The single-page app answers every non-API path; /api/* never falls through to it (global #17).
+            app.MapFallbackToFile("{*path:regex(^(?!api/|downloads/).*$)}", "index.html",
+                new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
+        }
+    }
+
+    public const string DownloadsPath = "/" + ApiConfig.DownloadsFolder;
+
+    /// <summary>A folder of the web root that may appear after the start (the deploy copies the builds in).</summary>
+    private sealed class SubFolderProvider(IFileProvider root, string folder) : IFileProvider
+    {
+        public IFileInfo GetFileInfo(string subpath) => root.GetFileInfo(Combine(subpath));
+        public IDirectoryContents GetDirectoryContents(string subpath) => root.GetDirectoryContents(Combine(subpath));
+        public IChangeToken Watch(string filter) => root.Watch(Combine(filter));
+        private string Combine(string subpath) => folder + "/" + subpath.TrimStart('/');
+    }
+
+    /// <summary>The standard map, plus the checksum file the build writes without an extension.</summary>
+    private sealed class DownloadContentTypes : Microsoft.AspNetCore.StaticFiles.IContentTypeProvider
+    {
+        private readonly Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider standard = new();
+
+        public bool TryGetContentType(string subpath, out string contentType)
+        {
+            if (string.Equals(Path.GetFileName(subpath), "SHA256SUMS", StringComparison.Ordinal))
+            {
+                contentType = "text/plain; charset=utf-8";
+                return true;
+            }
+
+            return standard.TryGetContentType(subpath, out contentType!);
+        }
+    }
+
+    /// <summary>The page itself is always revalidated, so a new deploy loads at once; the hashed bundles may cache.</summary>
+    private static void NoCacheForPages(Microsoft.AspNetCore.StaticFiles.StaticFileResponseContext ctx)
+    {
+        if (ctx.File.Name.EndsWith(".html", StringComparison.Ordinal)) ctx.Context.Response.Headers.CacheControl = "no-cache";
+    }
+
+    private static Task SecurityHeaders(HttpContext http, Func<Task> next)
+    {
+        var h = http.Response.Headers;
+        h.XContentTypeOptions = "nosniff";
+        h.XFrameOptions = "DENY";
+        h["Referrer-Policy"] = "same-origin";
+        h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        h["Cross-Origin-Opener-Policy"] = "same-origin";
+        h["Cross-Origin-Embedder-Policy"] = "require-corp";
+        h["Cross-Origin-Resource-Policy"] = "same-origin";
+        if (http.Request.Path.StartsWithSegments("/api"))
+        {
+            // Account data, sessions and captured content: never kept by a browser or a proxy cache.
+            h.CacheControl = "no-store";
+        }
+
+        h.ContentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self'; " +
+                                  "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+        return next();
+    }
+
+    /// <summary>
+    /// Cookie-authenticated changes must come from our own pages: an unsafe method on /api needs the X-CSRF header
+    /// (a cross-site form cannot set it, and a cross-site script cannot without a CORS preflight we never allow) and,
+    /// when the browser sends Origin, it must be ours. Agent calls carry a bearer token instead of a cookie.
+    /// </summary>
+    private static Task Csrf(HttpContext http, Func<Task> next, ApiConfig config)
+    {
+        var request = http.Request;
+        var unsafeMethod = !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method));
+        var cookieCall = request.Path.StartsWithSegments("/api")
+                         && (request.Cookies.ContainsKey(ApiConfig.SessionCookie) || request.Cookies.ContainsKey(ApiConfig.MfaCookie))
+                         && !request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.Ordinal);
+        if (unsafeMethod && cookieCall)
+        {
+            var origin = request.Headers.Origin.ToString();
+            if (request.Headers[ApiConfig.CsrfHeader].ToString() != "1" || (origin.Length > 0 && origin != config.PublicOrigin))
+            {
+                http.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return http.Response.WriteAsJsonAsync(new { title = "csrf" });
+            }
+        }
+
+        return next();
+    }
+}

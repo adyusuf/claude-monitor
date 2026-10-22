@@ -1,5 +1,5 @@
 {
-  "name": "claude-monitor-web",
+  "name": "podium-web",
   "private": true,
   "type": "module",
   "description": "The web app (ADR-0002 phase 3): accounts, workspaces, machines, live sessions and commands.",

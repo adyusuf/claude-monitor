@@ -1,0 +1,109 @@
+using Podium.Contracts;
+
+namespace Podium.Agent.Config;
+
+// Remote work (ADR-0005): service mode, the exec policy and the limits of runs, metrics and relays. Part of the ONE
+// configuration module; FromEnvironment in AgentConfig.cs still reads every variable.
+public sealed partial record AgentConfig
+{
+    /// <summary>
+    /// True when the daemon runs as a boot service under its own account (ADR-0005); the service units set AP_SERVICE=1.
+    /// Its exec level is then read from <see cref="ExecConfigPath"/>, an admin-owned file, never from agent.json.
+    /// </summary>
+    public bool ServiceMode { get; init; }
+
+    /// <summary>The most Claude sessions this agent keeps running that were started from the web (ADR-0014).</summary>
+    public int ClaudeWorkersMax { get; init; } = 3;
+
+    /// <summary>How often the daemon looks for an ask that no session can take (the automatic mode, ADR-0014 P3).</summary>
+    public TimeSpan ClaudeAutoEvery { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>How often the automatic mode asks Claude Code which sessions it started still run.</summary>
+    public TimeSpan ClaudeAutoReconcileEvery { get; init; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>An ask must have found no idle session for this long before the automatic mode starts one (a session that just finished its turn is given time to go idle).</summary>
+    public TimeSpan ClaudeAutoWait { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The most sessions the automatic mode starts by itself in an hour, for the whole machine.</summary>
+    public int ClaudeAutoStartsPerHour { get; init; } = 3;
+
+    /// <summary>How long a project is left alone after the automatic mode could not start a session in it.</summary>
+    public TimeSpan ClaudeAutoBackoff { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The longest first prompt of a web start the agent hands to `claude` (the API caps what a person may type at ClaudeFirstPromptMax; the extra room is for the characters wrapping adds, and anything longer is cut with a marker).</summary>
+    public int ClaudeFirstPromptMax { get; init; } = AgentActionKinds.ClaudeFirstPromptMax + 200;
+
+    /// <summary>The usage limits Claude Code last gave to `aipod statusline` (ADR-0011 §7a), in the user-only home.</summary>
+    public string ClaudeLimitsPath => Path.Combine(Home, "claude-limits.json");
+
+    /// <summary>How often the daemon reads what Claude Code has on the machine (sessions, plugins, skills, project settings; ADR-0011 §7a step E) to put it in its profile.</summary>
+    public TimeSpan ClaudeInventoryEvery { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>The sessions this agent started from the web and has not stopped (ids and folders, in the user-only home).</summary>
+    public string ClaudeWorkersPath => Path.Combine(Home, "claude-workers.json");
+
+    /// <summary>The admin-owned exec policy of a service agent: level and optional ceiling (ADR-0005, "Four fail-closed keys").</summary>
+    public string ExecConfigPath { get; init; } = DefaultExecConfigPath(Os);
+
+    /// <summary>Remote runs executing at once on this target; one more is refused as busy.</summary>
+    public int ExecMaxConcurrent { get; init; } = 2;
+    public TimeSpan ExecTimeoutDefault { get; init; } = TimeSpan.FromSeconds(120);
+    public TimeSpan ExecTimeoutMax { get; init; } = TimeSpan.FromSeconds(3600);
+
+    /// <summary>After SIGTERM (or a Job Object close request) a run's processes get this long before they are killed.</summary>
+    public TimeSpan ExecKillGrace { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Limits of a run on macOS (<see cref="RunLimits"/>): the cores its CPU budget allows (budget = timeout + grace, times
+    /// this), the largest file it may write and its open descriptors. Bounded where they are used.
+    /// </summary>
+    public int ExecCpuCores { get; init; } = Environment.ProcessorCount;
+    public long ExecFileSizeMax { get; init; } = 1024L * 1024 * 1024;
+    public int ExecOpenFilesMax { get; init; } = 1024;
+
+    /// <summary>
+    /// macOS only: how often the descendants of a run are recorded so that a kill also reaches those that left the process
+    /// group (<see cref="DescendantTracker"/>). Zero turns it off; otherwise between 50 ms and 5 s.
+    /// </summary>
+    public TimeSpan ExecTrackEvery { get; init; } = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>Output kept from the start of a run; past it only a tail of <see cref="RunTailBytes"/> is kept.</summary>
+    public int RunHeadBytes { get; init; } = 256 * 1024;
+    public int RunTailBytes { get; init; } = 256 * 1024;
+
+    /// <summary>A run that prints more than this in total is killed (output_limit).</summary>
+    public long RunReadCap { get; init; } = 64L * 1024 * 1024;
+
+    /// <summary>AP_EXEC_SCRIPT_OUTPUT_CEILING: the most output of a script run this agent keeps, whatever the workspace allows (1 to 64 MiB).</summary>
+    public long ExecScriptOutputCeiling { get; init; } = 64L * 1024 * 1024;
+
+    /// <summary>The most one output chunk carries to the API (the API refuses more than 64 KB).</summary>
+    public int RunChunkBytes { get; init; } = 32 * 1024;
+
+    public TimeSpan MetricsEvery { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>Finished runs (and the output read from them) are deleted from the local database after this long.</summary>
+    public TimeSpan RemoteLocalRetention { get; init; } = TimeSpan.FromDays(7);
+
+    /// <summary>How often the daemon sends queued remote requests and polls open runs it asked for (fallback to run_update).</summary>
+    public TimeSpan RemotePollEvery { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// The signed-approval policy file (ADR-0010 §4): beside the exec policy of a service agent, in the home of an interactive one.
+    /// </summary>
+    public string ApproversPath => ServiceMode ? Path.Combine(Path.GetDirectoryName(ExecConfigPath) ?? Home, "approvers.json") : Path.Combine(Home, "approvers.json");
+
+    /// <summary>How often the MCP process looks in the local database for an answer while a tool waits.</summary>
+    public TimeSpan RemoteWaitPoll { get; init; } = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>The longest an MCP tool waits for a run before answering with its current status.</summary>
+    public const int RemoteWaitMaxSeconds = 50;
+
+    /// <summary>Linux /etc/aipod; macOS /Library/Application Support/aipod; Windows %ProgramFiles%\aipod — all admin-owned.</summary>
+    public static string DefaultExecConfigPath(string os) => os switch
+    {
+        OsKinds.Windows => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "aipod", "exec.json"),
+        OsKinds.MacOs => "/Library/Application Support/aipod/exec.json",
+        _ => "/etc/aipod/exec.json",
+    };
+}

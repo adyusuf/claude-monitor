@@ -2,7 +2,7 @@
 
 A throw-away key is made with openssl for each run; the Keychain is never touched (the key arrives through --key-env).
 Verification here is done with openssl itself, independent of the script's own signing code; the .NET side checks the
-same signatures with UpdateManifest.Verify (known-answer test in ClaudeMonitor.Agent.Tests).
+same signatures with UpdateManifest.Verify (known-answer test in Podium.Agent.Tests).
 """
 import base64
 import contextlib
@@ -40,7 +40,10 @@ def verifies(public_b64, text, signature_b64):
 class PayloadTests(unittest.TestCase):
     def test_the_text_is_one_field_per_line_in_a_fixed_order(self):
         self.assertEqual(sm.payload('test', '0.3.1', 'macos', 'arm64', SHA, '0.2.0'),
-                         'cm-agent-update/1\nchannel=test\nversion=0.3.1\nos=macos\narch=arm64\n' + f'sha256={SHA}\nminSupported=0.2.0\n')
+                         'aipod-update/1\nchannel=test\nversion=0.3.1\nos=macos\narch=arm64\n' + f'sha256={SHA}\nminSupported=0.2.0\n')
+
+    def test_the_keychain_item_of_a_channel_key_is_named_after_the_channel(self):
+        self.assertEqual([sm.service(channel) for channel in ('test', 'prod')], ['aipod-update-test', 'aipod-update-prod'])
 
     def test_a_field_with_a_line_break_or_nothing_is_refused(self):
         for bad in ('', 'x\ny', 'x\ry'):
@@ -59,7 +62,7 @@ class SigningTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.key = new_key()
         self.public = sm.public_key(self.key)
-        for name, body in (('cm-agent-macos-arm64.zip', b'one'), ('cm-agent-windows-x64.zip', b'two'), ('SHA256SUMS', b'x'), ('notes.txt', b'y')):
+        for name, body in (('aipod-macos-arm64.zip', b'one'), ('aipod-windows-x64.zip', b'two'), ('SHA256SUMS', b'x'), ('notes.txt', b'y')):
             with open(os.path.join(self.dir.name, name), 'wb') as f:
                 f.write(body)
 
@@ -70,8 +73,8 @@ class SigningTests(unittest.TestCase):
 
     def test_every_zip_gets_an_entry_with_its_hash_and_a_signature_that_verifies(self):
         entries = {e['file']: e for e in self.manifest()['entries']}
-        self.assertEqual(sorted(entries), ['cm-agent-macos-arm64.zip', 'cm-agent-windows-x64.zip'])
-        mac = entries['cm-agent-macos-arm64.zip']
+        self.assertEqual(sorted(entries), ['aipod-macos-arm64.zip', 'aipod-windows-x64.zip'])
+        mac = entries['aipod-macos-arm64.zip']
         self.assertEqual((mac['os'], mac['arch'], mac['channel'], mac['version'], mac['minSupported']), ('macos', 'arm64', 'test', '0.3.1', '0.2.0'))
         import hashlib
         self.assertEqual(mac['sha256'], hashlib.sha256(b'one').hexdigest())
@@ -80,13 +83,13 @@ class SigningTests(unittest.TestCase):
 
     def test_linux_zips_are_signed_and_an_unknown_os_is_not(self):
         import hashlib
-        for name, body in (('cm-agent-linux-x64.zip', b'three'), ('cm-agent-linux-arm64.zip', b'four'), ('cm-agent-freebsd-x64.zip', b'five')):
+        for name, body in (('aipod-linux-x64.zip', b'three'), ('aipod-linux-arm64.zip', b'four'), ('aipod-freebsd-x64.zip', b'five')):
             with open(os.path.join(self.dir.name, name), 'wb') as f:
                 f.write(body)
         entries = {e['file']: e for e in self.manifest()['entries']}
-        self.assertEqual(sorted(entries), ['cm-agent-linux-arm64.zip', 'cm-agent-linux-x64.zip', 'cm-agent-macos-arm64.zip', 'cm-agent-windows-x64.zip'])
+        self.assertEqual(sorted(entries), ['aipod-linux-arm64.zip', 'aipod-linux-x64.zip', 'aipod-macos-arm64.zip', 'aipod-windows-x64.zip'])
         for arch, body in (('x64', b'three'), ('arm64', b'four')):
-            linux = entries[f'cm-agent-linux-{arch}.zip']
+            linux = entries[f'aipod-linux-{arch}.zip']
             self.assertEqual((linux['os'], linux['arch'], linux['sha256']), ('linux', arch, hashlib.sha256(body).hexdigest()))
             text = sm.payload('test', '0.3.1', 'linux', arch, linux['sha256'], '0.2.0')
             self.assertTrue(verifies(self.public, text, linux['signature']))
@@ -120,7 +123,7 @@ class SigningTests(unittest.TestCase):
         self.assertEqual(code, 0)
         with open(os.path.join(self.dir.name, 'manifest.json')) as f:
             manifest = json.load(f)
-        self.assertEqual(manifest['format'], 'cm-agent-update/1')
+        self.assertEqual(manifest['format'], 'aipod-update/1')
         self.assertEqual({e['channel'] for e in manifest['entries']}, {'prod'})
 
     def test_a_signature_that_does_not_verify_is_never_published(self):

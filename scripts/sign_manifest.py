@@ -5,11 +5,11 @@
                                                           only, the public key is printed (commit it as
                                                           deploy/update-keys/<channel>.pub)
   sign_manifest.py sign --channel test|prod --downloads DIR --version X.Y.Z --min-supported X.Y.Z
-                                                          write DIR/manifest.json: one signed entry per cm-agent-<os>-<arch>.zip
+                                                          write DIR/manifest.json: one signed entry per aipod-<os>-<arch>.zip
 
 The private key is never written to a file and never put on a command line: it is read from the Keychain (or, off a Mac,
 from the environment variable named by --key-env) and handed to openssl on standard input. ECDSA P-256 / SHA-256, DER
-signatures, public key as base64 SubjectPublicKeyInfo: exactly what ClaudeMonitor.Contracts.UpdateManifest verifies.
+signatures, public key as base64 SubjectPublicKeyInfo: exactly what Podium.Contracts.UpdateManifest verifies.
 The signed text is built by payload() below and by UpdateManifest.Payload; a known-answer test in both test suites keeps them equal.
 """
 import argparse
@@ -23,16 +23,16 @@ import subprocess
 import sys
 import tempfile
 
-FORMAT = 'cm-agent-update/1'
+FORMAT = 'aipod-update/1'
 CHANNELS = ('test', 'prod')
-ZIP = re.compile(r'^cm-agent-(macos|windows|linux)-(arm64|x64)\.zip$')
+ZIP = re.compile(r'^aipod-(macos|windows|linux)-(arm64|x64)\.zip$')
 VERSION = re.compile(r'^\d+\.\d+\.\d+$')
 # The committed public halves (deploy/update-keys/<channel>.pub); tests point this at a temporary folder.
 KEYS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'deploy', 'update-keys')
 
 
 def service(channel):
-    return f'cm-agent-update-{channel}'
+    return f'aipod-update-{channel}'
 
 
 def payload(channel, version, os_name, arch, sha256, min_supported):
@@ -128,7 +128,7 @@ def build_manifest(channel, downloads, version, min_supported, private_b64):
         entries.append({'channel': channel, 'version': version, 'os': match.group(1), 'arch': match.group(2), 'file': name,
                         'sha256': digest, 'minSupported': min_supported, 'signature': signature})
     if not entries:
-        raise RuntimeError(f'no cm-agent-<os>-<arch>.zip in {downloads}')
+        raise RuntimeError(f'no aipod-<os>-<arch>.zip in {downloads}')
     return {'format': FORMAT, 'entries': entries}
 
 

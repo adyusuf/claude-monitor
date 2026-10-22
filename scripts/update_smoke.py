@@ -6,8 +6,8 @@ Runs on the host (macOS or Windows): it publishes the agent twice (0.3.0 and 0.3
 configuration), starts its daemon against a fake API on 127.0.0.1 and then checks four things:
 
   1. an update signed with the right key is downloaded and installed: the binary is replaced, the daemon restarts and
-     `cm-agent status` reports 0.3.1;
-  2. a manifest signed with another key changes nothing and `cm-agent status` shows why (bad-signature);
+     `aipod status` reports 0.3.1;
+  2. a manifest signed with another key changes nothing and `aipod status` shows why (bad-signature);
   3. a download whose bytes differ from the signed hash changes nothing (hash-mismatch);
   4. a new daemon that the API never answers is rolled back to 0.3.0 (the fake API refuses 0.3.1's heartbeats).
 
@@ -31,7 +31,7 @@ import time
 import zipfile
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-PROJECT = os.path.join(ROOT, 'src', 'ClaudeMonitor.Agent')
+PROJECT = os.path.join(ROOT, 'src', 'Podium.Agent')
 WORKSPACE = '00000000-0000-0000-0000-000000000001'
 AGENT = '00000000-0000-0000-0000-000000000002'
 spec = importlib.util.spec_from_file_location('sign_manifest', os.path.join(ROOT, 'scripts', 'sign_manifest.py'))
@@ -135,17 +135,17 @@ def publish(rid, out, version, public_key):
     if done.returncode != 0:
         print(done.stdout[-2000:] + done.stderr[-2000:])
         return None
-    return os.path.join(out, 'cm-agent.exe' if rid.startswith('win') else 'cm-agent')
+    return os.path.join(out, 'aipod.exe' if rid.startswith('win') else 'aipod')
 
 
 def agent(binary, home, *args, timeout=240):
-    env = dict(os.environ, CM_AGENT_HOME=home, CM_CREDENTIALS='file', CM_UPDATE_HEALTH_WAIT='20')
+    env = dict(os.environ, AP_AGENT_HOME=home, AP_CREDENTIALS='file', AP_UPDATE_HEALTH_WAIT='20')
     done = subprocess.run([binary, *args], env=env, capture_output=True, text=True, timeout=timeout)
     return done.returncode, done.stdout + done.stderr
 
 
 def start_daemon(binary, home):
-    env = dict(os.environ, CM_AGENT_HOME=home, CM_CREDENTIALS='file')
+    env = dict(os.environ, AP_AGENT_HOME=home, AP_CREDENTIALS='file')
     return subprocess.Popen([binary, 'daemon'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -168,7 +168,7 @@ def zip_binary(binary, target):
 def run(installed, offered, system, arch, key, public):
     problems = []
     os_name = 'macos' if system == 'osx' else 'windows'
-    work = tempfile.mkdtemp(prefix='cm-update-smoke-')
+    work = tempfile.mkdtemp(prefix='ap-update-smoke-')
     server = Server()
     threading.Thread(target=server.serve_forever, daemon=True).start()
     home = os.path.join(work, 'home')
@@ -185,7 +185,7 @@ def run(installed, offered, system, arch, key, public):
         folder = os.path.join(work, 'downloads')
         shutil.rmtree(folder, ignore_errors=True)
         os.makedirs(folder)
-        name = f'cm-agent-{os_name}-{arch}.zip'
+        name = f'aipod-{os_name}-{arch}.zip'
         data = zip_binary(offered, os.path.join(folder, name))
         manifest = sm.build_manifest('test', folder, '0.3.1', '0.3.0', signing_key)
         entry = manifest['entries'][0]
@@ -202,7 +202,7 @@ def run(installed, offered, system, arch, key, public):
         code, text = agent(bin_path, home, 'update')
         print(f'  update: exit {code}: {text.strip()[:300]}')
         if code != 0:
-            problems.append(f'1: `cm-agent update` failed: {text.strip()[:400]}')
+            problems.append(f'1: `aipod update` failed: {text.strip()[:400]}')
         if not wait_for(lambda: '0.3.1' in server.heartbeats, 60):
             problems.append('1: the restarted daemon (0.3.1) never reached the fake API')
         code, text = agent(bin_path, home, 'version')
@@ -211,7 +211,7 @@ def run(installed, offered, system, arch, key, public):
         code, status = agent(bin_path, home, 'status')
         print('  status after the update:\n    ' + status.strip().replace('\n', '\n    '))
         if 'version: 0.3.1' not in status or 'daemon: running' not in status:
-            problems.append('1: `cm-agent status` does not show 0.3.1 with a running daemon')
+            problems.append('1: `aipod status` does not show 0.3.1 with a running daemon')
         # bring the home back to 0.3.0 for the refusal cases
         agent(bin_path, home, 'update', '--check')
         stop_daemon(home)
@@ -231,7 +231,7 @@ def run(installed, offered, system, arch, key, public):
             problems.append(f'2: a bad signature was not refused or changed the binary: {text.strip()[:300]}')
         status = agent(bin_path, home, 'status')[1]
         if 'bad-signature' not in status:
-            problems.append('2: `cm-agent status` does not show the bad signature')
+            problems.append('2: `aipod status` does not show the bad signature')
 
         # 3. the download differs from the signed hash
         publish_offer(key, tamper=True)
@@ -247,7 +247,7 @@ def run(installed, offered, system, arch, key, public):
         if code == 0 or agent(bin_path, home, 'version')[1].strip() != '0.3.0':
             problems.append(f'4: the unhealthy 0.3.1 was not rolled back: {text.strip()[:300]}')
         if 'rolled back' not in agent(bin_path, home, 'status')[1]:
-            problems.append('4: `cm-agent status` does not show the rollback')
+            problems.append('4: `aipod status` does not show the rollback')
     finally:
         stop_daemon(home)
         time.sleep(2)
@@ -265,8 +265,8 @@ def stop_daemon(home):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    parser.add_argument('--installed', help='skip the publish: a cm-agent 0.3.0 built with the update key of this run (only useful when debugging)')
-    parser.add_argument('--offered', help='skip the publish: the cm-agent 0.3.1 to offer')
+    parser.add_argument('--installed', help='skip the publish: a aipod 0.3.0 built with the update key of this run (only useful when debugging)')
+    parser.add_argument('--offered', help='skip the publish: the aipod 0.3.1 to offer')
     args = parser.parse_args(argv)
     target = host()
     if target is None or shutil.which('dotnet') is None or shutil.which('openssl') is None:
@@ -275,7 +275,7 @@ def main(argv=None):
     system, arch = target
     key = base64.b64encode(sm.openssl(['ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-outform', 'DER'])).decode()
     public = sm.public_key(key)
-    out = tempfile.mkdtemp(prefix='cm-update-publish-')
+    out = tempfile.mkdtemp(prefix='ap-update-publish-')
     try:
         installed, offered = args.installed, args.offered
         if installed is None or offered is None:

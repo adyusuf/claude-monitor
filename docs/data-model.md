@@ -243,7 +243,7 @@ An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a li
 `projects` gains `source_connection_id`; `sprints` gains `source_connection_id`; `issues` gains `external_key` (≤ 64), `external_url` (https, ≤ 500), `assignee_person_id` (FK `integration_people`, null).
 `ux_sprints_active_project` and `ux_sprints_active_application` now also require `source_connection_id IS NULL` (a mirrored space may run parallel sprints, as Jira allows). Nothing is removed or retyped.
 
-- **Secrets:** `refresh_token`, `access_token` and `verifier` are sealed with `MONITOR_INTEGRATION_KEY`; they are never exported, logged or audited. Disconnecting a connection or an account clears them.
+- **Secrets:** `refresh_token`, `access_token` and `verifier` are sealed with `AIPOD_INTEGRATION_KEY`; they are never exported, logged or audited. Disconnecting a connection or an account clears them.
 - **Retention:** `integration_webhook_receipts` are deleted after 7 days, `integration_oauth_states` after expiry, `integration_sync_runs` after `retention_days`.
 - **Account deletion:** the user's `integration_accounts` rows are deleted; the connections they made stay (an admin can reassign the connector by connecting again); their `integration_people.user_id` links are cleared.
 

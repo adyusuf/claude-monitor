@@ -9,11 +9,11 @@
 
   <!-- Line coverage, collected only when COVERAGE_DIR is set (tests/coverage.props). -->
   <Import Project="..\coverage.props" />
-  <!-- This codebase is the tray (aipod-tray) only. The agent (cm-agent) and the contracts are measured by their own test projects, so their assemblies
+  <!-- This codebase is the tray (aipod-tray) only. The agent (aipod) and the contracts are measured by their own test projects, so their assemblies
        are left out here by name: this is not hand-written code of this codebase being removed from the count. (An Include filter on the hyphenated
-       name `[aipod-tray]*` does not select anything in coverlet, hence the Exclude; `[cm*]*` is the pattern that matches `cm-agent`.) -->
+       name `[aipod-tray]*` does not select anything in coverlet, hence the Exclude; `[ap*]*` is the pattern that matches `aipod`.) -->
   <PropertyGroup Condition="'$(COVERAGE_DIR)' != ''">
-    <Exclude>[cm*]*,[ClaudeMonitor.*]*</Exclude>
+    <Exclude>[ap*]*,[Podium.*]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>

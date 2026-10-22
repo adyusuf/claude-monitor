@@ -56,7 +56,6 @@ export const enMachines = {
     none: "No ask yet.", question: "Question", answer: "Answer", answerCut: "The answer was cut at the server's limit.",
     status: { queued: "waiting", delivered: "delivered, waiting for the answer", answered: "answered", no_idle_session: "no idle session", not_accepting: "not accepting", no_answer: "no answer", expired: "expired", cancelled: "cancelled" },
   },
-  plugin: { old: "old plugin: move to aipod" },
   claudeControl: {
     title: "Claude Code",
     hint: "Start and stop Claude Code on this machine from here, in the background. Only the machine's owner, only on a development or test machine, and only after the owner switches it on for this machine. Each session is Claude Code's own background session, in a project this machine has reported, under the owner's Claude account and plan.",

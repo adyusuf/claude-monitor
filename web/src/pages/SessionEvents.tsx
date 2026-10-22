@@ -60,7 +60,7 @@ export function EventsCard({ sessionId, owner, version }: { sessionId: string; o
   const line = (item: TimelineItem) => {
     const common = { item, open: opened.has(item.key), onToggle: toggle };
     switch (item.cls) {
-      case ActivityClass.MonitorInput:
+      case ActivityClass.PodiumInput:
       case ActivityClass.HumanInput:
         return <InputLine key={item.key} who={owner} {...common} />;
       case ActivityClass.Assistant:

@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using ClaudeMonitor.Agent.Config;
-using ClaudeMonitor.Agent.Daemon;
+using Podium.Agent.Config;
+using Podium.Agent.Daemon;
 
 namespace Aipod.Tray;
 
