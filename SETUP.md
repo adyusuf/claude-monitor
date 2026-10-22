@@ -86,7 +86,7 @@ out/osx-arm64/aipod install                                         # copies its
 out/osx-arm64/aipod status
 ```
 
-`install` registers a local plugin marketplace (`monitor-agent-local`) whose hooks and MCP server run the
+`install` registers a local plugin marketplace (`aipod-local`) whose hooks and MCP server run the
 installed binary, so Claude Code starts the agent with its sessions; nothing is registered with the OS. Without
 the `claude` CLI on `PATH` it prints the two `claude plugin` commands to run. The agent's tokens are in the macOS
 Keychain / Windows Credential Manager (service `aipod`); on Linux, which has no credential store, in
@@ -104,26 +104,24 @@ ADR-0002, "Commands from the web".
 The recommended way to get the agent onto a machine: nothing is downloaded or run by hand.
 
 ```bash
-claude plugin install monitor-agent --marketplace <owner>/<repo>#<branch>    # the web's "Get the agent" page shows the exact command
+claude plugin install aipod --marketplace <owner>/<repo>#<branch>    # the web's "Get the agent" page shows the exact command
 ```
 
 Claude Code asks for the server address (the plugin's one option; it is the address you open in the browser). The next session
-start installs the agent in the background (`plugin/monitor-agent/scripts/ensure.sh`: downloads `<server>/downloads/<zip>`, checks
+start installs the agent in the background (`plugin/aipod/scripts/ensure.sh`: downloads `<server>/downloads/<zip>`, checks
 it against the SHA-256 the plugin pins in `agent-release.txt`, puts it in the plugin's data directory); then, in Claude Code,
-`/monitor-agent:connect` shows a code to approve on the web, `/monitor-agent:status` shows how the install and the connection
-are doing, `/monitor-agent:disconnect` signs the machine out. The first session after installing reports nothing (the binary is
+`/aipod:connect` shows a code to approve on the web, `/aipod:status` shows how the install and the connection
+are doing, `/aipod:disconnect` signs the machine out. The first session after installing reports nothing (the binary is
 not there yet); the transcript is read later, so nothing of it is lost. **Uninstalling or disabling the plugin stops the daemon within
 30 s**: Claude Code runs nothing at uninstall, so the daemon watches for its data directory to disappear, for the plugin to drop out of Claude Code's plugin list, and for a `false` in
 `enabledPlugins` where the plugin is installed (everywhere it is installed: a plugin switched off in one project's settings only does not stop it). The agent home, the login and the credential store stay: installing the plugin again continues from them.
 `claude plugin uninstall --keep-data` keeps the data directory, but the plugin leaves Claude Code's plugin list, which the daemon also reads (when that list has an
-unknown shape it falls back to the data directory and the settings alone). The old local plugin (`aipod install`, `monitor-agent-local`) reports
-every event a second time if it stays enabled: `/monitor-agent:connect` removes it, and the bootstrap says so while it is there.
+unknown shape it falls back to the data directory and the settings alone). The local plugin (`aipod install`, `aipod-local`) reports
+every event a second time if it stays enabled next to this one: `/aipod:connect` removes it, and the bootstrap says so while it is there.
 
-The plugin is now called `aipod` (ADR-0013 section 1): `claude plugin marketplace add <site>/downloads/aipod-marketplace.json`, `claude plugin install aipod@aipod-releases`,
-then `/aipod:connect` (which removes the old `monitor-agent` plugin; the skills are `/aipod:connect|status|disconnect`). The `monitor-agent` plugin stays as a bridge: it goes
-quiet once `aipod` is enabled, and `aipod` goes quiet while a pre-bridge (0.5.0 or older) `monitor-agent` is still enabled, so no event is reported twice. Everything above applies to either name.
+The plugin is called `aipod` (ADR-0016): `claude plugin marketplace add <site>/downloads/aipod-marketplace.json`, `claude plugin install aipod@aipod-releases`, then `/aipod:connect` (the skills are `/aipod:connect|status|disconnect`).
 
-A maintainer renders the plugin's manifest, hooks and MCP file (for both plugins) from the one list of hooks in the agent with
+A maintainer renders the plugin's manifest, hooks and MCP file from the one list of hooks in the agent with
 `dotnet run --project src/Podium.Agent -- plugin-files .` and commits them (a test fails when they differ). `--stop-wait` works for a
 plugin-started agent from the plugin version whose wrapper exports `AP_PLUGIN_STOP_WAIT_MAX` (its Stop hook then allows 600 s; an older version waits for nothing). Limits: the plugin has no channel entry (push through the
 inbox needs none); Windows needs Git for Windows (Claude Code requires it) and has not been run (ADR-0007, "Risks").
@@ -172,7 +170,7 @@ to ask you before any request with side effects). A channel is a Claude Code res
 allowlist, so Claude Code must be started with the flag `install` prints:
 
 ```bash
-claude --dangerously-load-development-channels plugin:monitor-agent@monitor-agent-local   # accept the "local development" prompt
+claude --dangerously-load-development-channels plugin:aipod@aipod-local   # accept the "local development" prompt
 ```
 
 Without the flag (or where an organisation has channels off) nothing is lost: a pushed message that does not show up in the
@@ -388,7 +386,7 @@ aipod config auto-update off|check|on # what the daemon may do by itself (defaul
 
 1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `aipod-update-<channel>`) and is never written to a file; the public half is printed:
    `python3 scripts/sign_manifest.py keygen --channel test` and `... --channel prod`. Save the printed line as `deploy/update-keys/<channel>.pub` and commit it (it is public by design).
-2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SITE_URL=https://<site>` also writes `marketplace.json` and `monitor-agent-plugin.zip` so the site serves the plugin itself (with `VITE_PLUGIN_FROM_SERVER=1` in the web build); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
+2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SITE_URL=https://<site>` also writes `aipod-marketplace.json` and `aipod-plugin.zip` so the site serves the plugin itself (with `VITE_PLUGIN_FROM_SERVER=1` in the web build); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
    The channel's public key is built into the agent; `out/downloads` gets the six zips (macOS, Windows, Linux), `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
 3. **Publish them on the download host** (an R2 bucket behind a public domain; the release package carries no agent zip any more, and a file the server holds itself would win over the host, so none must stay in a web root): `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh test|prod` uploads the build to `daemons/<channel>/` (and keeps it under `daemons/<version>/<channel>/`),
    and the server's `aipod.env` gets `AIPOD_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>`. The update check then reads `manifest.json` there and offers addresses there; `/downloads/<file>` on the server redirects to the host (`docs/release.md`, "Download host").

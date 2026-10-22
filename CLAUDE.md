@@ -1,4 +1,4 @@
-# podium
+# Podium
 
 An agent on each machine collects what AI harnesses report and sends it to a central API; people follow
 and command their sessions on the web. Design: `docs/adr-0002-agent-platform.md`, `docs/data-model.md`.

@@ -48,15 +48,15 @@ public sealed class InboxShortTests : IDisposable
 
     private InboxTools Tool(AgentConfig? config = null) => new(config ?? home.Config, clock);
 
-    // ---- the notice names the tool of the session it is written to (ADR-0013) -----------------------------------------
+    // ---- the notice names the tool of the session it is written to (ADR-0016) -----------------------------------------
 
     [Fact]
-    public async Task A_session_that_has_the_new_tool_names_gets_a_notice_that_names_them_and_an_old_one_keeps_the_old_name()
+    public async Task A_notice_names_the_aipod_tool_whether_or_not_the_inbox_row_kept_the_tool_word()
     {
         store.SaveCommand(new LocalCommand("c-new", "s-new", CommandKinds.Prompt, "hello", Start.AddMinutes(30)));
         store.SaveCommand(new LocalCommand("c-old", "s-old", CommandKinds.Prompt, "hello", Start.AddMinutes(30)));
-        store.SaveInbox("s-new", "/tmp/cc-socks/new.sock", "token", Start, tools: "aipod");
-        store.SaveInbox("s-old", "/tmp/cc-socks/old.sock", "token", Start); // a row from before the names were kept
+        store.SaveInbox("s-new", "/tmp/cc-socks/new.sock", "token", Start, tools: McpToolNames.StoredWord);
+        store.SaveInbox("s-old", "/tmp/cc-socks/old.sock", "token", Start); // a row from before the word was kept
 
         Assert.Equal(2, await PumpAsync());
 
@@ -65,32 +65,26 @@ public sealed class InboxShortTests : IDisposable
     }
 
     [Fact]
-    public void The_names_of_a_sessions_tools_are_kept_with_its_inbox_and_a_later_hook_may_change_them()
+    public void The_tool_word_of_a_session_is_kept_with_its_inbox_and_a_later_hook_that_says_nothing_keeps_it()
     {
         store.SaveInbox("s-1", "/tmp/a.sock", "k", Start);
         Assert.Null(store.InboxOf("s-1")!.Tools);
-        store.SaveInbox("s-1", "/tmp/a.sock", "k", Start, tools: "aipod");
+        store.SaveInbox("s-1", "/tmp/a.sock", "k", Start, tools: McpToolNames.StoredWord);
         Assert.Equal("aipod", store.InboxOf("s-1")!.Tools);
         store.SaveInbox("s-1", "/tmp/a.sock", "k", Start); // a hook that says nothing about them keeps what is known
         Assert.Equal("aipod", store.Inboxes().Single().Tools);
-        store.SaveInbox("s-1", "/tmp/a.sock", "k", Start, tools: "legacy");
-        Assert.Equal("legacy", store.InboxOf("s-1")!.Tools);
     }
 
     [Fact]
-    public async Task The_hook_stores_the_names_of_the_session_it_runs_in()
+    public async Task The_hook_stores_the_tool_word_of_the_session_it_runs_in()
     {
         using var hooks = new TempHome(c => c with { PushEnabled = true, PushTransport = PushTransports.Inbox, MessagingSocket = "/tmp/cc-socks/h.sock", MessagingToken = new SecretText("t") });
         using var hookStore = new LocalStore(hooks.Config.DatabasePath);
-        foreach (var (mode, word) in new[] { (ToolNameMode.Aipod, "aipod"), (ToolNameMode.Legacy, "legacy") })
-        {
-            using var scope = McpToolNames.Scope(mode);
-            var payload = JsonSerializer.Serialize(new { session_id = $"s-{word}", cwd = "/tmp" });
-            await new Podium.Agent.Capture.HookRunner(hooks.Config, hookStore, clock).RunAsync("PreToolUse", payload, CancellationToken.None);
-        }
+        var payload = JsonSerializer.Serialize(new { session_id = "s-1", cwd = "/tmp" });
 
-        Assert.Equal("aipod", hookStore.InboxOf("s-aipod")!.Tools);
-        Assert.Equal("legacy", hookStore.InboxOf("s-legacy")!.Tools);
+        await new Podium.Agent.Capture.HookRunner(hooks.Config, hookStore, clock).RunAsync("PreToolUse", payload, CancellationToken.None);
+
+        Assert.Equal("aipod", hookStore.InboxOf("s-1")!.Tools);
     }
 
     // ---- the notice holds nothing from the web ---------------------------------------------------------------------

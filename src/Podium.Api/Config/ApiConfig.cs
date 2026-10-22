@@ -205,7 +205,7 @@ public sealed record ApiConfig
                 int.Parse(SmtpRequired("AIPOD_SMTP_PORT", "Port", "1025"), System.Globalization.CultureInfo.InvariantCulture),
                 SmtpValue("AIPOD_SMTP_USER", "User"),
                 SmtpValue("AIPOD_SMTP_PASSWORD", "Password"),
-                SmtpRequired("AIPOD_SMTP_FROM", "From", "monitor@localhost"),
+                SmtpRequired("AIPOD_SMTP_FROM", "From", "podium@localhost"),
                 string.Equals(SmtpValue("AIPOD_SMTP_TLS", "StartTls") ?? (development ? "false" : "true"), "true",
                     StringComparison.OrdinalIgnoreCase)),
             GitHub = Client("AIPOD_GITHUB"),

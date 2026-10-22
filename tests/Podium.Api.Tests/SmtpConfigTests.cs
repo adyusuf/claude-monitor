@@ -93,7 +93,7 @@ public sealed class SmtpConfigTests
     public void Development_without_either_keeps_the_local_defaults()
     {
         var smtp = Load("{}", development: true).Smtp;
-        Assert.Equal(("localhost", 1025, "monitor@localhost", false), (smtp.Host, smtp.Port, smtp.From, smtp.StartTls));
+        Assert.Equal(("localhost", 1025, "podium@localhost", false), (smtp.Host, smtp.Port, smtp.From, smtp.StartTls));
         Assert.Null(smtp.Password);
     }
 }
