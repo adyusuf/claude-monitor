@@ -72,10 +72,21 @@ if [ -z "$shas" ] || [ -z "$file" ]; then
   finish
 fi
 printf '%s' "$file" | grep -Eq '^aipod-(macos|windows|linux)-(arm64|x64)\.zip$' || { say "refused: $file is not a build file name"; finish; }
-if ! valid_server "$server"; then
-  say "no https server address is set for this plugin; nothing was installed"
-  msg="${msg:+$msg }aipod: set the server address in the plugin's options (/plugin, aipod agent, Configure options)."
-  finish
+# Where the build comes from: the download host this plugin was built for (build_plugin_site.py writes its address into download-base.txt),
+# else the server's own /downloads, which is why a plugin without that file still needs the server address.
+dl="$(sed -n '1p' "$root/download-base.txt" 2> /dev/null | tr -d '\r ')"
+dl="${dl%/}"
+if [ -n "$dl" ] && ! valid_server "$dl"; then
+  say "refused: download-base.txt does not hold an https address"
+  dl=""
+fi
+if [ -z "$dl" ]; then
+  if ! valid_server "$server"; then
+    say "no https server address is set for this plugin; nothing was installed"
+    msg="${msg:+$msg }aipod: set the server address in the plugin's options (/plugin, aipod agent, Configure options)."
+    finish
+  fi
+  dl="$server/downloads"
 fi
 if ! command -v curl > /dev/null 2>&1; then
   say "curl is needed to download the agent and was not found"
@@ -98,8 +109,8 @@ sha256() { if command -v sha256sum > /dev/null 2>&1; then sha256sum "$1" | awk '
   tmp="$data/download.$$"
   fail() { say "$1"; printf '%s\n' "$failure_key" > "$data/install.failed"; exit 0; }
   mkdir -p "$tmp/x" || exit 0
-  say "installing version $pinned for $os-$arch from the server"
-  curl -fsSL --max-time 300 --max-filesize 262144000 -o "$tmp/$file" "$server/downloads/$file" || fail "download failed"
+  say "installing version $pinned for $os-$arch from the download host"
+  curl -fsSL --max-time 300 --max-filesize 262144000 -o "$tmp/$file" "$dl/$file" || fail "download failed"
   printf '%s\n' "$shas" | grep -qx "$(sha256 "$tmp/$file")" || fail "refused: the download does not match the pinned SHA-256"
   if command -v unzip > /dev/null 2>&1; then unzip -o -q "$tmp/$file" -d "$tmp/x" || fail "unzip failed"
   elif [ "$os" = windows ] && command -v powershell.exe > /dev/null 2>&1; then

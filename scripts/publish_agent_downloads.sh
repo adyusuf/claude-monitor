@@ -3,7 +3,7 @@
 # (docs/release.md, "Download host"). One folder per channel holds what the update check reads; every version is also kept under its own folder:
 #
 #   <prefix>/<channel>/                 the current build: the six zips, SHA256SUMS and manifest.json (overwritten each release), and the plugin
-#                                       files when the build wrote them (AGENT_SITE_URL: aipod-marketplace.json, aipod-plugin.zip), because the site no
+#                                       files when the build wrote them (AGENT_DOWNLOADS_URL: aipod-marketplace.json, aipod-plugin.zip), because the site no
 #                                       longer carries any zip itself, and the installers (aipod-install.sh, aipod-install.ps1: README, "Install aipod")
 #   <prefix>/<version>/<channel>/       the same files, kept
 #
