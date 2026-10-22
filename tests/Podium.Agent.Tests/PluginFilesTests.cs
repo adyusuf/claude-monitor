@@ -38,16 +38,16 @@ public sealed class PluginFilesTests : IDisposable
     [Fact]
     public void The_stop_hook_fits_the_longest_stop_wait_and_the_wrapper_says_so_with_the_same_number()
     {
-        var hooks = JsonNode.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), MarketplacePlugin.PluginFolder, "hooks", "hooks.json")))!["hooks"]!.AsObject();
+        var hooks = JsonNode.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), MarketplacePlugin.AipodFolder, "hooks", "hooks.json")))!["hooks"]!.AsObject();
         Assert.True(hooks["Stop"]![0]!["hooks"]![0]!["timeout"]!.GetValue<int>() >= AgentConfig.WaitMaxSeconds + 10, "a stop wait would be cut off");
-        var wrapper = File.ReadAllText(Path.Combine(RepositoryRoot(), MarketplacePlugin.PluginFolder, "scripts", "run.sh"));
+        var wrapper = File.ReadAllText(Path.Combine(RepositoryRoot(), MarketplacePlugin.AipodFolder, "scripts", "run.sh"));
         Assert.Contains($"export AP_PLUGIN_STOP_WAIT_MAX={AgentConfig.WaitMaxSeconds}\n", wrapper, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Every_hook_the_local_install_registers_is_in_the_plugin_with_the_same_timing_and_goes_through_the_wrapper()
     {
-        var hooks = JsonNode.Parse(MarketplacePlugin.Render("1.0.0")[$"{MarketplacePlugin.PluginFolder}/hooks/hooks.json"])!["hooks"]!.AsObject();
+        var hooks = JsonNode.Parse(MarketplacePlugin.Render("1.0.0")[$"{MarketplacePlugin.AipodFolder}/hooks/hooks.json"])!["hooks"]!.AsObject();
         Assert.Equal(PluginInstaller.Hooks.Select(h => h.Event).Distinct().Order(), hooks.Select(p => p.Key).Order());
         foreach (var (name, isAsync, timeout, extra) in PluginInstaller.Hooks)
         {
@@ -70,49 +70,41 @@ public sealed class PluginFilesTests : IDisposable
     public void The_plugin_asks_for_the_server_and_hands_it_to_the_mcp_server_and_names_no_host()
     {
         var files = MarketplacePlugin.Render("1.0.0");
-        var manifest = JsonNode.Parse(files[$"{MarketplacePlugin.PluginFolder}/.claude-plugin/plugin.json"])!;
-        Assert.Equal(("monitor-agent", "1.0.0"), (manifest["name"]!.GetValue<string>(), manifest["version"]!.GetValue<string>()));
-        Assert.True(manifest["userConfig"]!["server"]!["required"]!.GetValue<bool>());
-        var mcp = JsonNode.Parse(files[$"{MarketplacePlugin.PluginFolder}/.mcp.json"])!["mcpServers"]![PluginInstaller.McpServerName]!;
+        var manifest = JsonNode.Parse(files[$"{MarketplacePlugin.AipodFolder}/.claude-plugin/plugin.json"])!;
+        Assert.Equal(("aipod", "1.0.0"), (manifest["name"]!.GetValue<string>(), manifest["version"]!.GetValue<string>()));
+        Assert.True(manifest["userConfig"]!["server"] is not null);
+        var mcp = JsonNode.Parse(files[$"{MarketplacePlugin.AipodFolder}/.mcp.json"])!["mcpServers"]![PluginInstaller.McpServerName]!;
         Assert.Equal("${user_config.server}", mcp["env"]!["AP_SERVER"]!.GetValue<string>());
         Assert.Equal(["${CLAUDE_PLUGIN_ROOT}/scripts/run.sh", "mcp"], mcp["args"]!.AsArray().Select(a => a!.GetValue<string>()));
         var marketplace = JsonNode.Parse(files[MarketplacePlugin.MarketplaceFile])!;
         Assert.Equal(AgentConfig.ReleasesMarketplaceName, marketplace["name"]!.GetValue<string>());
-        Assert.Equal("./plugin/monitor-agent", marketplace["plugins"]![0]!["source"]!.GetValue<string>());
-        Assert.Equal("./plugin/aipod", marketplace["plugins"]![1]!["source"]!.GetValue<string>()); // the repository catalog offers the new plugin too
+        Assert.Equal("./plugin/aipod", Assert.Single(marketplace["plugins"]!.AsArray())!["source"]!.GetValue<string>());
         Assert.All(files.Values, text => Assert.DoesNotMatch(@"https?://[a-z0-9.-]+\.[a-z]{2,}", text)); // host names live in deployment configuration
         Assert.Throws<ArgumentException>(() => MarketplacePlugin.Render(""));
     }
 
     [Fact]
-    public void The_aipod_plugin_is_the_old_one_under_the_new_name_with_the_same_hooks_and_mcp_server_and_its_own_words()
+    public void The_plugin_is_called_aipod_and_a_connected_machine_is_not_asked_for_the_server_again()
     {
         var files = MarketplacePlugin.Render("1.0.0");
         var aipod = JsonNode.Parse(files[$"{MarketplacePlugin.AipodFolder}/.claude-plugin/plugin.json"])!;
-        Assert.Equal(("aipod", "1.0.0"), (aipod["name"]!.GetValue<string>(), aipod["version"]!.GetValue<string>()));
-        Assert.False(aipod["userConfig"]!["server"]!["required"]!.GetValue<bool>()); // a connected machine is not asked again
-        Assert.DoesNotContain("Podium", aipod.ToJsonString(), StringComparison.Ordinal);
-        foreach (var file in new[] { "hooks/hooks.json", ".mcp.json" })
-        {
-            Assert.Equal(files[$"{MarketplacePlugin.PluginFolder}/{file}"], files[$"{MarketplacePlugin.AipodFolder}/{file}"]);
-        }
 
-        var old = JsonNode.Parse(files[$"{MarketplacePlugin.PluginFolder}/.claude-plugin/plugin.json"])!;
-        Assert.StartsWith("Replaced by the aipod plugin", old["description"]!.GetValue<string>(), StringComparison.Ordinal); // the bridge says so in the plugin list
+        Assert.Equal(("aipod", "1.0.0"), (aipod["name"]!.GetValue<string>(), aipod["version"]!.GetValue<string>()));
+        Assert.False(aipod["userConfig"]!["server"]!["required"]!.GetValue<bool>());
+        Assert.DoesNotContain("monitor", aipod.ToJsonString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(4, files.Count); // the catalog, the manifest, the hooks and the MCP server: no second plugin is rendered
+        Assert.All(files.Keys, path => Assert.True(path == MarketplacePlugin.MarketplaceFile || path.StartsWith(MarketplacePlugin.AipodFolder + "/", StringComparison.Ordinal), path));
     }
 
     [Fact]
     public async Task Writing_the_files_creates_the_folders_and_the_plugin_files_verb_does_it_from_the_command_line()
     {
         var target = Path.Combine(home.Dir, "out");
-        Assert.Equal(7, MarketplacePlugin.WriteTo(target, "2.0.0"));
-        foreach (var plugin in new[] { "monitor-agent", "aipod" })
-        {
-            Assert.Contains("\"version\": \"2.0.0\"", File.ReadAllText(Path.Combine(target, "plugin", plugin, ".claude-plugin", "plugin.json")), StringComparison.Ordinal);
-        }
+        Assert.Equal(4, MarketplacePlugin.WriteTo(target, "2.0.0"));
+        Assert.Contains("\"version\": \"2.0.0\"", File.ReadAllText(Path.Combine(target, "plugin", "aipod", ".claude-plugin", "plugin.json")), StringComparison.Ordinal);
         var stdout = new StringWriter();
         Assert.Equal(0, await Cli.RunAsync(["plugin-files", Path.Combine(home.Dir, "out2")], home.Config, new StringReader(""), stdout, new StringWriter(), TimeProvider.System));
-        Assert.Contains("7 files written", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("4 files written", stdout.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -121,12 +113,12 @@ public sealed class PluginFilesTests : IDisposable
         var c = AgentConfig.FromEnvironment(k => k switch
         {
             "AP_BINARY" => "/data/bin/aipod",
-            "AP_PLUGIN_ID" => "monitor-agent@monitor-agent-releases",
+            "AP_PLUGIN_ID" => "aipod@aipod-releases",
             "CLAUDE_PLUGIN_DATA" => "/data",
             "AP_AGENT_HOME" => home.Dir,
             _ => null,
         });
-        Assert.Equal(("/data/bin/aipod", "monitor-agent@monitor-agent-releases", "/data"), (c.BinaryPath, c.PluginId, c.PluginDataDir));
+        Assert.Equal(("/data/bin/aipod", "aipod@aipod-releases", "/data"), (c.BinaryPath, c.PluginId, c.PluginDataDir));
         var plain = AgentConfig.FromEnvironment(k => k == "AP_AGENT_HOME" ? home.Dir : null);
         Assert.StartsWith(home.Dir, plain.BinaryPath, StringComparison.Ordinal);
         Assert.Equal((null, null), (plain.PluginId, plain.PluginDataDir));
