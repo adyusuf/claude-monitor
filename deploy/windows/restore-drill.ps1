@@ -12,7 +12,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)] [ValidateSet("test", "prod")] [string] $Environment,
-  [string] $Root = "C:\Podium",
+  [string] $Root = "C:\iis\Podium",
   [string] $PgBin = "C:\Program Files\PostgreSQL\18\bin"
 )
 $ErrorActionPreference = "Stop"
