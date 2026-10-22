@@ -127,7 +127,9 @@ public static class Startup
         app.UseAuthorization();
 
         var api = app.MapGroup("/api");
-        api.MapGet("/version", () => Results.Ok(new { commit = config.Commit }));
+        // downloadsUrl (additive): the download host's folder when this server has one (AIPOD_DOWNLOADS_URL), else null. It is a public address, and the web's
+        // "Get the agent" page builds its links and install commands from it, so one release package serves every environment.
+        api.MapGet("/version", () => Results.Ok(new { commit = config.Commit, downloadsUrl = config.DownloadsUrl }));
         AuthEndpoints.Map(api);
         ExternalAuthEndpoints.Map(api);
         MeEndpoints.Map(api);
