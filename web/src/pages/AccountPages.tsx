@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { api, providerUrl } from "../api/endpoints";
 import { useSession } from "../auth/session";
@@ -68,7 +69,14 @@ export function AcceptInvitationPage() {
 export function DownloadPage() {
   const { t } = useI18n();
   const origin = window.location.origin;
-  const downloads = config.downloadsUrl || `${origin}/downloads`; // the download host itself when the build names it
+  // The download host itself when the server has one (it says so in /version); until then, or when it has none, this site's /downloads, which redirects there.
+  const [host, setHost] = useState("");
+  useEffect(() => {
+    let live = true;
+    api.version().then((v) => { if (live && v.downloadsUrl) setHost(v.downloadsUrl); }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+  const downloads = host || `${origin}/downloads`;
   const hasPlugin = config.pluginMarketplace !== "" || config.pluginFromServer;
   const files = [
     { os: t("download.macos"), file: "aipod-macos-arm64.zip", label: "Apple silicon" },
@@ -104,7 +112,7 @@ export function DownloadPage() {
       {hasPlugin && <p className="muted">{t("download.orManual")}</p>}
       <Card title={`1. ${t("download.step1")}`}>
         <ul className="downloads">
-          {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`${config.downloadsUrl || "/downloads"}/${f.file}`}>{f.os} · {f.label}</a></li>)}
+          {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`${host || "/downloads"}/${f.file}`}>{f.os} · {f.label}</a></li>)}
         </ul>
       </Card>
       <Card title={`2. ${t("download.step2")}`}><CopyText text={`aipod login --server ${origin}`} /></Card>

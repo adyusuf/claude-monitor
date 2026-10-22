@@ -127,6 +127,15 @@ public sealed class AuthTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task The_version_names_the_commit_and_the_download_host_when_there_is_one()
+    {
+        var body = await api.NewClient().Http.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/version");
+        Assert.True(body.TryGetProperty("commit", out _));
+        Assert.True(body.TryGetProperty("downloadsUrl", out var downloads));
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, downloads.ValueKind); // the test server has no AIPOD_DOWNLOADS_URL
+    }
+
+    [Fact]
     public async Task Responses_carry_the_security_headers_and_version()
     {
         var response = await api.NewClient().Http.GetAsync("/api/version");

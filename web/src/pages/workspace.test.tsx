@@ -258,21 +258,25 @@ describe("workspace settings and account", () => {
     expect(screen.getByText(/^irm .*\/downloads\/aipod-install\.ps1 -OutFile/)).toBeInTheDocument();
   });
 
-  it("links straight to the download host when the build names it", async () => {
-    const settable = config as { downloadsUrl: string; pluginFromServer: boolean };
-    settable.downloadsUrl = "https://downloads.example.net/pods/prod";
+  it("links straight to the download host when the server names it", async () => {
+    const settable = config as { pluginFromServer: boolean };
     settable.pluginFromServer = true;
     try {
-      mockApi({ "GET /me": { body: ME } });
+      mockApi({ "GET /me": { body: ME }, "GET /version": { body: { commit: "abc", downloadsUrl: "https://downloads.example.net/pods/prod" } } });
       renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
       const origin = window.location.origin;
       expect(await screen.findByText(`curl -fsSL https://downloads.example.net/pods/prod/aipod-install.sh | sh -s -- --server ${origin} --from https://downloads.example.net/pods/prod`)).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "macOS · Apple silicon" })).toHaveAttribute("href", "https://downloads.example.net/pods/prod/aipod-macos-arm64.zip");
       expect(screen.getByText("claude plugin marketplace add https://downloads.example.net/pods/prod/aipod-marketplace.json")).toBeInTheDocument();
     } finally {
-      settable.downloadsUrl = "";
       settable.pluginFromServer = false;
     }
+  });
+
+  it("keeps this site's /downloads when the server has no download host", async () => {
+    mockApi({ "GET /me": { body: ME }, "GET /version": { body: { commit: "abc", downloadsUrl: null } } });
+    renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
+    expect(await screen.findByRole("link", { name: "macOS · Apple silicon" })).toHaveAttribute("href", "/downloads/aipod-macos-arm64.zip");
   });
 
   it("offers the plugin first when the environment names its marketplace, with this site's address as the server", async () => {
