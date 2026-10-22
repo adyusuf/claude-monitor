@@ -1,6 +1,6 @@
 # ADR-0016: One set of names: Podium and aipod
 
-**Status:** Decided by the maintainer (21/10/2026). Done on the branch `chore/rename-podium-aipod`.
+**Status:** Decided by the maintainer (22/10/2026). Done on the branch `chore/rename-podium-aipod`.
 **Replaces the transition of** [ADR-0012](adr-0012-aipod-name-and-tray.md) and [ADR-0013](adr-0013-aipod-migration-plan.md): no installed copy of the old names is carried over. The older ADRs keep the old names, because they record what was decided then.
 
 ## 1. Decision
