@@ -63,6 +63,20 @@ class PublishTests(unittest.TestCase):
             'b/daemons/prod/aipod-plugin.zip', 'b/daemons/prod/aipod-marketplace.json',
             'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
 
+    def test_the_installers_go_up_beside_the_zips_when_the_build_has_them(self):
+        with tempfile.TemporaryDirectory() as folder:
+            build(folder)
+            for name in ('aipod-install.sh', 'aipod-install.ps1'):
+                with open(os.path.join(folder, name), 'wb') as handle:
+                    handle.write(name.encode())
+            result = run('prod', folder, {'AGENT_R2_BUCKET': 'b'}, ['--dry-run'])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        keys = [line.split()[1] for line in result.stdout.splitlines() if line.startswith('put b/daemons/prod/')]
+        self.assertEqual(keys, [
+            'b/daemons/prod/aipod-macos-arm64.zip', 'b/daemons/prod/aipod-windows-x64.zip',
+            'b/daemons/prod/aipod-install.sh', 'b/daemons/prod/aipod-install.ps1',
+            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
+
     def test_the_prefix_can_be_changed(self):
         with tempfile.TemporaryDirectory() as folder:
             build(folder, channel='test')
