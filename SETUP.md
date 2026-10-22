@@ -108,7 +108,7 @@ claude plugin install aipod --marketplace <owner>/<repo>#<branch>    # the web's
 ```
 
 Claude Code asks for the server address (the plugin's one option; it is the address you open in the browser). The next session
-start installs the agent in the background (`plugin/aipod/scripts/ensure.sh`: downloads `<server>/downloads/<zip>`, checks
+start installs the agent in the background (`plugin/aipod/scripts/ensure.sh`: downloads `<download host>/<zip>` (the address in the plugin's `download-base.txt`; `<server>/downloads/<zip>` for a plugin without it), checks
 it against the SHA-256 the plugin pins in `agent-release.txt`, puts it in the plugin's data directory); then, in Claude Code,
 `/aipod:connect` shows a code to approve on the web, `/aipod:status` shows how the install and the connection
 are doing, `/aipod:disconnect` signs the machine out. The first session after installing reports nothing (the binary is
@@ -388,7 +388,7 @@ aipod config auto-update off|check|on # what the daemon may do by itself (defaul
 
 1. **Once per channel,** generate the signing key. The private half goes to your Keychain (service `aipod-update-<channel>`) and is never written to a file; the public half is printed:
    `python3 scripts/sign_manifest.py keygen --channel test` and `... --channel prod`. Save the printed line as `deploy/update-keys/<channel>.pub` and commit it (it is public by design).
-2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_SITE_URL=https://<site>` also writes `aipod-marketplace.json` and `aipod-plugin.zip` so the site serves the plugin itself (with `VITE_PLUGIN_FROM_SERVER=1` in the web build); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
+2. Build: `AGENT_UPDATE_CHANNEL=test|prod bash scripts/build-agent.sh` (optional `AGENT_MIN_SUPPORTED=x.y.z`, default = this version; `AGENT_DOWNLOADS_URL=https://<download host>/<prefix>/<channel>` also writes `aipod-marketplace.json` and `aipod-plugin.zip`, addressed at the download host itself (the plugin zip carries that address in `download-base.txt`, and its bootstrap installs the agent from there, not from the server's `/downloads`); `AGENT_SIGN_IDENTITY` and `AGENT_NOTARY_PROFILE` as before).
    The channel's public key is built into the agent; `out/downloads` gets the six zips (macOS, Windows, Linux), `SHA256SUMS` and a signed `manifest.json`. Without `AGENT_UPDATE_CHANNEL` the agent has no key, cannot update itself, and no manifest is written.
 3. **Publish them on the download host** (an R2 bucket behind a public domain; the release package carries no agent zip any more, and a file the server holds itself would win over the host, so none must stay in a web root): `AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh test|prod` uploads the build to `daemons/<channel>/` (and keeps it under `daemons/<version>/<channel>/`),
    and the server's `aipod.env` gets `AIPOD_DOWNLOADS_URL=https://<downloads host>/daemons/<channel>`. The update check then reads `manifest.json` there and offers addresses there; `/downloads/<file>` on the server redirects to the host (`docs/release.md`, "Download host").

@@ -8,7 +8,7 @@
 # environment names them; nothing secret is passed here, only names that resolve in the maintainer's keychain:
 #   AGENT_SIGN_IDENTITY="Developer ID Application: <name> (<team>)"   # skip signing when unset
 #   AGENT_NOTARY_PROFILE=<notarytool keychain profile>               # skip notarisation when unset
-#   AGENT_SITE_URL=https://<site>                                     # also write marketplace.json and the plugin zip for this site (ADR-0007 section 9.2)
+#   AGENT_DOWNLOADS_URL=https://<download host>/<prefix>/<channel>   # also write the marketplace and the plugin zip, addressed at the download host (ADR-0007 section 9.2)
 # Windows and Linux builds are not signed (ADR-0002, open item: the signing route; ADR-0005): an admin verifies the
 # SHA-256 in SHA256SUMS before a service upgrade (docs/release.md). Single file, never compressed (see the csproj).
 #
@@ -72,11 +72,11 @@ if [ -n "$channel" ]; then
 else
   echo "! no AGENT_UPDATE_CHANNEL: built without an update key and without manifest.json (these agents cannot self-update)"
 fi
-# The plugin served by this site itself (ADR-0007 section 9.2): needs the site's https address, which is a deployment value (AGENT_SITE_URL), never in the repository.
-if [ -n "${AGENT_SITE_URL:-}" ]; then
-  python3 "$root/scripts/build_plugin_site.py" "$out" --base-url "$AGENT_SITE_URL"
+# The plugin served by the download host (ADR-0007 section 9.2): needs that folder's https address, which is a deployment value (AGENT_DOWNLOADS_URL, the same one the server's AIPOD_DOWNLOADS_URL names), never in the repository.
+if [ -n "${AGENT_DOWNLOADS_URL:-}" ]; then
+  python3 "$root/scripts/build_plugin_site.py" "$out" --base-url "$AGENT_DOWNLOADS_URL"
 else
-  echo "! no AGENT_SITE_URL: no marketplace.json and no plugin zip for this site (the plugin comes from the repository's marketplace)"
+  echo "! no AGENT_DOWNLOADS_URL: no marketplace.json and no plugin zip for the download host (the plugin comes from the repository's marketplace)"
 fi
 # The installers (README, "Install aipod"): the same two files for every build, served from the download host beside the zips.
 cp "$root/scripts/install/aipod-install.sh" "$root/scripts/install/aipod-install.ps1" "$out/"
