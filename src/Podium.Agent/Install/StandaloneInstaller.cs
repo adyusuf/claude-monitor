@@ -12,7 +12,7 @@ namespace Podium.Agent.Install;
 /// has no identity. On macOS and Windows the autostart is an application, not a console program (decision §9.12); on Linux a <c>systemd --user</c> unit.
 /// </summary>
 public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnlyList<string>, int> run, Func<string, IReadOnlyList<string>, string?> read,
-    StandaloneLayout layout, bool isRoot, Func<bool> connected, Func<string?, Task<int>> login, Func<uint?> uid, string version, StandaloneLayout? legacy = null)
+    StandaloneLayout layout, bool isRoot, Func<bool> connected, Func<string?, Task<int>> login, Func<uint?> uid, string version)
 {
     private const string Systemctl = "/usr/bin/systemctl";
     private const string Loginctl = "/usr/bin/loginctl";
@@ -66,7 +66,6 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
             effective = CopyBinaries(currentBinary);
             if (effective.BundlePath is not null) WriteBundle(effective);
             WriteDefinition(effective);
-            ReplaceLegacy();
             Enable(effective);
         }
         catch (Exception e) when (e is StepFailedException or IOException or UnauthorizedAccessException or System.Xml.XmlException or ArgumentException)
@@ -82,18 +81,14 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
     }
 
     /// <summary>
-    /// Stops the autostart and removes its definition and the application bundle, under the aipod names and, when the old layout is known, under the old ones too (an agent installed before the
-    /// rename). The home, the login and the binary copy stay.
+    /// Stops the autostart and removes its definition and the application bundle. The home, the login and the binary copy stay.
     /// </summary>
     public int Uninstall()
     {
         var any = false;
-        foreach (var l in new[] { layout, legacy }.Where(l => l is not null).Cast<StandaloneLayout>())
-        {
-            var code = RemoveRegistration(l, report: false, out var found);
-            if (code != 0) return code;
-            any |= found;
-        }
+        var code = RemoveRegistration(layout, report: false, out var found);
+        if (code != 0) return code;
+        any |= found;
 
         if (!any)
         {
@@ -148,18 +143,6 @@ public sealed class StandaloneInstaller(TextWriter output, Func<string, IReadOnl
     {
         if (report) output.WriteLine(Strings.T(Msg.SaNotInstalled));
         return 0;
-    }
-
-    /// <summary>
-    /// An install since the rename replaces a registration under the old names (ADR-0013, tier 2): its supervisor is stopped and its definition and bundle removed before the new one is enabled,
-    /// so a machine is never started by both. The daemon lock keeps a second daemon out anyway.
-    /// </summary>
-    private void ReplaceLegacy()
-    {
-        if (legacy is null || legacy.Names == layout.Names) return;
-        var code = RemoveRegistration(legacy, report: false, out var found);
-        if (code != 0) throw new StepFailedException("could not remove the autostart under the old names");
-        if (found) output.WriteLine(Strings.T(Msg.SaReplaced));
     }
 
     /// <summary>The console binary into the home, and the application's executable (macOS) or the windowless build (Windows) beside it.</summary>

@@ -75,11 +75,10 @@ describe("i18n", () => {
     }
   });
 
-  it("names the site Podium in every language and the agent aipod, never the old names", () => {
+  it("names the site Podium in every language", () => {
     for (const dict of [en, tr, de]) {
       expect(dict.app.name).toBe("Podium");
       expect(dict.activity.podiumInput).toMatch(/^Podium \(web\)$/i); // German writes "Web" with a capital
-      expect(JSON.stringify(dict)).not.toMatch(/aipod|Podium/);
     }
   });
 

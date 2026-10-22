@@ -5,10 +5,9 @@ namespace Podium.Agent.Config;
 /// <summary>How the configuration is read from the environment (every variable is in .env.example) and where the home is.</summary>
 public sealed partial record AgentConfig
 {
-    public static AgentConfig FromEnvironment(Func<string, string?>? read = null, Func<string?>? legacyHome = null, Func<string, bool>? fileExists = null)
+    public static AgentConfig FromEnvironment(Func<string, string?>? read = null)
     {
         read ??= Environment.GetEnvironmentVariable;
-        legacyHome ??= LegacyHome;
         static TimeSpan Seconds(string? value, TimeSpan fallback, int max) =>
             int.TryParse(value, out var s) && s >= 0 ? TimeSpan.FromSeconds(Math.Min(s, max)) : fallback;
         static TimeSpan Between(string? value, TimeSpan fallback, int min, int max) =>
@@ -17,8 +16,7 @@ public sealed partial record AgentConfig
         var explicitHome = read("AP_AGENT_HOME") is { Length: > 0 };
         return new AgentConfig
         {
-            Home = explicitHome ? read("AP_AGENT_HOME")! : DefaultHome(fileExists),
-            MigrateFrom = explicitHome ? null : legacyHome(),
+            Home = explicitHome ? read("AP_AGENT_HOME")! : DefaultHome(),
             ServerOverride = read("AP_SERVER") is { Length: > 0 } s ? s.TrimEnd('/') : null,
             CredentialStore = read("AP_CREDENTIALS") == "file" ? "file" : "keychain",
             PermissionWait = Seconds(read("AP_PERMISSION_WAIT"), TimeSpan.FromSeconds(120), WaitMaxSeconds),
@@ -58,23 +56,15 @@ public sealed partial record AgentConfig
     }
 
     /// <summary>
-    /// The home when no variable names one (<see cref="HomeResolver"/>, ADR-0013): the folder the machine already uses (macOS
-    /// ~/Library/Application Support/Podium; Windows %USERPROFILE%\.aipod), else the aipod folder (~/Library/Application
-    /// Support/aipod; ~/.aipod). Not under AppData: the Claude desktop app is a packaged (MSIX) app, and every process it starts sees
-    /// %LOCALAPPDATA% redirected to a private copy, so a login made in a normal terminal was invisible to its hooks and MCP server.
+    /// The home when no variable names one (ADR-0016): macOS ~/Library/Application Support/aipod; Windows and Linux ~/.aipod. Not under AppData: the Claude
+    /// desktop app is a packaged (MSIX) app, and every process it starts sees %LOCALAPPDATA% redirected to a private copy, so a login made in a normal
+    /// terminal was invisible to its hooks and MCP server.
     /// </summary>
-    public static string DefaultHome(Func<string, bool>? fileExists = null) =>
-        HomeResolver.Resolve(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), fileExists ?? File.Exists);
-
-    /// <summary>The older Windows default (%LOCALAPPDATA%\Podium), kept only to migrate from and to find old installs; null on macOS.</summary>
-    public static string? LegacyHome() =>
-        OperatingSystem.IsWindows() ? LegacyHomeFor(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)) : null;
+    public static string DefaultHome() => HomeFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     public static string HomeFor(bool windows, string userProfile) => HomeFor(windows ? OsKinds.Windows : OsKinds.MacOs, userProfile);
 
     /// <summary>macOS keeps the Library folder; Windows and Linux use a dot folder in the user's profile.</summary>
     public static string HomeFor(string os, string userProfile) =>
-        os == OsKinds.MacOs ? Path.Combine(userProfile, "Library", "Application Support", "Podium") : Path.Combine(userProfile, ".aipod");
-
-    public static string LegacyHomeFor(string localAppData) => Path.Combine(localAppData, "Podium");
+        os == OsKinds.MacOs ? Path.Combine(userProfile, "Library", "Application Support", "aipod") : Path.Combine(userProfile, ".aipod");
 }

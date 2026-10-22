@@ -129,8 +129,8 @@ public sealed class ApprovalVerifierTests
     // ---- a signature made by a real browser (Node WebCrypto), checked by this code --------------------------------------------
 
     // The public half of a throwaway test key (its private half was discarded): a test vector, not a secret.
-    private const string BrowserKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjVzUVruijJwX3hreZFoDwzCsbjf0RYXr+k4vTRcDjPUj5UHd5D5KpBV7fnHqAulEYmymSVtNi037+o52d+s1ng=="; // gitleaks:allow
-    private const string BrowserSignature = "QL8DauuF1hk1MwECldHBnuZb8vFDs5fNwLU7f8bd492Je//c0eQPfdEflZ5SAGSX4o2hfV9C2plJnFU5291/dA==";
+    private const string BrowserKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuAAWhEe5Y2VyLWnGCfyuU38iZ4BcNjlT7Ce2ebO5M0e+r1fXJAdZ27HwS0z9lOQF0IUervFscdnPMYcrZA5rYg=="; // gitleaks:allow
+    private const string BrowserSignature = "wKLRO+RF7sP/6JX0hfhH9jghkqf3LXuSm1NaFgCMfX84oAJEx+ohNrDKG3tAilIN7EsivNf3CjN8I4284D4How==";
     private const string BrowserPayload = "ap-approval-v1\nrun\n0198f1c2-7a55-7d3a-9b1e-2f6c3a4d5e60\n0198f1c2-7a55-7d3a-9b1e-2f6c3a4d5e61\nabababababababababababababababababababababababababababababababab\n1792000000";
 
     [Fact]

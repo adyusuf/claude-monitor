@@ -3,8 +3,8 @@ import { approvalKeys as shared, createApprovalKeys, fingerprintOf, memoryStore,
 
 // Made by Node's WebCrypto for the C# test of the same name: the agent's verifier checks this very signature.
 // The public half of a throwaway test key (its private half was discarded): a test vector, not a secret.
-const BROWSER_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjVzUVruijJwX3hreZFoDwzCsbjf0RYXr+k4vTRcDjPUj5UHd5D5KpBV7fnHqAulEYmymSVtNi037+o52d+s1ng=="; // gitleaks:allow
-const BROWSER_SIGNATURE = "QL8DauuF1hk1MwECldHBnuZb8vFDs5fNwLU7f8bd492Je//c0eQPfdEflZ5SAGSX4o2hfV9C2plJnFU5291/dA==";
+const BROWSER_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuAAWhEe5Y2VyLWnGCfyuU38iZ4BcNjlT7Ce2ebO5M0e+r1fXJAdZ27HwS0z9lOQF0IUervFscdnPMYcrZA5rYg=="; // gitleaks:allow
+const BROWSER_SIGNATURE = "wKLRO+RF7sP/6JX0hfhH9jghkqf3LXuSm1NaFgCMfX84oAJEx+ohNrDKG3tAilIN7EsivNf3CjN8I4284D4How==";
 const BROWSER_PAYLOAD = "ap-approval-v1\nrun\n0198f1c2-7a55-7d3a-9b1e-2f6c3a4d5e60\n0198f1c2-7a55-7d3a-9b1e-2f6c3a4d5e61\n" + "ab".repeat(32) + "\n1792000000";
 
 const bytes = (base64: string) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));

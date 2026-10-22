@@ -60,14 +60,14 @@ describe("the activity list tells inputs from everything else", () => {
   it("shows a web command and a typed prompt apart, each with a label, an icon and a status, in text and not by colour alone", async () => {
     await open({ events: mixed, commands: [command()] });
     const card = await activityCard();
-    const monitor = (await within(card).findByText("run the tests")).closest("li")!;
+    const webItem = (await within(card).findByText("run the tests")).closest("li")!;
     const human = within(card).getByText("please fix the login").closest("li")!;
 
-    expect(monitor).toHaveClass("act-podium_input");
-    expect(within(monitor).getByText("Podium (web)")).toBeInTheDocument();
-    expect(within(monitor).getByText("sent by Örnek Kişi")).toBeInTheDocument();
-    expect(within(monitor).getByText("Applied")).toBeInTheDocument();
-    expect(within(monitor).getByText("\u2601\uFE0E")).toBeInTheDocument();
+    expect(webItem).toHaveClass("act-podium_input");
+    expect(within(webItem).getByText("Podium (web)")).toBeInTheDocument();
+    expect(within(webItem).getByText("sent by Örnek Kişi")).toBeInTheDocument();
+    expect(within(webItem).getByText("Applied")).toBeInTheDocument();
+    expect(within(webItem).getByText("\u2601\uFE0E")).toBeInTheDocument();
 
     expect(human).toHaveClass("act-human_input");
     expect(within(human).getByText("Human (Claude Code)")).toBeInTheDocument();

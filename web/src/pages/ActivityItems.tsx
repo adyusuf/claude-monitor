@@ -19,7 +19,7 @@ interface LineProps {
 }
 
 /** Text presentation (U+FE0E), so the icons take the line's colour instead of drawing as emoji. */
-const ICON = { monitor: "\u2601\uFE0E", human: "\u2328\uFE0E" } as const;
+const ICON = { web: "\u2601\uFE0E", human: "\u2328\uFE0E" } as const;
 
 const moment = (item: TimelineItem) => (item.at ? time(new Date(item.at).toISOString()) : "");
 
@@ -46,18 +46,18 @@ function Pressable({ item, open, onToggle, className, children }: Pick<LineProps
 /** A message that entered the session: sent from the web (a command) or typed in the harness. Closed to a short preview; pressed, the whole text and the payload. */
 export function InputLine({ item, who, open, onToggle }: LineProps) {
   const { t, dict } = useI18n();
-  const monitor = item.cls === ActivityClass.PodiumInput;
+  const fromWeb = item.cls === ActivityClass.PodiumInput;
   const command = item.command;
   const stop = command?.kind === CommandKind.Stop;
-  const label = monitor ? t("activity.podiumInput") : t("activity.humanInput");
-  const by = monitor
+  const label = fromWeb ? t("activity.podiumInput") : t("activity.humanInput");
+  const by = fromWeb
     ? t("activity.sentBy", { name: command?.createdBy === who.ownerId ? who.ownerName : t("activity.someone") })
     : t("activity.typedBy", { name: who.ownerName });
   const statuses: Record<string, string> = dict.activity.status;
   return (
     <li className={`act act-input act-${item.cls}${item.pending ? " act-pending" : ""}${open ? " act-open" : ""}`}>
       <div className="act-head">
-        <span className="act-icon" aria-hidden>{monitor ? ICON.monitor : ICON.human}</span>
+        <span className="act-icon" aria-hidden>{fromWeb ? ICON.web : ICON.human}</span>
         <span className="act-label">{label}</span>
         <span className="act-by">{by}</span>
         {command ? <span className={`badge status-${command.status}`}>{statuses[command.status] ?? command.status}</span> : null}

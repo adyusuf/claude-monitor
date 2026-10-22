@@ -91,7 +91,6 @@ export function DownloadPage() {
           <CopyText text={origin} />
           <p className="muted">2. {t("download.plugin2")}</p>
           <CopyText text="/aipod:connect" />
-          <p className="muted">{t("download.pluginOld")}</p>
         </Card>
       )}
       {hasPlugin && <p className="muted">{t("download.orManual")}</p>}

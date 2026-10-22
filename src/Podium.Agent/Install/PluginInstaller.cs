@@ -48,7 +48,6 @@ public sealed class PluginInstaller(AgentConfig config, TextWriter output, Func<
             File.Copy(sourceBinary, BinaryPath, overwrite: true);
         }
 
-        BinaryAlias.Ensure(BinaryPath);
         WritePlugin();
         var claude = run ?? Run;
         var added = claude("claude", ["plugin", "marketplace", "add", config.PluginDir]);

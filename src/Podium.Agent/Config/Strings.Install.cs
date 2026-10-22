@@ -15,8 +15,6 @@ public static partial class Msg
     public const string ServiceRunAccountWindows = "install.service.runaccountwindows";
     public const string ServiceRunAccountPlain = "install.service.runaccountplain";
     public const string ServiceShellWarning = "install.service.shellwarning";
-    public const string ServiceOldNames = "install.service.oldnames";
-    public const string ServiceMigrateUsage = "install.service.migrateusage";
     public const string ServiceExecIs = "install.service.execis";
     public const string ServiceExecOption = "install.service.execoption";
     public const string SvcExecBad = "install.svc.execbad";
@@ -48,7 +46,6 @@ public static partial class Msg
     public const string SaNotInstalled = "install.sa.notinstalled";
     public const string SaRemoved = "install.sa.removed";
     public const string SaUnsupportedOs = "install.sa.unsupportedos";
-    public const string SaReplaced = "install.sa.replaced";
     public const string SaConsoleBuild = "install.sa.consolebuild";
     public const string SaLinger = "install.sa.linger";
     public const string SaCheck = "install.sa.check";
@@ -70,8 +67,6 @@ public static partial class Strings
         E(Msg.ServiceRunAccountWindows, "{0} is supported on Linux and macOS only (ADR-0010 §5).", "{0} yalnız Linux ve macOS'ta desteklenir (ADR-0010 §5).", "{0} wird nur unter Linux und macOS unterstützt (ADR-0010 §5)."),
         E(Msg.ServiceRunAccountPlain, "{0} takes a plain account name (letters, digits, underscore, dash), not \"{1}\".", "{0}, sade bir hesap adı alır (harf, rakam, alt çizgi, tire), \"{1}\" değil.", "{0} nimmt einen einfachen Kontonamen (Buchstaben, Ziffern, Unterstrich, Bindestrich), nicht „{1}“."),
         E(Msg.ServiceShellWarning, "Warning: exec level shell lets approved runs execute any shell text on this machine.", "Uyarı: shell yürütme düzeyi, onaylanmış çalıştırmaların bu makinede her kabuk metnini yürütmesine izin verir.", "Warnung: Die Ausführungsstufe shell lässt freigegebene Läufe jeden Shell-Text auf dieser Maschine ausführen."),
-        E(Msg.ServiceOldNames, "This service still has its old names (aipod). It is upgraded as it is; `aipod service migrate` moves it to the aipod names.", "Bu hizmet hâlâ eski adlarını (aipod) taşıyor. Olduğu gibi yükseltilir; `aipod service migrate` onu aipod adlarına taşır.", "Dieser Dienst hat noch seine alten Namen (aipod). Er wird so aktualisiert, wie er ist; `aipod service migrate` stellt ihn auf die aipod-Namen um."),
-        E(Msg.ServiceMigrateUsage, "usage: service {0} [{1} | {2} | {3} [{4}]]", "kullanım: service {0} [{1} | {2} | {3} [{4}]]", "Aufruf: service {0} [{1} | {2} | {3} [{4}]]"),
         E(Msg.ServiceExecIs, "Remote runs on this machine: {0} (the workspace switch and an owner's approval still apply).", "Bu makinede uzaktan çalıştırmalar: {0} (çalışma alanı anahtarı ve sahibin onayı yine geçerlidir).", "Remote-Läufe auf dieser Maschine: {0} (der Schalter des Arbeitsbereichs und die Freigabe eines Eigentümers gelten weiterhin)."),
         E(Msg.ServiceExecOption, "{0} takes {1}, not \"{2}\".", "{0} şunlardan birini alır: {1}; \"{2}\" değil.", "{0} nimmt {1}, nicht „{2}“."),
         E(Msg.SvcExecBad, "--exec takes off, argv or shell, not \"{0}\".", "--exec off, argv ya da shell alır, \"{0}\" değil.", "--exec nimmt off, argv oder shell, nicht „{0}“."),
@@ -103,7 +98,6 @@ public static partial class Strings
         E(Msg.SaNotInstalled, "The standalone autostart is not installed.", "Bağımsız otomatik başlatma kurulu değil.", "Der Autostart des eigenständigen Agents ist nicht installiert."),
         E(Msg.SaRemoved, "The standalone autostart is removed. Kept: the home {0} (the login and the queue) and the binary {1}.", "Bağımsız otomatik başlatma kaldırıldı. Korunanlar: ev dizini {0} (giriş ve kuyruk) ve ikili dosya {1}.", "Der Autostart des eigenständigen Agents ist entfernt. Erhalten bleiben: der Heimatordner {0} (die Anmeldung und die Warteschlange) und das Programm {1}."),
         E(Msg.SaUnsupportedOs, "A standalone agent is not supported on this OS ({0}).", "Bu işletim sisteminde bağımsız ajan desteklenmiyor ({0}).", "Ein eigenständiger Agent wird auf diesem Betriebssystem nicht unterstützt ({0})."),
-        E(Msg.SaReplaced, "Replaced the autostart that had the old names (com.aipod.agent.user / aipod / Aipod).", "Eski adları taşıyan otomatik başlatma değiştirildi (com.aipod.agent.user / aipod / Aipod).", "Der Autostart mit den alten Namen wurde ersetzt (com.aipod.agent.user / aipod / Aipod)."),
         E(Msg.SaConsoleBuild, "Note: a windowless copy could not be made, so the autostart uses the console build and Windows may show a console window at logon.", "Not: penceresiz bir kopya yapılamadı, bu yüzden otomatik başlatma konsol sürümünü kullanır ve Windows oturum açılışında bir konsol penceresi gösterebilir.", "Hinweis: eine fensterlose Kopie konnte nicht erstellt werden, deshalb nutzt der Autostart die Konsolenversion und Windows zeigt bei der Anmeldung eventuell ein Konsolenfenster."),
         E(Msg.SaLinger, "Note: without lingering the agent runs only while you are logged in. To keep it running after you log out: sudo loginctl enable-linger {0}", "Not: lingering olmadan ajan yalnız oturum açıkken çalışır. Oturumu kapattıktan sonra da çalışmasını istiyorsanız: sudo loginctl enable-linger {0}", "Hinweis: ohne Lingering läuft der Agent nur, solange Sie angemeldet sind. Damit er nach der Abmeldung weiterläuft: sudo loginctl enable-linger {0}"),
         E(Msg.SaCheck, "Run `aipod status` to check it. This machine reports no Claude Code (claude=none); other machines can still reach it as a target.", "Denetlemek için `aipod status` çalıştırın. Bu makine Claude Code bildirmiyor (claude=none); diğer makineler yine de ona hedef olarak ulaşabilir.", "Prüfen Sie es mit `aipod status`. Diese Maschine meldet kein Claude Code (claude=none); andere Maschinen können sie trotzdem als Ziel erreichen."),

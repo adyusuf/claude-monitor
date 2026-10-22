@@ -79,7 +79,6 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var revoked = CancellationTokenSource.CreateLinkedTokenSource(stop);
         DropStaleStopRequest(started);
         updateStore.Set(UpdateHealth.VersionKey, AgentConfig.Version);
-        Install.BinaryAlias.Ensure(config.BinaryPath); // the new name beside the old one, also after an update swapped the binary
         File.WriteAllText(config.PidPath, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         using (var updating = TryLock(config.UpdateLockPath))
         {

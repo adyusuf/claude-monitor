@@ -58,7 +58,6 @@ export const trMachines: Dictionary["machines"] = {
     none: "Henüz soru yok.", question: "Soru", answer: "Cevap", answerCut: "Cevap sunucunun sınırında kesildi.",
     status: { queued: "bekliyor", delivered: "iletildi, cevap bekleniyor", answered: "cevaplandı", no_idle_session: "boşta oturum yok", not_accepting: "kabul etmiyor", no_answer: "cevap yok", expired: "süresi doldu", cancelled: "iptal edildi" },
   },
-  plugin: { old: "eski eklenti: aipod'a geçin" },
   claudeControl: {
     title: "Claude Code",
     hint: "Bu makinede Claude Code'u buradan arka planda başlatın ve durdurun. Yalnızca makinenin sahibi, yalnızca geliştirme veya test makinesinde ve yalnızca sahibi bu makine için açtıktan sonra. Her oturum Claude Code'un kendi arka plan oturumudur; bu makinenin bildirdiği bir projede, sahibinin Claude hesabı ve planıyla çalışır.",

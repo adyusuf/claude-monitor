@@ -275,7 +275,6 @@ describe("workspace settings and account", () => {
       expect(screen.getByText(`claude plugin marketplace add ${window.location.origin}/downloads/aipod-marketplace.json`)).toBeInTheDocument();
       expect(screen.getByText("claude plugin install aipod@aipod-releases")).toBeInTheDocument();
       expect(screen.getByText("/aipod:connect")).toBeInTheDocument();
-      expect(screen.getByText(/already has the old monitor-agent plugin/)).toBeInTheDocument(); // the order for a machine that is on the old plugin
       expect(screen.getByText(`aipod login --server ${window.location.origin}`)).toBeInTheDocument();
     } finally {
       settable.pluginFromServer = false;

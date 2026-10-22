@@ -19,11 +19,11 @@ public static partial class RunAccount
     /// <summary>The group-writable mask the run works under, so the service (a member of the run account's group) can always clean up after it.</summary>
     public const string Umask = "007";
 
-    /// <summary>The default account name for an OS: <c>ap-run</c> on Linux, <c>_cmrun</c> on macOS; null where a run account is not supported.</summary>
+    /// <summary>The default account name for an OS: <c>ap-run</c> on Linux, <c>_aprun</c> on macOS; null where a run account is not supported.</summary>
     public static string? DefaultName(string os) => os switch
     {
         OsKinds.Linux => "ap-run",
-        OsKinds.MacOs => "_cmrun",
+        OsKinds.MacOs => "_aprun",
         _ => null,
     };
 

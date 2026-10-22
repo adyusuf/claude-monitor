@@ -13,13 +13,6 @@ public sealed partial record AgentConfig
     /// <summary>The user-only directory holding the local database, the lock and the agent's identity file.</summary>
     public required string Home { get; init; }
 
-    /// <summary>
-    /// The folder an older agent used as its default home, set only when <see cref="Home"/> is the default and an older
-    /// default exists (Windows: %LOCALAPPDATA%\Podium). <see cref="HomeMigration"/> copies the identity file from it.
-    /// Null when AP_AGENT_HOME is set: an explicit home is never migrated.
-    /// </summary>
-    public string? MigrateFrom { get; init; }
-
     /// <summary>The API's origin when none is saved yet (set by "aipod login --server").</summary>
     public string? ServerOverride { get; init; }
 
