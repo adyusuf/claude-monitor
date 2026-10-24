@@ -5,7 +5,7 @@ import { App } from "../App";
 import { Layout } from "../components/Layout";
 import { dictionaries } from "../i18n";
 import { ME, mockApi, renderAt } from "../test/helpers";
-import { serveIntegrations } from "../test/integrations-fixtures";
+import { serveIntegrations, siteHeading } from "../test/integrations-fixtures";
 
 describe("integrations in the frame and the routes", () => {
   it("puts Integrations in the sidebar of the workspace, linking to its page", async () => {
@@ -25,6 +25,6 @@ describe("integrations in the frame and the routes", () => {
     serveIntegrations();
     renderAt("/w/w1/integrations", [{ path: "*", element: <App /> }]);
     expect(await screen.findByRole("heading", { level: 1, name: "Integrations" })).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { level: 2, name: /acme\.atlassian\.net/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", siteHeading("acme.atlassian.net"))).toBeInTheDocument();
   });
 });
