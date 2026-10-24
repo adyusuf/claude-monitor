@@ -6,12 +6,13 @@ import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
 import { deSprints } from "./de.sprints";
 import { deIntegrations } from "./de.integrations";
+import { deServerSettings } from "./de.serverSettings";
 
 // German: the same keys as en.ts (the type makes a missing key a build error). "Sie" throughout.
 export const de: Dictionary = {
   app: { name: "Podium", tagline: "Verfolgen Sie Ihre KI-Programmiersitzungen live." },
   nav: {
-    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen",
+    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
     account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
   },
@@ -33,7 +34,7 @@ export const de: Dictionary = {
     reauthorize: "Die Verbindung braucht eine neue Anmeldung bei Atlassian.", jira_account_required: "Verknüpfen Sie zuerst Ihr eigenes Atlassian-Konto.",
     tracker_unauthorized: "Atlassian hat die Anmeldung abgelehnt. Verbinden Sie erneut.", tracker_forbidden: "Jira erlaubt das diesem Konto nicht.",
     tracker_not_found: "Jira kennt das nicht.", tracker_rate_limited: "Jira bittet um weniger Tempo. Versuchen Sie es in einer Minute erneut.",
-    tracker_unavailable: "Jira ist gerade nicht erreichbar.", tracker_rejected: "Jira hat das nicht akzeptiert.", tracker_changed: "In Jira hat sich das geändert. Sehen Sie es sich erneut an.",
+    tracker_unavailable: "Jira ist gerade nicht erreichbar.", internal_error: "Die Prüfung ist auf dem Server fehlgeschlagen. Sie wird erneut versucht.", tracker_rejected: "Jira hat das nicht akzeptiert.", tracker_changed: "In Jira hat sich das geändert. Sehen Sie es sich erneut an.",
     space_not_found: "Dieser Bereich ist nicht in Jira (oder dieses Konto sieht ihn nicht).",
     invalid_email: "Das sieht nicht nach einer E-Mail-Adresse aus.", weak_password: "Verwenden Sie mindestens 10 Zeichen.",
     invalid_name: "Geben Sie einen Namen ein (bis zu 100 Zeichen).", invalid_credentials: "Die E-Mail oder das Passwort ist falsch. Nach zu vielen Versuchen wird das Konto für eine Weile gesperrt; ein Zurücksetzen des Passworts öffnet es sofort.",
@@ -103,6 +104,8 @@ export const de: Dictionary = {
     invalid_auto_project: "Wählen Sie ein Projekt, das diese Maschine gemeldet hat und dem Claude Code vertraut.",
     invalid_first_prompt: "Die erste Eingabe ist ein Text mit 1 bis 2000 Zeichen.", claude_folder_not_trusted: "Claude Code vertraut diesem Ordner noch nicht: Öffnen Sie Claude dort einmal an der Maschine und bestätigen Sie die Vertrauensfrage.",
     claude_start_pending: "Ein anderer Start auf dieser Maschine wartet noch: Versuchen Sie es erneut, wenn er fertig ist.",
+    set_on_server: "Dieser Wert ist auf dem Server selbst gesetzt und lässt sich hier nicht ändern.", integration_key_missing: "Auf dem Server fehlt der Integrationsschlüssel, daher kann dies nicht gespeichert werden.",
+    settings_conflict: "Jemand anderes hat dies im selben Moment gespeichert. Laden Sie die Seite neu und versuchen Sie es erneut.", mail_failed: "Die Test-E-Mail konnte nicht gesendet werden. Prüfen Sie die Einstellungen des Mailservers.", no_email: "Ihr Konto hat keine E-Mail-Adresse, an die die Test-E-Mail gehen kann.",
   },
   status: { active: "Arbeitet", idle: "Untätig", waiting: "Braucht Sie", ended: "Beendet" },
   time: { now: "jetzt", s: "s", m: "min", h: "h", d: "T" },
@@ -174,6 +177,7 @@ export const de: Dictionary = {
   issues: deIssues,
   sprints: deSprints,
   integrations: deIntegrations,
+  serverSettings: deServerSettings,
   twoStep: deTwoStep,
   device: {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",

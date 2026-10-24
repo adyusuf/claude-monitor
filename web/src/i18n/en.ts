@@ -3,6 +3,7 @@ import { enProjects } from "./en.projects";
 import { enIssues } from "./en.issues";
 import { enSprints } from "./en.sprints";
 import { enIntegrations } from "./en.integrations";
+import { enServerSettings } from "./en.serverSettings";
 import { enTwoStep } from "./en.twoStep";
 import { enRemote } from "./en.remote";
 
@@ -10,7 +11,7 @@ import { enRemote } from "./en.remote";
 export const en = {
   app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
-    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", integrations: "Integrations", settings: "Workspace settings",
+    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
   },
@@ -32,7 +33,7 @@ export const en = {
     reauthorize: "The connection needs a new sign-in at Atlassian.", jira_account_required: "Link your own Atlassian account first.",
     tracker_unauthorized: "Atlassian refused the sign-in. Connect again.", tracker_forbidden: "Jira does not allow that for this account.",
     tracker_not_found: "Jira does not have that.", tracker_rate_limited: "Jira asks to slow down. Try again in a minute.",
-    tracker_unavailable: "Jira cannot be reached right now.", tracker_rejected: "Jira did not accept that.", tracker_changed: "It changed in Jira. Look at it again.",
+    tracker_unavailable: "Jira cannot be reached right now.", internal_error: "The check failed on the server. It is tried again.", tracker_rejected: "Jira did not accept that.", tracker_changed: "It changed in Jira. Look at it again.",
     space_not_found: "That space is not in Jira (or this account cannot see it).",
     invalid_email: "That does not look like an e-mail address.", weak_password: "Use at least 10 characters.",
     invalid_name: "Enter a name (up to 100 characters).", invalid_credentials: "The e-mail or the password is wrong. After too many attempts the account is locked for a while; resetting the password opens it at once.",
@@ -102,6 +103,8 @@ export const en = {
     invalid_auto_project: "Pick a project this machine has reported and Claude Code trusts.",
     invalid_first_prompt: "The first prompt is 1 to 2000 characters of text.", claude_folder_not_trusted: "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt.",
     claude_start_pending: "Another start on this machine is still waiting: try again when it has finished.",
+    set_on_server: "This value is set on the server itself and cannot be changed here.", integration_key_missing: "The integration key is missing on the server, so this cannot be saved.",
+    settings_conflict: "Someone else saved this at the same moment. Reload the page and try again.", mail_failed: "The test mail could not be sent. Check the mail server settings.", no_email: "Your account has no e-mail address to send the test mail to.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", s: "s", m: "m", h: "h", d: "d" },
@@ -173,6 +176,7 @@ export const en = {
   issues: enIssues,
   sprints: enSprints,
   integrations: enIntegrations,
+  serverSettings: enServerSettings,
   twoStep: enTwoStep,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
