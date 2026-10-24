@@ -91,10 +91,12 @@ if (-not (Test-Path $envFile)) {
     "AIPOD_PROXY_NETWORKS=$cloudflare",
     "AIPOD_BACKUP_KEY=$(New-Secret 32)",
     "AIPOD_MFA_KEY=$(New-Secret 32)",
+    "AIPOD_INTEGRATION_KEY=$(New-Secret 32)",
+    "AIPOD_ADMIN_WORKSPACE=",
     "AIPOD_BACKUP_OFFSITE=",
     "AIPOD_ALERT_EMAIL="
   ) | Set-Content -Path $envFile -Encoding UTF8
-  Write-Host "   wrote $envFile - fill in the SMTP password and the OAuth client secrets"
+  Write-Host "   wrote $envFile - set AIPOD_ADMIN_WORKSPACE to your workspace id, then enter the SMTP password and the OAuth apps on Settings, Integrations"
 }
 
 Write-Host "3. PostgreSQL role and database"
