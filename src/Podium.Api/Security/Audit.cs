@@ -97,6 +97,7 @@ public static class AuditActions
     public const string IntegrationImported = "integration.imported";
     public const string IntegrationInvited = "integration.person_invited";
     public const string IntegrationPersonLinked = "integration.person_linked";
+    public const string ServerSettingsChanged = "server.settings_changed";
 }
 
 public static class Audit

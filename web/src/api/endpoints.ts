@@ -14,6 +14,7 @@ import type { SprintInput, SprintQuery, SprintSummary, SprintView } from "./type
 import type {
   IntegrationsView, PersonView, SpaceImportResult, SpaceView, SprintChoice, SprintImportResult, SyncRunView,
 } from "./typesIntegrations";
+import type { ServerIntegrationsView, ServerSettingsInput } from "./typesServerSettings";
 
 const q = (params: Record<string, string | number | boolean | undefined | null>) => {
   const s = new URLSearchParams();
@@ -194,6 +195,12 @@ export const api = {
   setIntegrationPerson: (personId: string, input: { email?: string; userId?: string }) => request<void>("PUT", `/integrations/people/${personId}`, input),
   syncIntegration: (id: string) => request<SyncRunView>("POST", `/integrations/${id}/sync`),
   integrationRuns: (id: string) => request<SyncRunView[]>("GET", `/integrations/${id}/runs`),
+
+  serverIntegrations: () => request<ServerIntegrationsView>("GET", "/server/integrations"),
+  saveServerIntegration: (id: string, input: ServerSettingsInput) =>
+    request<ServerIntegrationsView>("PUT", `/server/integrations/${encodeURIComponent(id)}`, input),
+  /** Sends a test mail to the caller's own address with the saved settings. */
+  testServerMail: () => request<void>("POST", "/server/integrations/smtp/test"),
 };
 
 /** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */

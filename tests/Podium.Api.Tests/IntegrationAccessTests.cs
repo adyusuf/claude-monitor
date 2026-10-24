@@ -134,13 +134,17 @@ public sealed class IntegrationAccessTests(ApiFactory api)
         Assert.DoesNotContain(w.WorkspaceId.ToString(), response.Headers.Location!.ToString(), StringComparison.Ordinal);
     }
 
+    /// <summary>The running settings take the Jira app from the environment's values (ADR-0017), so "no app" removes them there as well.</summary>
+    private static Dictionary<string, string> WithoutJira(IReadOnlyDictionary<string, string> env) =>
+        env.Where(e => !e.Key.StartsWith("jira.", StringComparison.Ordinal)).ToDictionary(e => e.Key, e => e.Value);
+
     [Theory]
     [InlineData("no app")]
     [InlineData("no key")]
     public async Task Without_the_jira_app_or_the_key_the_page_says_it_is_not_available_and_connecting_is_refused(string missing)
     {
         var w = await JiraKit.ConnectedAsync(api);
-        await using var off = JiraKit.With(api, c => missing == "no app" ? c with { Jira = null } : c with { IntegrationKey = null });
+        await using var off = JiraKit.With(api, c => missing == "no app" ? c with { Jira = null, IntegrationEnv = WithoutJira(c.IntegrationEnv) } : c with { IntegrationKey = null });
         var admin = JiraKit.ClientOf(api, off);
         (await admin.PostAsync("/api/auth/login", new { email = w.Admin.Email, password = TestUser.Password })).EnsureSuccessStatusCode();
 

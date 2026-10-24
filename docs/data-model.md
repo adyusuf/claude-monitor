@@ -177,7 +177,7 @@ report's time. The search reads at most `ReplyScanMax` events (500) from the old
 | `audit_events` | `id` (`bigint`), `workspace_id` (null for account-level events), `actor_user_id`, `actor_agent_id`, `action`, `target_type`, `target_id`, `at`, `ip_hash`, `detail` `jsonb` | (`workspace_id`, `at` DESC); (`actor_user_id`, `at` DESC) |
 
 Written for sign-in and its failures, provider linking, password changes, invitations and role changes,
-device approvals, token revocation, settings changes and every session command. Never contains captured
+device approvals, token revocation, settings changes (the server's Settings → Integrations saves as `server.settings_changed`, naming the changed fields only; §9) and every session command. Never contains captured
 content, passwords or tokens.
 
 ## Relationships
@@ -246,6 +246,19 @@ An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a li
 - **Secrets:** `refresh_token`, `access_token` and `verifier` are sealed with `AIPOD_INTEGRATION_KEY`; they are never exported, logged or audited. Disconnecting a connection or an account clears them.
 - **Retention:** `integration_webhook_receipts` are deleted after 7 days, `integration_oauth_states` after expiry, `integration_sync_runs` after `retention_days`.
 - **Account deletion:** the user's `integration_accounts` rows are deleted; the connections they made stay (an admin can reassign the connector by connecting again); their `integration_people.user_id` links are cleared.
+
+## 9. Server settings ([ADR-0017](adr-0017-server-integration-settings.md))
+
+| Table | Columns | Keys and indexes |
+|---|---|---|
+| `server_settings` | `key` (≤ 100, the catalog key such as `smtp.password` or `jira.client_secret`), `value` (≤ 4000; sealed with `AIPOD_INTEGRATION_KEY` when `secret`), `secret` (boolean), `updated_at` (`timestamptz`), `updated_by` (FK users, not null, restrict) | PK `key`; (`updated_by`) |
+
+- **Precedence:** a non-empty environment value (for SMTP also the `Smtp` node of a server-only appsettings) wins over the row and is never changed by it.
+- **Secrets:** a `secret` row is sealed with `AIPOD_INTEGRATION_KEY` (AES-256-GCM, the `SecretBox` of [ADR-0015](adr-0015-work-tracker-integrations.md) §5) and is never sent back to the web, logged or audited. Without the key the page is read-only.
+- **Audit:** `server.settings_changed` names the changed fields only.
+- **Backups:** the database backup holds the sealed values; they are readable only with the key, which is kept in the maintainer's password manager (ADR-0017 §4).
+- **Account deletion:** the user's row is never removed (see "Your data"), so `updated_by` never blocks a deletion. The table is server configuration, not personal data: export and deletion leave it alone (ADR-0017 §8).
+- **Clearing:** saving an empty value deletes the row (also when the environment hides it, so it does not come back when the environment's value goes).
 
 ## Your data: export and account deletion
 

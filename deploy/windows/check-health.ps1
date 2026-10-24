@@ -2,7 +2,8 @@
 .SYNOPSIS
   The hourly health check of one environment, and its alarm (global #18: a failed backup and a backup that never ran
   are alarmed separately). Registered by setup-server.ps1. Mails AIPOD_ALERT_EMAIL through the environment's own
-  SMTP settings when anything is wrong, and always writes the result to the event log.
+  SMTP settings (the API's: aipod.env first, then the Smtp node of the live release's appsettings.Production.json;
+  PodiumOps.psm1) when anything is wrong, and always writes the result to the event log.
 
 .DESCRIPTION
   Alarms when:
@@ -37,6 +38,7 @@ function Get-Events([string] $Provider, [int[]] $Ids, [DateTime] $After, [int] $
   try { return @(Get-WinEvent -FilterHashtable $filter -ErrorAction Stop) } catch { return @() }
 }
 
+$version = $null
 try {
   $version = Invoke-RestMethod -Uri "http://127.0.0.1:$LoopbackPort/api/version" -TimeoutSec 10
   if (-not $version.commit) { $problems.Add("/api/version answered without a commit") }
@@ -68,10 +70,13 @@ $text = "Podium $Environment needs attention:`n`n- " + ($problems -join "`n- ")
 Write-EventLog -LogName Application -Source $source -EventId 1020 -EntryType Error -Message $text
 try {
   if (-not $values["AIPOD_ALERT_EMAIL"]) { throw "AIPOD_ALERT_EMAIL is not set" }
-  $smtp = New-Object Net.Mail.SmtpClient($values["AIPOD_SMTP_HOST"], [int]$values["AIPOD_SMTP_PORT"])
-  $smtp.EnableSsl = $values["AIPOD_SMTP_TLS"] -ne "false"
-  if ($values["AIPOD_SMTP_USER"]) { $smtp.Credentials = New-Object Net.NetworkCredential($values["AIPOD_SMTP_USER"], $values["AIPOD_SMTP_PASSWORD"]) }
-  $smtp.Send($values["AIPOD_SMTP_FROM"], $values["AIPOD_ALERT_EMAIL"], "Podium ${Environment}: $($problems.Count) problem(s)", $text)
+  # Imported here, not at the top: a module missing next to this script must show up as event 1021, not stop the whole check.
+  Import-Module (Join-Path $PSScriptRoot "PodiumOps.psm1")
+  $settings = Get-SmtpSettings -Values $values -AppSettingsPath (Find-AppSettings -EnvironmentHome $home_ -Commit $version.commit)
+  $smtp = New-Object Net.Mail.SmtpClient($settings.Host, $settings.Port)
+  $smtp.EnableSsl = $settings.StartTls
+  if ($settings.User) { $smtp.Credentials = New-Object Net.NetworkCredential($settings.User, $settings.Password) }
+  $smtp.Send($settings.From, $values["AIPOD_ALERT_EMAIL"], "Podium ${Environment}: $($problems.Count) problem(s)", $text)
 } catch {
   Write-EventLog -LogName Application -Source $source -EventId 1021 -EntryType Error -Message "health alarm mail for $Environment could not be sent: $($_.Exception.Message)"
 }
