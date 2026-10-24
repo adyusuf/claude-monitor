@@ -86,7 +86,11 @@ agents signed for the wrong channel.
 - **The alarm:** `Podium-health-<env>` runs `check-health.ps1` every hour and mails `AIPOD_ALERT_EMAIL` when
   the API does not answer, no backup succeeded in 26 hours (a backup that never ran, global #18), a backup or drill
   failed, the ASP.NET Core module logged an error, or no restore drill succeeded in 35 days. Results are events 1019
-  (ok) and 1020 (problems); a mail that cannot be sent is 1021.
+  (ok) and 1020 (problems); a mail that cannot be sent is 1021. The mail uses the API's SMTP settings per field: a
+  non-empty `AIPOD_SMTP_*` value of `aipod.env`, else the `Smtp` node of the `appsettings.Production.json` of the release `/api/version` reported, or, when the API
+  does not answer, of the newest release folder that has one (`PodiumOps.psm1`, which must sit next to
+  `check-health.ps1`). StartTls is read as the API reads it: on when unset, otherwise only for `true`. An unresolved
+  host, port or sender is named in event 1021.
 - **Once a month**: `.\restore-drill.ps1 -Environment prod`. It restores the newest backup into a scratch database,
   checks it and records the result in `backups\restore-drills.log`; a failure is event 1011.
 
