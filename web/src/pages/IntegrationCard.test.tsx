@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionView } from "../api/typesIntegrations";
 import { renderAt } from "../test/helpers";
-import { connection, localIso, serveIntegrations as serve, stubLocation, syncRun } from "../test/integrations-fixtures";
+import { connection, localIso, serveIntegrations as serve, siteHeading, stubLocation, syncRun } from "../test/integrations-fixtures";
 import { IntegrationCard } from "./IntegrationCard";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -18,7 +18,7 @@ describe("a connection card: how it stands", () => {
   it("shows the site, the green Connected badge, who connected it and how many projects came in", async () => {
     serve();
     open();
-    const head = await screen.findByRole("heading", { level: 2, name: /acme\.atlassian\.net/ });
+    const head = await screen.findByRole("heading", siteHeading("acme.atlassian.net"));
     expect(within(head).getByText("Connected")).toHaveClass("badge", "ok");
     expect(screen.getByText(/Connected by Örnek Kişi/)).toBeInTheDocument();
     expect(screen.getByText(/Projects imported: 2/)).toBeInTheDocument();
@@ -28,7 +28,7 @@ describe("a connection card: how it stands", () => {
   it("shows the Sign in again badge in warning colour and the needs-sign-in notice for a connection that needs it", async () => {
     serve();
     open({ status: "reauthorize" });
-    const head = await screen.findByRole("heading", { level: 2, name: /acme\.atlassian\.net/ });
+    const head = await screen.findByRole("heading", siteHeading("acme.atlassian.net"));
     expect(within(head).getByText("Sign in again")).toHaveClass("badge", "warn");
     expect(screen.getByRole("alert")).toHaveTextContent("The account that connected this site must sign in again.");
   });

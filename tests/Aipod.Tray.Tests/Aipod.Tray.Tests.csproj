@@ -11,9 +11,11 @@
   <Import Project="..\coverage.props" />
   <!-- This codebase is the tray (aipod-tray) only. The agent (aipod) and the contracts are measured by their own test projects, so their assemblies
        are left out here by name: this is not hand-written code of this codebase being removed from the count. (An Include filter on the hyphenated
-       name `[aipod-tray]*` does not select anything in coverlet, hence the Exclude; `[ap*]*` is the pattern that matches `aipod`.) -->
+       name `[aipod-tray]*` does not select anything in coverlet, hence the Exclude. `[aipod]*` is the agent's exact assembly name, the same one
+       the agent's own test project Includes; an earlier `[ap*]*` matched nothing ("aipod" does not start with "ap"), so the agent's ~10 000 lines
+       sat in the tray's denominator at 6%. Do not widen it to `[aipod*]*`: that would also match `aipod-tray` itself.) -->
   <PropertyGroup Condition="'$(COVERAGE_DIR)' != ''">
-    <Exclude>[ap*]*,[Podium.*]*</Exclude>
+    <Exclude>[aipod]*,[Podium.*]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>
