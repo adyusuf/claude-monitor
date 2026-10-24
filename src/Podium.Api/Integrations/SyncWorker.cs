@@ -36,9 +36,9 @@ public sealed class SyncWorker(IServiceScopeFactory scopes, SyncInbox inbox, ILo
             if (request.Target == SyncTarget.Issue) await sync.SyncIssueAsync(connection, request.Ref, ct);
             else await sync.SyncSprintAsync(connection, request.Ref, ct);
         }
-        catch (Exception e) when (e is TrackerException or DbUpdateException)
+        catch (Exception e) when (e is not OperationCanceledException)
         {
-            // The pass finds it again; the request is not worth stopping the worker.
+            // The pass finds it again; the request is not worth stopping the worker (or, with a database that is down, the host).
             log.LogWarning("Webhook sync for {Connection} failed: {Type}", request.ConnectionId, e.GetType().Name);
         }
     }

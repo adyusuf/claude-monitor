@@ -8,7 +8,7 @@ namespace Podium.Api.Endpoints;
 
 public sealed record MeWorkspace(Guid Id, string Name, string Role);
 public sealed record MeResponse(Guid Id, string? Email, string DisplayName, bool HasPassword, IReadOnlyList<string> Providers,
-    IReadOnlyList<MeWorkspace> Workspaces, bool MfaEnabled = false, string? Language = null);
+    IReadOnlyList<MeWorkspace> Workspaces, bool MfaEnabled = false, string? Language = null, bool ServerAdmin = false);
 public sealed record LanguageRequest(string? Language);
 public sealed record ProvidersResponse(IReadOnlyList<string> Available);
 
@@ -22,7 +22,7 @@ public static class MeEndpoints
         api.MapGet("/auth/providers", Available);
     }
 
-    private static async Task<IResult> Me(HttpContext http, PodiumDb db)
+    private static async Task<IResult> Me(HttpContext http, PodiumDb db, ApiConfig config)
     {
         var userId = http.User.UserId();
         var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, http.RequestAborted);
@@ -34,7 +34,7 @@ public static class MeEndpoints
                                 orderby w.Name
                                 select new MeWorkspace(w.Id, w.Name, m.Role)).ToListAsync(http.RequestAborted);
         return Results.Ok(new MeResponse(user.Id, user.Email, user.DisplayName, user.PasswordHash is not null, providers, workspaces,
-            user.TotpEnabledAt is not null, user.Language));
+            user.TotpEnabledAt is not null, user.Language, ServerSettingsEndpoints.IsServerAdmin(config, workspaces)));
     }
 
     /// <summary>The language the person picked in the menu, kept on the account so the mails to them follow it (en, tr or de; anything else is refused).</summary>
@@ -47,14 +47,7 @@ public static class MeEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Available(IAuthenticationSchemeProvider schemes)
-    {
-        var available = new List<string>();
-        foreach (var provider in Providers.All.Order(StringComparer.Ordinal))
-        {
-            if (await schemes.GetSchemeAsync(provider) is not null) available.Add(provider);
-        }
-
-        return Results.Ok(new ProvidersResponse(available));
-    }
+    /// <summary>The providers whose app is set, in the environment or on the Integrations page (ADR-0017).</summary>
+    private static IResult Available(IntegrationSettings settings) =>
+        Results.Ok(new ProvidersResponse([.. Providers.All.Order(StringComparer.Ordinal).Where(p => settings.Provider(p) is not null)]));
 }

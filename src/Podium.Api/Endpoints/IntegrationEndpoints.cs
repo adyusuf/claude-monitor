@@ -26,7 +26,7 @@ public static class IntegrationEndpoints
         g.MapDelete("/integrations/{id:guid}", Disconnect);
     }
 
-    private static async Task<IResult> List(Guid ws, HttpContext http, PodiumDb db, ApiConfig config)
+    private static async Task<IResult> List(Guid ws, HttpContext http, PodiumDb db, IntegrationSettings settings)
     {
         var me = http.User.UserId();
         if (await Access.MemberAsync(db, me, ws, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
@@ -40,25 +40,27 @@ public static class IntegrationEndpoints
         var counts = await db.Projects.AsNoTracking().Where(p => p.SourceConnectionId != null && ids.Contains(p.SourceConnectionId.Value) && p.Status == ManagedStatuses.Active)
             .GroupBy(p => p.SourceConnectionId!.Value).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, http.RequestAborted);
         var rows = connections.Select(c => IntegrationViews.Of(c, names.GetValueOrDefault(c.ConnectorUserId, ""), me, accounts.GetValueOrDefault(c.Id), counts.GetValueOrDefault(c.Id))).ToList();
-        return Results.Ok(new IntegrationsView(config.JiraAvailable, config.JiraAvailable ? [TrackerProviders.Jira] : [], rows));
+        return Results.Ok(new IntegrationsView(settings.JiraAvailable, settings.JiraAvailable ? [TrackerProviders.Jira] : [], rows));
     }
 
-    private static async Task<IResult> Connect(Guid ws, ConnectRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, JiraOAuth oauth)
+    private static async Task<IResult> Connect(Guid ws, ConnectRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, JiraOAuth oauth,
+        IntegrationSettings settings)
     {
         var me = http.User.UserId();
         if (await Access.MemberAsync(db, me, ws, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
-        if (!config.JiraAvailable) return Http.Invalid("provider", "integration_unavailable");
+        if (!settings.JiraAvailable) return Http.Invalid("provider", "integration_unavailable");
         if (JiraOAuth.SiteHost(req?.Subdomain) is not { } host) return Http.Invalid("subdomain", "invalid_site");
         if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, req!.Code)) return RemoteChecks.ReauthRefused();
         return Results.Ok(await StartAsync(db, config, clock, oauth, me, ws, null, OAuthPurposes.Connect, host, http.RequestAborted));
     }
 
-    private static async Task<IResult> ConnectAccount(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, JiraOAuth oauth)
+    private static async Task<IResult> ConnectAccount(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, JiraOAuth oauth,
+        IntegrationSettings settings)
     {
         var me = http.User.UserId();
         var connection = await db.IntegrationConnections.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id && c.Status != ConnectionStatuses.Disconnected, http.RequestAborted);
         if (connection is null || await Access.MemberAsync(db, me, connection.WorkspaceId, Roles.Member, http.RequestAborted) is null) return Http.NotFound();
-        if (!config.JiraAvailable) return Http.Invalid("provider", "integration_unavailable");
+        if (!settings.JiraAvailable) return Http.Invalid("provider", "integration_unavailable");
         return Results.Ok(await StartAsync(db, config, clock, oauth, me, connection.WorkspaceId, id, OAuthPurposes.Account, connection.SiteHost, http.RequestAborted));
     }
 

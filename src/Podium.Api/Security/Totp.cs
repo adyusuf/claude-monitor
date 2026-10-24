@@ -94,6 +94,8 @@ public static class SecretBox
     public static byte[] Open(byte[] key, string sealedText)
     {
         var data = Convert.FromBase64String(sealedText);
+        // nonce (12) + tag (16) at least: anything shorter was never sealed by Seal, and says so the way a wrong key does.
+        if (data.Length < 28) throw new CryptographicException("sealed value too short");
         var plain = new byte[data.Length - 28];
         using var aes = new AesGcm(key, 16);
         aes.Decrypt(data.AsSpan(0, 12), data.AsSpan(28), data.AsSpan(12, 16), plain);

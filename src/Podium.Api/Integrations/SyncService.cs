@@ -63,6 +63,9 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
         }, ct);
     }
 
+    /// <summary>The error a run is closed with when the pass failed for a reason that is not the tracker's (see PassAsync).</summary>
+    public const string InternalError = "internal_error";
+
     /// <summary>One reconciliation pass over an active connection. Returns the run (also stored) so a caller can show it.</summary>
     public Task<IntegrationSyncRun> PassAsync(IntegrationConnection connection, CancellationToken ct)
     {
@@ -89,6 +92,18 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
                 run.Status = SyncStatuses.Failed;
                 run.Error = e.Code;
                 log.LogWarning("Integration pass {Connection} failed: {Code}", connection.Id, e.Code);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Not the tracker's doing (bad data, a bug, a database that went away). The run row was saved as "running" above, so it is closed
+                // here, on a clean tracker (the failed save may have left the context in an unusable state), and the failure goes on to the caller,
+                // which logs it and carries on with the next connection.
+                log.LogWarning("Integration pass {Connection} failed unexpectedly: {Type}", connection.Id, e.GetType().Name);
+                db.ChangeTracker.Clear();
+                var ended = clock.GetUtcNow();
+                await db.IntegrationSyncRuns.Where(r => r.Id == run.Id).ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, SyncStatuses.Failed).SetProperty(r => r.Error, InternalError).SetProperty(r => r.EndedAt, ended), CancellationToken.None);
+                throw;
             }
 
             run.Created = counts.Created;

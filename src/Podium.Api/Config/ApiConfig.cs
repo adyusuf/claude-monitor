@@ -43,8 +43,20 @@ public sealed record ApiConfig
     /// <summary>The Atlassian OAuth 2.0 (3LO) app (AIPOD_JIRA_CLIENT_ID / _SECRET).</summary>
     public OAuthClient? Jira { get; init; }
 
-    /// <summary>Jira is offered only when the app is registered and tokens can be sealed.</summary>
+    /// <summary>Jira is offered only when the app is registered and tokens can be sealed. The environment's view only: the running
+    /// value, which also counts what was saved on the Integrations page, is <see cref="IntegrationSettings.JiraAvailable"/>.</summary>
     public bool JiraAvailable => Jira is not null && IntegrationKey is not null;
+
+    /// <summary>
+    /// The integration settings this server's environment (or SMTP's "Smtp" node) sets, by <see cref="SettingField.Key"/>; only non-empty
+    /// values. They win over what the Integrations page saved (ADR-0017).
+    /// </summary>
+    public IReadOnlyDictionary<string, string> IntegrationEnv { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// The workspace whose owners and admins manage the server-wide settings (AIPOD_ADMIN_WORKSPACE, ADR-0017). Null: nobody does (fail-closed).
+    /// </summary>
+    public Guid? AdminWorkspace { get; init; }
 
     /// <summary>Atlassian's fixed endpoints (ADR-0015 §3); here so that no other file holds an address (global #2).</summary>
     public string AtlassianAuthBase { get; init; } = "https://auth.atlassian.com";
@@ -218,6 +230,13 @@ public sealed record ApiConfig
             IntegrationKey = env["AIPOD_INTEGRATION_KEY"] is { Length: > 0 } ik ? Key32("AIPOD_INTEGRATION_KEY", ik)
                 : development ? System.Security.Cryptography.SHA256.HashData("development-only-integration-key"u8) : null,
             Jira = Client("AIPOD_JIRA"),
+            IntegrationEnv = IntegrationCatalog.Fields
+                .Select(f => (f.Key, Value: f.SmtpNode is { } node ? SmtpValue(f.EnvName, node) : env[f.EnvName] is { Length: > 0 } v ? v : null))
+                .Where(x => x.Value is not null)
+                .ToDictionary(x => x.Key, x => x.Value!, StringComparer.Ordinal),
+            AdminWorkspace = env["AIPOD_ADMIN_WORKSPACE"] is not { Length: > 0 } admin ? null
+                : Guid.TryParse(admin, out var adminId) ? adminId
+                : throw new InvalidOperationException("AIPOD_ADMIN_WORKSPACE must be a workspace id (see .env.example)"),
             MinimumAgentVersion = Version.Parse(env["AIPOD_MIN_AGENT_VERSION"] is { Length: > 0 } m ? m : "0.1.0"),
             SecureCookies = origin.StartsWith("https://", StringComparison.Ordinal),
             BackgroundJobs = env["AIPOD_BACKGROUND_JOBS"] != "off",

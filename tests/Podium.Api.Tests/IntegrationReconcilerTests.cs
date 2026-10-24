@@ -13,7 +13,8 @@ namespace Podium.Api.Tests;
 [Collection(ApiGroup.Name)]
 public sealed class IntegrationReconcilerTests(ApiFactory api)
 {
-    private Reconciler Reconciler() => new(api.Services.GetRequiredService<IServiceScopeFactory>(), api.Services.GetRequiredService<ApiConfig>(), api.Clock, NullLogger<Reconciler>.Instance);
+    private Reconciler Reconciler() => new(api.Services.GetRequiredService<IServiceScopeFactory>(), api.Services.GetRequiredService<ApiConfig>(),
+        api.Services.GetRequiredService<IntegrationSettings>(), api.Clock, NullLogger<Reconciler>.Instance);
 
     /// <summary>The connections other tests made are put aside, so that the loop only has these to look at.</summary>
     private async Task OnlyAsync(params JiraWorld[] keep)

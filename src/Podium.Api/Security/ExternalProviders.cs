@@ -11,7 +11,7 @@ namespace Podium.Api.Security;
 /// <summary>
 /// GitHub and Google sign-in through ASP.NET Core's own OAuth handler (no extra package). Each provider puts the
 /// same claims on the short-lived external cookie: subject, e-mail, whether the provider verified it, and a name.
-/// A provider without a client id/secret in the environment is simply not registered.
+/// Both are always registered; whether one is offered follows the running settings (ADR-0017).
 /// </summary>
 public static class ExternalProviders
 {
@@ -29,40 +29,79 @@ public static class ExternalProviders
             o.Cookie.SecurePolicy = config.SecureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
             o.ExpireTimeSpan = TimeSpan.FromMinutes(5);
         });
-        if (config.GitHub is { } gh)
+        auth.AddOAuth(Providers.GitHub, o =>
         {
-            auth.AddOAuth(Providers.GitHub, o =>
-            {
-                Common(o, gh, Providers.GitHub);
-                o.AuthorizationEndpoint = ProviderEndpoints.GitHubAuthorize;
-                o.TokenEndpoint = ProviderEndpoints.GitHubToken;
-                o.Scope.Add("read:user");
-                o.Scope.Add("user:email");
-                o.Events.OnCreatingTicket = GitHubTicket;
-            });
-        }
-
-        if (config.Google is { } g)
+            Common(o, Providers.GitHub);
+            o.AuthorizationEndpoint = ProviderEndpoints.GitHubAuthorize;
+            o.TokenEndpoint = ProviderEndpoints.GitHubToken;
+            o.Scope.Add("read:user");
+            o.Scope.Add("user:email");
+            o.Events.OnCreatingTicket = GitHubTicket;
+        });
+        auth.AddOAuth(Providers.Google, o =>
         {
-            auth.AddOAuth(Providers.Google, o =>
-            {
-                Common(o, g, Providers.Google);
-                o.AuthorizationEndpoint = ProviderEndpoints.GoogleAuthorize;
-                o.TokenEndpoint = ProviderEndpoints.GoogleToken;
-                o.Scope.Add("openid");
-                o.Scope.Add("email");
-                o.Scope.Add("profile");
-                o.Events.OnCreatingTicket = GoogleTicket;
-            });
+            Common(o, Providers.Google);
+            o.AuthorizationEndpoint = ProviderEndpoints.GoogleAuthorize;
+            o.TokenEndpoint = ProviderEndpoints.GoogleToken;
+            o.Scope.Add("openid");
+            o.Scope.Add("email");
+            o.Scope.Add("profile");
+            o.Events.OnCreatingTicket = GoogleTicket;
+        });
+        foreach (var provider in Providers.All)
+        {
+            auth.Services.AddOptions<OAuthOptions>(provider).Configure<IntegrationSettings>((o, settings) => App(o, settings.Provider(provider)));
         }
 
         return auth;
     }
 
-    private static void Common(OAuthOptions o, OAuthClient client, string provider)
+    /// <summary>
+    /// The app values, read again whenever <see cref="IntegrationSettings"/> drops the cached options. A provider that is not set still gets
+    /// placeholders, because the handler validates its options on every request it looks at; it is not offered (/auth/providers) and its
+    /// sign-in start answers 404 (ADR-0017).
+    /// </summary>
+    internal static void App(OAuthOptions o, OAuthClient? client)
     {
-        o.ClientId = client.ClientId;
-        o.ClientSecret = client.ClientSecret;
+        o.ClientId = client?.ClientId ?? NotConfigured;
+        o.ClientSecret = client?.ClientSecret ?? NotConfigured;
+    }
+
+    internal const string NotConfigured = "not-configured";
+
+    /// <summary>
+    /// A callback that fails (no or wrong state, the person said no at the provider, the code was refused). Without this the handler throws, which
+    /// is a 500 and an error in the log for every stray request. A provider that is not set answers 404 like any unknown route; otherwise the
+    /// person goes back to the sign-in page (ADR-0017).
+    /// </summary>
+    internal static Task RemoteFailure(RemoteFailureContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        var services = ctx.HttpContext.RequestServices;
+        if (services.GetRequiredService<IntegrationSettings>().Provider(ctx.Scheme.Name) is null)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+        }
+        else
+        {
+            // The framework logs a handled failure at Information only, which production drops: a mistyped client secret would fail every
+            // sign-in without a trace. The type of the failure, never its message or the provider's answer (they can carry the code or token).
+            var log = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(ExternalProviders).FullName!);
+            if (ctx.Request.Query["error"] == "access_denied") log.LogInformation("Sign-in with {Provider} was cancelled by the person", ctx.Scheme.Name);
+            else log.LogWarning("Sign-in with {Provider} failed: {Type}", ctx.Scheme.Name, ctx.Failure?.GetType().Name ?? "unknown");
+
+            // Linking from Settings goes back to Settings: the person is signed in already, the sign-in form would be a surprise.
+            var back = ctx.Properties?.RedirectUri?.Contains("mode=link", StringComparison.Ordinal) == true ? "/settings" : "/login";
+            ctx.Response.Redirect(services.GetRequiredService<ApiConfig>().PublicOrigin + back + "?error=provider_failed");
+        }
+
+        ctx.HandleResponse();
+        return Task.CompletedTask;
+    }
+
+    private static void Common(OAuthOptions o, string provider)
+    {
+        o.Events.OnRemoteFailure = RemoteFailure;
         o.CallbackPath = ProviderEndpoints.CallbackPrefix + provider;
         o.SignInScheme = Schemes.External;
         o.UsePkce = true;

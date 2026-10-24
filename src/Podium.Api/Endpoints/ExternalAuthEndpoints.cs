@@ -24,10 +24,9 @@ public static class ExternalAuthEndpoints
         api.MapGet("/auth/external/{provider}/done", Done);
     }
 
-    private static async Task<IResult> Start(string provider, string? mode, HttpContext http)
+    private static IResult Start(string provider, string? mode, IntegrationSettings settings)
     {
-        var schemes = http.RequestServices.GetRequiredService<IAuthenticationSchemeProvider>();
-        if (!Providers.All.Contains(provider) || await schemes.GetSchemeAsync(provider) is null)
+        if (!Providers.All.Contains(provider) || settings.Provider(provider) is null)
         {
             return Http.NotFound();
         }
