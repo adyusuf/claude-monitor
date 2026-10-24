@@ -85,7 +85,7 @@ describe("the Claude card on the machine page", () => {
   it("sends a first prompt with the start, trimmed, and clears the box; an empty box sends none", async () => {
     const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev);
     open();
-    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[()]/g, "\\$&")));
+    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[\\()]/g, "\\$&")));
     await userEvent.click(await screen.findByRole("button", { name: en.machines.claudeControl.start }));
     expect(await screen.findByText(en.machines.claudeControl.done.started)).toBeInTheDocument();
     expect(posts(calls)[0]!.body).toEqual({ kind: "claude_start", projectKey: "git:host/shop", permissionMode: "manual" }); // no firstPrompt key at all
@@ -101,7 +101,7 @@ describe("the Claude card on the machine page", () => {
   it("counts the characters of the first prompt, says how it is sent, and keeps Start off over the limit", async () => {
     api({}, dev);
     open();
-    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[()]/g, "\\$&")));
+    const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[\\()]/g, "\\$&")));
     expect(screen.getByText(en.machines.claudeControl.firstPromptHint)).toBeInTheDocument();
     expect(screen.getByText(`0 / ${FIRST_PROMPT_MAX}`)).toBeInTheDocument();
 

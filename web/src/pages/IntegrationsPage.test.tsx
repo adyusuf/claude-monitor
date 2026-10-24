@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useLocation } from "react-router";
 import { renderAt } from "../test/helpers";
-import { connection, integrationsView, serveIntegrations as serve } from "../test/integrations-fixtures";
+import { connection, integrationsView, serveIntegrations as serve, siteHeading } from "../test/integrations-fixtures";
 import { meAs } from "../test/projects-fixtures";
 import { IntegrationsPage } from "./IntegrationsPage";
 
@@ -12,7 +12,7 @@ function Where() {
 }
 const route = [{ path: "/w/:ws/integrations", element: <><IntegrationsPage /><Where /></> }];
 /** The heading of the card of one connection. */
-const site = (host: string) => screen.findByRole("heading", { level: 2, name: new RegExp(host.replace(/\./g, "\\.")) });
+const site = (host: string) => screen.findByRole("heading", siteHeading(host));
 const open = (query = "") => renderAt(`/w/w1/integrations${query}`, route);
 
 describe("the integrations page: what it shows", () => {
@@ -32,7 +32,7 @@ describe("the integrations page: what it shows", () => {
     expect(await screen.findByText(/Jira is not set up on this server yet/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Jira address")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 2, name: /acme\.atlassian\.net/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", siteHeading("acme.atlassian.net"))).not.toBeInTheDocument();
   });
 
   it("shows one card per connection", async () => {
@@ -43,7 +43,7 @@ describe("the integrations page: what it shows", () => {
     });
     open();
     expect(await site("acme.atlassian.net")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: /beta\.atlassian\.net/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", siteHeading("beta.atlassian.net"))).toBeInTheDocument();
   });
 
   it.each(["admin", "owner"] as const)("gives a workspace %s the connect card, the import button and the admin actions", async (role) => {

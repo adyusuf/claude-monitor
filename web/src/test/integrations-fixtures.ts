@@ -14,6 +14,9 @@ export const connection = (over: Partial<ConnectionView> = {}): ConnectionView =
   lastError: null, projectCount: 2, ...over,
 });
 
+/** Options for finding the card heading of one connection: its name starts with exactly this host (the status badge follows it), never merely contains it. */
+export const siteHeading = (host: string) => ({ level: 2, name: (name: string) => name.split(" ")[0] === host });
+
 export const integrationsView = (connections: ConnectionView[] = [connection()], over: Partial<IntegrationsView> = {}): IntegrationsView => ({
   available: true, providers: ["jira"], connections, ...over,
 });

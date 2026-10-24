@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { SessionProvider } from "../auth/session";
 import { I18nProvider } from "../i18n";
 import { renderAt } from "../test/helpers";
-import { serveIntegrations as serve } from "../test/integrations-fixtures";
+import { serveIntegrations as serve, siteHeading } from "../test/integrations-fixtures";
 import { IntegrationsPage } from "./IntegrationsPage";
 
 /** Shows the address's query string, so a test can see that the result code was taken out of it. */
@@ -23,14 +23,14 @@ describe("the integrations page: the result of the Atlassian round trip", () => 
   it("takes the result code out of the address once the page is up", async () => {
     serve();
     renderAt("/w/w1/integrations?result=denied", route);
-    await screen.findByRole("heading", { level: 2, name: /acme\.atlassian\.net/ });
+    await screen.findByRole("heading", siteHeading("acme.atlassian.net"));
     expect(screen.getByTestId("where").textContent).toBe("");
   });
 
   it("leaves an address without a result code alone", async () => {
     serve();
     renderAt("/w/w1/integrations?tab=x", route);
-    await screen.findByRole("heading", { level: 2, name: /acme\.atlassian\.net/ });
+    await screen.findByRole("heading", siteHeading("acme.atlassian.net"));
     expect(screen.getByTestId("where").textContent).toBe("?tab=x");
   });
 
@@ -67,7 +67,7 @@ describe("the integrations page: the result of the Atlassian round trip", () => 
   it("keeps the result notice on screen after the address was cleaned", async () => {
     serve();
     renderAt("/w/w1/integrations?result=ok", route);
-    await screen.findByRole("heading", { level: 2, name: /acme\.atlassian\.net/ });
+    await screen.findByRole("heading", siteHeading("acme.atlassian.net"));
     expect(screen.getByRole("status", { name: "" })).toHaveTextContent("Done.");
     expect(screen.getByTestId("where").textContent).toBe("");
   });
