@@ -29,10 +29,23 @@ IIS site, app pool, PostgreSQL database and folder under `C:\iis\Podium\<env>`. 
    .\setup-server.ps1 -Environment prod -HostName <prod host> -CertThumbprint <thumbprint> -LoopbackPort 8080 -SmtpUser <sender> -SmtpFrom <sender>
    ```
 
-   Then fill in `C:\iis\Podium\<env>\aipod.env`: the Gmail app password, the GitHub and Google OAuth client
-   ids and secrets (one OAuth app per environment; callbacks `https://<host>/api/auth/callback/github` and
-   `.../google`), and `AIPOD_BACKUP_OFFSITE` (a folder on another machine). Copy `AIPOD_BACKUP_KEY` into the
-   password manager: without it no backup can be restored.
+   Then fill in `C:\iis\Podium\<env>\aipod.env`: `AIPOD_ADMIN_WORKSPACE` (your workspace id, the `/w/<id>` part of
+   its address) and `AIPOD_BACKUP_OFFSITE` (a folder on another machine). Copy `AIPOD_BACKUP_KEY` and
+   `AIPOD_INTEGRATION_KEY` into the password manager: without the first no backup can be restored, without the second
+   the settings saved on the page cannot be read. The Gmail app password and the GitHub, Google and Jira apps (one
+   OAuth app per environment) are then entered on **Settings, Integrations** (ADR-0017), which also shows the callback
+   address to register at each provider; the same values in `aipod.env` still work and win over the page.
+
+   **A server that is already deployed** has neither `AIPOD_ADMIN_WORKSPACE` nor (unless Jira was set up)
+   `AIPOD_INTEGRATION_KEY`, so nobody can open the page and it could not save secrets. Add both, then deploy the
+   same release again so `deploy.ps1` writes them into `web.config`:
+
+   ```powershell
+   .\enable-integration-settings.ps1 -Environment test -AdminWorkspace <workspace id>
+   ```
+
+   It keeps the old file as `aipod.env.bak-<date>`, keeps an existing `AIPOD_INTEGRATION_KEY`, and prints key names
+   only. Copy the new key into the password manager at once.
 
    SMTP can also be given as an `"Smtp"` node (`Host`, `Port`, `User`, `Password`, `From`, `StartTls`) in
    `releases\<commit>\api\appsettings.Production.json` on the server. A non-empty `AIPOD_SMTP_*` value in

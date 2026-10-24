@@ -4,6 +4,7 @@ import { trProjects } from "./tr.projects";
 import { trIssues } from "./tr.issues";
 import { trSprints } from "./tr.sprints";
 import { trIntegrations } from "./tr.integrations";
+import { trServerSettings } from "./tr.serverSettings";
 import { trTwoStep } from "./tr.twoStep";
 import { trRemote } from "./tr.remote";
 
@@ -11,7 +12,7 @@ import { trRemote } from "./tr.remote";
 export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
-    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları",
+    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
   },
@@ -33,7 +34,7 @@ export const tr: Dictionary = {
     reauthorize: "Bağlantı için Atlassian'da yeniden oturum açılmalı.", jira_account_required: "Önce kendi Atlassian hesabınızı bağlayın.",
     tracker_unauthorized: "Atlassian oturum açmayı reddetti. Yeniden bağlanın.", tracker_forbidden: "Jira bu hesaba buna izin vermiyor.",
     tracker_not_found: "Jira'da bu yok.", tracker_rate_limited: "Jira yavaşlamanızı istiyor. Bir dakika sonra deneyin.",
-    tracker_unavailable: "Jira'ya şu anda ulaşılamıyor.", tracker_rejected: "Jira bunu kabul etmedi.", tracker_changed: "Jira'da değişti. Yeniden bakın.",
+    tracker_unavailable: "Jira'ya şu anda ulaşılamıyor.", internal_error: "Kontrol sunucuda başarısız oldu. Yeniden denenecek.", tracker_rejected: "Jira bunu kabul etmedi.", tracker_changed: "Jira'da değişti. Yeniden bakın.",
     space_not_found: "Bu alan Jira'da yok (ya da bu hesap göremiyor).",
     invalid_email: "Bu bir e-posta adresine benzemiyor.", weak_password: "En az 10 karakter kullanın.",
     invalid_name: "Bir ad girin (en çok 100 karakter).", invalid_credentials: "E-posta ya da parola yanlış. Çok fazla denemeden sonra hesap bir süre kilitlenir; parolayı sıfırlamak kilidi hemen açar.",
@@ -103,6 +104,8 @@ export const tr: Dictionary = {
     invalid_auto_project: "Bu makinenin bildirdiği ve Claude Code’un güvendiği bir proje seçin.",
     invalid_first_prompt: "İlk istem 1 ile 2000 karakterlik metin olmalı.", claude_folder_not_trusted: "Claude Code bu klasöre henüz güvenmiyor: makinede orada bir kez Claude'u açıp güven sorusunu onaylayın.",
     claude_start_pending: "Bu makinede başka bir başlatma hâlâ bekliyor: bitince yeniden deneyin.",
+    set_on_server: "Bu değer sunucunun kendisinde tanımlı ve burada değiştirilemez.", integration_key_missing: "Sunucuda entegrasyon anahtarı eksik, bu yüzden bu kaydedilemez.",
+    settings_conflict: "Başka biri bunu aynı anda kaydetti. Sayfayı yenileyip yeniden deneyin.", mail_failed: "Deneme e-postası gönderilemedi. E-posta sunucusu ayarlarını kontrol edin.", no_email: "Hesabınızda deneme e-postasının gönderileceği bir adres yok.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
   time: { now: "şimdi", s: "sn", m: "dk", h: "sa", d: "g" },
@@ -174,6 +177,7 @@ export const tr: Dictionary = {
   issues: trIssues,
   sprints: trSprints,
   integrations: trIntegrations,
+  serverSettings: trServerSettings,
   twoStep: trTwoStep,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",

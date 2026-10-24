@@ -21,6 +21,8 @@ namespace Podium.Api.Tests.Infrastructure;
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string Origin = "http://podium.test.invalid";
+    /// <summary>The workspace whose owners and admins manage the server-wide settings (AIPOD_ADMIN_WORKSPACE, ADR-0017); <see cref="ServerAdminKit"/> fills it.</summary>
+    public static readonly Guid AdminWorkspaceId = Guid.Parse("5e7c0a11-0d4a-4a6e-9a51-2b6f3f0c7a01");
     private readonly PostgreSqlContainer db = new PostgreSqlBuilder("postgres:18").Build();
 
     public ApiFactory()
@@ -32,7 +34,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>A scripted Atlassian behind the API's "atlassian" HTTP client (ADR-0015): no test reaches a real account.</summary>
     public FakeJira Jira { get; }
     // Starts at the real time: cookies carry expiry dates and the test client's cookie jar judges them by the wall clock.
-    public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
+    // Whole microseconds, as PostgreSQL keeps them (Windows gives 100 ns ticks): a time written and read back compares equal.
+    public TestClock Clock { get; } = new(new DateTimeOffset(DateTimeOffset.UtcNow.UtcTicks / 10 * 10, TimeSpan.Zero));
     public string WebRoot { get; } = Path.Combine(Path.GetTempPath(), "ap-web-" + Guid.NewGuid().ToString("N"));
     public string ArchiveDir { get; } = Path.Combine(Path.GetTempPath(), "ap-archive-" + Guid.NewGuid().ToString("N"));
 
@@ -44,6 +47,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("AIPOD_BACKGROUND_JOBS", "off");
         Environment.SetEnvironmentVariable("AIPOD_ARCHIVE_DIR", ArchiveDir);
         Environment.SetEnvironmentVariable("AIPOD_COMMIT", "test-sha");
+        Environment.SetEnvironmentVariable("AIPOD_ADMIN_WORKSPACE", AdminWorkspaceId.ToString());
         Directory.CreateDirectory(Path.Combine(WebRoot, "assets"));
         await File.WriteAllTextAsync(Path.Combine(WebRoot, "index.html"), "<!doctype html><title>app</title>");
         await File.WriteAllTextAsync(Path.Combine(WebRoot, "assets", "app.js"), "console.log('app');");

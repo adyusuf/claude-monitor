@@ -11,13 +11,13 @@ public interface IMailer
     Task SendAsync(MailMessageData message, CancellationToken ct);
 }
 
-/// <summary>Plain SMTP with STARTTLS (Gmail / Google Workspace in production, Mailpit in development).</summary>
-public sealed class SmtpMailer(ApiConfig config, ILogger<SmtpMailer> log) : IMailer
+/// <summary>Plain SMTP with STARTTLS (Gmail / Google Workspace in production, Mailpit in development); the values in force at each send (ADR-0017).</summary>
+public sealed class SmtpMailer(IntegrationSettings settings, ILogger<SmtpMailer> log) : IMailer
 {
     public async Task SendAsync(MailMessageData message, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var smtp = config.Smtp;
+        var smtp = settings.Smtp;
         using var client = new SmtpClient(smtp.Host, smtp.Port) { EnableSsl = smtp.StartTls };
         if (!string.IsNullOrEmpty(smtp.User))
         {
@@ -51,6 +51,7 @@ public static class MailTemplates
                 "Open this link to choose a new password:\n\n{0}\n\nThe link works for 24 hours. If you did not ask for it, ignore this mail."),
             ["invite"] = ("You are invited to a workspace",
                 "{1} invited you to the workspace \"{2}\" on Podium. Open this link to join:\n\n{0}\n\nThe invitation works for 7 days."),
+            ["test"] = ("Podium test mail", "This is a test mail from the Settings, Integrations page of Podium. The mail settings work."),
         },
         ["tr"] = new()
         {
@@ -60,6 +61,7 @@ public static class MailTemplates
                 "Yeni bir parola seçmek için bu bağlantıyı açın:\n\n{0}\n\nBağlantı 24 saat geçerlidir. Siz istemediyseniz bu e-postayı yok sayın."),
             ["invite"] = ("Bir çalışma alanına davet edildiniz",
                 "{1} sizi Podium'daki \"{2}\" çalışma alanına davet etti. Katılmak için bu bağlantıyı açın:\n\n{0}\n\nDavet 7 gün geçerlidir."),
+            ["test"] = ("Podium deneme e-postası", "Bu, Podium'un Ayarlar, Entegrasyonlar sayfasından gönderilen bir deneme e-postasıdır. E-posta ayarları çalışıyor."),
         },
         ["de"] = new()
         {
@@ -69,8 +71,12 @@ public static class MailTemplates
                 "Öffnen Sie diesen Link, um ein neues Passwort zu wählen:\n\n{0}\n\nDer Link ist 24 Stunden gültig. Wenn Sie ihn nicht angefordert haben, ignorieren Sie diese E-Mail."),
             ["invite"] = ("Sie wurden zu einem Arbeitsbereich eingeladen",
                 "{1} hat Sie zum Arbeitsbereich \"{2}\" auf Podium eingeladen. Öffnen Sie diesen Link, um beizutreten:\n\n{0}\n\nDie Einladung ist 7 Tage gültig."),
+            ["test"] = ("Podium-Testmail", "Dies ist eine Testmail von der Seite Einstellungen, Integrationen in Podium. Die E-Mail-Einstellungen funktionieren."),
         },
     };
+
+    /// <summary>The test mail of the Integrations page (ADR-0017).</summary>
+    public const string Test = "test";
 
     /// <summary>The languages the mails exist in.</summary>
     public static readonly IReadOnlyList<string> Languages = ["en", "tr", "de"];

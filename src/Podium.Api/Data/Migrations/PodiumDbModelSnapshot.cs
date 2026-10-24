@@ -2,11 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
-using Podium.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Podium.Api.Data;
 
 #nullable disable
 
@@ -3410,6 +3410,40 @@ namespace Podium.Api.Data.Migrations
                     b.ToTable("repos");
                 });
 
+            modelBuilder.Entity("Podium.Api.Data.ServerSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<bool>("Secret")
+                        .HasColumnType("boolean")
+                        .HasColumnName("secret");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Key")
+                        .HasName("pk_server_settings");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_server_settings_updated_by");
+
+                    b.ToTable("server_settings");
+                });
+
             modelBuilder.Entity("Podium.Api.Data.SessionCommand", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5220,6 +5254,16 @@ namespace Podium.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_repos_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("Podium.Api.Data.ServerSetting", b =>
+                {
+                    b.HasOne("Podium.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_server_settings_users_updated_by");
                 });
 
             modelBuilder.Entity("Podium.Api.Data.SessionCommand", b =>

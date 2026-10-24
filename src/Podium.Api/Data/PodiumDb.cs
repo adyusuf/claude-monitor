@@ -61,6 +61,7 @@ public sealed class PodiumDb(DbContextOptions<PodiumDb> options) : DbContext(opt
     public DbSet<IntegrationPerson> IntegrationPeople => Set<IntegrationPerson>();
     public DbSet<IntegrationSyncRun> IntegrationSyncRuns => Set<IntegrationSyncRun>();
     public DbSet<IntegrationWebhookReceipt> IntegrationWebhookReceipts => Set<IntegrationWebhookReceipt>();
+    public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

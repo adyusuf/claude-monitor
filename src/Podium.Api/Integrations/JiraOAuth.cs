@@ -16,7 +16,7 @@ public sealed record AtlassianSite(string Id, string Host, string Name);
 /// reach and the account behind it. PKCE is sent as well; Atlassian ignores a challenge it does not use. Responses are read for the fields we
 /// need only and never logged.
 /// </summary>
-public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig config)
+public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig config, IntegrationSettings settings)
 {
     public const string HostSuffix = ".atlassian.net";
 
@@ -24,7 +24,13 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
     public static readonly IReadOnlyList<string> Scopes =
         ["read:jira-work", "write:jira-work", "read:jira-user", "manage:jira-webhook", "offline_access"];
 
-    public string RedirectUri => $"{config.PublicOrigin}/api/integrations/jira/callback";
+    /// <summary>The Atlassian app in force (environment or Integrations page); callers check <see cref="IntegrationSettings.JiraAvailable"/> first.</summary>
+    private OAuthClient App => settings.Jira ?? throw new TrackerException(TrackerException.Codes.Unavailable);
+
+    /// <summary>The callback the Atlassian app registers (under the site's origin).</summary>
+    public const string CallbackPath = "/api/integrations/jira/callback";
+
+    public string RedirectUri => config.PublicOrigin + CallbackPath;
 
     /// <summary>"acme", "acme.atlassian.net" or "https://acme.atlassian.net/jira" to "acme.atlassian.net"; null for anything else.</summary>
     public static string? SiteHost(string? input)
@@ -50,7 +56,7 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
         var query = new Dictionary<string, string>
         {
             ["audience"] = "api.atlassian.com",
-            ["client_id"] = config.Jira!.ClientId,
+            ["client_id"] = App.ClientId,
             ["scope"] = string.Join(' ', Scopes),
             ["redirect_uri"] = RedirectUri,
             ["state"] = state,
@@ -65,8 +71,8 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
     public Task<TokenSet> ExchangeAsync(string code, string verifier, CancellationToken ct) => TokenAsync(new Dictionary<string, string>
     {
         ["grant_type"] = "authorization_code",
-        ["client_id"] = config.Jira!.ClientId,
-        ["client_secret"] = config.Jira.ClientSecret,
+        ["client_id"] = App.ClientId,
+        ["client_secret"] = App.ClientSecret,
         ["code"] = code,
         ["redirect_uri"] = RedirectUri,
         ["code_verifier"] = verifier,
@@ -75,8 +81,8 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
     public Task<TokenSet> RefreshAsync(string refreshToken, CancellationToken ct) => TokenAsync(new Dictionary<string, string>
     {
         ["grant_type"] = "refresh_token",
-        ["client_id"] = config.Jira!.ClientId,
-        ["client_secret"] = config.Jira.ClientSecret,
+        ["client_id"] = App.ClientId,
+        ["client_secret"] = App.ClientSecret,
         ["refresh_token"] = refreshToken,
     }, ct);
 
