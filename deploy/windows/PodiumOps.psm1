@@ -33,13 +33,18 @@ function Get-SmtpSettings {
     (Host, Port, User, Password, From, StartTls). check-health.ps1 used to read the environment file alone, so with
     the user and password only in the node every alarm mail was refused ("The SMTP server requires a secure
     connection or the client was not authenticated", event 1021), unseen.
-    StartTls is on unless the value is "false" (any case); unset counts as on, the production default.
+    StartTls follows ApiConfig exactly: unset counts as on (the production default), any set value is on only when it
+    is "true" in any case, so "false", "0", "no" or a typo turn it off, as they do for the API.
     Throws, naming the fields, when host, port or sender stay unresolved or the port is not a number.
   #>
   param([Parameter(Mandatory)] [hashtable] $Values, [string] $AppSettingsPath)
   $node = $null
   if ($AppSettingsPath -and (Test-Path -LiteralPath $AppSettingsPath)) {
-    try { $node = (Get-Content -LiteralPath $AppSettingsPath -Raw | ConvertFrom-Json).Smtp }
+    # Read and parse apart, so event 1021 sends the operator to the right place (access denied vs. broken JSON).
+    # Neither message quotes the file; the read error names only the exception type.
+    try { $raw = Get-Content -LiteralPath $AppSettingsPath -Raw -ErrorAction Stop }
+    catch { throw "appsettings.Production.json could not be read ($AppSettingsPath): $($_.Exception.GetType().Name)" }
+    try { $node = ($raw | ConvertFrom-Json).Smtp }
     catch { throw "appsettings.Production.json could not be parsed ($AppSettingsPath)" }
   }
   function Pick([hashtable] $Source, $Node, [string] $Key, [string] $Field) {
@@ -54,15 +59,15 @@ function Get-SmtpSettings {
     User     = Pick $Values $node "AIPOD_SMTP_USER" "User"
     Password = Pick $Values $node "AIPOD_SMTP_PASSWORD" "Password"
     From     = Pick $Values $node "AIPOD_SMTP_FROM" "From"
-    StartTls = "$tls" -ne "false"
+    StartTls = if ("$tls" -ne "") { "$tls" -eq "true" } else { $true }   # as ApiConfig: unset = on, else on only for "true"
   }
   $missing = @()
   if (-not $settings.Host) { $missing += "host (AIPOD_SMTP_HOST / Smtp:Host)" }
   if (-not $settings.Port) { $missing += "port (AIPOD_SMTP_PORT / Smtp:Port)" }
   if (-not $settings.From) { $missing += "sender (AIPOD_SMTP_FROM / Smtp:From)" }
   if ($missing.Count -gt 0) {
-    $where = if ($AppSettingsPath -and (Test-Path -LiteralPath $AppSettingsPath)) { "the Smtp node of $AppSettingsPath" } else { "no appsettings.Production.json found in a release" }
-    throw "SMTP $($missing -join ', ') not set in the environment file ($where)"
+    $where = if ($AppSettingsPath -and (Test-Path -LiteralPath $AppSettingsPath)) { "the Smtp node of $AppSettingsPath" } else { "any release (no appsettings.Production.json found)" }
+    throw "SMTP $($missing -join ', ') not set in aipod.env, and not in $where"
   }
   $number = 0
   if (-not [int]::TryParse($settings.Port, [ref] $number)) { throw "SMTP port is not a number (AIPOD_SMTP_PORT / Smtp:Port)" }

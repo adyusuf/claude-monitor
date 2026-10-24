@@ -91,16 +91,21 @@ class SmtpSettings(PowerShellCase):
         self.assertEqual(("smtp.env", 465, "env@from"), (got["Host"], got["Port"], got["From"]))
         self.assertEqual(("node-user", "node-pass"), (got["User"], got["Password"]))
 
-    def test_starttls_defaults_to_on_and_only_false_turns_it_off(self):
+    def test_starttls_follows_the_api_unset_is_on_and_only_true_keeps_it_on(self):
         self.assertTrue(self.smtp(self.BASE)["StartTls"], "unset: on, the production default")
-        self.assertFalse(self.smtp({**self.BASE, "AIPOD_SMTP_TLS": "false"})["StartTls"])
-        self.assertFalse(self.smtp({**self.BASE, "AIPOD_SMTP_TLS": "FALSE"})["StartTls"])
         self.assertTrue(self.smtp({**self.BASE, "AIPOD_SMTP_TLS": "true"})["StartTls"])
+        self.assertTrue(self.smtp({**self.BASE, "AIPOD_SMTP_TLS": "TRUE"})["StartTls"])
+        # ApiConfig turns TLS off for every set value that is not "true": a plain relay written as 0/no/off, or a typo.
+        for value in ("false", "FALSE", "0", "no", "off", "fasle"):
+            self.assertFalse(self.smtp({**self.BASE, "AIPOD_SMTP_TLS": value})["StartTls"], value)
 
     def test_starttls_from_the_node_as_a_json_boolean_or_a_string(self):
-        for value in (False, "False", "false"):
+        for value in (False, "False", "false", "0"):
             self.settings.write_text(json.dumps({"Smtp": {**self.NODE["Smtp"], "StartTls": value}}), encoding="utf-8")
             self.assertFalse(self.smtp({}, self.settings)["StartTls"], repr(value))
+        for value in (True, "True", "true"):
+            self.settings.write_text(json.dumps({"Smtp": {**self.NODE["Smtp"], "StartTls": value}}), encoding="utf-8")
+            self.assertTrue(self.smtp({}, self.settings)["StartTls"], repr(value))
 
     def test_a_missing_file_leaves_only_the_env(self):
         got = self.smtp({**self.BASE, "AIPOD_SMTP_HOST": "smtp.env"}, self.dir / "missing.json")
@@ -126,6 +131,14 @@ class SmtpSettings(PowerShellCase):
         message = self.ps_error(f"Get-SmtpSettings -Values @{{}} -AppSettingsPath '{self.settings}'")
         self.assertIn("could not be parsed", message)
         self.assertNotIn("SECRET-VALUE", message)
+
+    def test_a_file_that_cannot_be_read_says_read_not_parse(self):
+        # A directory where the file should be: present for Test-Path, impossible to read as text.
+        unreadable = self.dir / "unreadable.json"
+        unreadable.mkdir()
+        message = self.ps_error(f"Get-SmtpSettings -Values @{{}} -AppSettingsPath '{unreadable}'")
+        self.assertIn("could not be read", message)
+        self.assertNotIn("could not be parsed", message)
 
 
 class FindAppSettings(PowerShellCase):
