@@ -1,7 +1,10 @@
 using Podium.Api.Config;
 using Podium.Api.Integrations;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Podium.Api.Tests.Infrastructure;
 
@@ -41,13 +44,17 @@ public sealed class JiraClients : IDisposable
         provider = services.BuildServiceProvider();
         var clients = provider.GetRequiredService<IHttpClientFactory>();
         Api = new JiraApi(clients, Config);
-        OAuth = new JiraOAuth(clients, Config);
+        // The running settings with nothing saved on the page: the environment's Jira app, as before ADR-0017.
+        Settings = new IntegrationSettings(Config, provider.GetRequiredService<IServiceScopeFactory>(), new OptionsCache<OAuthOptions>(),
+            NullLogger<IntegrationSettings>.Instance);
+        OAuth = new JiraOAuth(clients, Config, Settings);
         Tracker = new JiraTracker(Api);
         Writer = new JiraWriter(Api, Tracker);
     }
 
     public FakeJira Jira { get; }
     public ApiConfig Config { get; }
+    public IntegrationSettings Settings { get; }
     public JiraApi Api { get; }
     public JiraOAuth OAuth { get; }
     public JiraTracker Tracker { get; }

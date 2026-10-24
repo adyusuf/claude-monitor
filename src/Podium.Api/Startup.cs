@@ -27,6 +27,8 @@ public static class Startup
         services.AddSingleton(new UpdateCatalog(config));
         if (config.DownloadsUrl is not null) services.AddHostedService<UpdateCatalogRefresher>();
         services.AddDbContext<PodiumDb>(o => o.UseNpgsql(config.DatabaseUrl));
+        services.AddSingleton<IntegrationSettings>();
+        services.AddHostedService<IntegrationSettingsLoader>();
         services.AddSingleton<IMailer, SmtpMailer>();
         services.AddScoped<BatchIngestor>();
         services.AddScoped<Podium.Api.Remote.RunCreator>();
@@ -59,11 +61,9 @@ public static class Startup
         {
             services.AddHostedService<Housekeeper>();
             services.AddHostedService<Archiver>();
-            if (config.JiraAvailable)
-            {
-                services.AddHostedService<Podium.Api.Integrations.SyncWorker>();
-                services.AddHostedService<Podium.Api.Integrations.Reconciler>();
-            }
+            // Always: the Jira app may be saved on the Integrations page while the server runs (ADR-0017); both idle without it.
+            services.AddHostedService<Podium.Api.Integrations.SyncWorker>();
+            services.AddHostedService<Podium.Api.Integrations.Reconciler>();
         }
 
         services.AddAuthentication(Schemes.Session)
@@ -169,6 +169,7 @@ public static class Startup
         IntegrationEndpoints.Map(api);
         IntegrationImportEndpoints.Map(api);
         IntegrationWebhookEndpoints.Map(api);
+        ServerSettingsEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)

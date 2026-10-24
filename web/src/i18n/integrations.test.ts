@@ -40,7 +40,7 @@ describe("the integrations texts", () => {
 
   it("have the error texts the pages use for the codes of the work tracker", () => {
     for (const language of ["en", "tr", "de"] as const) {
-      for (const code of ["invalid_site", "integration_unavailable", "reauthorize", "tracker_unavailable", "space_not_found", "tracker_rate_limited"] as const) {
+      for (const code of ["invalid_site", "integration_unavailable", "reauthorize", "tracker_unavailable", "space_not_found", "tracker_rate_limited", "internal_error"] as const) {
         expect(dictionaries[language].errors[code], `${language} ${code}`).toEqual(expect.any(String));
       }
     }

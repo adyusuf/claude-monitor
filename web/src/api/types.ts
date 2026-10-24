@@ -14,6 +14,8 @@ export interface Me {
   mfaEnabled?: boolean;
   /** The language kept on the account (ADR-0014 Part A): the mails to the person follow it. */
   language?: string | null;
+  /** May change the server-wide settings (ADR-0017); an older server leaves it out, which means no. */
+  serverAdmin?: boolean;
 }
 
 export type AgentUpdateMode = "off" | "check" | "on";

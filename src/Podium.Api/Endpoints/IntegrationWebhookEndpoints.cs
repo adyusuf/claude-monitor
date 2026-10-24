@@ -18,11 +18,11 @@ public static class IntegrationWebhookEndpoints
 
     public static void Map(RouteGroupBuilder api) => api.MapPost("/integrations/jira/webhook/{id:guid}", Receive);
 
-    private static async Task<IResult> Receive(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, SyncInbox inbox)
+    private static async Task<IResult> Receive(Guid id, HttpContext http, PodiumDb db, IntegrationSettings settings, TimeProvider clock, SyncInbox inbox)
     {
         var ct = http.RequestAborted;
-        if (!config.JiraAvailable) return Results.NotFound();
-        if (!WebhookJwt.Verify(http.Request.Headers.Authorization.ToString(), config.Jira!.ClientSecret, clock.GetUtcNow())) return Results.Unauthorized();
+        if (!settings.JiraAvailable || settings.Jira is not { } app) return Results.NotFound();
+        if (!WebhookJwt.Verify(http.Request.Headers.Authorization.ToString(), app.ClientSecret, clock.GetUtcNow())) return Results.Unauthorized();
         var connection = await db.IntegrationConnections.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id && c.Status == ConnectionStatuses.Active, ct);
         if (connection is null) return Results.NotFound();
 

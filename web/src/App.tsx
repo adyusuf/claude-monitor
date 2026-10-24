@@ -13,6 +13,7 @@ import { TwoStepPage } from "./pages/TwoStepPage";
 import { MachinePage } from "./pages/MachinePage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { MembersPage } from "./pages/MembersPage";
+import { ServerIntegrationsPage } from "./pages/ServerIntegrationsPage";
 import { MfaPage } from "./pages/Mfa";
 import { ProjectPage } from "./pages/ProjectPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
@@ -52,6 +53,7 @@ export function App() {
         <Route path="/download" element={<DownloadPage />} />
         <Route path="/invitations/accept" element={<AcceptInvitationPage />} />
         <Route path="/workspaces/new" element={<NewWorkspacePage />} />
+        <Route path="/server/integrations" element={<ServerIntegrationsPage />} />
         <Route path="/w/:ws/projects" element={<ProjectsPage />} />
         <Route path="/w/:ws/projects/:id" element={<ProjectPage />} />
         <Route path="/w/:ws/projects/:projectId/applications/:id" element={<ApplicationPage />} />
