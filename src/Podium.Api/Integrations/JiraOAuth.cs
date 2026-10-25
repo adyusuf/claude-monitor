@@ -20,9 +20,27 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
 {
     public const string HostSuffix = ".atlassian.net";
 
-    /// <summary>Classic scopes: read and write issues and boards, read people, register webhooks, and a refresh token.</summary>
-    public static readonly IReadOnlyList<string> Scopes =
-        ["read:jira-work", "write:jira-work", "read:jira-user", "manage:jira-webhook", "offline_access"];
+    /// <summary>Classic scopes of the platform API: read and write issues, read people, register webhooks.</summary>
+    public static readonly IReadOnlyList<string> PlatformScopes = ["read:jira-work", "write:jira-work", "read:jira-user", "manage:jira-webhook"];
+
+    /// <summary>
+    /// GRANULAR scopes of the Jira Software API (boards, sprints, rank). Atlassian: "Jira Software doesn't support classic scopes": with only the
+    /// classic ones every /rest/agile call answers 401 "Unauthorized; scope does not match" (seen on the first import, 25/10/2026). One line per
+    /// call the tracker and the writer make; the Atlassian app must have the same scopes (SETUP.md).
+    /// </summary>
+    public static readonly IReadOnlyList<string> SoftwareScopes =
+    [
+        "read:board-scope:jira-software",   // GET board, GET board/{id}/backlog
+        "read:sprint:jira-software",        // GET board/{id}/sprint, GET sprint/{id}, GET sprint/{id}/issue
+        "read:issue:jira-software",         // the issues' estimates in those answers
+        "write:board-scope:jira-software",  // POST backlog/issue (move to the backlog)
+        "write:sprint:jira-software",       // POST sprint, POST sprint/{id}, POST sprint/{id}/issue
+        "write:issue:jira-software",        // PUT issue/rank
+        "delete:sprint:jira-software",      // DELETE sprint/{id}
+    ];
+
+    /// <summary>What the sign-in asks for: both lists and a refresh token (offline_access).</summary>
+    public static readonly IReadOnlyList<string> Scopes = [.. PlatformScopes, .. SoftwareScopes, "offline_access"];
 
     /// <summary>The Atlassian app in force (environment or Integrations page); callers check <see cref="IntegrationSettings.JiraAvailable"/> first.</summary>
     private OAuthClient App => settings.Jira ?? throw new TrackerException(TrackerException.Codes.Unavailable);
