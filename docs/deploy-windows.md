@@ -62,6 +62,11 @@ Jira Software scopes (ADR-0015, `JiraOAuth.Scopes`) it no longer fits. Raise the
 & "$env:windir\System32\inetsrv\appcmd.exe" set config "Podium-prod" -section:system.webServer/security/requestFiltering /requestLimits.maxQueryString:8192 /commit:apphost
 ```
 
+**Nobody can sign in (mail not set up yet).** Sign-in needs a verified e-mail, and the verification and reset links are mailed. On a server whose mail does not work yet,
+run `deploy/windows/reset-owner-password.ps1 -Environment <env> -Email <address>` yourself on the server (elevated PowerShell): it asks for a new password (hidden,
+twice), marks the e-mail verified, clears a lockout, signs the account out everywhere and writes an audit row, like the reset link does. `-VerifyOnly` only marks the
+e-mail verified and keeps the password; `-DryRun` only shows the account. It writes straight to the environment's database, so run it only as the maintainer.
+
 ## Every release
 
 On the Mac, from a clean checkout of the commit to ship:
