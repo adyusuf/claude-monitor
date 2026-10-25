@@ -3,6 +3,7 @@ using Podium.Api.Integrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -31,7 +32,7 @@ public sealed class JiraClients : IDisposable
 {
     private readonly ServiceProvider provider;
 
-    public JiraClients(Func<HttpMessageHandler>? handler = null, FakeJira? jira = null)
+    public JiraClients(Func<HttpMessageHandler>? handler = null, FakeJira? jira = null, ILogger<JiraApi>? log = null)
     {
         Jira = jira ?? new FakeJira(() => DateTimeOffset.UtcNow);
         Config = ApiConfig.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -43,7 +44,7 @@ public sealed class JiraClients : IDisposable
         services.AddHttpClient(JiraApi.ClientName).ConfigurePrimaryHttpMessageHandler(handler ?? Jira.Handler);
         provider = services.BuildServiceProvider();
         var clients = provider.GetRequiredService<IHttpClientFactory>();
-        Api = new JiraApi(clients, Config);
+        Api = new JiraApi(clients, Config, log ?? NullLogger<JiraApi>.Instance);
         // The running settings with nothing saved on the page: the environment's Jira app, as before ADR-0017.
         Settings = new IntegrationSettings(Config, provider.GetRequiredService<IServiceScopeFactory>(), new OptionsCache<OAuthOptions>(),
             NullLogger<IntegrationSettings>.Instance);
