@@ -26,17 +26,21 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
     /// <summary>
     /// GRANULAR scopes of the Jira Software API (boards, sprints, rank). Atlassian: "Jira Software doesn't support classic scopes": with only the
     /// classic ones every /rest/agile call answers 401 "Unauthorized; scope does not match" (seen on the first import, 25/10/2026). One line per
-    /// call the tracker and the writer make; the Atlassian app must have the same scopes (SETUP.md).
+    /// call the tracker and the writer make; the Atlassian app must have the same scopes (SETUP.md). Taken from Atlassian's own API definition
+    /// (dac-static.atlassian.com/cloud/jira/software/swagger.v3.json). Three of them are GRANULAR PLATFORM scopes that the Software calls check as
+    /// well: the classic read:jira-work does not stand in for them (the import still answered 401 with the Software scopes alone, 25/10/2026).
     /// </summary>
     public static readonly IReadOnlyList<string> SoftwareScopes =
     [
         "read:board-scope:jira-software",   // GET board, GET board/{id}/backlog
         "read:sprint:jira-software",        // GET board/{id}/sprint, GET sprint/{id}, GET sprint/{id}/issue
-        "read:issue:jira-software",         // the issues' estimates in those answers
         "write:board-scope:jira-software",  // POST backlog/issue (move to the backlog)
         "write:sprint:jira-software",       // POST sprint, POST sprint/{id}, POST sprint/{id}/issue
         "write:issue:jira-software",        // PUT issue/rank
         "delete:sprint:jira-software",      // DELETE sprint/{id}
+        "read:project:jira",                // GET board (also checked next to read:board-scope)
+        "read:issue-details:jira",          // GET board/{id}/backlog, GET sprint/{id}/issue
+        "read:jql:jira",                    // GET sprint/{id}/issue
     ];
 
     /// <summary>What the sign-in asks for: both lists and a refresh token (offline_access).</summary>

@@ -340,9 +340,9 @@ Atlassian app; without `AIPOD_JIRA_CLIENT_ID` and `AIPOD_JIRA_CLIENT_SECRET` (an
 1. **Register the app (once per environment; only the maintainer can).** developer.atlassian.com, Developer console, Create, OAuth 2.0 integration. Under
    Authorization add the callback `https://<host>/api/integrations/jira/callback` (one app per environment, so the callbacks of dev, test and prod are not mixed up).
    Under Permissions add Jira API with the classic scopes `read:jira-work`, `write:jira-work`, `read:jira-user`, `manage:jira-webhook` and, on the Granular scopes tab, the
-   Jira Software scopes `read:board-scope:jira-software`, `read:sprint:jira-software`, `read:issue:jira-software`, `write:board-scope:jira-software`, `write:sprint:jira-software`,
-   `write:issue:jira-software` and `delete:sprint:jira-software`. **Jira Software does not support classic scopes** (Atlassian): without these every board and sprint call answers
-   401 "scope does not match". The list is `JiraOAuth.Scopes`; an app that lacked a scope when a person connected needs Disconnect and Connect again, because a token only carries
+   Jira Software scopes `read:board-scope:jira-software`, `read:sprint:jira-software`, `write:board-scope:jira-software`, `write:sprint:jira-software`, `write:issue:jira-software`,
+   `delete:sprint:jira-software` and the three granular platform scopes the Software calls check next to them: `read:project:jira`, `read:issue-details:jira` and `read:jql:jira`.
+   **Jira Software does not support classic scopes** (Atlassian): without these every board and sprint call answers 401 "scope does not match". The list is `JiraOAuth.Scopes`; an app that lacked a scope when a person connected needs Disconnect and Connect again, because a token only carries
    the scopes it was issued with. If Atlassian offers `offline_access` as a setting, enable it so refresh tokens are issued.
 2. **Give the server the secrets.** `AIPOD_INTEGRATION_KEY` (32 random bytes, base64url, for example `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`),
    `AIPOD_JIRA_CLIENT_ID` and `AIPOD_JIRA_CLIENT_SECRET` in the server's environment file, then restart the API; or enter the two Jira values on Settings → Integrations (ADR-0017), which needs no restart. An environment value wins over the page. See the secret inventory below.

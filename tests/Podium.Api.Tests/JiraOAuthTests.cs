@@ -105,8 +105,8 @@ public sealed class JiraOAuthTests
         Assert.Contains("offline_access", JiraOAuth.Scopes); // without it there is no refresh token
         Assert.Contains("read:jira-work", JiraOAuth.Scopes);
         // Jira Software has no classic scopes (Atlassian): the agile calls need these granular ones or answer 401 "scope does not match".
-        string[] agile = ["read:board-scope:jira-software", "read:sprint:jira-software", "read:issue:jira-software", "write:board-scope:jira-software",
-            "write:sprint:jira-software", "write:issue:jira-software", "delete:sprint:jira-software"];
+        string[] agile = ["read:board-scope:jira-software", "read:sprint:jira-software", "write:board-scope:jira-software", "write:sprint:jira-software",
+            "write:issue:jira-software", "delete:sprint:jira-software", "read:project:jira", "read:issue-details:jira", "read:jql:jira"];
         Assert.All(agile, scope => Assert.Contains(scope, query["scope"]!.Split(' ')));
         Assert.Equal(agile, JiraOAuth.SoftwareScopes);
         Assert.Equal(JiraOAuth.Scopes.Count, JiraOAuth.Scopes.Distinct(StringComparer.Ordinal).Count());
