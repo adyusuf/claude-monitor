@@ -52,6 +52,16 @@ IIS site, app pool, PostgreSQL database and folder under `C:\iis\Podium\<env>`. 
    `aipod.env` wins over it, an empty one does not hide it. The file is not in the package, so a new release folder
    starts without it: copy it into each release, or keep the values in `aipod.env`, which every deploy carries over.
 
+**IIS request limits.** IIS refuses a query string over 2048 bytes by default (an HTTP 404 with sub-status 15 in its log, before the API sees the request). The
+Jira sign-in comes back to `/api/integrations/jira/callback?state=...&code=...` and Atlassian's `code` carries every scope the app asked for, so with the granular
+Jira Software scopes (ADR-0015, `JiraOAuth.Scopes`) it no longer fits. Raise the limit on each Podium site, in `applicationHost.config` like the other site hardening
+(it survives every release), then check with a long dummy address (it must answer 401, not 404):
+
+```powershell
+& "$env:windir\System32\inetsrv\appcmd.exe" set config "Podium-test" -section:system.webServer/security/requestFiltering /requestLimits.maxQueryString:8192 /commit:apphost
+& "$env:windir\System32\inetsrv\appcmd.exe" set config "Podium-prod" -section:system.webServer/security/requestFiltering /requestLimits.maxQueryString:8192 /commit:apphost
+```
+
 ## Every release
 
 On the Mac, from a clean checkout of the commit to ship:
