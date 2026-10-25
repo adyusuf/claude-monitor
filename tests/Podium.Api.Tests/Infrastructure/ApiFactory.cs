@@ -34,8 +34,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>A scripted Atlassian behind the API's "atlassian" HTTP client (ADR-0015): no test reaches a real account.</summary>
     public FakeJira Jira { get; }
     // Starts at the real time: cookies carry expiry dates and the test client's cookie jar judges them by the wall clock.
-    // Whole microseconds, as PostgreSQL keeps them (Windows gives 100 ns ticks): a time written and read back compares equal.
-    public TestClock Clock { get; } = new(new DateTimeOffset(DateTimeOffset.UtcNow.UtcTicks / 10 * 10, TimeSpan.Zero));
+    // Whole microseconds, as PostgreSQL keeps them (TestClock cuts every time it hands out): a time written and read back compares equal.
+    public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
     public string WebRoot { get; } = Path.Combine(Path.GetTempPath(), "ap-web-" + Guid.NewGuid().ToString("N"));
     public string ArchiveDir { get; } = Path.Combine(Path.GetTempPath(), "ap-archive-" + Guid.NewGuid().ToString("N"));
 
@@ -138,11 +138,12 @@ public sealed class FakeMailer : IMailer
     }
 }
 
+/// <summary>A clock that only moves when told to. It always reads whole microseconds, however far it is advanced, so that what it hands out survives a round trip through PostgreSQL unchanged.</summary>
 public sealed class TestClock(DateTimeOffset start) : TimeProvider
 {
-    private DateTimeOffset now = start;
+    private DateTimeOffset now = start.ToMicroseconds();
 
     public override DateTimeOffset GetUtcNow() => now;
 
-    public void Advance(TimeSpan by) => now += by;
+    public void Advance(TimeSpan by) => now = (now + by).ToMicroseconds();
 }
