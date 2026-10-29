@@ -107,9 +107,9 @@ fi
 FAILED=0
 LISTED=""
 # Project-specific discovery exclusions: `# exclude:<relative-path>` in the budget
-# file. Why in the tsv: an exclusion is project data (in ~/.claude, plugins/ and
-# skills/addy are third-party; another project excludes something else) — it is
-# not baked into the script, the script is generic.
+# file. Why in the tsv: an exclusion is project data (in the configuration repository
+# plugins/ and skills/addy are third-party; another project excludes something
+# else) — it is not baked into the script, the script is generic.
 # ⚠️ An empty "# exclude:" is ignored so a typo cannot exclude everything.
 EXCLUDE=()
 while IFS= read -r line; do
