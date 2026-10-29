@@ -29,7 +29,7 @@ def git(root, *args, check=True):
 class Repo(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
-        git(self.root, 'init', '-q')
+        git(self.root, 'init', '-q', '-b', 'feature/x')  # not a protected branch: pre-commit step 0
         git(self.root, 'config', 'user.email', 't@example.invalid')
         git(self.root, 'config', 'user.name', 't')
         os.makedirs(os.path.join(self.root, 'scripts'))
