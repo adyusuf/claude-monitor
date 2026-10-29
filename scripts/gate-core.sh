@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # Shared gate CORE — one definition of the step set for every project.
 #
-# Usage:  scripts/gate-core.sh <dev|test|prod> [--list]
+# Usage:  scripts/gate-core.sh <dev|test|prod> [--list | --coverage-only]
 #
 # Two layers, deliberately: this file owns the SHARED STEPS, while a project's own
 # scripts/merge-gate.sh stays the orchestrator (it pulls, merges, pushes and adds
 # whatever that project needs) and CALLS this file for the shared set. That way the
 # step definition lives in one place and a project can ADD steps without forking it.
 # `--list` prints the steps that WOULD run, with the command each one resolves to,
-# and runs nothing — use it when rolling the gate into a project.
+# and runs nothing — use it when rolling the gate into a project. It ends "LISTING
+# ONLY", never "GATE GREEN": a listing is not a verdict (a step it can already see
+# would be skipped or fail still ends INCOMPLETE / CLOSED, as the real run would).
+# `--coverage-only` runs the coverage step and nothing else: it is what still runs when
+# the configuration turns the gate off (gates_before_push.<t> = no), because rule #29 is
+# never waived (user decision 29/10/2026, standards/13 §8a). COVERAGE_CMD must then measure
+# on its own, not read a result an earlier step of the full gate left behind.
 #
 # ⚠️ The canonical copy lives in the configuration repository; every project takes
 # a COPY into its own scripts/ and commits it. A project's gate cannot depend on a
@@ -49,7 +55,8 @@
 #   E2E_WEB_CMD="npx playwright test"                   # default when e2e/ (root, tests/e2e or <web tier>/e2e) exists;
 #                                                       # it runs from the directory that holds the suite
 #   E2E_MOBILE_CMD="bash scripts/mobile-e2e.sh"         # default when .maestro/ exists
-#   COVERAGE_CMD="node scripts/coverage-budget.cjs"     # must exit non-zero below the threshold
+#   COVERAGE_CMD="bash scripts/coverage.sh"             # must MEASURE (run the tests), not read an old
+#                                                       # report, and exit non-zero below the threshold
 #   COVERAGE_MIN=80
 #   SAST_CMD="bash scripts/codeql-scan.sh"              # default: scripts/codeql-scan.sh
 #   BACKCOMPAT_CMD="bash scripts/api-compat.sh"         # default: scripts/backward-compat-scan.sh
@@ -88,10 +95,16 @@ set -uo pipefail
 
 TARGET="${1:-}"
 LIST_ONLY=0
-[ "${2:-}" = "--list" ] && LIST_ONLY=1
+COVERAGE_ONLY=0
+case "${2:-}" in
+  "") ;;
+  --list) LIST_ONLY=1 ;;
+  --coverage-only) COVERAGE_ONLY=1 ;;
+  *) echo "usage: $0 <dev|test|prod> [--list | --coverage-only]"; exit 2 ;;
+esac
 case "$TARGET" in
   dev|test|prod) ;;
-  *) echo "usage: $0 <dev|test|prod> [--list]"; exit 2 ;;
+  *) echo "usage: $0 <dev|test|prod> [--list | --coverage-only]"; exit 2 ;;
 esac
 
 GATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -111,6 +124,19 @@ for lib in gate-lib.sh gate-lib-node.sh gate-lib-prod.sh; do
   # shellcheck source=/dev/null  # the path is resolved at run time, beside this file
   . "$GATE_DIR/$lib"
 done
+# ...nor with a STALE one: a library from an older version may lack a function this file calls, and
+# bash would say "command not found" and carry on. With gate_coverage missing that dropped coverage
+# without a trace and ended GATE GREEN (found 29/10/2026). Every function the core calls must exist.
+for fn in say ok bad skip warn na have run gate_coverage gate_result gate_prod node_start node_join \
+  node_lint node_typecheck node_build node_test node_audit; do
+  declare -F "$fn" >/dev/null || {
+    echo "gate-core.sh: $fn is not defined - a library beside it is older than this file; copy all four twins (scripts/twins.txt)" >&2
+    exit 2
+  }
+done
+
+# The gate is off by configuration, coverage is not (#29): run that one step and stop.
+if [ "$COVERAGE_ONLY" = 1 ]; then gate_coverage; gate_result; fi
 
 # ── Everything except e2e: dev and test ──────────────────────────────────────
 if [ "$TARGET" != "prod" ]; then
@@ -141,10 +167,7 @@ if [ "$TARGET" != "prod" ]; then
   [ "$NODE_PARALLEL_ACTIVE" = 1 ] || node_test
 
   node_join
-  say "coverage (>= ${COVERAGE_MIN}% lines, per codebase)"
-  if [ -n "${COVERAGE_CMD:-}" ]; then run "coverage" bash -c "$COVERAGE_CMD"
-  elif [ -x scripts/coverage.sh ]; then run "coverage" bash scripts/coverage.sh
-  else skip "coverage: set COVERAGE_CMD in scripts/merge-gate.conf — the threshold is NOT measured"; fi
+  gate_coverage
 
   say "secret scan"
   if [ -n "${SECRET_CMD:-}" ]; then run "secret scan" bash -c "$SECRET_CMD"

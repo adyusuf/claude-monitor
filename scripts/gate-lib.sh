@@ -97,10 +97,19 @@ HAS_E2E_MOBILE=0; [ -d .maestro ] || [ -d "${MOBILE_DIR:-mobile}/.maestro" ] && 
 echo "merge gate → $TARGET   ($(git rev-parse --short HEAD), $ROOT)"
 echo "stacks: dotnet=$HAS_DOTNET${SLN:+ (${SLN#./})} node=$HAS_NODE web=${WEB_DIR:-none} mobile=${MOBILE_DIR:-none} e2e=web:$HAS_E2E_WEB/mobile:$HAS_E2E_MOBILE"
 
+# ── Coverage (#29): a step of the full gate, and the one step --coverage-only runs ──
+gate_coverage() {
+  say "coverage (>= ${COVERAGE_MIN}% lines, per codebase)"
+  if [ -n "${COVERAGE_CMD:-}" ]; then run "coverage" bash -c "$COVERAGE_CMD"
+  elif [ -x scripts/coverage.sh ]; then run "coverage" bash scripts/coverage.sh
+  else skip "coverage: set COVERAGE_CMD in scripts/merge-gate.conf — the threshold is NOT measured"; fi
+}
+
 # ── The verdict ──────────────────────────────────────────────────────────────
 gate_result() {
   printf '\n\033[1m── result ──\033[0m\n'
-  printf '  passed  : %d\n' "${#PASS[@]}"
+  # A listing runs nothing, so nothing "passed": the count is what WOULD run (--list).
+  if [ "$LIST_ONLY" = 1 ]; then printf '  would run: %d\n' "${#PASS[@]}"; else printf '  passed  : %d\n' "${#PASS[@]}"; fi
   printf '  warnings: %d\n' "${#WARN[@]}"
   printf '  n/a     : %d\n' "${#NA[@]}"
   printf '  accepted: %d\n' "${#ACCEPTED[@]}"
@@ -120,6 +129,18 @@ gate_result() {
     printf '\n\033[33mGATE INCOMPLETE\033[0m — %d step(s) did not run. A step that did not run did not pass;\n' "${#SKIP[@]}"
     printf 'the result is not green. Install the tool, or record the reason and get the user to accept it.\n'
     exit 1
+  fi
+  # ⚠️ A listing used to end "GATE GREEN — promotion is allowed" although nothing had run. What a
+  # listing CAN find (a check that would fail or be skipped) still blocks above, as the real run would;
+  # a clean listing is not a verdict.
+  if [ "$LIST_ONLY" = 1 ]; then
+    printf '\n\033[1mLISTING ONLY\033[0m — %d step(s) would run; nothing ran, so there is no verdict. Run without --list for the gate.\n' "${#PASS[@]}"
+    exit 0
+  fi
+  # Only coverage ran, so this is not the gate's green: it says what was not run.
+  if [ "${COVERAGE_ONLY:-0}" = 1 ]; then
+    printf '\n\033[32mCOVERAGE GREEN\033[0m — the coverage step passed. The rest of the %s gate did NOT run (turned off by configuration).\n' "$TARGET"
+    exit 0
   fi
   if [ "${#ACCEPTED[@]}" -gt 0 ]; then
     printf '\n\033[32mGATE GREEN\033[0m (with %d accepted gap(s)) — %s promotion is allowed.\n' "${#ACCEPTED[@]}" "$TARGET"
