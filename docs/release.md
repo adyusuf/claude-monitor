@@ -138,6 +138,5 @@ module (global #2).
 ## CI, gates and test runs paused (maintainer, 19/10/2026)
 
 First dev and test, then everything: `.github/workflows/ci.yml` and `e2e.yml` now start only by hand (`workflow_dispatch`; the nightly e2e run is gone too).
-`.claude/adyusuf.json` sets `run_before_push` (`unit`, `e2e`) to no for dev, test and prod, so merges carry `Gate-Waived:` trailers (global rule #34) and the report before a prod merge
-lists them; no session runs `scripts/quick-check.sh` or the test suites while it stands. Coverage (#29) is not met by this: it is only not measured. To turn it back on: restore the triggers
-(see the comments in both workflow files) and run `adyusuf_config.py unset --project` for the keys in `.claude/adyusuf.json`.
+Promotions follow the adyusuf settings (`/adyusuf:config`). Coverage (#29) is not met by this: it is only not measured. To turn it back on: restore the triggers
+(see the comments in both workflow files).
