@@ -34,7 +34,11 @@ run()  { # run <label> <command...>
   local label="$1"; shift
   if [ "$LIST_ONLY" = 1 ]; then printf '  → %-42s %s\n' "$label" "$*"; PASS+=("$label"); return 0; fi
   local out; out="$(mktemp)"   # not $$: the node track runs in a subshell that shares the parent's $$
-  if "$@" >"$out" 2>&1; then ok "$label"; else bad "$label"; tail -20 "$out" | sed 's/^/      /'; fi
+  if "$@" >"$out" 2>&1; then
+    ok "$label"
+    # RUN_SHOW=1: the step's own tail is evidence (coverage prints the figure a promotion rests on).
+    if [ "${RUN_SHOW:-0}" = 1 ]; then tail -25 "$out" | sed 's/^/      /'; fi
+  else bad "$label"; tail -20 "$out" | sed 's/^/      /'; fi
   rm -f "$out"
 }
 
@@ -100,8 +104,9 @@ echo "stacks: dotnet=$HAS_DOTNET${SLN:+ (${SLN#./})} node=$HAS_NODE web=${WEB_DI
 # ── Coverage (#29): a step of the full gate, and the one step --coverage-only runs ──
 gate_coverage() {
   say "coverage (>= ${COVERAGE_MIN}% lines, per codebase)"
-  if [ -n "${COVERAGE_CMD:-}" ]; then run "coverage" bash -c "$COVERAGE_CMD"
-  elif [ -x scripts/coverage.sh ]; then run "coverage" bash scripts/coverage.sh
+  # RUN_SHOW: a green coverage step prints the figures it measured (rule #15: a figure is read, not assumed).
+  if [ -n "${COVERAGE_CMD:-}" ]; then RUN_SHOW=1 run "coverage" bash -c "$COVERAGE_CMD"
+  elif [ -x scripts/coverage.sh ]; then RUN_SHOW=1 run "coverage" bash scripts/coverage.sh
   else skip "coverage: set COVERAGE_CMD in scripts/merge-gate.conf — the threshold is NOT measured"; fi
 }
 
