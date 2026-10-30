@@ -179,8 +179,9 @@ class GateConf(unittest.TestCase):
         finally:
             shutil.rmtree(values['DIR'], ignore_errors=True)
 
-    def test_the_prod_gate_and_a_listing_make_no_directory(self):
-        for env in ({'TARGET': 'prod'}, {'TARGET': 'dev', 'LIST_ONLY': '1'}):
+    def test_the_prod_gate_a_listing_and_a_coverage_only_run_make_no_directory(self):
+        # --coverage-only runs no unit-test step, so reuse would leave nothing to judge (NOT MEASURED, 30/10/2026).
+        for env in ({'TARGET': 'prod'}, {'TARGET': 'dev', 'LIST_ONLY': '1'}, {'TARGET': 'test', 'COVERAGE_ONLY': '1'}):
             values, _ = self.sourced(**env)
             self.assertEqual('', values['DIR'], env)
             self.assertEqual('', values['REUSE'], env)
