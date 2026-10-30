@@ -161,10 +161,13 @@ class GateConf(unittest.TestCase):
         values = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
         return values, result.stdout
 
-    def test_the_threshold_is_exported_so_coverage_sh_sees_it(self):
+    def test_the_conf_sets_no_threshold_of_its_own_and_coverage_sh_defaults_to_80(self):
+        # 30/10/2026: the project keeps no coverage setting (standards/13 section 8a); 80 is the default.
         values, out = self.sourced(TARGET='prod')
-        self.assertEqual('80', values['MIN'])
-        self.assertIn('COVERAGE_MIN=80', out.split('DIR=', 1)[1])        # in the environment, not only a shell variable
+        self.assertEqual('', values['MIN'])
+        self.assertNotIn('COVERAGE_MIN', out.split('DIR=', 1)[1])
+        with open(os.path.join(self.ROOT, 'scripts', 'coverage.sh'), encoding='utf-8') as handle:
+            self.assertIn('min="${COVERAGE_MIN:-80}"', handle.read())
 
     def test_a_dev_gate_run_gets_a_fresh_coverage_directory_to_reuse(self):
         values, _ = self.sourced(TARGET='dev')
@@ -176,8 +179,9 @@ class GateConf(unittest.TestCase):
         finally:
             shutil.rmtree(values['DIR'], ignore_errors=True)
 
-    def test_the_prod_gate_and_a_listing_make_no_directory(self):
-        for env in ({'TARGET': 'prod'}, {'TARGET': 'dev', 'LIST_ONLY': '1'}):
+    def test_the_prod_gate_a_listing_and_a_coverage_only_run_make_no_directory(self):
+        # --coverage-only runs no unit-test step, so reuse would leave nothing to judge (NOT MEASURED, 30/10/2026).
+        for env in ({'TARGET': 'prod'}, {'TARGET': 'dev', 'LIST_ONLY': '1'}, {'TARGET': 'test', 'COVERAGE_ONLY': '1'}):
             values, _ = self.sourced(**env)
             self.assertEqual('', values['DIR'], env)
             self.assertEqual('', values['REUSE'], env)
