@@ -102,8 +102,33 @@ echo "merge gate → $TARGET   ($(git rev-parse --short HEAD), $ROOT)"
 echo "stacks: dotnet=$HAS_DOTNET${SLN:+ (${SLN#./})} node=$HAS_NODE web=${WEB_DIR:-none} mobile=${MOBILE_DIR:-none} e2e=web:$HAS_E2E_WEB/mobile:$HAS_E2E_MOBILE"
 
 # ── Coverage (#29): a step of the full gate, and the one step --coverage-only runs ──
+# Whether it runs is the panel's "Run coverage before pushing" (coverage_before_push.<target>), read from the
+# file the panel writes into the project (.claude/sdlc-settings.json, scripts/sdlc_settings.py) - the project
+# keeps no coverage switch of its own (user decision 30/10/2026). Only an explicit `false` turns it off: a
+# missing file, key or python3, or a file that does not parse, runs it (fail closed).
+SDLC_SETTINGS_FILE=".claude/sdlc-settings.json"
+WAIVED=()
+coverage_setting() {
+  [ -f "$SDLC_SETTINGS_FILE" ] || { echo "unset"; return 0; }
+  have python3 || { echo "unreadable"; return 0; }
+  python3 -c 'import json, sys
+try:
+    value = json.load(open(sys.argv[1], encoding="utf-8"))["settings"]["coverage_before_push"][sys.argv[2]]
+except (KeyError, TypeError):
+    print("unset"); sys.exit(0)
+except Exception:
+    print("unreadable"); sys.exit(0)
+print("no" if value is False else "yes")' "$SDLC_SETTINGS_FILE" "$TARGET" 2>/dev/null || echo "unreadable"
+}
 gate_coverage() {
   say "coverage (>= ${COVERAGE_MIN}% lines, per codebase)"
+  local setting; setting="$(coverage_setting)"
+  if [ "$setting" = "no" ]; then
+    # Not a pass and not a gap: the user turned it off. Reported on every run, never counted as passed.
+    printf '  \033[33m-\033[0m WAIVED: coverage (coverage_before_push.%s = no in %s)\n' "$TARGET" "$SDLC_SETTINGS_FILE"
+    WAIVED+=("coverage"); return 0
+  fi
+  [ "$setting" = "unreadable" ] && warn "$SDLC_SETTINGS_FILE could not be read - coverage runs (fail closed)"
   # RUN_SHOW: a green coverage step prints the figures it measured (rule #15: a figure is read, not assumed).
   if [ -n "${COVERAGE_CMD:-}" ]; then RUN_SHOW=1 run "coverage" bash -c "$COVERAGE_CMD"
   elif [ -x scripts/coverage.sh ]; then RUN_SHOW=1 run "coverage" bash scripts/coverage.sh
@@ -118,11 +143,13 @@ gate_result() {
   printf '  warnings: %d\n' "${#WARN[@]}"
   printf '  n/a     : %d\n' "${#NA[@]}"
   printf '  accepted: %d\n' "${#ACCEPTED[@]}"
+  printf '  waived  : %d\n' "${#WAIVED[@]}"
   printf '  skipped : %d\n' "${#SKIP[@]}"
   printf '  failed  : %d\n' "${#FAIL[@]}"
   for x in "${WARN[@]+"${WARN[@]}"}"; do printf '  ! %s\n' "$x"; done
   for x in "${ACCEPTED[@]+"${ACCEPTED[@]}"}"; do printf '  ~ ACCEPTED GAP %s\n' "$x"; done
   [ "${#ACCEPTED[@]}" -gt 0 ] && printf '    reason: %s\n' "${ACCEPTED_GAPS_REASON:-}"
+  for x in "${WAIVED[@]+"${WAIVED[@]}"}"; do printf '  - WAIVED %s (configuration; the merge commit must carry Gate-Waived: %s)\n' "$x" "$x"; done
   for x in "${SKIP[@]+"${SKIP[@]}"}"; do printf '  · SKIPPED %s\n' "$x"; done
   for x in "${FAIL[@]+"${FAIL[@]}"}"; do printf '  ✗ %s\n' "$x"; done
 
@@ -143,12 +170,17 @@ gate_result() {
     exit 0
   fi
   # Only coverage ran, so this is not the gate's green: it says what was not run.
+  if [ "${COVERAGE_ONLY:-0}" = 1 ] && [ "${#WAIVED[@]}" -gt 0 ]; then
+    printf '\n\033[33mCOVERAGE WAIVED\033[0m — coverage_before_push.%s is no: nothing ran, nothing passed. The push is allowed by configuration.\n' "$TARGET"
+    exit 0
+  fi
   if [ "${COVERAGE_ONLY:-0}" = 1 ]; then
     printf '\n\033[32mCOVERAGE GREEN\033[0m — the coverage step passed. The rest of the %s gate did NOT run (turned off by configuration).\n' "$TARGET"
     exit 0
   fi
-  if [ "${#ACCEPTED[@]}" -gt 0 ]; then
-    printf '\n\033[32mGATE GREEN\033[0m (with %d accepted gap(s)) — %s promotion is allowed.\n' "${#ACCEPTED[@]}" "$TARGET"
+  if [ "${#ACCEPTED[@]}" -gt 0 ] || [ "${#WAIVED[@]}" -gt 0 ]; then
+    printf '\n\033[32mGATE GREEN\033[0m (with %d accepted gap(s), %d step(s) waived by configuration: %s) — %s promotion is allowed.\n' \
+      "${#ACCEPTED[@]}" "${#WAIVED[@]}" "${WAIVED[*]-none}" "$TARGET"
     exit 0
   fi
   printf '\n\033[32mGATE GREEN\033[0m — every applicable step passed. %s promotion is allowed.\n' "$TARGET"
