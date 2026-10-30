@@ -11,10 +11,13 @@
 # and runs nothing — use it when rolling the gate into a project. It ends "LISTING
 # ONLY", never "GATE GREEN": a listing is not a verdict (a step it can already see
 # would be skipped or fail still ends INCOMPLETE / CLOSED, as the real run would).
-# `--coverage-only` runs the coverage step and nothing else: it is what still runs when
-# the configuration turns the gate off (gates_before_push.<t> = no), because rule #29 is
-# never waived (user decision 29/10/2026, standards/13 §8a). COVERAGE_CMD must then measure
-# on its own, not read a result an earlier step of the full gate left behind.
+# `--coverage-only` runs the coverage step and nothing else: it is what runs when the
+# configuration turns the gate off (gates_before_push.<t> = no) and coverage on
+# (standards/13 §8a). COVERAGE_CMD must then measure on its own, not read a result an
+# earlier step of the full gate left behind.
+# Whether the coverage step runs at all is the panel's "Run coverage before pushing"
+# (coverage_before_push.<t>, user decision 30/10/2026), read from .claude/sdlc-settings.json:
+# `false` there reports the step WAIVED (never passed); anything else runs it (fail closed).
 #
 # ⚠️ The canonical copy lives in the configuration repository; every project takes
 # a COPY into its own scripts/ and commits it. A project's gate cannot depend on a
@@ -57,7 +60,8 @@
 #   E2E_MOBILE_CMD="bash scripts/mobile-e2e.sh"         # default when .maestro/ exists
 #   COVERAGE_CMD="bash scripts/coverage.sh"             # must MEASURE (run the tests), not read an old
 #                                                       # report, and exit non-zero below the threshold
-#   COVERAGE_MIN=80
+#   COVERAGE_MIN=80                                     # NOT in a project's conf (standards/13 §8a): 80 is
+#                                                       # the default here; the env may only RAISE it (#29)
 #   SAST_CMD="bash scripts/codeql-scan.sh"              # default: scripts/codeql-scan.sh
 #   BACKCOMPAT_CMD="bash scripts/api-compat.sh"         # default: scripts/backward-compat-scan.sh
 #   SECRET_CMD="gitleaks detect --no-banner --redact"   # default: the same
@@ -127,7 +131,7 @@ done
 # ...nor with a STALE one: a library from an older version may lack a function this file calls, and
 # bash would say "command not found" and carry on. With gate_coverage missing that dropped coverage
 # without a trace and ended GATE GREEN (found 29/10/2026). Every function the core calls must exist.
-for fn in say ok bad skip warn na have run gate_coverage gate_result gate_prod node_start node_join \
+for fn in say ok bad skip warn na have run coverage_setting gate_coverage gate_result gate_prod node_start node_join \
   node_lint node_typecheck node_build node_test node_audit; do
   declare -F "$fn" >/dev/null || {
     echo "gate-core.sh: $fn is not defined - a library beside it is older than this file; copy all four twins (scripts/twins.txt)" >&2
@@ -135,7 +139,7 @@ for fn in say ok bad skip warn na have run gate_coverage gate_result gate_prod n
   }
 done
 
-# The gate is off by configuration, coverage is not (#29): run that one step and stop.
+# The gate is off by configuration, coverage may not be (coverage_before_push.<t>): run that one step and stop.
 if [ "$COVERAGE_ONLY" = 1 ]; then gate_coverage; gate_result; fi
 
 # ── Everything except e2e: the SAME step set for dev, test and prod (29/10/2026) ──

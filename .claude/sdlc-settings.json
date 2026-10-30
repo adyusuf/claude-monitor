@@ -1,0 +1,10 @@
+{
+  "settings": {
+    "coverage_before_push": {
+      "dev": false,
+      "prod": true,
+      "test": true
+    }
+  },
+  "version": 1
+}
