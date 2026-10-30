@@ -138,8 +138,11 @@ done
 # The gate is off by configuration, coverage is not (#29): run that one step and stop.
 if [ "$COVERAGE_ONLY" = 1 ]; then gate_coverage; gate_result; fi
 
-# ── Everything except e2e: dev and test ──────────────────────────────────────
-if [ "$TARGET" != "prod" ]; then
+# ── Everything except e2e: the SAME step set for dev, test and prod (29/10/2026) ──
+# prod used to run only its own extras, on the assumption that the code had passed the gate on test; with the
+# gate off by configuration that proves nothing, and the projects had already worked around it by calling the
+# prod gate with the test target.
+if true; then
   node_start
 
   say "formatter / linter"
@@ -281,7 +284,7 @@ if [ "$TARGET" != "prod" ]; then
   fi
 fi
 
-# ── prod: the test deploy check and the full e2e suite, both only on request ──
+# ── prod: on top of the shared set, the test deploy check and the full e2e suite, both on request ──
 if [ "$TARGET" = "prod" ]; then gate_prod; fi
 
 # ── Result ───────────────────────────────────────────────────────────────────
