@@ -27,7 +27,9 @@
 
 /* Issues and the backlog (ADR-0011 phase 2). */
 .filters { align-items: center; }
-.filters .filter { flex: 0 1 170px; width: auto; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.filters .filter { width: auto; }
+.filters .search { grid-column: 1 / -1; min-width: 0; }
 .issue-list { gap: 8px; }
 .issue-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .issue-row.dim { opacity: 0.7; }
@@ -54,3 +56,11 @@
 .sprint-issue-actions { display: flex; gap: 6px; align-items: center; }
 .sprint-issue-actions .input { flex: 1; min-width: 0; padding: 5px 8px; }
 .candidate { align-items: center; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .row-input { flex-wrap: wrap; }
+  .row-input .input { flex: 1 1 100%; }
+  .row-input .type-pick { flex: 1 1 120px !important; }
+  .issue-row { grid-template-columns: 1fr; }
+  .issue-actions { grid-column: 1; grid-row: auto; flex-wrap: wrap; }
+}
