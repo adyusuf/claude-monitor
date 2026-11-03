@@ -15,6 +15,7 @@ export const de: Dictionary = {
     projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
     account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
+    themeSystem: "System", themeLight: "Hell", themeDark: "Dunkel",
   },
   auth: {
     signIn: "Anmelden", signUp: "Konto erstellen", email: "E-Mail", password: "Passwort", name: "Ihr Name",

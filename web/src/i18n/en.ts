@@ -14,6 +14,7 @@ export const en = {
     projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
+    themeSystem: "System", themeLight: "Light", themeDark: "Dark",
   },
   auth: {
     signIn: "Sign in", signUp: "Create account", email: "E-mail", password: "Password", name: "Your name",
