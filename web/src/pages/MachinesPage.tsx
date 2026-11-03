@@ -26,16 +26,16 @@ function MachineRow({ ws, agent: a, view: v, canRevoke, onRevoke }: {
       <td>{a.userName}</td>
       <td>{v ? <><RoleBadge view={v} /> <ClaudeBadge view={v} /> <TagChips view={v} /></> : null}</td>
       <td>{v ? <><ExecBadge level={v.execLevel} /> <ServiceBadge serviceMode={v.serviceMode} /></> : null}</td>
-      <td>{v ? percent(v.latest?.cpuPct) : ""}</td>
-      <td>{v ? percent(memoryPct(v.latest)) : ""}</td>
-      <td>{v ? percent(maxDiskPct(v.latest)) : ""}</td>
-      <td>{v ? <span className={v.openAlerts > 0 ? "badge status-failed" : "muted"}>{v.openAlerts}</span> : ""}</td>
+      <td className="num">{v ? percent(v.latest?.cpuPct) : ""}</td>
+      <td className="num">{v ? percent(memoryPct(v.latest)) : ""}</td>
+      <td className="num">{v ? percent(maxDiskPct(v.latest)) : ""}</td>
+      <td className="num">{v ? <span className={v.openAlerts > 0 ? "badge status-failed" : "muted"}>{v.openAlerts}</span> : ""}</td>
       <td>
         {a.version}
         {a.status === "active" && a.updateAvailable
           ? <> <span className="badge warn" title={t("machines.updateHint")}>{t("machines.updateAvailable", { version: a.latestVersion ?? "" })}</span></> : null}
       </td>
-      <td>{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
+      <td className="nowrap">{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
       <td className="right">
         {canRevoke ? <Button variant="ghost" onClick={() => onRevoke(a.id)}>{t("machines.revoke")}</Button> : null}
       </td>
@@ -101,8 +101,8 @@ export function MachinesPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>{t("sessions.host")}</th><th>{t("machines.user")}</th><th>{t("machines.role.title")}</th><th>{t("remote.remote")}</th><th>{t("remote.cpu")}</th>
-                  <th>{t("remote.memory")}</th><th>{t("remote.disk")}</th><th>{t("remote.alerts")}</th><th>{t("machines.version")}</th>
+                  <th>{t("sessions.host")}</th><th>{t("machines.user")}</th><th>{t("machines.role.title")}</th><th>{t("remote.remote")}</th><th className="num">{t("remote.cpu")}</th>
+                  <th className="num">{t("remote.memory")}</th><th className="num">{t("remote.disk")}</th><th className="num">{t("remote.alerts")}</th><th>{t("machines.version")}</th>
                   <th>{t("machines.lastSeen")}</th><th />
                 </tr>
               </thead>
