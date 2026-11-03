@@ -62,7 +62,7 @@ export function MachinePage() {
   const waiting = data.runs.filter((r) => r.canDecide && r.status === "pending_approval");
 
   return (
-    <div className="page">
+    <div className="page machine-page">
       <Link className="back" to={`/w/${ws}/machines`}>← {t("machines.title")}</Link>
       <header className="page-head session-head">
         <div>

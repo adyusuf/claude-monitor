@@ -108,8 +108,16 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }
 .main { flex: 1; min-width: 0; margin: var(--sheet-inset) var(--sheet-inset) var(--sheet-inset) 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); min-height: calc(100vh - 2 * var(--sheet-inset)); }
 .page { max-width: 1180px; margin: 0 auto; padding: var(--pad) var(--pad) 64px; display: flex; flex-direction: column; gap: var(--gap); }
 .page.narrow { max-width: 640px; }
-.page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
 .back { color: var(--muted); font-size: 13px; }
+h1 .badge, h1 .pill { margin-left: 8px; vertical-align: middle; }
+.page > .lead { margin-top: -12px; }
+/* a machine has many short cards: on a wide screen they flow down two columns, the title and the notices across both */
+@media (min-width: 1200px) {
+  .machine-page { display: block; columns: 2; column-gap: var(--gap); }
+  .machine-page > * { break-inside: avoid; margin-bottom: var(--gap); }
+  .machine-page > .back, .machine-page > .page-head, .machine-page > .notice { column-span: all; }
+}
 
 /* ---- components ---- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; }
@@ -141,7 +149,7 @@ textarea.input { resize: vertical; }
 .check { display: flex; gap: 10px; align-items: flex-start; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .inline-form { display: grid; grid-template-columns: 1fr 160px auto; gap: 12px; align-items: end; }
-.row-actions, .compose-actions, .permission-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.row-actions, .compose-actions, .permission-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .notice { padding: 10px 14px; border-radius: var(--radius-control); background: var(--accent-soft); }
 .notice-error { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
@@ -176,7 +184,7 @@ textarea.input { resize: vertical; }
 .dim { opacity: 0.55; }
 .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .copy { display: flex; gap: 8px; align-items: center; background: var(--raised); border-radius: var(--radius-control); padding: 8px 10px; }
-.copy code { flex: 1; overflow-x: auto; white-space: nowrap; }
+.copy code { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .json pre { margin: 6px 0 0; padding: 10px; background: var(--raised); border-radius: var(--radius-control); overflow-x: auto; }
 .json-closed { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 .json-open { white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow-y: auto; }
@@ -364,6 +372,7 @@ button.act-text { cursor: pointer; }
   .topbar-name { font-weight: 600; font-size: 15px; }
   .main { margin: 0; border-width: 1px 0 0; border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; min-height: calc(100vh - 48px); }
   .page { padding: 16px 16px 48px; }
+  .page-head .row-actions { justify-content: flex-start; }
   .grid { grid-template-columns: 1fr; }
   .inline-form { grid-template-columns: 1fr; }
   .session-row { flex-direction: column; }
