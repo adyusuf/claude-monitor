@@ -427,3 +427,11 @@ button.act-text { cursor: pointer; }
   .table-rows td.num { text-align: right; }
   .table-rows td.right { padding-top: 8px; }
 }
+
+/* an icon standing inside a line of text */
+.session-meta .icon, .session-machine-name .icon, .session-branch-name .icon, .chat-option-label .icon, .badge .icon { vertical-align: -3px; }
+.session-meta .icon { width: 14px; height: 14px; margin-right: 2px; }
+.empty-mark .icon { width: 28px; height: 28px; }
+@media (max-width: 900px) {
+  .head-side { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; }
+}

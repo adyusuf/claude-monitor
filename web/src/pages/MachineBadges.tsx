@@ -1,5 +1,6 @@
 import type { MachineView, ToolInfo } from "../api/types";
 import { useI18n } from "../i18n";
+import { Icon } from "../components/icons";
 
 /** True for a production or database machine (ADR-0008 §2): the badge turns red and scripts will need a code. */
 export const isStrict = (m: MachineView): boolean => m.effectiveEnvironment === "production" || m.effectiveFunction === "database";
@@ -61,7 +62,7 @@ export function ToolList({ view: m }: { view: MachineView }) {
       <ul className="chips" aria-label={t("machines.tools.title")}>
         {m.tools.map((tool: ToolInfo) => (
           <li key={tool.name} className={tool.trusted ? "badge" : "badge warn"} title={tool.trusted ? tool.path : `${tool.path} — ${t("machines.tools.untrusted")}`}>
-            {tool.name}{tool.version ? ` ${tool.version}` : ""}{interpreters.has(tool.name) ? " ✓" : ""}
+            {tool.name}{tool.version ? ` ${tool.version}` : ""}{interpreters.has(tool.name) ? <> <Icon name="check" /></> : null}
           </li>
         ))}
       </ul>

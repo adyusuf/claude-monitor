@@ -14,6 +14,8 @@ const paths = {
   check: <><path d="M3.5 8.5 6.5 11.5 12.5 4.5" /></>,
   progress: <><circle cx="8" cy="8" r="5.5" /><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor" /></>,
   todo: <><circle cx="8" cy="8" r="5.5" /></>,
+  branch: <><circle cx="4.5" cy="3.5" r="1.5" /><circle cx="4.5" cy="12.5" r="1.5" /><circle cx="11.5" cy="6" r="1.5" /><path d="M4.5 5v6M11.5 7.5c0 2.2-2.6 2.8-7 3.6" /></>,
+  empty: <><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="2.8" /></>,
   menu: <><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" /></>,
 } satisfies Record<string, ReactNode>;
 

@@ -119,7 +119,9 @@ describe("the tool inventory on the machine page", () => {
     page({ tools: [node, bash, { name: "tmux", path: "bin/tmux", version: null, trusted: true }], interpreters: [bash] });
     renderAt("/w/w1/machines/a1", pageRoute);
     const chips = within(await screen.findByRole("list", { name: en.machines.tools.title })).getAllByRole("listitem");
-    expect(chips.map((c) => c.textContent)).toEqual(["node 22.1.0", "bash 5.2 ✓", "tmux"]);
+    expect(chips.map((c) => c.textContent?.trim())).toEqual(["node 22.1.0", "bash 5.2", "tmux"]);
+    expect(chips[1]?.querySelector("svg.icon")).not.toBeNull(); // an interpreter carries a check
+    expect(chips[2]?.querySelector("svg.icon")).toBeNull();
     expect(chips[0]).toHaveClass("badge", "warn");
     expect(chips[0]).toHaveAttribute("title", `usr/local/bin/node — ${en.machines.tools.untrusted}`);
     expect(chips[1]).toHaveClass("badge");
