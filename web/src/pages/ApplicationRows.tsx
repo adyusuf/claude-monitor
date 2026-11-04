@@ -55,7 +55,7 @@ export function TechStackEditor({ items, onChange, error }: { items: string[]; o
         ))}
       </ul>
       <div className="row-input">
-        <input className="input" aria-label={t("projects.techName")} maxLength={projectLimits.techNameMax} value={text} onChange={(e) => setText(e.target.value)}
+        <input className="input" aria-label={t("projects.techName")} placeholder={t("projects.techName")} maxLength={projectLimits.techNameMax} value={text} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -79,7 +79,7 @@ export function TargetRows({ rows, onChange, error }: { rows: ApplicationDraft["
           <select className="input target-kind" aria-label={`${t("projects.targetKind")} ${i + 1}`} value={row.kind} onChange={(e) => set(i, { kind: e.target.value as TargetKind })}>
             {TARGET_KINDS.map((k) => <option key={k} value={k}>{t(`projects.target.${k}`)}</option>)}
           </select>
-          <input className="input" aria-label={`${t("projects.targetText")} ${i + 1}`} maxLength={projectLimits.lineMax} value={row.target} onChange={(e) => set(i, { target: e.target.value })} />
+          <input className="input" aria-label={`${t("projects.targetText")} ${i + 1}`} placeholder={t("projects.targetText")} maxLength={projectLimits.lineMax} value={row.target} onChange={(e) => set(i, { target: e.target.value })} />
           <Button variant="subtle" aria-label={`${t("projects.removeRow")} ${t("projects.targets")} ${i + 1}`} onClick={() => onChange(rows.filter((_, j) => j !== i))}>×</Button>
         </div>
       ))}

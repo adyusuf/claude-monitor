@@ -29,6 +29,15 @@ describe("machines and devices", () => {
     await waitFor(() => expect(calls.some((c) => c.path === "/agents/a1/revoke")).toBe(true));
   });
 
+  it("names each cell of a machine row, so the table can read as a card on a phone", async () => {
+    mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/agents": { body: [agent()] } });
+    const { container } = renderAt("/w/w1/machines", [{ path: "/w/:ws/machines", element: <MachinesPage /> }]);
+    await screen.findAllByText("laptop-1");
+    expect(container.querySelector("table.table-rows")).not.toBeNull();
+    const labels = [...container.querySelectorAll("tbody td[data-label]")].map((td) => td.getAttribute("data-label"));
+    expect(labels).toEqual(expect.arrayContaining(["User", "CPU", "Memory", "Disk", "Last seen"]));
+  });
+
   it("marks a machine whose agent can be updated, and only an active one", async () => {
     mockApi({
       "GET /me": { body: ME },
@@ -172,6 +181,20 @@ describe("workspace settings and account", () => {
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ maskSecrets: false, retentionDays: 30, eventMaxBytes: 262144, agentUpdate: "off", claudeUpdate: false });
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ name: "Renamed" });
+  });
+
+  it("groups the settings into named sections, each with its own explanation", async () => {
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1": { body: { id: "w1", name: "Team", role: "owner", settings: { maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off" } } },
+      "GET /workspaces/w1/audit": { body: { items: [], next: null } },
+    });
+    renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    await screen.findByLabelText("Name");
+    for (const name of ["General", "Capture", "Updates", "Remote work", "Audit log"]) {
+      expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
+    }
+    expect(screen.getByText("What machines send and how long it is kept.")).toBeInTheDocument();
   });
 
   it("lets an admin choose how far agents may update themselves, off by default", async () => {

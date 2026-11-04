@@ -17,7 +17,7 @@ const CAP_MAX = 64;
 const inRange = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
 
 /** The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; only an admin changes them. */
-export function RemoteSettingsCard({ ws, canEdit }: { ws: string; canEdit: boolean }) {
+export function RemoteSettingsCard({ ws, canEdit, titled = true }: { ws: string; canEdit: boolean; titled?: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [form, setForm] = useState<RemoteSettings | null>(null);
@@ -39,7 +39,7 @@ export function RemoteSettingsCard({ ws, canEdit }: { ws: string; canEdit: boole
   }, [ws]);
 
   if (unavailable) return null;
-  if (!form) return notice ? <Card title={t("remote.settingsTitle")}><Notice kind="error">{notice.text}</Notice></Card> : null;
+  if (!form) return notice ? <Card title={titled ? t("remote.settingsTitle") : undefined}><Notice kind="error">{notice.text}</Notice></Card> : null;
 
   const set = (patch: Partial<RemoteSettings>) => setForm({ ...form, ...patch });
   const num = (key: "alertCpuPct" | "alertMemoryPct" | "alertDiskPct", label: string) => (
@@ -63,7 +63,7 @@ export function RemoteSettingsCard({ ws, canEdit }: { ws: string; canEdit: boole
   };
 
   return (
-    <Card title={t("remote.settingsTitle")}>
+    <Card title={titled ? t("remote.settingsTitle") : undefined}>
       <div className="stack">
         {notice ? <Notice kind={notice.kind}>{notice.text}</Notice> : null}
         {canEdit ? null : <p className="muted small">{t("remote.settingsReadOnly")}</p>}

@@ -23,19 +23,19 @@ function MachineRow({ ws, agent: a, view: v, canRevoke, onRevoke }: {
         {v ? <Link to={`/w/${ws}/machines/${a.id}`}><strong>{a.hostname}</strong></Link> : <strong>{a.hostname}</strong>}{" "}
         <span className="muted small">{a.os} {a.arch}</span>
       </td>
-      <td>{a.userName}</td>
-      <td>{v ? <><RoleBadge view={v} /> <ClaudeBadge view={v} /> <TagChips view={v} /></> : null}</td>
-      <td>{v ? <><ExecBadge level={v.execLevel} /> <ServiceBadge serviceMode={v.serviceMode} /></> : null}</td>
-      <td className="num">{v ? percent(v.latest?.cpuPct) : ""}</td>
-      <td className="num">{v ? percent(memoryPct(v.latest)) : ""}</td>
-      <td className="num">{v ? percent(maxDiskPct(v.latest)) : ""}</td>
-      <td className="num">{v ? <span className={v.openAlerts > 0 ? "badge status-failed" : "muted"}>{v.openAlerts}</span> : ""}</td>
-      <td>
+      <td data-label={t("machines.user")}>{a.userName}</td>
+      <td data-label={t("machines.role.title")}>{v ? <><RoleBadge view={v} /> <ClaudeBadge view={v} /> <TagChips view={v} /></> : null}</td>
+      <td data-label={t("remote.remote")}>{v ? <><ExecBadge level={v.execLevel} /> <ServiceBadge serviceMode={v.serviceMode} /></> : null}</td>
+      <td className="num" data-label={t("remote.cpu")}>{v ? percent(v.latest?.cpuPct) : ""}</td>
+      <td className="num" data-label={t("remote.memory")}>{v ? percent(memoryPct(v.latest)) : ""}</td>
+      <td className="num" data-label={t("remote.disk")}>{v ? percent(maxDiskPct(v.latest)) : ""}</td>
+      <td className="num" data-label={t("remote.alerts")}>{v ? <span className={v.openAlerts > 0 ? "badge status-failed" : "muted"}>{v.openAlerts}</span> : ""}</td>
+      <td data-label={t("machines.version")}>
         {a.version}
         {a.status === "active" && a.updateAvailable
           ? <> <span className="badge warn" title={t("machines.updateHint")}>{t("machines.updateAvailable", { version: a.latestVersion ?? "" })}</span></> : null}
       </td>
-      <td className="nowrap">{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
+      <td className="nowrap" data-label={t("machines.lastSeen")}>{a.status === "revoked" ? t("machines.revoked") : dateTime(a.lastHeartbeatAt ?? a.enrolledAt)}</td>
       <td className="right">
         {canRevoke ? <Button variant="ghost" onClick={() => onRevoke(a.id)}>{t("machines.revoke")}</Button> : null}
       </td>
@@ -98,7 +98,7 @@ export function MachinesPage() {
       {rows === null ? <Spinner /> : rows.length === 0 ? <Empty title={t("machines.empty")} hint={t("sessions.emptyHint")} /> : (
         <Card>
           <div className="table-scroll">
-            <table className="table">
+            <table className="table table-rows">
               <thead>
                 <tr>
                   <th>{t("sessions.host")}</th><th>{t("machines.user")}</th><th>{t("machines.role.title")}</th><th>{t("remote.remote")}</th><th className="num">{t("remote.cpu")}</th>

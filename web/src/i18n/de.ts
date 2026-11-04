@@ -203,6 +203,9 @@ export const de: Dictionary = {
     agentUpdateOn: "Erlaubt: Agenten dürfen signierte Updates selbst installieren",
     claudeUpdate: "Agenten dürfen Claude Code aktualisieren",
     claudeUpdateHint: "Nur wenn jede Claude-Sitzung auf der Maschine untätig ist, nach einem Countdown, den die Person abbrechen kann, und nur mit dem eigenen Update-Befehl von Claude Code. Jede Maschine muss es außerdem einschalten (aipod config claude-update on). Laufende Sitzungen werden nie neu gestartet.",
+    sectionGeneral: "Allgemein", sectionGeneralHint: "Der Name, den die Leute in der Arbeitsbereich-Liste sehen.",
+    sectionCapture: "Erfassung", sectionCaptureHint: "Was Maschinen senden und wie lange es aufbewahrt wird.",
+    sectionUpdates: "Updates", sectionUpdatesHint: "Ob Agents und Claude Code sich selbst aktualisieren dürfen.", auditHint: "Wer in diesem Arbeitsbereich was geändert hat.",
     agentUpdateHint: "Das Äußerste, was ein Agent von selbst tun darf. Jede Maschine muss es außerdem einschalten (aipod config auto-update); es gilt der niedrigere der beiden Werte. Updates sind signiert und werden vom Agent geprüft.",
   },
   account: {
