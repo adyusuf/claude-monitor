@@ -272,6 +272,17 @@ describe("workspace settings and account", () => {
     expect(screen.queryByText(/Install as a Claude Code plugin/)).not.toBeInTheDocument(); // no marketplace configured: the zips only
   });
 
+  it("sets the by-hand install out as three numbered steps in their order, under its own heading", async () => {
+    mockApi({ "GET /me": { body: ME } });
+    const { container } = renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
+    expect(await screen.findByRole("heading", { level: 2, name: "Install by hand" })).toBeInTheDocument();
+    const steps = [...container.querySelectorAll("ol.steps")].pop()?.querySelectorAll(":scope > li") ?? [];
+    expect(steps).toHaveLength(3);
+    expect(steps[0]?.textContent).toContain("Download the agent");
+    expect(steps[1]?.textContent).toContain("aipod login");
+    expect(steps[2]?.textContent).toContain("aipod install");
+  });
+
   it("offers the one-step installer, from this site's /downloads until the build names the download host", async () => {
     mockApi({ "GET /me": { body: ME } });
     renderAt("/download", [{ path: "/download", element: <DownloadPage /> }]);
