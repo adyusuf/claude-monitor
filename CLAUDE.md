@@ -16,5 +16,6 @@ and command their sessions on the web. Design: `docs/adr-0002-agent-platform.md`
 - **Tests never touch a real database, account or harness configuration.**
 - **Public repository.** No real project, company or personal names or addresses in code, tests,
   docs or commit messages.
+- **Web look:** ADR-0018 (style tokens, self-hosted fonts, SVG icons, no emoji).
 - **Gate:** `scripts/ci-status.sh` reads CI's verdict, `scripts/waived-gates.sh` lists waived gates.
 - **Integration settings live in one place:** Settings → Integrations (ADR-0017), for the owners and admins of the `AIPOD_ADMIN_WORKSPACE` workspace only; an environment value wins and cannot be changed there; secrets are sealed with `AIPOD_INTEGRATION_KEY` and never leave the API.

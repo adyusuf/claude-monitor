@@ -53,7 +53,7 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
 
   const fields = (d: Draft, label: string, onChange: (d: Draft) => void) => (
     <>
-      <input className="input" aria-label={`${t("projects.releaseName")} ${label}`} maxLength={projectLimits.nameMax} value={d.name} onChange={(e) => onChange({ ...d, name: e.target.value })} />
+      <input className="input" aria-label={`${t("projects.releaseName")} ${label}`} placeholder={t("projects.releaseName")} maxLength={projectLimits.nameMax} value={d.name} onChange={(e) => onChange({ ...d, name: e.target.value })} />
       <input className="input" type="date" aria-label={`${t("projects.plannedDate")} ${label}`} value={d.plannedDate} onChange={(e) => onChange({ ...d, plannedDate: e.target.value })} />
       <select className="input" aria-label={`${t("projects.releaseStatus")} ${label}`} value={d.status} onChange={(e) => onChange({ ...d, status: e.target.value as ReleaseStatus })}>
         {RELEASE_STATUSES.map((s) => <option key={s} value={s}>{t(`projects.release.${s}`)}</option>)}

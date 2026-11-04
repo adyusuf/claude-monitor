@@ -5,6 +5,7 @@ import { StatusPill } from "../components/ui";
 import { useI18n } from "../i18n";
 import { age, dateTime, usd } from "../lib/format";
 import { groupSessions, type MachineGroup, type MachineOrder, orderOf } from "../lib/sessionGroups";
+import { Icon } from "../components/icons";
 
 function SessionRowLink({ ws, s, now }: { ws: string; s: SessionRow; now: number }) {
   const { t, dict } = useI18n();
@@ -17,8 +18,8 @@ function SessionRowLink({ ws, s, now }: { ws: string; s: SessionRow; now: number
           {s.openPermissions > 0 ? <span className="badge warn">{t("sessions.permissionsWaiting", { n: s.openPermissions })}</span> : null}
         </div>
         <div className="session-meta muted">
-          {s.projectName ? <span>▸ {s.projectName}</span> : null}
-          <span>◍ {s.ownerName}</span>
+          {s.projectName ? <span><Icon name="projects" /> {s.projectName}</span> : null}
+          <span><Icon name="members" /> {s.ownerName}</span>
           {s.model ? <span>{s.model}</span> : null}
         </div>
       </div>
@@ -52,10 +53,10 @@ export function SessionList({ ws, rows, now }: { ws: string; rows: SessionRow[];
         <section key={machine.hostname} className="session-machine" aria-label={machine.hostname}
           onMouseEnter={() => freeze(machine)} onMouseLeave={() => release(machine.hostname)}
           onFocus={() => freeze(machine)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) release(machine.hostname); }}>
-          <h2 className="session-machine-name"><span aria-hidden>⌂</span> {machine.hostname} <span className="badge">{machine.count}</span></h2>
+          <h2 className="session-machine-name"><Icon name="machines" /> {machine.hostname} <span className="badge">{machine.count}</span></h2>
           {machine.branches.map((group) => (
             <div key={group.branch ?? ""} className="session-branch">
-              <h3 className="session-branch-name"><span aria-hidden>⎇</span> {group.branch ?? <span className="muted">{t("sessions.noBranch")}</span>}</h3>
+              <h3 className="session-branch-name"><Icon name="branch" /> {group.branch ?? <span className="muted">{t("sessions.noBranch")}</span>}</h3>
               <ul className="session-list">
                 {group.rows.map((s) => <li key={s.id}><SessionRowLink ws={ws} s={s} now={now} /></li>)}
               </ul>

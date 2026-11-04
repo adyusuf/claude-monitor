@@ -14,7 +14,7 @@ export const grouped = (fingerprint: string): string => fingerprint.match(/.{1,4
  * The approval keys of the signed-in person (ADR-0010 §4): make a key in this browser (its private half never leaves it), register its public half, and see what to type
  * on a machine whose admin pins it. A machine that requires signed approvals runs nothing this key did not sign.
  */
-export function ApprovalKeysCard() {
+export function ApprovalKeysCard({ titled = true }: { titled?: boolean } = {}) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const gate = useCodeGate("reauth_required", "remote.codeHintReauth");
@@ -65,7 +65,7 @@ export function ApprovalKeysCard() {
   };
 
   return (
-    <Card title={t("approvals.title")}>
+    <Card title={titled ? t("approvals.title") : undefined}>
       <div className="stack">
         <p className="muted small">{t("approvals.intro")}</p>
         {problem ? <Notice kind="error">{problem}</Notice> : null}

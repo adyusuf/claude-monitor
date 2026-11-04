@@ -49,7 +49,7 @@ export function MfaPage() {
 }
 
 /** Account page: turn two-step sign-in on (key, first code, recovery codes) or off (a code). */
-export function MfaCard({ guide = true }: { guide?: boolean } = {}) {
+export function MfaCard({ guide = true, titled = true }: { guide?: boolean; titled?: boolean } = {}) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { me, refresh } = useSession();
@@ -68,7 +68,7 @@ export function MfaCard({ guide = true }: { guide?: boolean } = {}) {
   };
 
   return (
-    <Card title={t("account.mfa")}>
+    <Card title={titled ? t("account.mfa") : undefined}>
       {notice ? <Notice kind={notice.kind}>{notice.text}</Notice> : null}
       {recovery ? (
         <div className="stack">

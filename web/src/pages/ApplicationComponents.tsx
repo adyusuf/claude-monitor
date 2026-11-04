@@ -66,7 +66,7 @@ export function ApplicationComponents({ applicationId, canEdit }: { applicationI
                   e.preventDefault();
                   if (!blankName(editing.draft.name)) void act(() => api.putComponent(c.id, editing.draft), () => setEditing(null));
                 }}>
-                  <input className="input" aria-label={t("projects.componentName")} maxLength={projectLimits.nameMax} value={editing.draft.name}
+                  <input className="input" aria-label={t("projects.componentName")} placeholder={t("projects.componentName")} maxLength={projectLimits.nameMax} value={editing.draft.name}
                     onChange={(e) => setEditing({ id: c.id, draft: { ...editing.draft, name: e.target.value } })} />
                   {kindSelect(editing.draft.kind, t("projects.componentKind"), (kind) => setEditing({ id: c.id, draft: { ...editing.draft, kind } }))}
                   <Button type="submit">{t("common.save")}</Button>
@@ -92,7 +92,7 @@ export function ApplicationComponents({ applicationId, canEdit }: { applicationI
           e.preventDefault();
           if (!blankName(draft.name)) void act(() => api.addComponent(applicationId, draft), () => setDraft(blank));
         }}>
-          <input className="input" aria-label={t("projects.newComponentName")} maxLength={projectLimits.nameMax} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <input className="input" aria-label={t("projects.newComponentName")} placeholder={t("projects.newComponentName")} maxLength={projectLimits.nameMax} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           {kindSelect(draft.kind, t("projects.newComponentKind"), (kind) => setDraft({ ...draft, kind }))}
           <Button type="submit">{t("projects.addComponent")}</Button>
         </form>
