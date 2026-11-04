@@ -29,6 +29,15 @@ describe("machines and devices", () => {
     await waitFor(() => expect(calls.some((c) => c.path === "/agents/a1/revoke")).toBe(true));
   });
 
+  it("names each cell of a machine row, so the table can read as a card on a phone", async () => {
+    mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/agents": { body: [agent()] } });
+    const { container } = renderAt("/w/w1/machines", [{ path: "/w/:ws/machines", element: <MachinesPage /> }]);
+    await screen.findAllByText("laptop-1");
+    expect(container.querySelector("table.table-rows")).not.toBeNull();
+    const labels = [...container.querySelectorAll("tbody td[data-label]")].map((td) => td.getAttribute("data-label"));
+    expect(labels).toEqual(expect.arrayContaining(["User", "CPU", "Memory", "Disk", "Last seen"]));
+  });
+
   it("marks a machine whose agent can be updated, and only an active one", async () => {
     mockApi({
       "GET /me": { body: ME },

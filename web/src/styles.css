@@ -412,3 +412,17 @@ button.act-text { cursor: pointer; }
   .setting-row { grid-template-columns: 240px minmax(0, 1fr); gap: var(--gap); }
   .setting-body { max-width: 640px; }
 }
+
+/* a wide table that becomes one card per row on a phone; each cell names itself with its data-label */
+@media (max-width: 700px) {
+  .table-rows, .table-rows tbody, .table-rows tr, .table-rows td { display: block; }
+  .table-rows thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .table-rows tr { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .table-rows tr:last-child { border-bottom: none; }
+  .table-rows td { padding: 3px 0; border-bottom: none; text-align: left; }
+  .table-rows td[data-label] { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .table-rows td[data-label]:empty { display: none; }
+  .table-rows td[data-label]::before { content: attr(data-label); flex: none; font-size: 12px; color: var(--muted); }
+  .table-rows td.num { text-align: right; }
+  .table-rows td.right { padding-top: 8px; }
+}
