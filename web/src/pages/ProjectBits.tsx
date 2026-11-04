@@ -52,7 +52,7 @@ export function LineList({ label, lines, onChange, error, max }: {
     <Group legend={label} error={error}>
       {lines.map((line, i) => (
         <div key={i} className="row-input">
-          <input className="input" aria-label={`${label} ${i + 1}`} value={line} onChange={(e) => onChange(lines.map((l, j) => j === i ? e.target.value : l))} />
+          <input className="input" aria-label={`${label} ${i + 1}`} placeholder={label} value={line} onChange={(e) => onChange(lines.map((l, j) => j === i ? e.target.value : l))} />
           <Button variant="subtle" aria-label={`${t("projects.removeRow")} ${label} ${i + 1}`} onClick={() => onChange(lines.filter((_, j) => j !== i))}>×</Button>
         </div>
       ))}

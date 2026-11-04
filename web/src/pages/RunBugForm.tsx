@@ -55,7 +55,7 @@ export function RunBugForm({ run, ws, onCancel }: { run: WebRunView; ws: string;
           <option value="">–</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <input className="input" aria-label={t("issues.runBugTitle")} maxLength={issueLimits.titleMax} value={title} disabled={busy} onChange={(e) => setTitle(e.target.value)} />
+        <input className="input" aria-label={t("issues.runBugTitle")} placeholder={t("issues.runBugTitle")} maxLength={issueLimits.titleMax} value={title} disabled={busy} onChange={(e) => setTitle(e.target.value)} />
         <Button type="submit" busy={busy} disabled={!projectId || !title.trim()}>{t("issues.runCreateAction")}</Button>
         <Button variant="ghost" disabled={busy} onClick={onCancel}>{t("common.cancel")}</Button>
       </form>
