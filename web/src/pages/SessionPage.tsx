@@ -8,6 +8,7 @@ import { count, dateTime, usd } from "../lib/format";
 import { debounce, isCatchUp, useLive } from "../lib/live";
 import { CommandsCard, Composer, PermissionsCard } from "./SessionControls";
 import { useCommandRows } from "./useCommandRows";
+import { Icon } from "../components/icons";
 import { ChatCard } from "./ChatView";
 import { EventsCard } from "./SessionEvents";
 import { SubagentsCard } from "./SubagentsCard";
@@ -95,7 +96,7 @@ export function SessionPage() {
               <ul className="tasks">
                 {detail.tasks.map((task) => (
                   <li key={task.id} className={`task task-${task.status}`}>
-                    <span className="task-box" aria-hidden>{task.status === "completed" ? "✓" : task.status === "in_progress" ? "◐" : "○"}</span>
+                    <span className="task-box" aria-hidden><Icon name={task.status === "completed" ? "check" : task.status === "in_progress" ? "progress" : "todo"} /></span>
                     <span>{task.subject}</span>
                   </li>
                 ))}

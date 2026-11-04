@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router";
 import { App } from "./App";
 import { SessionProvider } from "./auth/session";
 import { I18nProvider } from "./i18n";
+import "./fonts.css";
 import "./styles.css";
 import "./remote.css";
 import "./projects.css";
