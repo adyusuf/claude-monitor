@@ -37,6 +37,7 @@ export const deRemote: Dictionary["remote"] = {
   days: "Tage", grantCreate: "Freigabe erteilen", grantIncomplete: "Geben Sie die Vorlage und den Arbeitsordner ein.",
   jobs: "Aufträge", noJobs: "Keine Aufträge.", jobStatus: { proposed: "Vorgeschlagen", active: "Aktiv", denied: "Abgelehnt", retired: "Entfernt" },
   proposedBy: "vorgeschlagen von {user}", retire: "Entfernen",
+  settingsHint: "Ausführung auf Maschinen, Maschinenwarnungen und Zeitpläne.",
   settingsTitle: "Fernarbeit", settingsReadOnly: "Nur ein Administrator kann das ändern.", enabled: "Fernarbeit in diesem Arbeitsbereich erlauben",
   enabledHint: "Das Ausschalten bricht sofort jede offene Ausführung ab.", disableConfirm: "Fernarbeit ausschalten? Jede offene Ausführung wird jetzt abgebrochen.",
   alertCpu: "CPU-Warnung (%)", alertMemory: "Speicherwarnung (%)", alertDisk: "Datenträgerwarnung (%)", alertSustain: "Andauernd für (Sekunden)",

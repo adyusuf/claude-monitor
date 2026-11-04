@@ -174,6 +174,20 @@ describe("workspace settings and account", () => {
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ name: "Renamed" });
   });
 
+  it("groups the settings into named sections, each with its own explanation", async () => {
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1": { body: { id: "w1", name: "Team", role: "owner", settings: { maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off" } } },
+      "GET /workspaces/w1/audit": { body: { items: [], next: null } },
+    });
+    renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    await screen.findByLabelText("Name");
+    for (const name of ["General", "Capture", "Updates", "Remote work", "Audit log"]) {
+      expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
+    }
+    expect(screen.getByText("What machines send and how long it is kept.")).toBeInTheDocument();
+  });
+
   it("lets an admin choose how far agents may update themselves, off by default", async () => {
     const calls = mockApi({
       "GET /me": { body: ME },

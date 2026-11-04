@@ -203,6 +203,9 @@ export const tr: Dictionary = {
     agentUpdateOn: "İzinli: ajanlar imzalı güncellemeleri kendiliğinden kurabilir",
     claudeUpdate: "Ajanların Claude Code'u güncellemesine izin ver",
     claudeUpdateHint: "Yalnızca makinedeki her Claude oturumu boştayken, kişinin iptal edebileceği bir geri sayımdan sonra ve yalnızca Claude Code'un kendi güncelleme komutuyla. Her makinede ayrıca açılmalıdır (aipod config claude-update on). Çalışan oturumlar asla yeniden başlatılmaz.",
+    sectionGeneral: "Genel", sectionGeneralHint: "Çalışma alanı listesinde görünen ad.",
+    sectionCapture: "Toplama", sectionCaptureHint: "Makinelerin ne gönderdiği ve ne kadar saklandığı.",
+    sectionUpdates: "Güncellemeler", sectionUpdatesHint: "Ajanların ve Claude Code'un kendini güncelleyip güncelleyemeyeceği.", auditHint: "Bu çalışma alanında kimin neyi değiştirdiği.",
     agentUpdateHint: "Bir ajanın kendi başına yapabileceği en fazla şey. Her makinede de açılmalıdır (aipod config auto-update); ikisinden düşük olan geçerlidir. Güncellemeler imzalıdır ve ajan tarafından doğrulanır.",
   },
   account: {

@@ -202,6 +202,9 @@ export const en = {
     agentUpdateOn: "Allowed: agents may install signed updates by themselves",
     claudeUpdate: "Allow agents to update Claude Code",
     claudeUpdateHint: "Only when every Claude session on the machine is idle, after a countdown the person can cancel, and only with Claude Code's own update command. Each machine must also turn it on (aipod config claude-update on). Running sessions are never restarted.",
+    sectionGeneral: "General", sectionGeneralHint: "The name people see in the workspace list.",
+    sectionCapture: "Capture", sectionCaptureHint: "What machines send and how long it is kept.",
+    sectionUpdates: "Updates", sectionUpdatesHint: "Whether agents and Claude Code may update themselves.", auditHint: "Who changed what in this workspace.",
     agentUpdateHint: "The most an agent may do on its own. Each machine must also turn it on (aipod config auto-update); the lower of the two applies. Updates are signed and verified by the agent.",
   },
   account: {
