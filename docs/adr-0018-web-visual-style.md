@@ -19,13 +19,12 @@ The web app had grown page by page: grey cards on a grey ground, one shadow ever
 | 5 | **IBM Plex Sans (400, 500, 600) and Plex Mono (400, 500), self-hosted** in `web/public/fonts/` (latin and latin-ext, woff2, with the SIL Open Font License text beside them), loaded by `web/src/fonts.css`. The API's content security policy is `default-src 'self'` and `style-src 'self'`, so a font from another host or an inline style would be blocked. Mono is for code, paths and ids, and for the figures in a table's number columns (`td.num`). |
 | 6 | **Icons are SVG, not glyphs.** `web/src/components/icons.tsx` has one `Icon` component (16px, 1.5px stroke, `aria-hidden`) and the `BrandMark`. A new icon is added there. An emoji or a text symbol (a triangle, a house, a check mark) is never an icon, because it renders differently on each system. Arrows that only point (← ↑ ↓) are text and stay. Where a control is only an icon, it has an accessible name. |
 | 7 | **Class names stay.** The restyle changed values, not markup, so a page's tests and its class hooks did not change. New layout helpers: `.machine-page` (two columns from 1200px), `.setting-row` (see 3), `.table-rows` (see 4). |
-| 8 | **Settings pages are rows of "what it is, then its controls".** `SettingsSection` puts the group's name and one line of help on the left (240px) and its card on the right (at most 640px) from 900px; below that it stacks. The workspace settings page uses it for General, Capture, Updates, Remote work and the audit log; the account page for Profile, Sign-in methods, Two-step sign-in, Approval keys, Your data and Delete the account. |
+| 8 | **Settings pages are rows of "what it is, then its controls".** `SettingsSection` puts the group's name and one line of help on the left (240px) and its card on the right (at most 640px) from 900px; below that it stacks. The workspace settings page uses it for General, Capture, Updates, Remote work and the audit log; the account page for Profile, Sign-in methods, Two-step sign-in, Approval keys, Your data and Delete the account. The download page uses it too, for the one-step install, the plugin and the by-hand install; steps that must be done in order are a numbered `ol.steps`. |
 | 9 | **A wide table becomes one card per row on a phone.** Add `table-rows` to the table and a `data-label` to each cell; from 700px down each cell shows its own label. The machines table uses it. A table with only a few short columns stays a table inside `.table-scroll`. |
 | 10 | **A text field in a row of fields shows its name as a placeholder**, besides its `aria-label`, so the row reads without hovering. A visible `<label>` is still the rule for a stand-alone field. |
 
 ## 3. What was not done
 
-- The download page stays a narrow centred column: it is a set of steps, not settings.
 - End-to-end specs were not run for the restyle (rule 33); the unit tests, `tsc` and `eslint` were.
 
 ## 4. How to check a change
