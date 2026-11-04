@@ -5,6 +5,7 @@ import { useSession } from "../auth/session";
 import { config } from "../config";
 import { languages, useI18n, type Language } from "../i18n";
 import { usePendingApprovals } from "../lib/pending";
+import { BrandMark, Icon, type IconName } from "./icons";
 
 type Theme = "light" | "dark" | "system";
 
@@ -43,9 +44,9 @@ export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const pending = usePendingApprovals(current?.id, useLocation().pathname);
 
-  const link = (to: string, label: string, icon: ReactNode, badge = 0) => (
+  const link = (to: string, label: string, icon: IconName, badge = 0) => (
     <NavLink to={to} className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")} onClick={() => setMenuOpen(false)}>
-      <span className="nav-icon" aria-hidden>{icon}</span>
+      <span className="nav-icon" aria-hidden><Icon name={icon} /></span>
       {label}
       {badge > 0 ? <span className="badge warn nav-badge" title={t("remote.pendingBadge", { n: badge })}>{badge}</span> : null}
     </NavLink>
@@ -55,7 +56,7 @@ export function Layout() {
     <div className="shell">
       <aside className={menuOpen ? "sidebar open" : "sidebar"}>
         <div className="brand">
-          <span className="brand-mark" aria-hidden>◉</span>
+          <BrandMark />
           <span>{t("app.name")}</span>
         </div>
         {current ? (
@@ -69,19 +70,19 @@ export function Layout() {
         ) : null}
         {current ? (
           <nav className="nav">
-            {link(`/w/${current.id}/projects`, t("nav.projects"), "▦")}
-            {link(`/w/${current.id}/sessions`, t("nav.sessions"), "▤")}
-            {link(`/w/${current.id}/machines`, t("nav.machines"), "▣", pending)}
-            {link(`/w/${current.id}/members`, t("nav.members"), "◍")}
-            {link(`/w/${current.id}/integrations`, t("nav.integrations"), "⇄")}
-            {current.role === "owner" || current.role === "admin" ? link(`/w/${current.id}/settings`, t("nav.settings"), "⚙") : null}
-            {me?.serverAdmin ? link("/server/integrations", t("nav.serverSettings"), "◈") : null}
-            {link("/download", t("nav.download"), "↓")}
+            {link(`/w/${current.id}/projects`, t("nav.projects"), "projects")}
+            {link(`/w/${current.id}/sessions`, t("nav.sessions"), "sessions")}
+            {link(`/w/${current.id}/machines`, t("nav.machines"), "machines", pending)}
+            {link(`/w/${current.id}/members`, t("nav.members"), "members")}
+            {link(`/w/${current.id}/integrations`, t("nav.integrations"), "integrations")}
+            {current.role === "owner" || current.role === "admin" ? link(`/w/${current.id}/settings`, t("nav.settings"), "settings") : null}
+            {me?.serverAdmin ? link("/server/integrations", t("nav.serverSettings"), "server") : null}
+            {link("/download", t("nav.download"), "download")}
           </nav>
         ) : null}
         <div className="sidebar-foot">
           <NavLink to="/two-step" className="who-link" onClick={() => setMenuOpen(false)}>
-            <span aria-hidden>🔐</span> {t("twoStep.nav")}
+            <Icon name="lock" /> {t("twoStep.nav")}
             {me && !me.mfaEnabled ? <span className="badge warn">{t("twoStep.navOff")}</span> : null}
           </NavLink>
           <NavLink to="/account" className="who" onClick={() => setMenuOpen(false)}>
@@ -97,9 +98,9 @@ export function Layout() {
               {languages.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
             <select aria-label={t("nav.theme")} value={theme} onChange={(e) => setTheme(e.target.value as Theme)}>
-              <option value="system">◐</option>
-              <option value="light">☀</option>
-              <option value="dark">☾</option>
+              <option value="system">{t("nav.themeSystem")}</option>
+              <option value="light">{t("nav.themeLight")}</option>
+              <option value="dark">{t("nav.themeDark")}</option>
             </select>
           </div>
           <button type="button" className="link" onClick={async () => {
@@ -108,9 +109,14 @@ export function Layout() {
           }}>{t("nav.signOut")}</button>
         </div>
       </aside>
-      <div className="main">
-        <button type="button" className="menu-toggle" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>☰</button>
-        <Outlet />
+      <div className="main-col">
+        <div className="topbar">
+          <button type="button" className="menu-toggle" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
+          <span className="topbar-name">{t("app.name")}</span>
+        </div>
+        <div className="main">
+          <Outlet />
+        </div>
       </div>
     </div>
   );
@@ -122,7 +128,7 @@ export function AuthFrame({ title, children }: { title: string; children: ReactN
   return (
     <div className="auth">
       <div className="auth-card">
-        <div className="brand auth-brand"><span className="brand-mark" aria-hidden>◉</span><span>{t("app.name")}</span></div>
+        <div className="brand auth-brand"><BrandMark /><span>{t("app.name")}</span></div>
         <p className="muted auth-tagline">{t("app.tagline")}</p>
         <h1>{title}</h1>
         {children}

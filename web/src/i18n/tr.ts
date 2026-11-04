@@ -15,6 +15,7 @@ export const tr: Dictionary = {
     projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
+    themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
   },
   auth: {
     signIn: "Giriş yap", signUp: "Hesap oluştur", email: "E-posta", password: "Parola", name: "Adınız",
