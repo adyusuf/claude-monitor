@@ -1,6 +1,7 @@
 import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 import type { SessionStatus } from "../api/types";
 import { useI18n } from "../i18n";
+import { Icon } from "./icons";
 
 export function Button({ variant = "primary", busy, children, ...rest }:
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "subtle"; busy?: boolean }) {
@@ -57,7 +58,7 @@ export function Spinner() {
 export function Empty({ title, hint, children }: { title: string; hint?: string; children?: ReactNode }) {
   return (
     <div className="empty">
-      <div className="empty-mark" aria-hidden>◎</div>
+      <div className="empty-mark"><Icon name="empty" /></div>
       <p className="empty-title">{title}</p>
       {hint ? <p className="muted">{hint}</p> : null}
       {children}

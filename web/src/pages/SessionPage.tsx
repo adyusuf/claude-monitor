@@ -57,10 +57,10 @@ export function SessionPage() {
         <div>
           <h1>{s.title ?? t("sessions.untitled")}</h1>
           <div className="session-meta muted">
-            {s.projectName ? <span>▸ {s.projectName}</span> : null}
+            {s.projectName ? <span><Icon name="projects" /> {s.projectName}</span> : null}
             {s.gitBranch ? <span>{t("session.branch")}: {s.gitBranch}</span> : null}
-            <span>⌂ {s.hostname}</span>
-            <span>◍ {s.ownerName}</span>
+            <span><Icon name="machines" /> {s.hostname}</span>
+            <span><Icon name="members" /> {s.ownerName}</span>
             <span>{t("session.started")}: {dateTime(s.startedAt)}</span>
           </div>
         </div>
