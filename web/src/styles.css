@@ -435,3 +435,12 @@ button.act-text { cursor: pointer; }
 @media (max-width: 900px) {
   .head-side { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; }
 }
+
+/* the steps of an install: numbered, because they must be done in this order */
+.steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 20px; }
+.steps > li { counter-increment: step; position: relative; padding-left: 36px; display: flex; flex-direction: column; gap: 8px; }
+.steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--control); display: grid; place-items: center; font-size: 12px; font-weight: 500; color: var(--muted); }
+.steps > li > p { margin: 0; }
+.stack-tight { display: flex; flex-direction: column; gap: 6px; }
+.stack-tight > p { margin: 0; }
+.setting-body .card > p:first-child, .setting-body .card .stack > p:first-child { margin-top: 0; }
