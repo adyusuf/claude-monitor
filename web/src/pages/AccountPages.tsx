@@ -96,36 +96,60 @@ export function DownloadPage() {
     { os: t("download.linux"), file: "aipod-linux-arm64.zip", label: "ARM64" },
   ];
   return (
-    <div className="page narrow">
-      <h1>{t("download.title")}</h1>
+    <div className="page">
+      <header className="page-head"><div><h1>{t("download.title")}</h1></div></header>
       <p className="lead">{t("download.intro")}</p>
-      <Card title={t("download.installerTitle")}>
-        <p>{t("download.installerIntro")}</p>
-        <p className="muted">{t("download.installerUnix")}</p>
-        <CopyText text={`curl -fsSL ${downloads}/aipod-install.sh | sh -s -- --server ${origin} --from ${downloads}`} />
-        <p className="muted">{t("download.installerWindows")}</p>
-        <CopyText text={`irm ${downloads}/aipod-install.ps1 -OutFile "$env:TEMP\\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\aipod-install.ps1" -Server ${origin} -From ${downloads}`} />
-      </Card>
-      {hasPlugin && (
-        <Card title={t("download.pluginTitle")}>
-          <p>{t("download.pluginIntro")}</p>
-          <p className="muted">1. {t("download.plugin1")}</p>
-          {config.pluginMarketplace
-            ? <CopyText text={`claude plugin install aipod --marketplace ${config.pluginMarketplace}`} />
-            : <><CopyText text={`claude plugin marketplace add ${downloads}/aipod-marketplace.json`} /><CopyText text="claude plugin install aipod@aipod-releases" /></>}
-          <CopyText text={origin} />
-          <p className="muted">2. {t("download.plugin2")}</p>
-          <CopyText text="/aipod:connect" />
+      <SettingsSection title={t("download.installerTitle")} hint={t("download.installerHint")}>
+        <Card>
+          <div className="stack">
+            <p>{t("download.installerIntro")}</p>
+            <div className="stack-tight">
+              <p className="muted">{t("download.installerUnix")}</p>
+              <CopyText text={`curl -fsSL ${downloads}/aipod-install.sh | sh -s -- --server ${origin} --from ${downloads}`} />
+            </div>
+            <div className="stack-tight">
+              <p className="muted">{t("download.installerWindows")}</p>
+              <CopyText text={`irm ${downloads}/aipod-install.ps1 -OutFile "$env:TEMP\\aipod-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\aipod-install.ps1" -Server ${origin} -From ${downloads}`} />
+            </div>
+          </div>
         </Card>
+      </SettingsSection>
+      {hasPlugin && (
+        <SettingsSection title={t("download.pluginTitle")} hint={t("download.pluginHint")}>
+          <Card>
+            <div className="stack">
+              <p>{t("download.pluginIntro")}</p>
+              <ol className="steps">
+                <li>
+                  <p>{t("download.plugin1")}</p>
+                  {config.pluginMarketplace
+                    ? <CopyText text={`claude plugin install aipod --marketplace ${config.pluginMarketplace}`} />
+                    : <><CopyText text={`claude plugin marketplace add ${downloads}/aipod-marketplace.json`} /><CopyText text="claude plugin install aipod@aipod-releases" /></>}
+                  <CopyText text={origin} />
+                </li>
+                <li>
+                  <p>{t("download.plugin2")}</p>
+                  <CopyText text="/aipod:connect" />
+                </li>
+              </ol>
+            </div>
+          </Card>
+        </SettingsSection>
       )}
-      {hasPlugin && <p className="muted">{t("download.orManual")}</p>}
-      <Card title={`1. ${t("download.step1")}`}>
-        <ul className="downloads">
-          {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`${host || "/downloads"}/${f.file}`}>{f.os} · {f.label}</a></li>)}
-        </ul>
-      </Card>
-      <Card title={`2. ${t("download.step2")}`}><CopyText text={`aipod login --server ${origin}`} /></Card>
-      <Card title={`3. ${t("download.step3")}`}><CopyText text="aipod install" /></Card>
+      <SettingsSection title={t("download.manualTitle")} hint={t("download.manualHint")}>
+        <Card>
+          <ol className="steps">
+            <li>
+              <p>{t("download.step1")}</p>
+              <ul className="downloads">
+                {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`${host || "/downloads"}/${f.file}`}>{f.os} · {f.label}</a></li>)}
+              </ul>
+            </li>
+            <li><p>{t("download.step2")}</p><CopyText text={`aipod login --server ${origin}`} /></li>
+            <li><p>{t("download.step3")}</p><CopyText text="aipod install" /></li>
+          </ol>
+        </Card>
+      </SettingsSection>
       <p className="muted"><Link to="/">{t("notFound.home")}</Link></p>
     </div>
   );
