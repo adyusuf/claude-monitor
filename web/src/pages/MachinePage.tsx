@@ -24,6 +24,7 @@ import { ExecBadge, OnlineDot, ServiceBadge } from "./MachineBits";
 import { RunApproval } from "./RunApproval";
 import { RunList } from "./RunList";
 import { useMachineData } from "./useMachineData";
+import { Icon } from "../components/icons";
 
 /** The live events that change what this page shows. */
 const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "machine", "action"];
@@ -69,7 +70,7 @@ export function MachinePage() {
           <h1><OnlineDot online={m.online} /> {m.hostname}</h1>
           <div className="session-meta muted">
             <span>{m.os}</span>
-            <span>◍ {m.userName}</span>
+            <span><Icon name="members" /> {m.userName}</span>
             <span>{t("machines.lastSeen")}: {m.lastSeenAt ? dateTime(m.lastSeenAt) : "–"}</span>
           </div>
         </div>

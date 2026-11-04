@@ -213,6 +213,8 @@ export const tr: Dictionary = {
     hasPassword: "Ayarlı", noPassword: "Ayarlı değil (bir sağlayıcıyla giriş yapın ya da sıfırlayarak ayarlayın)",
     data: "Verileriniz", exportHint: "Sizinle ve oturumlarınızla ilgili her şey, tek bir JSON dosyası olarak.", export: "Verilerimi indir",
     deleteTitle: "Hesabı sil", deleteHint: "Adınız, adresiniz, giriş yöntemleriniz ve makinelerinizin yakaladığı her şey silinir; makinelerinizin bağlantısı kesilir. Geri alınamaz.",
+    sectionProfile: "Profil", sectionProfileHint: "Giriş yaptığınız ad ve adres.", providersHint: "Bu hesaba giriş yolları.",
+    mfaHint: "Her girişte doğrulama uygulamasından bir kod.", dataHint: "Sizinle ilgili her şeyi indirin.", deleteSectionHint: "Hesabınızı kalıcı olarak silin.",
     mfa: "İki adımlı giriş", mfaOn: "Açık: her girişte doğrulama uygulamanızdan bir kod da istenir.",
     mfaOff: "Kapalı. Her girişte doğrulama uygulamasından kod istemek için açın.", mfaSetup: "Kur",
 
@@ -240,6 +242,7 @@ export const tr: Dictionary = {
   remote: trRemote,
   approvals: {
     title: "Onay anahtarları", intro: "Bu tarayıcıda üretilen bir anahtar, izin verdiğiniz çalıştırmaları imzalar. Yöneticisi anahtarı sabitlemiş ve imzalı onayı açmış bir makine, bu anahtarla imzalanmamış hiçbir şeyi çalıştırmaz; ele geçirilmiş bir sunucu bile sizin adınıza çalıştırma başlatamaz. Özel yarı bu tarayıcıdan hiç çıkmaz.",
+    sectionHint: "İzin verdiğiniz çalıştırmaları imzalayan anahtarlar.",
     thisBrowser: "Bu tarayıcı", registered: "kayıtlı", notRegistered: "henüz kayıtlı değil", defaultName: "Bu tarayıcı", name: "Bu anahtar için bir ad", make: "Anahtar üret ve kaydet", register: "Bu anahtarı kaydet",
     registeredKeys: "Kayıtlı anahtarlar", retire: "Emekli et", pinHint: "Bu anahtara güvenecek bir makinede yönetici onu sabitler (önce parmak izini karşılaştırın), sonra imzalı onayı açar (aipod config approvals required):",
     runNeedsKey: "Bu makine yalnızca sabitlenmiş bir anahtarın imzaladığını çalıştırır: izin vermek bu çalıştırmayı bu tarayıcının anahtarıyla imzalar.", needKey: "Bu makine imzalı onay ister, bu tarayıcıda ise anahtar yok. Önce hesap sayfanızda bir tane üretin.",

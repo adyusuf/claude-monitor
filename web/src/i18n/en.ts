@@ -212,6 +212,8 @@ export const en = {
     hasPassword: "Set", noPassword: "Not set (sign in with a provider, or reset to set one)",
     data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
     deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",
+    sectionProfile: "Profile", sectionProfileHint: "The name and address you sign in with.", providersHint: "Ways to sign in to this account.",
+    mfaHint: "A code from an authenticator app at every sign-in.", dataHint: "Download everything about you.", deleteSectionHint: "Remove your account for good.",
     mfa: "Two-step sign-in", mfaOn: "On: every sign-in also asks for a code from your authenticator app.",
     mfaOff: "Off. Turn it on to ask for a code from an authenticator app at every sign-in.", mfaSetup: "Set up",
 
@@ -239,6 +241,7 @@ export const en = {
   remote: enRemote,
   approvals: {
     title: "Approval keys", intro: "A key made in this browser signs the runs you allow. A machine whose admin pinned the key and switched on signed approvals runs nothing that was not signed with it, so even a compromised server cannot start a run in your name. The private half never leaves this browser.",
+    sectionHint: "Keys that sign the runs you allow.",
     thisBrowser: "This browser", registered: "registered", notRegistered: "not registered yet", defaultName: "This browser", name: "A name for this key", make: "Make a key and register it", register: "Register this key",
     registeredKeys: "Registered keys", retire: "Retire", pinHint: "On a machine that should trust this key, an admin pins it (compare the fingerprint first), then switches on signed approvals (aipod config approvals required):",
     runNeedsKey: "This machine only runs what a pinned key signed: allowing signs this run with the key of this browser.", needKey: "This machine requires a signed approval, and this browser has no key. Make one on your account page first.",

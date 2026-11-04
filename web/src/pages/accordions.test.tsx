@@ -121,8 +121,9 @@ describe("questions in the conversation", () => {
     expect(card.open).toBe(true);
     expect(screen.getByText("go left")).toBeVisible();
     expect(screen.getByText("go right")).toBeVisible();
-    expect(screen.getByText(/✓ Right/)).toBeInTheDocument();
-    expect(screen.queryByText(/✓ Left/)).toBeNull();
+    expect(screen.getByText("Right").closest("li")).toHaveClass("chat-option-chosen");
+    expect(screen.getByText("Left").closest("li")).not.toHaveClass("chat-option-chosen");
+    expect(screen.getByText("Right").querySelector("svg.icon")).not.toBeNull();
     expect(card.querySelectorAll(".chat-options")).toHaveLength(2);
   });
 

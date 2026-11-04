@@ -68,8 +68,9 @@ describe("the conversation on the session page", () => {
     renderAt("/w/w1/sessions/s1", route);
     expect(await screen.findByText("Which way?")).toBeInTheDocument();
     expect(screen.getByText("go left")).toBeInTheDocument();
-    expect(screen.getByText(/✓ Right/)).toBeInTheDocument();
-    expect(screen.queryByText(/✓ Left/)).toBeNull();
+    expect(screen.getByText("Right").closest("li")).toHaveClass("chat-option-chosen");
+    expect(screen.getByText("Left").closest("li")).not.toHaveClass("chat-option-chosen");
+    expect(screen.getByText("Right").querySelector("svg.icon")).not.toBeNull();
     expect(screen.getByText("failed")).toBeInTheDocument();
   });
 

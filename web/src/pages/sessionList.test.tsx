@@ -34,7 +34,7 @@ describe("the sessions list grouped by machine and branch", () => {
     const machines = [...document.querySelectorAll<HTMLElement>(".session-machine")];
     expect(machines.map((m) => m.getAttribute("aria-label"))).toEqual(["alpha", "zulu"]);
     const alpha = within(machines[0]!);
-    expect(alpha.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["⎇ main", "⎇ No branch reported"]);
+    expect(alpha.getAllByRole("heading", { level: 3 }).map((h) => h.textContent?.trim())).toEqual(["main", "No branch reported"]);
     expect(titles(machines[0]!)).toEqual(["Title new", "Title old", "Title side"]);
     expect(within(machines[1]!).getByRole("heading", { level: 3 })).toHaveTextContent("feature/x");
     expect(alpha.getByRole("heading", { level: 2 })).toHaveTextContent("alpha");

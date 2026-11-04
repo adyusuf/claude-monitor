@@ -7,6 +7,7 @@ import { noticeLine, fieldLabel } from "../lib/notice";
 import { toolCounts, toolState, type ToolItem, type ToolRun } from "../lib/toolRuns";
 import { config } from "../config";
 import { useFold } from "./fold";
+import { Icon } from "../components/icons";
 
 /** Output longer than this is cut on the page (the event itself is whole); the rest opens with "Show all". */
 function Output({ result }: { result: ToolResult }) {
@@ -98,7 +99,7 @@ function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "question" }> 
         <ul key={q.question} className="chat-options" aria-label={`${t("chat.options")}: ${q.question}`}>
           {q.options.map((o) => (
             <li key={o.label} className={chosen(q, o.label) ? "chat-option chat-option-chosen" : "chat-option"}>
-              <span className="chat-option-label">{chosen(q, o.label) ? "✓ " : ""}{o.label}</span>
+              <span className="chat-option-label">{chosen(q, o.label) ? <><Icon name="check" /> </> : null}{o.label}</span>
               {o.description ? <span className="muted small">{o.description}</span> : null}
             </li>
           ))}
