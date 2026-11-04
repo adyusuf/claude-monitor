@@ -37,6 +37,7 @@ export const trRemote: Dictionary["remote"] = {
   days: "Gün", grantCreate: "İzni ver", grantIncomplete: "Şablonu ve çalışma klasörünü girin.",
   jobs: "İşler", noJobs: "İş yok.", jobStatus: { proposed: "Önerildi", active: "Etkin", denied: "Reddedildi", retired: "Emekli edildi" },
   proposedBy: "{user} önerdi", retire: "Emekli et",
+  settingsHint: "Makinelerde çalıştırma, makine uyarıları ve zamanlamalar.",
   settingsTitle: "Uzaktan çalışma", settingsReadOnly: "Bunları yalnızca bir yönetici değiştirebilir.", enabled: "Bu çalışma alanında uzaktan çalışmaya izin ver",
   enabledHint: "Kapatmak, açık olan her çalıştırmayı hemen iptal eder.", disableConfirm: "Uzaktan çalışma kapatılsın mı? Açık olan her çalıştırma şimdi iptal edilir.",
   alertCpu: "İşlemci uyarısı (%)", alertMemory: "Bellek uyarısı (%)", alertDisk: "Disk uyarısı (%)", alertSustain: "Süre (saniye)",

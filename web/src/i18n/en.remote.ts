@@ -35,6 +35,7 @@ export const enRemote = {
   days: "Days", grantCreate: "Give the grant", grantIncomplete: "Enter the template and the working folder.",
   jobs: "Jobs", noJobs: "No jobs.", jobStatus: { proposed: "Proposed", active: "Active", denied: "Denied", retired: "Retired" },
   proposedBy: "proposed by {user}", retire: "Retire",
+  settingsHint: "Runs on your machines, machine alerts and schedules.",
   settingsTitle: "Remote work", settingsReadOnly: "Only an admin can change these.", enabled: "Allow remote work in this workspace",
   enabledHint: "Switching it off cancels every open run at once.", disableConfirm: "Switch remote work off? Every open run is cancelled now.",
   alertCpu: "CPU alert (%)", alertMemory: "Memory alert (%)", alertDisk: "Disk alert (%)", alertSustain: "Sustained for (seconds)",

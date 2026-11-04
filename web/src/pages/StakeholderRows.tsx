@@ -14,9 +14,9 @@ export function StakeholderRows({ rows, onChange, error }: { rows: Row[]; onChan
     <Group legend={t("projects.stakeholders")} error={error}>
       {rows.map((row, i) => (
         <div key={i} className="row-input">
-          <input className="input" aria-label={`${t("projects.stakeholderName")} ${i + 1}`} maxLength={projectLimits.nameMax} value={row.name}
+          <input className="input" aria-label={`${t("projects.stakeholderName")} ${i + 1}`} placeholder={t("projects.stakeholderName")} maxLength={projectLimits.nameMax} value={row.name}
             onChange={(e) => set(i, { name: e.target.value })} />
-          <input className="input" aria-label={`${t("projects.stakeholderRole")} ${i + 1}`} maxLength={projectLimits.nameMax} value={row.role}
+          <input className="input" aria-label={`${t("projects.stakeholderRole")} ${i + 1}`} placeholder={t("projects.stakeholderRole")} maxLength={projectLimits.nameMax} value={row.role}
             onChange={(e) => set(i, { role: e.target.value })} />
           <Button variant="subtle" aria-label={`${t("projects.removeRow")} ${t("projects.stakeholders")} ${i + 1}`} onClick={() => onChange(rows.filter((_, j) => j !== i))}>×</Button>
         </div>
