@@ -213,6 +213,8 @@ export const de: Dictionary = {
     hasPassword: "Gesetzt", noPassword: "Nicht gesetzt (mit einem Anbieter anmelden oder zurücksetzen, um eines zu setzen)",
     data: "Ihre Daten", exportHint: "Alles über Sie und Ihre Sitzungen als eine JSON-Datei.", export: "Meine Daten herunterladen",
     deleteTitle: "Konto löschen", deleteHint: "Ihr Name, Ihre Adresse, Ihre Anmeldemethoden und alles, was Ihre Maschinen erfasst haben, werden gelöscht; Ihre Maschinen werden getrennt. Das lässt sich nicht rückgängig machen.",
+    sectionProfile: "Profil", sectionProfileHint: "Name und Adresse, mit denen Sie sich anmelden.", providersHint: "Wege, sich bei diesem Konto anzumelden.",
+    mfaHint: "Bei jeder Anmeldung ein Code aus einer Authentifizierungs-App.", dataHint: "Alles über Sie herunterladen.", deleteSectionHint: "Ihr Konto endgültig löschen.",
     mfa: "Anmeldung in zwei Schritten", mfaOn: "An: Bei jeder Anmeldung wird auch ein Code aus Ihrer Authenticator-App verlangt.",
     mfaOff: "Aus. Schalten Sie sie ein, um bei jeder Anmeldung einen Code aus einer Authenticator-App zu verlangen.", mfaSetup: "Einrichten",
 
@@ -240,6 +242,7 @@ export const de: Dictionary = {
   remote: deRemote,
   approvals: {
     title: "Freigabeschlüssel", intro: "Ein in diesem Browser erzeugter Schlüssel signiert die Ausführungen, die Sie erlauben. Eine Maschine, deren Administrator den Schlüssel angeheftet und signierte Freigaben eingeschaltet hat, führt nichts aus, was nicht damit signiert wurde; so kann selbst ein kompromittierter Server in Ihrem Namen keine Ausführung starten. Die private Hälfte verlässt diesen Browser nie.",
+    sectionHint: "Schlüssel, die die von Ihnen erlaubten Läufe signieren.",
     thisBrowser: "Dieser Browser", registered: "registriert", notRegistered: "noch nicht registriert", defaultName: "Dieser Browser", name: "Ein Name für diesen Schlüssel", make: "Schlüssel erzeugen und registrieren", register: "Diesen Schlüssel registrieren",
     registeredKeys: "Registrierte Schlüssel", retire: "Entfernen", pinHint: "Auf einer Maschine, die diesem Schlüssel vertrauen soll, heftet ein Administrator ihn an (vergleichen Sie zuerst den Fingerabdruck) und schaltet dann signierte Freigaben ein (aipod config approvals required):",
     runNeedsKey: "Diese Maschine führt nur aus, was ein angehefteter Schlüssel signiert hat: Das Erlauben signiert diese Ausführung mit dem Schlüssel dieses Browsers.", needKey: "Diese Maschine verlangt eine signierte Freigabe, und dieser Browser hat keinen Schlüssel. Erzeugen Sie zuerst auf Ihrer Kontoseite einen.",

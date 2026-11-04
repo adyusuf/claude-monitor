@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, exportUrl } from "../api/endpoints";
 import { useSession } from "../auth/session";
+import { SettingsSection } from "../components/SettingsSection";
 import { Button, Card, Field, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 
@@ -45,11 +46,14 @@ export function AccountDataCards() {
 
   return (
     <>
-      <Card title={t("account.data")}>
-        <p className="muted">{t("account.exportHint")}</p>
-        <a className="btn btn-ghost" href={exportUrl} download>{t("account.export")}</a>
-      </Card>
-      <Card title={t("account.deleteTitle")} className="card-danger">
+      <SettingsSection title={t("account.data")} hint={t("account.dataHint")}>
+        <Card>
+          <p className="muted">{t("account.exportHint")}</p>
+          <a className="btn btn-ghost" href={exportUrl} download>{t("account.export")}</a>
+        </Card>
+      </SettingsSection>
+      <SettingsSection title={t("account.deleteTitle")} hint={t("account.deleteSectionHint")}>
+      <Card className="card-danger">
         <p className="muted">{t("account.deleteHint")}</p>
         {error ? <Notice kind="error">{error}</Notice> : null}
         <form className="stack" onSubmit={remove}>
@@ -65,6 +69,7 @@ export function AccountDataCards() {
           <div><Button type="submit" variant="danger" busy={busy}>{t("account.deleteButton")}</Button></div>
         </form>
       </Card>
+      </SettingsSection>
     </>
   );
 }

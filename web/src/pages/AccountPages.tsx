@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { api, providerUrl } from "../api/endpoints";
 import { useSession } from "../auth/session";
+import { SettingsSection } from "../components/SettingsSection";
 import { Card, CopyText, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
@@ -19,28 +20,36 @@ export function AccountPage() {
   const [params] = useSearchParams();
   const error = params.get("error");
   return (
-    <div className="page narrow">
+    <div className="page">
       <h1>{t("account.title")}</h1>
       {error ? <Notice kind="error">{tx(`errors.${error}`)}</Notice> : null}
-      <Card>
-        <p><strong>{me?.displayName}</strong></p>
-        <p className="muted">{me?.email}</p>
-      </Card>
-      <Card title={t("account.providers")}>
-        <ul className="plain">
-          <li className="spread"><span>{t("account.password")}</span><span className="muted">{me?.hasPassword ? t("account.hasPassword") : t("account.noPassword")}</span></li>
-          {PROVIDERS.map((p) => (
-            <li key={p.id} className="spread">
-              <span>{p.name}</span>
-              {me?.providers.includes(p.id)
-                ? <span className="badge ok">{t("account.linked")}</span>
-                : <a className="btn btn-ghost" href={providerUrl(p.id, "link")}>{t("account.link", { provider: p.name })}</a>}
-            </li>
-          ))}
-        </ul>
-      </Card>
-      <MfaCard />
-      <ApprovalKeysCard />
+      <SettingsSection title={t("account.sectionProfile")} hint={t("account.sectionProfileHint")}>
+        <Card>
+          <p><strong>{me?.displayName}</strong></p>
+          <p className="muted">{me?.email}</p>
+        </Card>
+      </SettingsSection>
+      <SettingsSection title={t("account.providers")} hint={t("account.providersHint")}>
+        <Card>
+          <ul className="plain">
+            <li className="spread"><span>{t("account.password")}</span><span className="muted">{me?.hasPassword ? t("account.hasPassword") : t("account.noPassword")}</span></li>
+            {PROVIDERS.map((p) => (
+              <li key={p.id} className="spread">
+                <span>{p.name}</span>
+                {me?.providers.includes(p.id)
+                  ? <span className="badge ok">{t("account.linked")}</span>
+                  : <a className="btn btn-ghost" href={providerUrl(p.id, "link")}>{t("account.link", { provider: p.name })}</a>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </SettingsSection>
+      <SettingsSection title={t("account.mfa")} hint={t("account.mfaHint")}>
+        <MfaCard titled={false} />
+      </SettingsSection>
+      <SettingsSection title={t("approvals.title")} hint={t("approvals.sectionHint")}>
+        <ApprovalKeysCard titled={false} />
+      </SettingsSection>
       <AccountDataCards />
     </div>
   );
