@@ -1,7 +1,95 @@
 {
   "settings": {
+    "ci": {
+      "runner": "self-hosted"
+    },
+    "ci_after_push": {
+      "dev": false,
+      "prod": false,
+      "test": false
+    },
     "coverage_before_push": {
       "dev": false,
+      "prod": false,
+      "test": false
+    },
+    "deploy_after_push": {
+      "prod": false,
+      "test": true
+    },
+    "e2e_before_deploy": {
+      "prod": false,
+      "test": false
+    },
+    "gate_steps": {
+      "build": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "compat": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "cve": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "documents": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "e2e_specs": {
+        "dev": false,
+        "prod": false,
+        "test": false
+      },
+      "lint": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "md": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "sast": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "secrets": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "typecheck": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      },
+      "unit": {
+        "dev": true,
+        "prod": true,
+        "test": true
+      }
+    },
+    "gates_before_push": {
+      "dev": false,
+      "prod": false,
+      "test": false
+    },
+    "merge": {
+      "dev": true,
+      "prod": true,
+      "test": true
+    },
+    "push": {
+      "dev": true,
       "prod": true,
       "test": true
     }
