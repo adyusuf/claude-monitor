@@ -65,25 +65,46 @@ gate_prod() {
       warn "the test branch and the test environment were NOT checked (not required since 04/10/2026; GATE_CHECK_TEST_DEPLOY=1 checks the deployed SHA) — this promotion does not prove the code ran on test"
     fi
 
-    # E2E is OPTIONAL (CLAUDE.md #33, 03/10/2026: not enough resources to run it). By default the gate
-    # does NOT run it and says so; the report never reads that as a pass. GATE_RUN_E2E=1 runs the suite
-    # and a red result then blocks like any other step.
-    if [ "${GATE_RUN_E2E:-0}" != 1 ]; then
+    gate_e2e_suite
+}
+
+# The e2e suite, on request only (#33). prod: GATE_RUN_E2E=1, or the panel's e2e_before_deploy.prod = yes, runs the suite
+# against the TEST environment (E2E_WEB_CMD / E2E_MOBILE_CMD, the code being promoted is deployed there). test: only the
+# panel's e2e_before_deploy.test = yes, and it runs on DEV (standards/13 §8a): E2E_DEV_WEB_CMD / E2E_DEV_MOBILE_CMD in
+# merge-gate.conf - the test environment still holds the previous release, so the test commands would prove nothing.
+# Asked by the panel where the project has no suite or no such environment: the report says so, not a failure (§8a).
+# Asked with GATE_RUN_E2E=1 and no suite: SKIPPED, as before. A red run blocks like any other step.
+gate_e2e_suite() {
+    local asked="" web_cmd mobile_cmd where
+    if [ "$TARGET" = "prod" ]; then
+      [ "${GATE_RUN_E2E:-0}" = 1 ] && asked="GATE_RUN_E2E=1"
+      web_cmd="${E2E_WEB_CMD:-}"; mobile_cmd="${E2E_MOBILE_CMD:-}"; where="the test environment"
+    else
+      web_cmd="${E2E_DEV_WEB_CMD:-}"; mobile_cmd="${E2E_DEV_MOBILE_CMD:-}"; where="dev"
+    fi
+    [ -z "$asked" ] && [ "$(panel_value "e2e_before_deploy.$TARGET")" = "yes" ] && asked="e2e_before_deploy.$TARGET = yes in $SDLC_SETTINGS_LABEL"
+    if [ -z "$asked" ]; then
       say "e2e (optional) — not run"
-      warn "e2e was NOT run (optional since 03/10/2026; GATE_RUN_E2E=1 runs it) — nothing in this promotion was proven end to end"
+      warn "e2e was NOT run (optional; e2e_before_deploy.$TARGET in the panel runs it) — nothing in this promotion was proven end to end"
       return 0
     fi
-    say "full e2e suite against the test environment (requested with GATE_RUN_E2E=1)"
-    ran=0
-    if [ "$HAS_E2E_WEB" = 1 ]; then
-      ran=1
-      if [ -n "${E2E_WEB_CMD:-}" ]; then run "web e2e ($E2E_WEB_CMD)" bash -c "$E2E_WEB_CMD"
-      else run "web e2e (playwright)" bash -c "cd \"$E2E_WEB_DIR\" && npx playwright test"; fi
+    say "e2e suite on $where (requested: $asked)"
+    if [ "$TARGET" != "prod" ] && [ -z "$web_cmd$mobile_cmd" ]; then
+      warn "no such environment: set E2E_DEV_WEB_CMD / E2E_DEV_MOBILE_CMD in scripts/merge-gate.conf (the suite against dev) — e2e was NOT run"
+      return 0
     fi
-    if [ "$HAS_E2E_MOBILE" = 1 ]; then
+    ran=0
+    if [ "$HAS_E2E_WEB" = 1 ] || [ -n "$web_cmd" ]; then
+      if [ -n "$web_cmd" ]; then ran=1; run "web e2e ($web_cmd)" bash -c "$web_cmd"
+      elif [ "$TARGET" = "prod" ]; then ran=1; run "web e2e (playwright)" bash -c "cd \"$E2E_WEB_DIR\" && npx playwright test"; fi
+    fi
+    if [ "$HAS_E2E_MOBILE" = 1 ] || [ -n "$mobile_cmd" ]; then
       ran=1
-      if [ -n "${E2E_MOBILE_CMD:-}" ]; then run "mobile e2e ($E2E_MOBILE_CMD)" bash -c "$E2E_MOBILE_CMD"
+      if [ -n "$mobile_cmd" ]; then run "mobile e2e ($mobile_cmd)" bash -c "$mobile_cmd"
       else skip "mobile e2e: set E2E_MOBILE_CMD (maestro needs a device/emulator)"; fi
     fi
-    [ "$ran" = 0 ] && skip "e2e: this project has no e2e suite — nothing proves this promotion"
+    if [ "$ran" = 0 ]; then
+      if [ "${GATE_RUN_E2E:-0}" = 1 ] && [ "$TARGET" = "prod" ]; then skip "e2e: this project has no e2e suite — nothing proves this promotion"
+      else warn "no e2e suite in this project — e2e was NOT run (not a failure, standards/13 §8a)"; fi
+    fi
 }
