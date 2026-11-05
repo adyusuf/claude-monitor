@@ -125,18 +125,114 @@ gate_coverage() {
   local setting; setting="$(coverage_setting)"
   if [ "$setting" = "no" ]; then
     # Not a pass and not a gap: the user turned it off. Reported on every run, never counted as passed.
-    printf '  \033[33m-\033[0m WAIVED: coverage (coverage_before_push.%s = no in %s)\n' "$TARGET" "$SDLC_SETTINGS_FILE"
+    printf '  \033[33m-\033[0m WAIVED: coverage (coverage_before_push.%s = no in %s)\n' "$TARGET" "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE}"
     WAIVED+=("coverage"); return 0
   fi
-  [ "$setting" = "unreadable" ] && warn "$SDLC_SETTINGS_FILE could not be read - coverage runs (fail closed)"
+  [ "$setting" = "unreadable" ] && warn "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} could not be read - coverage runs (fail closed)"
   # RUN_SHOW: a green coverage step prints the figures it measured (rule #15: a figure is read, not assumed).
   if [ -n "${COVERAGE_CMD:-}" ]; then RUN_SHOW=1 run "coverage" bash -c "$COVERAGE_CMD"
   elif [ -x scripts/coverage.sh ]; then RUN_SHOW=1 run "coverage" bash scripts/coverage.sh
   else skip "coverage: set COVERAGE_CMD in scripts/merge-gate.conf — the threshold is NOT measured"; fi
 }
 
+# ── The steps the user can untick (user decision 02/11/2026) ─────────────────
+# THE ONE LIST of the gate's steps (rule #2): id|the name the podium Settings pane shows|the heading the gate prints,
+# and a fourth column `locked` for a step nobody can untick. podium_schema.py reads this block for the pane's rows
+# (gate_steps.<id>.<target>); keep it one step per line, between the quotes. Coverage is not here: it has its own
+# setting (coverage_before_push.<t>, rule #29). The secret scan and SAST are locked (user decision 02/11/2026, rule #19:
+# they are never switched off): the settings refuse to turn them off, and an off value in the file is ignored here.
+GATE_STEPS='lint|lint|formatter / linter
+typecheck|types|typecheck
+build|build|build
+unit|unit|unit tests
+secrets|secrets|secret scan|locked
+cve|CVE|dependency CVE
+sast|SAST|SAST|locked
+compat|compat|backward compatibility
+md|md size|CLAUDE.md gates
+documents|docs|project documents (rule #16 — fail closed)
+e2e_specs|e2e|e2e specs — CHECK ONLY, nothing is run here'
+# The ids unticked for $TARGET, read once from the panel's settings in the project. Only an explicit `false` unticks a
+# step; a missing file or key runs it, and an unreadable file runs every step with a warning (fail closed).
+GATE_STEPS_OFF=""; GATE_STEPS_READ=0
+gate_steps_off() {
+  [ "$GATE_STEPS_READ" = 0 ] || return 0
+  GATE_STEPS_READ=1
+  [ -f "$SDLC_SETTINGS_FILE" ] || return 0
+  have python3 || { warn "python3 is missing: ${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} not read - every gate step runs (fail closed)"; return 0; }
+  # Only well-formed ids come back (qa 02/11/2026): a key such as `*` would otherwise glob over the files in the project.
+  GATE_STEPS_OFF="$(python3 -c 'import json, re, sys
+try:
+    steps = json.load(open(sys.argv[1], encoding="utf-8"))["settings"].get("gate_steps", {})
+except (KeyError, TypeError, AttributeError):
+    sys.exit(0)
+except Exception:
+    sys.exit(3)
+print(" ".join(sorted(i for i, t in steps.items()
+                     if re.fullmatch("[a-z0-9_]+", i) and isinstance(t, dict) and t.get(sys.argv[2]) is False)))' \
+    "$SDLC_SETTINGS_FILE" "$TARGET" 2>/dev/null)" || {
+    GATE_STEPS_OFF=""; warn "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} could not be read - every gate step runs (fail closed)"; }
+  # A locked step runs whatever the file says: a pull request that commits it off changes nothing, and the gate says so.
+  local id kept=""
+  for id in $GATE_STEPS_OFF; do
+    if printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$id" '$1 == id && $4 == "locked" { found = 1 } END { exit !found }'; then
+      warn "gate_steps.$id.$TARGET = no in ${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} was IGNORED: $id is locked and always runs (rule #19)"
+    else kept="$kept $id"; fi
+  done
+  GATE_STEPS_OFF="${kept# }"
+}
+step_on() { gate_steps_off; case " $GATE_STEPS_OFF " in *" $1 "*) return 1 ;; esac; return 0; }
+# gate_step <id>: print the step's heading; 0 when it runs, 1 when the user unticked it. An unticked step is WAIVED:
+# reported on every run and named in the merge commit's Gate-Waived line, never counted as passed.
+gate_step() {
+  local heading; heading="$(printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$1" '$1 == id { print $3 }')"
+  say "${heading:-$1}"
+  step_on "$1" && return 0
+  printf '  \033[33m-\033[0m WAIVED: %s (gate_steps.%s.%s = no in %s)\n' "$1" "$1" "$TARGET" "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE}"
+  WAIVED+=("$1"); return 1
+}
+
+# The e2e spec check: a WARNING in both directions, it blocks nothing (#33). Moved here from gate-core.sh unchanged, so
+# that file stays under 300 lines (rule #9).
+gate_e2e_specs() {
+  missing=0
+  if [ "$LIST_ONLY" = 1 ]; then
+    printf '  → %-42s %s\n' "e2e spec check" "git diff --name-only <base>..HEAD (no e2e run)"
+    PASS+=("e2e spec check")
+    return 0
+  fi
+  if [ "$HAS_E2E_WEB" = 1 ] || [ "$HAS_E2E_MOBILE" = 1 ]; then
+    base="$(git merge-base HEAD "origin/$TARGET" 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
+    changed="$(git diff --name-only "$base"..HEAD 2>/dev/null)"
+    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|[^/]+/e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
+    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|[^/]+/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
+    if [ -n "$behaviour" ] && [ -z "$specs_touched" ]; then
+      missing=1
+      warn "behaviour changed in $(printf '%s\n' "$behaviour" | wc -l | tr -d ' ') file(s) but no e2e spec was touched"
+      printf '%s\n' "$behaviour" | head -8 | sed 's/^/      /'
+    else
+      ok "e2e specs: nothing missing for this change"
+    fi
+  else
+    skip "e2e spec check: this project has no e2e suite"
+  fi
+  # A missing spec is a WARNING in both directions and blocks nothing. It used to
+  # fail the dev -> test promotion, which put the whole e2e backlog in front of an
+  # integration merge and stopped work that had nothing to do with e2e. #33 moved
+  # the writing to the pre-prod gate, where a spec can actually be verified
+  # against a deployed test environment — writing it earlier means writing it
+  # blind. The gap is NOT dropped: step 2 of the test -> prod gate writes every
+  # missing spec before the suite runs, and that gate does block. The gate still
+  # SAYS it on every run, so the backlog stays visible rather than silent.
+  # User decision.
+  if [ "$missing" = 1 ] && [ "$TARGET" = "test" ]; then
+    warn "the missing spec(s) above are a reminder only: e2e is optional (#33); dev -> test is not blocked"
+  fi
+}
+
 # ── The verdict ──────────────────────────────────────────────────────────────
 gate_result() {
+  [ -n "${PANEL_LIVE_FILE:-}" ] && rm -f "$PANEL_LIVE_FILE"   # the live panel's copy (gate-lib-panel.sh)
   printf '\n\033[1m── result ──\033[0m\n'
   # A listing runs nothing, so nothing "passed": the count is what WOULD run (--list).
   if [ "$LIST_ONLY" = 1 ]; then printf '  would run: %d\n' "${#PASS[@]}"; else printf '  passed  : %d\n' "${#PASS[@]}"; fi
@@ -170,13 +266,18 @@ gate_result() {
     exit 0
   fi
   # Only coverage ran, so this is not the gate's green: it says what was not run.
+  if [ "${COVERAGE_ONLY:-0}" = 1 ] && [ "${GATE_OFF_BY_PANEL:-0}" = 1 ]; then
+    printf '  - WAIVED the gate (gates_before_push.%s = no; the merge commit must carry Gate-Waived)\n' "$TARGET"
+  fi
+  # Exit 10 when the gate turned itself off (gates_before_push.<t> = no): allowed, but not a pass a caller may stamp.
+  local off_exit=0; [ "${GATE_OFF_BY_PANEL:-0}" = 1 ] && off_exit=10
   if [ "${COVERAGE_ONLY:-0}" = 1 ] && [ "${#WAIVED[@]}" -gt 0 ]; then
     printf '\n\033[33mCOVERAGE WAIVED\033[0m — coverage_before_push.%s is no: nothing ran, nothing passed. The push is allowed by configuration.\n' "$TARGET"
-    exit 0
+    exit "$off_exit"
   fi
   if [ "${COVERAGE_ONLY:-0}" = 1 ]; then
     printf '\n\033[32mCOVERAGE GREEN\033[0m — the coverage step passed. The rest of the %s gate did NOT run (turned off by configuration).\n' "$TARGET"
-    exit 0
+    exit "$off_exit"
   fi
   if [ "${#ACCEPTED[@]}" -gt 0 ] || [ "${#WAIVED[@]}" -gt 0 ]; then
     printf '\n\033[32mGATE GREEN\033[0m (with %d accepted gap(s), %d step(s) waived by configuration: %s) — %s promotion is allowed.\n' \
