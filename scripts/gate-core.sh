@@ -16,8 +16,12 @@
 # (standards/13 §8a). COVERAGE_CMD must then measure on its own, not read a result an
 # earlier step of the full gate left behind.
 # Whether the coverage step runs at all is the panel's "Run coverage before pushing"
-# (coverage_before_push.<t>, user decision 30/10/2026), read from .claude/sdlc-settings.json:
+# (coverage_before_push.<t>, user decision 30/10/2026), read from the live panel when the podium plugin is enabled
+# here (not in CI), else from .claude/sdlc-settings.json (gate-lib-panel.sh, user decision 06/11/2026):
 # `false` there reports the step WAIVED (never passed); anything else runs it (fail closed).
+# The other steps work the same way (user decision 02/11/2026): each is one row of GATE_STEPS in gate-lib.sh, and
+# gate_steps.<id>.<t> = false in that file waives it - it does not run, it is reported WAIVED and the merge commit's
+# Gate-Waived line names it. A missing key runs it.
 #
 # ⚠️ The canonical copy lives in the configuration repository; every project takes
 # a COPY into its own scripts/ and commits it. A project's gate cannot depend on a
@@ -30,12 +34,15 @@
 #               build, unit tests, coverage (the 80% threshold per codebase),
 #               secret scan, dependency CVE, SAST, backward-compatibility scan,
 #               the CLAUDE.md size and rule gates, and a CHECK for missing e2e
-#               specs (a WARNING — it never blocks). A test promotion also warns
-#               that e2e was NOT run: e2e is OPTIONAL (#33, 03/10/2026).
+#               specs (a WARNING — it never blocks). e2e is OPTIONAL (#33): a test
+#               promotion runs it on dev only when the panel's e2e_before_deploy.test
+#               is yes (E2E_DEV_WEB_CMD / E2E_DEV_MOBILE_CMD), else it warns.
+#               gates_before_push.<t> = no (not in CI) runs coverage only: exit 10.
 #   prod      : the test branch and the TEST environment are NOT checked (04/10/2026,
 #               CLAUDE.md #33) and e2e is NOT run — the gate warns for both.
 #               GATE_CHECK_TEST_DEPLOY=1 verifies the deployed SHA (TEST_VERSION_URL /
-#               TEST_DEPLOY_SHA_CMD below); GATE_RUN_E2E=1 runs the suite. A red
+#               TEST_DEPLOY_SHA_CMD below); GATE_RUN_E2E=1 or the panel's
+#               e2e_before_deploy.prod = yes runs the suite. A red
 #               result of either then blocks.
 #
 # ⚠️ A STEP THAT DID NOT RUN DID NOT PASS. A missing tool is reported as SKIPPED
@@ -92,9 +99,10 @@
 # ACCEPTED_GAPS does nothing but print that it cannot be accepted, and the gate
 # stays INCOMPLETE. Install the measurement (scripts/coverage.sh) instead.
 #
-# The gate is split over four files so that none passes 300 lines (global rule #9): this one
-# orchestrates, gate-lib.sh holds the helpers, stack detection and the verdict, gate-lib-node.sh the
-# Node steps, gate-lib-prod.sh the test -> prod steps. They are TWINS: copy all four (scripts/twins.txt).
+# The gate is split over five files so that none passes 300 lines (global rule #9): this one
+# orchestrates, gate-lib.sh holds the helpers, stack detection and the verdict, gate-lib-panel.sh where the panel's
+# values come from, gate-lib-node.sh the Node steps, gate-lib-prod.sh the e2e and test -> prod steps. They are TWINS:
+# copy all five (scripts/twins.txt).
 set -uo pipefail
 
 TARGET="${1:-}"
@@ -120,9 +128,9 @@ cd "$ROOT" || exit 2
 COVERAGE_MIN="${COVERAGE_MIN:-80}"
 
 # Fail closed: a copy of this file without its libraries must not run a partial gate.
-for lib in gate-lib.sh gate-lib-node.sh gate-lib-prod.sh; do
+for lib in gate-lib.sh gate-lib-panel.sh gate-lib-node.sh gate-lib-prod.sh; do
   if [ ! -f "$GATE_DIR/$lib" ]; then
-    echo "gate-core.sh: $lib is missing next to it - the gate is four twin files (scripts/twins.txt); copy them all" >&2
+    echo "gate-core.sh: $lib is missing next to it - the gate is five twin files (scripts/twins.txt); copy them all" >&2
     exit 2
   fi
   # shellcheck source=/dev/null  # the path is resolved at run time, beside this file
@@ -132,57 +140,79 @@ done
 # bash would say "command not found" and carry on. With gate_coverage missing that dropped coverage
 # without a trace and ended GATE GREEN (found 29/10/2026). Every function the core calls must exist.
 for fn in say ok bad skip warn na have run coverage_setting gate_coverage gate_result gate_prod node_start node_join \
-  node_lint node_typecheck node_build node_test node_audit; do
+  gate_steps_off step_on gate_step gate_e2e_specs node_lint node_typecheck node_build node_test node_audit \
+  panel_resolve panel_value gate_e2e_suite; do
   declare -F "$fn" >/dev/null || {
-    echo "gate-core.sh: $fn is not defined - a library beside it is older than this file; copy all four twins (scripts/twins.txt)" >&2
+    echo "gate-core.sh: $fn is not defined - a library beside it is older than this file; copy all five twins (scripts/twins.txt)" >&2
     exit 2
   }
 done
 
-# The gate is off by configuration, coverage may not be (coverage_before_push.<t>): run that one step and stop.
+# Every panel value comes from the live panel when the podium plugin is enabled here, else from the project's copy.
+panel_resolve
+# The gate is off by configuration (gates_before_push.<t> = no, or the caller's --coverage-only); coverage may not be
+# (coverage_before_push.<t>): run that one step and stop.
+# It is a setting about pushing: CI ignores it and runs the gate (qa 06/11/2026). A self-waived run exits 10, never 0,
+# so a caller cannot read it as a pass (it may push: the configuration allows it; nothing passed).
+if [ "$COVERAGE_ONLY" != 1 ] && [ "$(panel_value "gates_before_push.$TARGET")" = "no" ]; then
+  if gate_in_ci; then
+    say "gates_before_push.$TARGET = no is a local setting — CI runs the gate"
+  else
+  say "gate off: gates_before_push.$TARGET = no in $SDLC_SETTINGS_LABEL"
+  printf '  \033[33m-\033[0m WAIVED: the gate (only coverage runs; exit 10; the merge commit must carry Gate-Waived)\n'
+  COVERAGE_ONLY=1
+  # shellcheck disable=SC2034  # read by gate_result in gate-lib.sh
+  GATE_OFF_BY_PANEL=1
+  fi
+fi
 if [ "$COVERAGE_ONLY" = 1 ]; then gate_coverage; gate_result; fi
 
 # ── Everything except e2e: the SAME step set for dev, test and prod (29/10/2026) ──
 # prod used to run only its own extras, on the assumption that the code had passed the gate on test; with the
 # gate off by configuration that proves nothing, and the projects had already worked around it by calling the
 # prod gate with the test target.
+# A step the user unticked (gate_steps.<id>.<t> = no, gate-lib.sh) prints WAIVED and does not run (02/11/2026).
 if true; then
+  gate_steps_off      # read once here, before the Node track forks
   node_start
 
-  say "formatter / linter"
+  if gate_step lint; then
   if [ "$HAS_DOTNET" = 1 ]; then
     if have dotnet; then run "dotnet format" dotnet format ${SLN:+"$SLN"} --verify-no-changes
     else skip "dotnet format (dotnet missing)"; fi
   fi
   [ "$NODE_PARALLEL_ACTIVE" = 1 ] || node_lint
+  fi
 
-  say "typecheck"
-  [ "$NODE_PARALLEL_ACTIVE" = 1 ] || node_typecheck
+  if gate_step typecheck; then [ "$NODE_PARALLEL_ACTIVE" = 1 ] || node_typecheck; fi
 
-  say "build"
+  if gate_step build; then
   if [ "$HAS_DOTNET" = 1 ]; then
     if have dotnet; then run "dotnet build" dotnet build ${SLN:+"$SLN"} -warnaserror
     else skip "dotnet build (dotnet missing)"; fi
   fi
   [ "$NODE_PARALLEL_ACTIVE" = 1 ] || node_build
+  fi
 
-  say "unit tests"
+  if gate_step unit; then
   if [ "$HAS_DOTNET" = 1 ]; then
     if have dotnet; then run "dotnet test" dotnet test ${SLN:+"$SLN"} --nologo
     else skip "dotnet test (dotnet missing)"; fi
   fi
   [ "$NODE_PARALLEL_ACTIVE" = 1 ] || node_test
+  fi
 
   node_join
   gate_coverage
 
-  say "secret scan"
+  if gate_step secrets; then
   if [ -n "${SECRET_CMD:-}" ]; then run "secret scan" bash -c "$SECRET_CMD"
   elif have gitleaks; then run "gitleaks detect" gitleaks detect --no-banner --redact
   else skip "gitleaks is not installed"; fi
+  fi
 
-  say "dependency CVE"
-  if [ "$LIST_ONLY" = 1 ]; then
+  if ! gate_step cve; then :
+  elif [ "$LIST_ONLY" = 1 ]; then
     [ "$HAS_DOTNET" = 1 ] && { printf '  → %-42s %s\n' "dotnet vulnerable packages" "dotnet list package --vulnerable${SLN:+ ($SLN)}"; PASS+=("dotnet cve"); }
     for d in "$WEB_DIR" "$MOBILE_DIR"; do [ -n "$d" ] && { if [ -f "$d/pnpm-lock.yaml" ] || { [ "$d" != "." ] && [ -f "pnpm-lock.yaml" ]; }; then printf '  → %-42s %s\n' "pnpm audit ($d)" "pnpm --dir $d audit --audit-level=high"; PASS+=("pnpm audit $d"); else printf '  → %-42s %s\n' "npm audit ($d)" "npm --prefix $d audit --audit-level=high"; PASS+=("npm audit $d"); fi; }; done
   else
@@ -216,24 +246,27 @@ if true; then
   [ "$NODE_PARALLEL_ACTIVE" = 1 ] || node_audit
   fi
 
-  say "SAST"
+  if gate_step sast; then
   if [ -n "${SAST_CMD:-}" ]; then run "SAST" bash -c "$SAST_CMD"
   elif [ -x scripts/codeql-scan.sh ]; then run "SAST" bash scripts/codeql-scan.sh
   else skip "SAST: set SAST_CMD in scripts/merge-gate.conf"; fi
+  fi
 
-  say "backward compatibility"
+  if gate_step compat; then
   if [ -n "${BACKCOMPAT_CMD:-}" ]; then run "backward compatibility" bash -c "$BACKCOMPAT_CMD"
   elif [ -x scripts/backward-compat-scan.sh ]; then run "backward compatibility" bash scripts/backward-compat-scan.sh
   else skip "backward-compatibility scan: set BACKCOMPAT_CMD in scripts/merge-gate.conf"; fi
+  fi
 
-  say "CLAUDE.md gates"
+  if gate_step md; then
   if [ -x scripts/md-size-gate.sh ]; then run "md-size-gate.sh" bash scripts/md-size-gate.sh
   else skip "md-size-gate.sh is missing"; fi
   if [ -f scripts/md-rule-gate.py ]; then ok "md-rule-gate.py present (run by hand when splitting)"
   else skip "md-rule-gate.py is missing"; fi
+  fi
 
-  say "project documents (rule #16 — fail closed)"
-  if [ "$LIST_ONLY" = 1 ]; then
+  if ! gate_step documents; then :
+  elif [ "$LIST_ONLY" = 1 ]; then
     printf '  → %-42s %s\n' "SETUP.md, .env.example, secret inventory" "file and heading checks"
     PASS+=("project documents")
   elif [ "$HAS_DOTNET" = 0 ] && [ "$HAS_NODE" = 0 ]; then
@@ -249,43 +282,8 @@ if true; then
     fi
   fi
 
-  say "e2e specs — CHECK ONLY, nothing is run here"
-  missing=0
-  if [ "$LIST_ONLY" = 1 ]; then
-    printf '  → %-42s %s\n' "e2e spec check" "git diff --name-only <base>..HEAD (no e2e run)"
-    PASS+=("e2e spec check")
-  else
-  if [ "$HAS_E2E_WEB" = 1 ] || [ "$HAS_E2E_MOBILE" = 1 ]; then
-    base="$(git merge-base HEAD "origin/$TARGET" 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
-    changed="$(git diff --name-only "$base"..HEAD 2>/dev/null)"
-    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|[^/]+/e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
-    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|[^/]+/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
-    if [ -n "$behaviour" ] && [ -z "$specs_touched" ]; then
-      missing=1
-      warn "behaviour changed in $(printf '%s\n' "$behaviour" | wc -l | tr -d ' ') file(s) but no e2e spec was touched"
-      printf '%s\n' "$behaviour" | head -8 | sed 's/^/      /'
-    else
-      ok "e2e specs: nothing missing for this change"
-    fi
-  else
-    skip "e2e spec check: this project has no e2e suite"
-  fi
-  # A missing spec is a WARNING in both directions and blocks nothing. It used to
-  # fail the dev -> test promotion, which put the whole e2e backlog in front of an
-  # integration merge and stopped work that had nothing to do with e2e. #33 moved
-  # the writing to the pre-prod gate, where a spec can actually be verified
-  # against a deployed test environment — writing it earlier means writing it
-  # blind. The gap is NOT dropped: step 2 of the test -> prod gate writes every
-  # missing spec before the suite runs, and that gate does block. The gate still
-  # SAYS it on every run, so the backlog stays visible rather than silent.
-  # User decision.
-  if [ "$missing" = 1 ] && [ "$TARGET" = "test" ]; then
-    warn "the missing spec(s) above are a reminder only: e2e is optional (#33); dev -> test is not blocked"
-  fi
-  fi
-  if [ "$TARGET" = "test" ]; then
-    warn "e2e was NOT run (optional since 03/10/2026) — nothing in this promotion was proven end to end"
-  fi
+  if gate_step e2e_specs; then gate_e2e_specs; fi
+  if [ "$TARGET" = "test" ]; then gate_e2e_suite; fi
 fi
 
 # ── prod: on top of the shared set, the test deploy check and the full e2e suite, both on request ──

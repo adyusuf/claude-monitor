@@ -9,6 +9,9 @@ ROOT="$(git rev-parse --show-toplevel)"
 target="${1:-dev}"
 bash "$ROOT/scripts/gate-core.sh" "$target" "${@:2}"
 status=$?
+# 10: the panel turned the gate off (gates_before_push.<t> = no) - allowed, nothing passed; this wrapper's own steps
+# do not run either (standards/13 §8a). Any other non-zero is a closed gate.
+[ "$status" = 10 ] && exit 10
 # The project's own steps run something (publish, scan); a listing must run nothing.
 [ "${2:-}" = "--list" ] && exit "$status"
 # The published agent binary must stay up (docs/adr-0002-agent-platform.md, "Published build"); 3 = not run, which blocks.
