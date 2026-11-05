@@ -126,7 +126,9 @@ fi
 node_track() {
   local t0=$SECONDS
   say "node track — lint · typecheck · build · test · audit (ran beside the .NET steps)"
-  node_lint; node_typecheck; node_build; node_test; node_audit
+  # A step the user unticked does not run here either; gate-core.sh already printed it WAIVED under its own heading.
+  step_on lint && node_lint; step_on typecheck && node_typecheck; step_on build && node_build
+  step_on unit && node_test; step_on cve && node_audit
   printf '  node track: %ds\n' $((SECONDS - t0))
 }
 node_start() {
