@@ -50,7 +50,15 @@ function PairInputs({ k, v, setK, setV }: { k: string; v: string; setK: (s: stri
 export function TagsEditor({ agentId, tags, canEdit, onChanged }: { agentId: string; tags: Record<string, string> | null | undefined; canEdit: boolean; onChanged: () => void }) {
   const { t } = useI18n();
   const errorText = useErrorText();
-  const pairs = sortedTags(tags);
+  // The set last written here stands in for the prop until the machine is read again, so a second change never starts from the old set.
+  const [written, setWritten] = useState<Record<string, string> | null>(null);
+  const storedKey = JSON.stringify(sortedTags(tags));
+  const [seen, setSeen] = useState(storedKey);
+  if (seen !== storedKey) {
+    setSeen(storedKey);
+    setWritten(null);
+  }
+  const pairs = sortedTags(written ?? tags);
   const [editing, setEditing] = useState<string | null>(null);
   const [editKey, setEditKey] = useState("");
   const [editValue, setEditValue] = useState("");
@@ -79,6 +87,7 @@ export function TagsEditor({ agentId, tags, canEdit, onChanged }: { agentId: str
     setError(null);
     try {
       await api.setAgentTags(agentId, next);
+      setWritten(next);
       setSaved(true);
       onChanged();
       return true;

@@ -85,7 +85,7 @@ describe("tags and the note on the machine page", () => {
     expect(puts(calls, "tags")[0]!.body).toEqual({ tags: { project: "shop", region: "eu" } });
   });
 
-  it("edits a pair from its chip and removes another from its chip", async () => {
+  it("edits a pair from its chip, then removes another from the set it just wrote, not the one read before", async () => {
     const calls = api({ "PUT /agents/a1/tags": { body: {} } }, { tags: { region: "eu", tier: "1" } });
     open();
     await userEvent.click(await screen.findByRole("button", { name: "Edit region=eu" }));
@@ -99,7 +99,7 @@ describe("tags and the note on the machine page", () => {
     expect(puts(calls, "tags")[0]!.body).toEqual({ tags: { region: "us", tier: "1" } });
     await userEvent.click(screen.getByRole("button", { name: "Remove tier=1" }));
     await waitFor(() => expect(puts(calls, "tags")).toHaveLength(2));
-    expect(puts(calls, "tags")[1]!.body).toEqual({ tags: { region: "eu" } });
+    expect(puts(calls, "tags")[1]!.body).toEqual({ tags: { region: "us" } });
   });
 
   it("keeps the add button off for a malformed part and refuses a key that is taken", async () => {
