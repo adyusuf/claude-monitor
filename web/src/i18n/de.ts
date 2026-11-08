@@ -3,6 +3,7 @@ import { deMachines } from "./de.machines";
 import { deTwoStep } from "./de.twoStep";
 import { deApprovalRules } from "./de.approvalRules";
 import { deDashboard } from "./de.dashboard";
+import { deInstallOptions } from "./de.installOptions";
 import { deRemote } from "./de.remote";
 import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
@@ -193,6 +194,7 @@ export const de: Dictionary = {
   twoStep: deTwoStep,
   approvalRules: deApprovalRules,
   dashboard: deDashboard,
+  installOptions: deInstallOptions,
   device: {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",
     approve: "Diese Maschine verbinden", deny: "Das bin nicht ich", approved: "Fertig. Die Maschine ist verbunden; Sie können diese Seite schließen.",

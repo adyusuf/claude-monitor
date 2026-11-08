@@ -8,6 +8,7 @@ import { trServerSettings } from "./tr.serverSettings";
 import { trTwoStep } from "./tr.twoStep";
 import { trApprovalRules } from "./tr.approvalRules";
 import { trDashboard } from "./tr.dashboard";
+import { trInstallOptions } from "./tr.installOptions";
 import { trRemote } from "./tr.remote";
 
 // Turkish: the same keys as en.ts (the type makes a missing key a build error).
@@ -193,6 +194,7 @@ export const tr: Dictionary = {
   twoStep: trTwoStep,
   approvalRules: trApprovalRules,
   dashboard: trDashboard,
+  installOptions: trInstallOptions,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
     approve: "Bu makineyi bağla", deny: "Bu ben değilim", approved: "Tamam. Makine bağlandı; bu sayfayı kapatabilirsiniz.",
