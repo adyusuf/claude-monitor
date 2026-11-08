@@ -8,6 +8,7 @@ import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { AccountDataCards } from "./AccountData";
 import { ApprovalKeysCard } from "./ApprovalKeysCard";
+import { InstallOptions } from "./InstallOptions";
 import { MfaCard } from "./Mfa";
 import { useTokenOnce } from "./AuthPages";
 
@@ -136,6 +137,9 @@ export function DownloadPage() {
           </Card>
         </SettingsSection>
       )}
+      <SettingsSection title={t("installOptions.title")} hint={t("installOptions.hint")}>
+        <InstallOptions server={origin} />
+      </SettingsSection>
       <SettingsSection title={t("download.manualTitle")} hint={t("download.manualHint")}>
         <Card>
           <ol className="steps">
