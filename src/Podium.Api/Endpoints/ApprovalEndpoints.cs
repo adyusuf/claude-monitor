@@ -14,7 +14,7 @@ public sealed record ApprovalRequestRow(Guid Id, Guid SessionId, string? Session
 
 /// <summary>One of the caller's approval rules.</summary>
 public sealed record ApprovalRuleRow(Guid Id, Guid AgentId, string Hostname, string ToolName, string? Command, string Duration,
-    DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt, int UseCount, DateTimeOffset? LastUsedAt);
+    DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt, int UseCount, DateTimeOffset? LastUsedAt, string? ProjectName = null);
 
 /// <summary>
 /// The approvals page and band (ADR-0019): the permission requests on the caller's own sessions, the caller's own approval rules, and revoking
@@ -74,10 +74,12 @@ public static class ApprovalEndpoints
         var rows = await (from r in db.ApprovalRules.AsNoTracking()
                           join a in db.Agents.AsNoTracking() on r.AgentId equals a.Id
                           join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
+                          join p in db.Repos.AsNoTracking() on r.RepoId equals (Guid?)p.Id into projects
+                          from p in projects.DefaultIfEmpty()
                           where r.WorkspaceId == id && r.UserId == userId && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now)
                           orderby r.CreatedAt descending
                           select new ApprovalRuleRow(r.Id, r.AgentId, m.Hostname, r.ToolName, r.Command, r.Duration, r.CreatedAt, r.ExpiresAt,
-                              r.UseCount, r.LastUsedAt))
+                              r.UseCount, r.LastUsedAt, p == null ? null : p.DisplayName))
             .Take(ApprovalRuleLimits.LiveMax).ToListAsync(ct);
         return Results.Ok(rows);
     }
@@ -96,7 +98,7 @@ public static class ApprovalEndpoints
         Audit.Add(db, http, clock, AuditActions.ApprovalRuleRevoked, rule.WorkspaceId, userId, targetType: "approval_rule", targetId: id,
             detail: new { rule.ToolName, rule.Duration });
         await db.SaveChangesAsync(ct);
-        broker.Publish(Broker.Workspace(rule.WorkspaceId), new StreamMessage("approval_rule", new { id, userId }));
+        broker.Publish(Broker.Workspace(rule.WorkspaceId), new StreamMessage("approval_rule", new { id }));
         return Results.NoContent();
     }
 }

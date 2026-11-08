@@ -174,7 +174,8 @@ public static class CommandEndpoints
 
         if (remember == ApprovalDurations.Always && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, code)) return RemoteChecks.ReauthRefused();
         DateTimeOffset? ends = ApprovalDurations.Length(remember) is { } length ? now + length : null;
-        var rule = await db.ApprovalRules.Where(r => r.AgentId == agent.Id && r.UserId == userId && r.WorkspaceId == agent.WorkspaceId
+        var repoId = await db.HarnessSessions.AsNoTracking().Where(s => s.Id == request.SessionId).Select(s => s.RepoId).FirstOrDefaultAsync(ct);
+        var rule = await db.ApprovalRules.Where(r => r.AgentId == agent.Id && r.UserId == userId && r.WorkspaceId == agent.WorkspaceId && r.RepoId == repoId
                 && r.ToolName == scope.Tool && r.Command == scope.Command && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now))
             .OrderBy(r => r.CreatedAt).FirstOrDefaultAsync(ct);
         if (rule is null)
@@ -183,7 +184,7 @@ public static class CommandEndpoints
             if (live >= ApprovalRuleLimits.LiveMax) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: RuleLimit);
             rule = new ApprovalRule
             {
-                WorkspaceId = agent.WorkspaceId, UserId = userId, AgentId = agent.Id, ToolName = scope.Tool, Command = scope.Command,
+                WorkspaceId = agent.WorkspaceId, UserId = userId, AgentId = agent.Id, RepoId = repoId, ToolName = scope.Tool, Command = scope.Command,
                 CreatedAt = now, CreatedFromRequest = request.Id,
             };
             db.ApprovalRules.Add(rule);

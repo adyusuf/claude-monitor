@@ -14,7 +14,7 @@ using Podium.Api.Data;
 namespace Podium.Api.Data.Migrations
 {
     [DbContext(typeof(PodiumDb))]
-    [Migration("20261108205404_ApprovalRules")]
+    [Migration("20261108210604_ApprovalRules")]
     partial class ApprovalRules
     {
         /// <inheritdoc />
@@ -724,6 +724,10 @@ namespace Podium.Api.Data.Migrations
                     b.Property<DateTimeOffset?>("LastUsedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_used_at");
+
+                    b.Property<Guid?>("RepoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("repo_id");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")

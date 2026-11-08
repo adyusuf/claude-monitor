@@ -25,6 +25,7 @@ namespace Podium.Api.Data.Migrations
                     workspace_id = table.Column<Guid>(type: "uuid", nullable: false),
                     user_id = table.Column<Guid>(type: "uuid", nullable: false),
                     agent_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    repo_id = table.Column<Guid>(type: "uuid", nullable: true),
                     tool_name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     command = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     duration = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),

@@ -196,7 +196,7 @@ public static class AgentEndpoints
 
         // An approval rule answers at once, but only to an agent that reads the answer in this response (ADR-0019 §7, §8).
         var agent = req.InlineAnswer ? await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted) : null;
-        var rule = agent is null ? null : await ApprovalRules.MatchAsync(db, agent, req.ToolName, req.ToolInput, now, http.RequestAborted);
+        var rule = agent is null ? null : await ApprovalRules.MatchAsync(db, agent, session.RepoId, req.ToolName, req.ToolInput, now, http.RequestAborted);
         PermissionAnswerMessage? answer = null;
         if (rule is not null)
         {

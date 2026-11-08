@@ -16,6 +16,13 @@ export function commandOf(row: { toolName: string; toolInput: Record<string, unk
   return row.toolName === "Bash" && typeof c === "string" ? c : null;
 }
 
+/** The keys of a Bash call other than its command and description (a sandbox flag, background, …), so the owner sees all that runs. */
+export function bashExtras(row: { toolName: string; toolInput: Record<string, unknown> }): Record<string, unknown> | null {
+  if (commandOf(row) === null) return null;
+  const rest = Object.fromEntries(Object.entries(row.toolInput).filter(([k]) => k !== "command" && k !== "description"));
+  return Object.keys(rest).length > 0 ? rest : null;
+}
+
 /** A one-line preview of a request: the command, a file path, or the tool alone. */
 export function previewOf(row: { toolName: string; toolInput: Record<string, unknown> }): string {
   const command = commandOf(row);
@@ -38,6 +45,7 @@ export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalReq
   const gate = useCodeGate("reauth_required", "approvalRules.rememberHintAlways");
   const question = row.toolName === QUESTION_TOOL;
   const command = commandOf(row);
+  const extras = bashExtras(row);
 
   const answer = async (decision: "allow" | "deny") => {
     const ok = await gate.attempt((code) => api.answer(row.id, decision, reason.trim() || undefined, undefined,
@@ -57,7 +65,7 @@ export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalReq
         {row.projectName ? <span className="muted"> · <Icon name="projects" /> {row.projectName}</span> : null}
         {row.strict ? <span className="badge warn">{t("machines.role.strict")}</span> : null}
       </p>
-      {command !== null ? <pre className="code approval-command">{command}</pre>
+      {command !== null ? <><pre className="code approval-command">{command}</pre>{extras ? <Json value={extras} /> : null}</>
         : row.toolName === PLAN_TOOL ? <PlanPrompt input={row.toolInput} /> : question ? null : <Json value={row.toolInput} />}
       {question ? (
         <p className="small">{t("approvalRules.questionOnSession")} <Link to={`/w/${ws}/sessions/${row.sessionId}`}>{t("approvalRules.openSession")}</Link></p>
