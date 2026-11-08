@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import { Icon } from "./icons";
 
+const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
+
 /**
  * A dialog over the page: a title, a close button, Escape and a click on the backdrop close it. Focus moves into it when it opens and goes back
  * to where it was when it closes; the page behind does not scroll while it is open.
@@ -22,6 +24,20 @@ export function Modal({ title, onClose, children }: { title: ReactNode; onClose:
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close.current();
+      if (e.key !== "Tab" || !box.current) return;
+      // Tab and Shift+Tab go round the dialog's own controls; the page behind is out of reach while it is open.
+      const focusable = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.hasAttribute("disabled"));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      const at = document.activeElement;
+      if (e.shiftKey && (at === first || at === box.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (at === last || !box.current.contains(at))) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => {
