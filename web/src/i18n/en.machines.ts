@@ -24,7 +24,8 @@ export const enMachines = {
     hint: "The agent probes a fixed list by absolute path and reports what it finds; it runs --version only for trusted or self-owned binaries.",
   },
   tags: {
-    title: "Tags", label: "Tags (key=value, separated by spaces)", none: "No tags.", save: "Save tags", saved: "Tags saved.",
+    title: "Tags", none: "No tags.", saved: "Tags saved.", key: "Key", value: "Value", add: "Add tag",
+    edit: "Edit {tag}", remove: "Remove {tag}", duplicate: "Another tag already has this key.", full: "A machine has at most {max} tags.",
     hint: "At most {max} pairs; keys and values use letters, digits, dot, underscore and dash (1 to 32 characters). Claude sees them as labels, never as instructions.",
   },
   note: {

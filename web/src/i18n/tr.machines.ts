@@ -26,7 +26,8 @@ export const trMachines: Dictionary["machines"] = {
     hint: "Ajan sabit bir listeyi mutlak yollardan yoklar ve bulduklarını bildirir; --version'ı yalnızca güvenilen ya da kendi hesabının sahip olduğu dosyalar için çalıştırır.",
   },
   tags: {
-    title: "Etiketler", label: "Etiketler (anahtar=değer, boşlukla ayrılmış)", none: "Etiket yok.", save: "Etiketleri kaydet", saved: "Etiketler kaydedildi.",
+    title: "Etiketler", none: "Etiket yok.", saved: "Etiketler kaydedildi.", key: "Anahtar", value: "Değer", add: "Etiket ekle",
+    edit: "{tag} etiketini düzenle", remove: "{tag} etiketini kaldır", duplicate: "Bu anahtar başka bir etikette var.", full: "Bir makinede en fazla {max} etiket olur.",
     hint: "En fazla {max} çift; anahtar ve değerde harf, rakam, nokta, alt çizgi ve tire kullanılır (1 ile 32 karakter). Claude bunları etiket olarak görür, talimat olarak değil.",
   },
   note: {

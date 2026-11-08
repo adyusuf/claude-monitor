@@ -5,7 +5,8 @@ import type { MachineDetail, MachineProjectView, Me } from "../api/types";
 import { en } from "../i18n/en";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
-import { noteOk, parseTags, TAGS_MAX, tagsText } from "./MachineFacts";
+import { noteOk } from "./MachineFacts";
+import { sortedTags, TAGS_MAX, tagPartOk, withTag } from "./MachineTagsEditor";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
 
@@ -42,21 +43,30 @@ function api(over: Parameters<typeof mockApi>[0] = {}, view: Partial<ReturnType<
 const puts = (calls: ReturnType<typeof mockApi>, what: string) => calls.filter((c) => c.method === "PUT" && c.path === `/agents/a1/${what}`);
 
 describe("the tag and note helpers", () => {
-  it("reads key=value pairs separated by spaces or commas and refuses a malformed pair or too many", () => {
-    expect(parseTags("project=shop, region=eu  tier=1")).toEqual({ project: "shop", region: "eu", tier: "1" });
-    expect(parseTags("")).toEqual({});
-    expect(parseTags("novalue")).toBeNull();
-    expect(parseTags("a=b=c")).toBeNull();
-    expect(parseTags("=v")).toBeNull();
-    expect(parseTags("k=ü")).toBeNull();
-    expect(parseTags(`k=${"x".repeat(33)}`)).toBeNull();
-    expect(parseTags(Array.from({ length: TAGS_MAX + 1 }, (_, i) => `k${i}=v`).join(" "))).toBeNull();
-    expect(parseTags(Array.from({ length: TAGS_MAX }, (_, i) => `k${i}=v`).join(" "))).not.toBeNull();
+  it("accepts a key or value of letters, digits, dot, underscore and dash up to 32 characters", () => {
+    expect(tagPartOk("shop-1.eu_x")).toBe(true);
+    expect(tagPartOk("")).toBe(false);
+    expect(tagPartOk("a=b")).toBe(false);
+    expect(tagPartOk("ü")).toBe(false);
+    expect(tagPartOk("x".repeat(32))).toBe(true);
+    expect(tagPartOk("x".repeat(33))).toBe(false);
   });
 
-  it("writes the tags back sorted and accepts a note without control characters", () => {
-    expect(tagsText({ region: "eu", project: "shop" })).toBe("project=shop region=eu");
-    expect(tagsText(null)).toBe("");
+  it("adds, renames and refuses a pair: a malformed part, a key that is taken, or one beyond the limit", () => {
+    expect(withTag({ region: "eu" }, null, "project", "shop")).toEqual({ project: "shop", region: "eu" });
+    expect(withTag({ region: "eu" }, "region", "zone", "eu-1")).toEqual({ zone: "eu-1" });
+    expect(withTag({ region: "eu" }, "region", "region", "us")).toEqual({ region: "us" });
+    expect(withTag({ region: "eu", project: "shop" }, "region", "project", "x")).toBe("duplicate");
+    expect(withTag({ region: "eu" }, null, "region", "us")).toBe("duplicate");
+    expect(withTag({}, null, "a=b", "c")).toBe("invalid");
+    const full = Object.fromEntries(Array.from({ length: TAGS_MAX }, (_, i) => [`k${i}`, "v"]));
+    expect(withTag(full, null, "one", "more")).toBe("full");
+    expect(withTag(full, "k0", "renamed", "v")).not.toBe("full");
+  });
+
+  it("sorts the pairs by key and accepts a note without control characters", () => {
+    expect(sortedTags({ region: "eu", project: "shop" })).toEqual([["project", "shop"], ["region", "eu"]]);
+    expect(sortedTags(null)).toEqual([]);
     expect(noteOk("line one\nline two\ttab")).toBe(true);
     expect(noteOk("bell\u0007")).toBe(false);
     expect(noteOk("x".repeat(2001))).toBe(false);
@@ -64,33 +74,53 @@ describe("the tag and note helpers", () => {
 });
 
 describe("tags and the note on the machine page", () => {
-  it("shows an admin the tags in an input, saves them as pairs and reads the machine again", async () => {
+  it("adds a pair from the row below the chips and reads the machine again", async () => {
     const calls = api({ "PUT /agents/a1/tags": { body: {} } }, { tags: { region: "eu" } });
     open();
-    const input = await screen.findByLabelText(en.machines.tags.label);
-    expect(input).toHaveValue("region=eu");
-    await userEvent.clear(input);
-    await userEvent.type(input, "project=shop region=eu");
-    await userEvent.click(screen.getByRole("button", { name: en.machines.tags.save }));
+    expect(await screen.findByText("region=eu")).toHaveClass("tag-chip");
+    await userEvent.type(screen.getByLabelText(en.machines.tags.key), "project");
+    await userEvent.type(screen.getByLabelText(en.machines.tags.value), "shop");
+    await userEvent.click(screen.getByRole("button", { name: en.machines.tags.add }));
     expect(await screen.findByText(en.machines.tags.saved)).toBeInTheDocument();
     expect(puts(calls, "tags")[0]!.body).toEqual({ tags: { project: "shop", region: "eu" } });
   });
 
-  it("refuses a malformed tag on the client and keeps the save button off", async () => {
-    const calls = api();
+  it("edits a pair from its chip and removes another from its chip", async () => {
+    const calls = api({ "PUT /agents/a1/tags": { body: {} } }, { tags: { region: "eu", tier: "1" } });
     open();
-    const input = await screen.findByLabelText(en.machines.tags.label);
-    await userEvent.type(input, "no-value");
-    expect(screen.getByText(en.errors.invalid_tag)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: en.machines.tags.save })).toBeDisabled();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit region=eu" }));
+    const keys = screen.getAllByLabelText(en.machines.tags.key);
+    const values = screen.getAllByLabelText(en.machines.tags.value);
+    expect(keys[0]).toHaveValue("region");
+    await userEvent.clear(values[0]!);
+    await userEvent.type(values[0]!, "us");
+    await userEvent.click(screen.getByRole("button", { name: en.common.save }));
+    await waitFor(() => expect(puts(calls, "tags")).toHaveLength(1));
+    expect(puts(calls, "tags")[0]!.body).toEqual({ tags: { region: "us", tier: "1" } });
+    await userEvent.click(screen.getByRole("button", { name: "Remove tier=1" }));
+    await waitFor(() => expect(puts(calls, "tags")).toHaveLength(2));
+    expect(puts(calls, "tags")[1]!.body).toEqual({ tags: { region: "eu" } });
+  });
+
+  it("keeps the add button off for a malformed part and refuses a key that is taken", async () => {
+    const calls = api({}, { tags: { region: "eu" } });
+    open();
+    await userEvent.type(await screen.findByLabelText(en.machines.tags.key), "no=good");
+    await userEvent.type(screen.getByLabelText(en.machines.tags.value), "v");
+    expect(screen.getByRole("button", { name: en.machines.tags.add })).toBeDisabled();
+    await userEvent.clear(screen.getByLabelText(en.machines.tags.key));
+    await userEvent.type(screen.getByLabelText(en.machines.tags.key), "region");
+    await userEvent.click(screen.getByRole("button", { name: en.machines.tags.add }));
+    expect(await screen.findByText(en.machines.tags.duplicate)).toBeInTheDocument();
     expect(puts(calls, "tags")).toHaveLength(0);
   });
 
   it("shows the API's refusal of a tag set", async () => {
     api({ "PUT /agents/a1/tags": { status: 400, body: { title: "invalid_tag" } } });
     open();
-    await userEvent.type(await screen.findByLabelText(en.machines.tags.label), "a=b");
-    await userEvent.click(screen.getByRole("button", { name: en.machines.tags.save }));
+    await userEvent.type(await screen.findByLabelText(en.machines.tags.key), "a");
+    await userEvent.type(screen.getByLabelText(en.machines.tags.value), "b");
+    await userEvent.click(screen.getByRole("button", { name: en.machines.tags.add }));
     expect(await screen.findByText(en.errors.invalid_tag)).toBeInTheDocument();
   });
 
@@ -99,7 +129,7 @@ describe("tags and the note on the machine page", () => {
     open();
     expect(await screen.findByText("project=shop")).toHaveClass("badge");
     expect(screen.getByText("Restart the database first.")).toBeInTheDocument();
-    expect(screen.queryByLabelText(en.machines.tags.label)).toBeNull();
+    expect(screen.queryByLabelText(en.machines.tags.key)).toBeNull();
     expect(screen.queryByLabelText(en.machines.note.label)).toBeNull();
   });
 
