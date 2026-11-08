@@ -95,6 +95,19 @@ export interface PermissionRow {
   answeredAt: string | null;
 }
 
+/** How many of something are in one state. */
+export interface StateCount { state: string; count: number }
+/** The dashboard's counts (runs and permission answers over the last `days` days). */
+export interface DashboardView {
+  days: number;
+  projects: StateCount[];
+  sprints: StateCount[];
+  runs: StateCount[];
+  /** Permission requests by outcome: allow, auto_allowed, deny, expired, open. */
+  approvals: StateCount[];
+  openAlerts: number;
+}
+
 /** How long an allow stands for the same tool on the same machine (ADR-0019). */
 export type ApprovalDuration = "once" | "5m" | "10m" | "30m" | "1h" | "always";
 export const APPROVAL_DURATIONS: readonly ApprovalDuration[] = ["once", "5m", "10m", "30m", "1h", "always"];

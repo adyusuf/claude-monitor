@@ -21,6 +21,7 @@ import { SprintPage } from "./pages/SprintPage";
 import { SprintsPage } from "./pages/SprintsPage";
 import { RunsPage } from "./pages/RunsPage";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { SessionPage } from "./pages/SessionPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { NewWorkspacePage, WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage";
@@ -71,6 +72,7 @@ export function App() {
         <Route path="/w/:ws/machines/:agentId" element={<MachinePage />} />
         <Route path="/w/:ws/runs" element={<RunsPage />} />
         <Route path="/w/:ws/approvals" element={<ApprovalsPage />} />
+        <Route path="/w/:ws/dashboard" element={<DashboardPage />} />
         <Route path="/w/:ws/members" element={<MembersPage />} />
         <Route path="/w/:ws/integrations" element={<IntegrationsPage />} />
         <Route path="/w/:ws/settings" element={<WorkspaceSettingsPage />} />

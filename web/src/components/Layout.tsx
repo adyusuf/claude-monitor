@@ -74,6 +74,7 @@ export function Layout() {
         ) : null}
         {current ? (
           <nav className="nav">
+            {link(`/w/${current.id}/dashboard`, t("nav.dashboard"), "dashboard")}
             {link(`/w/${current.id}/projects`, t("nav.projects"), "projects")}
             {link(`/w/${current.id}/sessions`, t("nav.sessions"), "sessions")}
             {link(`/w/${current.id}/machines`, t("nav.machines"), "machines", pending)}
