@@ -12,7 +12,7 @@ import { deServerSettings } from "./de.serverSettings";
 export const de: Dictionary = {
   app: { name: "Podium", tagline: "Verfolgen Sie Ihre KI-Programmiersitzungen live." },
   nav: {
-    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
+    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", runs: "Ausführungen", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
     account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
     themeSystem: "System", themeLight: "Hell", themeDark: "Dunkel",
@@ -240,6 +240,11 @@ export const de: Dictionary = {
     installerTitle: "In einem Schritt installieren (empfohlen)",
     installerIntro: "Ein Befehl installiert den Agent und das Claude-Code-Plugin und verbindet diese Maschine (ein Code erscheint; geben Sie ihn auf der sich öffnenden Seite frei). Er ersetzt einen älteren Agent nach Rückfrage und behält dessen Einstellungen und Anmeldung.",
     installerUnix: "macOS und Linux:", installerWindows: "Windows (PowerShell):",
+  },
+  runsPage: {
+    title: "Ausführungen", intro: "Jeder Befehl, den eine Maschine dieses Arbeitsbereichs ausführen sollte, der neueste zuerst: wer ihn wollte, wo, und wer entschied.",
+    status: "Status", allMachines: "Alle Maschinen", machine: "Maschine", command: "Befehl", requestedBy: "Angefordert von", when: "Wann", decidedBy: "Entschieden von",
+    byGrant: "eine Freigabe", byJob: "ein Auftrag", undecided: "noch nicht", details: "Details", detailsOf: "Details der Ausführung", empty: "In diesem Arbeitsbereich wurde noch nichts ausgeführt.",
   },
   common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert" },
   remote: deRemote,

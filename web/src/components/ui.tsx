@@ -3,10 +3,11 @@ import type { SessionStatus } from "../api/types";
 import { useI18n } from "../i18n";
 import { Icon } from "./icons";
 
-export function Button({ variant = "primary", busy, children, ...rest }:
+/** A button; while `busy` it shows a spinner and takes no clicks, whatever `disabled` says. */
+export function Button({ variant = "primary", busy, disabled, children, ...rest }:
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "subtle"; busy?: boolean }) {
   return (
-    <button type="button" className={`btn btn-${variant}`} disabled={busy || rest.disabled} {...rest}>
+    <button type="button" className={`btn btn-${variant}`} {...rest} disabled={busy || disabled}>
       {busy ? <span className="btn-spin" aria-hidden /> : null}
       {children}
     </button>

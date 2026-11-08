@@ -45,7 +45,7 @@ can run the application's tests on a test machine.
   and never replaces a set value with a non-strict one; the "role is set" test (`role_not_set`) looks at the **set**
   value only, so a machine with no set role and a claim of `production` is still refused scripts and asks.
 - **Facts:** what an agent reports about its machine beyond metrics: Claude presence, the **tool inventory**, the
-  **listening services** (opt-in), the **projects** found on it. **Tags** (`key=value`, at most 10) and the **admin
+  **listening services** (opt-in), the **projects** found on it. **Tags** (`key=value`, at most 100; 10 before 08/11/2026) and the **admin
   note** (at most 2 000 characters; there is no second note) are set on the web.
 - **Project history on a machine:** what happened to one project on one agent: its version there, the runs that
   targeted it (tests, builds, deploys), the errors its sessions hit there; recorded automatically.
@@ -96,7 +96,7 @@ can run the application's tests on a test machine.
   16/10/2026); Claude reads the list and decides. The tool descriptions say that a script's PATH is the fixed one of
   §3c, so a script that needs a user-owned tool sets its own PATH, which the approver then sees. The `claude` entry's path is
   withheld from `MachineView` (decision 9): members see that Claude Code is there, not where.
-- **Tags** `key=value`: at most 10 per agent, keys and values in `[A-Za-z0-9._-]{1,32}` (`invalid_tag` otherwise), set
+- **Tags** `key=value`: at most 100 per agent (raised from 10 on 08/11/2026), keys and values in `[A-Za-z0-9._-]{1,32}` (`invalid_tag` otherwise), set
   by an admin on the web, audited. Shown everywhere a role is shown. In the session-start block they are **inside the
   untrusted envelope** (§3b): a tag is admin-typed text, not a rule.
 - **Admin note (runbook)**: at most 2 000 characters, set by an admin (`invalid_note` for control characters), untrusted
@@ -324,7 +324,7 @@ That reading is a change to the request's wording and is flagged here for the ma
 | Migration (phase) | Adds |
 |---|---|
 | `MachineRoles` (1) | `agents`: `role_environment`, `role_function` (CHECK on the closed sets of §2, NULL passes), `role_set_at`, `role_set_by`, `claimed_environment`, `claimed_function`, `claude_kind` (`none`, `npm`, `native`, `unsupported`; NULL = unknown), `claude_path`, `claude_version`, `claude_sessions_live`, `claude_sessions_idle`, `presence_at`, `interpreters` jsonb (NULL = unknown, `[]` = none), `tools` jsonb (same convention, ≤ 32 entries, each `{name, path, version, trusted}`), `capabilities` text[] |
-| `MachineFacts` (1b) | `agents`: `tags` jsonb (≤ 10 pairs, CHECK on the count), `tags_set_at`, `tags_set_by`, `admin_note` (≤ 2 000), `admin_note_set_at`, `admin_note_set_by`, `share_services` bool default false, `share_services_set_at`, `share_services_set_by`, `services` jsonb (≤ 64 entries `{port, proto, process}`), `services_at`; new `machine_projects` (`agent_id`, `project_key`, `workspace_id`, `name`, `path_hmac`, `branch`, `head_sha` (≤ 64), `tag` (≤ 64), `last_seen_at`, `source` (`session`, `listed`)) PK (`agent_id`, `project_key`), index (`workspace_id`, `project_key`); `remote_runs.project_key` (≤ 200, NULL), `remote_runs.kind` (`test`, `build`, `deploy`, `other`, NULL) with an index (`target_agent_id`, `project_key`, `created_at` DESC) WHERE `project_key IS NOT NULL` |
+| `MachineFacts` (1b) | `agents`: `tags` jsonb (≤ 10 pairs, CHECK on the count; ≤ 100 from migration `MachineTagsMax100`), `tags_set_at`, `tags_set_by`, `admin_note` (≤ 2 000), `admin_note_set_at`, `admin_note_set_by`, `share_services` bool default false, `share_services_set_at`, `share_services_set_by`, `services` jsonb (≤ 64 entries `{port, proto, process}`), `services_at`; new `machine_projects` (`agent_id`, `project_key`, `workspace_id`, `name`, `path_hmac`, `branch`, `head_sha` (≤ 64), `tag` (≤ 64), `last_seen_at`, `source` (`session`, `listed`)) PK (`agent_id`, `project_key`), index (`workspace_id`, `project_key`); `remote_runs.project_key` (≤ 200, NULL), `remote_runs.kind` (`test`, `build`, `deploy`, `other`, NULL) with an index (`target_agent_id`, `project_key`, `created_at` DESC) WHERE `project_key IS NOT NULL` |
 | `ScriptRuns` (2) | `remote_runs`: `script_interpreter`, `script_body`, `script_args`, `target_environment`, `target_function`, `output_cap` (NULL = the old 1 MiB rule, else 1–64 MiB), `output_read_bytes`, `output_dropped_bytes`, `output_refused_bytes`, `output_missing_from_seq`, `output_chunks`, `output_complete`, `approved_with_totp`; the mode and shape CHECKs widened; `workspace_settings.script_output_max_bytes` (default 8 MiB) |
 | `MachineAsks` (3) | new `machine_asks` (`id`, `workspace_id`, requester agent/user/session, target agent/user/session, `client_key`, `question` 1–8 000, `status`, `answer` ≤ 100 000, `answer_truncated`, `error`, timestamps; CHECK `requester_user_id = target_user_id` and `requester_agent_id <> target_agent_id`; UNIQUE (`requester_agent_id`, `client_key`); indexes for the target queue, the rate cap, the web list, the depth and loop windows, and retention); `agents.accepts_asks`, `accepts_asks_set_at`, `accepts_asks_set_by` |
 

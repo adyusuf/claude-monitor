@@ -175,6 +175,9 @@ export interface WebRunView {
   testsPassed?: number | null;
   testsFailed?: number | null;
   testsSkipped?: number | null;
+  /** Who allowed or denied the run and when; null while it waits. A run a grant or a job allowed names the owner of that grant or job. Absent on an older API. */
+  decidedByName?: string | null;
+  decidedAt?: string | null;
 }
 export interface RunOutputChunk { seq: number; stream: string; body: string; gapBefore: boolean }
 export interface RunOutputPage { chunks: RunOutputChunk[]; nextSeq: number; done: boolean }

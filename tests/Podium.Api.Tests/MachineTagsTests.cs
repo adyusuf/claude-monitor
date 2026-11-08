@@ -38,8 +38,8 @@ public sealed class MachineTagsTests(ApiFactory api)
     public void Tags_are_valid_up_to_ten_pairs_and_the_note_refuses_control_characters_but_not_line_breaks()
     {
         Assert.True(MachineTags.IsValid(null));
-        Assert.True(MachineTags.IsValid(Enumerable.Range(0, 10).ToDictionary(i => $"k{i}", i => $"v{i}")));
-        Assert.False(MachineTags.IsValid(Enumerable.Range(0, 11).ToDictionary(i => $"k{i}", i => $"v{i}")));
+        Assert.True(MachineTags.IsValid(Enumerable.Range(0, MachineTags.Max).ToDictionary(i => $"k{i}", i => $"v{i}")));
+        Assert.False(MachineTags.IsValid(Enumerable.Range(0, MachineTags.Max + 1).ToDictionary(i => $"k{i}", i => $"v{i}")));
         Assert.False(MachineTags.IsValid(new Dictionary<string, string> { ["ok"] = "no way" }));
         Assert.False(MachineTags.IsValid(new Dictionary<string, string> { [new string('k', 33)] = "v" }));
         Assert.True(MachineTags.IsNote("line one\nline two\ttabbed"));
@@ -83,7 +83,7 @@ public sealed class MachineTagsTests(ApiFactory api)
     {
         var team = await RemoteKit.TeamAsync(api);
         (await PutTagsAsync(team.Admin, team.TargetId, new() { ["keep"] = "me" })).EnsureSuccessStatusCode();
-        var tooMany = Enumerable.Range(0, 11).ToDictionary(i => $"k{i}", i => $"v{i}");
+        var tooMany = Enumerable.Range(0, MachineTags.Max + 1).ToDictionary(i => $"k{i}", i => $"v{i}");
         foreach (var bad in new[] { tooMany, new Dictionary<string, string> { ["a"] = "x y" }, new Dictionary<string, string> { ["a=b"] = "x" } })
         {
             var response = await PutTagsAsync(team.Admin, team.TargetId, bad);

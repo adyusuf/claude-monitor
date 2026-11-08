@@ -315,7 +315,7 @@ namespace Podium.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_agents_status", "status IN ('active', 'revoked')");
 
-                            t.HasCheckConstraint("ck_agents_tags", "tags IS NULL OR (jsonb_typeof(tags) = 'object' AND jsonb_array_length(jsonb_path_query_array(tags, '$.keyvalue()')) <= 10)");
+                            t.HasCheckConstraint("ck_agents_tags", "tags IS NULL OR (jsonb_typeof(tags) = 'object' AND jsonb_array_length(jsonb_path_query_array(tags, '$.keyvalue()')) <= 100)");
                         });
                 });
 

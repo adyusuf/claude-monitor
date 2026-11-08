@@ -67,3 +67,14 @@ circle.spark-line { fill: var(--accent); stroke: none; }
 .meter { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
 .meter-fill { height: 100%; background: var(--accent); }
 .meter-fill.warn { background: var(--warn); }
+
+/* A dialog over the page (components/Modal) and the workspace's runs table. */
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; overflow-y: auto; background: color-mix(in srgb, var(--ground) 60%, transparent); }
+.modal { width: min(820px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; outline: none; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.modal-head h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.modal-close { background: none; border: none; color: inherit; cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; }
+.modal-close:hover, .modal-close:focus-visible { background: var(--raised); }
+.modal-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.runs-command { max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) { .modal-backdrop { padding: 16px 8px; } .runs-command { max-width: none; } }

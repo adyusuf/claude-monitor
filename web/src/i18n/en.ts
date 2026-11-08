@@ -11,7 +11,7 @@ import { enRemote } from "./en.remote";
 export const en = {
   app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
-    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
+    projects: "Projects", sessions: "Sessions", machines: "Machines", runs: "Runs", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
     themeSystem: "System", themeLight: "Light", themeDark: "Dark",
@@ -239,6 +239,11 @@ export const en = {
     installerTitle: "Install in one step (recommended)",
     installerIntro: "One command installs the agent and the Claude Code plugin and connects this machine (a code appears; approve it on the page that opens). It replaces an older agent after asking, and keeps its settings and login.",
     installerUnix: "macOS and Linux:", installerWindows: "Windows (PowerShell):",
+  },
+  runsPage: {
+    title: "Runs", intro: "Every command a machine of this workspace was asked to run, newest first: who asked, where, and who decided.",
+    status: "Status", allMachines: "All machines", machine: "Machine", command: "Command", requestedBy: "Requested by", when: "When", decidedBy: "Decided by",
+    byGrant: "a grant", byJob: "a job", undecided: "not yet", details: "Details", detailsOf: "Run details", empty: "Nothing has run in this workspace yet.",
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: enRemote,
