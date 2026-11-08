@@ -206,9 +206,17 @@ textarea.input { resize: vertical; }
 .seg:hover { color: var(--text); }
 .seg.active { color: var(--text); border-bottom-color: var(--text); }
 .session-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; }
-.session-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--rule); color: var(--text); }
+.session-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--rule); color: var(--text); }
+.session-link { flex: 1 1 320px; min-width: 0; display: flex; justify-content: space-between; gap: 16px; color: inherit; }
+.session-link:hover { text-decoration: none; }
+.session-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.session-row > .notice { flex-basis: 100%; }
+.session-machine-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; margin: 0 0 8px; }
+.session-machine-head .session-machine-name { margin: 0; }
+.session-machine-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.session-none { margin: 0 0 0 4px; }
 .session-list > li:last-child > .session-row { border-bottom: none; }
-.session-row:hover { background: var(--raised); text-decoration: none; }
+.session-row:hover { background: var(--raised); }
 .session-groups { display: flex; flex-direction: column; gap: 24px; }
 .session-machine-name { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 16px; overflow-wrap: anywhere; }
 .session-branch + .session-branch { margin-top: 16px; }
@@ -383,7 +391,7 @@ button.act-text { cursor: pointer; }
   .page-head .row-actions { justify-content: flex-start; }
   .grid { grid-template-columns: 1fr; }
   .inline-form { grid-template-columns: 1fr; }
-  .session-row { flex-direction: column; }
+  .session-link { flex-direction: column; }
   .session-side { flex-direction: row; justify-content: space-between; align-items: center; }
 }
 .prompt-question, .prompt-plan { margin: 8px 0; }

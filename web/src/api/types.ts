@@ -46,6 +46,10 @@ export interface SessionRow {
   openPermissions: number;
   /** The push transport the session's machine has on ("inbox" or "channel"); absent or null when it is off or the agent is older. */
   pushTransport?: string | null;
+  /** Claude Code started this session in the background from the web (ADR-0014); absent on an older API. */
+  startedFromWeb?: boolean;
+  /** The short id of that start, for a stop from the web; null when the web did not start it. */
+  webSessionRef?: string | null;
 }
 export interface TaskRow { id: string; externalId: string; subject: string; status: string; updatedAt: string }
 export interface SubagentRow { id: string; agentType: string; description: string | null; status: string; startedAt: string; endedAt: string | null }
