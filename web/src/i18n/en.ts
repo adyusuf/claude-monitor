@@ -122,7 +122,7 @@ export const en = {
     count: "{n} session(s)", machineGone: "This machine is no longer connected.", noneOnMachine: "No session on this machine.",
     noneLoaded: "No session among the ones loaded so far.", noRepo: "No repository reported", noMatch: "No session matches.",
     fromWeb: "Started from the web", fromWebHint: "Claude Code was started in the background for this session from the web.",
-    stop: "Stop", stopConfirm: "Stop this session? Its conversation is kept.", hide: "Remove from the list",
+    stop: "Stop", stopSent: "Stop sent. The machine stops the session when it next checks in; the result is in its Claude dialog.", stopConfirm: "Stop this session? Its conversation is kept.", hide: "Remove from the list",
     hideConfirm: "Remove this ended session from the list? Nothing is deleted, and it comes back if it reports again.",
   },
   session: {

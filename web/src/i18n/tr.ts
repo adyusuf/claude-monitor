@@ -123,7 +123,7 @@ export const tr: Dictionary = {
     count: "{n} oturum", machineGone: "Bu makine artık bağlı değil.", noneOnMachine: "Bu makinede oturum yok.",
     noneLoaded: "Şimdiye kadar yüklenenler arasında oturum yok.", noRepo: "Depo bildirilmedi", noMatch: "Eşleşen oturum yok.",
     fromWeb: "Web'den başlatıldı", fromWebHint: "Bu oturum için Claude Code web'den arka planda başlatıldı.",
-    stop: "Durdur", stopConfirm: "Bu oturum durdurulsun mu? Konuşması korunur.", hide: "Listeden kaldır",
+    stop: "Durdur", stopSent: "Durdurma gönderildi. Makine bir sonraki bağlantısında oturumu durdurur; sonuç Claude penceresinde görünür.", stopConfirm: "Bu oturum durdurulsun mu? Konuşması korunur.", hide: "Listeden kaldır",
     hideConfirm: "Biten bu oturum listeden kaldırılsın mı? Hiçbir şey silinmez; yeniden rapor verirse geri gelir.",
   },
   session: {

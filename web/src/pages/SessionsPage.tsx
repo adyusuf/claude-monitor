@@ -89,7 +89,7 @@ export function SessionsPage() {
         filtered ? <Empty title={t("sessions.noMatch")} />
           : <Empty title={t("sessions.empty")} hint={t("sessions.emptyHint")}><Link className="btn btn-primary" to="/download">{t("nav.download")}</Link></Empty>
       ) : (
-        <SessionList ws={ws} rows={rows} machines={filtered ? [] : machines} agents={agents} userId={me?.id} now={now} complete={next === null}
+        <SessionList ws={ws} rows={rows} machines={machines} withEmpty={!filtered} agents={agents} userId={me?.id} now={now} complete={next === null}
           onChanged={() => void load()} />
       )}
       {next ? <div className="more"><Button variant="ghost" onClick={() => void more()}>{t("sessions.more")}</Button></div> : null}

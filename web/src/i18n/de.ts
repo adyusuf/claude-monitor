@@ -123,7 +123,7 @@ export const de: Dictionary = {
     count: "{n} Sitzung(en)", machineGone: "Diese Maschine ist nicht mehr verbunden.", noneOnMachine: "Keine Sitzung auf dieser Maschine.",
     noneLoaded: "Keine Sitzung unter den bisher geladenen.", noRepo: "Kein Repository gemeldet", noMatch: "Keine Sitzung passt.",
     fromWeb: "Vom Web gestartet", fromWebHint: "Claude Code wurde für diese Sitzung vom Web aus im Hintergrund gestartet.",
-    stop: "Stoppen", stopConfirm: "Diese Sitzung stoppen? Ihre Unterhaltung bleibt erhalten.", hide: "Aus der Liste entfernen",
+    stop: "Stoppen", stopSent: "Stopp gesendet. Die Maschine stoppt die Sitzung bei ihrer nächsten Meldung; das Ergebnis steht in ihrem Claude-Dialog.", stopConfirm: "Diese Sitzung stoppen? Ihre Unterhaltung bleibt erhalten.", hide: "Aus der Liste entfernen",
     hideConfirm: "Diese beendete Sitzung aus der Liste entfernen? Nichts wird gelöscht; sie kommt zurück, wenn sie sich wieder meldet.",
   },
   session: {

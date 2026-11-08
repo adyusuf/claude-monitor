@@ -11,7 +11,7 @@ import { OnlineDot } from "./MachineBits";
 
 /**
  * Whether Claude Code is on the machine and running there, as the agent last reported it: not installed, installed and not running, or running
- * with how many sessions. Nothing when the machine is not known (a disconnected one that still has sessions).
+ * with how many sessions (only while the machine is online). Nothing when the machine is not known (a disconnected one that still has sessions).
  */
 export function ClaudeState({ view }: { view: MachineView }) {
   const { t } = useI18n();
@@ -19,7 +19,8 @@ export function ClaudeState({ view }: { view: MachineView }) {
   if (view.claudeKind === "none") return <span className="badge">{t("sessions.claude.none")}</span>;
   const version = view.claudeVersion ?? "";
   const live = view.claudeSessionsLive;
-  if (live === undefined || live === null) return <span className="badge">{t("sessions.claude.installed", { version })}</span>;
+  // An offline machine's last report is old news: say only that Claude is installed, not whether it runs.
+  if (!view.online || live === undefined || live === null) return <span className="badge">{t("sessions.claude.installed", { version })}</span>;
   return live > 0
     ? <span className="badge ok">{t("sessions.claude.running", { version, n: live })}</span>
     : <span className="badge">{t("sessions.claude.stopped", { version })}</span>;

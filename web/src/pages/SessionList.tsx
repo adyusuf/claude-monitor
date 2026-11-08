@@ -18,11 +18,13 @@ function SessionItem({ ws, s, now, mine, onChanged }: { ws: string; s: SessionRo
   const errorText = useErrorText();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const act = async (call: () => Promise<unknown>) => {
+  const [stopSent, setStopSent] = useState(false);
+  const act = async (call: () => Promise<unknown>, then?: () => void) => {
     setBusy(true);
     setError(null);
     try {
       await call();
+      then?.();
       onChanged();
     } catch (e) {
       setError(e);
@@ -32,7 +34,7 @@ function SessionItem({ ws, s, now, mine, onChanged }: { ws: string; s: SessionRo
   };
   const ended = s.status === "ended";
   const stop = () => {
-    if (window.confirm(t("sessions.stopConfirm"))) void act(() => api.requestAgentAction(s.agentId, "claude_stop", undefined, { sessionRef: s.webSessionRef ?? undefined }));
+    if (window.confirm(t("sessions.stopConfirm"))) void act(() => api.requestAgentAction(s.agentId, "claude_stop", undefined, { sessionRef: s.webSessionRef ?? undefined }), () => setStopSent(true));
   };
   const hide = () => {
     if (window.confirm(t("sessions.hideConfirm"))) void act(() => api.hideSession(s.id));
@@ -60,28 +62,30 @@ function SessionItem({ ws, s, now, mine, onChanged }: { ws: string; s: SessionRo
       </Link>
       {mine && ((s.startedFromWeb && s.webSessionRef && !ended) || ended) ? (
         <div className="session-actions">
-          {mine && s.startedFromWeb && s.webSessionRef && !ended ? <Button variant="ghost" busy={busy} onClick={stop}>{t("sessions.stop")}</Button> : null}
+          {mine && s.startedFromWeb && s.webSessionRef && !ended ? <Button variant="ghost" busy={busy} disabled={stopSent} onClick={stop}>{t("sessions.stop")}</Button> : null}
           {mine && ended ? <Button variant="ghost" busy={busy} onClick={hide}>{t("sessions.hide")}</Button> : null}
         </div>
       ) : null}
+      {stopSent && !ended ? <Notice>{t("sessions.stopSent")}</Notice> : null}
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
     </div>
   );
 }
 
 /**
- * Every machine in `machines`, then its sessions under their repository (the page passes no machine while a search or filter is on, so only
- * machines with a match show then). A machine with no session is still listed, with its Claude state and
+ * Every machine in `machines`, then its sessions under their repository (with `withEmpty` false, while a search or filter is on, only the machines
+ * with a match). A machine with no session is still listed, with its Claude state and
  * (for its owner) the controls to start Claude there. The machines stay where they are (by name); inside a machine the most recently active
  * repository and session come first. While the pointer (or the keyboard focus) is on a machine's card its order is kept as it was when the pointer
  * arrived: the data in it goes on updating, but no row moves under the reader until they leave.
  */
-export function SessionList({ ws, rows, machines, agents, userId, now, complete, onChanged }: {
-  ws: string; rows: SessionRow[]; machines: MachineView[]; agents: AgentRow[]; userId: string | undefined; now: number; complete: boolean; onChanged: () => void;
+export function SessionList({ ws, rows, machines, agents, userId, now, complete, withEmpty, onChanged }: {
+  ws: string; rows: SessionRow[]; machines: MachineView[]; agents: AgentRow[]; userId: string | undefined; now: number; complete: boolean; withEmpty: boolean;
+  onChanged: () => void;
 }) {
   const { t } = useI18n();
   const [frozen, setFrozen] = useState<Readonly<Record<string, MachineOrder>>>({});
-  const groups = groupSessions(rows, machines, frozen);
+  const groups = groupSessions(rows, machines, frozen, withEmpty);
   const views = new Map(machines.map((m) => [m.agentId, m]));
   const owners = new Map(agents.map((a) => [a.id, a]));
   const freeze = (machine: MachineGroup) => setFrozen((f) => (f[machine.key] ? f : { ...f, [machine.key]: orderOf(machine) }));

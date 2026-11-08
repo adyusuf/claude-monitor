@@ -37,10 +37,11 @@ const byName = (a: { hostname: string }, b: { hostname: string }) =>
 /**
  * Every machine first, then its sessions grouped by repository. The machines come from `machines` (so one with no session is still listed) and
  * from the sessions (a machine no longer connected that still has sessions); they keep a fixed order by name, so a card never moves under the
- * reader. Inside a machine the repository and the sessions with the newest activity come first. A machine in `frozen` keeps the order it was
+ * reader. With `withEmpty` false (a search or filter is on) a machine with no session is left out, but the others keep their key and name.
+ * Inside a machine the repository and the sessions with the newest activity come first. A machine in `frozen` keeps the order it was
  * shown in (new arrivals go after it) while the data in it stays current.
  */
-export function groupSessions(rows: SessionRow[], machines: readonly MachineSeed[] = [], frozen: Readonly<Record<string, MachineOrder>> = {}): MachineGroup[] {
+export function groupSessions(rows: SessionRow[], machines: readonly MachineSeed[] = [], frozen: Readonly<Record<string, MachineOrder>> = {}, withEmpty = true): MachineGroup[] {
   const seeds = new Map(machines.map((m) => [m.agentId, m]));
   const found = new Map<string, { agentId: string | null; hostname: string; repos: Map<string | null, SessionRow[]> }>();
   for (const m of machines) found.set(m.agentId, { agentId: m.agentId, hostname: m.hostname, repos: new Map() });
@@ -63,5 +64,5 @@ export function groupSessions(rows: SessionRow[], machines: readonly MachineSeed
       latest: repos.length === 0 ? 0 : Math.max(...repos.map((g) => g.latest)), count: repos.reduce((n, g) => n + g.rows.length, 0),
     };
   });
-  return groups.sort(byName);
+  return groups.filter((g) => withEmpty || g.count > 0).sort(byName);
 }
