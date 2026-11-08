@@ -7,6 +7,7 @@ import { enServerSettings } from "./en.serverSettings";
 import { enTwoStep } from "./en.twoStep";
 import { enApprovalRules } from "./en.approvalRules";
 import { enDashboard } from "./en.dashboard";
+import { enInstallOptions } from "./en.installOptions";
 import { enRemote } from "./en.remote";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
@@ -192,6 +193,7 @@ export const en = {
   twoStep: enTwoStep,
   approvalRules: enApprovalRules,
   dashboard: enDashboard,
+  installOptions: enInstallOptions,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
     approve: "Connect this machine", deny: "This is not me", approved: "Done. The machine is connected; you can close this page.",
