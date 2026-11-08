@@ -921,6 +921,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("harness_kind");
 
+                    b.Property<DateTimeOffset?>("HiddenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hidden_at");
+
                     b.Property<DateTimeOffset>("LastEventAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_event_at");

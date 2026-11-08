@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
+import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
-import type { SessionRow, SessionStatus } from "../api/types";
+import type { AgentRow, MachineView, SessionRow, SessionStatus } from "../api/types";
+import { useSession } from "../auth/session";
 import { Button, Empty, Notice, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
@@ -10,12 +12,21 @@ import { SessionList } from "./SessionList";
 
 const FILTERS: (SessionStatus | "")[] = ["", "active", "waiting", "idle", "ended"];
 
-/** The workspace's sessions grouped by machine and branch, the most recent activity first, kept current by the live stream. */
+/** Machines that answer 404 (an API without remote work) or fail: the page then shows the sessions alone, grouped by their machine's name. */
+const orNone = <T,>(read: Promise<T[]>): Promise<T[]> => read.catch((e: unknown) => {
+  if (!(e instanceof ApiError && e.status === 404)) console.warn("sessions page: machines could not be read", e);
+  return [];
+});
+
+/** Every machine of the workspace and, under it, its sessions grouped by repository, the most recent activity first; kept current by the live stream. */
 export function SessionsPage() {
   const { ws = "" } = useParams();
   const { t } = useI18n();
   const errorText = useErrorText();
+  const { me } = useSession();
   const [rows, setRows] = useState<SessionRow[] | null>(null);
+  const [machines, setMachines] = useState<MachineView[]>([]);
+  const [agents, setAgents] = useState<AgentRow[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<SessionStatus | "">("");
@@ -24,8 +35,10 @@ export function SessionsPage() {
 
   const load = useCallback(async () => {
     try {
-      const page = await api.sessions(ws, { q: query, status, limit: config.pageSize });
+      const [page, views, list] = await Promise.all([api.sessions(ws, { q: query, status, limit: config.pageSize }), orNone(api.machines(ws)), orNone(api.agents(ws))]);
       setRows(page.items);
+      setMachines(views);
+      setAgents(list.filter((a) => a.status === "active"));
       setNext(page.next);
       setError(null);
     } catch (e) {
@@ -43,6 +56,7 @@ export function SessionsPage() {
     return () => clearInterval(tick);
   }, []);
 
+  const filtered = query.trim() !== "" || status !== "";
   const reload = useMemo(() => debounce(() => void load()), [load]);
   const live = useLive(ws, reload);
 
@@ -71,10 +85,12 @@ export function SessionsPage() {
         </div>
       </div>
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
-      {rows === null ? <Spinner /> : rows.length === 0 ? (
-        <Empty title={t("sessions.empty")} hint={t("sessions.emptyHint")}><Link className="btn btn-primary" to="/download">{t("nav.download")}</Link></Empty>
+      {rows === null ? <Spinner /> : rows.length === 0 && (filtered || machines.length === 0) ? (
+        filtered ? <Empty title={t("sessions.noMatch")} />
+          : <Empty title={t("sessions.empty")} hint={t("sessions.emptyHint")}><Link className="btn btn-primary" to="/download">{t("nav.download")}</Link></Empty>
       ) : (
-        <SessionList ws={ws} rows={rows} now={now} />
+        <SessionList ws={ws} rows={rows} machines={machines} withEmpty={!filtered} agents={agents} userId={me?.id} now={now} complete={next === null}
+          onChanged={() => void load()} />
       )}
       {next ? <div className="more"><Button variant="ghost" onClick={() => void more()}>{t("sessions.more")}</Button></div> : null}
     </div>

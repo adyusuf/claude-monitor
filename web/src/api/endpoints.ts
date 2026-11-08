@@ -60,6 +60,8 @@ export const api = {
   sessions: (id: string, opts: { q?: string; status?: string; cursor?: string | null; limit?: number }) =>
     request<Page<SessionRow>>("GET", `/workspaces/${id}/sessions${q(opts)}`),
   session: (id: string) => request<SessionDetail>("GET", `/sessions/${id}`),
+  /** The owner takes an ended session off the lists; it comes back by itself when it reports again. */
+  hideSession: (id: string) => request<void>("POST", `/sessions/${id}/hide`),
   events: (id: string, opts: { before?: string | null; kind?: string; limit?: number }) =>
     request<Page<EventRow>>("GET", `/sessions/${id}/events${q(opts)}`),
   commands: (id: string) => request<CommandRow[]>("GET", `/sessions/${id}/commands`),
