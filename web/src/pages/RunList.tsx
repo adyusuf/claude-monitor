@@ -65,11 +65,28 @@ export function RunStatusChip({ status }: { status: RunStatus | string }) {
 const CANCELLABLE: readonly string[] = ["approved", "delivered", "running"];
 
 /** The one-line summary of a run's command; the whole of it is in the expanded row. */
-function Preview({ run }: { run: WebRunView }) {
+export function Preview({ run }: { run: WebRunView }) {
   const { t } = useI18n();
   if (!run.visible) return <span className="muted small">{t("remote.commandHidden")}</span>;
   return <code className="run-preview"><VisibleText text={run.mode === "script" ? `${run.scriptInterpreter ?? "script"}: ${(run.scriptBody ?? "").split("\n")[0] ?? ""}` : run.mode === "shell" ? (run.shellCommand ?? "") : (run.argv ?? []).join(" ")} /></code>;
 }
+
+/** The whole of a run: its facts, how it ended and (for the requester and the owner) its output. */
+export function RunDetail({ run, ws, version }: { run: WebRunView; ws: string; version: number }) {
+  const { t } = useI18n();
+  return (
+    <div className="run-detail">
+      <RunFacts run={run} ws={ws} />
+      {run.exitCode !== null ? <p className="small">{t("remote.exitCode", { code: run.exitCode })}</p> : null}
+      {run.error ? <p className="small">{t("remote.runError")}: {run.error}</p> : null}
+      {run.visible && run.outputBytes > 0 ? <RunOutput runId={run.id} truncated={run.outputTruncated} version={version} /> : null}
+      {run.visible ? <RunOutputAccount run={run} /> : null}
+    </div>
+  );
+}
+
+/** A run still open on the target (or about to be) that the requester or the owner may cancel. */
+export const cancellable = (run: WebRunView): boolean => run.visible && CANCELLABLE.includes(run.status);
 
 function RunRow({ run, ws, version, onChanged }: { run: WebRunView; ws: string; version: number; onChanged: () => void }) {
   const { t } = useI18n();
@@ -97,19 +114,11 @@ function RunRow({ run, ws, version, onChanged }: { run: WebRunView; ws: string; 
         <span className="muted small">{run.requesterUser} · {run.requesterHostname}</span>
         <span className="muted small">{dateTime(run.createdAt)}</span>
         {isFinishedRun(run) ? <Button variant="ghost" aria-expanded={issuesOpen} onClick={() => setIssuesOpen(!issuesOpen)}>{t("issues.runIssues")}</Button> : null}
-        {run.visible && CANCELLABLE.includes(run.status) ? <Button variant="ghost" onClick={() => void cancel()}>{t("remote.cancelRun")}</Button> : null}
+        {cancellable(run) ? <Button variant="ghost" onClick={() => void cancel()}>{t("remote.cancelRun")}</Button> : null}
       </div>
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
       {issuesOpen ? <RunIssues run={run} ws={ws} /> : null}
-      {open ? (
-        <div className="run-detail">
-          <RunFacts run={run} ws={ws} />
-          {run.exitCode !== null ? <p className="small">{t("remote.exitCode", { code: run.exitCode })}</p> : null}
-          {run.error ? <p className="small">{t("remote.runError")}: {run.error}</p> : null}
-          {run.visible && run.outputBytes > 0 ? <RunOutput runId={run.id} truncated={run.outputTruncated} version={version} /> : null}
-          {run.visible ? <RunOutputAccount run={run} /> : null}
-        </div>
-      ) : null}
+      {open ? <RunDetail run={run} ws={ws} version={version} /> : null}
     </li>
   );
 }
