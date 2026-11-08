@@ -44,11 +44,17 @@ function kindText(kind: string, t: (key: "machines.claude.kind.npm" | "machines.
   }
 }
 
-/** The admin's tags as small chips; nothing when there are none (an older API omits them). */
+/** How many tags a row of the machines table shows before it says how many more there are. */
+export const TAG_CHIPS_SHOWN = 5;
+
+/** The admin's tags as small chips, the first few and a count of the rest; nothing when there are none (an older API omits them). */
 export function TagChips({ view: m }: { view: MachineView }) {
-  const entries = Object.entries(m.tags ?? {});
+  const { t } = useI18n();
+  const entries = Object.entries(m.tags ?? {}).sort(([a], [b]) => (a < b ? -1 : 1));
   if (entries.length === 0) return null;
-  return <>{entries.sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => <span key={k} className="badge">{k}={v}</span>)} </>;
+  const rest = entries.length - TAG_CHIPS_SHOWN;
+  return <>{entries.slice(0, TAG_CHIPS_SHOWN).map(([k, v]) => <span key={k} className="badge">{k}={v}</span>)}{rest > 0
+    ? <span className="badge" title={entries.slice(TAG_CHIPS_SHOWN).map(([k, v]) => `${k}=${v}`).join(" ")}>{t("machines.tags.more", { n: rest })}</span> : null} </>;
 }
 
 /** The tool inventory as "name version" chips; an untrusted tool is marked, and an agent that reported nothing says so. */

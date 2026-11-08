@@ -12,7 +12,7 @@ import { trRemote } from "./tr.remote";
 export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
-    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
+    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
     themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
@@ -240,6 +240,11 @@ export const tr: Dictionary = {
     installerTitle: "Tek adımda kurun (önerilen)",
     installerIntro: "Tek bir komut ajanı ve Claude Code eklentisini kurar, bu makineyi bağlar (bir kod çıkar; açılan sayfada onaylayın). Eski bir ajanı sorduktan sonra değiştirir, ayarlarını ve girişini korur.",
     installerUnix: "macOS ve Linux:", installerWindows: "Windows (PowerShell):",
+  },
+  runsPage: {
+    title: "Çalıştırmalar", intro: "Bu çalışma alanındaki makinelerden istenen her komut, en yenisi önce: kim istedi, nerede, kim karar verdi.",
+    status: "Durum", allMachines: "Tüm makineler", machine: "Makine", command: "Komut", requestedBy: "İsteyen", when: "Ne zaman", decidedBy: "Karar veren",
+    byGrant: "bir izin", byJob: "bir iş", undecided: "henüz yok", details: "Ayrıntılar", detailsOf: "Çalıştırma ayrıntıları", empty: "Bu çalışma alanında henüz hiçbir şey çalışmadı.",
   },
   common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
   remote: trRemote,

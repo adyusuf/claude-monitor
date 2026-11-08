@@ -73,6 +73,7 @@ export function Layout() {
             {link(`/w/${current.id}/projects`, t("nav.projects"), "projects")}
             {link(`/w/${current.id}/sessions`, t("nav.sessions"), "sessions")}
             {link(`/w/${current.id}/machines`, t("nav.machines"), "machines", pending)}
+            {link(`/w/${current.id}/runs`, t("nav.runs"), "runs")}
             {link(`/w/${current.id}/members`, t("nav.members"), "members")}
             {link(`/w/${current.id}/integrations`, t("nav.integrations"), "integrations")}
             {current.role === "owner" || current.role === "admin" ? link(`/w/${current.id}/settings`, t("nav.settings"), "settings") : null}
