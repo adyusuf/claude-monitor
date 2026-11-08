@@ -8,6 +8,8 @@ export const deMachines: Dictionary["machines"] = {
   updateAvailable: "Update verfügbar: {version}",
   updateHint: "Führen Sie auf der Maschine „aipod update“ aus oder lassen Sie sie sich selbst aktualisieren (aipod config auto-update on, wenn der Arbeitsbereich es erlaubt).",
   role: {
+    environments: "Umgebungen", functions: "Funktionen", addEnvironment: "Umgebung hinzufügen", addFunction: "Funktion hinzufügen", editValue: "{value} ändern", removeValue: "{value} entfernen",
+    setHint: "Eine Maschine kann von beidem mehrere haben. Die strengste entscheidet die Regeln: eine Maschine, die auch Produktion oder auch Datenbankserver ist, ist ein strenges Ziel.",
     title: "Rolle", environment: "Umgebung", function: "Funktion", notSet: "nicht festgelegt", unknown: "unbekannt",
     claimed: "Die Maschine selbst sagt: {role}.", claimTightens: "Eine Angabe macht die Rolle nur strenger; sie legt sie nie fest und lockert sie nie.",
     adminOnly: "Nur ein Administrator des Arbeitsbereichs legt die Rolle fest.", save: "Rolle speichern", saved: "Rolle gespeichert.",

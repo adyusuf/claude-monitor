@@ -6,6 +6,8 @@ export const enMachines = {
   updateAvailable: "Update available: {version}",
   updateHint: "Run \"aipod update\" on the machine, or let it update itself (aipod config auto-update on, if the workspace allows it).",
   role: {
+    environments: "Environments", functions: "Functions", addEnvironment: "Add an environment", addFunction: "Add a function", editValue: "Change {value}", removeValue: "Remove {value}",
+    setHint: "A machine may have several of each. The strictest one decides the rules: a machine that is also production or also a database server is a strict target.",
     title: "Role", environment: "Environment", function: "Function", notSet: "not set", unknown: "unknown",
     claimed: "The machine itself says: {role}.", claimTightens: "A claim only makes the role stricter; it never sets or loosens it.",
     adminOnly: "Only a workspace admin sets the role.", save: "Save role", saved: "Role saved.",

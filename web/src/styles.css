@@ -167,6 +167,9 @@ textarea.input { resize: vertical; }
 .tag-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px 1px 8px; border-radius: var(--radius-chip); font-size: 12px; font-weight: 500; background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); overflow-wrap: anywhere; }
 .tag-chip .chip-x { display: inline-flex; padding: 2px; border-radius: 4px; }
 .tag-chip .chip-x:hover, .tag-chip .chip-x:focus-visible { background: var(--pill-neutral-ink); color: var(--pill-neutral-bg); }
+.tag-chip.role-chip-strict { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
+.role-set { min-width: 200px; flex: 1 1 240px; }
+.role-edit { width: auto; max-width: 100%; }
 .tag-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .tag-input { width: 12ch; min-width: 0; flex: 1 1 10ch; max-width: 20ch; }
 .badge.warn { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
