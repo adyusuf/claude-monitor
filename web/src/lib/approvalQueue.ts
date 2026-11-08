@@ -9,14 +9,15 @@ import { config } from "../config";
  * real state.
  */
 export function useApprovalQueue(workspaceId: string | undefined, refreshKey: string): { rows: ApprovalRequestRow[]; reload: () => void; drop: (id: string) => void } {
-  const [rows, setRows] = useState<ApprovalRequestRow[]>([]);
+  // The rows are kept with the workspace they were read for: after a switch the band shows nothing until the new one answers.
+  const [read, setRead] = useState<{ ws: string; rows: ApprovalRequestRow[] }>({ ws: "", rows: [] });
   const [tick, setTick] = useState(0);
   const reload = useCallback(() => setTick((n) => n + 1), []);
-  const drop = useCallback((id: string) => setRows((r) => r.filter((x) => x.id !== id)), []);
+  const drop = useCallback((id: string) => setRead((r) => ({ ws: r.ws, rows: r.rows.filter((x) => x.id !== id) })), []);
   useEffect(() => {
     if (!workspaceId) return;
     let live = true;
-    const load = () => api.workspacePermissions(workspaceId).then((r) => live && setRows(r)).catch(() => undefined);
+    const load = () => api.workspacePermissions(workspaceId).then((rows) => live && setRead({ ws: workspaceId, rows })).catch(() => undefined);
     void load();
     const timer = setInterval(() => void load(), config.approvalPollMs);
     return () => {
@@ -24,5 +25,5 @@ export function useApprovalQueue(workspaceId: string | undefined, refreshKey: st
       clearInterval(timer);
     };
   }, [workspaceId, refreshKey, tick]);
-  return { rows: workspaceId ? rows : [], reload, drop };
+  return { rows: workspaceId && read.ws === workspaceId ? read.rows : [], reload, drop };
 }

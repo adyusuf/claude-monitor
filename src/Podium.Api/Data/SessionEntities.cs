@@ -167,7 +167,8 @@ public sealed class PermissionRequest
 }
 
 /// <summary>
-/// An owner's standing allow for one tool on one machine (ADR-0019): for <c>Bash</c> one exact command, for any other tool every input.
+/// An owner's standing allow for one tool on one machine in one project (ADR-0019): for <c>Bash</c> one exact command, for a file tool one
+/// exact path, for a reading tool every input. Only the tools of <see cref="Approvals.ApprovalRules"/> can have one.
 /// Ends at <see cref="ExpiresAt"/> (null: always) or when revoked; never made or matched on a strict machine.
 /// </summary>
 public sealed class ApprovalRule
@@ -176,8 +177,10 @@ public sealed class ApprovalRule
     public Guid WorkspaceId { get; set; }
     public Guid UserId { get; set; }
     public Guid AgentId { get; set; }
+    /// <summary>The project (repository) of the session the rule was made in; it acts only in sessions of that project (null: none).</summary>
+    public Guid? RepoId { get; set; }
     public string ToolName { get; set; } = "";
-    /// <summary>The exact command for <c>Bash</c>; null for every other tool.</summary>
+    /// <summary>The value the rule pins: the exact command for <c>Bash</c>, the exact path for a file tool; null for a reading tool.</summary>
     public string? Command { get; set; }
     public string Duration { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
@@ -217,6 +220,4 @@ public static class ApprovalRuleLimits
     /// <summary>The tool that runs a shell command; its rule holds the exact command.</summary>
     public const string ShellTool = "Bash";
 
-    /// <summary>Tools that never get a rule: a question needs its answers, a plan is approved one at a time.</summary>
-    public static readonly IReadOnlySet<string> NeverRemembered = new HashSet<string>(StringComparer.Ordinal) { "AskUserQuestion", "ExitPlanMode" };
 }

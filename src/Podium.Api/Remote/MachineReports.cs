@@ -27,6 +27,12 @@ public static class MachineReports
         agent.ServiceMode = profile.ServiceMode;
         agent.ProfileAt = now;
         MachineFacts.Apply(agent, profile, now);
+        // A machine that now says it is production or database keeps no standing approval (ADR-0019 §9a): dropping the claim brings none back.
+        if (Approvals.ApprovalRules.Strict(agent))
+        {
+            await db.ApprovalRules.Where(r => r.AgentId == agent.Id && r.RevokedAt == null).ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, now), ct);
+        }
+
         await MachineProjects.ApplyAsync(db, agent.Id, agent.WorkspaceId, profile.Projects, now, ct);
         agent.ApprovalsRequired = profile.ApprovalsRequired == true;
         agent.PushTransport = profile.PushTransport is CommandTransports.Inbox or CommandTransports.Channel ? profile.PushTransport : null;

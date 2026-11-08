@@ -163,6 +163,7 @@ internal static class PodiumDbModel
         b.Entity<PermissionRequest>(e =>
         {
             e.HasIndex(x => new { x.SessionId, x.Status });
+            e.HasIndex(x => new { x.WorkspaceId, x.Status, x.CreatedAt });
             e.Property(x => x.ToolInput).HasColumnType("jsonb");
             e.ToTable(t =>
             {
