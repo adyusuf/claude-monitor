@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Podium.Api.Approvals;
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Ingest;
@@ -192,11 +193,33 @@ public static class AgentEndpoints
             ExpiresAt = now.AddSeconds(wait),
         };
         db.PermissionRequests.Add(request);
-        session.Status = SessionStatuses.Waiting;
+
+        // An approval rule answers at once, but only to an agent that reads the answer in this response (ADR-0019 §7, §8).
+        var agent = req.InlineAnswer ? await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted) : null;
+        var rule = agent is null ? null : await ApprovalRules.MatchAsync(db, agent, req.ToolName, req.ToolInput, now, http.RequestAborted);
+        PermissionAnswerMessage? answer = null;
+        if (rule is not null)
+        {
+            request.Status = PermissionStatuses.Answered;
+            request.Decision = PermissionDecisions.Allow;
+            request.AnsweredBy = rule.UserId;
+            request.AnsweredAt = now;
+            request.AnsweredByRule = rule.Id;
+            rule.UseCount++;
+            rule.LastUsedAt = now;
+            Audit.Add(db, http, clock, AuditActions.PermissionAutoAllowed, session.WorkspaceId, rule.UserId, targetType: "permission_request",
+                targetId: request.Id, detail: new { rule = rule.Id, request.ToolName });
+            answer = new PermissionAnswerMessage(request.Id, session.ExternalId, PermissionDecisions.Allow, null);
+        }
+        else
+        {
+            session.Status = SessionStatuses.Waiting;
+        }
+
         await db.SaveChangesAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(session.WorkspaceId),
             new StreamMessage("permission", new { sessionId = session.Id, id = request.Id, status = request.Status }));
-        return Results.Ok(new PermissionRequestCreated(request.Id, request.ExpiresAt));
+        return Results.Ok(new PermissionRequestCreated(request.Id, request.ExpiresAt, answer));
     }
 
     private static async Task<IResult> GetPermission(Guid id, HttpContext http, PodiumDb db)

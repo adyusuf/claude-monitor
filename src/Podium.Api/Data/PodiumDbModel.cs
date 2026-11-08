@@ -171,6 +171,20 @@ internal static class PodiumDbModel
                 t.HasCheckConstraint("ck_permission_requests_decision", "decision IS NULL OR decision IN ('allow', 'deny')");
             });
         });
+        b.Entity<ApprovalRule>(e =>
+        {
+            e.HasIndex(x => new { x.AgentId, x.ToolName });
+            e.HasIndex(x => new { x.UserId, x.WorkspaceId });
+            e.Property(x => x.ToolName).HasMaxLength(200);
+            e.Property(x => x.Command).HasMaxLength(ApprovalRuleLimits.CommandMax);
+            e.Property(x => x.Duration).HasMaxLength(16);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_approval_rules_duration", In("duration", ApprovalDurations.FiveMinutes, ApprovalDurations.TenMinutes,
+                    ApprovalDurations.ThirtyMinutes, ApprovalDurations.OneHour, ApprovalDurations.Always));
+                t.HasCheckConstraint("ck_approval_rules_expiry", "(duration = 'always') = (expires_at IS NULL)");
+            });
+        });
         b.Entity<AuditEvent>(e =>
         {
             e.Property(x => x.Id).UseIdentityAlwaysColumn();
@@ -217,5 +231,6 @@ internal static class PodiumDbModel
         Fk<SessionCommand, HarnessSession>(x => x.SessionId);
         Fk<SessionCommand, User>(x => x.CreatedBy);
         Fk<PermissionRequest, HarnessSession>(x => x.SessionId);
+        Fk<ApprovalRule, Agent>(x => x.AgentId);
     }
 }

@@ -70,10 +70,12 @@ public static class DeviceTokenErrors
 }
 
 /// <summary>A tool call waiting for a person's answer, sent the moment the harness asks.</summary>
+/// <param name="InlineAnswer">True when the agent reads <see cref="PermissionRequestCreated.Answer"/>; only then may an approval rule answer at once (ADR-0019 §8).</param>
 public sealed record PermissionRequestCreate(
-    string HarnessKind, string SessionExternalId, string ToolName, JsonElement ToolInput, int WaitSeconds);
+    string HarnessKind, string SessionExternalId, string ToolName, JsonElement ToolInput, int WaitSeconds, bool InlineAnswer = false);
 
-public sealed record PermissionRequestCreated(Guid Id, DateTimeOffset ExpiresAt);
+/// <param name="Answer">The answer when an approval rule allowed the request at once (ADR-0019 §7); null when the owner is asked.</param>
+public sealed record PermissionRequestCreated(Guid Id, DateTimeOffset ExpiresAt, PermissionAnswerMessage? Answer = null);
 
 /// <summary>A message on the agent's own event stream (server-sent events, type in the event name).</summary>
 public sealed record AgentCommandMessage(Guid Id, Guid SessionId, string SessionExternalId, string Kind, string? Body,
