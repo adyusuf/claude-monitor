@@ -3,13 +3,15 @@ using Podium.Api.Data;
 using Podium.Api.Security;
 using Podium.Api.Streaming;
 using Podium.Api.Text;
+using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Endpoints;
 
 public sealed record SessionRow(Guid Id, string HarnessKind, string? Title, string? Model, string? GitBranch, string Status,
     DateTimeOffset StartedAt, DateTimeOffset LastEventAt, DateTimeOffset? EndedAt, Guid? ProjectId, string? ProjectName,
-    Guid AgentId, string Hostname, Guid OwnerId, string OwnerName, decimal? CostUsd, int OpenPermissions, string? PushTransport = null);
+    Guid AgentId, string Hostname, Guid OwnerId, string OwnerName, decimal? CostUsd, int OpenPermissions, string? PushTransport = null,
+    bool StartedFromWeb = false, string? WebSessionRef = null);
 public sealed record Page<T>(IReadOnlyList<T> Items, string? Next);
 public sealed record TaskRow(Guid Id, string ExternalId, string Subject, string Status, DateTimeOffset UpdatedAt);
 public sealed record SubagentRow(Guid Id, string AgentType, string? Description, string Status, DateTimeOffset StartedAt, DateTimeOffset? EndedAt);
@@ -28,14 +30,43 @@ public static class SessionEndpoints
         g.MapGet("/workspaces/{id:guid}/stream", Stream);
         g.MapGet("/sessions/{id:guid}", Detail);
         g.MapGet("/sessions/{id:guid}/events", Events);
+        g.MapPost("/sessions/{id:guid}/hide", Hide);
     }
+
+    /// <summary>
+    /// The owner takes an ended session off the lists. Nothing is deleted (retention still does that); the session comes back on its own when it
+    /// reports again, and its page stays reachable by its link.
+    /// </summary>
+    private static async Task<IResult> Hide(Guid id, HttpContext http, PodiumDb db, TimeProvider clock, Broker broker)
+    {
+        var userId = http.User.UserId();
+        if (await Access.SessionAsync(db, userId, id, http.RequestAborted) is not { } found) return Http.NotFound();
+        if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
+        // One statement checks that it ended and hides it, so a resume in between cannot be hidden. The mark is the session's own last event time
+        // (the agent's clock, like LastEventAt), never the server's: a machine whose clock runs ahead would otherwise keep showing the session.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var hidden = await db.HarnessSessions.Where(s => s.Id == id && s.Status == SessionStatuses.Ended)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.HiddenAt, x => x.LastEventAt), http.RequestAborted);
+        if (hidden == 0) return Http.Invalid("session", SessionNotEnded);
+        Audit.Add(db, http, clock, AuditActions.SessionHidden, found.Session.WorkspaceId, userId, targetType: "session", targetId: id);
+        await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
+        broker.Publish(Broker.Workspace(found.Session.WorkspaceId), new StreamMessage("session", new { sessionId = id, status = found.Session.Status }));
+        return Results.NoContent();
+    }
+
+    /// <summary>How long before a session started a web start may have been asked for (the action waits in a queue for at most ten minutes).</summary>
+    private static readonly TimeSpan WebStartLead = TimeSpan.FromHours(1);
+
+    /// <summary>The refusal of hiding a session that is still running.</summary>
+    public const string SessionNotEnded = "session_not_ended";
 
     private static async Task<IResult> List(Guid id, string? q, string? status, string? cursor, int? limit, HttpContext http,
         PodiumDb db, ApiConfig config)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
         var take = Http.Limit(limit, config);
-        var query = db.HarnessSessions.AsNoTracking().Where(s => s.WorkspaceId == id);
+        var query = db.HarnessSessions.AsNoTracking().Where(s => s.WorkspaceId == id && (s.HiddenAt == null || s.LastEventAt > s.HiddenAt || s.Status != SessionStatuses.Ended));
         if (!string.IsNullOrWhiteSpace(q))
         {
             var pattern = SearchText.ContainsPattern(q);
@@ -69,6 +100,12 @@ public static class SessionEndpoints
         var projects = await db.Repos.AsNoTracking().Where(p => projectIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => p.DisplayName, ct);
         var usage = await db.SessionUsage.AsNoTracking().Where(u => ids.Contains(u.SessionId)).ToListAsync(ct);
+        // A session Claude Code started in the background from the web: its id begins with the short id the agent reported for that start (ADR-0014).
+        // Only starts from shortly before the oldest session of the page can match, which keeps the read to the page's window.
+        var since = sessions.Count == 0 ? DateTimeOffset.MaxValue : sessions.Min(s => s.StartedAt) - WebStartLead;
+        var webStarts = await db.AgentActions.AsNoTracking()
+            .Where(a => agentIds.Contains(a.AgentId) && a.CreatedAt >= since && a.Kind == AgentActionKinds.ClaudeStart && a.Status == AgentActionStatuses.Succeeded && a.SessionRef != null)
+            .Select(a => new { a.AgentId, a.SessionRef }).ToListAsync(ct);
         var open = await db.PermissionRequests.AsNoTracking()
             .Where(p => ids.Contains(p.SessionId) && p.Status == PermissionStatuses.Open)
             .GroupBy(p => p.SessionId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
@@ -77,9 +114,10 @@ public static class SessionEndpoints
             var a = agents[s.AgentId];
             var mine = usage.Where(u => u.SessionId == s.Id).ToList();
             decimal? cost = mine.Count == 0 ? 0m : mine.Any(u => u.CostUsd is null) ? null : mine.Sum(u => u.CostUsd!.Value);
+            var webRef = webStarts.FirstOrDefault(w => w.AgentId == s.AgentId && s.ExternalId.StartsWith(w.SessionRef!, StringComparison.Ordinal))?.SessionRef;
             return new SessionRow(s.Id, s.HarnessKind, s.Title, s.Model, s.GitBranch, s.Status, s.StartedAt, s.LastEventAt,
                 s.EndedAt, s.RepoId, s.RepoId is { } pid ? projects.GetValueOrDefault(pid) : null, s.AgentId, a.Hostname,
-                a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id), a.PushTransport);
+                a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id), a.PushTransport, webRef is not null, webRef);
         }).ToList();
     }
 

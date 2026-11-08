@@ -41,6 +41,7 @@ public static class AuditActions
     public const string AskCancelled = "ask.cancelled";
     public const string RefreshReuse = "agent.refresh_reuse";
     public const string CommandCreated = "session.command_created";
+    public const string SessionHidden = "session.hidden";
     public const string CommandCancelled = "session.command_cancelled";
     public const string PermissionAnswered = "session.permission_answered";
     public const string RunCreated = "remote.run_created";
