@@ -5,7 +5,7 @@ import type { MachineDetail, MachineProjectView, Me } from "../api/types";
 import { en } from "../i18n/en";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
-import { noteOk, parseTags, tagsText } from "./MachineFacts";
+import { noteOk, parseTags, TAGS_MAX, tagsText } from "./MachineFacts";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
 
@@ -50,8 +50,8 @@ describe("the tag and note helpers", () => {
     expect(parseTags("=v")).toBeNull();
     expect(parseTags("k=ü")).toBeNull();
     expect(parseTags(`k=${"x".repeat(33)}`)).toBeNull();
-    expect(parseTags(Array.from({ length: 11 }, (_, i) => `k${i}=v`).join(" "))).toBeNull();
-    expect(parseTags(Array.from({ length: 10 }, (_, i) => `k${i}=v`).join(" "))).not.toBeNull();
+    expect(parseTags(Array.from({ length: TAGS_MAX + 1 }, (_, i) => `k${i}=v`).join(" "))).toBeNull();
+    expect(parseTags(Array.from({ length: TAGS_MAX }, (_, i) => `k${i}=v`).join(" "))).not.toBeNull();
   });
 
   it("writes the tags back sorted and accepts a note without control characters", () => {

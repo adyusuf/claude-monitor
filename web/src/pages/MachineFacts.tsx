@@ -4,7 +4,7 @@ import { Button, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 
 const PART = /^[A-Za-z0-9._-]{1,32}$/;
-export const TAGS_MAX = 10;
+export const TAGS_MAX = 100;
 export const NOTE_MAX = 2000;
 
 /** "project=shop region=eu" (spaces or commas between pairs) as pairs; null when a pair is malformed or there are too many. */
