@@ -23,6 +23,12 @@ namespace Podium.Api.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // The old CHECK refuses a machine with more than 10 tags, so those keep their first 10 keys (in key order) before it comes back.
+            migrationBuilder.Sql("""
+                UPDATE agents SET tags = (SELECT jsonb_object_agg(e.key, e.value) FROM (SELECT key, value FROM jsonb_each(agents.tags) ORDER BY key LIMIT 10) e)
+                WHERE jsonb_typeof(tags) = 'object' AND (SELECT count(*) FROM jsonb_each(agents.tags)) > 10;
+                """);
+
             migrationBuilder.DropCheckConstraint(
                 name: "ck_agents_tags",
                 table: "agents");
