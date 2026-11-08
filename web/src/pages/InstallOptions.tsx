@@ -7,7 +7,7 @@ type Exec = "off" | "argv" | "shell";
 
 /** The agent's own rule for a run account's name (RunAccount.IsValidName): a plain name of at most 32 characters, not a system one. */
 const RUN_ACCOUNT_NAME = /^[A-Za-z_][A-Za-z0-9_-]{0,31}$/;
-const RESERVED = ["root", "wheel", "admin", "sudo", "daemon", "nobody", "system"];
+const RESERVED = ["root", "wheel", "admin", "sudo", "daemon", "nobody", "system", "aipod", "_aipod"];
 export const runAccountNameOk = (name: string): boolean => RUN_ACCOUNT_NAME.test(name) && !RESERVED.includes(name.toLowerCase());
 
 /**
@@ -16,13 +16,19 @@ export const runAccountNameOk = (name: string): boolean => RUN_ACCOUNT_NAME.test
  * `aipod install --exec` alone only sets the level, so that mode gives both. A service is installed by an administrator through sudo, with
  * the agent's full path (sudo does not search the user's own folders). Null when a run account's name is not one the agent accepts.
  */
-export function installCommands(o: { mode: Mode; exec: Exec; server: string; runAccount: boolean; runAccountName: string }): string[] | null {
-  if (o.mode === "plugin") return ["aipod install", `aipod install --exec ${o.exec}`];
-  if (o.mode === "standalone") return [`aipod install --standalone --server ${o.server} --exec ${o.exec}`];
+/** Where the installer puts the agent, per system (scripts/install/aipod-install.sh; an AP_AGENT_HOME override moves it): sudo needs this full path. */
+const AGENT_PATH = { linux: "~/.aipod/bin/aipod", macos: "\"$HOME/Library/Application Support/aipod/bin/aipod\"" } as const;
+
+export interface InstallLine { os?: "linux" | "macos"; text: string }
+
+export function installCommands(o: { mode: Mode; exec: Exec; server: string; runAccount: boolean; runAccountName: string }): InstallLine[] | null {
+  if (o.mode === "plugin") return [{ text: "aipod install" }, { text: `aipod install --exec ${o.exec}` }];
+  if (o.mode === "standalone") return [{ text: `aipod install --standalone --server ${o.server} --exec ${o.exec}` }];
   const name = o.runAccountName.trim();
   if (o.runAccount && name !== "" && !runAccountNameOk(name)) return null;
   const run = o.runAccount ? (name ? ` --run-account ${name}` : " --run-account") : "";
-  return [`sudo ~/.aipod/bin/aipod install --service --server ${o.server} --exec ${o.exec}${run}`];
+  const args = `install --service --server ${o.server} --exec ${o.exec}${run}`;
+  return [{ os: "linux", text: `sudo ${AGENT_PATH.linux} ${args}` }, { os: "macos", text: `sudo ${AGENT_PATH.macos} ${args}` }];
 }
 
 /**
@@ -80,7 +86,12 @@ export function InstallOptions({ server }: { server: string }) {
         {commands ? (
           <div className="stack-tight">
             <p className="muted">{mode === "service" ? t("installOptions.runService") : t("installOptions.runUser")}</p>
-            {commands.map((c) => <CopyText key={c} text={c} />)}
+            {commands.map((c) => (
+              <div key={c.text} className="stack-tight">
+                {c.os ? <span className="muted small">{t(`installOptions.os.${c.os}`)}</span> : null}
+                <CopyText text={c.text} />
+              </div>
+            ))}
           </div>
         ) : null}
       </div>

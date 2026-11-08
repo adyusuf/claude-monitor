@@ -16,5 +16,6 @@ export const deInstallOptions: Dictionary["installOptions"] = {
   adminUser: "Er fragt nie nach Administratorrechten; was er ausführt, hat nur die Rechte Ihres Benutzers.",
   adminService: "Der Dienst läuft nie als Administrator: er läuft unter seinem eigenen Konto ohne Rechte, und die Installation lehnt root, SYSTEM und LocalSystem ab. Nur die Installation braucht einen Administrator.",
   exec: "Ausführungen aus der Ferne auf dieser Maschine", execs: { off: "Aus (Standard)", argv: "Nur freigegebene Programme (argv)", shell: "Auch freigegebene Shell-Befehle" },
-  runUser: "Geben Sie dies in einem Terminal auf der Maschine ein (eine Zeile nach der anderen):", runService: "Geben Sie dies als Administrator in einem Terminal ein. Unter Linux und macOS braucht sudo den vollen Pfad des Agents (der Installer legt ihn in ~/.aipod/bin ab); unter Windows starten Sie in einer PowerShell mit erhöhten Rechten aipod install --service mit denselben Optionen.",
+  os: { linux: "Linux", macos: "macOS" },
+  runUser: "Geben Sie dies in einem Terminal auf der Maschine ein (eine Zeile nach der anderen):", runService: "Geben Sie dies als Administrator in einem Terminal ein, mit der Zeile für Ihr System: sudo braucht den vollen Pfad des Agents. Unter Windows führen Sie in einer PowerShell mit erhöhten Rechten aipod install --service mit denselben Optionen aus.",
 };

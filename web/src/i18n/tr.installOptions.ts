@@ -16,5 +16,6 @@ export const trInstallOptions: Dictionary["installOptions"] = {
   adminUser: "Yönetici hakkı istemez; çalıştırdığı her şey yalnızca senin kullanıcının yetkisine sahiptir.",
   adminService: "Servis asla yönetici olarak çalışmaz: kendi yetkisiz hesabıyla çalışır, kurulum root, SYSTEM ve LocalSystem'i reddeder. Yalnızca kurmak için yönetici gerekir.",
   exec: "Bu makinede uzaktan çalıştırma", execs: { off: "Kapalı (varsayılan)", argv: "Yalnızca onaylı programlar (argv)", shell: "Onaylı shell komutları da" },
-  runUser: "Makinede bir terminale şunu yaz (satırlar sırayla):", runService: "Bunu yönetici olarak bir terminale yaz. Linux ve macOS'ta sudo ajanın tam yolunu ister (kurulum onu ~/.aipod/bin içine koyar); Windows'ta yönetici PowerShell'de aipod install --service ve aynı seçeneklerle başlat.",
+  os: { linux: "Linux", macos: "macOS" },
+  runUser: "Makinede bir terminale şunu yaz (satırlar sırayla):", runService: "Bunu yönetici olarak bir terminale, sistemine uyan satırla yaz: sudo ajanın tam yolunu ister. Windows'ta yönetici PowerShell'de aipod install --service komutunu aynı seçeneklerle çalıştır.",
 };
