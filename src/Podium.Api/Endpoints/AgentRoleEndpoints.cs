@@ -58,11 +58,12 @@ public static class AgentRoleEndpoints
             return Http.NotFound();
         }
 
-        var sets = req.Environments is not null || req.Functions is not null;
-        if (sets ? !MachineRoles.IsEnvironments(req.Environments) : !MachineRoles.IsEnvironment(req.Environment)) return Http.Invalid("environment", RemoteErrors.InvalidMachineRole);
-        if (sets ? !MachineRoles.IsFunctions(req.Functions) : !MachineRoles.IsFunction(req.Function)) return Http.Invalid("function", RemoteErrors.InvalidMachineRole);
-        var environments = MachineRoles.Normalize(sets ? req.Environments : req.Environment is null ? null : [req.Environment], MachineRoles.EnvironmentOrder);
-        var functions = MachineRoles.Normalize(sets ? req.Functions : req.Function is null ? null : [req.Function], MachineRoles.FunctionOrder);
+        if (req.Environments is not null ? !MachineRoles.IsEnvironments(req.Environments) : !MachineRoles.IsEnvironment(req.Environment)) return Http.Invalid("environment", RemoteErrors.InvalidMachineRole);
+        if (req.Functions is not null ? !MachineRoles.IsFunctions(req.Functions) : !MachineRoles.IsFunction(req.Function)) return Http.Invalid("function", RemoteErrors.InvalidMachineRole);
+        var storedEnvironments = MachineRoles.SetOf(agent.RoleEnvironments, agent.RoleEnvironment, MachineRoles.EnvironmentOrder);
+        var storedFunctions = MachineRoles.SetOf(agent.RoleFunctions, agent.RoleFunction, MachineRoles.FunctionOrder);
+        var environments = MachineRoles.Normalize(Requested(req.Environments, req.Environment, agent.RoleEnvironment, storedEnvironments), MachineRoles.EnvironmentOrder);
+        var functions = MachineRoles.Normalize(Requested(req.Functions, req.Function, agent.RoleFunction, storedFunctions), MachineRoles.FunctionOrder);
         var environment = MachineRoles.Strictest(environments, MachineRoles.EnvironmentOrder);
         var function = MachineRoles.Strictest(functions, MachineRoles.FunctionOrder);
         // Lowering is judged on the strictest values: dropping production (or database) from the set is lowering, adding a looser value is not.
@@ -72,15 +73,12 @@ public static class AgentRoleEndpoints
             return RemoteChecks.ReauthRefused();
         }
 
-        var before = new
-        {
-            environment = agent.RoleEnvironment, function = agent.RoleFunction,
-            environments = MachineRoles.SetOf(agent.RoleEnvironments, agent.RoleEnvironment), functions = MachineRoles.SetOf(agent.RoleFunctions, agent.RoleFunction),
-        };
+        var before = new { environment = agent.RoleEnvironment, function = agent.RoleFunction, environments = storedEnvironments, functions = storedFunctions };
         var now = clock.GetUtcNow();
         // Compare-and-set on the values the decision was made on: a concurrent raise to production is never overwritten without its re-authentication.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        if (!await TrySetAsync(db, id, before.environment, before.function, environment, function, now, userId, http.RequestAborted, environments, functions))
+        if (!await TrySetAsync(db, id, before.environment, before.function, environment, function, now, userId, http.RequestAborted, environments, functions,
+                agent.RoleEnvironments, agent.RoleFunctions))
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "conflict");
         }
@@ -100,17 +98,30 @@ public static class AgentRoleEndpoints
     }
 
     /// <summary>
-    /// Writes the role only while the row still holds the strictest values the decision was made on; false when they changed in between. The
-    /// sets default to the single values (a set of one); the single values written are the strictest of the sets.
+    /// One attribute of the request as a set: the set when it was sent; else the single value, which keeps the stored set when it is the strictest
+    /// value already stored (an older client that only shows the strictest value never collapses a set it did not change); null clears.
+    /// </summary>
+    private static IReadOnlyList<string>? Requested(IReadOnlyList<string>? set, string? one, string? storedOne, IReadOnlyList<string>? stored) =>
+        set ?? (one is null ? null : one == storedOne && stored is not null ? stored : [one]);
+
+    /// <summary>
+    /// Writes the role only while the row still holds the values the decision was made on (the strictest values and, when given, the stored
+    /// sets); false when they changed in between. The sets default to the single values (a set of one); when sets are given, the single values
+    /// written are their strictest members whatever was passed, so the two columns never disagree.
     /// </summary>
     public static async Task<bool> TrySetAsync(PodiumDb db, Guid id, string? beforeEnvironment, string? beforeFunction, string? environment,
-        string? function, DateTimeOffset now, Guid userId, CancellationToken ct, IReadOnlyList<string>? environments = null, IReadOnlyList<string>? functions = null)
+        string? function, DateTimeOffset now, Guid userId, CancellationToken ct, IReadOnlyList<string>? environments = null, IReadOnlyList<string>? functions = null,
+        List<string>? beforeEnvironments = null, List<string>? beforeFunctions = null)
     {
         ArgumentNullException.ThrowIfNull(db);
+        if (environments is not null) environment = MachineRoles.Strictest(environments, MachineRoles.EnvironmentOrder);
+        if (functions is not null) function = MachineRoles.Strictest(functions, MachineRoles.FunctionOrder);
         var envs = (environments ?? (environment is null ? null : [environment]))?.ToList();
         var fns = (functions ?? (function is null ? null : [function]))?.ToList();
+        var checkSets = beforeEnvironments is not null || beforeFunctions is not null;
         var changed = await db.Agents
-            .Where(a => a.Id == id && a.Status == AgentStatuses.Active && a.RoleEnvironment == beforeEnvironment && a.RoleFunction == beforeFunction)
+            .Where(a => a.Id == id && a.Status == AgentStatuses.Active && a.RoleEnvironment == beforeEnvironment && a.RoleFunction == beforeFunction
+                && (!checkSets || (a.RoleEnvironments == beforeEnvironments && a.RoleFunctions == beforeFunctions)))
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.RoleEnvironment, environment).SetProperty(a => a.RoleFunction, function)
                 .SetProperty(a => a.RoleEnvironments, envs).SetProperty(a => a.RoleFunctions, fns)
                 .SetProperty(a => a.RoleSetAt, now).SetProperty(a => a.RoleSetBy, userId), ct);
@@ -122,6 +133,6 @@ public static class AgentRoleEndpoints
         ArgumentNullException.ThrowIfNull(a);
         return new(a.Id, a.RoleEnvironment, a.RoleFunction, a.RoleSetAt, a.RoleSetBy, a.ClaimedEnvironment, a.ClaimedFunction,
             MachineRoles.EffectiveEnvironment(a.RoleEnvironment, a.ClaimedEnvironment), MachineRoles.EffectiveFunction(a.RoleFunction, a.ClaimedFunction),
-            MachineRoles.SetOf(a.RoleEnvironments, a.RoleEnvironment), MachineRoles.SetOf(a.RoleFunctions, a.RoleFunction));
+            MachineRoles.SetOf(a.RoleEnvironments, a.RoleEnvironment, MachineRoles.EnvironmentOrder), MachineRoles.SetOf(a.RoleFunctions, a.RoleFunction, MachineRoles.FunctionOrder));
     }
 }

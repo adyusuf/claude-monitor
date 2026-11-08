@@ -148,9 +148,12 @@ public static class MachineRoles
         return values?.Where(order.Contains).OrderByDescending(v => IndexOf(order, v)).FirstOrDefault();
     }
 
-    /// <summary>The stored set, or for a row written before sets existed its single value as a set of one.</summary>
-    public static IReadOnlyList<string>? SetOf(IReadOnlyList<string>? values, string? one) =>
-        values is { Count: > 0 } ? values : one is null ? null : [one];
+    /// <summary>
+    /// The stored set, or the single value as a set of one when there is no set (a row written before sets) or the set disagrees with it (an
+    /// older API wrote only the single column, during a deploy or after a rollback): the single column is what every rule enforces, so it wins.
+    /// </summary>
+    public static IReadOnlyList<string>? SetOf(IReadOnlyList<string>? values, string? one, IReadOnlyList<string> order) =>
+        values is { Count: > 0 } && one is not null && Strictest(values, order) == one ? Normalize(values, order) : one is null ? null : [one];
 
     private static int IndexOf(IReadOnlyList<string> order, string value)
     {
