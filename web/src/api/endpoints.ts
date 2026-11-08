@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalKeyView, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
@@ -69,8 +69,14 @@ export const api = {
   cancelCommand: (commandId: string) => request<void>("POST", `/commands/${commandId}/cancel`),
   permissions: (id: string, status?: string) => request<PermissionRow[]>("GET", `/sessions/${id}/permission-requests${q({ status })}`),
   /** `answers` (question text -> the option chosen) is only for the question tool's request, with an allow. */
-  answer: (permissionId: string, decision: "allow" | "deny", reason?: string, answers?: Record<string, string>) =>
-    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason, answers }),
+  answer: (permissionId: string, decision: "allow" | "deny", reason?: string, answers?: Record<string, string>,
+    opts?: { remember?: ApprovalDuration; code?: string }) =>
+    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason, answers, remember: opts?.remember, code: opts?.code }),
+  /** The requests on the viewer's own sessions: open ones oldest first, or with "answered" the latest answers (ADR-0019). */
+  workspacePermissions: (id: string, status?: "answered") =>
+    request<ApprovalRequestRow[]>("GET", `/workspaces/${id}/permission-requests${q({ status })}`),
+  approvalRules: (id: string) => request<ApprovalRuleRow[]>("GET", `/workspaces/${id}/approval-rules`),
+  revokeApprovalRule: (ruleId: string) => request<void>("DELETE", `/approval-rules/${ruleId}`),
 
   agents: (id: string) => request<AgentRow[]>("GET", `/workspaces/${id}/agents`),
   revokeAgent: (agentId: string) => request<void>("POST", `/agents/${agentId}/revoke`),

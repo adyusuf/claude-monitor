@@ -60,6 +60,28 @@ public static class QuestionTools
     public const string AskUserQuestion = "AskUserQuestion";
 }
 
+/// <summary>How long an allow from the web stands for the same tool on the same machine (ADR-0019): once is no rule.</summary>
+public static class ApprovalDurations
+{
+    public const string Once = "once";
+    public const string FiveMinutes = "5m";
+    public const string TenMinutes = "10m";
+    public const string ThirtyMinutes = "30m";
+    public const string OneHour = "1h";
+    public const string Always = "always";
+    public static readonly IReadOnlyList<string> All = [Once, FiveMinutes, TenMinutes, ThirtyMinutes, OneHour, Always];
+
+    /// <summary>The length of a time-limited rule; null for once and always (and for anything unknown).</summary>
+    public static TimeSpan? Length(string? duration) => duration switch
+    {
+        FiveMinutes => TimeSpan.FromMinutes(5),
+        TenMinutes => TimeSpan.FromMinutes(10),
+        ThirtyMinutes => TimeSpan.FromMinutes(30),
+        OneHour => TimeSpan.FromHours(1),
+        _ => null,
+    };
+}
+
 public static class PermissionDecisions
 {
     public const string Allow = "allow";

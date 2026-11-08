@@ -161,6 +161,34 @@ public sealed class PermissionRequest
     public string? Reason { get; set; }
     public Guid? AnsweredBy { get; set; }
     public DateTimeOffset? AnsweredAt { get; set; }
+
+    /// <summary>The approval rule that allowed the request at once (ADR-0019); null when a person answered or nobody did.</summary>
+    public Guid? AnsweredByRule { get; set; }
+}
+
+/// <summary>
+/// An owner's standing allow for one tool on one machine in one project (ADR-0019): for <c>Bash</c> one exact command, for a file tool one
+/// exact path, for a reading tool every input. Only the tools of <see cref="Approvals.ApprovalRules"/> can have one.
+/// Ends at <see cref="ExpiresAt"/> (null: always) or when revoked; never made or matched on a strict machine.
+/// </summary>
+public sealed class ApprovalRule
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid WorkspaceId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid AgentId { get; set; }
+    /// <summary>The project (repository) of the session the rule was made in; it acts only in sessions of that project (null: none).</summary>
+    public Guid? RepoId { get; set; }
+    public string ToolName { get; set; } = "";
+    /// <summary>The value the rule pins: the exact command for <c>Bash</c>, the exact path for a file tool; null for a reading tool.</summary>
+    public string? Command { get; set; }
+    public string Duration { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public Guid CreatedFromRequest { get; set; }
+    public int UseCount { get; set; }
+    public DateTimeOffset? LastUsedAt { get; set; }
 }
 
 public sealed class AuditEvent
@@ -175,4 +203,21 @@ public sealed class AuditEvent
     public DateTimeOffset At { get; set; }
     public string? IpHash { get; set; }
     public JsonDocument? Detail { get; set; }
+}
+
+/// <summary>The limits of approval rules (ADR-0019).</summary>
+public static class ApprovalRuleLimits
+{
+    /// <summary>A longer <c>Bash</c> command can be allowed once but gets no rule.</summary>
+    public const int CommandMax = 2_000;
+
+    /// <summary>Live rules one user may hold.</summary>
+    public const int LiveMax = 200;
+
+    /// <summary>How long an ended rule (and the command it holds) is kept before it is deleted.</summary>
+    public static readonly TimeSpan KeepEnded = TimeSpan.FromDays(7);
+
+    /// <summary>The tool that runs a shell command; its rule holds the exact command.</summary>
+    public const string ShellTool = "Bash";
+
 }
