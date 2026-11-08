@@ -142,6 +142,7 @@ public static class Startup
         MachineEndpoints.Map(api);
         SessionEndpoints.Map(api);
         CommandEndpoints.Map(api);
+        ApprovalEndpoints.Map(api);
         AgentRunEndpoints.Map(api);
         RunEndpoints.Map(api);
         AgentMachineEndpoints.Map(api);

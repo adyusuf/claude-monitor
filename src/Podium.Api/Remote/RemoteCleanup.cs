@@ -47,6 +47,9 @@ public static class RemoteCleanup
         Expression<Func<RemoteRun, bool>> runs = r => agents.Contains(r.TargetAgentId) || agents.Contains(r.RequesterAgentId)
             || (r.WorkspaceId == ws && (r.TargetUserId == user || r.RequesterUserId == user));
 
+        // Standing approvals (ADR-0019) of the agents, and the member's own in the workspace: a moved or revoked machine never comes back with them.
+        await db.ApprovalRules.Where(r => r.RevokedAt == null && (agents.Contains(r.AgentId) || (r.WorkspaceId == ws && r.UserId == user)))
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, now), ct);
         await RemoteLocks.JobsAsync(db, jobs, ct);
         await RemoteLocks.GrantsAsync(db, grants, ct);
         await RemoteLocks.AlertsAsync(db, alerts, ct);

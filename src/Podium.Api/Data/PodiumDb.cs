@@ -30,6 +30,7 @@ public sealed class PodiumDb(DbContextOptions<PodiumDb> options) : DbContext(opt
     public DbSet<EventArchive> EventArchives => Set<EventArchive>();
     public DbSet<SessionCommand> SessionCommands => Set<SessionCommand>();
     public DbSet<PermissionRequest> PermissionRequests => Set<PermissionRequest>();
+    public DbSet<ApprovalRule> ApprovalRules => Set<ApprovalRule>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<MachineGrant> MachineGrants => Set<MachineGrant>();
     public DbSet<MachineJob> MachineJobs => Set<MachineJob>();

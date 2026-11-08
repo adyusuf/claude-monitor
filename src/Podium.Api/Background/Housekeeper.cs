@@ -44,6 +44,10 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommandStatuses.Expired), ct);
         await db.PermissionRequests.Where(p => p.Status == PermissionStatuses.Open && p.ExpiresAt <= now)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Expired), ct);
+        // An approval rule holds a command the session ran: a week after it ended (revoked or expired) it is gone (ADR-0019).
+        var ruleCutoff = now - ApprovalRuleLimits.KeepEnded;
+        await db.ApprovalRules.Where(r => (r.RevokedAt != null && r.RevokedAt <= ruleCutoff) || (r.ExpiresAt != null && r.ExpiresAt <= ruleCutoff))
+            .ExecuteDeleteAsync(ct);
         await db.DeviceAuthorizations
             .Where(d => (d.Status == DeviceStatuses.Pending || d.Status == DeviceStatuses.Approved) && d.ExpiresAt <= now)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, DeviceStatuses.Expired), ct);

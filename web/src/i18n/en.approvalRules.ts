@@ -1,0 +1,20 @@
+// The approval band, its dialog and the approvals page (ADR-0019); en.ts assigns it as `approvalRules`.
+export const enApprovalRules = {
+  title: "Approvals",
+  intro: "What your Claude sessions are waiting for, the approvals you let stand for a while, and what was answered lately.",
+  bandOne: "1 approval is waiting", bandMany: "{n} approvals are waiting", bandRuns: "{n} runs wait for you", details: "Details", dialog: "Waiting approvals",
+  waiting: "Waiting", noneWaiting: "Nothing is waiting for you.",
+  rules: "Standing approvals", noRules: "You have no standing approvals.",
+  recent: "Recently answered", noRecent: "Nothing was answered lately.",
+  session: "Session", machine: "Machine", tool: "Tool", command: "Command", input: "Input", expires: "Waits until", untitled: "Untitled session",
+  remember: "Allow for", duration: { once: "This time only", "5m": "5 minutes", "10m": "10 minutes", "30m": "30 minutes", "1h": "1 hour", always: "Always" },
+  rememberHint: "The same tool on this machine, in this project, is then allowed by itself until the time ends: for Bash only this exact command, for a file only this file.",
+  rememberHintAlways: "Always lasts until you revoke it on the approvals page, and asks for your code.",
+  strictNoRemember: "Production or database machine: each request is decided on its own.",
+  noRemember: "This request is answered once: this tool, input or file cannot have a standing approval.",
+  questionOnSession: "A question: answer it on the session page.", openSession: "Open the session",
+  allow: "Allow", deny: "Deny", reason: "Reason (optional)",
+  ends: "Ends", never: "until revoked", uses: "Used", lastUsed: "Last used", revoke: "Revoke", revokeConfirm: "Revoke this standing approval? The next request asks again.",
+  answeredBy: "Answered by", byRule: "a standing approval", decision: { allow: "Allowed", deny: "Denied" }, when: "When",
+  anyInput: "any input",
+};

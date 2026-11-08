@@ -83,6 +83,13 @@ public static class AgentRoleEndpoints
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "conflict");
         }
 
+        // A machine made production or database keeps no standing approval (ADR-0019 §4): lowering it later does not bring one back.
+        if (MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(environment, agent.ClaimedEnvironment), MachineRoles.EffectiveFunction(function, agent.ClaimedFunction)))
+        {
+            await db.ApprovalRules.Where(r => r.AgentId == id && r.RevokedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, now), http.RequestAborted);
+        }
+
         Audit.Add(db, http, clock, AuditActions.AgentRoleChanged, agent.WorkspaceId, userId, targetType: "agent", targetId: id,
             detail: new { before, after = new { environment, function, environments, functions } });
         await db.SaveChangesAsync(http.RequestAborted);

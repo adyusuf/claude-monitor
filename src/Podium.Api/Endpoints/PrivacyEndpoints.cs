@@ -185,6 +185,7 @@ public static class PrivacyEndpoints
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.Title, (string?)null).SetProperty(x => x.TitleSearch, ""), ct);
         await db.PermissionRequests.Where(p => sessionIds.Contains(p.SessionId))
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.ToolInput, JsonDocument.Parse("{}")).SetProperty(p => p.Reason, (string?)null), ct);
+        await db.ApprovalRules.Where(r => r.UserId == userId || agentIds.Contains(r.AgentId)).ExecuteDeleteAsync(ct);
         await db.SessionCommands.Where(c => sessionIds.Contains(c.SessionId) || c.CreatedBy == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Body, (string?)null), ct);
 
