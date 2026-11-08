@@ -52,6 +52,9 @@ public sealed class HarnessSession
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset LastEventAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }
+
+    /// <summary>When the owner took the ended session off the lists; an event after it shows it again. Null = shown.</summary>
+    public DateTimeOffset? HiddenAt { get; set; }
 }
 
 public sealed class SessionTask
