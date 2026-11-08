@@ -27,6 +27,7 @@ export const deRemote: Dictionary["remote"] = {
   recentOutput: "Die Sitzung, die es angefordert hat, hat in den letzten Minuten Ausgabe von einer anderen Maschine gelesen. Sie wurde möglicherweise von dieser Ausgabe gesteuert: Prüfen Sie den Befehl sorgfältig.",
   allow: "Erlauben", allowWait: "Sie können gleich erlauben.", deny: "Ablehnen", denyReason: "Begründung (optional)",
   codeLabel: "Code aus Ihrer Authenticator-App",
+  codeWindow: "Nach einem angenommenen Code wird in diesem Browser 5 Minuten lang kein Code mehr verlangt, außer auf Produktions- und Datenbankmaschinen.",
   codeHintRun: "Sie haben die Anmeldung in zwei Schritten eingeschaltet, daher verlangt das Erlauben eines Shell-Befehls einen Code.",
   codeHintReauth: "Dafür ist eine aktuelle Anmeldung nötig. Geben Sie einen Code aus Ihrer Authenticator-App ein oder melden Sie sich erneut an und versuchen Sie es noch einmal.",
   cancelRun: "Abbrechen", exitCode: "Exit-Code: {code}", runError: "Meldung",

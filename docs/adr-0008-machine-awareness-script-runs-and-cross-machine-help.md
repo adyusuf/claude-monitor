@@ -529,3 +529,17 @@ environment, a hostile repository configuration starts nothing, the output cap d
 - **Not covered.** A message for a machine with no session at all still needs a session to exist: web prompts are addressed
   to a session id (ADR-0002), so a web message to an idle machine with nothing open is a separate design (a machine-addressed
   message: new endpoint, table and web screen).
+
+## Amendment 08/11/2026: a code accepted in the last 5 minutes is not asked again (§9.13a)
+
+- **Asked for.** The maintainer: when the owner gave their two-step code in the last 5 minutes, the code is not asked again.
+- **Decided.** A code (or recovery code) accepted on a browser sign-in stamps that login session (`login_sessions.code_checked_at`).
+  For `ApiConfig.CodeWindow` (5 minutes) after it, every re-authentication check off a strict target passes without a code on
+  that sign-in. This covers turning a machine setting on, a role change, a grant or job approval, a server or integration
+  setting, an approval key, and a shell or script run approval. The window applies to that sign-in only, never to an agent token
+  or another browser. A stamp ahead of the clock does not count, and each accepted code restarts the window.
+- **Not changed.** On a strict target (production or database) every approval still needs a fresh code (§9.13). A run
+  approved through the window is stored with `approved_with_totp = false`, so a target that turns strict before delivery
+  still cancels it. Turning two-step sign-in off and the recovery-code screens still ask for their own code.
+- **Built in.** `RemoteChecks.RecentCodeAsync` and `CodeAsync`, used by `ReauthAsync`, `ApprovalGateAsync` and the run
+  approval in `RunDecisions`. The web code field says so (`remote.codeWindow`).

@@ -1,6 +1,7 @@
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Endpoints;
+using Podium.Api.Security;
 using Podium.Api.Streaming;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
@@ -20,20 +21,56 @@ public static class RemoteChecks
     private static readonly string[] Open =
         [RunStatuses.PendingApproval, RunStatuses.Approved, RunStatuses.Delivered, RunStatuses.Running];
 
-    /// <summary>True after a sign-in within the re-authentication window, or when the user has two-step sign-in on and sent a valid code.</summary>
+    /// <summary>
+    /// True after a sign-in within the re-authentication window, after a two-step code accepted on this sign-in within the code window, or when
+    /// the user has two-step sign-in on and sent a valid code (which opens the code window again).
+    /// </summary>
     public static async Task<bool> ReauthAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, Guid userId, string? code)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(db);
         if (await PrivacyEndpoints.RecentSignInAsync(http, db, config, clock)) return true;
         var user = await db.Users.FirstAsync(u => u.Id == userId, http.RequestAborted);
-        return user.TotpEnabledAt is not null && await MfaEndpoints.CheckAsync(db, config, user, code, clock.GetUtcNow(), http.RequestAborted);
+        if (user.TotpEnabledAt is null) return false;
+        if (await RecentCodeAsync(http, db, config, clock)) return true;
+        return await CodeAsync(http, db, config, user, code, clock.GetUtcNow());
+    }
+
+    /// <summary>
+    /// True when a two-step code was accepted on this sign-in (the browser's login session, never an agent token) within the code window
+    /// (ADR-0008 §9.13a). A time ahead of the clock does not count.
+    /// </summary>
+    public static async Task<bool> RecentCodeAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(clock);
+        if (http.User.LoginSessionId() is not { } id) return false;
+        var at = await db.LoginSessions.Where(s => s.Id == id && s.RevokedAt == null).Select(s => s.CodeCheckedAt).FirstOrDefaultAsync(http.RequestAborted);
+        var now = clock.GetUtcNow();
+        return at is { } a && a <= now && now - a <= config.CodeWindow;
+    }
+
+    /// <summary>Checks a two-step code (or a recovery code); when it is accepted, this sign-in's code window starts again.</summary>
+    public static async Task<bool> CodeAsync(HttpContext http, PodiumDb db, ApiConfig config, User user, string? code, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(db);
+        if (!await MfaEndpoints.CheckAsync(db, config, user, code, now, http.RequestAborted)) return false;
+        if (http.User.LoginSessionId() is { } id)
+        {
+            await db.LoginSessions.Where(s => s.Id == id && s.RevokedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.CodeCheckedAt, now), http.RequestAborted);
+        }
+
+        return true;
     }
 
     /// <summary>
     /// The gate of an owner's grant or job approval (and of creating a grant for another user): on a strict target (production or database) a fresh
-    /// two-step code is always needed, a recent sign-in does not count, and no two-step sign-in means no approval (<c>totp_required</c>); elsewhere
-    /// the re-authentication rule above. Null when the approval may go on (decision §9.13).
+    /// two-step code is always needed, neither a recent sign-in nor the code window counts, and no two-step sign-in means no approval
+    /// (<c>totp_required</c>); elsewhere the re-authentication rule above. Null when the approval may go on (decision §9.13).
     /// </summary>
     public static async Task<IResult?> ApprovalGateAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, Guid userId, Agent target, string? code)
     {
@@ -45,7 +82,7 @@ public static class RemoteChecks
         if (!strict) return await ReauthAsync(http, db, config, clock, userId, code) ? null : ReauthRefused();
         var user = await db.Users.FirstAsync(u => u.Id == userId, http.RequestAborted);
         if (user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
-        return await MfaEndpoints.CheckAsync(db, config, user, code, clock.GetUtcNow(), http.RequestAborted) ? null : ReauthRefused();
+        return await CodeAsync(http, db, config, user, code, clock.GetUtcNow()) ? null : ReauthRefused();
     }
 
     public static IResult ReauthRefused() => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ReauthRequired);

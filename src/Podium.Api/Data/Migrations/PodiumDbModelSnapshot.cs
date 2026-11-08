@@ -1968,6 +1968,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("CodeCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("code_checked_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

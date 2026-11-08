@@ -25,6 +25,7 @@ export const enRemote = {
   recentOutput: "The session that asked read output from another machine in the last minutes. It may have been steered by that output: check the command with care.",
   allow: "Allow", allowWait: "You can allow in a moment.", deny: "Deny", denyReason: "Reason (optional)",
   codeLabel: "Code from your authenticator app",
+  codeWindow: "Once a code is accepted, no code is asked again in this browser for 5 minutes, except on production and database machines.",
   codeHintRun: "You have two-step sign-in on, so allowing a shell command asks for a code.",
   codeHintReauth: "This needs a recent sign-in. Enter a code from your authenticator app, or sign in again and retry.",
   cancelRun: "Cancel", exitCode: "Exit code: {code}", runError: "Message",
