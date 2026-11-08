@@ -194,16 +194,24 @@ public static class CommandEndpoints
         var rule = await db.ApprovalRules.Where(r => r.AgentId == agent.Id && r.UserId == userId && r.WorkspaceId == agent.WorkspaceId && r.RepoId == repoId
                 && r.ToolName == scope.Tool && r.Command == scope.Command && r.RevokedAt == null)
             .OrderBy(r => r.CreatedAt).FirstOrDefaultAsync(ct);
-        if (rule is null)
+        if (rule is null || (rule.ExpiresAt is { } ended && ended <= now))
         {
             var live = await db.ApprovalRules.CountAsync(r => r.UserId == userId && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now), ct);
             if (live >= ApprovalRuleLimits.LiveMax) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: RuleLimit);
-            rule = new ApprovalRule
+            if (rule is null)
             {
-                WorkspaceId = agent.WorkspaceId, UserId = userId, AgentId = agent.Id, RepoId = repoId, ToolName = scope.Tool, Command = scope.Command,
-                CreatedAt = now, CreatedFromRequest = request.Id,
-            };
-            db.ApprovalRules.Add(rule);
+                rule = new ApprovalRule
+                {
+                    WorkspaceId = agent.WorkspaceId, UserId = userId, AgentId = agent.Id, RepoId = repoId, ToolName = scope.Tool, Command = scope.Command,
+                    CreatedAt = now, CreatedFromRequest = request.Id,
+                };
+                db.ApprovalRules.Add(rule);
+            }
+            else
+            {
+                rule.CreatedAt = now; // an ended rule of the same scope starts again (one row per scope)
+                rule.CreatedFromRequest = request.Id;
+            }
         }
         else if (rule.ExpiresAt is null && ends is not null)
         {
