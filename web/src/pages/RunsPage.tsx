@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { AgentRow, WebRunView } from "../api/types";
@@ -7,17 +7,31 @@ import { Button, Card, Empty, Notice, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
-import { debounce, isCatchUp, useLive } from "../lib/live";
+import { isCatchUp, useLive } from "../lib/live";
 import { RunApproval } from "./RunApproval";
 import { cancellable, Preview, RunDetail, RunStatusChip } from "./RunList";
 
-/** Who decided a run: the person, or the grant or job that allowed it, or nobody yet. */
+/**
+ * Who decided a run: the grant or job that allowed it on its own (the API records the owner as the decider then, so it is checked first), else
+ * the person who allowed or denied it; "not yet" only while it still waits, a dash for a run that ended undecided (expired, cancelled).
+ */
 function Decider({ run }: { run: WebRunView }) {
   const { t } = useI18n();
-  if (run.decidedByName) return <>{run.decidedByName}{run.decidedAt ? <span className="muted small"> · {dateTime(run.decidedAt)}</span> : null}</>;
   if (run.grantId) return <span className="muted">{t("runsPage.byGrant")}</span>;
   if (run.jobId) return <span className="muted">{t("runsPage.byJob")}</span>;
-  return <span className="muted">{t("runsPage.undecided")}</span>;
+  if (run.decidedByName) return <>{run.decidedByName}{run.decidedAt ? <span className="muted small"> · {dateTime(run.decidedAt)}</span> : null}</>;
+  return <span className="muted">{run.status === "pending_approval" ? t("runsPage.undecided") : "—"}</span>;
+}
+
+/**
+ * The first page read again, put in front of the older runs already loaded: those keep their place, so a live update never shrinks the list. A
+ * first page shorter than a page is the whole list.
+ */
+export function mergeFirstPage(page: WebRunView[], loaded: WebRunView[], pageSize: number): WebRunView[] {
+  const last = page[page.length - 1];
+  if (!last || page.length < pageSize) return page;
+  const ids = new Set(page.map((r) => r.id));
+  return [...page, ...loaded.filter((r) => !ids.has(r.id) && r.createdAt < last.createdAt)];
 }
 
 /** One run in the popup: the approval card while it waits for this user, then its whole detail, and a cancel while it is open. */
@@ -62,39 +76,68 @@ export function RunsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<unknown>(null);
+  // A response is used only while the filter it was asked for is still the one shown, and only the latest read of the first page counts.
+  const filter = `${ws}/${agent}`;
+  const shown = useRef(filter);
+  const reads = useRef(0);
+  useEffect(() => {
+    shown.current = filter;
+  }, [filter]);
 
-  const load = useCallback(async () => {
+  /** Reads the first page; `fresh` replaces the list (a new filter), otherwise the page is merged into what is loaded. */
+  const load = useCallback(async (fresh: boolean) => {
+    const asked = `${ws}/${agent}`;
+    const read = ++reads.current;
     try {
       const page = await api.runs(ws, { agent: agent || undefined, limit: config.runPageSize });
-      setRuns(page);
-      setHasMore(page.length === config.runPageSize);
+      if (shown.current !== asked || read !== reads.current) return;
+      setRuns((r) => (fresh || !r ? page : mergeFirstPage(page, r, config.runPageSize)));
+      if (fresh || page.length < config.runPageSize) setHasMore(page.length === config.runPageSize);
       setVersion((v) => v + 1);
       setError(null);
     } catch (e) {
-      setError(e);
+      if (shown.current === asked) setError(e);
     }
   }, [ws, agent]);
 
   useEffect(() => {
-    void load();
+    setRuns(null);
+    void load(true);
   }, [load]);
   useEffect(() => {
     api.agents(ws).then(setAgents).catch(() => setAgents([])); // the filter is a convenience; the list works without it
   }, [ws]);
-  const reload = useMemo(() => debounce(() => void load()), [load]);
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(reloadTimer.current), []);
+
+  // The run in the popup is read again on every update, so it stays current even when it is older than the first page.
+  useEffect(() => {
+    if (!openId) return;
+    let live = true;
+    api.run(openId).then((fresh) => {
+      if (live) setRuns((r) => r?.map((x) => (x.id === fresh.id ? fresh : x)) ?? r);
+    }).catch(() => undefined); // the row already shown stays; the popup is only a closer look
+    return () => {
+      live = false;
+    };
+  }, [openId, version]);
   const live = useLive(ws, (m) => {
-    if (m.event === "run" || isCatchUp(m)) reload();
+    if (m.event !== "run" && !isCatchUp(m)) return;
+    clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => void load(false), config.liveDebounceMs);
   });
 
   const more = async () => {
     const oldest = runs?.[runs.length - 1];
     if (!oldest) return;
+    const asked = filter;
     try {
       const page = await api.runs(ws, { agent: agent || undefined, before: oldest.createdAt, limit: config.runPageSize });
+      if (shown.current !== asked) return;
       setRuns((r) => [...(r ?? []), ...page.filter((p) => !(r ?? []).some((x) => x.id === p.id))]);
       setHasMore(page.length === config.runPageSize);
     } catch (e) {
-      setError(e);
+      if (shown.current === asked) setError(e);
     }
   };
 
@@ -141,7 +184,7 @@ export function RunsPage() {
           {hasMore ? <div className="more"><Button variant="ghost" onClick={() => void more()}>{t("sessions.more")}</Button></div> : null}
         </Card>
       )}
-      {opened ? <RunPopup run={opened} ws={ws} version={version} onClose={() => setOpenId(null)} onChanged={() => void load()} /> : null}
+      {opened ? <RunPopup run={opened} ws={ws} version={version} onClose={() => setOpenId(null)} onChanged={() => void load(false)} /> : null}
     </div>
   );
 }
