@@ -7,14 +7,15 @@ import { ME, mockApi, renderAt } from "../test/helpers";
 import { application, project } from "../test/projects-fixtures";
 
 describe("projects in the frame and the routes", () => {
-  it("puts Projects first in the sidebar, before Sessions", async () => {
+  it("puts the dashboard first and Projects next in the sidebar, before Sessions", async () => {
     mockApi({ "GET /me": { body: ME } });
     renderAt("/w/w1/x", [{ path: "/w/:ws/*", element: <Layout /> }]);
     const projects = await screen.findByRole("link", { name: /Projects/ });
     expect(projects).toHaveAttribute("href", "/w/w1/projects");
     const links = screen.getAllByRole("link").map((l) => l.getAttribute("href"));
     expect(links.indexOf("/w/w1/projects")).toBeLessThan(links.indexOf("/w/w1/sessions"));
-    expect(links.indexOf("/w/w1/projects")).toBe(0);
+    expect(links.indexOf("/w/w1/dashboard")).toBe(0);
+    expect(links.indexOf("/w/w1/projects")).toBe(1);
   });
 
   it("shows the link in Turkish too", async () => {

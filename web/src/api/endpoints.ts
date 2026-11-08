@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
@@ -75,6 +75,7 @@ export const api = {
   /** The requests on the viewer's own sessions: open ones oldest first, or with "answered" the latest answers (ADR-0019). */
   workspacePermissions: (id: string, status?: "answered") =>
     request<ApprovalRequestRow[]>("GET", `/workspaces/${id}/permission-requests${q({ status })}`),
+  dashboard: (id: string, days?: number) => request<DashboardView>("GET", `/workspaces/${id}/dashboard${q({ days })}`),
   approvalRules: (id: string) => request<ApprovalRuleRow[]>("GET", `/workspaces/${id}/approval-rules`),
   revokeApprovalRule: (ruleId: string) => request<void>("DELETE", `/approval-rules/${ruleId}`),
 
