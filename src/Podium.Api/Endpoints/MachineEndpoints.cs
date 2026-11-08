@@ -115,6 +115,8 @@ public static class MachineEndpoints
         // The role belongs to the workspace that set it (ADR-0008 §3a): the new one starts unset.
         agent.RoleEnvironment = null;
         agent.RoleFunction = null;
+        agent.RoleEnvironments = null;
+        agent.RoleFunctions = null;
         agent.RoleSetAt = null;
         agent.RoleSetBy = null;
         agent.AcceptsAsks = false; // the opt-in belongs to the machine's owner in the workspace they gave it for
