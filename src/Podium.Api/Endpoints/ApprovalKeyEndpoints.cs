@@ -34,7 +34,7 @@ public static class ApprovalKeyEndpoints
         if (req?.Name is not { Length: >= 1 and <= 64 } name || name.Any(char.IsControl)) return Http.Invalid("name", "invalid");
         var spki = ApprovalSigning.FromBase64(req.PublicKey);
         if (spki is null || !ApprovalSigning.IsValidPublicKey(spki)) return Http.Invalid("publicKey", RemoteErrors.InvalidApprovalKey);
-        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code, window: false)) return RemoteChecks.ReauthRefused();
         var fingerprint = ApprovalSigning.Fingerprint(spki);
         var live = await db.ApprovalKeys.AsNoTracking().Where(k => k.UserId == userId && k.RetiredAt == null).ToListAsync(ct);
         if (live.Any(k => k.Fingerprint == fingerprint)) return RemoteChecks.Conflict("approval_key_exists");

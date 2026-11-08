@@ -27,7 +27,7 @@ the EF Core migrations of phase 1 implement it and this file follows them.
 | `users` | `id`, `email`, `email_normalized`, `display_name`, `display_name_search`, `password_hash` (null when only a provider is used), `email_verified_at`, `status` (`active`, `disabled`, `deleted`), `created_at`, `updated_at` | UNIQUE `email_normalized` |
 | `user_logins` | `id`, `user_id`, `provider` (`github`, `google`), `provider_subject`, `provider_email`, `linked_at` | UNIQUE (`provider`, `provider_subject`) |
 | `user_tokens` | `id`, `user_id`, `purpose` (`verify_email`, `reset_password`), `token_hash`, `created_at`, `expires_at`, `used_at` | UNIQUE `token_hash` |
-| `login_sessions` | `id`, `user_id`, `token_hash`, `created_at`, `expires_at`, `last_seen_at`, `revoked_at`, `user_agent` | UNIQUE `token_hash`; (`user_id`) |
+| `login_sessions` | `id`, `user_id`, `token_hash`, `created_at`, `expires_at`, `last_seen_at`, `revoked_at`, `user_agent`, `code_checked_at` (last accepted two-step code; ADR-0008 §9.13a) | UNIQUE `token_hash`; (`user_id`) |
 
 ## 2. Workspaces
 

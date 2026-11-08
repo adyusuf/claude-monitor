@@ -69,7 +69,7 @@ public static class ServerSettingsEndpoints
         }
 
         var me = http.User.UserId();
-        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, req.Code)) return RemoteChecks.ReauthRefused();
+        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, req.Code, window: false)) return RemoteChecks.ReauthRefused();
 
         var now = clock.GetUtcNow();
         var keys = changes.Select(c => c.Field.Key).ToList();
