@@ -55,12 +55,7 @@ public static class ApprovalRules
     {
         if (string.IsNullOrEmpty(toolName) || input.ValueKind != JsonValueKind.Object) return null;
         if (ReadPathTools.TryGetValue(toolName, out var readKey)) return Plain(input, readKey) is { } read ? (toolName, read) : null;
-        if (SearchTools.Contains(toolName))
-        {
-            // The whole call as JSON (keys as sent): the same search again, never a wider one.
-            var raw = input.GetRawText();
-            return raw.Length <= ApprovalRuleLimits.CommandMax && !raw.Contains(MaskedMark, StringComparison.Ordinal) && !raw.Any(Hidden) ? (toolName, raw) : null;
-        }
+        if (SearchTools.Contains(toolName)) return Canonical(input) is { } search ? (toolName, search) : null;
 
         if (string.Equals(toolName, ApprovalRuleLimits.ShellTool, StringComparison.Ordinal))
         {
@@ -80,6 +75,47 @@ public static class ApprovalRules
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// A flat call as one canonical text (keys in ordinal order, compact, strings written from their decoded value), so the request the agent
+    /// sends and the one read back from the database give the same text. Null for a nested value, a masked or hidden text, or a long one.
+    /// </summary>
+    private static string? Canonical(JsonElement input)
+    {
+        using var buffer = new MemoryStream();
+        using (var w = new Utf8JsonWriter(buffer))
+        {
+            w.WriteStartObject();
+            foreach (var p in input.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
+            {
+                w.WritePropertyName(p.Name);
+                switch (p.Value.ValueKind)
+                {
+                    case JsonValueKind.String:
+                        var text = p.Value.GetString()!;
+                        if (text.Contains(MaskedMark, StringComparison.Ordinal) || text.Any(Hidden)) return null;
+                        w.WriteStringValue(text);
+                        break;
+                    case JsonValueKind.Number when p.Value.TryGetDecimal(out var number):
+                        w.WriteNumberValue(number);
+                        break;
+                    case JsonValueKind.True or JsonValueKind.False:
+                        w.WriteBooleanValue(p.Value.GetBoolean());
+                        break;
+                    case JsonValueKind.Null:
+                        w.WriteNullValue();
+                        break;
+                    default:
+                        return null;
+                }
+            }
+
+            w.WriteEndObject();
+        }
+
+        var canonical = System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+        return canonical.Length <= ApprovalRuleLimits.CommandMax ? canonical : null;
     }
 
     /// <summary>A string field as shown to the owner, or null when it is missing, too long, masked, or carries characters that hide what it says.</summary>
