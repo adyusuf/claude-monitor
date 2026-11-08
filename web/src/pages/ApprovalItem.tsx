@@ -48,8 +48,9 @@ export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalReq
   const extras = bashExtras(row);
 
   const answer = async (decision: "allow" | "deny") => {
+    const always = decision === "allow" && remember === "always";
     const ok = await gate.attempt((code) => api.answer(row.id, decision, reason.trim() || undefined, undefined,
-      { remember: decision === "allow" && remember !== "once" ? remember : undefined, code }));
+      { remember: decision === "allow" && remember !== "once" ? remember : undefined, code: always ? code : undefined }));
     if (ok) onDone(row.id);
   };
 
@@ -80,12 +81,12 @@ export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalReq
               <span className="muted small">{remember === "always" ? t("approvalRules.rememberHintAlways") : t("approvalRules.rememberHint")}</span>
             </label>
           ) : <p className="muted small">{row.strict ? t("approvalRules.strictNoRemember") : t("approvalRules.noRemember")}</p>}
-          {gate.field}
+          {remember === "always" ? gate.field : null}
           {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}
           <div className="permission-actions">
             <input className="input" aria-label={t("approvalRules.reason")} placeholder={t("approvalRules.reason")} maxLength={config.reasonMax}
               value={reason} onChange={(e) => setReason(e.target.value)} />
-            <Button busy={gate.busy} disabled={!gate.ready} onClick={() => void answer("allow")}>{row.toolName === PLAN_TOOL ? t("chat.approvePlan") : t("approvalRules.allow")}</Button>
+            <Button busy={gate.busy} disabled={remember === "always" && !gate.ready} onClick={() => void answer("allow")}>{row.toolName === PLAN_TOOL ? t("chat.approvePlan") : t("approvalRules.allow")}</Button>
             <Button variant="danger" busy={gate.busy} onClick={() => void answer("deny")}>{row.toolName === PLAN_TOOL ? t("chat.rejectPlan") : t("approvalRules.deny")}</Button>
           </div>
         </>

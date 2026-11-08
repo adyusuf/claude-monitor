@@ -3085,6 +3085,9 @@ namespace Podium.Api.Data.Migrations
                     b.HasIndex("SessionId", "Status")
                         .HasDatabaseName("ix_permission_requests_session_id_status");
 
+                    b.HasIndex("WorkspaceId", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_permission_requests_workspace_id_status_created_at");
+
                     b.ToTable("permission_requests", t =>
                         {
                             t.HasCheckConstraint("ck_permission_requests_decision", "decision IS NULL OR decision IN ('allow', 'deny')");

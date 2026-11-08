@@ -7,6 +7,7 @@ using Podium.Api.Security;
 using Podium.Api.Streaming;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Podium.Api.Endpoints;
 
@@ -147,7 +148,22 @@ public static class CommandEndpoints
         request.AnsweredAt = now;
         Audit.Add(db, http, clock, AuditActions.PermissionAnswered, request.WorkspaceId, userId, targetType: "permission_request",
             targetId: id, detail: new { request.Decision, request.ToolName });
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Another answer made the same standing approval a moment ago (one per scope, ux_approval_rules_scope): this answer stands, the rule is theirs.
+            foreach (var added in db.ChangeTracker.Entries().Where(x => x.State == EntityState.Added
+                && (x.Entity is ApprovalRule || x.Entity is AuditEvent { Action: AuditActions.ApprovalRuleCreated })).ToList())
+            {
+                added.State = EntityState.Detached;
+            }
+
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+
         broker.Publish(Broker.Agent(request.AgentId), new StreamMessage(AgentStreamEvents.PermissionAnswer,
             new PermissionAnswerMessage(id, found.Session.ExternalId, request.Decision!, request.Reason, req.Answers)));
         broker.Publish(Broker.Workspace(request.WorkspaceId), new StreamMessage("permission", new { sessionId = request.SessionId, id, status = request.Status }));
@@ -166,7 +182,7 @@ public static class CommandEndpoints
     {
         var ct = http.RequestAborted;
         var agent = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == request.AgentId, ct);
-        if (agent is null || agent.UserId != userId || agent.Status != AgentStatuses.Active || ApprovalRules.Strict(agent)
+        if (agent is null || agent.UserId != userId || agent.Status != AgentStatuses.Active || agent.WorkspaceId != request.WorkspaceId || ApprovalRules.Strict(agent)
             || ApprovalRules.ScopeOf(request.ToolName, request.ToolInput.RootElement) is not { } scope)
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: RuleNotAllowed);
@@ -176,7 +192,7 @@ public static class CommandEndpoints
         DateTimeOffset? ends = ApprovalDurations.Length(remember) is { } length ? now + length : null;
         var repoId = await db.HarnessSessions.AsNoTracking().Where(s => s.Id == request.SessionId).Select(s => s.RepoId).FirstOrDefaultAsync(ct);
         var rule = await db.ApprovalRules.Where(r => r.AgentId == agent.Id && r.UserId == userId && r.WorkspaceId == agent.WorkspaceId && r.RepoId == repoId
-                && r.ToolName == scope.Tool && r.Command == scope.Command && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now))
+                && r.ToolName == scope.Tool && r.Command == scope.Command && r.RevokedAt == null)
             .OrderBy(r => r.CreatedAt).FirstOrDefaultAsync(ct);
         if (rule is null)
         {

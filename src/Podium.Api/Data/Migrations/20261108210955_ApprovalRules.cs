@@ -50,6 +50,11 @@ namespace Podium.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "ix_permission_requests_workspace_id_status_created_at",
+                table: "permission_requests",
+                columns: new[] { "workspace_id", "status", "created_at" });
+
+            migrationBuilder.CreateIndex(
                 name: "ix_approval_rules_agent_id_tool_name",
                 table: "approval_rules",
                 columns: new[] { "agent_id", "tool_name" });
@@ -58,13 +63,24 @@ namespace Podium.Api.Data.Migrations
                 name: "ix_approval_rules_user_id_workspace_id",
                 table: "approval_rules",
                 columns: new[] { "user_id", "workspace_id" });
+
+            // One live standing approval per scope (ADR-0019 §9); the command is hashed, so a long one fits the index.
+            migrationBuilder.Sql(
+                "CREATE UNIQUE INDEX ux_approval_rules_scope ON approval_rules (agent_id, user_id, workspace_id, " +
+                "coalesce(repo_id, '00000000-0000-0000-0000-000000000000'::uuid), tool_name, md5(coalesce(command, ''))) WHERE revoked_at IS NULL;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP INDEX IF EXISTS ux_approval_rules_scope;");
+
             migrationBuilder.DropTable(
                 name: "approval_rules");
+
+            migrationBuilder.DropIndex(
+                name: "ix_permission_requests_workspace_id_status_created_at",
+                table: "permission_requests");
 
             migrationBuilder.DropColumn(
                 name: "answered_by_rule",

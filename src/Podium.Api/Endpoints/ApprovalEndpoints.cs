@@ -76,7 +76,8 @@ public static class ApprovalEndpoints
                           join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
                           join p in db.Repos.AsNoTracking() on r.RepoId equals (Guid?)p.Id into projects
                           from p in projects.DefaultIfEmpty()
-                          where r.WorkspaceId == id && r.UserId == userId && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now)
+                          where r.WorkspaceId == id && r.UserId == userId && r.RevokedAt == null && a.Status == AgentStatuses.Active
+                              && a.WorkspaceId == r.WorkspaceId && a.UserId == r.UserId && (r.ExpiresAt == null || r.ExpiresAt > now)
                           orderby r.CreatedAt descending
                           select new ApprovalRuleRow(r.Id, r.AgentId, m.Hostname, r.ToolName, r.Command, r.Duration, r.CreatedAt, r.ExpiresAt,
                               r.UseCount, r.LastUsedAt, p == null ? null : p.DisplayName))
