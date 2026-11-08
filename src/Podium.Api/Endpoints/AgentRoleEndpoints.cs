@@ -68,7 +68,7 @@ public static class AgentRoleEndpoints
         var function = MachineRoles.Strictest(functions, MachineRoles.FunctionOrder);
         // Lowering is judged on the strictest values: dropping production (or database) from the set is lowering, adding a looser value is not.
         if (MachineRoles.IsLowering(agent.RoleEnvironment, agent.RoleFunction, environment, function)
-            && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code))
+            && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code, window: false))
         {
             return RemoteChecks.ReauthRefused();
         }

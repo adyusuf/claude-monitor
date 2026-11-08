@@ -112,6 +112,9 @@ public sealed class LoginSession
     public DateTimeOffset LastSeenAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
     public string? UserAgent { get; set; }
+
+    /// <summary>When a two-step code was last accepted on this sign-in; for <see cref="Config.ApiConfig.CodeWindow"/> after it no code is asked again.</summary>
+    public DateTimeOffset? CodeCheckedAt { get; set; }
 }
 
 public sealed class Workspace

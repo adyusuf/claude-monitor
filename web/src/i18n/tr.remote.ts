@@ -27,6 +27,7 @@ export const trRemote: Dictionary["remote"] = {
   recentOutput: "İsteyen oturum son dakikalarda başka bir makinenin çıktısını okudu. O çıktı tarafından yönlendirilmiş olabilir: komutu dikkatle kontrol edin.",
   allow: "İzin ver", allowWait: "Birazdan izin verebilirsiniz.", deny: "Reddet", denyReason: "Gerekçe (isteğe bağlı)",
   codeLabel: "Doğrulama uygulamasındaki kod",
+  codeWindow: "Bir kod kabul edilince bu tarayıcıda 5 dakika boyunca çoğu işlemde tekrar kod sorulmaz. Rol düşürme, sunucu ayarları ve onay anahtarları son 10 dakikada giriş yapmadıysan yine sorar; production ve database makineleri her zaman sorar.",
   codeHintRun: "İki adımlı giriş açık olduğundan bir kabuk komutuna izin vermek kod ister.",
   codeHintReauth: "Bunun için yakın zamanda giriş yapmış olmalısınız. Doğrulama uygulamasındaki kodu girin ya da yeniden giriş yapıp tekrar deneyin.",
   cancelRun: "İptal", exitCode: "Çıkış kodu: {code}", runError: "Mesaj",
