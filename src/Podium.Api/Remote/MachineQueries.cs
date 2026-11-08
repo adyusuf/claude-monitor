@@ -35,6 +35,8 @@ public static class MachineQueries
                               Alerts = db.MachineAlerts.Count(x => x.AgentId == a.Id && x.State == AlertStates.Open),
                               a.RoleEnvironment,
                               a.RoleFunction,
+                              a.RoleEnvironments,
+                              a.RoleFunctions,
                               a.ClaimedEnvironment,
                               a.ClaimedFunction,
                               a.ClaudeKind,
@@ -64,7 +66,8 @@ public static class MachineQueries
             r.Alerts, r.RoleEnvironment, r.RoleFunction, r.ClaimedEnvironment, r.ClaimedFunction,
             MachineRoles.EffectiveEnvironment(r.RoleEnvironment, r.ClaimedEnvironment), MachineRoles.EffectiveFunction(r.RoleFunction, r.ClaimedFunction),
             r.ClaudeKind, r.ClaudeVersion, r.ClaudeSessionsIdle, MachineFacts.Tools(r.Interpreters), MachineFacts.Tools(r.Tools),
-            r.Capabilities, r.PresenceAt, MachineFacts.TagsFrom(r.Tags), r.AcceptsAsks, r.AcceptsClaudeControl, r.ClaudeAutoMode, r.PluginId, r.ClaudeAutoProject, r.ClaudeSessionsLive)).ToList();
+            r.Capabilities, r.PresenceAt, MachineFacts.TagsFrom(r.Tags), r.AcceptsAsks, r.AcceptsClaudeControl, r.ClaudeAutoMode, r.PluginId, r.ClaudeAutoProject, r.ClaudeSessionsLive,
+            MachineRoles.SetOf(r.RoleEnvironments, r.RoleEnvironment, MachineRoles.EnvironmentOrder), MachineRoles.SetOf(r.RoleFunctions, r.RoleFunction, MachineRoles.FunctionOrder))).ToList();
     }
 
     public static async Task<List<MetricSample>> MetricsAsync(PodiumDb db, ApiConfig config, Guid workspaceId, Guid agentId,

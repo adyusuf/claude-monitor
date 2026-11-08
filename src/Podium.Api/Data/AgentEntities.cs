@@ -59,6 +59,10 @@ public sealed class Agent
     // ADR-0008 §3a: the role a workspace admin set and the claim the agent reports. NULL is "not set"; a claim only tightens.
     public string? RoleEnvironment { get; set; }
     public string? RoleFunction { get; set; }
+
+    // Every environment and function the admin set (08/11/2026); RoleEnvironment/RoleFunction above hold the strictest of each, for every reader of a single role.
+    public List<string>? RoleEnvironments { get; set; }
+    public List<string>? RoleFunctions { get; set; }
     public DateTimeOffset? RoleSetAt { get; set; }
     public Guid? RoleSetBy { get; set; }
     public string? ClaimedEnvironment { get; set; }

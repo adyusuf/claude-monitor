@@ -72,6 +72,13 @@ can run the application's tests on a test machine.
   red) and printed by `monitor_machines`.
 - **No inference** from host names, no role set by Claude, no CLI setting of the set role.
 
+**Amendment, 08/11/2026: a role is a set.** An admin may give a machine several environments and several functions (each value a chip
+on the web). The sets are stored in `role_environments`/`role_functions` (migration `MachineRoleSets`); `role_environment`/`role_function`
+keep the **strictest** member of each (dev < test < other < stage < preprod < production; development < ci < web < application < storage <
+other < database), and every rule that reads a single role reads that value. So a machine that is also production, or also a database
+server, is strict; Claude is started from the web only when every environment is dev or test; lowering is dropping production (or database)
+from the set. The request takes `environments`/`functions` next to the old single fields (additive). The agent's claim stays one value.
+
 ### 3a′. Facts, tags, note, services and projects (request 1a)
 
 - **Tool inventory (report only, not an execution path).** The agent probes a fixed candidate list by absolute path,

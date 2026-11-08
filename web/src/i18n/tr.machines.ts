@@ -8,6 +8,8 @@ export const trMachines: Dictionary["machines"] = {
   updateAvailable: "Güncelleme var: {version}",
   updateHint: "Makinede \"aipod update\" çalıştırın ya da kendini güncellemesine izin verin (çalışma alanı izin veriyorsa: aipod config auto-update on).",
   role: {
+    environments: "Ortamlar", functions: "İşlevler", addEnvironment: "Ortam ekle", addFunction: "İşlev ekle", editValue: "{value} değerini değiştir", removeValue: "{value} değerini kaldır",
+    setHint: "Bir makinenin her birinden birden fazla olabilir. Kuralları en sıkı olan belirler: aynı zamanda production ya da veritabanı sunucusu olan makine sıkı hedeftir.",
     title: "Rol", environment: "Ortam", function: "İşlev", notSet: "belirlenmedi", unknown: "bilinmiyor",
     claimed: "Makinenin kendi beyanı: {role}.", claimTightens: "Beyan rolü yalnızca sıkılaştırır; hiçbir zaman belirlemez ya da gevşetmez.",
     adminOnly: "Rolü yalnızca bir çalışma alanı yöneticisi belirler.", save: "Rolü kaydet", saved: "Rol kaydedildi.",
