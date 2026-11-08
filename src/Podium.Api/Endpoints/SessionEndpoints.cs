@@ -42,11 +42,15 @@ public static class SessionEndpoints
         var userId = http.User.UserId();
         if (await Access.SessionAsync(db, userId, id, http.RequestAborted) is not { } found) return Http.NotFound();
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
-        if (found.Session.Status != SessionStatuses.Ended) return Http.Invalid("session", SessionNotEnded);
-        var now = clock.GetUtcNow();
-        await db.HarnessSessions.Where(s => s.Id == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.HiddenAt, now), http.RequestAborted);
+        // One statement checks that it ended and hides it, so a resume in between cannot be hidden. The mark is the session's own last event time
+        // (the agent's clock, like LastEventAt), never the server's: a machine whose clock runs ahead would otherwise keep showing the session.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var hidden = await db.HarnessSessions.Where(s => s.Id == id && s.Status == SessionStatuses.Ended)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.HiddenAt, x => x.LastEventAt), http.RequestAborted);
+        if (hidden == 0) return Http.Invalid("session", SessionNotEnded);
         Audit.Add(db, http, clock, AuditActions.SessionHidden, found.Session.WorkspaceId, userId, targetType: "session", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(found.Session.WorkspaceId), new StreamMessage("session", new { sessionId = id, status = found.Session.Status }));
         return Results.NoContent();
     }
