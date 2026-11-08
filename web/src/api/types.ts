@@ -146,6 +146,8 @@ export interface ApprovalRuleRow {
   expiresAt: string | null;
   useCount: number;
   lastUsedAt: string | null;
+  /** The project the rule acts in (null: sessions with no project). */
+  projectName?: string | null;
 }
 
 export interface AgentRow {

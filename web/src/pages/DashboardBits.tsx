@@ -18,10 +18,10 @@ export function SoftwareMark({ tool }: { tool: ToolInfo }) {
 export function Meter({ label, pct, none }: { label: string; pct: number | null; none: string }) {
   const value = pct === null ? null : Math.max(0, Math.min(100, Math.round(pct)));
   return (
-    <div className="meter-row">
-      <span className="meter-label">{label}</span>
-      <span className="meter" aria-hidden><span className={value !== null && value >= 90 ? "meter-fill meter-high" : "meter-fill"} style={{ width: `${value ?? 0}%` }} /></span>
-      <span className="meter-value">{value === null ? none : `${value}%`}</span>
+    <div className="dash-meter-row">
+      <span className="dash-meter-label">{label}</span>
+      <span className="dash-meter" aria-hidden><span className={value !== null && value >= 90 ? "dash-meter-fill dash-meter-high" : "dash-meter-fill"} style={{ width: `${value ?? 0}%` }} /></span>
+      <span className="dash-meter-value">{value === null ? none : `${value}%`}</span>
     </div>
   );
 }

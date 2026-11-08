@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { DashboardView, MachineView, StateCount } from "../api/types";
 import { Card, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
-import { isCatchUp, useLive } from "../lib/live";
+import { debounce, isCatchUp, useLive } from "../lib/live";
 import { maxDiskPct, memoryPct, OnlineDot } from "./MachineBits";
 import { BarList, Meter, SoftwareMark } from "./DashboardBits";
 import { statusKey } from "./RunList";
@@ -29,7 +29,7 @@ function MachineTile({ ws, m }: { ws: string; m: MachineView }) {
       <Meter label={t("dashboard.cpu")} pct={m.latest?.cpuPct ?? null} none={t("dashboard.notMeasured")} />
       <Meter label={t("dashboard.memory")} pct={memoryPct(m.latest)} none={t("dashboard.notMeasured")} />
       <Meter label={t("dashboard.disk")} pct={maxDiskPct(m.latest)} none={t("dashboard.notMeasured")} />
-      <div className="dash-software" aria-label={t("dashboard.software")}>
+      <div className="dash-software" role="group" aria-label={t("dashboard.software")}>
         {marks.length === 0 ? <span className="muted small">{t("dashboard.noSoftware")}</span> : marks.map((s) => <SoftwareMark key={s.name} tool={s} />)}
       </div>
     </li>
@@ -47,21 +47,25 @@ export function DashboardPage() {
   const [view, setView] = useState<DashboardView | null>(null);
   const [machines, setMachines] = useState<MachineView[]>([]);
   const [error, setError] = useState<unknown>(null);
-  const load = useCallback(async () => {
-    try {
-      const [d, m] = await Promise.all([api.dashboard(ws), api.machines(ws)]);
+  // Each live change asks for one read after a short pause; a read the next one overtook is dropped, so older figures never win.
+  const [tick, setTick] = useState(0);
+  const reload = useMemo(() => debounce(() => setTick((n) => n + 1)), []);
+  useEffect(() => {
+    let current = true;
+    Promise.all([api.dashboard(ws), api.machines(ws)]).then(([d, m]) => {
+      if (!current) return;
       setView(d);
       setMachines(m);
       setError(null);
-    } catch (e) {
-      setError(e);
-    }
-  }, [ws]);
-  useEffect(() => {
-    void load();
-  }, [load]);
+    }).catch((e: unknown) => {
+      if (current) setError(e);
+    });
+    return () => {
+      current = false;
+    };
+  }, [ws, tick]);
   const live = useLive(ws, (m) => {
-    if (["machine", "run", "permission", "alert"].includes(m.event) || isCatchUp(m)) void load();
+    if (["machine", "run", "permission", "alert"].includes(m.event) || isCatchUp(m)) reload();
   });
 
   if (view === null) return <div className="page">{error ? <Notice kind="error">{errorText(error)}</Notice> : <Spinner />}</div>;
