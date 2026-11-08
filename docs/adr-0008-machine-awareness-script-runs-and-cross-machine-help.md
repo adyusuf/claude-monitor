@@ -535,7 +535,7 @@ environment, a hostile repository configuration starts nothing, the output cap d
 - **Asked for.** The maintainer: when the owner gave their two-step code in the last 5 minutes, the code is not asked again.
 - **Decided.** A code (or recovery code) accepted on a browser sign-in stamps that login session (`login_sessions.code_checked_at`).
   For `ApiConfig.CodeWindow` (5 minutes) after it, every re-authentication check off a strict target passes without a code on
-  that sign-in. This covers turning a machine setting on, a role change, a grant or job approval, a server or integration
+  that sign-in. This covers turning a machine setting on, a role change that does not lower the role, a grant or job approval, a server or integration
   setting, an approval key, and a shell or script run approval. The window applies to that sign-in only, never to an agent token
   or another browser. A stamp ahead of the clock does not count, and each accepted code restarts the window.
 - **Outside the window.** The window does not count for what reaches as far as a strict approval. Lowering a role (dropping
