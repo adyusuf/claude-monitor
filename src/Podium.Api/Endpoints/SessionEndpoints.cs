@@ -66,7 +66,7 @@ public static class SessionEndpoints
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
         var take = Http.Limit(limit, config);
-        var query = db.HarnessSessions.AsNoTracking().Where(s => s.WorkspaceId == id && (s.HiddenAt == null || s.LastEventAt > s.HiddenAt));
+        var query = db.HarnessSessions.AsNoTracking().Where(s => s.WorkspaceId == id && (s.HiddenAt == null || s.LastEventAt > s.HiddenAt || s.Status != SessionStatuses.Ended));
         if (!string.IsNullOrWhiteSpace(q))
         {
             var pattern = SearchText.ContainsPattern(q);
