@@ -6,13 +6,14 @@ import { trSprints } from "./tr.sprints";
 import { trIntegrations } from "./tr.integrations";
 import { trServerSettings } from "./tr.serverSettings";
 import { trTwoStep } from "./tr.twoStep";
+import { trApprovalRules } from "./tr.approvalRules";
 import { trRemote } from "./tr.remote";
 
 // Turkish: the same keys as en.ts (the type makes a missing key a build error).
 export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
-    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
+    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", approvals: "Onaylar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
     themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
@@ -189,6 +190,7 @@ export const tr: Dictionary = {
   integrations: trIntegrations,
   serverSettings: trServerSettings,
   twoStep: trTwoStep,
+  approvalRules: trApprovalRules,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
     approve: "Bu makineyi bağla", deny: "Bu ben değilim", approved: "Tamam. Makine bağlandı; bu sayfayı kapatabilirsiniz.",

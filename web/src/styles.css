@@ -462,3 +462,11 @@ button.act-text { cursor: pointer; }
 .stack-tight { display: flex; flex-direction: column; gap: 6px; }
 .stack-tight > p { margin: 0; }
 .setting-body .card > p:first-child, .setting-body .card .stack > p:first-child { margin-top: 0; }
+
+/* The approval band and its items (ADR-0019). */
+.approval-band { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 var(--gap); padding: 8px 12px; border: 1px solid var(--warning); border-radius: var(--radius-card); background: var(--warn-soft); }
+.approval-band-text { display: flex; flex-wrap: wrap; gap: 4px 10px; flex: 1; min-width: 0; }
+.approval-band-first { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.approval-where { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0 8px; }
+.approval-command { white-space: pre-wrap; word-break: break-word; max-height: 12em; overflow: auto; }
+.approval-remember { margin-top: 8px; max-width: 360px; }

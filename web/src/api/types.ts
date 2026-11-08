@@ -95,6 +95,46 @@ export interface PermissionRow {
   answeredAt: string | null;
 }
 
+/** How long an allow stands for the same tool on the same machine (ADR-0019). */
+export type ApprovalDuration = "once" | "5m" | "10m" | "30m" | "1h" | "always";
+export const APPROVAL_DURATIONS: readonly ApprovalDuration[] = ["once", "5m", "10m", "30m", "1h", "always"];
+
+/** A permission request on one of the viewer's own sessions, with where it comes from. */
+export interface ApprovalRequestRow {
+  id: string;
+  sessionId: string;
+  sessionTitle: string | null;
+  projectName: string | null;
+  agentId: string;
+  hostname: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  status: "open" | "answered" | "expired";
+  createdAt: string;
+  expiresAt: string;
+  decision: "allow" | "deny" | null;
+  answeredAt: string | null;
+  answeredByName: string | null;
+  answeredByRule: string | null;
+  /** Whether an allow may stand for a while (not on a strict machine, not a question or a plan, not a too long command). */
+  canRemember: boolean;
+  strict: boolean;
+}
+
+/** One of the viewer's standing approvals. */
+export interface ApprovalRuleRow {
+  id: string;
+  agentId: string;
+  hostname: string;
+  toolName: string;
+  command: string | null;
+  duration: Exclude<ApprovalDuration, "once">;
+  createdAt: string;
+  expiresAt: string | null;
+  useCount: number;
+  lastUsedAt: string | null;
+}
+
 export interface AgentRow {
   id: string;
   machineId: string;
