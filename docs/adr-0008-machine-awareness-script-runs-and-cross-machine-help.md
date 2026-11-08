@@ -538,6 +538,12 @@ environment, a hostile repository configuration starts nothing, the output cap d
   that sign-in. This covers turning a machine setting on, a role change, a grant or job approval, a server or integration
   setting, an approval key, and a shell or script run approval. The window applies to that sign-in only, never to an agent token
   or another browser. A stamp ahead of the clock does not count, and each accepted code restarts the window.
+- **Outside the window.** The window does not count for what reaches as far as a strict approval. Lowering a role (dropping
+  production or database) still needs a sign-in of the last 10 minutes or a fresh code: otherwise a code given for one strict
+  run would let a stolen session lower the machine and approve the rest without a code. The same holds for the server's mail
+  and sign-in settings (a mail relay sees every reset link) and for registering an approval key (`ReauthAsync(window: false)`).
+  The window stamp is set on the tracked login session, so it is saved together with the used TOTP step or recovery code. A
+  request that ends before its save uses up nothing and opens no window. A run approval's audit records `codeWindow`.
 - **Not changed.** On a strict target (production or database) every approval still needs a fresh code (§9.13). A run
   approved through the window is stored with `approved_with_totp = false`, so a target that turns strict before delivery
   still cancels it. Turning two-step sign-in off and the recovery-code screens still ask for their own code.

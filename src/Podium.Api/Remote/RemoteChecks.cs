@@ -25,14 +25,19 @@ public static class RemoteChecks
     /// True after a sign-in within the re-authentication window, after a two-step code accepted on this sign-in within the code window, or when
     /// the user has two-step sign-in on and sent a valid code (which opens the code window again).
     /// </summary>
-    public static async Task<bool> ReauthAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, Guid userId, string? code)
+    /// <remarks>
+    /// With <paramref name="window"/> false the code window does not count (a recent sign-in or a fresh code, as before ADR-0008 §9.13a): for
+    /// what reaches as far as a strict approval, such as lowering a strict role, the server's mail and sign-in settings, and an approval key.
+    /// </remarks>
+    public static async Task<bool> ReauthAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, Guid userId, string? code,
+        bool window = true)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(db);
         if (await PrivacyEndpoints.RecentSignInAsync(http, db, config, clock)) return true;
         var user = await db.Users.FirstAsync(u => u.Id == userId, http.RequestAborted);
         if (user.TotpEnabledAt is null) return false;
-        if (await RecentCodeAsync(http, db, config, clock)) return true;
+        if (window && await RecentCodeAsync(http, db, config, clock)) return true;
         return await CodeAsync(http, db, config, user, code, clock.GetUtcNow());
     }
 
@@ -52,16 +57,20 @@ public static class RemoteChecks
         return at is { } a && a <= now && now - a <= config.CodeWindow;
     }
 
-    /// <summary>Checks a two-step code (or a recovery code); when it is accepted, this sign-in's code window starts again.</summary>
+    /// <summary>
+    /// Checks a two-step code (or a recovery code); when it is accepted, this sign-in's code window starts again. The stamp is set on the tracked
+    /// login session, so it is written by the caller's save together with the used code's step or recovery code: a request that ends before
+    /// saving uses up nothing and opens no window.
+    /// </summary>
     public static async Task<bool> CodeAsync(HttpContext http, PodiumDb db, ApiConfig config, User user, string? code, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(db);
         if (!await MfaEndpoints.CheckAsync(db, config, user, code, now, http.RequestAborted)) return false;
-        if (http.User.LoginSessionId() is { } id)
+        if (http.User.LoginSessionId() is { } id
+            && await db.LoginSessions.FirstOrDefaultAsync(s => s.Id == id && s.RevokedAt == null, http.RequestAborted) is { } session)
         {
-            await db.LoginSessions.Where(s => s.Id == id && s.RevokedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.CodeCheckedAt, now), http.RequestAborted);
+            session.CodeCheckedAt = now;
         }
 
         return true;
