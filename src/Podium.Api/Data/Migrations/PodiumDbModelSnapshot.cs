@@ -174,9 +174,17 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("role_environment");
 
+                    b.PrimitiveCollection<List<string>>("RoleEnvironments")
+                        .HasColumnType("text[]")
+                        .HasColumnName("role_environments");
+
                     b.Property<string>("RoleFunction")
                         .HasColumnType("text")
                         .HasColumnName("role_function");
+
+                    b.PrimitiveCollection<List<string>>("RoleFunctions")
+                        .HasColumnType("text[]")
+                        .HasColumnName("role_functions");
 
                     b.Property<DateTimeOffset?>("RoleSetAt")
                         .HasColumnType("timestamp with time zone")
@@ -309,7 +317,11 @@ namespace Podium.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_agents_role_environment", "role_environment IS NULL OR role_environment IN ('dev', 'test', 'stage', 'preprod', 'production', 'other')");
 
+                            t.HasCheckConstraint("ck_agents_role_environments", "role_environments IS NULL OR role_environments <@ ARRAY['dev', 'test', 'stage', 'preprod', 'production', 'other']::text[]");
+
                             t.HasCheckConstraint("ck_agents_role_function", "role_function IS NULL OR role_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
+
+                            t.HasCheckConstraint("ck_agents_role_functions", "role_functions IS NULL OR role_functions <@ ARRAY['development', 'application', 'web', 'database', 'ci', 'storage', 'other']::text[]");
 
                             t.HasCheckConstraint("ck_agents_services", "services IS NULL OR (jsonb_typeof(services) = 'array' AND jsonb_array_length(services) <= 64)");
 

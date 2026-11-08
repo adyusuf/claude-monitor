@@ -1,14 +1,25 @@
 import type { MachineView, ToolInfo } from "../api/types";
 import { useI18n } from "../i18n";
+import { ENVIRONMENT_ORDER, environmentsOf, FUNCTION_ORDER, functionsOf, normalize } from "../lib/roles";
 import { Icon } from "../components/icons";
 
 /** True for a production or database machine (ADR-0008 §2): the badge turns red and scripts will need a code. */
 export const isStrict = (m: MachineView): boolean => m.effectiveEnvironment === "production" || m.effectiveFunction === "database";
 
-/** "production/database", "test/not set", or "not set"; the server computed the effective role, the claim only tightened it. */
+/** The values of a set with the effective one added when a claim made it stricter than anything set, loosest first. */
+function withEffective<T extends string>(values: T[], effective: T | null | undefined, order: readonly T[]): T[] {
+  return effective && !values.includes(effective) ? normalize([...values, effective], order) : values;
+}
+
+/**
+ * "production/database", "test/not set", "dev+test/web", or "not set"; the server computed the effective role (the claim only tightened it),
+ * and a role with several values names each of them.
+ */
 export function roleCode(m: MachineView, notSet: string): string {
   if (!m.effectiveEnvironment && !m.effectiveFunction) return notSet;
-  return `${m.effectiveEnvironment ?? notSet}/${m.effectiveFunction ?? notSet}`;
+  const envs = m.effectiveEnvironment ? withEffective(environmentsOf(m), m.effectiveEnvironment, ENVIRONMENT_ORDER) : [];
+  const fns = m.effectiveFunction ? withEffective(functionsOf(m), m.effectiveFunction, FUNCTION_ORDER) : [];
+  return `${envs.length > 0 ? envs.join("+") : notSet}/${fns.length > 0 ? fns.join("+") : notSet}`;
 }
 
 /** The effective role, red when strict, with the machine's own claim in the title. */

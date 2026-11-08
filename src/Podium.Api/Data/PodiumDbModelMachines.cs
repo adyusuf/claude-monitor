@@ -27,6 +27,8 @@ internal static class PodiumDbModelMachines
             {
                 t.HasCheckConstraint("ck_agents_role_environment", Optional("role_environment", MachineEnvironments.All));
                 t.HasCheckConstraint("ck_agents_role_function", Optional("role_function", MachineFunctions.All));
+                t.HasCheckConstraint("ck_agents_role_environments", $"role_environments IS NULL OR role_environments <@ ARRAY[{string.Join(", ", MachineEnvironments.All.Select(v => $"'{v}'"))}]::text[]");
+                t.HasCheckConstraint("ck_agents_role_functions", $"role_functions IS NULL OR role_functions <@ ARRAY[{string.Join(", ", MachineFunctions.All.Select(v => $"'{v}'"))}]::text[]");
                 t.HasCheckConstraint("ck_agents_claimed_environment", Optional("claimed_environment", MachineEnvironments.All));
                 t.HasCheckConstraint("ck_agents_claimed_function", Optional("claimed_function", MachineFunctions.All));
                 t.HasCheckConstraint("ck_agents_claude_kind", Optional("claude_kind", ClaudeKinds.All));
