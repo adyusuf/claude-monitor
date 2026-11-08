@@ -46,6 +46,8 @@ export interface MachineView {
   pluginId?: string | null;
   /** The project the mode "always" keeps a session running in (ADR-0014 P3). */
   claudeAutoProject?: string | null;
+  /** How many Claude Code sessions the machine reported running at its last presence report; null when unknown. Absent on an older API. */
+  claudeSessionsLive?: number | null;
 }
 export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
 export interface AgentRoleView {
