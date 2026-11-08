@@ -16,10 +16,17 @@ export function strictest<T extends string>(values: readonly T[], order: readonl
   return sorted.length === 0 ? null : sorted[sorted.length - 1]!;
 }
 
-/** The environments a machine's admin set: the set an API sends, else the single value as a set of one (an older API). */
-export const environmentsOf = (m: MachineView): MachineEnvironment[] =>
-  m.roleEnvironments && m.roleEnvironments.length > 0 ? normalize(m.roleEnvironments, ENVIRONMENT_ORDER) : m.roleEnvironment ? [m.roleEnvironment] : [];
+/**
+ * The set when its strictest member is the single value, else the single value as a set of one: an older API sends no set, and a set that
+ * disagrees with the single value is stale (the single value is what the rules enforce), so it is never shown or saved back.
+ */
+function setOf<T extends string>(values: readonly T[] | null | undefined, one: T | null | undefined, order: readonly T[]): T[] {
+  if (!one) return [];
+  return values && values.length > 0 && strictest(values, order) === one ? normalize(values, order) : [one];
+}
 
-/** The functions a machine's admin set, the same way. */
-export const functionsOf = (m: MachineView): MachineFunction[] =>
-  m.roleFunctions && m.roleFunctions.length > 0 ? normalize(m.roleFunctions, FUNCTION_ORDER) : m.roleFunction ? [m.roleFunction] : [];
+/** The environments a machine's admin set. */
+export const environmentsOf = (m: MachineView): MachineEnvironment[] => setOf(m.roleEnvironments, m.roleEnvironment, ENVIRONMENT_ORDER);
+
+/** The functions a machine's admin set. */
+export const functionsOf = (m: MachineView): MachineFunction[] => setOf(m.roleFunctions, m.roleFunction, FUNCTION_ORDER);
