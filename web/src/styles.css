@@ -470,3 +470,23 @@ button.act-text { cursor: pointer; }
 .approval-where { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0 8px; }
 .approval-command { white-space: pre-wrap; word-break: break-word; max-height: 12em; overflow: auto; }
 .approval-remember { margin-top: 8px; max-width: 360px; }
+
+/* The dashboard: figures, machine tiles, resource meters, software marks and bar lists. One hue for every bar; values are always text. */
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
+.stat-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); }
+.stat-label { color: var(--muted); font-size: 12.5px; }
+.stat-value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-sub { font-size: 13px; font-weight: 500; color: var(--muted); }
+.dash-machines { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: var(--gap); }
+.dash-machine { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+.dash-machine-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 500; }
+.dash-meter-row, .bar-row { display: grid; grid-template-columns: minmax(70px, 30%) 1fr auto; align-items: center; gap: 8px; font-size: 12.5px; }
+.dash-meter, .bar-track { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+.dash-meter-fill, .bar-fill { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.dash-meter-fill.dash-meter-high { background: var(--warning); }
+.dash-meter-value, .bar-value { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 3.5em; text-align: right; }
+.dash-meter-label, .bar-label { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-software { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.soft-mark { display: inline-flex; align-items: center; min-width: 28px; justify-content: center; padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--radius-chip); background: var(--raised); font: 500 11.5px var(--mono); }
+.bar-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dash-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--gap); margin-top: var(--gap); }

@@ -20,6 +20,7 @@ const paths = {
   edit: <><path d="M10.5 3 13 5.5 6 12.5H3.5V10z" /><path d="M9 4.5 11.5 7" /></>,
   close: <><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></>,
   runs: <><rect x="2" y="3" width="12" height="10" rx="1.5" /><path d="M4.8 6.5 6.8 8l-2 1.5M8.5 10h3" /></>,
+  dashboard: <><rect x="2" y="2" width="5" height="6" rx="1" /><rect x="9" y="2" width="5" height="3.5" rx="1" /><rect x="9" y="7.5" width="5" height="6.5" rx="1" /><rect x="2" y="10" width="5" height="4" rx="1" /></>,
   approvals: <><path d="M8 1.8 13 3.6v4c0 3.1-2.1 5.4-5 6.6-2.9-1.2-5-3.5-5-6.6v-4L8 1.8Z" /><path d="m5.7 8 1.6 1.6L10.5 6.4" /></>,
 } satisfies Record<string, ReactNode>;
 

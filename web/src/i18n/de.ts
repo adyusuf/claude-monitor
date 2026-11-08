@@ -2,6 +2,7 @@ import type { Dictionary } from "./en";
 import { deMachines } from "./de.machines";
 import { deTwoStep } from "./de.twoStep";
 import { deApprovalRules } from "./de.approvalRules";
+import { deDashboard } from "./de.dashboard";
 import { deRemote } from "./de.remote";
 import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
@@ -13,7 +14,7 @@ import { deServerSettings } from "./de.serverSettings";
 export const de: Dictionary = {
   app: { name: "Podium", tagline: "Verfolgen Sie Ihre KI-Programmiersitzungen live." },
   nav: {
-    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", runs: "Ausführungen", approvals: "Freigaben", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
+    dashboard: "Übersicht", projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", runs: "Ausführungen", approvals: "Freigaben", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
     account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
     themeSystem: "System", themeLight: "Hell", themeDark: "Dunkel",
@@ -191,6 +192,7 @@ export const de: Dictionary = {
   serverSettings: deServerSettings,
   twoStep: deTwoStep,
   approvalRules: deApprovalRules,
+  dashboard: deDashboard,
   device: {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",
     approve: "Diese Maschine verbinden", deny: "Das bin nicht ich", approved: "Fertig. Die Maschine ist verbunden; Sie können diese Seite schließen.",
