@@ -14,10 +14,10 @@ The maintainer asked for two things:
 The agent already has every choice:
 - **How it starts:** `aipod install` (Claude Code plugin hooks), `--standalone` (at sign-in) or `--service` (at boot).
 - **The account:** your own user for the first two. A service has its own account, and can add a second unprivileged account for runs (`--run-account [<name>]`).
-- **Administrator rights:** never by default. A service refuses root, SYSTEM and LocalSystem. `--allow-root` lets it run as one of them, but then it executes nothing; it only sends metrics and sessions.
+- **Administrator rights:** never. A service always runs under its own unprivileged account (`aipod`, `_aipod`, `NT SERVICE\aipod`), and the install refuses root, SYSTEM and LocalSystem. `--allow-root` is read only for a privileged service account, which the CLI never picks, so the form does not offer it; it states the rule instead. Only installing a service needs an administrator.
 - **Remote runs:** `--exec off|argv|shell`.
 
-The web did not show these choices. The download page now has a form, "Install choices", that builds the one command for what was chosen. It adds no new flag and no new right. The agent checks every choice again when it installs: the run account's name, refusing a privileged account, and that only an administrator can install a service.
+The web did not show these choices. The download page now has a form, "Install choices", that builds the commands for what was chosen. The level of remote runs is always written, `off` too, so a reinstall never keeps an earlier level. With Claude Code it gives two lines, because `aipod install --exec <level>` alone only sets the level and does not register the plugin. A service command uses the agent's full path under sudo, because sudo does not search the user's own folders. It adds no new flag and no new right. The agent checks every choice again when it installs: the run account's name, refusing a privileged account, and that only an administrator can install a service.
 
 ## 3. Part 2: what reaches folders and applications today
 
