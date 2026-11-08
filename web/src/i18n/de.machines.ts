@@ -26,7 +26,7 @@ export const deMachines: Dictionary["machines"] = {
     hint: "Der Agent prüft eine feste Liste über absolute Pfade und meldet, was er findet; --version führt er nur für vertrauenswürdige oder eigene Programme aus.",
   },
   tags: {
-    title: "Tags", none: "Keine Tags.", saved: "Tags gespeichert.", key: "Schlüssel", value: "Wert", add: "Tag hinzufügen",
+    title: "Tags", none: "Keine Tags.", saved: "Tags gespeichert.", key: "Tag-Schlüssel", value: "Tag-Wert", add: "Tag hinzufügen",
     edit: "{tag} bearbeiten", remove: "{tag} entfernen", duplicate: "Ein anderes Tag hat diesen Schlüssel bereits.", full: "Eine Maschine hat höchstens {max} Tags.",
     hint: "Höchstens {max} Paare; Schlüssel und Werte bestehen aus Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich (1 bis 32 Zeichen). Claude sieht sie als Beschriftungen, nie als Anweisungen.",
   },
