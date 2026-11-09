@@ -13,6 +13,7 @@ export interface KeyStore {
 
 export const SIGNING = { name: "ECDSA", namedCurve: "P-256" } as const;
 export const TAG = "ap-approval-v1";
+export const TAG_V2 = "ap-approval-v2";
 
 const toBase64 = (bytes: ArrayBuffer): string => {
   let text = "";
@@ -25,6 +26,17 @@ const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((b) =
 /** The bytes signed, as text: the tag, the kind, the run, the target agent, the run's hash and the signed expiry in whole Unix seconds, one per line. */
 export const payloadFor = (kind: string, id: string, targetAgentId: string, hash: string, notAfterIso: string): string =>
   `${TAG}\n${kind}\n${id.toLowerCase()}\n${targetAgentId.toLowerCase()}\n${hash}\n${Math.floor(Date.parse(notAfterIso) / 1000)}`;
+
+/**
+ * Version 2 (ADR-0020 §4 rule 6): the same lines under its own tag, then the run's repository key, which decides the run's access policy, so the
+ * server cannot relabel a run after it was signed (ApprovalSigning.PayloadV2).
+ */
+export const payloadV2For = (kind: string, id: string, targetAgentId: string, hash: string, notAfterIso: string, projectKey: string): string =>
+  `${TAG_V2}\n${kind}\n${id.toLowerCase()}\n${targetAgentId.toLowerCase()}\n${hash}\n${Math.floor(Date.parse(notAfterIso) / 1000)}\n${projectKey}`;
+
+/** What a run's approval signs: version 2 exactly when the run names a repository, else version 1 (the API and the agent pick the same). */
+export const runPayload = (run: { id: string; targetAgentId: string; expiresAt: string; projectKey?: string | null }, hash: string): string =>
+  run.projectKey ? payloadV2For("run", run.id, run.targetAgentId, hash, run.expiresAt, run.projectKey) : payloadFor("run", run.id, run.targetAgentId, hash, run.expiresAt);
 
 /** SHA-256 of the key's SubjectPublicKeyInfo as lowercase hex: what a person compares with what the machine prints. */
 export const fingerprintOf = async (spkiBase64: string): Promise<string> => {

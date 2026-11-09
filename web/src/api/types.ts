@@ -19,7 +19,7 @@ export interface Me {
 }
 
 export type AgentUpdateMode = "off" | "check" | "on";
-export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate?: boolean }
+export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate?: boolean; enforceAccessPolicies?: boolean }
 export interface WorkspaceInfo { id: string; name: string; role: Role; settings: Settings }
 export interface Member { userId: string; displayName: string; email: string | null; role: Role; joinedAt: string }
 export interface Invitation { id: string; email: string; role: Role; createdAt: string; expiresAt: string }
@@ -49,7 +49,7 @@ export interface SessionRow {
   /** Claude Code started this session in the background from the web (ADR-0014); absent on an older API. */
   startedFromWeb?: boolean;
   /** The short id of that start, for a stop from the web; null when the web did not start it. */
-  webSessionRef?: string | null;
+  webSessionRef?: string | null; /** The session's repository key, which names its access policy (ADR-0020 §4); absent on an older API. */ projectKey?: string | null;
 }
 export interface TaskRow { id: string; externalId: string; subject: string; status: string; updatedAt: string }
 export interface SubagentRow { id: string; agentType: string; description: string | null; status: string; startedAt: string; endedAt: string | null }
@@ -236,7 +236,7 @@ export interface WebRunView {
   testsSkipped?: number | null;
   /** Who allowed or denied the run and when; null while it waits. A run a grant or a job allowed names the owner of that grant or job. Absent on an older API. */
   decidedByName?: string | null;
-  decidedAt?: string | null;
+  decidedAt?: string | null; /** ADR-0020 §4: with an access_ error, the layer that refused the run and the policy version; absent on an older API. */ refusedBy?: string | null; accessVersion?: number | null;
 }
 export interface RunOutputChunk { seq: number; stream: string; body: string; gapBefore: boolean }
 export interface RunOutputPage { chunks: RunOutputChunk[]; nextSeq: number; done: boolean }

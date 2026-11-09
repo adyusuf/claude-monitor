@@ -5,6 +5,7 @@ import { deApprovalRules } from "./de.approvalRules";
 import { deDashboard } from "./de.dashboard";
 import { deInstallOptions } from "./de.installOptions";
 import { deRemote } from "./de.remote";
+import { deAccess, deAccessErrors } from "./de.access";
 import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
 import { deSprints } from "./de.sprints";
@@ -33,6 +34,7 @@ export const de: Dictionary = {
     mfaTitle: "Anmeldung in zwei Schritten", mfaCode: "Code aus Ihrer Authenticator-App (oder ein Wiederherstellungscode)", mfaVerify: "Bestätigen",
   },
   errors: {
+    ...deAccessErrors,
     jira_changed: "Es hat sich in Jira geändert, seit Sie nachgesehen haben. Neu laden und erneut versuchen.", jira_transition_unavailable: "Jira kennt keinen Schritt von diesem Status zu jenem.", jira_no_board: "Der Jira-Bereich hat kein Board, auf dem ein Sprint angelegt werden könnte.", mirrored_scope: "Ein Issue und ein Sprint müssen beide aus Jira oder beide aus Podium stammen.", mirrored_type_locked: "Der Typ eines Jira-Issues wird in Jira geführt.", mirrored_no_archive: "Ein Jira-Issue kann hier nicht archiviert werden. Brechen Sie es stattdessen ab.", mirrored_field_locked: "Name und Zweck eines Jira-Projekts werden in Jira geführt.", mirrored_detached: "Dies wurde aus Jira importiert und die Verbindung besteht nicht mehr. Verbinden Sie die Site erneut.", assignee_not_in_jira: "Podium kennt kein Jira-Konto dieser Person. Verknüpfen Sie es auf der Seite Integrationen.",
     invalid_site: "Geben Sie Ihre Jira-Subdomain ein, etwa acme für acme.atlassian.net.", integration_unavailable: "Jira ist auf diesem Server nicht eingerichtet.",
     reauthorize: "Die Verbindung braucht eine neue Anmeldung bei Atlassian.", jira_account_required: "Verknüpfen Sie zuerst Ihr eigenes Atlassian-Konto.",
@@ -195,6 +197,7 @@ export const de: Dictionary = {
   approvalRules: deApprovalRules,
   dashboard: deDashboard,
   installOptions: deInstallOptions,
+  access: deAccess,
   device: {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",
     approve: "Diese Maschine verbinden", deny: "Das bin nicht ich", approved: "Fertig. Die Maschine ist verbunden; Sie können diese Seite schließen.",

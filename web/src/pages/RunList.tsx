@@ -10,6 +10,7 @@ import { RunFacts } from "./RunFacts";
 import { RunIssues } from "./RunIssues";
 import { RunOutput } from "./RunOutput";
 import { RunOutputAccount } from "./RunOutputAccount";
+import { isAccessRefusal, RunAccessRefusal } from "./RunAccessRefusal";
 
 export function statusKey(status: RunStatus | string): Key {
   switch (status) {
@@ -78,7 +79,7 @@ export function RunDetail({ run, ws, version }: { run: WebRunView; ws: string; v
     <div className="run-detail">
       <RunFacts run={run} ws={ws} />
       {run.exitCode !== null ? <p className="small">{t("remote.exitCode", { code: run.exitCode })}</p> : null}
-      {run.error ? <p className="small">{t("remote.runError")}: {run.error}</p> : null}
+      {run.error && isAccessRefusal(run) ? <RunAccessRefusal run={run} /> : run.error ? <p className="small">{t("remote.runError")}: {run.error}</p> : null}
       {run.visible && run.outputBytes > 0 ? <RunOutput runId={run.id} truncated={run.outputTruncated} version={version} /> : null}
       {run.visible ? <RunOutputAccount run={run} /> : null}
     </div>
