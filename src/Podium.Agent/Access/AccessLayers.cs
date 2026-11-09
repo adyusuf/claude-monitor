@@ -20,12 +20,18 @@ public sealed class AccessLayers(AgentConfig config)
     /// <summary>Whether the workspace's machine list (the API's view) says this machine is production or database: "true", "false", or unread.</summary>
     public const string StrictKey = "access.self_strict";
 
-    /// <summary>The layers for a run on its real working directory and paths, or the refusal when the repositories it touches cannot be judged.</summary>
+    /// <summary>
+    /// The layers for a run on its real working directory and paths, or the refusal when the repositories it touches cannot be judged. A label that names
+    /// none of the working directory's checkouts is refused only where a layer beyond the ceiling applies; with the ceiling only (switch off, no policy,
+    /// not strict) the run goes on as before, and the union of keys already holds it to any checkout's policy.
+    /// </summary>
     public (IReadOnlyList<AccessLayer> Layers, AccessRefusal? Refusal) For(RunMessage run, ExecPolicy policy, string? cwd, IReadOnlyList<string> paths)
     {
         ArgumentNullException.ThrowIfNull(run);
-        var (keys, refusal) = AccessRunKeys.Of(run.ProjectKey, cwd, paths);
-        return refusal is not null ? ([], refusal) : (For(keys, policy, run), null);
+        var (keys, refusal, mismatch) = AccessRunKeys.Of(run.ProjectKey, cwd, paths);
+        if (refusal is not null) return ([], refusal);
+        var layers = For(keys, policy, run);
+        return mismatch && layers.Count > 1 ? ([], AccessRunKeys.Mismatch()) : (layers, null);
     }
 
     /// <summary>The layers for these repository keys (a session's, or a run's when <paramref name="run"/> is given).</summary>
