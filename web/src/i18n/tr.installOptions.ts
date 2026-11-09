@@ -16,6 +16,9 @@ export const trInstallOptions: Dictionary["installOptions"] = {
   adminUser: "Yönetici hakkı istemez; çalıştırdığı her şey yalnızca senin kullanıcının yetkisine sahiptir.",
   adminService: "Servis asla yönetici olarak çalışmaz: kendi yetkisiz hesabıyla çalışır, kurulum root, SYSTEM ve LocalSystem'i reddeder. Yalnızca kurmak için yönetici gerekir.",
   exec: "Bu makinede uzaktan çalıştırma", execs: { off: "Kapalı (varsayılan)", argv: "Yalnızca onaylı programlar (argv)", shell: "Onaylı shell komutları da" },
-  os: { linux: "Linux", macos: "macOS" },
-  runUser: "Makinede bir terminale şunu yaz (satırlar sırayla):", runService: "Bunu yönetici olarak bir terminale, sistemine uyan satırla yaz: sudo ajanın tam yolunu ister. Windows'ta yönetici PowerShell'de aipod install --service komutunu aynı seçeneklerle çalıştır.",
+  os: { linux: "Linux", macos: "macOS", windows: "Windows (yönetici PowerShell)" },
+  runUser: "Makinede bir terminale şunu yaz (satırlar sırayla):", runService: "Bunu yönetici olarak, sistemine uyan satırla yaz: Linux ve macOS'ta sudo ile, Windows'ta yönetici PowerShell'de. Her satır ajanın tam yolunu verir, çünkü yönetici kabuğu senin klasörlerinde aramaz. Windows'ta o PowerShell'i ajanı kuran kullanıcıyla aç: yol o kullanıcının profilinde.",
+  noWindows: "Windows satırı yok: çalıştırma hesabı yalnız Linux ve macOS'ta var.",
+  serviceHttps: "Hizmet bu sunucuya https adresiyle bağlanmalı. Komutu almak için bu sayfayı sunucunun https adresinden aç.",
+  standaloneHttps: "Ajan http adresini yalnız bu makinede (localhost) kabul eder. Komutu almak için bu sayfayı sunucunun https adresinden aç.",
 };

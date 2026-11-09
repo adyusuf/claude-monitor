@@ -3056,6 +3056,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("reason");
 
+                    b.Property<Guid?>("RepoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("repo_id");
+
                     b.Property<Guid>("SessionId")
                         .HasColumnType("uuid")
                         .HasColumnName("session_id");

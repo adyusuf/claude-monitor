@@ -49,8 +49,12 @@ public static class DashboardEndpoints
             .GroupBy(r => r.Status).Select(g => new StateCount(g.Key, g.Count())).ToListAsync(ct);
         var answers = await db.PermissionRequests.AsNoTracking().Where(p => p.WorkspaceId == id && p.CreatedAt >= since)
             // An open request past its wait is shown as expired at once, as the approvals page does (the housekeeper marks it within a minute).
-            .GroupBy(p => new { Status = p.Status == PermissionStatuses.Open && p.ExpiresAt <= now ? PermissionStatuses.Expired : p.Status, p.Decision,
-                Rule = p.AnsweredByRule != null })
+            .GroupBy(p => new
+            {
+                Status = p.Status == PermissionStatuses.Open && p.ExpiresAt <= now ? PermissionStatuses.Expired : p.Status,
+                p.Decision,
+                Rule = p.AnsweredByRule != null
+            })
             .Select(g => new { g.Key.Status, g.Key.Decision, g.Key.Rule, N = g.Count() }).ToListAsync(ct);
         var approvals = answers
             .GroupBy(a => a.Rule ? AutoAllowed
