@@ -81,7 +81,7 @@ public static class RunNotices
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(run);
-        return await MessageAsync(db, run, await AccessPolicyDelivery.StampAsync(db, run.TargetAgentId, run.WorkspaceId, ct), ct);
+        return await MessageAsync(db, run, await AccessPolicyDelivery.StampAsync(db, run.WorkspaceId, ct), ct);
     }
 
     private static async Task<RunMessage> MessageAsync(PodiumDb db, RemoteRun run, string? accessStamp, CancellationToken ct)
@@ -113,7 +113,7 @@ public static class RunNotices
             if (broker is not null && await RoleBlocksAsync(db, broker, run, ct)) continue;
             if (!stamps.TryGetValue(run.WorkspaceId, out var stamp))
             {
-                stamp = await AccessPolicyDelivery.StampAsync(db, targetAgentId, run.WorkspaceId, ct);
+                stamp = await AccessPolicyDelivery.StampAsync(db, run.WorkspaceId, ct);
                 stamps[run.WorkspaceId] = stamp;
             }
 

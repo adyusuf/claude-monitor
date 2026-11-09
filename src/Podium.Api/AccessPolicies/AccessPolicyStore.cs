@@ -47,16 +47,15 @@ public static class AccessPolicyStore
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
     }
 
-    /// <summary>Active machines of the workspace that require signed approvals and work in one of these repositories: they ignore an unsigned version.</summary>
-    public static async Task<int> MachinesRequiringSignatureAsync(PodiumDb db, Guid workspaceId, IReadOnlyList<string> keys, CancellationToken ct)
+    /// <summary>
+    /// Active machines of the workspace that require signed approvals: every one of them receives the policy (<see cref="AccessPolicyDelivery"/>)
+    /// and ignores an unsigned version of it.
+    /// </summary>
+    public static async Task<int> MachinesRequiringSignatureAsync(PodiumDb db, Guid workspaceId, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
-        var list = keys.ToList();
-        if (list.Count == 0) return 0;
         return await db.Agents.AsNoTracking()
-            .Where(a => a.WorkspaceId == workspaceId && a.Status == AgentStatuses.Active && a.ApprovalsRequired
-                && db.MachineProjects.Any(p => p.AgentId == a.Id && list.Contains(p.ProjectKey)))
-            .CountAsync(ct);
+            .Where(a => a.WorkspaceId == workspaceId && a.Status == AgentStatuses.Active && a.ApprovalsRequired).CountAsync(ct);
     }
 
     /// <summary>
@@ -73,7 +72,7 @@ public static class AccessPolicyStore
         {
             var fallback = AccessPolicyRules.Canonical(AccessPolicyRules.DefaultDocument(candidates));
             return new AccessPolicyView(project.Id, 0, fallback, AccessPolicySigning.Hash(fallback), true, false, null, candidates,
-                await MachinesRequiringSignatureAsync(db, project.WorkspaceId, fallback.ProjectKeys, ct), canEdit);
+                await MachinesRequiringSignatureAsync(db, project.WorkspaceId, ct), canEdit);
         }
 
         var document = Read(row);
@@ -81,6 +80,6 @@ public static class AccessPolicyStore
             ? await db.Users.AsNoTracking().Where(u => u.Id == by).Select(u => u.DisplayName).FirstOrDefaultAsync(ct)
             : null;
         return new AccessPolicyView(project.Id, row.Version, document, row.DocumentHash, false, row.Signature is not null, signer, candidates,
-            await MachinesRequiringSignatureAsync(db, project.WorkspaceId, document.ProjectKeys, ct), canEdit);
+            await MachinesRequiringSignatureAsync(db, project.WorkspaceId, ct), canEdit);
     }
 }
