@@ -14,6 +14,9 @@ export const enInstallOptions = {
   adminUser: "It never asks for administrator rights; what it runs has only your user's rights.",
   adminService: "The service never runs as an administrator: it runs under its own unprivileged account, and the install refuses root, SYSTEM and LocalSystem. Only installing it needs an administrator.",
   exec: "Remote runs on this machine", execs: { off: "Off (default)", argv: "Approved programs only (argv)", shell: "Approved shell commands too" },
-  os: { linux: "Linux", macos: "macOS" },
-  runUser: "Type this in a terminal on the machine (one line after the other):", runService: "Type this in a terminal as an administrator, with the line for your system: sudo needs the agent's full path. On Windows, in an elevated PowerShell, run aipod install --service with the same options.",
+  os: { linux: "Linux", macos: "macOS", windows: "Windows (elevated PowerShell)" },
+  runUser: "Type this in a terminal on the machine (one line after the other):", runService: "Type this as an administrator, with the line for your system: sudo on Linux and macOS, an elevated PowerShell on Windows. Each names the agent's full path, because an administrator's shell does not search your own folders.",
+  noWindows: "No Windows line: a run account exists on Linux and macOS only.",
+  serviceHttps: "A service needs this server at an https address. Open this page through the server's https address to get the command.",
+  standaloneHttps: "The agent takes an http address only on this machine (localhost). Open this page through the server's https address to get the command.",
 };
