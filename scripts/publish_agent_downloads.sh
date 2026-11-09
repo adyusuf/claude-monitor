@@ -6,6 +6,7 @@
 #                                       files when the build wrote them (AGENT_DOWNLOADS_URL: aipod-marketplace.json, aipod-plugin.zip), because the site no
 #                                       longer carries any zip itself, and the installers (aipod-install.sh, aipod-install.ps1: README, "Install aipod")
 #   <prefix>/<version>/<channel>/       the same files, kept
+#   <prefix>/<channel>/versions.json    every version published to the channel, newest first (the "Get the agent" page offers the kept ones)
 #
 #   AGENT_R2_BUCKET=<bucket> bash scripts/publish_agent_downloads.sh <test|prod> [downloads-dir] [--dry-run]
 #
@@ -63,4 +64,22 @@ upload() { # <folder> <cache-control>
 
 upload "$prefix/$version/$channel" "public, max-age=31536000, immutable"
 upload "$prefix/$channel" "no-cache"
+
+# versions.json in the channel folder lists every version published to this channel (newest first), so the API and the web can
+# offer the earlier ones from their kept folders. Read back from the bucket and merged; a missing or unreadable one starts over.
+versions_file="$(mktemp)"
+trap 'rm -f "$versions_file"' EXIT
+if [ "$dry" = 0 ] && wrangler r2 object get "$bucket/$prefix/$channel/versions.json" --file "$versions_file" --remote > /dev/null 2>&1; then :; else echo '{}' > "$versions_file"; fi
+python3 - "$versions_file" "$version" <<'PY'
+import json, re, sys
+path, version = sys.argv[1], sys.argv[2]
+try:
+    known = json.load(open(path)).get("versions", [])
+except Exception:
+    known = []
+plain = re.compile(r"^\d+\.\d+\.\d+$")
+keep = sorted({v for v in known + [version] if isinstance(v, str) and plain.match(v)}, key=lambda v: tuple(int(p) for p in v.split(".")), reverse=True)
+json.dump({"versions": keep}, open(path, "w"))
+PY
+put "$prefix/$channel/versions.json" "$versions_file" application/json "no-cache"
 echo "✓ $channel $version published to $bucket/$prefix/$channel (and kept under $prefix/$version/$channel)"
