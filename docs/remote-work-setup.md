@@ -256,11 +256,12 @@ have not yet run on a real Windows host.
 
 Known limits of this release, stated plainly:
 
-- **Runs from the web name no repository yet.** The web sends no `projectKey` when it creates a run, so such a run is
-  never covered by a policy. On a production or database machine (and wherever the switch is on) every web-created
-  shell or script run therefore gets the default and is refused (`access_shell_refused`, `access_script_refused`), and
-  no policy can lift that until web runs carry their repository. Runs Claude asks for with a project key are covered
-  by their policy as described above.
+- **A run without a repository gets the default where the default applies.** Runs are asked for by Claude through
+  `aipod_run` and `aipod_script`, whose `project` argument (a key from `aipod_machine`) is optional; the web starts only
+  a project's test command (which always names its repository) and job schedules (argv jobs, which name none and never
+  run on a production or database machine). A shell or script run that names no repository is therefore refused on a
+  production or database machine, and wherever the switch is on (`access_shell_refused`, `access_script_refused`): no
+  policy can lift it, because none covers it. Name the repository (`project`) for a run that a policy should allow.
 - **Older agents and path approval rules.** An agent older than this release reports no access scope with a
   permission request, so approval rules for path tools (Read, Edit, Write, MultiEdit, LS, NotebookEdit, and Glob or
   Grep with a path) stop matching for it and "remember" is not offered for them until its agent is updated; Bash
