@@ -248,6 +248,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                     return true;
                 }
 
+                if (!await new Access.AccessPolicySync(config, store, api, clock).FreshAsync(run, ct)) return true; // ADR-0020 §4: the policies the run was sent under
                 Runs.Accept(run, ct);
                 return true;
             case AgentStreamEvents.RunCancel:

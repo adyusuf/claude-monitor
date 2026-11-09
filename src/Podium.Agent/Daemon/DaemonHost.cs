@@ -60,8 +60,9 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var accessSync = new Access.AccessPolicySync(config, settingsStore, api, clock);
         using var machinesStore = new LocalStore(config.DatabasePath);
         var machines = new MachineCache(config, machinesStore, api, clock);
+        var accessLayers = new Access.AccessLayers(config);
         var executor = new RunExecutor(config, clock, log,
-            run => ApprovalVerifier.Refusal(config, run, clock.GetUtcNow()) is { } refused ? ExecDecision.Refuse(refused) : ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
+            run => ApprovalVerifier.Refusal(config, run, clock.GetUtcNow()) is { } refused ? ExecDecision.Refuse(refused) : ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home, accessLayers),
             ExecPolicyLoader.RunningAsRoot, () => monitor.Policy().RunAccount);
         using var runs = new RunRelay(config, execStore, api, clock, executor, log);
         runs.Recover();
