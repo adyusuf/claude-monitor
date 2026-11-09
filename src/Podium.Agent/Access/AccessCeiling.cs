@@ -83,7 +83,7 @@ internal static class AccessCeilingFile
             return;
         }
 
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         (identity with
         {
             AccessAllowedRoots = ceiling.AllowedRoots.Count > 0 ? [.. ceiling.AllowedRoots] : null,

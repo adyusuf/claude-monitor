@@ -143,8 +143,8 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         var store = Credentials.For(config);
         store.Delete(Credentials.Access);
         store.Delete(Credentials.Refresh);
-        var identity = Identity.Load(config);
-        (identity with { AgentId = null, WorkspaceId = null }).Save(config);
+        var identity = Identity.ForEdit(config);
+        if (File.Exists(config.IdentityPath)) (identity with { AgentId = null, WorkspaceId = null }).Save(config);
         ForgetWorkspaceSettings();
         await output.WriteLineAsync(Strings.T(Msg.LogoutDone));
         return 0;

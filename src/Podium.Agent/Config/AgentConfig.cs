@@ -173,6 +173,9 @@ public sealed partial record AgentConfig
     public string DatabasePath => Path.Combine(Home, "agent.db");
     public string LockPath => Path.Combine(Home, "daemon.lock");
     public string IdentityPath => Path.Combine(Home, "agent.json");
+
+    /// <summary>Earlier homes whose identity is carried over once when this home has none (empty for an explicit home and a service).</summary>
+    public IReadOnlyList<string> LegacyHomes { get; init; } = [];
     public string PluginDir => Path.Combine(Home, "claude-plugin");
     public string LogPath => Path.Combine(Home, "agent.log");
     public string BinaryPath => BinaryOverride ?? Path.Combine(Home, "bin", OperatingSystem.IsWindows() ? "aipod.exe" : "aipod");

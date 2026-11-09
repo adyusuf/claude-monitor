@@ -23,7 +23,7 @@ public sealed class AipodTools(AgentConfig config, TimeProvider clock)
     [Description("Whether this machine reports to Podium, which server, how many events wait to be sent and since when, whether the stream from the web is connected, the last message id, and whether web messages are pushed into this session.")]
     public string Status()
     {
-        var identity = Identity.Load(config);
+        var identity = Identity.Find(config) ?? Identity.None;
         using var store = new LocalStore(config.DatabasePath);
         if (!identity.Connected) return "Not connected. The user can run: aipod login --server <address>";
         using var english = Strings.Scope("en"); // what the model reads stays English whatever the person's language is
