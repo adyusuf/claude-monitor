@@ -83,13 +83,16 @@ public static partial class Cli
             config.EnsureHome();
             var input = await stdin.ReadToEndAsync();
             string? output;
+            bool connected;
             using (var store = new LocalStore(config.DatabasePath))
             {
                 output = await new HookRunner(config, store, clock).RunAsync(hookEvent, input, CancellationToken.None);
+                // No identity is made here: only login makes one. Saying so once a day is enough; every tool call runs a hook.
+                connected = Identity.Find(config) is { Connected: true };
+                if (!connected && NotConnectedNoteDue(store, clock)) await stderr.WriteLineAsync(Strings.T(Msg.StatusNotConnected));
             }
 
-            if (Identity.Find(config) is { Connected: true }) DaemonHost.EnsureRunning(config, log);
-            else await stderr.WriteLineAsync(Strings.T(Msg.StatusNotConnected)); // no identity is made here: only login makes one
+            if (connected) DaemonHost.EnsureRunning(config, log);
             if (output is not null) await stdout.WriteAsync(output);
         }
         catch (Exception e)
@@ -99,6 +102,23 @@ public static partial class Cli
         }
 
         return 0;
+    }
+
+    /// <summary>When the hooks last said "not connected" (ISO-8601 UTC).</summary>
+    private const string NotConnectedNoteKey = "hook.not_connected_at";
+
+    /// <summary>True (and the time is kept) when the hooks have not said "not connected" in the last day; a time in the future counts as never.</summary>
+    private static bool NotConnectedNoteDue(LocalStore store, TimeProvider clock)
+    {
+        var now = clock.GetUtcNow();
+        if (DateTimeOffset.TryParse(store.Get(NotConnectedNoteKey), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var last)
+            && last <= now && now - last < TimeSpan.FromDays(1))
+        {
+            return false;
+        }
+
+        store.Set(NotConnectedNoteKey, now.ToString("O", CultureInfo.InvariantCulture));
+        return true;
     }
 
     /// <summary>"aipod restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
