@@ -2,7 +2,7 @@
 export const enRemote = {
   remote: "Remote", cpu: "CPU", memory: "Memory", disk: "Disk", disks: "Disks", alerts: "Alerts", online: "Online", offline: "Offline",
   service: "Service", exec: { off: "Runs: off", argv: "Runs: commands", shell: "Runs: shell", unknown: "Runs: off" },
-  execOffNote: "Remote runs are off on this machine. Only the person at the machine can turn them on, in its agent settings.",
+  execOffNote: "Remote runs are off on this machine. Its owner can turn them on on this page, signed with the approval key pinned on the machine, or locally with aipod install --exec.",
   resources: "Resources, last {minutes} minutes", noMetrics: "No measurements in this period.", noDisks: "No disk was measured.",
   noAlerts: "No alerts.", showResolved: "Include resolved",
   alertKind: { cpu: "CPU", memory: "Memory", disk: "Disk", offline: "Offline" }, alertState: { open: "Open", resolved: "Resolved" },

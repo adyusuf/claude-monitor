@@ -42,6 +42,8 @@ public static class AgentFactsEndpoints
         g.MapPut("/{id:guid}/note", PutNote);
         g.MapPut("/{id:guid}/services", PutServices);
         g.MapPut("/{id:guid}/inventory", PutInventory);
+        g.MapPut("/{id:guid}/exec-level", ExecLevelChanges.PutAsync);
+        g.MapGet("/{id:guid}/exec-level", ExecLevelChanges.GetAsync);
     }
 
     private static async Task<IResult> PutTags(Guid id, AgentTagsRequest req, HttpContext http, PodiumDb db, TimeProvider clock, Broker broker)

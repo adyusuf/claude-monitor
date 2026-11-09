@@ -4,7 +4,7 @@ import type { Dictionary } from "./en";
 export const trRemote: Dictionary["remote"] = {
   remote: "Uzaktan", cpu: "İşlemci", memory: "Bellek", disk: "Disk", disks: "Diskler", alerts: "Uyarılar", online: "Çevrimiçi", offline: "Çevrimdışı",
   service: "Servis", exec: { off: "Çalıştırma: kapalı", argv: "Çalıştırma: komutlar", shell: "Çalıştırma: kabuk", unknown: "Çalıştırma: kapalı" },
-  execOffNote: "Bu makinede uzaktan çalıştırma kapalı. Yalnızca makinenin başındaki kişi, ajanın ayarlarından açabilir.",
+  execOffNote: "Bu makinede uzaktan çalıştırma kapalı. Sahibi bu sayfadan, makinede sabitlenmiş onay anahtarıyla imzalayarak, ya da makinede aipod install --exec ile açabilir.",
   resources: "Kaynaklar, son {minutes} dakika", noMetrics: "Bu dönemde ölçüm yok.", noDisks: "Hiçbir disk ölçülmedi.",
   noAlerts: "Uyarı yok.", showResolved: "Çözülenleri de göster",
   alertKind: { cpu: "İşlemci", memory: "Bellek", disk: "Disk", offline: "Çevrimdışı" }, alertState: { open: "Açık", resolved: "Çözüldü" },

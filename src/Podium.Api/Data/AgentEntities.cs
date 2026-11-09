@@ -133,6 +133,16 @@ public sealed class Agent
     /// <summary>ADR-0020 §4: the agent's access report (its ceiling and the state of each policy it received), one JSON document replaced by every profile; NULL from an older agent.</summary>
     public string? AccessReport { get; set; }
     public DateTimeOffset? AccessReportAt { get; set; }
+
+    /// <summary>ADR-0021: the sequence of the latest exec-level change the owner asked for on the web; the next one must be this + 1 (compare-and-set).</summary>
+    public long ExecLevelSequence { get; set; }
+
+    /// <summary>ADR-0021: the latest <c>ExecLevelRequest</c> (JSON) the agent receives in its settings; NULL when none was asked for.</summary>
+    public string? ExecLevelRequest { get; set; }
+
+    /// <summary>ADR-0021: what the agent reported it did with the latest change (<c>ExecLevelReport</c> JSON), from its profile; NULL from an older agent.</summary>
+    public string? ExecLevelReport { get; set; }
+    public DateTimeOffset? ExecLevelReportAt { get; set; }
 }
 
 public sealed class AgentToken

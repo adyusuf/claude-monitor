@@ -4,7 +4,7 @@ import type { Dictionary } from "./en";
 export const deRemote: Dictionary["remote"] = {
   remote: "Fern", cpu: "CPU", memory: "Speicher", disk: "Datenträger", disks: "Datenträger", alerts: "Warnungen", online: "Online", offline: "Offline",
   service: "Dienst", exec: { off: "Ausführung: aus", argv: "Ausführung: Befehle", shell: "Ausführung: Shell", unknown: "Ausführung: aus" },
-  execOffNote: "Fernausführungen sind auf dieser Maschine aus. Nur die Person an der Maschine kann sie in den Einstellungen ihres Agents einschalten.",
+  execOffNote: "Remote-Ausführungen sind auf dieser Maschine aus. Ihr Eigentümer kann sie auf dieser Seite einschalten, signiert mit dem auf der Maschine gepinnten Freigabeschlüssel, oder lokal mit aipod install --exec.",
   resources: "Ressourcen, letzte {minutes} Minuten", noMetrics: "Keine Messwerte in diesem Zeitraum.", noDisks: "Es wurde kein Datenträger gemessen.",
   noAlerts: "Keine Warnungen.", showResolved: "Behobene einbeziehen",
   alertKind: { cpu: "CPU", memory: "Speicher", disk: "Datenträger", offline: "Offline" }, alertState: { open: "Offen", resolved: "Behoben" },

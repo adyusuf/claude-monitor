@@ -19,6 +19,7 @@ import { MachineClaude } from "./MachineClaude";
 import { MachineInventory } from "./MachineInventory";
 import { MachineAccess } from "./MachineAccess";
 import { MachineAsks } from "./MachineAsks";
+import { MachineExecLevel } from "./MachineExecLevel";
 import { MachineProjects } from "./MachineProjects";
 import { MachineRoleEditor } from "./MachineRoleEditor";
 import { MachineServices } from "./MachineServices";
@@ -87,6 +88,7 @@ export function MachinePage() {
       {data.detail ? (
         <>
           <Card title={t("machines.services.title")}><MachineServices agentId={agentId} detail={data.detail} owned={data.owned} onChanged={() => void reload()} /></Card>
+          <Card title={t("machines.execLevel.title")}><MachineExecLevel agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
           <Card title={t("machines.actions.title")}>
             <MachineActions agentId={agentId} view={m} owned={data.owned} agentVersion={data.agentVersion} version={version} onChanged={() => void reload()} />
           </Card>

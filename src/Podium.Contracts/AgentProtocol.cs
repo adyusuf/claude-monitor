@@ -102,7 +102,7 @@ public sealed record CommandStatusUpdate(string Status, string? Result, DateTime
 /// <param name="EnforceAccessPolicies">The workspace switch: a run whose repository has no policy, or that names none, gets the default.</param>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, string AgentUpdate = UpdateModes.Off,
     bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false, bool ShareServices = false, string? ClaudeAutoMode = null, string? ClaudeAutoProject = null,
-    bool ShareInventory = false, string? AccessPolicyStamp = null, bool EnforceAccessPolicies = false);
+    bool ShareInventory = false, string? AccessPolicyStamp = null, bool EnforceAccessPolicies = false, ExecLevelRequest? ExecLevelRequest = null);
 
 public static class AgentStreamEvents
 {

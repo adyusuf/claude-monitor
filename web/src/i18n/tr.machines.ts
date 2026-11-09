@@ -106,4 +106,22 @@ export const trMachines: Dictionary["machines"] = {
     testAsked: "Test, aşağıdaki çalıştırmalar listesinde onayınızı bekliyor. Komutu kontrol edin, sonra izin verin.",
     passed: "{n} geçti", failed: "{n} kaldı", skipped: "{n} atlandı", kind: { test: "test", build: "derleme", deploy: "dağıtım", other: "diğer" },
   },
+  execLevel: {
+    title: "Bu makinede uzaktan çalıştırma", hint: "Bu makinenin uzaktan çalıştırmalara ne kadar izin verdiği. Artırmak, bu tarayıcıdaki onay anahtarınızla imzalanır; azaltmak imza gerektirmez.",
+    label: "Bu makinede uzaktan çalıştırma", off: "Kapalı", argv: "Yalnızca programlar (argv)", shell: "Kabuk", save: "Düzeyi değiştir",
+    saved: "Makineye gönderildi. Ayarlarını bir sonraki okuyuşunda değişikliği uygular.", current: "Şimdi: {level}", ownerOnly: "Bunu yalnızca makinenin sahibi değiştirir.",
+    noKey: "Uzaktan çalıştırmayı artırmak imzalı olmalı ve bu tarayıcıda onay anahtarı yok. Hesap sayfanızda bir anahtar oluşturun, sonra makineye bir kez sabitleyin.", makeKey: "Onay anahtarı oluştur",
+    keyUnreadable: "Bu tarayıcının onay anahtarı okunamadı.", codeHint: "Bu makine canlı ya da veritabanı: kimlik doğrulayıcı uygulamanızdan yeni bir kod yazın.",
+    waiting: "Değişiklik (sıra {sequence}) makinenin onu okumasını bekliyor.",
+    state: {
+      applied: "Makine değişikliği uyguladı: uzaktan çalıştırma artık {level}.",
+      signature_refused: "Makine değişikliği reddetti: sabitlenmiş anahtarları imzayı kabul etmedi.",
+      no_pinned_key: "Makinede sabitlenmiş anahtar yok, bu yüzden web'den gelen artırmayı denetleyemez. Anahtarınızı makineye bir kez sabitleyin: aipod approvers add <anahtar>.",
+      expired: "Değişiklik makineye süresi dolduktan sonra ulaştı. Yeniden kaydedin.",
+      needs_admin: "Bu makine bir hizmet: düzeyi yalnızca yöneticinin değiştirebildiği bir dosyada duruyor. Yönetici aipod install --service --exec <düzey> çalıştırır.",
+      invalid: "Makine istenen düzeyi tanımıyor.",
+      stale: "Makine daha yeni bir değişikliği zaten işlemiş ya da bu değişiklik çok ileri atlamış, bu yüzden uygulanmadı. Makinede yeniden giriş yapmak sayımı sıfırlar.",
+      unknown: "Makine bu sayfanın tanımadığı bir durum bildirdi.",
+    },
+  },
 };

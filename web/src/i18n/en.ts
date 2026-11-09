@@ -69,6 +69,7 @@ export const en = {
     totp_required: "This machine is production or a database: you need two-step sign-in to allow this here.",
     approval_required: "This machine only runs what a pinned key signed. Make a key on your account page and allow again.",
     approval_invalid: "The signature does not match this run or this key is not registered. Make a key on your account page.",
+    exec_level_changed: "Someone changed this machine's remote-run level meanwhile. The page was reloaded: look at it and save again.", exec_level_invalid: "That level or deadline is not valid. Try again.", exec_level_signature_required: "Turning remote runs up needs your approval key. Make one on your account page.",
     invalid_approval_key: "That is not an ECDSA P-256 public key.", approval_key_limit: "You already have the most keys you can have (10). Retire one first.", approval_key_exists: "That key is already registered.",
     schedule_approvals: "A machine that requires signed approvals takes no schedules: every run there needs a signature.",
     invalid_schedule: "A schedule repeats every 15 minutes to 7 days, or once a day at a time of day (UTC).",
