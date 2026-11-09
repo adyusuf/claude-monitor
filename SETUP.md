@@ -195,8 +195,8 @@ first start of `aipod` (a hook, the daemon, the MCP server or a command) copies 
 service or Credential Manager prefix `claude-monitor-agent`, or the old home's protected token files on Linux) into the new home
 and credential store, never over one already there. The web sees the same machine and no new login is needed; `agent.db` is not
 moved, so events not yet uploaded are lost. The installer scripts do the same. The old folder and credential entries are left in
-place and can be deleted afterwards. An old home set with the old variable `CM_AGENT_HOME` is carried over from first, as the
-installer scripts do; otherwise an explicit `AP_AGENT_HOME` reads no old home, and a service never does. Only `aipod login`,
+place and can be deleted afterwards. On the default home, an old home set with the old variable `CM_AGENT_HOME` is carried over
+from first, as the installer scripts do; an explicit `AP_AGENT_HOME` reads no old home at all, and a service never does. Only `aipod login`,
 `aipod connect` and `aipod install` ever make a new machine key; with no identity the hooks, the daemon and `aipod_status` say
 "not connected" and create nothing. The old plugin keeps running the old binary until you run `aipod install` again with the new
 one; do that from a normal terminal, then check that `aipod status` and `aipod_status` in a new Claude session show the same `home:`.
