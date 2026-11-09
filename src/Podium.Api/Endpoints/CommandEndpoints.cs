@@ -195,6 +195,9 @@ public static class CommandEndpoints
     public const string RuleNotAllowed = "rule_not_allowed";
     public const string RuleLimit = "rule_limit";
 
+    /// <summary>A path tool's path is not inside the project's access (ADR-0020 §4): the request is answered once, never remembered.</summary>
+    public const string RuleOutsideAccess = "rule_outside_access";
+
     /// <summary>
     /// Answers are chosen options, so they are accepted only for the question tool, only with an allow, only for the
     /// questions the request really carries, and each as short text: the web can never put other input into a tool call.

@@ -54,14 +54,21 @@ public static class ApprovalEndpoints
         var repos = await db.Repos.AsNoTracking().Where(r => repoIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.DisplayName, ct);
         var userIds = rows.Where(r => r.p.AnsweredBy != null).Select(r => r.p.AnsweredBy!.Value).Distinct().ToList();
         var names = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
-        return Results.Ok(rows.Select(r =>
+        var access = new ApprovalRuleAccess(db);
+        var result = new List<ApprovalRequestRow>(rows.Count);
+        foreach (var r in rows)
         {
             var strict = ApprovalRules.Strict(r.a);
-            var canRemember = !strict && ApprovalRules.ScopeOf(r.p.ToolName, r.p.ToolInput.RootElement) is not null;
-            return new ApprovalRequestRow(r.p.Id, r.p.SessionId, r.Title, r.RepoId is { } rid ? repos.GetValueOrDefault(rid) : null, r.a.Id, r.Hostname,
+            var input = r.p.ToolInput.RootElement;
+            // The same checks the answer makes (ApprovalRuleCreation.RememberAsync), the access tie included (ADR-0020 §4).
+            var canRemember = !strict && ApprovalRules.ScopeOf(r.p.ToolName, input) is not null
+                && await access.AllowsAsync(r.a, r.p.RepoId, r.p.ToolName, input, r.p.AccessScope, ct);
+            result.Add(new ApprovalRequestRow(r.p.Id, r.p.SessionId, r.Title, r.RepoId is { } rid ? repos.GetValueOrDefault(rid) : null, r.a.Id, r.Hostname,
                 r.p.ToolName, r.p.ToolInput, r.p.Status, r.p.CreatedAt, r.p.ExpiresAt, r.p.Decision, r.p.AnsweredAt,
-                r.p.AnsweredBy is { } by ? names.GetValueOrDefault(by) : null, r.p.AnsweredByRule, canRemember, strict);
-        }).ToList());
+                r.p.AnsweredBy is { } by ? names.GetValueOrDefault(by) : null, r.p.AnsweredByRule, canRemember, strict));
+        }
+
+        return Results.Ok(result);
     }
 
     /// <summary>The caller's live rules in this workspace, the newest first.</summary>
