@@ -81,6 +81,20 @@ public static class ApprovalRules
     }
 
     /// <summary>
+    /// Whether the call is one of a path tool (ADR-0020 §4): Read, LS and the file tools always, Glob and Grep when they carry a path; and that
+    /// path, or null when it is missing or not plain text. False for every other call (Bash, a search in the working folder).
+    /// </summary>
+    public static bool IsPathCall(string toolName, JsonElement input, out string? path)
+    {
+        path = null;
+        var pathTool = ReadPathTools.TryGetValue(toolName, out var key) || FileTools.TryGetValue(toolName, out key);
+        var objectInput = input.ValueKind == JsonValueKind.Object;
+        if (!pathTool && !(SearchTools.Contains(toolName) && objectInput && input.TryGetProperty("path", out _))) return false;
+        path = objectInput ? Plain(input, key ?? "path") : null;
+        return true;
+    }
+
+    /// <summary>
     /// A flat call as one canonical text (keys in ordinal order, compact, strings written from their decoded value), so the request the agent
     /// sends and the one read back from the database give the same text. Null for a nested value, a masked or hidden text, or a long one.
     /// </summary>
@@ -151,14 +165,16 @@ public static class ApprovalRules
 
     /// <summary>
     /// The live rule that allows this request, if any: the same machine, project, tool and pinned value, made by the user who owns the machine
-    /// now, in its workspace, not revoked and not ended, and the machine active and not strict.
+    /// now, in its workspace, not revoked and not ended, and the machine active and not strict. A path tool's request matches only inside the
+    /// project's access (<see cref="ApprovalRuleAccess"/>).
     /// </summary>
-    public static async Task<ApprovalRule?> MatchAsync(PodiumDb db, Agent agent, Guid? repoId, string toolName, JsonElement input, DateTimeOffset now,
-        CancellationToken ct)
+    public static async Task<ApprovalRule?> MatchAsync(PodiumDb db, Agent agent, Guid? repoId, string toolName, JsonElement input, string? accessScope,
+        DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(agent);
         if (agent.Status != AgentStatuses.Active || Strict(agent) || ScopeOf(toolName, input) is not { } scope) return null;
+        if (!await new ApprovalRuleAccess(db).AllowsAsync(agent, repoId, toolName, input, accessScope, ct)) return null;
         return await db.ApprovalRules
             .Where(r => r.AgentId == agent.Id && r.UserId == agent.UserId && r.WorkspaceId == agent.WorkspaceId && r.RepoId == repoId
                 && r.ToolName == scope.Tool && r.Command == scope.Command && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now))

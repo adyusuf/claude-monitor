@@ -170,6 +170,9 @@ public sealed class PermissionRequest
     /// was matched in, even when the session has moved to another since (ADR-0019). Null: none, or a request from before this column.
     /// </summary>
     public Guid? RepoId { get; set; }
+
+    /// <summary>For a path tool, where the agent found its path against the session's project access layers (<see cref="Podium.Contracts.AccessScopes"/>); null from an older agent (ADR-0020 §4).</summary>
+    public string? AccessScope { get; set; }
 }
 
 /// <summary>

@@ -37,6 +37,9 @@ public static class MachineReports
         agent.ApprovalsRequired = profile.ApprovalsRequired == true;
         agent.PushTransport = profile.PushTransport is CommandTransports.Inbox or CommandTransports.Channel ? profile.PushTransport : null;
         agent.PluginId = PluginIds.IsValid(profile.PluginId) ? profile.PluginId : null;
+        // ADR-0020 §4: the ceiling and the state of each policy, replaced by every profile; an older agent sends none.
+        agent.AccessReport = AccessPolicies.AccessReports.Store(profile.Access);
+        agent.AccessReportAt = agent.AccessReport is null ? null : now;
         if (profile.OsVersion is { Length: > 0 } version)
         {
             var clean = Clean(version, OsVersionMax);

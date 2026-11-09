@@ -63,6 +63,8 @@ public sealed class PodiumDb(DbContextOptions<PodiumDb> options) : DbContext(opt
     public DbSet<IntegrationSyncRun> IntegrationSyncRuns => Set<IntegrationSyncRun>();
     public DbSet<IntegrationWebhookReceipt> IntegrationWebhookReceipts => Set<IntegrationWebhookReceipt>();
     public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
+    public DbSet<ProjectAccessPolicy> ProjectAccessPolicies => Set<ProjectAccessPolicy>();
+    public DbSet<ProjectAccessPolicyKey> ProjectAccessPolicyKeys => Set<ProjectAccessPolicyKey>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

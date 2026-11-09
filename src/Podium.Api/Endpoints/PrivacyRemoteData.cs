@@ -196,7 +196,8 @@ public static class PrivacyRemoteData
         await db.MachineProjects.Where(p => agentIds.Contains(p.AgentId)).ExecuteDeleteAsync(ct);
         await db.Agents.Where(a => agentIds.Contains(a.Id)).ExecuteUpdateAsync(s => s.SetProperty(a => a.Services, (string?)null)
             .SetProperty(a => a.ServicesAt, (DateTimeOffset?)null).SetProperty(a => a.ShareServices, false)
-            .SetProperty(a => a.ClaudeInventory, (string?)null).SetProperty(a => a.ClaudeInventoryAt, (DateTimeOffset?)null).SetProperty(a => a.ShareInventory, false), ct);
+            .SetProperty(a => a.ClaudeInventory, (string?)null).SetProperty(a => a.ClaudeInventoryAt, (DateTimeOffset?)null).SetProperty(a => a.ShareInventory, false)
+            .SetProperty(a => a.AccessReport, (string?)null).SetProperty(a => a.AccessReportAt, (DateTimeOffset?)null), ct);
         await db.MachineMetrics.Where(m => agentIds.Contains(m.AgentId)).ExecuteDeleteAsync(ct);
         await db.MachineAlerts.Where(a => agentIds.Contains(a.AgentId)).ExecuteDeleteAsync(ct);
     }

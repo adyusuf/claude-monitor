@@ -11,7 +11,7 @@ namespace Podium.Api.Endpoints;
 public sealed record SessionRow(Guid Id, string HarnessKind, string? Title, string? Model, string? GitBranch, string Status,
     DateTimeOffset StartedAt, DateTimeOffset LastEventAt, DateTimeOffset? EndedAt, Guid? ProjectId, string? ProjectName,
     Guid AgentId, string Hostname, Guid OwnerId, string OwnerName, decimal? CostUsd, int OpenPermissions, string? PushTransport = null,
-    bool StartedFromWeb = false, string? WebSessionRef = null);
+    bool StartedFromWeb = false, string? WebSessionRef = null, string? ProjectKey = null);
 public sealed record Page<T>(IReadOnlyList<T> Items, string? Next);
 public sealed record TaskRow(Guid Id, string ExternalId, string Subject, string Status, DateTimeOffset UpdatedAt);
 public sealed record SubagentRow(Guid Id, string AgentType, string? Description, string Status, DateTimeOffset StartedAt, DateTimeOffset? EndedAt);
@@ -98,7 +98,7 @@ public static class SessionEndpoints
                             where agentIds.Contains(a.Id)
                             select new { a.Id, m.Hostname, a.UserId, u.DisplayName, a.PushTransport }).ToDictionaryAsync(x => x.Id, ct);
         var projects = await db.Repos.AsNoTracking().Where(p => projectIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, p => p.DisplayName, ct);
+            .ToDictionaryAsync(p => p.Id, p => new { p.DisplayName, p.Key }, ct);
         var usage = await db.SessionUsage.AsNoTracking().Where(u => ids.Contains(u.SessionId)).ToListAsync(ct);
         // A session Claude Code started in the background from the web: its id begins with the short id the agent reported for that start (ADR-0014).
         // Only starts from shortly before the oldest session of the page can match, which keeps the read to the page's window.
@@ -116,8 +116,9 @@ public static class SessionEndpoints
             decimal? cost = mine.Count == 0 ? 0m : mine.Any(u => u.CostUsd is null) ? null : mine.Sum(u => u.CostUsd!.Value);
             var webRef = webStarts.FirstOrDefault(w => w.AgentId == s.AgentId && s.ExternalId.StartsWith(w.SessionRef!, StringComparison.Ordinal))?.SessionRef;
             return new SessionRow(s.Id, s.HarnessKind, s.Title, s.Model, s.GitBranch, s.Status, s.StartedAt, s.LastEventAt,
-                s.EndedAt, s.RepoId, s.RepoId is { } pid ? projects.GetValueOrDefault(pid) : null, s.AgentId, a.Hostname,
-                a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id), a.PushTransport, webRef is not null, webRef);
+                s.EndedAt, s.RepoId, s.RepoId is { } pid ? projects.GetValueOrDefault(pid)?.DisplayName : null, s.AgentId, a.Hostname,
+                a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id), a.PushTransport, webRef is not null, webRef,
+                s.RepoId is { } rid ? projects.GetValueOrDefault(rid)?.Key : null); // the repo key, for the session's access line (ADR-0020 §4)
         }).ToList();
     }
 
