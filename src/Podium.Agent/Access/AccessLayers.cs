@@ -31,7 +31,7 @@ public sealed class AccessLayers(AgentConfig config)
         var (keys, refusal, mismatch) = AccessRunKeys.Of(run.ProjectKey, cwd, paths);
         if (refusal is not null) return ([], refusal);
         var layers = For(keys, policy, run);
-        return mismatch && layers.Count > 1 ? ([], AccessRunKeys.Mismatch()) : (layers, null);
+        return mismatch && layers.Count > 1 ? ([], AccessRunKeys.Mismatch(layers)) : (layers, null);
     }
 
     /// <summary>The layers for these repository keys (a session's, or a run's when <paramref name="run"/> is given).</summary>

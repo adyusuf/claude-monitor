@@ -38,7 +38,13 @@ public static class AccessRunKeys
     }
 
     /// <summary>The refusal of a run whose label names none of its working directory's checkouts.</summary>
-    public static AccessRefusal Mismatch() => Refuse(AccessErrors.CwdNotAllowed);
+    /// <summary>A label that names none of the working directory's checkouts, refused by the layer that makes it matter: a covering policy when one applies, else the default.</summary>
+    public static AccessRefusal Mismatch(IReadOnlyList<AccessLayer> layers)
+    {
+        ArgumentNullException.ThrowIfNull(layers);
+        var policy = layers.FirstOrDefault(l => l.Kind == AccessRefusedBy.Policy);
+        return policy is not null ? new(AccessErrors.CwdNotAllowed, AccessRefusedBy.Policy, policy.Version) : new(AccessErrors.CwdNotAllowed, AccessRefusedBy.Default, null);
+    }
 
     /// <summary>
     /// The keys of every checkout a real path lies in (judged by its deepest existing part), innermost first, up to the root: empty outside any
