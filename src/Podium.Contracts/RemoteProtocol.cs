@@ -8,7 +8,7 @@ public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? Os
     string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
     IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
     IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null, string? PluginId = null,
-    ClaudeInventory? Inventory = null);
+    ClaudeInventory? Inventory = null, AccessReport? Access = null);
 
 /// <summary>The Claude Code plugin a machine's agent runs under, as <c>name@marketplace</c> (ADR-0013): reported so the web can show which plugin a machine runs under.</summary>
 public static class PluginIds
@@ -100,21 +100,27 @@ public sealed record GrantTemplate(IReadOnlyList<string> Argv, string Cwd, int M
 /// <summary>
 /// An approved run sent to its target. NotAfter: the target never starts it later than this. DecidedAt: when the server approved it
 /// (server clock; null from an older API), so a target that refuses a run for an off switch knows whether its last settings read is older.
+/// ProjectKey: the run's repository, which decides its access policy (ADR-0020 §4); AccessStamp: the policy stamp the API had when it sent the run.
 /// </summary>
 public sealed record RunMessage(Guid Id, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand, string? Cwd,
     int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null,
     string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, long? OutputCap = null, bool ApprovedWithTotp = false,
     IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null,
-    string? ApprovalKeyId = null, string? ApprovalSignature = null, DateTimeOffset? ApprovalNotAfter = null, string? TargetEnvironment = null, string? TargetFunction = null);
+    string? ApprovalKeyId = null, string? ApprovalSignature = null, DateTimeOffset? ApprovalNotAfter = null, string? TargetEnvironment = null, string? TargetFunction = null,
+    string? ProjectKey = null, string? AccessStamp = null);
 
 public sealed record RunCancelMessage(Guid Id);
 
 /// <summary>Sent to the requester's agent when one of its runs changes, so it fetches the run without waiting for its poll.</summary>
 public sealed record RunUpdateMessage(Guid Id, string Status);
 
-/// <summary>The target's report on a run. At is when it happened on the target.</summary>
+/// <summary>
+/// The target's report on a run. At is when it happened on the target. RefusedBy (<see cref="AccessRefusedBy"/>) and AccessVersion say which access
+/// layer refused it when Error is an <see cref="AccessErrors"/> code.
+/// </summary>
 public sealed record RunStatusUpdate(string Status, int? ExitCode = null, string? Error = null, bool OutputTruncated = false,
-    string? ResolvedExe = null, DateTimeOffset? At = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, int? OutputChunks = null);
+    string? ResolvedExe = null, DateTimeOffset? At = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, int? OutputChunks = null,
+    string? RefusedBy = null, int? AccessVersion = null);
 
 public sealed record GrantRequest(Guid TargetAgentId, IReadOnlyList<string> Template, string Cwd, int MaxTimeoutSeconds, int Days,
     string? Reason);
@@ -141,7 +147,8 @@ public sealed record MachineProjectView(string Key, string Name, string? Branch,
 /// see them (the machine's owner and workspace admins; null otherwise, and when the owner has not opted in) and its projects.
 /// </summary>
 public sealed record MachineDetail(MachineView Machine, string? Note, DateTimeOffset? NoteSetAt, bool ServicesShared,
-    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects, ClaudeInventory? Inventory = null, bool InventoryShared = false);
+    IReadOnlyList<ServiceInfo>? Services, DateTimeOffset? ServicesAt, IReadOnlyList<MachineProjectView> Projects, ClaudeInventory? Inventory = null, bool InventoryShared = false,
+    MachineAccessView? Access = null);
 
 /// <summary>The limits of a project's test command (ADR-0011 §7a), shared by the agent that takes it and the API that stores it.</summary>
 public static class ProjectTestRules
