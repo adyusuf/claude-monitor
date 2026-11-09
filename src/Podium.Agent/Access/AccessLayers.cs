@@ -74,18 +74,21 @@ public sealed class AccessLayers(AgentConfig config)
     }
 
     /// <summary>
-    /// A strict machine (ADR-0008): the local claim, the role the API froze into a script run, or the role the workspace's machine list last gave this
-    /// machine. A role value this build does not know counts as strict.
+    /// A strict machine (ADR-0008); unsure counts as strict. For a run: what the API held at delivery (TargetStrict; none from an older API counts as
+    /// strict), the local claim, the role the API froze into a script run (a value this build does not know counts as strict), or the machine list's
+    /// "strict". Without a run (a session's tools, the reports): the local claim, or the machine list's answer, where an unread one counts as strict.
     /// </summary>
     public static bool IsStrict(RunMessage? run, ExecPolicy policy, LocalStore store)
     {
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(store);
-        return MachineRoles.IsStrict(policy.ClaimedEnvironment, policy.ClaimedFunction) || MachineRoles.IsStrict(run?.TargetEnvironment, run?.TargetFunction)
-            || !MachineRoles.IsEnvironment(run?.TargetEnvironment) || !MachineRoles.IsFunction(run?.TargetFunction) || store.Get(StrictKey) == "true";
+        if (MachineRoles.IsStrict(policy.ClaimedEnvironment, policy.ClaimedFunction)) return true;
+        if (run is null) return store.Get(StrictKey) != "false";
+        return run.TargetStrict != false || MachineRoles.IsStrict(run.TargetEnvironment, run.TargetFunction)
+            || !MachineRoles.IsEnvironment(run.TargetEnvironment) || !MachineRoles.IsFunction(run.TargetFunction) || store.Get(StrictKey) == "true";
     }
 
-    /// <summary>Keeps what the workspace's machine list says about this machine's role, for the runs that do not carry it.</summary>
+    /// <summary>Keeps what the workspace's machine list says about this machine's role: an extra "strict" for runs, the answer for the session's tools.</summary>
     public static void RememberRole(LocalStore store, IReadOnlyList<MachineView> machines, Guid? self)
     {
         ArgumentNullException.ThrowIfNull(store);
