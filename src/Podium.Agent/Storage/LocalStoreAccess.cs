@@ -14,6 +14,9 @@ public sealed partial class LocalStore
     /// <summary>The stamp (with its workspace) of the policy set last fetched: a sync is needed only when the settings name another.</summary>
     public const string AccessSyncedKey = "access.stamp";
 
+    /// <summary>"true" when the last delivery reached the cap and may have been cut: every run then gets the default.</summary>
+    public const string AccessTruncatedKey = "access.truncated";
+
     private void CreateAccessTables() => Exec("""
         CREATE TABLE IF NOT EXISTS access_policies (project_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, version INTEGER, message TEXT,
             signed INTEGER NOT NULL DEFAULT 0, received_at TEXT NOT NULL, kept_version INTEGER, kept_message TEXT);
@@ -35,14 +38,14 @@ public sealed partial class LocalStore
     }
 
     /// <summary>
-    /// Replaces the delivered set in one transaction, with the stamp it came with: each row's delivered message becomes the new one (null for a policy no
-    /// longer delivered) and its kept message the one given; a row with neither left is deleted. Nothing is half-written if this fails.
+    /// Makes the stored set exactly these rows in one transaction, with the stamp they came with and whether the delivery may have been cut; a row with
+    /// neither a delivered nor a kept message is not kept. Nothing is half-written if this fails.
     /// </summary>
-    public void ReplaceAccessPolicies(IReadOnlyList<StoredAccessPolicy> rows, string syncedStamp)
+    public void ReplaceAccessPolicies(IReadOnlyList<StoredAccessPolicy> rows, string syncedStamp, bool truncated = false)
     {
         ArgumentNullException.ThrowIfNull(rows);
         using var tx = db.BeginTransaction();
-        Exec("UPDATE access_policies SET version = NULL, message = NULL, signed = 0", tx);
+        Exec("DELETE FROM access_policies", tx);
         foreach (var row in rows)
         {
             Exec("""
@@ -56,6 +59,17 @@ public sealed partial class LocalStore
 
         Exec("DELETE FROM access_policies WHERE message IS NULL AND kept_message IS NULL", tx);
         Exec("INSERT INTO kv (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value", tx, ("$k", AccessSyncedKey), ("$v", syncedStamp));
+        Exec("INSERT INTO kv (key, value) VALUES ($k, $v) ON CONFLICT(key) DO UPDATE SET value = excluded.value", tx, ("$k", AccessTruncatedKey),
+            ("$v", truncated ? "true" : "false"));
+        tx.Commit();
+    }
+
+    /// <summary>Forgets every stored policy and the stamp they came with: the machine left its workspace (a login).</summary>
+    public void ForgetAccessPolicies()
+    {
+        using var tx = db.BeginTransaction();
+        Exec("DELETE FROM access_policies", tx);
+        Exec("DELETE FROM kv WHERE key IN ($a, $b)", tx, ("$a", AccessSyncedKey), ("$b", AccessTruncatedKey));
         tx.Commit();
     }
 }

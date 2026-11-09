@@ -45,10 +45,14 @@ public static class AccessScopes
             var os = AgentConfig.Os;
             var real = PathIdentity.Resolve(value.GetString(), os, allowMissing: true);
             if (real is null) return Scopes.Unknown;
+            // The session's repository and the checkout the path itself lies in: a path in another repository is held to that one's policy too.
+            var (judged, pathKey) = AccessRunKeys.KeyOf(real);
+            if (!judged) return Scopes.Unknown;
+            List<string> keys = [.. new[] { store.ProjectKeyOf(session), pathKey }.OfType<string>().Where(k => k.Length > 0).Distinct(RepoKeys.Comparer)];
             var saved = Identity.Peek(config);
             var policy = ExecPolicyLoader.Load(config, saved?.ExecLevel, saved?.ClaimedEnvironment, saved?.ClaimedFunction, saved?.ProjectFolders);
             // Only the folders are judged here: Claude's own tools are not the run's executable.
-            List<AccessLayer> layers = [.. new AccessLayers(config).For(store.ProjectKeyOf(session), policy).Select(l => l with { Applications = null })];
+            List<AccessLayer> layers = [.. new AccessLayers(config).For(keys, policy).Select(l => l with { Applications = null })];
             return AccessGuard.Check(layers, new AccessCheck(real, [], null, null, false, false), os) switch
             {
                 null => Scopes.Inside,
@@ -56,7 +60,8 @@ public static class AccessScopes
                 _ => Scopes.Outside,
             };
         }
-        catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException
+            or NotSupportedException)
         {
             return Scopes.Unknown;
         }

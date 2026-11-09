@@ -74,9 +74,9 @@ internal static class ExecPaths
 
                 target = entry.LinkTarget;
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
             {
-                return null; // unreadable is unresolved, and unresolved is refused
+                return null; // unreadable or not a valid name (a NUL in it) is unresolved, and unresolved is refused
             }
 
             if (target is null)
