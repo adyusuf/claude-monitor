@@ -95,8 +95,10 @@ public static class RemoteChecks
         return Passed(http, ReauthWays.Code);
     }
 
-    private static bool Passed(HttpContext http, string way)
+    /// <summary>Records how this request passed re-authentication, for its audit rows (<see cref="ReauthItem"/>); true, for the caller's return.</summary>
+    public static bool Passed(HttpContext http, string way)
     {
+        ArgumentNullException.ThrowIfNull(http);
         http.Items[ReauthItem] = way;
         return true;
     }
