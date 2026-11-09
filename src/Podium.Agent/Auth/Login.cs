@@ -163,6 +163,10 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         {
             local.Remove(key);
         }
+
+        // The access policies and the role the old workspace gave this machine are not the new one's (ADR-0020 §4).
+        local.ForgetAccessPolicies();
+        local.Remove(Access.AccessLayers.StrictKey);
     }
 
     private static bool OpenBrowser(string url)

@@ -74,7 +74,8 @@ public static class AccessReports
 
     /// <summary>Whether a run whose repository has no policy gets the default: the workspace switch, or a strict machine (unsure counts as strict).</summary>
     private static bool DefaultApplies(AgentConfig config, LocalStore store, ExecPolicy policy) =>
-        WorkspaceSettings.Get(config, store, AccessPolicySync.EnforceKey) == "true" || AccessLayers.IsStrict(null, policy, store);
+        WorkspaceSettings.Get(config, store, AccessPolicySync.EnforceKey) == "true" || AccessLayers.IsStrict(null, policy, store)
+        || store.Get(LocalStore.AccessTruncatedKey) == "true";
 
     private static int FolderCount(AppliedAccessPolicy judged, ExecPolicy policy, LocalStore store) =>
         judged.Keys.SelectMany(key => AccessFolders.For(key, policy.ProjectFolders, store, AgentConfig.Os)).Distinct(StringComparer.Ordinal).Count();

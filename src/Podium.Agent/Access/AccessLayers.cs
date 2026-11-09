@@ -12,7 +12,7 @@ namespace Podium.Agent.Access;
 /// The layers a run is checked against (ADR-0020 §4, maintainer amendment 1), always the ceiling first. The repositories are the run's label and the
 /// checkouts its real paths lie in (<see cref="AccessRunKeys"/>); every stored policy covering one of them applies (the default instead when one does
 /// not apply: invalid, unsigned where signatures are required, cleared). With none covering, when the workspace enforces access policies, the machine
-/// is strict (production or database): the ceiling and the default (the project's folders, argv only).
+/// is strict (production or database), or the delivered set was cut at its cap: the ceiling and the default (the project's folders, argv only).
 /// Otherwise the ceiling only, as before. Anything that cannot be read gives the ceiling and the default with no folder, never "no limit".
 /// </summary>
 public sealed class AccessLayers(AgentConfig config)
@@ -39,9 +39,9 @@ public sealed class AccessLayers(AgentConfig config)
             using var store = new LocalStore(config.DatabasePath);
             var judged = AccessPolicyVerifier.Load(config, store);
             var covering = judged.Where(p => p.Keys.Any(k => keys.Contains(k, RepoKeys.Comparer))).ToList();
-            // A stored policy that names no repository it could be for (unreadable) cannot be placed: every run then gets the default.
+            // A stored policy that names no repository it could be for (unreadable), or a delivery cut at its cap, cannot be placed: every run gets the default.
             var defaultApplies = WorkspaceSettings.Get(config, store, AccessPolicySync.EnforceKey) == "true" || IsStrict(run, policy, store)
-                || judged.Any(p => p.Keys.Count == 0);
+                || judged.Any(p => p.Keys.Count == 0) || store.Get(LocalStore.AccessTruncatedKey) == "true";
             IReadOnlyList<string> FoldersOf(IEnumerable<string> of) =>
                 [.. of.SelectMany(key => AccessFolders.For(key, policy.ProjectFolders, store, AgentConfig.Os)).Distinct(StringComparer.Ordinal)];
             return Compose(ceiling, covering, defaultApplies, FoldersOf, keys, AgentConfig.Os);

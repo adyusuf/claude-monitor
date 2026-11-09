@@ -36,7 +36,9 @@ public static class AccessPolicyVerifier
     {
         ArgumentNullException.ThrowIfNull(rows);
         ArgumentNullException.ThrowIfNull(approvers);
-        return [.. rows.Select(row => Judge(row, approvers, workspace)).OfType<AppliedAccessPolicy>()];
+        // A row of another workspace (left over from before a login or a move) is not this machine's policy at all: it is ignored, never judged.
+        var ours = workspace?.ToString("D");
+        return [.. rows.Where(row => ours is not null && row.WorkspaceId == ours).Select(row => Judge(row, approvers, workspace)).OfType<AppliedAccessPolicy>()];
     }
 
     private static AppliedAccessPolicy? Judge(StoredAccessPolicy row, ApproversPolicy approvers, Guid? workspace)

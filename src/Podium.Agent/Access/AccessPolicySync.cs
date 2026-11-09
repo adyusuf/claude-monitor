@@ -89,24 +89,48 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
         return true;
     }
 
+    /// <summary>
+    /// The API delivers every live policy and tombstone of the workspace. Rows of another workspace go. A delivered message replaces the row's delivered
+    /// one, and its kept one when it verifies and is newer. A row the full delivery no longer lists goes on a machine that does not require signatures;
+    /// where signatures are required its kept policy stays only while no delivered signed policy of a higher version covers one of its keys. A delivery
+    /// at the cap is taken as cut: nothing held is dropped and every run gets the default until a full one arrives.
+    /// </summary>
     private void Store(Guid workspace, AgentAccessPolicies answer)
     {
         var approvers = ApproversStore.Load(config);
-        var held = store.AccessPolicies().ToDictionary(p => p.ProjectId, StringComparer.Ordinal);
+        var ours = workspace.ToString("D");
+        var held = store.AccessPolicies().Where(p => p.WorkspaceId == ours).ToDictionary(p => p.ProjectId, StringComparer.Ordinal);
         var now = clock.GetUtcNow();
+        var truncated = answer.Policies.Count >= AgentLimits.Policies;
+        var delivered = answer.Policies.Where(m => m is not null && m.WorkspaceId == workspace).Take(AgentLimits.Policies).ToList();
         var rows = new Dictionary<string, StoredAccessPolicy>(StringComparer.Ordinal);
-        foreach (var message in answer.Policies.Where(m => m is not null).Take(AgentLimits.Policies))
+        foreach (var message in delivered)
         {
             var id = message.ProjectId.ToString("D");
             held.TryGetValue(id, out var before);
             var kept = AccessPolicyVerifier.Parse(before?.KeptMessage);
             var json = JsonSerializer.Serialize(message, ApiClient.Json);
             var keeps = AccessPolicyVerifier.Keeps(message, kept, approvers, workspace);
-            rows[id] = new StoredAccessPolicy(id, message.WorkspaceId.ToString("D"), message.Version, json, message.Signature is not null, now,
+            rows[id] = new StoredAccessPolicy(id, ours, message.Version, json, message.Signature is not null, now,
                 keeps ? message.Version : before?.KeptVersion, keeps ? json : before?.KeptMessage);
         }
 
-        store.ReplaceAccessPolicies([.. rows.Values], Marker(workspace, answer.Stamp ?? "")); // no stamp and an empty one: no policy
+        var signedDelivered = delivered.Where(m => AccessPolicyVerifier.Keeps(m, null, approvers, workspace)).ToList();
+        foreach (var (id, before) in held.Where(h => !rows.ContainsKey(h.Key)))
+        {
+            if (truncated)
+            {
+                rows[id] = before;
+                continue;
+            }
+
+            if (!approvers.Required || AccessPolicyVerifier.Parse(before.KeptMessage) is not { } kept) continue;
+            var replaced = signedDelivered.Any(m => m.Version > kept.Version
+                && m.Document.ProjectKeys.Any(k => kept.Document?.ProjectKeys?.Contains(k, RepoKeys.Comparer) == true));
+            if (!replaced) rows[id] = before with { Version = null, Message = null, IsSigned = false };
+        }
+
+        store.ReplaceAccessPolicies([.. rows.Values], Marker(workspace, answer.Stamp ?? ""), truncated); // no stamp and an empty one: no policy
     }
 
     /// <summary>The stamp held, tagged with its workspace: a login into another workspace never reads the old set as current.</summary>
