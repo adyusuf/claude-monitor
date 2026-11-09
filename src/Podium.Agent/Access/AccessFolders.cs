@@ -1,5 +1,6 @@
 using Podium.Agent.Capture;
 using Podium.Agent.Storage;
+using Podium.Contracts;
 
 namespace Podium.Agent.Access;
 
@@ -29,7 +30,7 @@ public static class AccessFolders
         try
         {
             var root = ProjectInfo.RootOf(candidate) ?? candidate;
-            if (ProjectInfo.Resolve(root)?.Key != projectKey) return null;
+            if (!RepoKeys.Same(ProjectInfo.Resolve(root)?.Key, projectKey)) return null;
             var real = PathIdentity.Resolve(root, os, allowMissing: false);
             return real is not null && Directory.Exists(real) ? real : null;
         }
