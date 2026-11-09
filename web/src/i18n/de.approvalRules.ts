@@ -19,5 +19,5 @@ export const deApprovalRules: Dictionary["approvalRules"] = {
   ends: "Endet", never: "bis zum Widerruf", uses: "Verwendet", lastUsed: "Zuletzt verwendet", revoke: "Widerrufen", revokeConfirm: "Diese stehende Freigabe widerrufen? Die nächste Anfrage fragt wieder.",
   answeredBy: "Beantwortet von", byRule: "eine stehende Freigabe", decision: { allow: "Erlaubt", deny: "Abgelehnt" }, when: "Wann",
   anyInput: "jede Eingabe",
-  moreLines: "+{n} weitere Zeilen",
+  moreLine: "+1 weitere Zeile", moreLines: "+{n} weitere Zeilen",
 };

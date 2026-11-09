@@ -19,5 +19,5 @@ export const trApprovalRules: Dictionary["approvalRules"] = {
   ends: "Bitiş", never: "geri alınana kadar", uses: "Kullanım", lastUsed: "Son kullanım", revoke: "Geri al", revokeConfirm: "Bu geçerli onay geri alınsın mı? Bir sonraki istek yine sorulur.",
   answeredBy: "Cevaplayan", byRule: "geçerli bir onay", decision: { allow: "İzin verildi", deny: "Reddedildi" }, when: "Zaman",
   anyInput: "her girdi",
-  moreLines: "+{n} satır daha",
+  moreLine: "+1 satır daha", moreLines: "+{n} satır daha",
 };

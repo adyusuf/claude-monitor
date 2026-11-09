@@ -7,10 +7,10 @@ import { Icon } from "./icons";
 import { Modal } from "./Modal";
 import { Button } from "./ui";
 
-/** The first line of a preview and how many lines follow it: the band shows one line, so a command of several never reads as one. */
+/** The first line with text of a preview and how many such lines follow it: the band shows one line, so a command of several never reads as one. */
 export function firstLine(text: string): [string, number] {
-  const lines = text.split(/\r\n|\r|\n/);
-  return [lines[0] ?? "", lines.length - 1];
+  const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim() !== "");
+  return [lines[0] ?? "", Math.max(lines.length - 1, 0)];
 }
 
 /**
@@ -31,7 +31,7 @@ export function ApprovalBand({ ws, rows, runs, onAnswered }: { ws: string; rows:
         <span className="approval-band-text">
           <strong>{rows.length === 1 ? t("approvalRules.bandOne") : t("approvalRules.bandMany", { n: rows.length })}</strong>
           <span className="approval-band-first">
-            {first.toolName}{preview ? <> <code>{preview}</code>{more > 0 ? <> {t("approvalRules.moreLines", { n: more })}</> : null}</> : null} · {first.sessionTitle ?? t("approvalRules.untitled")} · {first.hostname}
+            {first.toolName}{preview ? <> <code>{preview}</code>{more > 0 ? <> {more === 1 ? t("approvalRules.moreLine") : t("approvalRules.moreLines", { n: more })}</> : null}</> : null} · {first.sessionTitle ?? t("approvalRules.untitled")} · {first.hostname}
           </span>
         </span>
       ) : null}

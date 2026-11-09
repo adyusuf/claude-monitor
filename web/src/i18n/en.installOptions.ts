@@ -15,7 +15,7 @@ export const enInstallOptions = {
   adminService: "The service never runs as an administrator: it runs under its own unprivileged account, and the install refuses root, SYSTEM and LocalSystem. Only installing it needs an administrator.",
   exec: "Remote runs on this machine", execs: { off: "Off (default)", argv: "Approved programs only (argv)", shell: "Approved shell commands too" },
   os: { linux: "Linux", macos: "macOS", windows: "Windows (elevated PowerShell)" },
-  runUser: "Type this in a terminal on the machine (one line after the other):", runService: "Type this as an administrator, with the line for your system: sudo on Linux and macOS, an elevated PowerShell on Windows. Each names the agent's full path, because an administrator's shell does not search your own folders.",
+  runUser: "Type this in a terminal on the machine (one line after the other):", runService: "Type this as an administrator, with the line for your system: sudo on Linux and macOS, an elevated PowerShell on Windows. Each names the agent's full path, because an administrator's shell does not search your own folders. On Windows, open that PowerShell as the user who installed the agent: the path is under that user's profile.",
   noWindows: "No Windows line: a run account exists on Linux and macOS only.",
   serviceHttps: "A service needs this server at an https address. Open this page through the server's https address to get the command.",
   standaloneHttps: "The agent takes an http address only on this machine (localhost). Open this page through the server's https address to get the command.",

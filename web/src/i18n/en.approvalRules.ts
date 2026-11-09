@@ -17,5 +17,5 @@ export const enApprovalRules = {
   ends: "Ends", never: "until revoked", uses: "Used", lastUsed: "Last used", revoke: "Revoke", revokeConfirm: "Revoke this standing approval? The next request asks again.",
   answeredBy: "Answered by", byRule: "a standing approval", decision: { allow: "Allowed", deny: "Denied" }, when: "When",
   anyInput: "any input",
-  moreLines: "+{n} more lines",
+  moreLine: "+1 more line", moreLines: "+{n} more lines",
 };
