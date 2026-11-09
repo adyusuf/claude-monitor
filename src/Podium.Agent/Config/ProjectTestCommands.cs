@@ -28,7 +28,7 @@ public static class ProjectTestCommands
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!ProjectFolderList.IsAbsolute(folder) || !(exists ?? Directory.Exists)(folder) || !IsValid(argv)) return false;
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         var tests = new Dictionary<string, List<string>>(identity.ProjectTests ?? [], StringComparer.Ordinal);
         var key = Normalize(folder);
         if (!tests.ContainsKey(key) && tests.Count >= MaxCommands) return false;
@@ -41,7 +41,7 @@ public static class ProjectTestCommands
     public static bool Clear(AgentConfig config, string folder)
     {
         ArgumentNullException.ThrowIfNull(config);
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         var key = Normalize(folder);
         if (identity.ProjectTests is not { } tests || !tests.ContainsKey(key)) return false;
         var left = tests.Where(t => t.Key != key).ToDictionary(t => t.Key, t => t.Value, StringComparer.Ordinal);

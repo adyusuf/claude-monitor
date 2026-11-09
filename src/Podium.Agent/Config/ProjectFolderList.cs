@@ -22,7 +22,7 @@ public static class ProjectFolderList
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!IsAbsolute(path) || !(exists ?? Directory.Exists)(path)) return false;
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         var folders = identity.ProjectFolders ?? [];
         var full = path.Length > 1 ? path.TrimEnd('/', '\\') : path;
         if (folders.Contains(full, StringComparer.Ordinal) || folders.Count >= Max) return false;
@@ -34,7 +34,7 @@ public static class ProjectFolderList
     public static bool Remove(AgentConfig config, string path)
     {
         ArgumentNullException.ThrowIfNull(config);
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         var folders = identity.ProjectFolders ?? [];
         var full = path.Length > 1 ? path.TrimEnd('/', '\\') : path;
         if (!folders.Contains(full, StringComparer.Ordinal)) return false;

@@ -31,6 +31,20 @@ public static class Credentials
         if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux()) return new ProtectedFileStore(config.Home);
         throw new PlatformNotSupportedException("the agent runs on macOS, Windows and Linux");
     }
+
+    /// <summary>The keychain service and Credential Manager prefix the agent used before the rename (ADR-0016), read once to carry the login over.</summary>
+    public const string LegacyService = "claude-monitor-agent";
+
+    /// <summary>Where the agent kept its tokens before the rename, for an earlier home: the same kind of store as <see cref="For"/>, under the old names.</summary>
+    public static ICredentialStore Legacy(AgentConfig config, string legacyHome)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (config.CredentialStore == "file") return new FileCredentialStore(legacyHome);
+        if (OperatingSystem.IsWindows()) return config.ServiceMode ? new DpapiCredentialStore(legacyHome) : new WindowsCredentialManager(LegacyService);
+        if (OperatingSystem.IsMacOS() && !config.ServiceMode) return new MacKeychain(service: LegacyService);
+        if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux()) return new ProtectedFileStore(legacyHome);
+        throw new PlatformNotSupportedException("the agent runs on macOS, Windows and Linux");
+    }
 }
 
 /// <summary>Tests only (AP_CREDENTIALS=file): one file per account, readable by the user only.</summary>
@@ -98,12 +112,12 @@ public sealed class MacKeychain(string tool = MacKeychain.SecurityTool, string s
 
 /// <summary>Windows Credential Manager (generic credentials of the current user) through advapi32.</summary>
 [SupportedOSPlatform("windows")]
-public sealed partial class WindowsCredentialManager : ICredentialStore
+public sealed partial class WindowsCredentialManager(string service = AgentConfig.CredentialService) : ICredentialStore
 {
     private const int Generic = 1;
     private const int LocalMachinePersist = 2;
 
-    private static string Target(string account) => $"{AgentConfig.CredentialService}/{account}";
+    private string Target(string account) => $"{service}/{account}";
 
     public string? Read(string account)
     {

@@ -35,7 +35,7 @@ public static class UpdateCommand
             return 2;
         }
 
-        var identity = Identity.Load(config);
+        var identity = Identity.Find(config) ?? Identity.None;
         if (!identity.Connected)
         {
             await stderr.WriteLineAsync(Strings.T(Msg.UpdateNotConnected));

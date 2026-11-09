@@ -47,7 +47,7 @@ public static class DaemonRole
             return NotConnected;
         }
 
-        if (config.ServiceMode && !Identity.Load(config).Connected)
+        if (config.ServiceMode && Identity.Find(config) is not { Connected: true })
         {
             if (config.ServerOverride is null)
             {
@@ -66,10 +66,10 @@ public static class DaemonRole
 
         // A standalone daemon (ADR-0008 §3g) that is not connected does not exit with 1, as it would under a supervisor that restarts it in a loop: it logs
         // once, re-reads its identity every poll and starts when `aipod login` has saved one.
-        if (config.Standalone && !Identity.Load(config).Connected)
+        if (config.Standalone && Identity.Find(config) is not { Connected: true })
         {
             log.Write("standalone agent not connected: run `aipod login --server <url>`; waiting for the login");
-            while (!stop.IsCancellationRequested && !Identity.Load(config).Connected)
+            while (!stop.IsCancellationRequested && Identity.Find(config) is not { Connected: true })
             {
                 try
                 {
