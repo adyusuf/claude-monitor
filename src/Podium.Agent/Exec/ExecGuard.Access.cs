@@ -7,13 +7,19 @@ namespace Podium.Agent.Exec;
 // placeholders filled, its real executable, shell or script) is held to every access layer; a refusal names the layer and the policy version.
 public static partial class ExecGuard
 {
-    /// <summary>The full check with the access layers this run is held to, as <paramref name="access"/> resolves them for it now.</summary>
+    /// <summary>
+    /// The full check with the access layers this run is held to, as <paramref name="access"/> resolves them now for the repositories its real
+    /// working directory and paths lie in as well as the one it names (a label alone never picks the policy).
+    /// </summary>
     public static ExecDecision Check(RunMessage run, ExecPolicy policy, string os, string agentHome, AccessLayers access)
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(access);
-        return Check(run, policy, os, agentHome, access: access.For(run, policy));
+        var decision = CheckRun(run, policy, os, agentHome, null, null);
+        if (!decision.Allowed) return decision;
+        var (layers, refusal) = access.For(run, policy, decision.ResolvedCwd, decision.ResolvedPaths ?? []);
+        return refusal is not null ? ExecDecision.Refuse(refusal) : WithAccess(decision, run, layers, os);
     }
 
     private static ExecDecision WithAccess(ExecDecision decision, RunMessage run, IReadOnlyList<AccessLayer> layers, string os)
