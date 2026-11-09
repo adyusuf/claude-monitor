@@ -79,4 +79,6 @@ export const trAccessErrors: typeof enAccessErrors = {
   policy_sha256: "Bir SHA-256 64 onaltılık karakterdir.", policy_cleared: "Geri alınan bir politikanın kaydı ve kabuğu olmaz.",
   policy_too_large: "Politika çok büyük.", policy_not_canonical: "Politika tam biçiminde değildi. Sayfayı yenileyip yeniden deneyin.",
   access_policy_changed: "Başka biri bu politikanın daha yeni bir sürümünü önce kaydetti.", access_key_taken: "Seçtiğiniz bir depo zaten başka bir projenin politikasına ait.",
+  rule_outside_access: "Bu yol projenin erişim politikasının dışında; yalnızca bu seferlik izin verilebilir, hatırlanmaz.",
+  invalid_project_key: "Bu geçerli bir depo anahtarı değil.",
 };

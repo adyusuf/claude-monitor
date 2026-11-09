@@ -67,7 +67,7 @@ export const enAccess = {
   },
 };
 
-/** The API's codes for a refused policy save, as `errors.<code>` (useErrorText reads them there). */
+/** The API's access codes (a refused policy save, a standing approval outside the policy, a bad key on by-key), as `errors.<code>` (useErrorText reads them there). */
 export const enAccessErrors = {
   policy_malformed: "The policy is incomplete.", policy_format: "This policy format is not known.",
   policy_keys: "Pick 1 to 20 repositories, each 1 to 200 characters without hidden characters.",
@@ -78,4 +78,6 @@ export const enAccessErrors = {
   policy_sha256: "A SHA-256 is 64 hexadecimal characters.", policy_cleared: "A policy that is taken back has no entries and no shell.",
   policy_too_large: "The policy is too large.", policy_not_canonical: "The policy was not in its exact form. Reload the page and try again.",
   access_policy_changed: "Someone saved a newer version of this policy first.", access_key_taken: "A repository you picked already belongs to another project's policy.",
+  rule_outside_access: "This path lies outside the project's access policy, so it can be allowed only this once, never remembered.",
+  invalid_project_key: "That is not a valid repository key.",
 };

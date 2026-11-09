@@ -79,4 +79,6 @@ export const deAccessErrors: typeof enAccessErrors = {
   policy_sha256: "Ein SHA-256 besteht aus 64 Hexadezimalzeichen.", policy_cleared: "Eine zurückgenommene Richtlinie hat keine Einträge und keine Shell.",
   policy_too_large: "Die Richtlinie ist zu groß.", policy_not_canonical: "Die Richtlinie lag nicht in ihrer genauen Form vor. Laden Sie die Seite neu und versuchen Sie es noch einmal.",
   access_policy_changed: "Jemand hat zuerst eine neuere Version dieser Richtlinie gespeichert.", access_key_taken: "Ein gewähltes Repository gehört schon zur Richtlinie eines anderen Projekts.",
+  rule_outside_access: "Dieser Pfad liegt außerhalb der Zugriffsrichtlinie des Projekts: er kann nur dieses eine Mal erlaubt, nie gemerkt werden.",
+  invalid_project_key: "Das ist kein gültiger Repository-Schlüssel.",
 };
