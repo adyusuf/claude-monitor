@@ -43,7 +43,7 @@ function PolicyFacts({ view }: { view: AccessPolicyView }) {
         return (
           <section key={os} className="stack-tight" aria-label={t(`access.os.${os}`)}>
             <h3 className="subhead">{t(`access.os.${os}`)}</h3>
-            <AccessLists allowed={rules.allowedFolders} denied={rules.deniedFolders} applications={rules.applications} />
+            <AccessLists allowed={rules.allowedFolders} denied={rules.deniedFolders} applications={rules.applications} projectFolder={d.includeProjectFolder} />
           </section>
         );
       })}
