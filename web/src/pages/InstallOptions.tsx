@@ -10,25 +10,57 @@ const RUN_ACCOUNT_NAME = /^[A-Za-z_][A-Za-z0-9_-]{0,31}$/;
 const RESERVED = ["root", "wheel", "admin", "sudo", "daemon", "nobody", "system", "aipod", "_aipod"];
 export const runAccountNameOk = (name: string): boolean => RUN_ACCOUNT_NAME.test(name) && !RESERVED.includes(name.toLowerCase());
 
+/** Where the installer puts the agent, per system (scripts/install/aipod-install.sh and .ps1; an AP_AGENT_HOME override moves it): sudo needs this full path. */
+const AGENT_PATH = {
+  linux: "~/.aipod/bin/aipod",
+  macos: "\"$HOME/Library/Application Support/aipod/bin/aipod\"",
+  windows: "& \"$env:USERPROFILE\\.aipod\\bin\\aipod.exe\"",
+} as const;
+
+export type InstallOs = keyof typeof AGENT_PATH;
+export interface InstallLine { os?: InstallOs; text: string }
+export type InstallProblem = "runAccountInvalid" | "serviceHttps" | "standaloneHttps";
+export type InstallAnswer = { lines: InstallLine[]; noWindows: boolean } | { problem: InstallProblem };
+
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * The agent's own rule for the server address (ServiceCommands, StandaloneCommands): a service takes only https, without spaces, control
+ * characters, quotes, % or |; a daemon at sign-in also takes http on this machine (localhost). Null when the address is accepted.
+ */
+export function serverProblem(mode: Mode, server: string): InstallProblem | null {
+  let url: URL;
+  try {
+    url = new URL(server);
+  } catch {
+    return mode === "service" ? "serviceHttps" : mode === "standalone" ? "standaloneHttps" : null;
+  }
+  const unsafe = [...server].some((c) => /[\s"%|]/.test(c) || c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f);
+  if (mode === "service") return url.protocol === "https:" && !unsafe ? null : "serviceHttps";
+  if (mode === "standalone") return url.protocol === "https:" || (url.protocol === "http:" && LOOPBACK.has(url.hostname)) ? null : "standaloneHttps";
+  return null;
+}
+
 /**
  * The commands for the choices made, in order; every flag is one the agent already has (see `aipod help`). The level of remote runs is always
  * written, "off" too, so a reinstall never keeps what an earlier one set. With Claude Code, `aipod install` alone registers the plugin and
- * `aipod install --exec` alone only sets the level, so that mode gives both. A service is installed by an administrator through sudo, with
- * the agent's full path (sudo does not search the user's own folders). Null when a run account's name is not one the agent accepts.
+ * `aipod install --exec` alone only sets the level, so that mode gives both. A service is installed by an administrator with the agent's full
+ * path (sudo does not search the user's own folders), one line per system; a run account exists on Linux and macOS only, so with one there is
+ * no Windows line. A problem instead when the agent would refuse the choices: a run account's name, or a server address it does not take.
  */
-/** Where the installer puts the agent, per system (scripts/install/aipod-install.sh; an AP_AGENT_HOME override moves it): sudo needs this full path. */
-const AGENT_PATH = { linux: "~/.aipod/bin/aipod", macos: "\"$HOME/Library/Application Support/aipod/bin/aipod\"" } as const;
-
-export interface InstallLine { os?: "linux" | "macos"; text: string }
-
-export function installCommands(o: { mode: Mode; exec: Exec; server: string; runAccount: boolean; runAccountName: string }): InstallLine[] | null {
-  if (o.mode === "plugin") return [{ text: "aipod install" }, { text: `aipod install --exec ${o.exec}` }];
-  if (o.mode === "standalone") return [{ text: `aipod install --standalone --server ${o.server} --exec ${o.exec}` }];
+export function installCommands(o: { mode: Mode; exec: Exec; server: string; runAccount: boolean; runAccountName: string }): InstallAnswer {
+  const server = o.server.replace(/\/+$/, "");
+  if (o.mode === "plugin") return { lines: [{ text: "aipod install" }, { text: `aipod install --exec ${o.exec}` }], noWindows: false };
+  const problem = serverProblem(o.mode, server);
+  if (problem) return { problem };
+  if (o.mode === "standalone") return { lines: [{ text: `aipod install --standalone --server ${server} --exec ${o.exec}` }], noWindows: false };
   const name = o.runAccountName.trim();
-  if (o.runAccount && name !== "" && !runAccountNameOk(name)) return null;
+  if (o.runAccount && name !== "" && !runAccountNameOk(name)) return { problem: "runAccountInvalid" };
   const run = o.runAccount ? (name ? ` --run-account ${name}` : " --run-account") : "";
-  const args = `install --service --server ${o.server} --exec ${o.exec}${run}`;
-  return [{ os: "linux", text: `sudo ${AGENT_PATH.linux} ${args}` }, { os: "macos", text: `sudo ${AGENT_PATH.macos} ${args}` }];
+  const args = `install --service --server ${server} --exec ${o.exec}${run}`;
+  const lines: InstallLine[] = [{ os: "linux", text: `sudo ${AGENT_PATH.linux} ${args}` }, { os: "macos", text: `sudo ${AGENT_PATH.macos} ${args}` }];
+  if (!o.runAccount) lines.push({ os: "windows", text: `${AGENT_PATH.windows} ${args}` });
+  return { lines, noWindows: o.runAccount };
 }
 
 /**
@@ -41,7 +73,8 @@ export function InstallOptions({ server }: { server: string }) {
   const [exec, setExec] = useState<Exec>("off");
   const [runAccount, setRunAccount] = useState(false);
   const [runAccountName, setRunAccountName] = useState("");
-  const commands = installCommands({ mode, exec, server, runAccount, runAccountName });
+  const answer = installCommands({ mode, exec, server, runAccount, runAccountName });
+  const problem = "problem" in answer ? answer.problem : null;
   return (
     <Card>
       <div className="stack install-options">
@@ -64,8 +97,8 @@ export function InstallOptions({ server }: { server: string }) {
                 <label className="field">
                   <span className="field-label">{t("installOptions.runAccountName")}</span>
                   <input className="input" value={runAccountName} maxLength={32} placeholder={t("installOptions.runAccountDefault")}
-                    aria-invalid={commands === null} onChange={(e) => setRunAccountName(e.target.value)} />
-                  {commands === null ? <span className="field-error">{t("installOptions.runAccountInvalid")}</span> : null}
+                    aria-invalid={problem === "runAccountInvalid"} onChange={(e) => setRunAccountName(e.target.value)} />
+                  {problem === "runAccountInvalid" ? <span className="field-error">{t("installOptions.runAccountInvalid")}</span> : null}
                 </label>
               ) : null}
             </>
@@ -83,17 +116,18 @@ export function InstallOptions({ server }: { server: string }) {
             <option value="shell">{t("installOptions.execs.shell")}</option>
           </select>
         </label>
-        {commands ? (
+        {"lines" in answer ? (
           <div className="stack-tight">
             <p className="muted">{mode === "service" ? t("installOptions.runService") : t("installOptions.runUser")}</p>
-            {commands.map((c) => (
+            {answer.lines.map((c) => (
               <div key={c.text} className="stack-tight">
                 {c.os ? <span className="muted small">{t(`installOptions.os.${c.os}`)}</span> : null}
                 <CopyText text={c.text} />
               </div>
             ))}
+            {answer.noWindows ? <p className="muted small">{t("installOptions.noWindows")}</p> : null}
           </div>
-        ) : null}
+        ) : problem === "serviceHttps" || problem === "standaloneHttps" ? <p className="field-error">{t(`installOptions.${problem}`)}</p> : null}
       </div>
     </Card>
   );

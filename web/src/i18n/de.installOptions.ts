@@ -16,6 +16,9 @@ export const deInstallOptions: Dictionary["installOptions"] = {
   adminUser: "Er fragt nie nach Administratorrechten; was er ausführt, hat nur die Rechte Ihres Benutzers.",
   adminService: "Der Dienst läuft nie als Administrator: er läuft unter seinem eigenen Konto ohne Rechte, und die Installation lehnt root, SYSTEM und LocalSystem ab. Nur die Installation braucht einen Administrator.",
   exec: "Ausführungen aus der Ferne auf dieser Maschine", execs: { off: "Aus (Standard)", argv: "Nur freigegebene Programme (argv)", shell: "Auch freigegebene Shell-Befehle" },
-  os: { linux: "Linux", macos: "macOS" },
-  runUser: "Geben Sie dies in einem Terminal auf der Maschine ein (eine Zeile nach der anderen):", runService: "Geben Sie dies als Administrator in einem Terminal ein, mit der Zeile für Ihr System: sudo braucht den vollen Pfad des Agents. Unter Windows führen Sie in einer PowerShell mit erhöhten Rechten aipod install --service mit denselben Optionen aus.",
+  os: { linux: "Linux", macos: "macOS", windows: "Windows (PowerShell mit erhöhten Rechten)" },
+  runUser: "Geben Sie dies in einem Terminal auf der Maschine ein (eine Zeile nach der anderen):", runService: "Geben Sie dies als Administrator ein, mit der Zeile für Ihr System: unter Linux und macOS mit sudo, unter Windows in einer PowerShell mit erhöhten Rechten. Jede Zeile nennt den vollen Pfad des Agents, weil die Shell eines Administrators Ihre eigenen Ordner nicht durchsucht. Öffnen Sie diese PowerShell unter Windows als der Benutzer, der den Agent installiert hat: der Pfad liegt in dessen Profil.",
+  noWindows: "Keine Windows-Zeile: ein Ausführungskonto gibt es nur unter Linux und macOS.",
+  serviceHttps: "Ein Dienst braucht diesen Server unter einer https-Adresse. Öffnen Sie diese Seite über die https-Adresse des Servers, um den Befehl zu erhalten.",
+  standaloneHttps: "Der Agent nimmt eine http-Adresse nur auf dieser Maschine (localhost) an. Öffnen Sie diese Seite über die https-Adresse des Servers, um den Befehl zu erhalten.",
 };

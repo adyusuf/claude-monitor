@@ -31,7 +31,7 @@ function RuleRow({ rule, onRevoked }: { rule: ApprovalRuleRow; onRevoked: () => 
     <tr>
       <td>{rule.hostname}{rule.projectName ? <span className="muted small"> · {rule.projectName}</span> : null}</td>
       <td>{rule.toolName}</td>
-      <td>{rule.command !== null ? <code>{rule.command}</code> : <span className="muted">{t("approvalRules.anyInput")}</span>}</td>
+      <td>{rule.command !== null ? <code className="rule-command">{rule.command}</code> : <span className="muted">{t("approvalRules.anyInput")}</span>}</td>
       <td>{t(`approvalRules.duration.${rule.duration}`)}</td>
       <td>{rule.expiresAt ? dateTime(rule.expiresAt) : <span className="muted">{t("approvalRules.never")}</span>}</td>
       <td className="num">{rule.useCount}</td>

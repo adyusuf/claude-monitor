@@ -7,6 +7,12 @@ import { Icon } from "./icons";
 import { Modal } from "./Modal";
 import { Button } from "./ui";
 
+/** The first line with text of a preview and how many such lines follow it: the band shows one line, so a command of several never reads as one. */
+export function firstLine(text: string): [string, number] {
+  const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim() !== "");
+  return [lines[0] ?? "", Math.max(lines.length - 1, 0)];
+}
+
 /**
  * The band at the top of every workspace page (ADR-0019 §11): how many requests wait on the viewer's sessions, the oldest one in a line (tool,
  * preview, session, machine), and Details, which opens them all with Allow / Deny and how long an allow stands. Runs waiting for the viewer's
@@ -17,7 +23,7 @@ export function ApprovalBand({ ws, rows, runs, onAnswered }: { ws: string; rows:
   const [open, setOpen] = useState(false);
   if (rows.length === 0 && runs === 0) return null;
   const first = rows[0];
-  const preview = first ? previewOf(first) : "";
+  const [preview, more] = firstLine(first ? previewOf(first) : "");
   return (
     <div className="approval-band" role="status">
       <Icon name="approvals" />
@@ -25,7 +31,7 @@ export function ApprovalBand({ ws, rows, runs, onAnswered }: { ws: string; rows:
         <span className="approval-band-text">
           <strong>{rows.length === 1 ? t("approvalRules.bandOne") : t("approvalRules.bandMany", { n: rows.length })}</strong>
           <span className="approval-band-first">
-            {first.toolName}{preview ? <> <code>{preview}</code></> : null} · {first.sessionTitle ?? t("approvalRules.untitled")} · {first.hostname}
+            {first.toolName}{preview ? <> <code>{preview}</code>{more > 0 ? <> {more === 1 ? t("approvalRules.moreLine") : t("approvalRules.moreLines", { n: more })}</> : null}</> : null} · {first.sessionTitle ?? t("approvalRules.untitled")} · {first.hostname}
           </span>
         </span>
       ) : null}

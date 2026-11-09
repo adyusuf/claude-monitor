@@ -121,7 +121,24 @@ public static class Audit
             TargetId = targetId?.ToString(),
             At = clock.GetUtcNow(),
             IpHash = Secrets.IpTag(http?.Connection.RemoteIpAddress),
-            Detail = detail is null ? null : JsonSerializer.SerializeToDocument(detail),
+            Detail = DetailOf(http, detail),
         });
+    }
+
+    /// <summary>
+    /// The row's detail, with how the request passed re-authentication when it did (<see cref="Remote.RemoteChecks.ReauthItem"/>), so every row
+    /// a re-authenticated change writes says whether a sign-in, the code window or a fresh code let it through.
+    /// </summary>
+    private static JsonDocument? DetailOf(HttpContext? http, object? detail)
+    {
+        if (http?.Items.TryGetValue(Remote.RemoteChecks.ReauthItem, out var way) != true || way is not string reauth)
+        {
+            return detail is null ? null : JsonSerializer.SerializeToDocument(detail);
+        }
+
+        var node = detail is null ? new System.Text.Json.Nodes.JsonObject() : JsonSerializer.SerializeToNode(detail);
+        if (node is not System.Text.Json.Nodes.JsonObject obj) return JsonSerializer.SerializeToDocument(detail);
+        obj.TryAdd("reauth", reauth);
+        return JsonSerializer.SerializeToDocument(obj);
     }
 }

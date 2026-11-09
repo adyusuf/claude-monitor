@@ -21,7 +21,10 @@ public static class ApprovalRules
     /// <summary>Tools that write one file; their rule covers that exact path, read from the tool's own key only.</summary>
     private static readonly Dictionary<string, string> FileTools = new(StringComparer.Ordinal)
     {
-        ["Edit"] = "file_path", ["Write"] = "file_path", ["MultiEdit"] = "file_path", ["NotebookEdit"] = "notebook_path",
+        ["Edit"] = "file_path",
+        ["Write"] = "file_path",
+        ["MultiEdit"] = "file_path",
+        ["NotebookEdit"] = "notebook_path",
     };
 
     /// <summary>The keys that name a path in a file tool's call: a call that carries the other one gets no rule.</summary>
