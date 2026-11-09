@@ -92,7 +92,8 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
             try
             {
                 await api.RunStatusAsync(Guid.Parse(r.RunId),
-                    new RunStatusUpdate(r.FinalStatus ?? RunStatuses.Failed, r.ExitCode, r.Error, r.Truncated, r.ResolvedExe, clock.GetUtcNow()), ct);
+                    new RunStatusUpdate(r.FinalStatus ?? RunStatuses.Failed, r.ExitCode, r.Error, r.Truncated, r.ResolvedExe, clock.GetUtcNow(),
+                        RefusedBy: r.RefusedBy, AccessVersion: r.AccessVersion), ct);
             }
             catch (ApiException e) when (Permanent(e.Status))
             {
@@ -121,7 +122,7 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
                     ? Quietly(() => api.RunStatusAsync(run.Id, update, cts.Token))
                     : Task.CompletedTask,
                 cts.Token);
-            lock (gate) store.ExecEnd(id, result.Status, result.ExitCode, result.Error, result.OutputTruncated, result.ResolvedExe);
+            lock (gate) store.ExecEnd(id, result.Status, result.ExitCode, result.Error, result.OutputTruncated, result.ResolvedExe, result.RefusedBy, result.AccessVersion);
         }
         catch (Exception e)
         {

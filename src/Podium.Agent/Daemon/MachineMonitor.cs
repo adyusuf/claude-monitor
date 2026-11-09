@@ -68,7 +68,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var inventory = await InventoryAsync(policy, ct);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
             policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required,
-            PluginIds.IsValid(config.PluginId) ? config.PluginId : null, inventory);
+            PluginIds.IsValid(config.PluginId) ? config.PluginId : null, inventory, AccessOf(policy));
         var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default }, Inventory = inventory is null ? null : inventory with { At = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;
@@ -99,6 +99,19 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
 
         inventoryAt = now;
         return inventory;
+    }
+
+    /// <summary>The access report (ADR-0020 §4); a store that cannot be read reports the ceiling with no policy rather than nothing.</summary>
+    private AccessReport AccessOf(ExecPolicy policy)
+    {
+        try
+        {
+            return Access.AccessReports.Report(config, store, policy);
+        }
+        catch (Exception e) when (e is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return new AccessReport(Access.AccessCeiling.Report(policy), []);
+        }
     }
 
     /// <summary>The push transport this machine has on now (the saved setting, read fresh), or null when push is off: the web words its idle-session warning by it.</summary>
@@ -187,7 +200,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     {
         ArgumentNullException.ThrowIfNull(settings);
         List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false"), (ShareServicesKey, settings.ShareServices ? "true" : "false"),
-            (ShareInventoryKey, settings.ShareInventory ? "true" : "false")];
+            (ShareInventoryKey, settings.ShareInventory ? "true" : "false"), .. Access.AccessPolicySync.Entries(settings)];
         if (settings.Alerts is { } a)
         {
             entries.Add((ThresholdsKey, string.Join(',', new[] { a.CpuPct, a.MemoryPct, a.DiskPct, a.SustainSeconds }

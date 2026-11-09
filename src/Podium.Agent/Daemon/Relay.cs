@@ -71,7 +71,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
             using var input = JsonDocument.Parse(p.ToolInput);
             // InlineAnswer: an approval rule's allow comes back in this answer (ADR-0019); on the stream it could arrive before the id is stored.
             var created = await api.CreatePermissionAsync(
-                new PermissionRequestCreate(p.Harness, p.Session, p.ToolName, input.RootElement.Clone(), left, InlineAnswer: true), ct);
+                new PermissionRequestCreate(p.Harness, p.Session, p.ToolName, input.RootElement.Clone(), left, InlineAnswer: true, AccessScope: Access.AccessScopes.For(config, store, p.Session, p.ToolName, input.RootElement)), ct);
             if (created is null) continue;
             store.PermissionSent(p.LocalId, created.Id.ToString());
             if (created.Answer is { } a && a.Id == created.Id) store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason);
@@ -248,6 +248,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                     return true;
                 }
 
+                if (!await new Access.AccessPolicySync(config, store, api, clock).FreshAsync(run, ct)) return true; // ADR-0020 §4: the policies the run was sent under
                 Runs.Accept(run, ct);
                 return true;
             case AgentStreamEvents.RunCancel:

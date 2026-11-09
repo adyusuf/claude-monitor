@@ -166,14 +166,18 @@ internal static class ExecPaths
     private static IReadOnlyList<PathAcl>? ReadWindowsAcls(string realExe) =>
         OperatingSystem.IsWindows() ? WindowsAclReader.ReadChain(realExe) : null;
 
-    /// <summary>A file with more than one hard link can be reached from outside the root it seems to sit in.</summary>
+    /// <summary>
+    /// A file with more than one hard link can be reached from outside the root it seems to sit in. On Windows the count is read from the file's
+    /// handle (nNumberOfLinks), and a count that cannot be read counts as extra links; where Unix cannot read it, only the other checks apply.
+    /// </summary>
     public static bool HasExtraLinks(string realPath, string os)
     {
-        if (os == OsKinds.Windows || !File.Exists(realPath))
+        if (!File.Exists(realPath) || (os == OsKinds.Windows && !OperatingSystem.IsWindows()))
         {
             return false;
         }
 
-        return UnixFileInfo.TryGet(realPath) is { LinkCount: > 1 };
+        var links = Access.PathIdentity.LinkCount(realPath);
+        return OperatingSystem.IsWindows() ? links is not 1 : links > 1;
     }
 }

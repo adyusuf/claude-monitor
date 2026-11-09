@@ -214,6 +214,46 @@ See `SETUP.md`, "Job schedules, signed approvals and a separate run account". In
 schedule on machines that are not production or a database; a machine whose admin pinned owner keys runs only what such a key signed; a service agent can start runs as a second unprivileged account. The host checks nobody has run are in
 `docs/adr-0008-host-checks.md`; the ones for ADR-0010 (a real sudo run account, Windows and Linux) are listed in ADR-0010 §8.
 
+## 10. Folder and application access: the ceiling and the web policies (ADR-0020)
+
+Every remote run is checked, after the exec level, against **access layers**, always on real paths (links, junctions
+and Windows short names followed; a network or device path refused):
+
+1. **The machine's ceiling**, set by its admin with a command, never by editing a file:
+
+   ```
+   aipod config access show
+   aipod config access allow <folder>            # runs may use only the allowed folders (once one is listed)
+   aipod config access deny <folder>             # no run may use this folder or anything under it
+   aipod config access app <exe> [--sha256 <hex>] # runs may start only the listed programs; with a hash, that exact file
+   aipod config access remove <path>
+   aipod config access clear                     # back to what the run account may reach (the OS permissions)
+   ```
+
+   Each entry must exist and is stored as its real path; an allowed folder is never a system or home root. On a
+   service the ceiling lives in the admin-owned exec policy file (step 4: `deniedRoots`, `executableHashes` beside
+   `allowedRoots` and `allowedExecutables`), so these verbs run as the admin (`sudo aipod config access ...`, an
+   elevated prompt on Windows); an interactive agent keeps it in its `agent.json`. A ceiling with any entry still
+   refuses shell and script runs. It applies to the next run; a reinstall keeps it.
+2. **The web policy of the run's repository** (the project page, owners and admins), which only narrows the ceiling.
+   The agent fetches the policies of its repositories when the stamp in its settings changes, and again before a run
+   that names a newer stamp. On a machine with signed approvals (`aipod config approvals required`, step 9) a policy
+   applies only when a pinned owner key signed it; an unsigned or older version leaves the last signed one in place.
+3. **The default**, where no policy covers the run's repository but the workspace switch *enforce access policies* is
+   on, or the machine is production or a database: the run's project folder only, argv runs only, no shell and no
+   script. With the switch off and an ordinary machine, such a run is held to the ceiling only, as before.
+
+A refused run fails with a code that starts with `access_` (for example `access_cwd_not_allowed`,
+`access_exe_hash`, `access_shell_refused`) and the layer that refused it; the web shows both. `aipod status` prints
+one line about the ceiling and the policies; `aipod config access show` prints the ceiling and each policy's version,
+state and whether it is signed. A machine reports its ceiling to the web (shown only to its owner and the workspace's
+admins) and, of its project folders, only how many there are.
+
+A run that names a repository is approved with the repository in the signed payload (`ap-approval-v2`). A machine with
+signed approvals that runs an agent older than this release cannot verify such a signature and refuses the run
+(`approval_invalid`); update its agent. The Windows parts (final paths, file identity, the hard-link count) compile but
+have not yet run on a real Windows host.
+
 ## Residual risks (ADR-0005, "Consequences" and "Open")
 
 Read these before turning `shell` or a wide ceiling on:

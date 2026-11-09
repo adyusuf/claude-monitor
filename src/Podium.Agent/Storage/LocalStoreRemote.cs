@@ -10,8 +10,9 @@ public sealed record RemoteRequest(string LocalId, string Kind, string Method, s
 public sealed record FollowedRun(string RunId, string Status, string? View, int NextSeq, bool Done, DateTimeOffset UpdatedAt);
 
 /// <summary>A run this agent was sent to execute, written before it starts so a replay never starts it twice.</summary>
+/// <remarks>RefusedBy and AccessVersion: the access layer that refused the run, when Error is an access code (ADR-0020 §4).</remarks>
 public sealed record ExecRun(string RunId, string State, string? FinalStatus, int? ExitCode, string? Error, bool Truncated,
-    string? ResolvedExe, bool Reported);
+    string? ResolvedExe, bool Reported, string? RefusedBy = null, int? AccessVersion = null);
 
 public sealed record StoredChunk(string RunId, int Seq, string Stream, string Body, bool Gap);
 
@@ -143,11 +144,13 @@ public sealed partial class LocalStore
         Exec("INSERT INTO exec_runs (run_id, state, started_at) VALUES ($id, 'running', $t) ON CONFLICT(run_id) DO NOTHING",
             ("$id", runId), ("$t", Iso(now))) == 1;
 
-    public void ExecEnd(string runId, string status, int? exitCode, string? error, bool truncated, string? resolvedExe) =>
+    public void ExecEnd(string runId, string status, int? exitCode, string? error, bool truncated, string? resolvedExe, string? refusedBy = null,
+        int? accessVersion = null) =>
         Exec("""
             UPDATE exec_runs SET state = 'finished', final_status = $s, exit_code = $x, error = $e, truncated = $tr,
-                resolved_exe = COALESCE($r, resolved_exe), reported = 0 WHERE run_id = $id
-            """, ("$id", runId), ("$s", status), ("$x", exitCode), ("$e", error), ("$tr", truncated ? 1 : 0), ("$r", resolvedExe));
+                resolved_exe = COALESCE($r, resolved_exe), reported = 0, refused_by = $rb, access_version = $av WHERE run_id = $id
+            """, ("$id", runId), ("$s", status), ("$x", exitCode), ("$e", error), ("$tr", truncated ? 1 : 0), ("$r", resolvedExe), ("$rb", refusedBy),
+            ("$av", accessVersion));
 
     public ExecRun? ExecRunOf(string runId) => ExecRuns("WHERE run_id = $id", ("$id", runId)).FirstOrDefault();
 
@@ -178,13 +181,14 @@ public sealed partial class LocalStore
 
     private List<ExecRun> ExecRuns(string where, params (string Name, object? Value)[] args)
     {
-        using var cmd = Command($"SELECT run_id, state, final_status, exit_code, error, truncated, resolved_exe, reported FROM exec_runs {where}", null, args);
+        using var cmd = Command($"SELECT run_id, state, final_status, exit_code, error, truncated, resolved_exe, reported, refused_by, access_version FROM exec_runs {where}", null, args);
         using var r = cmd.ExecuteReader();
         var list = new List<ExecRun>();
         while (r.Read())
         {
             list.Add(new ExecRun(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.IsDBNull(3) ? null : r.GetInt32(3),
-                r.IsDBNull(4) ? null : r.GetString(4), r.GetInt32(5) == 1, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7) == 1));
+                r.IsDBNull(4) ? null : r.GetString(4), r.GetInt32(5) == 1, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7) == 1,
+                r.IsDBNull(8) ? null : r.GetString(8), r.IsDBNull(9) ? null : r.GetInt32(9)));
         }
 
         return list;

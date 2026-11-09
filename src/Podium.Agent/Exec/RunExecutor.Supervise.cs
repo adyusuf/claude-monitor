@@ -112,17 +112,19 @@ public sealed partial class RunExecutor
         }
     }
 
-    private async Task<RunResult> RefuseAsync(RunMessage run, string error, string? exe, long began, Func<RunStatusUpdate, Task> onStatus)
+    /// <summary>A refusal; one by an access layer (ADR-0020 §4) carries the layer and the policy version, and is logged by its code only.</summary>
+    private async Task<RunResult> RefuseAsync(RunMessage run, string error, string? exe, long began, Func<RunStatusUpdate, Task> onStatus,
+        ExecDecision? refusal = null)
     {
         log.Write($"run refused id={run.Id} grant={GrantOf(run)} reason={error}");
-        return await FinishAsync(run, RunStatuses.Failed, null, error, exe, began, onStatus, None, null, logEnd: false);
+        return await FinishAsync(run, RunStatuses.Failed, null, error, exe, began, onStatus, None, null, logEnd: false, refusal);
     }
 
     private async Task<RunResult> FinishAsync(RunMessage run, string status, int? code, string? error, string? exe, long began,
-        Func<RunStatusUpdate, Task> onStatus, string kill, OutputCollector? collector, bool logEnd = true)
+        Func<RunStatusUpdate, Task> onStatus, string kill, OutputCollector? collector, bool logEnd = true, ExecDecision? refusal = null)
     {
         var result = new RunResult(status, code, error, collector?.Truncated ?? false, exe, collector?.BytesRead ?? 0, clock.GetElapsedTime(began),
-            collector?.BytesDropped ?? 0, collector?.ChunksProduced ?? 0);
+            collector?.BytesDropped ?? 0, collector?.ChunksProduced ?? 0, refusal?.RefusedBy, refusal?.AccessVersion);
         if (logEnd)
         {
             log.Write($"run end id={run.Id} grant={GrantOf(run)} status={status} exit={code?.ToString() ?? None} read_bytes={result.BytesRead} "
