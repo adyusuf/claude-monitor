@@ -40,12 +40,19 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
             (WorkspaceKey, settings.WorkspaceId.ToString("D"))];
     }
 
-    /// <summary>The workspace this agent's policies belong to: the one the API's settings name, else agent.json's; null when neither is known.</summary>
+    /// <summary>
+    /// The workspace this agent's policies belong to. Where signed approvals are required it is agent.json's only, which only a local login
+    /// changes: the API is not trusted there, so a workspace it reports can never set the signed policies aside (a move on the web then gives the
+    /// default everywhere until the machine's admin logs in again). Elsewhere it is the one the API's settings name, else agent.json's; null when
+    /// neither is known.
+    /// </summary>
     public static Guid? CurrentWorkspace(AgentConfig config, LocalStore store)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(store);
-        return Guid.TryParse(WorkspaceSettings.Get(config, store, WorkspaceKey), out var fromApi) ? fromApi : Identity.Peek(config)?.WorkspaceId;
+        var local = Identity.Peek(config)?.WorkspaceId;
+        if (ApproversStore.Load(config).Required) return local;
+        return Guid.TryParse(WorkspaceSettings.Get(config, store, WorkspaceKey), out var fromApi) ? fromApi : local;
     }
 
     /// <summary>Fetches the set when the settings name another stamp than the one held (the settings loop).</summary>
@@ -152,7 +159,16 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
             if (approvers.Required && AccessPolicyVerifier.Parse(before.KeptMessage) is not null) rows[id] = before with { Version = null, Message = null, IsSigned = false };
         }
 
-        // Rows of another workspace (before a move on the web) are not passed on, so they go.
+        // Rows of another workspace (before a move on the web) are not passed on, so they go; where signatures are required a kept signed one stays
+        // (it is not judged while the workspace differs), so only a local login (ForgetAccessPolicies) ever removes a signed policy.
+        if (approvers.Required)
+        {
+            foreach (var other in store.AccessPolicies().Where(p => p.WorkspaceId != ours && p.KeptMessage is not null && !rows.ContainsKey(p.ProjectId)))
+            {
+                rows[other.ProjectId] = other;
+            }
+        }
+
         store.ReplaceAccessPolicies([.. rows.Values], Marker(marker, answer.Stamp ?? ""), truncated); // no stamp and an empty one: no policy
     }
 
