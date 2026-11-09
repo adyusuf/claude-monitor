@@ -76,6 +76,7 @@ public static partial class Cli
         if (args.FirstOrDefault() == "install" && StandaloneCommands.IsStandalone(args)) return await StandaloneCommands.InstallAsync(args, config, stdout, stderr, clock);
         if (args.FirstOrDefault() == "uninstall" && StandaloneCommands.IsStandalone(args)) return StandaloneCommands.Uninstall(config, stdout);
         var log = new AgentLog(config, clock);
+        _ = Identity.Find(config); // the one-time carry-over of the previous home comes before any setting is read (ADR-0016 §4)
         config = SavedSettings.Apply(config);
         switch (args.FirstOrDefault())
         {

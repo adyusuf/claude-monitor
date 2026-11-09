@@ -21,6 +21,7 @@ public static partial class Cli
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(stderr);
+        _ = Identity.Find(config); // carry the previous home over before its saved settings are read
         config = SavedSettings.Apply(config);
         if (Array.IndexOf(args, "--stop-wait") >= 0)
         {
