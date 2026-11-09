@@ -58,7 +58,14 @@ public sealed record Identity(string MachineKey, string? Server = null, Guid? Ag
     {
         ArgumentNullException.ThrowIfNull(config);
         if (Peek(config) is { } saved) return saved;
-        return !File.Exists(config.IdentityPath) && IdentityCarryOver.TryCarry(config) ? Peek(config) : null;
+        try
+        {
+            return !File.Exists(config.IdentityPath) && IdentityCarryOver.TryCarry(config) ? Peek(config) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null; // a home that cannot be written carries nothing over: "not connected", never a failing daemon, status or tool
+        }
     }
 
     /// <summary>The identity a settings command edits: the one <see cref="Find"/> gives (a machine key not set yet stays unset), else an empty one. It never mints one; login does.</summary>
