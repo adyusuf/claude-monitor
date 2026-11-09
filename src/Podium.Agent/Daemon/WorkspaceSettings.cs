@@ -20,7 +20,8 @@ public static class WorkspaceSettings
     /// <summary>Every workspace switch the daemon stores; login and logout forget them all.</summary>
     public static readonly IReadOnlyList<string> Switches =
         [ClaudeUpdate.ClaudePolicy.WorkspaceKey, Update.UpdatePolicy.WorkspaceKey, MachineMonitor.RemoteRunsKey, ClaudeAutoStart.ModeKey, ClaudeAutoStart.ProjectKey, WorkspaceKey,
-            Access.AccessPolicySync.StampKey, Access.AccessPolicySync.EnforceKey, Access.AccessPolicySync.WorkspaceKey];
+            Access.AccessPolicySync.StampKey, Access.AccessPolicySync.EnforceKey, Access.AccessPolicySync.WorkspaceKey,
+            Exec.ExecLevelChanges.SequenceKey, Exec.ExecLevelChanges.StateKey, Exec.ExecLevelChanges.LevelKey];
 
     public static void Tag(LocalStore store, Guid workspaceId)
     {

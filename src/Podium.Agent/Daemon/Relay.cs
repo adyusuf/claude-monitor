@@ -135,6 +135,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         ];
         if (workspace is { } w) entries.Add(WorkspaceSettings.TagEntry(w));
         StoreRead(began, entries);
+        Exec.ExecLevelChanges.Handle(config, store, clock, new AgentLog(config, clock), s.ExecLevelRequest);
     }
 
     // UTC ticks of the newest successful read's start. Two passes (this loop's and the stream's re-read) may overlap, so the
