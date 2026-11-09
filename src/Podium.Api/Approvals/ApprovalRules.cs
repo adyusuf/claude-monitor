@@ -97,7 +97,7 @@ public static class ApprovalRules
                 {
                     case JsonValueKind.String:
                         var text = p.Value.GetString()!;
-                        if (text.Contains(MaskedMark, StringComparison.Ordinal) || text.Any(Hidden)) return null;
+                        if (text.Contains(MaskedMark, StringComparison.Ordinal) || TextSafety.HasHidden(text)) return null;
                         w.WriteStringValue(text);
                         break;
                     case JsonValueKind.Number when p.Value.TryGetDecimal(out var number):
@@ -127,13 +127,8 @@ public static class ApprovalRules
         if (!input.TryGetProperty(key, out var v) || v.ValueKind != JsonValueKind.String) return null;
         var text = v.GetString();
         if (string.IsNullOrWhiteSpace(text) || text.Length > ApprovalRuleLimits.CommandMax || text.Contains(MaskedMark, StringComparison.Ordinal)) return null;
-        return text.Any(Hidden) ? null : text;
+        return TextSafety.HasHidden(text) ? null : text;
     }
-
-    /// <summary>Control characters other than a newline or a tab, bidirectional overrides and zero-width characters.</summary>
-    private static bool Hidden(char c) =>
-        (char.IsControl(c) && c is not ('\n' or '\t')) || c is >= '‪' and <= '‮' || c is >= '⁦' and <= '⁩'
-        || c is '​' or '‌' or '‍' or '⁠' or '﻿';
 
     private static bool Guarded(string path)
     {
