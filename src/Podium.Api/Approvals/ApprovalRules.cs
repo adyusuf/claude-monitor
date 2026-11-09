@@ -21,7 +21,10 @@ public static class ApprovalRules
     /// <summary>Tools that write one file; their rule covers that exact path, read from the tool's own key only.</summary>
     private static readonly Dictionary<string, string> FileTools = new(StringComparer.Ordinal)
     {
-        ["Edit"] = "file_path", ["Write"] = "file_path", ["MultiEdit"] = "file_path", ["NotebookEdit"] = "notebook_path",
+        ["Edit"] = "file_path",
+        ["Write"] = "file_path",
+        ["MultiEdit"] = "file_path",
+        ["NotebookEdit"] = "notebook_path",
     };
 
     /// <summary>The keys that name a path in a file tool's call: a call that carries the other one gets no rule.</summary>
@@ -78,6 +81,20 @@ public static class ApprovalRules
     }
 
     /// <summary>
+    /// Whether the call is one of a path tool (ADR-0020 §4): Read, LS and the file tools always, Glob and Grep when they carry a path; and that
+    /// path, or null when it is missing or not plain text. False for every other call (Bash, a search in the working folder).
+    /// </summary>
+    public static bool IsPathCall(string toolName, JsonElement input, out string? path)
+    {
+        path = null;
+        var pathTool = ReadPathTools.TryGetValue(toolName, out var key) || FileTools.TryGetValue(toolName, out key);
+        var objectInput = input.ValueKind == JsonValueKind.Object;
+        if (!pathTool && !(SearchTools.Contains(toolName) && objectInput && input.TryGetProperty("path", out _))) return false;
+        path = objectInput ? Plain(input, key ?? "path") : null;
+        return true;
+    }
+
+    /// <summary>
     /// A flat call as one canonical text (keys in ordinal order, compact, strings written from their decoded value), so the request the agent
     /// sends and the one read back from the database give the same text. Null for a nested value, a masked or hidden text, or a long one.
     /// </summary>
@@ -94,7 +111,7 @@ public static class ApprovalRules
                 {
                     case JsonValueKind.String:
                         var text = p.Value.GetString()!;
-                        if (text.Contains(MaskedMark, StringComparison.Ordinal) || text.Any(Hidden)) return null;
+                        if (text.Contains(MaskedMark, StringComparison.Ordinal) || TextSafety.HasHidden(text)) return null;
                         w.WriteStringValue(text);
                         break;
                     case JsonValueKind.Number when p.Value.TryGetDecimal(out var number):
@@ -124,13 +141,8 @@ public static class ApprovalRules
         if (!input.TryGetProperty(key, out var v) || v.ValueKind != JsonValueKind.String) return null;
         var text = v.GetString();
         if (string.IsNullOrWhiteSpace(text) || text.Length > ApprovalRuleLimits.CommandMax || text.Contains(MaskedMark, StringComparison.Ordinal)) return null;
-        return text.Any(Hidden) ? null : text;
+        return TextSafety.HasHidden(text) ? null : text;
     }
-
-    /// <summary>Control characters other than a newline or a tab, bidirectional overrides and zero-width characters.</summary>
-    private static bool Hidden(char c) =>
-        (char.IsControl(c) && c is not ('\n' or '\t')) || c is >= '‪' and <= '‮' || c is >= '⁦' and <= '⁩'
-        || c is '​' or '‌' or '‍' or '⁠' or '﻿';
 
     private static bool Guarded(string path)
     {
@@ -153,14 +165,16 @@ public static class ApprovalRules
 
     /// <summary>
     /// The live rule that allows this request, if any: the same machine, project, tool and pinned value, made by the user who owns the machine
-    /// now, in its workspace, not revoked and not ended, and the machine active and not strict.
+    /// now, in its workspace, not revoked and not ended, and the machine active and not strict. A path tool's request matches only inside the
+    /// project's access (<see cref="ApprovalRuleAccess"/>).
     /// </summary>
-    public static async Task<ApprovalRule?> MatchAsync(PodiumDb db, Agent agent, Guid? repoId, string toolName, JsonElement input, DateTimeOffset now,
-        CancellationToken ct)
+    public static async Task<ApprovalRule?> MatchAsync(PodiumDb db, Agent agent, Guid? repoId, string toolName, JsonElement input, string? accessScope,
+        DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(agent);
         if (agent.Status != AgentStatuses.Active || Strict(agent) || ScopeOf(toolName, input) is not { } scope) return null;
+        if (!await new ApprovalRuleAccess(db).AllowsAsync(agent, repoId, toolName, input, accessScope, ct)) return null;
         return await db.ApprovalRules
             .Where(r => r.AgentId == agent.Id && r.UserId == agent.UserId && r.WorkspaceId == agent.WorkspaceId && r.RepoId == repoId
                 && r.ToolName == scope.Tool && r.Command == scope.Command && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now))

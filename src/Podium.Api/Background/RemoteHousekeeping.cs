@@ -160,5 +160,13 @@ public static class RemoteHousekeeping
                             where x.State == AlertStates.Resolved && x.ResolvedAt < now.AddDays(-s.RetentionDays)
                             select x.Id).Take(Batch).ToListAsync(ct);
         if (alerts.Count > 0) await db.MachineAlerts.Where(x => alerts.Contains(x.Id)).ExecuteDeleteAsync(ct);
+
+        // An approval rule holds a command a session ran: one not used (or made) within the workspace's retention goes with it, so an always
+        // rule nobody uses keeps no command longer than the sessions it came from (ADR-0019 §9b).
+        var unused = await (from r in db.ApprovalRules.AsNoTracking()
+                            join s in db.WorkspaceSettings.AsNoTracking() on r.WorkspaceId equals s.WorkspaceId
+                            where (r.LastUsedAt ?? r.CreatedAt) < now.AddDays(-s.RetentionDays)
+                            select r.Id).Take(Batch).ToListAsync(ct);
+        if (unused.Count > 0) await db.ApprovalRules.Where(r => unused.Contains(r.Id)).ExecuteDeleteAsync(ct);
     }
 }

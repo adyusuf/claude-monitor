@@ -35,7 +35,7 @@ public static class UpdateCommand
             return 2;
         }
 
-        var identity = Identity.Load(config);
+        var identity = Identity.Find(config) ?? Identity.None;
         if (!identity.Connected)
         {
             await stderr.WriteLineAsync(Strings.T(Msg.UpdateNotConnected));
@@ -136,6 +136,11 @@ public static class UpdateCommand
         if (args.Length >= 2 && args[1] == "projects")
         {
             return await ProjectsAsync(args, config, stdout, stderr);
+        }
+
+        if (args.Length >= 2 && args[1] == Access.AccessCommand.Verb)
+        {
+            return await Access.AccessCommand.RunAsync(args, config, stdout, stderr);
         }
 
         await stderr.WriteLineAsync(Strings.T(Msg.ConfigUsage));

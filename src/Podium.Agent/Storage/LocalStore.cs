@@ -59,6 +59,9 @@ public sealed partial class LocalStore : IDisposable
         CreateFolderTables();
         AddColumnIfMissing("session_inboxes", "tools", "TEXT"); // a database made before the names of a session's tools were kept (ADR-0013)
         AddColumnIfMissing("session_inboxes", "permission_mode", "TEXT"); // a database made before the mode of a session was kept (ADR-0008 §3f)
+        AddColumnIfMissing("exec_runs", "refused_by", "TEXT"); // a database made before an access layer's refusal was reported (ADR-0020 §4)
+        AddColumnIfMissing("exec_runs", "access_version", "INTEGER");
+        CreateAccessTables();
     }
 
     /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>

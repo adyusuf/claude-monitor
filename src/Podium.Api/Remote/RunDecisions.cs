@@ -57,7 +57,8 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
             if (needsCode && user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
             // Off a strict target a code accepted on this sign-in in the last minutes stands in for one (ADR-0008 §9.13a); the run is then not
             // marked as approved with a code, so a target that turns strict before it starts still refuses it.
-            codeWindow = user.TotpEnabledAt is not null && !needsCode && await RemoteChecks.RecentCodeAsync(http, db, config, clock);
+            codeWindow = user.TotpEnabledAt is not null && !needsCode && await RemoteChecks.RecentCodeAsync(http, db, config, clock)
+                && RemoteChecks.Passed(http, ReauthWays.CodeWindow);
             if (user.TotpEnabledAt is not null && !codeWindow)
             {
                 if (!await RemoteChecks.CodeAsync(http, db, config, user, req.Code, now))
@@ -79,7 +80,11 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
                 .Where(k => k.UserId == userId && k.Fingerprint == req.KeyId && k.RetiredAt == null).Select(k => k.PublicKey).FirstOrDefaultAsync(ct);
             var key = ApprovalSigning.FromBase64(registered);
             var bytes = ApprovalSigning.FromBase64(sig);
-            if (key is null || bytes is null || !ApprovalSigning.Verify(key, ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt), bytes))
+            // A run with a repository is signed with it (payload v2, ADR-0020 §4 rule 6), so the server cannot relabel it and change its access policy.
+            var payload = run.ProjectKey is { Length: > 0 } projectKey
+                ? ApprovalSigning.PayloadV2(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt, projectKey)
+                : ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt);
+            if (key is null || bytes is null || !ApprovalSigning.Verify(key, payload, bytes))
             {
                 return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ApprovalErrors.Invalid);
             }

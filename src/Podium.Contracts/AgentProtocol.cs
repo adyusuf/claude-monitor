@@ -71,8 +71,10 @@ public static class DeviceTokenErrors
 
 /// <summary>A tool call waiting for a person's answer, sent the moment the harness asks.</summary>
 /// <param name="InlineAnswer">True when the agent reads <see cref="PermissionRequestCreated.Answer"/>; only then may an approval rule answer at once (ADR-0019 §8).</param>
+/// <param name="AccessScope">For a path tool, where its path lies against the session's project access layers (<see cref="AccessScopes"/>); null from an older agent.</param>
 public sealed record PermissionRequestCreate(
-    string HarnessKind, string SessionExternalId, string ToolName, JsonElement ToolInput, int WaitSeconds, bool InlineAnswer = false);
+    string HarnessKind, string SessionExternalId, string ToolName, JsonElement ToolInput, int WaitSeconds, bool InlineAnswer = false,
+    string? AccessScope = null);
 
 /// <param name="Answer">The answer when an approval rule allowed the request at once (ADR-0019 §7); null when the owner is asked.</param>
 public sealed record PermissionRequestCreated(Guid Id, DateTimeOffset ExpiresAt, PermissionAnswerMessage? Answer = null);
@@ -96,9 +98,11 @@ public sealed record PermissionAnswerMessage(Guid Id, string SessionExternalId, 
 public sealed record CommandStatusUpdate(string Status, string? Result, DateTimeOffset? At = null, string? Transport = null);
 
 /// <summary>What the agent must know of its workspace's settings before it captures anything. AgentUpdate is the most the workspace lets an agent do about updating itself; ClaudeUpdate whether it may update Claude Code on the machine (ADR-0006).</summary>
+/// <param name="AccessPolicyStamp">Changes whenever the access policies for this agent's repositories change, so it fetches them again (ADR-0020 §4).</param>
+/// <param name="EnforceAccessPolicies">The workspace switch: a run whose repository has no policy, or that names none, gets the default.</param>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, string AgentUpdate = UpdateModes.Off,
     bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false, bool ShareServices = false, string? ClaudeAutoMode = null, string? ClaudeAutoProject = null,
-    bool ShareInventory = false);
+    bool ShareInventory = false, string? AccessPolicyStamp = null, bool EnforceAccessPolicies = false);
 
 public static class AgentStreamEvents
 {

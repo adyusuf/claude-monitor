@@ -21,6 +21,7 @@ internal static class PodiumDbModel
         PodiumDbModelSprints.Configure(b);
         PodiumDbModelIntegrations.Configure(b);
         PodiumDbModelServerSettings.Configure(b);
+        PodiumDbModelAccess.Configure(b);
         b.Entity<HarnessKind>().HasData(new HarnessKind
         {
             Code = "claude_code",

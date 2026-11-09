@@ -173,6 +173,9 @@ public sealed class WorkspaceSettings
 
     /// <summary>Whether agents of this workspace may update Claude Code itself on their machines (when idle, with a countdown; ADR-0006); off until an admin says otherwise.</summary>
     public bool ClaudeUpdate { get; set; }
+
+    /// <summary>ADR-0020 §4 rule 4: a run whose repository has no access policy, or that names none, gets the default; off until an admin says otherwise.</summary>
+    public bool EnforceAccessPolicies { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
 }

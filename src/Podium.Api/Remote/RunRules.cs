@@ -17,6 +17,9 @@ public static class RunRules
     public const string BadTimeout = "invalid_timeout";
     public const string BadReason = "invalid_reason";
     public const string BadProject = "invalid_project";
+
+    /// <summary>The run names a repository its target does not report (ADR-0020 §4): the key decides the access policy, so it must be the target's.</summary>
+    public const string UnknownProject = "invalid_project_key";
     public const string BadKind = "invalid_kind";
     public const string InvalidScript = RemoteErrors.InvalidScript;
     public const string InvalidInterpreter = RemoteErrors.InvalidInterpreter;

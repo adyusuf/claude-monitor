@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
+using Podium.Contracts;
 
 namespace Podium.Agent.Capture;
 
@@ -81,27 +81,7 @@ public sealed partial record ProjectInfo(string Key, string Name, string? Branch
     }
 
     /// <summary>"git@GitHub.com:Org/Repo.git" and "https://user:pw@github.com/Org/Repo" both become "github.com/Org/Repo".</summary>
-    internal static string? NormalizeRemote(string url)
-    {
-        var m = ScpLike().Match(url);
-        string host, path;
-        if (m.Success)
-        {
-            (host, path) = (m.Groups["host"].Value, m.Groups["path"].Value);
-        }
-        else if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Host.Length > 0)
-        {
-            (host, path) = (uri.Host, uri.AbsolutePath);
-        }
-        else
-        {
-            return null;
-        }
-
-        path = path.Trim('/');
-        if (path.EndsWith(".git", StringComparison.OrdinalIgnoreCase)) path = path[..^4];
-        return path.Length == 0 ? null : $"{host.ToLowerInvariant()}/{path}";
-    }
+    internal static string? NormalizeRemote(string url) => RepoKeys.NormalizeRemote(url);
 
     internal static string? HeadBranch(string headPath)
     {
@@ -113,7 +93,4 @@ public sealed partial record ProjectInfo(string Key, string Name, string? Branch
 
     private static string Hash(string path) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)))[..16];
-
-    [GeneratedRegex(@"^(?:[\w.\-]+@)?(?<host>[\w.\-]+):(?!//)(?<path>.+)$")]
-    private static partial Regex ScpLike();
 }

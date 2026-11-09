@@ -143,8 +143,8 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         var store = Credentials.For(config);
         store.Delete(Credentials.Access);
         store.Delete(Credentials.Refresh);
-        var identity = Identity.Load(config);
-        (identity with { AgentId = null, WorkspaceId = null }).Save(config);
+        var identity = Identity.ForEdit(config);
+        if (File.Exists(config.IdentityPath)) (identity with { AgentId = null, WorkspaceId = null }).Save(config);
         ForgetWorkspaceSettings();
         await output.WriteLineAsync(Strings.T(Msg.LogoutDone));
         return 0;
@@ -163,6 +163,10 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
         {
             local.Remove(key);
         }
+
+        // The access policies and the role the old workspace gave this machine are not the new one's (ADR-0020 §4).
+        local.ForgetAccessPolicies();
+        local.Remove(Access.AccessLayers.StrictKey);
     }
 
     private static bool OpenBrowser(string url)

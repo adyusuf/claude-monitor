@@ -214,6 +214,10 @@ See `SETUP.md`, "Job schedules, signed approvals and a separate run account". In
 schedule on machines that are not production or a database; a machine whose admin pinned owner keys runs only what such a key signed; a service agent can start runs as a second unprivileged account. The host checks nobody has run are in
 `docs/adr-0008-host-checks.md`; the ones for ADR-0010 (a real sudo run account, Windows and Linux) are listed in ADR-0010 §8.
 
+## 10. Folder and application access: the ceiling and the web policies (ADR-0020)
+
+The ceiling, the web policies of a project, the default and their known limits: [remote-work-access.md](remote-work-access.md).
+
 ## Residual risks (ADR-0005, "Consequences" and "Open")
 
 Read these before turning `shell` or a wide ceiling on:

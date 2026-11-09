@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 
 namespace Podium.Agent.Exec;
 
-/// <summary>The owner and link count of a file or folder, which .NET does not expose; null where libc cannot tell.</summary>
-internal readonly record struct UnixFileStat(uint OwnerUid, ulong LinkCount);
+/// <summary>The owner, link count and identity (device and inode) of a file or folder, which .NET does not expose; null where libc cannot tell.</summary>
+internal readonly record struct UnixFileStat(uint OwnerUid, ulong LinkCount, ulong Device = 0, ulong Inode = 0);
 
 /// <summary>
 /// stat(2) read from a raw buffer: struct stat has no managed definition and its layout depends on the OS and the CPU.
@@ -24,6 +24,10 @@ internal static unsafe partial class UnixFileInfo
     private const int LinuxX64ModeOffset = 24;
     private const int LinuxArm64ModeOffset = 16;
     private const int PermissionBits = 0x1FF;
+
+    // st_dev leads every known layout; st_ino follows at 8 (macOS: a 32-bit dev_t, then mode and nlink, then the 64-bit inode).
+    private const int DeviceOffset = 0;
+    private const int InodeOffset = 8;
 
     public static UnixFileStat? TryGet(string path)
     {
@@ -56,17 +60,20 @@ internal static unsafe partial class UnixFileInfo
         var arm64 = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
         if (OperatingSystem.IsMacOS() && (arm64 || RuntimeInformation.ProcessArchitecture == Architecture.X64))
         {
-            return new UnixFileStat(Unsafe.ReadUnaligned<uint>(buffer + MacOsUidOffset), Unsafe.ReadUnaligned<ushort>(buffer + MacOsLinkCountOffset));
+            return new UnixFileStat(Unsafe.ReadUnaligned<uint>(buffer + MacOsUidOffset), Unsafe.ReadUnaligned<ushort>(buffer + MacOsLinkCountOffset),
+                Unsafe.ReadUnaligned<uint>(buffer + DeviceOffset), Unsafe.ReadUnaligned<ulong>(buffer + InodeOffset));
         }
 
         if (OperatingSystem.IsLinux() && arm64)
         {
-            return new UnixFileStat(Unsafe.ReadUnaligned<uint>(buffer + LinuxArm64UidOffset), Unsafe.ReadUnaligned<uint>(buffer + LinuxArm64LinkCountOffset));
+            return new UnixFileStat(Unsafe.ReadUnaligned<uint>(buffer + LinuxArm64UidOffset), Unsafe.ReadUnaligned<uint>(buffer + LinuxArm64LinkCountOffset),
+                Unsafe.ReadUnaligned<ulong>(buffer + DeviceOffset), Unsafe.ReadUnaligned<ulong>(buffer + InodeOffset));
         }
 
         if (OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.X64)
         {
-            return new UnixFileStat(Unsafe.ReadUnaligned<uint>(buffer + LinuxX64UidOffset), Unsafe.ReadUnaligned<ulong>(buffer + LinuxX64LinkCountOffset));
+            return new UnixFileStat(Unsafe.ReadUnaligned<uint>(buffer + LinuxX64UidOffset), Unsafe.ReadUnaligned<ulong>(buffer + LinuxX64LinkCountOffset),
+                Unsafe.ReadUnaligned<ulong>(buffer + DeviceOffset), Unsafe.ReadUnaligned<ulong>(buffer + InodeOffset));
         }
 
         return null;

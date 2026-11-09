@@ -11,6 +11,7 @@ import { useCommandRows } from "./useCommandRows";
 import { Icon } from "../components/icons";
 import { ChatCard } from "./ChatView";
 import { EventsCard } from "./SessionEvents";
+import { SessionAccessLine } from "./SessionAccessLine";
 import { SubagentsCard } from "./SubagentsCard";
 
 /** One session: what it is doing, what it cost, what waits for a person, and its activity. */
@@ -62,6 +63,7 @@ export function SessionPage() {
             <span><Icon name="machines" /> {s.hostname}</span>
             <span><Icon name="members" /> {s.ownerName}</span>
             <span>{t("session.started")}: {dateTime(s.startedAt)}</span>
+            <SessionAccessLine ws={ws} projectKey={s.projectKey} />
           </div>
         </div>
         <div className="head-side">

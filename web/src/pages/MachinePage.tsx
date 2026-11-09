@@ -17,6 +17,7 @@ import { TagsEditor } from "./MachineTagsEditor";
 import { MachineActions } from "./MachineActions";
 import { MachineClaude } from "./MachineClaude";
 import { MachineInventory } from "./MachineInventory";
+import { MachineAccess } from "./MachineAccess";
 import { MachineAsks } from "./MachineAsks";
 import { MachineProjects } from "./MachineProjects";
 import { MachineRoleEditor } from "./MachineRoleEditor";
@@ -97,6 +98,7 @@ export function MachinePage() {
           ) : null}
           <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
           <Card title={t("machines.projects.title")}><MachineProjects projects={data.detail.projects} agentId={agentId} owned={data.owned} onStarted={() => void reload()} /></Card>
+          {data.detail.access ? <Card title={t("access.machineTitle")}><MachineAccess ws={ws} access={data.detail.access} /></Card> : null}
         </>
       ) : null}
 

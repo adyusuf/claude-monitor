@@ -67,58 +67,7 @@ pair and marks the old one `replaced_by`; a reused, already-replaced refresh tok
 
 ## 3b. Remote work ([ADR-0005](adr-0005-remote-work.md))
 
-| Table | Columns | Keys and indexes |
-|---|---|---|
-| `machine_metrics` | `agent_id`, `sampled_at`, `workspace_id`, `received_at`, `cpu_pct`, `mem_used_bytes`, `mem_total_bytes`, `disks` `jsonb` (at most 16 `{mount, usedBytes, totalBytes}`) | PK (`agent_id`, `sampled_at`); BRIN (`sampled_at`) |
-| `machine_alerts` | `id`, `workspace_id`, `agent_id`, `kind` (`cpu`, `memory`, `disk`, `offline`), `subject` (the mount, or `''`), `state` (`open`, `resolved`), `threshold_pct`, `last_value`, `peak_value`, `opened_at`, `updated_at`, `resolved_at` | UNIQUE (`agent_id`, `kind`, `subject`) WHERE `state = 'open'`; (`workspace_id`, `opened_at` DESC, `id` DESC) |
-| `remote_runs` | `id`, `workspace_id`, `requester_agent_id`, `requester_user_id`, `requester_session_id`, `target_agent_id`, `target_user_id`, `client_key`, `mode` (`argv`, `shell`), `argv` `text[]`, `shell_command`, `cwd`, `resolved_exe`, `timeout_seconds` (1-3600), `reason`, `status` (`pending_approval`, `approved`, `delivered`, `running`, `succeeded`, `failed`, `timed_out`, `denied`, `expired`, `cancelled`), `created_at`, `expires_at`, `decided_at`, `decided_by`, `delivered_at`, `started_at`, `ended_at`, `exit_code`, `error`, `output_bytes`, `output_truncated`, `grant_id`, `job_id` | UNIQUE (`requester_agent_id`, `client_key`); (`target_agent_id`, `status`) WHERE live; (`target_user_id`, `created_at`) WHERE `status = 'pending_approval'`; (`target_agent_id`, `created_at` DESC, `id` DESC); (`workspace_id`, `created_at` DESC) |
-| `remote_run_output` | `run_id`, `seq`, `stream` (`stdout`, `stderr`), `body`, `bytes` (1-65536), `gap_before`, `received_at` | PK (`run_id`, `seq`) |
-| `machine_grants` | `id`, `workspace_id`, `target_agent_id`, `owner_user_id`, `grantee_user_id`, `grantee_agent_id`, `requested_by_agent_id`, `template` `text[]`, `cwd`, `template_hash`, `reason`, `status` (`requested`, `active`, `denied`, `revoked`, `expired`), `created_at`, `expires_at` (at most 90 days), `decided_at`, `decided_by`, `revoked_at`, `revoked_by`, `use_count`, `last_used_at` | (`target_agent_id`, `grantee_user_id`) WHERE `status = 'active'`; UNIQUE (`target_agent_id`, `grantee_user_id`, `template_hash`) WHERE `status IN ('requested', 'active')` |
-| `machine_jobs` | `id`, `workspace_id`, `target_agent_id`, `owner_user_id`, `name`, `name_search`, `argv` `text[]`, `cwd`, `timeout_seconds`, `status` (`proposed`, `active`, `denied`, `retired`), `proposed_by_user_id`, `proposed_by_agent_id`, `created_at`, `decided_at`, `decided_by`, `retired_at` | UNIQUE (`target_agent_id`, `name_search`) WHERE `status IN ('proposed', 'active')` |
-
-`workspace_settings` gains `alert_cpu_pct`, `alert_memory_pct`, `alert_disk_pct` (default 90, 1-100),
-`alert_sustain_seconds` (default 300, 60-86400) and `remote_runs_enabled` (default false). New columns carry
-database defaults, so an older API keeps inserting rows.
-
-**Script runs (ADR-0008 phase 2, migration `ScriptRuns`).** `remote_runs.mode` gains `script` (the mode CHECK and the shape CHECK are dropped and
-re-added: a script run has no `argv`, `shell_command` or `cwd`; an emptied run keeps its shape), and the table gains `script_interpreter`
-(`sh`, `bash`, `powershell`, `python`; CHECK), `script_body` (text; emptied on account deletion, exported), `script_args` `text[]`,
-`target_environment` and `target_function` (the effective role frozen at creation, part of the approval hash), `approved_with_totp`
-(boolean, default false), `output_cap` (bytes, 1-64 MiB, the workspace limit frozen at creation; NULL for argv and shell runs) and the
-output account: `output_read_bytes`, `output_dropped_bytes` (as the target reports them), `output_refused_bytes`, `output_missing_from_seq`
-(what the server refused over the cap, always one range from a chunk on), `output_chunks` and `output_complete` (NULL for argv and shell
-runs; true only when nothing was dropped, refused or stopped at the read limit). `workspace_settings.script_output_max_bytes` (default 8 MiB;
-CHECK 1-64 MiB; set by an admin in the remote settings).
-
-**Files and stdin on a script run (ADR-0010 §2, migration `ScriptRunFiles`).** `remote_runs` gains `script_files_json` (jsonb: the run's text files as `[{path, text}]`, sorted by path; null for none) and `script_stdin` (text; null for none), with a CHECK that only a `script` run carries either. The
-hash of a run with files or stdin uses the tag `script2`; one without keeps `script1` and its old bytes. `agents.capabilities` may now contain `script_files`, which an agent reports when it writes a script's files and stdin; the API refuses a run with either to an agent that does not (`files_unsupported`).
-Both columns are cleared by account deletion and included in the export.
-
-**Asks across machines (ADR-0008 phase 3, migration `MachineAsks`).** `agents` gains `accepts_asks` (boolean, default false: the machine owner's opt-in),
-`accepts_asks_set_at` and `accepts_asks_set_by` (FK users). New table `machine_asks`: `id`, `workspace_id`, `requester_agent_id`, `requester_user_id`,
-`requester_session_id` (FK sessions), `target_agent_id`, `target_user_id`, `target_session` (the Claude session that received it), `client_key`,
-`project_key`, `question` (1-8000; NULL once emptied), `status` (`queued`, `delivered`, `answered`, `no_idle_session`, `not_accepting`, `no_answer`,
-`expired`, `cancelled`; CHECK), `answer` (≤ 100 000; NULL once emptied), `answer_truncated`, `error`, `created_at`, `expires_at`, `received_at` (migration `AskReceivedAt`: when the target daemon said it holds the ask; the status stays `queued`), `delivered_at`,
-`answered_at`, `ended_at`; CHECKs `requester_user_id = target_user_id` and `requester_agent_id <> target_agent_id`; UNIQUE (`requester_agent_id`,
-`client_key`); indexes on (`target_agent_id`, `status`) WHERE open, (`requester_agent_id`, `created_at`) and (`workspace_id`, `created_at` DESC). The
-question and the answer are personal data like a command: exported (`asks`), emptied on account deletion and the rows deleted after `retention_days`
-past their end; the audit rows name an ask by id only. Every transition is a compare-and-set; the housekeeping loop expires a queued ask after 30 minutes (2 before 19/10/2026)
-and a delivered one after 15 without an answer, and member removal, an agent move or revoke, the opt-in turning off and the workspace switch turning off
-cancel the open ones.
-
-**Agent actions (ADR-0005 amendment, migration `AgentActions`).** New table `agent_actions`: `id`, `workspace_id`, `agent_id` (FK agents), `requested_by` (FK users, the machine's owner),
-`kind` (`restart`, `update_check`, `update`, `status`; CHECK), `status` (`queued`, `delivered`, `succeeded`, `failed`, `expired`; CHECK, default `queued`), `result` (the agent's text, ≤ 2000;
-it can name the machine's folders, so it is exported to its requester and emptied on account deletion), `created_at`, `expires_at` (created + 10 minutes), `delivered_at`, `finished_at`;
-UNIQUE (`agent_id`, `kind`) WHERE status IN ('queued', 'delivered') (one open action of a kind per agent) and an index on (`agent_id`, `created_at` DESC, `id` DESC). Every transition is a
-compare-and-set (`queued → delivered → succeeded | failed`; an open action past `expires_at` becomes `expired`); finished rows are deleted after `retention_days` by the housekeeping loop.
-
-- **Transitions are compare-and-set** (`UPDATE … WHERE status = <expected>`); a run, its audit row and a grant's
-  use count change in one transaction; the API publishes to the stream after commit.
-- **Output** is masked by the target, at most 1 MB per run (checked atomically with the chunk insert), never logged,
-  and never carries a NUL byte. Audit rows name a run by id and command hash, not its argv.
-- **Retention:** metrics 7 days; runs with their output, and resolved alerts, after `retention_days`; deletes run in
-  batches. Grants and jobs are configuration: retired, never deleted. Removing a member or moving an agent revokes
-  its grants, retires its jobs, resolves its alerts and cancels its open runs.
+The remote-work tables (ADR-0005, ADR-0010): [data-model-remote.md](data-model-remote.md).
 
 ## 4. Sessions and what they report
 
@@ -151,7 +100,7 @@ compare-and-set (`queued → delivered → succeeded | failed`; an open action p
 |---|---|---|
 | `session_commands` | `id`, `workspace_id`, `session_id`, `agent_id`, `kind` (`prompt`, `stop`), `body`, `created_by`, `created_at`, `expires_at`, `status` (`queued`, `delivered`, `applied`, `failed`, `expired`, `cancelled`), `delivered_at`, `applied_at`, `result`, `transport` (`hook`, `inbox`, `channel`; nullable: how an applied command reached its session, as the agent reported it; on a `delivered` command `inbox` or `channel` means it was written into the session and not shown yet) | (`agent_id`, `status`) WHERE `status IN ('queued', 'delivered')`; (`session_id`, `created_at` DESC) |
 
-| `permission_requests` | `id`, `workspace_id`, `session_id`, `agent_id`, `tool_name`, `tool_input` `jsonb`, `status` (`open`, `answered`, `expired`), `created_at`, `expires_at`, `decision` (`allow`, `deny`), `reason`, `answered_by`, `answered_at`, `answered_by_rule` (the approval rule that allowed it at once; ADR-0019) | (`session_id`, `status`) |
+| `permission_requests` | `id`, `workspace_id`, `session_id`, `agent_id`, `tool_name`, `tool_input` `jsonb`, `status` (`open`, `answered`, `expired`), `created_at`, `expires_at`, `decision` (`allow`, `deny`), `reason`, `answered_by`, `answered_at`, `answered_by_rule` (the approval rule that allowed it at once; ADR-0019), `repo_id` (the session's project when the request was made; a rule made from it holds this one) | (`session_id`, `status`) |
 | `approval_rules` | `id`, `workspace_id`, `user_id` (the owner), `agent_id` (FK agents), `repo_id` (the session's project; null: none), `tool_name` (≤ 200), `command` (the exact `Bash` command or file path, ≤ 2,000; null for a reading tool), `duration` (`5m`, `10m`, `30m`, `1h`, `always`; CHECK), `created_at`, `expires_at` (null exactly when `always`; CHECK), `revoked_at`, `created_from_request`, `use_count`, `last_used_at` | (`agent_id`, `tool_name`); (`user_id`, `workspace_id`). Deleted a week after it ends and with the account (ADR-0019) |
 
 The API accepts a command or a permission answer only from the session's owner (`agents.user_id` of the
@@ -304,3 +253,5 @@ ECDSA P-256 key), `fingerprint` (SHA-256 of it, hex), `created_at`, `retired_at`
 **Claude control, always (ADR-0014, migration `ClaudeAlways`).** `agents` gains `claude_auto_project` (nullable, at most 200 characters): the project key the automatic mode `always` keeps a session running in; set with the mode, NULL for every other mode, when the switch is turned off and when the machine moves workspace. `ck_agents_claude_auto_mode` now allows `always` too.
 
 **Account language (ADR-0014 Part A, migration `UserLanguage`).** `users` gains `language` (nullable, two characters, `ck_users_language` allows only `en`, `tr`, `de`): the language the person registered in or picked in the menu. Mails to them follow it (a verification mail, a reset, an invitation to an existing account); NULL means the `Accept-Language` header decides, as before. Set by `PUT /api/me/language`; `GET /api/me` returns it. Nothing is removed or retyped.
+
+**Access policies (ADR-0020 §4, migration `ProjectAccessPolicies`).** `project_access_policies` (`id`, `workspace_id`, `project_id` (FK projects, UNIQUE: one per managed project), `version` (CHECK ≥ 1; every save is the next one, a compare-and-set on the version), `document` jsonb (the policy exactly as the browser sent and may have signed it, already canonical: repo keys, per OS allowed and denied folders and applications with an optional SHA-256, the project-folder and shell flags), `document_hash` (lowercase hex SHA-256, 64), `cleared` (default false: a tombstone, the default applies again; never deleted), `signed_key_id` (≤ 64) and `signature` (≤ 128; CHECK `ck_project_access_policies_signed`: both or neither), `signed_by`, `updated_by` (FK users, ON DELETE SET NULL), `created_at`, `updated_at`; indexes on `workspace_id`, `signed_by`, `updated_by`) and `project_access_policy_keys` (`policy_id`, `project_key` (≤ 200), `workspace_id`; PK (`policy_id`, `project_key`); UNIQUE (`workspace_id`, `project_key`): a repository belongs to at most one policy, so editing an application's URL cannot move it; a cleared policy keeps its keys so its tombstone still reaches the machines, and a new policy for one of them takes the key over). `agents` gains `access_report` (jsonb, nullable: the ceiling and the state of each delivered policy, as the agent's last profile said, cleaned and capped; NULL from an older agent) and `access_report_at`; both are cleared when the machine moves workspace and when its user's account is deleted. `permission_requests` gains `access_scope` (nullable, CHECK `ck_permission_requests_access_scope`: `inside`, `outside`, `unknown`; where the agent found a path tool's path against the session's project access; NULL from an older agent, and then no path approval rule is made or matched). `workspace_settings` gains `enforce_access_policies` (boolean, default false). `remote_runs` gains `refused_by` (nullable, CHECK `ck_remote_runs_refused_by`: `ceiling`, `policy`, `default`) and `access_version` (nullable, CHECK ≥ 1): which access layer refused the run on its target and that policy's version, set only with an `access_` error. Audit actions `access_policy.updated`, `access_policy.cleared` (counts and flags, never a path), `workspace.access_enforcement_changed` and `run.access_refused` (`runId`, `code`, `refusedBy`, `version`, `projectKey`). Only new tables, nullable or defaulted columns, CHECKs and indexes: additive.

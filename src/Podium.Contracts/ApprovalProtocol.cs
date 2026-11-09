@@ -32,11 +32,19 @@ public static class ApprovalErrors
 public static class ApprovalSigning
 {
     public const string Tag = "ap-approval-v1";
+    public const string TagV2 = "ap-approval-v2";
     public const string KindRun = "run";
 
     /// <summary>The exact bytes signed: a tag, the kind, the run's id, the target agent, the run's hash and the signed expiry in whole Unix seconds, one per line.</summary>
     public static byte[] Payload(string kind, Guid id, Guid targetAgentId, string hash, DateTimeOffset notAfter) =>
         Encoding.UTF8.GetBytes($"{Tag}\n{kind}\n{id:D}\n{targetAgentId:D}\n{hash}\n{notAfter.ToUnixTimeSeconds()}");
+
+    /// <summary>
+    /// Version 2 (ADR-0020 §4 rule 6): the lines of <see cref="Payload"/> under its own tag, then the run's repository key, which decides the run's access
+    /// policy, so the server cannot relabel a run after it was signed. A run that names no repository signs an empty last line.
+    /// </summary>
+    public static byte[] PayloadV2(string kind, Guid id, Guid targetAgentId, string hash, DateTimeOffset notAfter, string? projectKey) =>
+        Encoding.UTF8.GetBytes($"{TagV2}\n{kind}\n{id:D}\n{targetAgentId:D}\n{hash}\n{notAfter.ToUnixTimeSeconds()}\n{projectKey}");
 
     /// <summary>Lowercase hex SHA-256 of the key's SubjectPublicKeyInfo: what the web shows and a person compares with what the machine shows.</summary>
     public static string Fingerprint(ReadOnlySpan<byte> spki) => Convert.ToHexStringLower(SHA256.HashData(spki));

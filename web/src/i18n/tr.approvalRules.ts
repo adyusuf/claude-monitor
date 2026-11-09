@@ -11,7 +11,7 @@ export const trApprovalRules: Dictionary["approvalRules"] = {
   session: "Oturum", machine: "Makine", tool: "Araç", command: "Komut", input: "Girdi", expires: "Bekleme sonu", untitled: "Adsız oturum",
   remember: "Şu süre izin ver", duration: { once: "Yalnızca bu sefer", "5m": "5 dakika", "10m": "10 dakika", "30m": "30 dakika", "1h": "1 saat", always: "Her zaman" },
   rememberHint: "Süre bitene kadar bu makinede, bu projede aynı araç kendiliğinden onaylanır: Bash için yalnızca bu komutun aynısı, dosya için yalnızca bu dosya.",
-  rememberHintAlways: "Her zaman, Onaylar sayfasında geri alana kadar sürer ve kodunu sorar.",
+  rememberHintAlways: "Her zaman, Onaylar sayfasında geri alana ya da çalışma alanının oturumları sakladığı süre boyunca kullanılmayana kadar sürer ve kodunu sorar.",
   strictNoRemember: "Production ya da database makinesi: her istek ayrı onaylanır.",
   noRemember: "Bu istek yalnızca bir kez cevaplanır: bu araç, girdi ya da dosya için geçerli onay olmaz.",
   questionOnSession: "Bir soru: oturum sayfasında cevapla.", openSession: "Oturumu aç",
@@ -19,4 +19,5 @@ export const trApprovalRules: Dictionary["approvalRules"] = {
   ends: "Bitiş", never: "geri alınana kadar", uses: "Kullanım", lastUsed: "Son kullanım", revoke: "Geri al", revokeConfirm: "Bu geçerli onay geri alınsın mı? Bir sonraki istek yine sorulur.",
   answeredBy: "Cevaplayan", byRule: "geçerli bir onay", decision: { allow: "İzin verildi", deny: "Reddedildi" }, when: "Zaman",
   anyInput: "her girdi",
+  moreLine: "+1 satır daha", moreLines: "+{n} satır daha",
 };

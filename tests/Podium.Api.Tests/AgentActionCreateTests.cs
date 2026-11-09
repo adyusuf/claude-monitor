@@ -52,9 +52,11 @@ public sealed class AgentActionCreateTests(ApiFactory api)
         await using var db = api.Db();
         var audit = await db.AuditEvents.AsNoTracking().SingleAsync(a => a.Action == "agent.action_requested" && a.TargetId == team.TargetId.ToString());
         Assert.Equal((team.WorkspaceId, team.Owner.Id, "agent"), (audit.WorkspaceId, audit.ActorUserId, audit.TargetType));
-        var detail = audit.Detail!.RootElement.EnumerateObject().ToList();
-        Assert.Equal(kind, Assert.Single(detail).Value.GetString()); // the kind and nothing else: no result, no code
-        Assert.Equal("kind", detail[0].Name);
+        var detail = audit.Detail!.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString());
+        // The kind and how re-authentication passed, nothing else: no result, no code.
+        Assert.Equal(kind, detail["kind"]);
+        Assert.Subset(new HashSet<string> { "kind", "reauth" }, detail.Keys.ToHashSet());
+        if (detail.TryGetValue("reauth", out var way)) Assert.Contains(way, new[] { ReauthWays.SignIn, ReauthWays.CodeWindow, ReauthWays.Code });
 
         var onWeb = await RemoteKit.NextEventAsync(web, AgentActions.WorkspaceEvent, e => e.GetProperty("agentId").GetGuid() == team.TargetId);
         Assert.Equal((view.Id, AgentActionStatuses.Queued), (onWeb.GetProperty("id").GetGuid(), onWeb.GetProperty("status").GetString()));

@@ -6,6 +6,7 @@ import type { ProjectInput, ProjectView } from "../api/typesProjects";
 import { Button, Card, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { draftOfProject } from "../lib/projectForm";
+import { ProjectAccessCard } from "./ProjectAccessCard";
 import { ProjectActiveSprints } from "./ProjectActiveSprints";
 import { ProjectApplications } from "./ProjectApplications";
 import { ProjectDefinition } from "./ProjectDefinition";
@@ -95,6 +96,7 @@ export function ProjectPage() {
       <ProjectActiveSprints ws={ws} projectId={id} unit={project.estimationUnit} />
       <ProjectMembers projectId={id} workspaceMembers={members} canEdit={access.canEdit && !archived} />
       <ProjectApplications ws={ws} projectId={id} canEdit={access.canEditApplications && !archived} workspaceMembers={members} />
+      <ProjectAccessCard ws={ws} projectId={id} />
     </div>
   );
 }

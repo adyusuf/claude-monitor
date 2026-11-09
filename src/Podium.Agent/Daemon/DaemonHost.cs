@@ -30,7 +30,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var started = clock.GetUtcNow();
         if (!OperatingSystem.IsWindows()) _ = SetSid(); // leave the hook's process group: its end must not end us
 
-        var identity = Identity.Load(config);
+        var identity = Identity.Find(config) ?? Identity.None; // never a new machine key: only login makes one
         if (!identity.Connected)
         {
             log.Write("not connected: run `aipod login --server <url>`");
@@ -57,10 +57,12 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var metricsStore = new LocalStore(config.DatabasePath);
         var remote = new RemoteRelay(config, remoteStore, api, clock);
         var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os), inventoryReader: new ClaudeInventoryReader(config, new SystemClaudeCli()));
+        var accessSync = new Access.AccessPolicySync(config, settingsStore, api, clock);
         using var machinesStore = new LocalStore(config.DatabasePath);
         var machines = new MachineCache(config, machinesStore, api, clock);
+        var accessLayers = new Access.AccessLayers(config);
         var executor = new RunExecutor(config, clock, log,
-            run => ApprovalVerifier.Refusal(config, run, clock.GetUtcNow()) is { } refused ? ExecDecision.Refuse(refused) : ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home),
+            run => ApprovalVerifier.Refusal(config, run, clock.GetUtcNow()) is { } refused ? ExecDecision.Refuse(refused) : ExecGuard.Check(run, monitor.Policy(), AgentConfig.Os, config.Home, accessLayers),
             ExecPolicyLoader.RunningAsRoot, () => monitor.Policy().RunAccount);
         using var runs = new RunRelay(config, execStore, api, clock, executor, log);
         runs.Recover();
@@ -122,6 +124,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             {
                 await settings.SettingsAsync(ct);
                 await monitor.ProfileAsync(ct);
+                await accessSync.SyncAsync(ct); // after the profile: a failed fetch must not hold the profile back
             }, api, revoked),
             Loop("remote", config.RemotePollEvery, remote.RunOnceAsync, api, revoked),
             Loop("runs", config.FlushEvery, runs.ReportAsync, api, revoked),
