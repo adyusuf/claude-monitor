@@ -8,6 +8,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Remote;
 
+/// <summary>How a request passed re-authentication, as its audit rows record it.</summary>
+public static class ReauthWays
+{
+    /// <summary>A sign-in within the re-authentication window.</summary>
+    public const string SignIn = "sign_in";
+
+    /// <summary>A two-step code accepted on this sign-in within the code window (ADR-0008 §9.13a).</summary>
+    public const string CodeWindow = "code_window";
+
+    /// <summary>A two-step or recovery code sent with this request.</summary>
+    public const string Code = "code";
+}
+
 /// <summary>
 /// The checks grants and jobs share (ADR-0005): the re-authentication an owner's approval needs, the template check
 /// answered as a 400 with the matcher's code, and the compare-and-set cancel of the runs a revoked grant or retired job
@@ -17,6 +30,12 @@ public static class RemoteChecks
 {
     public const string ReauthRequired = "reauth_required";
     public const string InvalidReason = "invalid_reason";
+
+    /// <summary>
+    /// How this request passed re-authentication (<see cref="ReauthWays"/>), kept on the request so every audit row it writes records it
+    /// (<see cref="Security.Audit"/>).
+    /// </summary>
+    public const string ReauthItem = "podium.reauth";
 
     private static readonly string[] Open =
         [RunStatuses.PendingApproval, RunStatuses.Approved, RunStatuses.Delivered, RunStatuses.Running];
@@ -34,10 +53,10 @@ public static class RemoteChecks
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(db);
-        if (await PrivacyEndpoints.RecentSignInAsync(http, db, config, clock)) return true;
+        if (await PrivacyEndpoints.RecentSignInAsync(http, db, config, clock)) return Passed(http, ReauthWays.SignIn);
         var user = await db.Users.FirstAsync(u => u.Id == userId, http.RequestAborted);
         if (user.TotpEnabledAt is null) return false;
-        if (window && await RecentCodeAsync(http, db, config, clock)) return true;
+        if (window && await RecentCodeAsync(http, db, config, clock)) return Passed(http, ReauthWays.CodeWindow);
         return await CodeAsync(http, db, config, user, code, clock.GetUtcNow());
     }
 
@@ -73,6 +92,12 @@ public static class RemoteChecks
             session.CodeCheckedAt = now;
         }
 
+        return Passed(http, ReauthWays.Code);
+    }
+
+    private static bool Passed(HttpContext http, string way)
+    {
+        http.Items[ReauthItem] = way;
         return true;
     }
 
