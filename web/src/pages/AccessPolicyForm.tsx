@@ -81,7 +81,7 @@ export function AccessPolicyForm({ view, ws, onSaved, onConflict, onCancel }: {
         ))}
       </div>
       <div role="tabpanel" aria-label={t(`access.os.${os}`)}>
-        <AccessPathRows key={os} os={os} rules={sectionOf(draft, os)} onChange={(rules) => setDraft(withSection(draft, os, rules))} />
+        <AccessPathRows key={os} os={os} rules={sectionOf(draft, os)} projectFolder={draft.includeProjectFolder} onChange={(rules) => setDraft(withSection(draft, os, rules))} />
       </div>
       {interpreter ? <div className="notice notice-error" role="alert">{t("access.interpreterWarning")}</div> : null}
       <label className="check">

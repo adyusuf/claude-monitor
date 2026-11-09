@@ -9,10 +9,12 @@ export const enAccess = {
   version: "Version {version}", signed: "Signed", signedBy: "Signed by {name}", unsigned: "Not signed",
   keys: "Repositories", keysHint: "The repositories this policy covers, from the addresses of the project's applications. A repository belongs to one policy at most.",
   noCandidates: "No application of this project has a repository address yet. Add one to an application first.", noKeys: "No repository is listed.",
+  nearKeys: "The machines report these repositories spelled differently (letter case or Unicode form). The policy still covers them: repository keys are compared without case.",
   projectFolder: "Allow the project's own folder on each machine", projectFolderHint: "Wherever a machine has a checkout of one of these repositories, runs may use it.",
-  projectFolderShort: "Project folder", projectFolderIncluded: "Plus the project's own folder on this machine.", allowed: "allowed", notAllowed: "not allowed",
+  projectFolderShort: "Project folder", allowed: "allowed", notAllowed: "not allowed",
   osTabs: "Operating system", os: { linux: "Linux", macos: "macOS", windows: "Windows" },
   allowedFolders: "Allowed folders", allowedHint: "A run may only use these folders and what is below them. Empty: no folder limit from this policy.",
+  allowedHintProject: "A run may only use the project's own folder and these folders, with what is below them. Empty: only the project's own folder.",
   deniedFolders: "Denied folders", deniedHint: "A run may never use these folders, even inside an allowed one.",
   applications: "Applications", applicationsHint: "A run may only start these programs, by full path. Empty: no application limit from this policy.",
   sha256: "SHA-256 (optional)", addAllowed: "Add an allowed folder", addDenied: "Add a denied folder", addApplication: "Add an application", remove: "Remove",
@@ -31,7 +33,7 @@ export const enAccess = {
   save: "Save the policy", saved: "Saved.", savedSigned: "Saved and signed.",
   reloaded: "Someone saved a newer version first. It is shown now: make your change again.",
   clear: "Take the policy back", clearConfirm: "Take this policy back? Runs in these repositories get the default again where it applies.",
-  noFolderLimit: "no folder limit", noneDenied: "none", noAppLimit: "no application limit",
+  noFolderLimit: "no folder limit", onlyProjectFolder: "only the project's own folder", plusProjectFolder: "Plus the project's own folder.", noneDenied: "none", noAppLimit: "no application limit",
   machineTitle: "Access", machineIntro: "What remote runs may reach on this machine: its own limit narrowed by each project's policy.", reportedAt: "Reported {at}.",
   agentTooOld: "This machine's agent is too old to apply access policies: runs there are limited only by its own settings. Update the agent.",
   defaultAppliesOn: "A run without a policy gets the default here: the project's own folder, programs only, no shell and no script.",
@@ -66,7 +68,7 @@ export const enAccess = {
   },
 };
 
-/** The API's codes for a refused policy save, as `errors.<code>` (useErrorText reads them there). */
+/** The API's access codes (a refused policy save, a standing approval outside the policy, a bad key on by-key), as `errors.<code>` (useErrorText reads them there). */
 export const enAccessErrors = {
   policy_malformed: "The policy is incomplete.", policy_format: "This policy format is not known.",
   policy_keys: "Pick 1 to 20 repositories, each 1 to 200 characters without hidden characters.",
@@ -77,4 +79,6 @@ export const enAccessErrors = {
   policy_sha256: "A SHA-256 is 64 hexadecimal characters.", policy_cleared: "A policy that is taken back has no entries and no shell.",
   policy_too_large: "The policy is too large.", policy_not_canonical: "The policy was not in its exact form. Reload the page and try again.",
   access_policy_changed: "Someone saved a newer version of this policy first.", access_key_taken: "A repository you picked already belongs to another project's policy.",
+  rule_outside_access: "This path lies outside the project's access policy, so it can be allowed only this once, never remembered.",
+  invalid_project_key: "That is not a valid repository key.",
 };

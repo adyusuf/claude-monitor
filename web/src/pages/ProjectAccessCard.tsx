@@ -3,6 +3,7 @@ import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
 import { OS_KINDS, type AccessPolicyView } from "../api/typesAccess";
 import { Button, Card, Notice, Spinner } from "../components/ui";
+import { VisibleText } from "../components/VisibleText";
 import { useErrorText, useI18n } from "../i18n";
 import { sectionOf } from "../lib/accessPolicy";
 import { AccessLists } from "./AccessLists";
@@ -20,6 +21,17 @@ function PolicyState({ view }: { view: AccessPolicyView }) {
         : <span className="badge warn">{t("access.unsigned")}</span>}
       {view.document.cleared ? <span className="muted">{t("access.cleared")}</span> : null}
     </p>
+  );
+}
+
+/** Repositories the machines report spelled differently from the project's (case or Unicode form): the policy still covers them. */
+function NearKeys({ keys }: { keys: string[] }) {
+  const { t } = useI18n();
+  return (
+    <div className="notice notice-warn" role="status">
+      <p className="small">{t("access.nearKeys")}</p>
+      <ul className="plain stack-tight">{keys.map((k) => <li key={k}><code><VisibleText text={k} /></code></li>)}</ul>
+    </div>
   );
 }
 
@@ -43,7 +55,7 @@ function PolicyFacts({ view }: { view: AccessPolicyView }) {
         return (
           <section key={os} className="stack-tight" aria-label={t(`access.os.${os}`)}>
             <h3 className="subhead">{t(`access.os.${os}`)}</h3>
-            <AccessLists allowed={rules.allowedFolders} denied={rules.deniedFolders} applications={rules.applications} />
+            <AccessLists allowed={rules.allowedFolders} denied={rules.deniedFolders} applications={rules.applications} projectFolder={d.includeProjectFolder} />
           </section>
         );
       })}
@@ -97,6 +109,7 @@ export function ProjectAccessCard({ ws, projectId }: { ws: string; projectId: st
         {view === null ? (error ? null : <Spinner />) : (
           <>
             <PolicyState view={view} />
+            {view.nearKeys && view.nearKeys.length > 0 ? <NearKeys keys={view.nearKeys} /> : null}
             {view.isDefault || view.document.cleared ? <p className="muted small">{t("access.defaultHint")}</p> : null}
             {editing ? (
               <AccessPolicyForm key={view.version} view={view} ws={ws} onCancel={() => setEditing(false)}

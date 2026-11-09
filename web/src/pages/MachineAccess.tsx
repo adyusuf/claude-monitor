@@ -32,8 +32,7 @@ function PolicyRow({ ws, policy }: { ws: string; policy: MachineAccessPolicyView
         {policy.isSigned ? <span className="badge ok">{t("access.signed")}</span> : <span className="badge warn">{t("access.unsigned")}</span>}
         {policy.shell ? <span className="badge status-failed">{t("access.shellOn")}</span> : null}
       </div>
-      {policy.includeProjectFolder ? <p className="muted small">{t("access.projectFolderIncluded")}</p> : null}
-      <AccessLists allowed={policy.allowedFolders} denied={policy.deniedFolders} applications={policy.applications} />
+      <AccessLists allowed={policy.allowedFolders} denied={policy.deniedFolders} applications={policy.applications} projectFolder={policy.includeProjectFolder} />
     </li>
   );
 }

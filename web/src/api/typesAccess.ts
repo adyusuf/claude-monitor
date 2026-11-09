@@ -36,6 +36,8 @@ export interface AccessPolicyView {
   /** Machines that require signed approvals: they ignore a version nobody signed and keep their last signed one. */
   machinesRequiringSignature: number;
   canEdit: boolean;
+  /** Keys machines report that equal a candidate apart from case or Unicode form; the policy still covers them. Absent on an older API. */
+  nearKeys?: string[];
 }
 
 /** What the web sends to save a policy. keyId and signature sign version expectedVersion + 1; code is the re-authentication code. */

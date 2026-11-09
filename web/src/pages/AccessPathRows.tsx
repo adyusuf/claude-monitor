@@ -64,11 +64,13 @@ function AppRows({ os, rows, onChange }: { os: OsKind; rows: AccessApp[]; onChan
 }
 
 /** One OS's section of a policy: allowed folders, denied folders and applications. An empty list means no limit from this policy. */
-export function AccessPathRows({ os, rules, onChange }: { os: OsKind; rules: AccessOsRules; onChange: (rules: AccessOsRules) => void }) {
+export function AccessPathRows({ os, rules, projectFolder, onChange }: {
+  os: OsKind; rules: AccessOsRules; projectFolder: boolean; onChange: (rules: AccessOsRules) => void;
+}) {
   const { t } = useI18n();
   return (
     <div className="stack">
-      <FolderRows os={os} legend={t("access.allowedFolders")} hint={t("access.allowedHint")} add={t("access.addAllowed")} rows={rules.allowedFolders} allowed
+      <FolderRows os={os} legend={t("access.allowedFolders")} hint={projectFolder ? t("access.allowedHintProject") : t("access.allowedHint")} add={t("access.addAllowed")} rows={rules.allowedFolders} allowed
         onChange={(allowedFolders) => onChange({ ...rules, allowedFolders })} />
       <FolderRows os={os} legend={t("access.deniedFolders")} hint={t("access.deniedHint")} add={t("access.addDenied")} rows={rules.deniedFolders} allowed={false}
         onChange={(deniedFolders) => onChange({ ...rules, deniedFolders })} />
