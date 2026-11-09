@@ -86,7 +86,8 @@ public static partial class Cli
                 output = await new HookRunner(config, store, clock).RunAsync(hookEvent, input, CancellationToken.None);
             }
 
-            if (Identity.Load(config).Connected) DaemonHost.EnsureRunning(config, log);
+            if (Identity.Find(config) is { Connected: true }) DaemonHost.EnsureRunning(config, log);
+            else await stderr.WriteLineAsync(Strings.T(Msg.StatusNotConnected)); // no identity is made here: only login makes one
             if (output is not null) await stdout.WriteAsync(output);
         }
         catch (Exception e)
@@ -101,7 +102,7 @@ public static partial class Cli
     /// <summary>"aipod restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
     public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout, Update.IDaemonControl? control = null)
     {
-        if (!Identity.Load(config).Connected)
+        if (Identity.Find(config) is not { Connected: true })
         {
             await stdout.WriteLineAsync(Strings.T(Msg.RestartNotConnected));
             return 0;
@@ -121,7 +122,7 @@ public static partial class Cli
     public static async Task<int> StatusAsync(AgentConfig config, TextWriter stdout, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(stdout);
-        var identity = Identity.Load(config);
+        var identity = Identity.Find(config) ?? Identity.None;
         using var store = new LocalStore(config.DatabasePath);
         using var probe = DaemonHost.TryLock(config.LockPath);
         await stdout.WriteLineAsync(Strings.T(Msg.StatusHome, config.Home));

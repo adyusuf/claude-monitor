@@ -16,7 +16,7 @@ public sealed partial class Updater
         var from = AgentConfig.Version;
         var style = BinarySwap.For(config.UpdateOs);
         var wasRunning = daemon.IsRunning();
-        var connected = Auth.Identity.Load(config).Connected;
+        var connected = Auth.Identity.Find(config) is { Connected: true };
         BinarySwap.Install(config.BinaryPath, staged, style);
         UpdateState.Change(config, s => s with { Phase = UpdateState.PendingHealth, From = from, To = offer.Version, Result = UpdateCodes.Available });
         log.Write($"update: {from} -> {offer.Version} put in place, restarting the daemon");

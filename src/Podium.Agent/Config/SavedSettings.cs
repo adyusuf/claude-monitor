@@ -36,7 +36,7 @@ public static class SavedSettings
     public static AgentConfig SaveClaudeUpdate(AgentConfig config, bool on)
     {
         ArgumentNullException.ThrowIfNull(config);
-        (Identity.Load(config) with { ClaudeUpdate = on }).Save(config);
+        (Identity.ForEdit(config) with { ClaudeUpdate = on }).Save(config);
         return config with { ClaudeUpdateEnabled = on };
     }
 
@@ -45,7 +45,7 @@ public static class SavedSettings
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!UpdateModes.IsValid(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
-        (Identity.Load(config) with { AutoUpdate = mode }).Save(config);
+        (Identity.ForEdit(config) with { AutoUpdate = mode }).Save(config);
         return config with { AutoUpdate = mode };
     }
 
@@ -56,7 +56,7 @@ public static class SavedSettings
     public static AgentConfig SavePush(AgentConfig config, bool on, string? transport = null)
     {
         ArgumentNullException.ThrowIfNull(config);
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         var chosen = PushTransports.Normalize(transport ?? identity.PushTransport);
         (identity with { Push = on, PushTransport = chosen }).Save(config);
         return config with { PushEnabled = on, PushTransport = chosen };
@@ -67,7 +67,7 @@ public static class SavedSettings
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!InboxFormats.IsValid(format)) throw new ArgumentOutOfRangeException(nameof(format));
-        (Identity.Load(config) with { InboxFormat = format }).Save(config);
+        (Identity.ForEdit(config) with { InboxFormat = format }).Save(config);
         return config with { InboxFormat = format };
     }
 
@@ -80,7 +80,7 @@ public static class SavedSettings
         ArgumentNullException.ThrowIfNull(config);
         if (!MachineRoles.IsEnvironment(environment)) throw new ArgumentOutOfRangeException(nameof(environment));
         if (!MachineRoles.IsFunction(function)) throw new ArgumentOutOfRangeException(nameof(function));
-        (Identity.Load(config) with { ClaimedEnvironment = environment, ClaimedFunction = function }).Save(config);
+        (Identity.ForEdit(config) with { ClaimedEnvironment = environment, ClaimedFunction = function }).Save(config);
     }
 
     /// <summary>Saves the stop wait (0 to <see cref="AgentConfig.WaitMaxSeconds"/>) and returns the configuration that uses it.</summary>
@@ -88,7 +88,7 @@ public static class SavedSettings
     {
         ArgumentNullException.ThrowIfNull(config);
         if (seconds is < 0 or > AgentConfig.WaitMaxSeconds) throw new ArgumentOutOfRangeException(nameof(seconds));
-        (Identity.Load(config) with { StopWaitSeconds = seconds }).Save(config);
+        (Identity.ForEdit(config) with { StopWaitSeconds = seconds }).Save(config);
         return config with { StopWait = TimeSpan.FromSeconds(seconds) };
     }
 }

@@ -30,7 +30,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var started = clock.GetUtcNow();
         if (!OperatingSystem.IsWindows()) _ = SetSid(); // leave the hook's process group: its end must not end us
 
-        var identity = Identity.Load(config);
+        var identity = Identity.Find(config) ?? Identity.None; // never a new machine key: only login makes one
         if (!identity.Connected)
         {
             log.Write("not connected: run `aipod login --server <url>`");

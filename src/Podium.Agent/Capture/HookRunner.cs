@@ -159,7 +159,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
     /// </summary>
     private bool CanHearTheWeb()
     {
-        if (!Identity.Load(config).Connected) return false;
+        if (Identity.Find(config) is not { Connected: true }) return false;
         var credentials = Credentials.For(config);
         if (credentials.Read(Credentials.Refresh) is null && credentials.Read(Credentials.Access) is null) return false;
         if (!DateTimeOffset.TryParse(store.Get(Relay.LastContactKey), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind,

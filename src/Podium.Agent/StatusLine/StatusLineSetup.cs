@@ -64,7 +64,7 @@ public static class StatusLineSetup
         }
 
         var original = root["statusLine"]?.DeepClone();
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         (identity with { StatusLineBackup = original?.ToJsonString() ?? "null" }).Save(config);
         var line = new JsonObject { ["type"] = "command", ["command"] = CommandLine(config) };
         if (original is JsonObject old && old["padding"] is { } padding) line["padding"] = padding.DeepClone();
@@ -77,7 +77,7 @@ public static class StatusLineSetup
 
     private static async Task<int> OffAsync(AgentConfig config, string path, TextWriter stdout, TextWriter stderr)
     {
-        var identity = Identity.Load(config);
+        var identity = Identity.ForEdit(config);
         if (identity.StatusLineBackup is not { } backup)
         {
             await stdout.WriteLineAsync("claude-statusline: was not on");
