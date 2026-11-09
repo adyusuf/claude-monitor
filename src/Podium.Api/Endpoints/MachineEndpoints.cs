@@ -126,6 +126,8 @@ public static class MachineEndpoints
         agent.ShareInventory = false; // and the one for reporting what Claude has on the machine (ADR-0011 step E)
         agent.ClaudeInventory = null;
         agent.ClaudeInventoryAt = null;
+        agent.AccessReport = null; // the access report names the machine's ceiling paths (ADR-0020 §4); the next profile sends it again
+        agent.AccessReportAt = null;
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
         // The move and the end of the agent's remote work in its old workspace commit together.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);

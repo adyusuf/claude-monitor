@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Podium.Api.AccessPolicies;
 using Podium.Api.Approvals;
 using Podium.Api.Config;
 using Podium.Api.Data;
@@ -97,9 +98,10 @@ public static class AgentEndpoints
         var mine = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => new { a.ShareServices, a.AcceptsClaudeControl, a.ClaudeAutoMode, a.ClaudeAutoProject, a.ShareInventory }).FirstOrDefaultAsync(http.RequestAborted);
         // The automatic Claude start (ADR-0014 P3) is only ever told to an agent whose owner has the switch on AND the workspace allows remote work: anything else reads as off.
         var auto = s.RemoteRunsEnabled && mine is { AcceptsClaudeControl: true, ClaudeAutoMode: ClaudeAutoModes.OnMessage or ClaudeAutoModes.Always } ? mine.ClaudeAutoMode! : ClaudeAutoModes.Off;
+        var stamp = await AccessPolicyDelivery.StampAsync(db, http.User.AgentId(), workspaceId, http.RequestAborted);
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
             new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, mine?.ShareServices ?? false, auto, auto == ClaudeAutoModes.Always ? mine!.ClaudeAutoProject : null,
-            mine?.ShareInventory ?? false));
+            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>

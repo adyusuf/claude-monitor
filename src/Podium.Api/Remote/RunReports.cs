@@ -53,6 +53,7 @@ public sealed class RunReports(PodiumDb db, ApiConfig config, TimeProvider clock
                 {
                     Audit.Add(db, http, clock, AuditActions.RunFinished, run.WorkspaceId, agentId: agentId, targetType: "run",
                         targetId: id, detail: new { status = req.Status, exitCode = req.ExitCode });
+                    if (error is { } code && code.StartsWith(AccessErrors.Prefix, StringComparison.Ordinal)) AuditRefusal(http, run, agentId, code, req);
                     await db.SaveChangesAsync(ct);
                     if (run.Mode == RunModes.Script) await StoreOutputAccountAsync(id, req, ct);
                     if (run.Kind == RunKinds.Test) await StoreTestCountsAsync(id, ct);
@@ -65,6 +66,25 @@ public sealed class RunReports(PodiumDb db, ApiConfig config, TimeProvider clock
         run.Status = req.Status!;
         RunNotices.Changed(broker, run);
         return Results.NoContent();
+    }
+
+    /// <summary>
+    /// The access layers refused the run on the target (ADR-0020 §4): the code, the layer (one of <see cref="AccessRefusedBy"/>, else none) and its
+    /// version, and the run's repository; a code this API does not know is kept only when it is a plain code.
+    /// </summary>
+    private void AuditRefusal(HttpContext http, RemoteRun run, Guid agentId, string code, RunStatusUpdate req)
+    {
+        var plain = AccessErrors.All.Contains(code)
+            || code.Length <= 64 && code.All(c => c is '_' or (>= 'a' and <= 'z') or (>= '0' and <= '9'));
+        Audit.Add(db, http, clock, AuditActions.RunAccessRefused, run.WorkspaceId, agentId: agentId, targetType: "run", targetId: run.Id,
+            detail: new
+            {
+                runId = run.Id,
+                code = plain ? code : AccessErrors.Prefix + "other",
+                refusedBy = AccessRefusedBy.All.Contains(req.RefusedBy ?? "") ? req.RefusedBy : null,
+                version = req.AccessVersion is > 0 ? req.AccessVersion : null,
+                projectKey = run.ProjectKey,
+            });
     }
 
     /// <summary>

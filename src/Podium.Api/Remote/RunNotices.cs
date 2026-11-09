@@ -1,3 +1,4 @@
+using Podium.Api.AccessPolicies;
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Streaming;
@@ -72,11 +73,19 @@ public static class RunNotices
         broker.Publish(Broker.Agent(run.TargetAgentId), new StreamMessage(AgentStreamEvents.RunCancel, new RunCancelMessage(run.Id)));
     }
 
-    /// <summary>The run as its target receives it, with the grant it matched so the target can check it again.</summary>
+    /// <summary>
+    /// The run as its target receives it, with the grant it matched so the target can check it again, its repository and the stamp of the target's
+    /// access policies now (ADR-0020 §4), so a target whose policies are older fetches them before it judges the run.
+    /// </summary>
     public static async Task<RunMessage> MessageAsync(PodiumDb db, RemoteRun run, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(run);
+        return await MessageAsync(db, run, await AccessPolicyDelivery.StampAsync(db, run.TargetAgentId, run.WorkspaceId, ct), ct);
+    }
+
+    private static async Task<RunMessage> MessageAsync(PodiumDb db, RemoteRun run, string? accessStamp, CancellationToken ct)
+    {
         GrantTemplate? grant = null;
         if (run.GrantId is { } grantId)
         {
@@ -86,7 +95,7 @@ public static class RunNotices
 
         return new RunMessage(run.Id, run.Mode, run.Argv, run.ShellCommand, run.Cwd, run.TimeoutSeconds, run.ExpiresAt,
             run.GrantId, grant, run.DecidedAt, run.ScriptInterpreter, run.ScriptBody, run.ScriptArgs, run.OutputCap, run.ApprovedWithTotp, run.ScriptFiles, run.ScriptStdin,
-            run.ApprovalKeyId, run.ApprovalSignature, run.ApprovalNotAfter, run.TargetEnvironment, run.TargetFunction);
+            run.ApprovalKeyId, run.ApprovalSignature, run.ApprovalNotAfter, run.TargetEnvironment, run.TargetFunction, run.ProjectKey, accessStamp);
     }
 
     /// <summary>The approved runs a target still owes an answer for, replayed on every stream connection.</summary>
@@ -98,10 +107,17 @@ public static class RunNotices
                         && r.ExpiresAt > now)
             .OrderBy(r => r.CreatedAt).Take(50).ToListAsync(ct);
         var messages = new List<RunMessage>(runs.Count);
+        var stamps = new Dictionary<Guid, string?>(); // the target's stamp, read once per workspace of its runs
         foreach (var run in runs)
         {
             if (broker is not null && await RoleBlocksAsync(db, broker, run, ct)) continue;
-            messages.Add(await MessageAsync(db, run, ct));
+            if (!stamps.TryGetValue(run.WorkspaceId, out var stamp))
+            {
+                stamp = await AccessPolicyDelivery.StampAsync(db, targetAgentId, run.WorkspaceId, ct);
+                stamps[run.WorkspaceId] = stamp;
+            }
+
+            messages.Add(await MessageAsync(db, run, stamp, ct));
         }
 
         return messages;
