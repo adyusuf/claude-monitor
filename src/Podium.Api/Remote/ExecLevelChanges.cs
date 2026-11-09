@@ -50,12 +50,17 @@ public static class ExecLevelChanges
         if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, agent, req.Code) is { } refused) return refused;
         var stored = new ExecLevelRequest(req.Level!, req.Sequence, req.NotAfter, signed ? req.KeyId : null, signed ? req.Signature : null);
         var json = JsonSerializer.Serialize(stored, Json);
-        var won = await db.Agents.Where(a => a.Id == id && a.ExecLevelSequence == req.Sequence - 1)
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevelSequence, req.Sequence).SetProperty(a => a.ExecLevelRequest, json), ct);
-        if (won != 1) return RemoteChecks.Conflict(ExecLevelErrors.Changed);
-        Audit.Add(db, http, clock, AuditActions.AgentExecLevelRequested, agent.WorkspaceId, userId, targetType: "agent", targetId: id,
-            detail: new { level = req.Level, sequence = req.Sequence, signed });
-        await db.SaveChangesAsync(ct);
+        // The change and its audit row commit together, or neither does (with the used code's step, which the gate tracked).
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            var won = await db.Agents.Where(a => a.Id == id && a.ExecLevelSequence == req.Sequence - 1)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.ExecLevelSequence, req.Sequence).SetProperty(a => a.ExecLevelRequest, json), ct);
+            if (won != 1) return RemoteChecks.Conflict(ExecLevelErrors.Changed);
+            Audit.Add(db, http, clock, AuditActions.AgentExecLevelRequested, agent.WorkspaceId, userId, targetType: "agent", targetId: id,
+                detail: new { level = req.Level, sequence = req.Sequence, signed });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         broker.Publish(Broker.Workspace(agent.WorkspaceId), new StreamMessage(AgentRoleEndpoints.MachineEvent, new { agentId = id }));
         return Results.Ok(View(await db.Agents.AsNoTracking().FirstAsync(a => a.Id == id, ct), true));
     }
