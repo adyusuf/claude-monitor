@@ -183,18 +183,22 @@ never touches the network. Revoke it from the web's Machines page; rotation is `
 status` show whether push is on, the stream state (connected / reconnecting), the last message id, what is queued locally and the last upload
 or failure. `scripts/push-check.py` repeats the end-to-end check against the local e2e stack (a stand-in client plays Claude Code). Design and limits: [ADR-0003](docs/adr-0003-push-into-idle-session.md).
 
-The agent home is the folder the machine already uses (`~/Library/Application Support/aipod` on macOS, `%USERPROFILE%\.aipod` on
-Windows and `~/.aipod` on Linux), and for a machine that has none the aipod folder (`~/Library/Application Support/aipod`, `~/.aipod`):
-nothing is moved, and a folder counts only when it holds `agent.json` or `agent.db` (ADR-0013). `AP_AGENT_HOME` / `AP_AGENT_HOME` override all of it; `aipod status` prints it as `home:`. It is deliberately **not** under
+The agent home is `~/Library/Application Support/aipod` on macOS, `%USERPROFILE%\.aipod` on Windows and `~/.aipod` on Linux
+(ADR-0016). `AP_AGENT_HOME` overrides it; `aipod status` prints it as `home:`. It is deliberately **not** under
 `%LOCALAPPDATA%`: the Claude desktop app is a packaged (MSIX) app, and everything it starts sees `%LOCALAPPDATA%`
 redirected to a private copy, so a login made in a normal terminal would be invisible to its sessions
 (ADR-0002, "Home outside AppData").
 
-**Upgrading a Windows machine** that used the old default (`%LOCALAPPDATA%\Podium`): the first start of the new
-`aipod` copies `agent.json` to the new home (no new login; `agent.db` is not moved, so events not yet uploaded are
-lost). The old plugin keeps running the old binary until you run `aipod install` again with the new one; do that
-from a normal terminal, then check that `aipod status` and `aipod_status` in a new Claude session show the same
-`home:`. The old folder is left in place and can be deleted afterwards.
+**Upgrading from the old names** (`~/Library/Application Support/ClaudeMonitor` on macOS, `~/.claude-monitor` on Linux,
+`%USERPROFILE%\.claude-monitor` then `%LOCALAPPDATA%\ClaudeMonitor` on Windows): when the default home has no `agent.json`, the
+first start of `aipod` (a hook, the daemon, the MCP server or a command) copies the old `agent.json` and the two tokens (keychain
+service or Credential Manager prefix `claude-monitor-agent`, or the old home's protected token files on Linux) into the new home
+and credential store, never over one already there. The web sees the same machine and no new login is needed; `agent.db` is not
+moved, so events not yet uploaded are lost. The installer scripts do the same. The old folder and credential entries are left in
+place and can be deleted afterwards. An explicit `AP_AGENT_HOME` and a service never read an old home. Only `aipod login`,
+`aipod connect` and `aipod install` ever make a new machine key; with no identity the hooks, the daemon and `aipod_status` say
+"not connected" and create nothing. The old plugin keeps running the old binary until you run `aipod install` again with the new
+one; do that from a normal terminal, then check that `aipod status` and `aipod_status` in a new Claude session show the same `home:`.
 
 ### Machine roles, the tool inventory and the session-start block (ADR-0008)
 

@@ -36,7 +36,10 @@ The product has two names and nothing else: **Podium** is the web site, the API 
 1. **Servers (test and prod), once each:** stop the site; rename `C:\ClaudeMonitor` to `C:\iis\Podium`, the IIS site and app pool to `Podium-<env>`, the scheduled backup task to `Podium-backup-<env>`; rename `monitor.env` to `aipod.env` and every `MONITOR_` line to `AIPOD_`; deploy the new package. The database and its role keep their names (they are values in the file).
 2. **The signing key in the macOS keychain:** the service name is now `aipod-update-<channel>`. Copy each key once (for `test` and `prod`): `security add-generic-password -s aipod-update-<channel> -a <account> -w "$(security find-generic-password -s cm-agent-update-<channel> -w)"`, check that a build signs, then delete the old entry.
 3. **Download host (R2):** publish with `scripts/publish_agent_downloads.sh`; the files are `aipod-*.zip` and the manifest format is `aipod-update/1`, so agents of the old names cannot read the new manifest. Delete the `cm-agent-*` files and `monitor-agent-plugin.zip` after the new ones are there.
-4. **Machines:** uninstall the old agent (service, autostart, plugin), install the new one, log in again. The old home folder is not read; copy nothing.
+4. **Machines:** uninstall the old agent (service, autostart, plugin) and install the new one. The installer scripts, and the agent itself on its first start
+   when its default home has no `agent.json`, carry the old home's `agent.json` and the two tokens over once (from `claude-monitor-agent` in the keychain or
+   Credential Manager, or the old home's token files), so the machine keeps its identity on the web and needs no new login; the old home is left in place.
+   An explicit `AP_AGENT_HOME` and a service never read an old home (amended 09/11/2026: an update must never need a new login or create a second device).
 5. **People:** everyone signs in again once (the cookie names changed) and the language and theme choices reset (the storage keys changed).
 6. **Repository:** rename the GitHub repository to `podium` and the local folder; the marketplace coordinates in the web's install commands then read `<owner>/podium`.
 
