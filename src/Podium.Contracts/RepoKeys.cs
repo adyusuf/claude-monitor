@@ -37,6 +37,26 @@ public static partial class RepoKeys
     public static string? FromRemote(string? url) =>
         string.IsNullOrWhiteSpace(url) ? null : NormalizeRemote(url) is { } normalized ? GitPrefix + normalized : null;
 
+    /// <summary>
+    /// Whether two repository keys name the same repository: compared after Unicode NFC and without case, because a clone URL and an
+    /// application's URL may differ in either (github.com/Org/Shop and github.com/org/shop are one repository). Every match of a key
+    /// against an access policy (ADR-0020) goes through this; stored keys keep their spelling.
+    /// </summary>
+    public static bool Same(string? a, string? b) =>
+        a is not null && b is not null && string.Equals(Fold(a), Fold(b), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The comparer of <see cref="Same"/>, for sets and dictionaries of keys.</summary>
+    public static IEqualityComparer<string> Comparer { get; } = new KeyComparer();
+
+    private static string Fold(string key) => key.IsNormalized(System.Text.NormalizationForm.FormC) ? key : key.Normalize(System.Text.NormalizationForm.FormC);
+
+    private sealed class KeyComparer : IEqualityComparer<string>
+    {
+        public bool Equals(string? x, string? y) => (x is null && y is null) || Same(x, y);
+
+        public int GetHashCode(string obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(Fold(obj));
+    }
+
     [GeneratedRegex(@"^(?:[\w.\-]+@)?(?<host>[\w.\-]+):(?!//)(?<path>.+)$")]
     private static partial Regex ScpLike();
 }
