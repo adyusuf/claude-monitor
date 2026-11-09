@@ -32,16 +32,21 @@ public static class AccessEffective
             var section = AccessPolicyRules.Section(document, os) ?? Empty;
             var state = applied.GetValueOrDefault(r.p.ProjectId);
             return new MachineAccessPolicyView(r.p.ProjectId, r.Name, r.p.Version, state?.Version, state?.State, state?.IsSigned ?? r.p.Signature is not null,
-                Allowed(section.AllowedFolders, ceiling?.AllowedFolders ?? [], os), [.. section.DeniedFolders.Union(ceiling?.DeniedFolders ?? [], StringComparer.Ordinal)],
+                Allowed(section.AllowedFolders, ceiling?.AllowedFolders ?? [], document.IncludeProjectFolder, os), [.. section.DeniedFolders.Union(ceiling?.DeniedFolders ?? [], StringComparer.Ordinal)],
                 Applications(section.Applications, ceiling?.Applications ?? [], os), document.IncludeProjectFolder,
                 document.Shell && (report?.Ceiling.Shell ?? true));
         }).ToList();
         return new MachineAccessView(ceiling, policies, agent.AccessReportAt, enforced || ApprovalRules.Strict(agent));
     }
 
-    /// <summary>The folders both allow: an empty list on either side is no limit there; otherwise each folder of one side that lies under the other.</summary>
-    public static IReadOnlyList<string> Allowed(IReadOnlyList<string> policy, IReadOnlyList<string> ceiling, string os)
+    /// <summary>
+    /// The folders both allow: an empty list on either side is no limit there; otherwise each folder of one side that lies under the other. A policy
+    /// that allows the project's own folder and lists none limits runs to that folder, which the API does not know: the list stays empty (the page
+    /// then says "only the project's own folder"), never the ceiling's.
+    /// </summary>
+    public static IReadOnlyList<string> Allowed(IReadOnlyList<string> policy, IReadOnlyList<string> ceiling, bool includeProjectFolder, string os)
     {
+        if (policy.Count == 0 && includeProjectFolder) return [];
         if (ceiling.Count == 0) return policy;
         if (policy.Count == 0) return ceiling;
         return [.. policy.Where(p => AccessPolicyMath.IsUnderAny(p, ceiling, os))
