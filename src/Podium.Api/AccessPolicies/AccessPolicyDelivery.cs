@@ -12,7 +12,7 @@ namespace Podium.Api.AccessPolicies;
 /// repository it never reported (a server with a clone and no session) still holds that repository's policy; any member can read them all on the web
 /// anyway. Live policies come first, then tombstones, each in project order, at most <see cref="PoliciesMax"/>: an answer that holds exactly
 /// <see cref="PoliciesMax"/> policies may have been cut, and the agent then applies the default to every run. Its settings and every run it is sent
-/// carry only a stamp of that set, so it fetches the bodies again only when the stamp moves.
+/// carry only a stamp of that set and of the workspace switch, so it fetches the bodies again only when the stamp moves.
 /// </summary>
 public static class AccessPolicyDelivery
 {
@@ -22,12 +22,15 @@ public static class AccessPolicyDelivery
         db.ProjectAccessPolicies.AsNoTracking().Where(p => p.WorkspaceId == workspaceId)
             .OrderBy(p => p.Cleared).ThenBy(p => p.ProjectId).Take(PoliciesMax);
 
-    /// <summary>The stamp of the workspace's set now (<see cref="Stamp"/>); null when there is no policy.</summary>
+    /// <summary>The line the stamp gains while the workspace switch is on, so the stamp moves when the switch does.</summary>
+    public const string EnforceLine = "enforce:1";
+
+    /// <summary>The stamp of the workspace's set and switch now (<see cref="Stamp"/>); null when there is no policy and the switch is off.</summary>
     public static async Task<string?> StampAsync(PodiumDb db, Guid workspaceId, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         var rows = await For(db, workspaceId).Select(p => new { p.ProjectId, p.Version }).ToListAsync(ct);
-        return Stamp(rows.Select(r => (r.ProjectId, r.Version)));
+        return Stamp(rows.Select(r => (r.ProjectId, r.Version)), await EnforcedAsync(db, workspaceId, ct));
     }
 
     /// <summary>The policies themselves, with the same stamp; an empty stamp when there is none (the settings then carry null).</summary>
@@ -37,13 +40,20 @@ public static class AccessPolicyDelivery
         var rows = await For(db, workspaceId).ToListAsync(ct);
         var messages = rows.Select(r => new AccessPolicyMessage(r.ProjectId, r.WorkspaceId, r.Version, AccessPolicyStore.Read(r), r.DocumentHash,
             r.SignedKeyId, r.Signature)).ToList();
-        return new AgentAccessPolicies(Stamp(rows.Select(r => (r.ProjectId, r.Version))) ?? "", messages);
+        return new AgentAccessPolicies(Stamp(rows.Select(r => (r.ProjectId, r.Version)), await EnforcedAsync(db, workspaceId, ct)) ?? "", messages);
     }
 
-    /// <summary>Lowercase hex SHA-256 over the "projectId:version" lines in ordinal order, joined by a newline; null for no policy.</summary>
-    public static string? Stamp(IEnumerable<(Guid ProjectId, int Version)> policies)
+    /// <summary>
+    /// Lowercase hex SHA-256 over the "projectId:version" lines, plus <see cref="EnforceLine"/> while the switch is on, in ordinal order, joined by a
+    /// newline; null when there are no lines.
+    /// </summary>
+    public static string? Stamp(IEnumerable<(Guid ProjectId, int Version)> policies, bool enforced)
     {
-        var lines = policies.Select(p => $"{p.ProjectId:D}:{p.Version.ToString(CultureInfo.InvariantCulture)}").Order(StringComparer.Ordinal).ToList();
+        var lines = policies.Select(p => $"{p.ProjectId:D}:{p.Version.ToString(CultureInfo.InvariantCulture)}")
+            .Concat(enforced ? [EnforceLine] : []).Order(StringComparer.Ordinal).ToList();
         return lines.Count == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines))));
     }
+
+    private static Task<bool> EnforcedAsync(PodiumDb db, Guid workspaceId, CancellationToken ct) =>
+        db.WorkspaceSettings.AsNoTracking().Where(s => s.WorkspaceId == workspaceId).Select(s => s.EnforceAccessPolicies).FirstOrDefaultAsync(ct);
 }
