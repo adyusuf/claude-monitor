@@ -82,6 +82,7 @@ public sealed class MachineProjectTests(ApiFactory api)
     public async Task A_finished_test_run_carries_the_counts_parsed_from_its_output_and_another_kind_does_not()
     {
         var team = await RemoteKit.TeamAsync(api);
+        await SendProfileAsync(team, Fact("shop")); // a run names only a project its target reports (ADR-0020 §4)
         var test = await FinishedRunAsync(team, "shop", RunKinds.Test, "Passed!  - Failed:     1, Passed:    41, Skipped:     2, Total:    44, Duration: 3 s - A.dll");
         var build = await FinishedRunAsync(team, "shop", RunKinds.Build, "Passed!  - Failed:     1, Passed:    41, Skipped:     2, Total:    44, Duration: 3 s - A.dll");
         var t = await RemoteKit.RunRowAsync(api, test);

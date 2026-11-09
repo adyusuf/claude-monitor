@@ -172,6 +172,8 @@ public static class Startup
         IntegrationImportEndpoints.Map(api);
         IntegrationWebhookEndpoints.Map(api);
         ServerSettingsEndpoints.Map(api);
+        AccessPolicyEndpoints.Map(api);
+        AgentAccessEndpoints.Map(api);
         api.MapFallback(() => Results.NotFound());
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
         if (files is not null)

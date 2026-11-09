@@ -138,6 +138,11 @@ public static class UpdateCommand
             return await ProjectsAsync(args, config, stdout, stderr);
         }
 
+        if (args.Length >= 2 && args[1] == Access.AccessCommand.Verb)
+        {
+            return await Access.AccessCommand.RunAsync(args, config, stdout, stderr);
+        }
+
         await stderr.WriteLineAsync(Strings.T(Msg.ConfigUsage));
         return 2;
     }

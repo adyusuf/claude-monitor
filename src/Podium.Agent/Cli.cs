@@ -53,6 +53,9 @@ public static partial class Cli
         aipod config approvals required|off
                                         pin an owner's approval key (copy it from the web; compare the fingerprint) and require that every remote run is
                                         signed by a pinned key; off by default. An admin runs these (the file is admin-owned on a service) (ADR-0010)
+        aipod config access show | allow <folder> | deny <folder> | app <exe> [--sha256 <hex>] | remove <path> | clear
+                                        the machine's own ceiling for remote runs: folders they may use or never use and the applications they
+                                        may start; every web access policy applies inside it. An admin runs these on a service (ADR-0020)
         aipod machines | machine <x> | metrics <x> | alerts [<x>] | jobs [<x>] | job-run <job id>
         aipod run --machine <x> (--script <file> --interpreter <i> [--arg <v>]... | --argv <exe> [args...]) [--timeout] [--reason] [--project] [--kind]
         aipod result <run or ask id> [--wait <seconds>] [--offset <chars>]

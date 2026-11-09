@@ -55,6 +55,14 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("accepts_claude_control_set_by");
 
+                    b.Property<string>("AccessReport")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("access_report");
+
+                    b.Property<DateTimeOffset?>("AccessReportAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("access_report_at");
+
                     b.Property<string>("AdminNote")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -3024,6 +3032,11 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AccessScope")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("access_scope");
+
                     b.Property<Guid>("AgentId")
                         .HasColumnType("uuid")
                         .HasColumnName("agent_id");
@@ -3094,10 +3107,123 @@ namespace Podium.Api.Data.Migrations
 
                     b.ToTable("permission_requests", t =>
                         {
+                            t.HasCheckConstraint("ck_permission_requests_access_scope", "access_scope IS NULL OR access_scope IN ('inside', 'outside', 'unknown')");
+
                             t.HasCheckConstraint("ck_permission_requests_decision", "decision IS NULL OR decision IN ('allow', 'deny')");
 
                             t.HasCheckConstraint("ck_permission_requests_status", "status IN ('open', 'answered', 'expired')");
                         });
+                });
+
+            modelBuilder.Entity("Podium.Api.Data.ProjectAccessPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Cleared")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("cleared");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Document")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("document");
+
+                    b.Property<string>("DocumentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("document_hash");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Signature")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("signature");
+
+                    b.Property<Guid?>("SignedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("signed_by");
+
+                    b.Property<string>("SignedKeyId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("signed_key_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_project_access_policies");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_project_access_policies_project_id");
+
+                    b.HasIndex("SignedBy")
+                        .HasDatabaseName("ix_project_access_policies_signed_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_project_access_policies_updated_by");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("ix_project_access_policies_workspace_id");
+
+                    b.ToTable("project_access_policies", t =>
+                        {
+                            t.HasCheckConstraint("ck_project_access_policies_signed", "(signed_key_id IS NULL) = (signature IS NULL)");
+
+                            t.HasCheckConstraint("ck_project_access_policies_version", "version >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Podium.Api.Data.ProjectAccessPolicyKey", b =>
+                {
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("policy_id");
+
+                    b.Property<string>("ProjectKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("project_key");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("PolicyId", "ProjectKey")
+                        .HasName("pk_project_access_policy_keys");
+
+                    b.HasIndex("WorkspaceId", "ProjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_project_access_policy_keys_workspace_id_project_key");
+
+                    b.ToTable("project_access_policy_keys");
                 });
 
             modelBuilder.Entity("Podium.Api.Data.ProjectMember", b =>
@@ -3144,6 +3270,10 @@ namespace Podium.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<int?>("AccessVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_version");
 
                     b.Property<string>("ApprovalKeyId")
                         .HasMaxLength(64)
@@ -3270,6 +3400,11 @@ namespace Podium.Api.Data.Migrations
                     b.Property<string>("Reason")
                         .HasColumnType("text")
                         .HasColumnName("reason");
+
+                    b.Property<string>("RefusedBy")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("refused_by");
 
                     b.Property<Guid>("RequesterAgentId")
                         .HasColumnType("uuid")
@@ -3413,6 +3548,8 @@ namespace Podium.Api.Data.Migrations
 
                     b.ToTable("remote_runs", t =>
                         {
+                            t.HasCheckConstraint("ck_remote_runs_access_version", "access_version IS NULL OR access_version >= 1");
+
                             t.HasCheckConstraint("ck_remote_runs_client_key", "char_length(client_key) BETWEEN 1 AND 100");
 
                             t.HasCheckConstraint("ck_remote_runs_kind", "kind IS NULL OR kind IN ('test', 'build', 'deploy', 'other')");
@@ -3422,6 +3559,8 @@ namespace Podium.Api.Data.Migrations
                             t.HasCheckConstraint("ck_remote_runs_mode_shape", "(mode = 'argv' AND shell_command IS NULL AND script_body IS NULL) OR (mode = 'shell' AND argv IS NULL AND script_body IS NULL) OR (mode = 'script' AND argv IS NULL AND shell_command IS NULL AND cwd IS NULL)");
 
                             t.HasCheckConstraint("ck_remote_runs_output_cap", "output_cap IS NULL OR output_cap BETWEEN 1048576 AND 67108864");
+
+                            t.HasCheckConstraint("ck_remote_runs_refused_by", "refused_by IS NULL OR refused_by IN ('ceiling', 'policy', 'default')");
 
                             t.HasCheckConstraint("ck_remote_runs_script_extras", "(script_files_json IS NULL AND script_stdin IS NULL) OR mode = 'script'");
 
@@ -4390,6 +4529,12 @@ namespace Podium.Api.Data.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("claude_update");
 
+                    b.Property<bool>("EnforceAccessPolicies")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("enforce_access_policies");
+
                     b.Property<int>("EventMaxBytes")
                         .HasColumnType("integer")
                         .HasColumnName("event_max_bytes");
@@ -5264,6 +5409,52 @@ namespace Podium.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_permission_requests_harness_sessions_session_id");
+                });
+
+            modelBuilder.Entity("Podium.Api.Data.ProjectAccessPolicy", b =>
+                {
+                    b.HasOne("Podium.Api.Data.ManagedProject", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_access_policies_projects_project_id");
+
+                    b.HasOne("Podium.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("SignedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_project_access_policies_users_signed_by");
+
+                    b.HasOne("Podium.Api.Data.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_project_access_policies_users_updated_by");
+
+                    b.HasOne("Podium.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_access_policies_workspaces_workspace_id");
+                });
+
+            modelBuilder.Entity("Podium.Api.Data.ProjectAccessPolicyKey", b =>
+                {
+                    b.HasOne("Podium.Api.Data.ProjectAccessPolicy", null)
+                        .WithMany()
+                        .HasForeignKey("PolicyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_access_policy_keys_project_access_policies_policy_id");
+
+                    b.HasOne("Podium.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_access_policy_keys_workspaces_workspace_id");
                 });
 
             modelBuilder.Entity("Podium.Api.Data.ProjectMember", b =>

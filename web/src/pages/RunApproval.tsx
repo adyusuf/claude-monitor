@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/endpoints";
-import { approvalKeys, payloadFor } from "../lib/approvalKey";
+import { approvalKeys, runPayload } from "../lib/approvalKey";
 import type { WebRunView } from "../api/types";
 import { Button, Card, Notice } from "../components/ui";
 import { config } from "../config";
@@ -40,10 +40,11 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
     if (!run.hash) return;
     const hash = run.hash;
     setSignProblem(null);
-    // A signed approval (ADR-0010 §4): this browser's key signs the exact run; a machine that requires it refuses an approval without one.
+    // A signed approval (ADR-0010 §4): this browser's key signs the exact run, and with it the run's repository when it names one (payload v2,
+    // ADR-0020 §4); a machine that requires it refuses an approval without one.
     let proof: { keyId: string; signature: string } | null = null;
     try {
-      proof = await approvalKeys.sign(payloadFor("run", run.id, run.targetAgentId, hash, run.expiresAt));
+      proof = await approvalKeys.sign(runPayload(run, hash));
     } catch {
       proof = null;
     }
@@ -72,6 +73,7 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
       <RunFacts run={run} ws={ws} onScriptEnd={() => setRead(true)} />
       {gate.field}
       {run.approvalsRequired ? <p className="muted small">{t("approvals.runNeedsKey")}</p> : null}
+      {run.projectKey ? <p className="muted small">{t("access.approvalProject", { key: run.projectKey })}</p> : null}
       {signProblem ? <Notice kind="error">{signProblem}</Notice> : null}
       {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}
       {denyError ? <Notice kind="error">{denyError}</Notice> : null}

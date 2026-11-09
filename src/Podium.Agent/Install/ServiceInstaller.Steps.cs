@@ -183,7 +183,8 @@ public sealed partial class ServiceInstaller
         // A reinstall (an upgrade) keeps the ceiling and the role claim an admin wrote by hand (ADR-0008 §3a).
         var before = ExecPolicyLoader.ReadExisting(l.ExecConfigPath);
         ExecPolicyLoader.Save(l.ExecConfigPath, new ExecPolicy(execLevel, before?.AllowedExecutables ?? [], before?.AllowedRoots ?? [],
-            before?.ClaimedEnvironment, before?.ClaimedFunction, RunAccount: runAccount ?? before?.RunAccount)); // a reinstall without the option keeps the account an admin chose
+            before?.ClaimedEnvironment, before?.ClaimedFunction, RunAccount: runAccount ?? before?.RunAccount, // a reinstall without the option keeps the account an admin chose
+            DeniedRoots: before?.DeniedRoots, ExecutableHashes: before?.ExecutableHashes)); // and the access ceiling (ADR-0020 §4): a reinstall never widens it
         if (!existed) undo.Add(("exec policy written", () => File.Delete(l.ExecConfigPath)));
     }
 

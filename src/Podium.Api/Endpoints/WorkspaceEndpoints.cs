@@ -10,10 +10,13 @@ namespace Podium.Api.Endpoints;
 
 public sealed record NameRequest(string? Name);
 public sealed record WorkspaceResponse(Guid Id, string Name, string Role, SettingsResponse Settings);
+/// <param name="EnforceAccessPolicies">ADR-0020 §4 rule 4: a run whose repository has no access policy, or that names none, gets the default.</param>
 public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes, string AgentUpdate = UpdateModes.Off,
-    bool ClaudeUpdate = false);
+    bool ClaudeUpdate = false, bool EnforceAccessPolicies = false);
+
+/// <param name="Code">The two-step code re-authentication may need when EnforceAccessPolicies changes.</param>
 public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes, string? AgentUpdate = null,
-    bool? ClaudeUpdate = null);
+    bool? ClaudeUpdate = null, bool? EnforceAccessPolicies = null, string? Code = null);
 public sealed record MemberResponse(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset JoinedAt);
 public sealed record RoleRequest(string? Role);
 
@@ -51,7 +54,7 @@ public static class WorkspaceEndpoints
         if (member is null) return Http.NotFound();
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate)));
+        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, View(s)));
     }
 
     private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db)
@@ -65,7 +68,11 @@ public static class WorkspaceEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> PutSettings(Guid id, SettingsRequest req, HttpContext http, PodiumDb db, TimeProvider clock)
+    private static SettingsResponse View(WorkspaceSettings s) =>
+        new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate, s.EnforceAccessPolicies);
+
+    /// <summary>Admins change the settings; turning access policy enforcement on or off also needs re-authentication and has its own audit row.</summary>
+    private static async Task<IResult> PutSettings(Guid id, SettingsRequest req, HttpContext http, PodiumDb db, Config.ApiConfig config, TimeProvider clock)
     {
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
@@ -74,16 +81,24 @@ public static class WorkspaceEndpoints
         if (req.AgentUpdate is not null && !UpdateModes.IsValid(req.AgentUpdate)) return Http.Invalid("agentUpdate", "invalid_mode");
 
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        var before = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate);
+        var before = View(s);
+        var enforce = req.EnforceAccessPolicies is { } wanted && wanted != s.EnforceAccessPolicies ? wanted : (bool?)null;
+        if (enforce is not null && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
         s.MaskSecrets = req.MaskSecrets ?? s.MaskSecrets;
         s.RetentionDays = req.RetentionDays ?? s.RetentionDays;
         s.EventMaxBytes = req.EventMaxBytes ?? s.EventMaxBytes;
         s.AgentUpdate = req.AgentUpdate ?? s.AgentUpdate;
         s.ClaudeUpdate = req.ClaudeUpdate ?? s.ClaudeUpdate;
+        s.EnforceAccessPolicies = enforce ?? s.EnforceAccessPolicies;
         s.UpdatedAt = clock.GetUtcNow();
         s.UpdatedBy = userId;
         Audit.Add(db, http, clock, AuditActions.SettingsChanged, id, userId,
-            detail: new { before, after = new SettingsResponse(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate) });
+            detail: new { before, after = View(s) });
+        if (enforce is { } on)
+        {
+            Audit.Add(db, http, clock, AuditActions.AccessEnforcementChanged, id, userId, detail: new { before = !on, after = on });
+        }
+
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }

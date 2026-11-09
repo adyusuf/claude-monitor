@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using System.Text;
+using static Podium.Contracts.CanonicalBytes;
 
 namespace Podium.Contracts;
 
@@ -64,43 +64,5 @@ public static partial class GrantMatcher
         }
 
         return Convert.ToHexStringLower(SHA256.HashData(buffer.ToArray()));
-    }
-
-    // Every field is "present flag, byte length, bytes", so null and empty differ and no two splits give the same bytes.
-    private static void Put(Stream stream, string? value)
-    {
-        if (value is null)
-        {
-            stream.WriteByte(0);
-            return;
-        }
-
-        stream.WriteByte(1);
-        var bytes = Encoding.UTF8.GetBytes(value);
-        PutInt(stream, bytes.Length);
-        stream.Write(bytes);
-    }
-
-    private static void PutList(Stream stream, IReadOnlyList<string>? values)
-    {
-        if (values is null)
-        {
-            stream.WriteByte(0);
-            return;
-        }
-
-        stream.WriteByte(1);
-        PutInt(stream, values.Count);
-        foreach (var value in values)
-        {
-            Put(stream, value);
-        }
-    }
-
-    private static void PutInt(Stream stream, int value)
-    {
-        Span<byte> bytes = stackalloc byte[sizeof(int)];
-        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes, value);
-        stream.Write(bytes);
     }
 }

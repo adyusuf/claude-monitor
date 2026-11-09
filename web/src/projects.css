@@ -25,6 +25,10 @@
 .pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .members-add { margin-top: 14px; }
 
+/* Access policies (ADR-0020 §4): paths and hashes in the mono face, a long hash breaks anywhere. */
+.input.path-input { font-family: var(--mono); font-size: 13px; }
+.access-hash { overflow-wrap: anywhere; }
+
 /* Issues and the backlog (ADR-0011 phase 2). */
 .filters { align-items: center; }
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }

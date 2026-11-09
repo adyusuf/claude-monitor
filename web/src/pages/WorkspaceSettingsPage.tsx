@@ -8,6 +8,7 @@ import { SettingsSection } from "../components/SettingsSection";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { AccessEnforcementCard } from "./AccessEnforcementCard";
 import { RemoteSettingsCard } from "./RemoteSettingsCard";
 
 /** Name, capture settings and the audit log (admins). */
@@ -91,6 +92,12 @@ export function WorkspaceSettingsPage() {
       <SettingsSection title={t("remote.settingsTitle")} hint={t("remote.settingsHint")}>
         <RemoteSettingsCard ws={ws} canEdit={info.role === "owner" || info.role === "admin"} titled={false} />
       </SettingsSection>
+      {info.settings.enforceAccessPolicies !== undefined ? (
+        <SettingsSection title={t("access.enforceTitle")} hint={t("access.enforceSection")}>
+          <AccessEnforcementCard ws={ws} enforce={info.settings.enforceAccessPolicies} canEdit={info.role === "owner" || info.role === "admin"}
+            onChanged={() => void api.workspace(ws).then(setInfo).catch((e: unknown) => setNotice({ kind: "error", text: errorText(e) }))} />
+        </SettingsSection>
+      ) : null}
       <SettingsSection title={t("workspace.audit")} hint={t("workspace.auditHint")}>
         <Card>
           {audit.length === 0 ? <p className="muted">{t("workspace.noAudit")}</p> : (

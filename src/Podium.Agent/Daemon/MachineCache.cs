@@ -48,6 +48,7 @@ public sealed class MachineCache(AgentConfig config, LocalStore store, ApiClient
     /// <summary>Renders and keeps the block for these machines (the API's answer, or a test's); clears it when there is nothing to tell.</summary>
     public void Store(IReadOnlyList<MachineView> machines)
     {
+        Access.AccessLayers.RememberRole(store, machines, Identity.Peek(config)?.AgentId); // this machine's role as the API sees it (ADR-0020 §4)
         var text = MachineContext.Render(machines, Identity.Peek(config)?.AgentId, config.MachinesContextMax);
         if (text is null)
         {

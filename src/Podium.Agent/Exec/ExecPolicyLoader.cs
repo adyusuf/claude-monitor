@@ -27,10 +27,20 @@ public static class ExecPolicyLoader
         ArgumentNullException.ThrowIfNull(config);
         if (!config.ServiceMode)
         {
-            // An interactive agent's claim (ADR-0008 §3a, `aipod config role`) rides with its level; the claim only ever tightens.
-            return identityExecLevel is not null && ExecLevels.All.Contains(identityExecLevel)
-                ? new ExecPolicy(identityExecLevel, [], [], Claim(claimedEnvironment, MachineEnvironments.All), Claim(claimedFunction, MachineFunctions.All), projectFolders)
-                : ExecPolicy.Off with { ClaimedEnvironment = Claim(claimedEnvironment, MachineEnvironments.All), ClaimedFunction = Claim(claimedFunction, MachineFunctions.All), ProjectFolders = projectFolders };
+            // An interactive agent's claim (ADR-0008 §3a, `aipod config role`) rides with its level; the claim only ever tightens. Its ceiling
+            // (ADR-0020 §4, `aipod config access`) is in agent.json; one that is not valid there allows nothing.
+            var off = ExecPolicy.Off with { ClaimedEnvironment = Claim(claimedEnvironment, MachineEnvironments.All), ClaimedFunction = Claim(claimedFunction, MachineFunctions.All), ProjectFolders = projectFolders };
+            if (identityExecLevel is null || !ExecLevels.All.Contains(identityExecLevel)) return off;
+            var saved = Identity.Peek(config);
+            // Empty lists stay the shared empty list, so a policy without a ceiling is the same value it always was.
+            var apps = saved?.AccessExecutables ?? [];
+            IReadOnlyList<string> executables = apps.Count > 0 ? [.. apps.Select(a => a?.Path ?? "")] : [];
+            var hashes = apps.Where(a => a?.Sha256 is not null).GroupBy(a => a.Path, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().Sha256!, StringComparer.Ordinal);
+            IReadOnlyList<string> roots = saved?.AccessAllowedRoots is { Count: > 0 } allowed ? [.. allowed] : [];
+            var denied = saved?.AccessDeniedRoots ?? [];
+            return IsValidCeiling(executables, roots, denied, hashes)
+                ? new ExecPolicy(identityExecLevel, executables, roots, off.ClaimedEnvironment, off.ClaimedFunction, projectFolders, null, denied.Count > 0 ? denied : null, hashes.Count > 0 ? hashes : null)
+                : off;
         }
 
         return ReadServiceFile(config.ExecConfigPath);
@@ -52,8 +62,8 @@ public static class ExecPolicyLoader
             var folders = Folders(file.Projects);
             // A run account the file names but that is not a plain name means "runs as the service account" would be wrong: the file is not believed at all.
             if (file.RunAccount is not null && !RunAccount.IsValidName(file.RunAccount)) return ExecPolicy.Off with { ClaimedEnvironment = claimEnv, ClaimedFunction = claimFn, ProjectFolders = folders };
-            return AllAbsolute(executables) && AllAbsolute(roots)
-                ? new ExecPolicy(level, executables, roots, claimEnv, claimFn, folders, file.RunAccount)
+            return IsValidCeiling(executables, roots, file.DeniedRoots ?? [], file.ExecutableHashes ?? [])
+                ? new ExecPolicy(level, executables, roots, claimEnv, claimFn, folders, file.RunAccount, NullIfEmpty(file.DeniedRoots), NullIfEmpty(file.ExecutableHashes))
                 : ExecPolicy.Off with { ClaimedEnvironment = claimEnv, ClaimedFunction = claimFn, ProjectFolders = folders };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
@@ -77,9 +87,9 @@ public static class ExecPolicyLoader
             var executables = file.AllowedExecutables ?? [];
             var roots = file.AllowedRoots ?? [];
             // The claim rides with the ceiling (ADR-0008 §3a): a reinstall must not erase what an admin wrote.
-            return AllAbsolute(executables) && AllAbsolute(roots)
+            return IsValidCeiling(executables, roots, file.DeniedRoots ?? [], file.ExecutableHashes ?? [])
                 ? new ExecPolicy(level, executables, roots, Claim(file.Environment, MachineEnvironments.All), Claim(file.Function, MachineFunctions.All), Folders(file.Projects),
-                    RunAccount.IsValidName(file.RunAccount) ? file.RunAccount : null)
+                    RunAccount.IsValidName(file.RunAccount) ? file.RunAccount : null, NullIfEmpty(file.DeniedRoots), NullIfEmpty(file.ExecutableHashes))
                 : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
@@ -94,9 +104,9 @@ public static class ExecPolicyLoader
     {
         ArgumentNullException.ThrowIfNull(policy);
         if (!ExecLevels.All.Contains(policy.Level)) throw new ArgumentException("unknown exec level", nameof(policy));
-        if (!AllAbsolute(policy.AllowedExecutables) || !AllAbsolute(policy.AllowedRoots))
+        if (!IsValidCeiling(policy.AllowedExecutables, policy.AllowedRoots, policy.DeniedRoots ?? [], policy.ExecutableHashes ?? new Dictionary<string, string>()))
         {
-            throw new ArgumentException("every allowed path must be absolute", nameof(policy));
+            throw new ArgumentException("every ceiling path must be absolute and every hash a listed executable's lowercase SHA-256", nameof(policy));
         }
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
@@ -107,7 +117,9 @@ public static class ExecPolicyLoader
         try
         {
             var file = new ExecFile(policy.Level, [.. policy.AllowedExecutables], [.. policy.AllowedRoots], policy.ClaimedEnvironment, policy.ClaimedFunction,
-                policy.ProjectFolders is { Count: > 0 } folders ? [.. folders] : null, policy.RunAccount);
+                policy.ProjectFolders is { Count: > 0 } folders ? [.. folders] : null, policy.RunAccount,
+                policy.DeniedRoots is { Count: > 0 } denied ? [.. denied] : null,
+                policy.ExecutableHashes is { Count: > 0 } hashes ? new Dictionary<string, string>(hashes, StringComparer.Ordinal) : null);
             File.WriteAllText(temp, JsonSerializer.Serialize(file, Json));
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, SavedFileMode);
             File.Move(temp, path, overwrite: true);
@@ -139,6 +151,15 @@ public static class ExecPolicyLoader
     }
 
     private static bool AllAbsolute(IEnumerable<string> paths) => paths.All(p => !string.IsNullOrEmpty(p) && Path.IsPathFullyQualified(p));
+
+    /// <summary>Every ceiling path absolute, and every hash the lowercase SHA-256 of an executable the ceiling lists: anything else makes the whole ceiling invalid.</summary>
+    private static bool IsValidCeiling(IReadOnlyList<string> executables, IReadOnlyList<string> roots, IReadOnlyList<string> denied, IReadOnlyDictionary<string, string> hashes) =>
+        AllAbsolute(executables) && AllAbsolute(roots) && AllAbsolute(denied)
+        && hashes.All(h => executables.Contains(h.Key, StringComparer.Ordinal) && AccessPolicyRules.IsSha256(h.Value));
+
+    private static List<string>? NullIfEmpty(List<string>? list) => list is { Count: > 0 } ? list : null;
+
+    private static Dictionary<string, string>? NullIfEmpty(Dictionary<string, string>? map) => map is { Count: > 0 } ? map : null;
 
     /// <summary>The file must not be changeable by the account that obeys it.</summary>
     internal static bool IsAdminOwned(string path)
@@ -193,5 +214,7 @@ public static class ExecPolicyLoader
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Environment = null,
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Function = null,
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] List<string>? Projects = null,
-        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? RunAccount = null);
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? RunAccount = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] List<string>? DeniedRoots = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] Dictionary<string, string>? ExecutableHashes = null);
 }
