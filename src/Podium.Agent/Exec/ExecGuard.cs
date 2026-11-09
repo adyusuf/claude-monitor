@@ -1,3 +1,4 @@
+using Podium.Agent.Access;
 using Podium.Contracts;
 
 namespace Podium.Agent.Exec;
@@ -157,7 +158,7 @@ public static class ExecGuard
 
     private static (string? Path, string? Error) CheckExecutable(string argv0, bool fromGrant, ExecPolicy policy, string os)
     {
-        var exe = ExecPaths.RealPath(argv0, os, allowMissing: false);
+        var exe = PathIdentity.Resolve(argv0, os, allowMissing: false);
         if (exe is null || !File.Exists(exe) || (os == OsKinds.Windows && !GrantMatcher.IsAbsoluteExecutable(exe, os)))
         {
             return (null, ExecErrors.ExeUnresolved);
@@ -184,13 +185,13 @@ public static class ExecGuard
 
     private static string? CheckPaths(string? cwd, IReadOnlyList<GrantPathUse> uses, ExecPolicy policy, string os, string agentHome)
     {
-        var home = ExecPaths.RealPath(agentHome, os, allowMissing: true) ?? agentHome;
+        var home = PathIdentity.Resolve(agentHome, os, allowMissing: true) ?? agentHome;
         var roots = ResolveAll(policy.AllowedRoots, os);
         var limited = policy.AllowedRoots.Count > 0;
 
         if (cwd is not null)
         {
-            var realCwd = ExecPaths.RealPath(cwd, os, allowMissing: false);
+            var realCwd = PathIdentity.Resolve(cwd, os, allowMissing: false);
             if (realCwd is null)
             {
                 return ExecErrors.PathUnresolved;
@@ -205,8 +206,8 @@ public static class ExecGuard
 
         foreach (var use in uses)
         {
-            var realRoot = ExecPaths.RealPath(use.Root, os, allowMissing: false);
-            var realValue = ExecPaths.RealPath(use.Value, os, allowMissing: true);
+            var realRoot = PathIdentity.Resolve(use.Root, os, allowMissing: false);
+            var realValue = PathIdentity.Resolve(use.Value, os, allowMissing: true);
             if (realRoot is null || realValue is null)
             {
                 return ExecErrors.PathUnresolved;
@@ -249,7 +250,7 @@ public static class ExecGuard
     }
 
     private static List<string> ResolveAll(IReadOnlyList<string> paths, string os) =>
-        paths.Select(path => ExecPaths.RealPath(path, os, allowMissing: false)).OfType<string>().ToList();
+        paths.Select(path => PathIdentity.Resolve(path, os, allowMissing: false)).OfType<string>().ToList();
 
     private static bool SamePath(string a, string b, string os) => string.Equals(a, b, os == OsKinds.Linux ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
 }
