@@ -152,27 +152,39 @@ public static class CommandEndpoints
         request.AnsweredAt = now;
         Audit.Add(db, http, clock, AuditActions.PermissionAnswered, request.WorkspaceId, userId, targetType: "permission_request",
             targetId: id, detail: new { request.Decision, request.ToolName });
-        try
+        // The answer, a new rule or the change to an existing one, and their audit rows are saved together or not at all: an answer that is
+        // not saved stays open (the owner can answer again), and one that is saved always reaches the agent below.
+        for (var attempt = 0; ; attempt++)
         {
-            await db.SaveChangesAsync(http.RequestAborted);
-        }
-        catch (DbUpdateException e) when (ask is not null && e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            // Another answer made the same standing approval a moment ago (one per scope, ux_approval_rules_scope): this answer stands, and its
-            // duration is applied to that rule (extending it when this one lasts longer).
-            foreach (var added in db.ChangeTracker.Entries().Where(x => x.State == EntityState.Added
-                && (x.Entity is ApprovalRule || x.Entity is AuditEvent { Action: AuditActions.ApprovalRuleCreated })).ToList())
+            await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+            try
             {
-                added.State = EntityState.Detached;
+                if (ask is not null && existing is { } ruleId && await StandLongerAsync(db, ruleId, ask, http.RequestAborted))
+                {
+                    AuditRule(db, http, clock, ask, ruleId);
+                }
+
+                await db.SaveChangesAsync(http.RequestAborted);
+                await tx.CommitAsync(http.RequestAborted);
+                break;
             }
+            catch (DbUpdateException e) when (attempt == 0 && ask is not null
+                && e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // Another answer made the same standing approval a moment ago (one per scope, ux_approval_rules_scope): this answer stands, and
+                // its duration is applied to that rule (extending it when this one lasts longer).
+                await tx.RollbackAsync(http.RequestAborted);
+                foreach (var added in db.ChangeTracker.Entries().Where(x => x.State == EntityState.Added
+                    && (x.Entity is ApprovalRule || x.Entity is AuditEvent { Action: AuditActions.ApprovalRuleCreated })).ToList())
+                {
+                    added.State = EntityState.Detached;
+                }
 
-            var (again, standing) = await ApplyRuleAsync(db, http, clock, ask);
-            if (again is not null) return again; // the rule cannot stand after all (the cap): nothing is saved, as on the first refusal
-            existing = standing;
-            await db.SaveChangesAsync(http.RequestAborted);
+                var (again, standing) = await ApplyRuleAsync(db, http, clock, ask);
+                if (again is not null) return again; // the rule cannot stand after all (the cap): nothing is saved, as on the first refusal
+                existing = standing;
+            }
         }
-
-        if (ask is not null && existing is { } ruleId) await StandLongerAsync(db, ruleId, ask, http.RequestAborted);
 
         broker.Publish(Broker.Agent(request.AgentId), new StreamMessage(AgentStreamEvents.PermissionAnswer,
             new PermissionAnswerMessage(id, found.Session.ExternalId, request.Decision!, request.Reason, req.Answers)));
@@ -209,8 +221,8 @@ public static class CommandEndpoints
     }
 
     /// <summary>
-    /// Puts the rule of one scope in place: a new one is added (saved with the answer); an existing one, live or ended, is named so that
-    /// <see cref="StandLongerAsync"/> makes it stand as long as asked once the answer is saved. A refusal instead: the cap of live rules.
+    /// Puts the rule of one scope in place: a new one is added with its audit row (saved with the answer); an existing one, live or ended, is
+    /// named so that <see cref="StandLongerAsync"/> makes it stand as long as asked in the answer's transaction. A refusal instead: the cap.
     /// </summary>
     private static async Task<(IResult? Refused, Guid? Existing)> ApplyRuleAsync(PodiumDb db, HttpContext http, TimeProvider clock, RuleAsk ask)
     {
@@ -244,23 +256,27 @@ public static class CommandEndpoints
             db.ApprovalRules.Add(rule);
         }
 
-        Audit.Add(db, http, clock, AuditActions.ApprovalRuleCreated, ask.WorkspaceId, ask.UserId, targetType: "approval_rule", targetId: rule.Id,
-            detail: new { request = ask.FromRequest, rule.ToolName, ask.Duration });
-        return (null, db.Entry(rule).State == EntityState.Added ? null : rule.Id);
+        if (db.Entry(rule).State != EntityState.Added) return (null, rule.Id); // audited by the answer's save, when the change is made
+        AuditRule(db, http, clock, ask, rule.Id);
+        return (null, null);
     }
+
+    private static void AuditRule(PodiumDb db, HttpContext http, TimeProvider clock, RuleAsk ask, Guid ruleId) =>
+        Audit.Add(db, http, clock, AuditActions.ApprovalRuleCreated, ask.WorkspaceId, ask.UserId, targetType: "approval_rule", targetId: ruleId,
+            detail: new { request = ask.FromRequest, ToolName = ask.Tool, ask.Duration });
 
     private static DateTimeOffset? EndOf(RuleAsk ask) => ApprovalDurations.Length(ask.Duration) is { } length ? ask.Now + length : null;
 
     /// <summary>
     /// Makes an existing rule stand as long as asked, in one conditional update: an ended rule starts again, a live one is extended to a later
     /// end or to always, and is never narrowed. The database checks the end again on the locked row, so two answers that extend the same rule
-    /// at once leave it at the longer of the two.
+    /// at once leave it at the longer of the two. True when the rule changed (an always rule, a later end, or a rule revoked meanwhile: false).
     /// </summary>
-    private static async Task StandLongerAsync(PodiumDb db, Guid ruleId, RuleAsk ask, CancellationToken ct)
+    private static async Task<bool> StandLongerAsync(PodiumDb db, Guid ruleId, RuleAsk ask, CancellationToken ct)
     {
         var now = ask.Now;
         var ends = EndOf(ask);
-        await db.ApprovalRules
+        return 1 == await db.ApprovalRules
             .Where(r => r.Id == ruleId && r.RevokedAt == null && r.ExpiresAt != null && (r.ExpiresAt <= now || ends == null || r.ExpiresAt < ends))
             .ExecuteUpdateAsync(u => u
                 .SetProperty(r => r.CreatedAt, r => r.ExpiresAt <= now ? now : r.CreatedAt) // an ended rule of the same scope starts again (one row per scope)
