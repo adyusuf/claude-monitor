@@ -58,7 +58,8 @@ public static partial class Cli
             config = SavedSettings.SaveInboxFormat(config, format!);
         }
 
-        if (Array.IndexOf(args, "--push") < 0 && !config.PushFromEnvironment && Identity.Peek(config)?.Push is null)
+        // Find, not Peek: an agent.json carried over from the previous home holds the push choice made there (--push off stays off).
+        if (Array.IndexOf(args, "--push") < 0 && !config.PushFromEnvironment && Identity.Find(config)?.Push is null)
         {
             // The first install turns the push on, through the inbox (the maintainer, 17/10/2026): it needs no start-up flag, so it works in the desktop app
             // and VS Code too, where a channel is never loaded and the message only arrives at the next prompt. --push channel picks the channel instead.
