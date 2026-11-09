@@ -32,6 +32,10 @@ public sealed class RunReports(PodiumDb db, ApiConfig config, TimeProvider clock
         var at = req.At is { } t && t <= now && t >= now - config.ClockSkewMax ? t : now;
         var error = req.Error is { } e ? Clean(e) : null;
         var exe = req.ResolvedExe is { } x ? Clean(x) : null;
+        // Which access layer refused the run (ADR-0020 §4): kept only with an access error and only when it is a known layer and a real version.
+        var refusal = error is { } code && code.StartsWith(AccessErrors.Prefix, StringComparison.Ordinal);
+        var refusedBy = refusal && AccessRefusedBy.All.Contains(req.RefusedBy ?? "") ? req.RefusedBy : null;
+        var accessVersion = refusal && req.AccessVersion is > 0 ? req.AccessVersion : null;
         int changed;
         switch (req.Status)
         {
@@ -48,12 +52,13 @@ public sealed class RunReports(PodiumDb db, ApiConfig config, TimeProvider clock
                 changed = await db.RemoteRuns.Where(r => r.Id == id && Live.Contains(r.Status))
                     .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, req.Status!).SetProperty(r => r.EndedAt, at)
                         .SetProperty(r => r.ExitCode, req.ExitCode).SetProperty(r => r.Error, error)
+                        .SetProperty(r => r.RefusedBy, refusedBy).SetProperty(r => r.AccessVersion, accessVersion)
                         .SetProperty(r => r.OutputTruncated, r => r.OutputTruncated || req.OutputTruncated), ct);
                 if (changed == 1)
                 {
                     Audit.Add(db, http, clock, AuditActions.RunFinished, run.WorkspaceId, agentId: agentId, targetType: "run",
                         targetId: id, detail: new { status = req.Status, exitCode = req.ExitCode });
-                    if (error is { } code && code.StartsWith(AccessErrors.Prefix, StringComparison.Ordinal)) AuditRefusal(http, run, agentId, code, req);
+                    if (refusal) AuditRefusal(http, run, agentId, error!, refusedBy, accessVersion);
                     await db.SaveChangesAsync(ct);
                     if (run.Mode == RunModes.Script) await StoreOutputAccountAsync(id, req, ct);
                     if (run.Kind == RunKinds.Test) await StoreTestCountsAsync(id, ct);
@@ -72,7 +77,7 @@ public sealed class RunReports(PodiumDb db, ApiConfig config, TimeProvider clock
     /// The access layers refused the run on the target (ADR-0020 §4): the code, the layer (one of <see cref="AccessRefusedBy"/>, else none) and its
     /// version, and the run's repository; a code this API does not know is kept only when it is a plain code.
     /// </summary>
-    private void AuditRefusal(HttpContext http, RemoteRun run, Guid agentId, string code, RunStatusUpdate req)
+    private void AuditRefusal(HttpContext http, RemoteRun run, Guid agentId, string code, string? refusedBy, int? version)
     {
         var plain = AccessErrors.All.Contains(code)
             || code.Length <= 64 && code.All(c => c is '_' or (>= 'a' and <= 'z') or (>= '0' and <= '9'));
@@ -81,8 +86,8 @@ public sealed class RunReports(PodiumDb db, ApiConfig config, TimeProvider clock
             {
                 runId = run.Id,
                 code = plain ? code : AccessErrors.Prefix + "other",
-                refusedBy = AccessRefusedBy.All.Contains(req.RefusedBy ?? "") ? req.RefusedBy : null,
-                version = req.AccessVersion is > 0 ? req.AccessVersion : null,
+                refusedBy,
+                version,
                 projectKey = run.ProjectKey,
             });
     }

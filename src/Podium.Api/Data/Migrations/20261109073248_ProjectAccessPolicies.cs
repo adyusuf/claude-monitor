@@ -18,6 +18,19 @@ namespace Podium.Api.Data.Migrations
                 nullable: false,
                 defaultValue: false);
 
+            migrationBuilder.AddColumn<int>(
+                name: "access_version",
+                table: "remote_runs",
+                type: "integer",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "refused_by",
+                table: "remote_runs",
+                type: "character varying(16)",
+                maxLength: 16,
+                nullable: true);
+
             migrationBuilder.AddColumn<string>(
                 name: "access_scope",
                 table: "permission_requests",
@@ -112,6 +125,16 @@ namespace Podium.Api.Data.Migrations
                 });
 
             migrationBuilder.AddCheckConstraint(
+                name: "ck_remote_runs_access_version",
+                table: "remote_runs",
+                sql: "access_version IS NULL OR access_version >= 1");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_remote_runs_refused_by",
+                table: "remote_runs",
+                sql: "refused_by IS NULL OR refused_by IN ('ceiling', 'policy', 'default')");
+
+            migrationBuilder.AddCheckConstraint(
                 name: "ck_permission_requests_access_scope",
                 table: "permission_requests",
                 sql: "access_scope IS NULL OR access_scope IN ('inside', 'outside', 'unknown')");
@@ -154,12 +177,28 @@ namespace Podium.Api.Data.Migrations
                 name: "project_access_policies");
 
             migrationBuilder.DropCheckConstraint(
+                name: "ck_remote_runs_access_version",
+                table: "remote_runs");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_remote_runs_refused_by",
+                table: "remote_runs");
+
+            migrationBuilder.DropCheckConstraint(
                 name: "ck_permission_requests_access_scope",
                 table: "permission_requests");
 
             migrationBuilder.DropColumn(
                 name: "enforce_access_policies",
                 table: "workspace_settings");
+
+            migrationBuilder.DropColumn(
+                name: "access_version",
+                table: "remote_runs");
+
+            migrationBuilder.DropColumn(
+                name: "refused_by",
+                table: "remote_runs");
 
             migrationBuilder.DropColumn(
                 name: "access_scope",

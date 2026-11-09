@@ -51,5 +51,15 @@ internal static class PodiumDbModelAccess
         });
 
         b.Entity<WorkspaceSettings>(e => e.Property(x => x.EnforceAccessPolicies).HasDefaultValue(false));
+
+        b.Entity<RemoteRun>(e =>
+        {
+            e.Property(x => x.RefusedBy).HasMaxLength(16);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_remote_runs_refused_by", "refused_by IS NULL OR " + PodiumDbModel.In("refused_by", [.. AccessRefusedBy.All]));
+                t.HasCheckConstraint("ck_remote_runs_access_version", "access_version IS NULL OR access_version >= 1");
+            });
+        });
     }
 }

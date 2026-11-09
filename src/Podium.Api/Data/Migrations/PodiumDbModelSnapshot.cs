@@ -3271,6 +3271,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int?>("AccessVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_version");
+
                     b.Property<string>("ApprovalKeyId")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -3396,6 +3400,11 @@ namespace Podium.Api.Data.Migrations
                     b.Property<string>("Reason")
                         .HasColumnType("text")
                         .HasColumnName("reason");
+
+                    b.Property<string>("RefusedBy")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("refused_by");
 
                     b.Property<Guid>("RequesterAgentId")
                         .HasColumnType("uuid")
@@ -3539,6 +3548,8 @@ namespace Podium.Api.Data.Migrations
 
                     b.ToTable("remote_runs", t =>
                         {
+                            t.HasCheckConstraint("ck_remote_runs_access_version", "access_version IS NULL OR access_version >= 1");
+
                             t.HasCheckConstraint("ck_remote_runs_client_key", "char_length(client_key) BETWEEN 1 AND 100");
 
                             t.HasCheckConstraint("ck_remote_runs_kind", "kind IS NULL OR kind IN ('test', 'build', 'deploy', 'other')");
@@ -3548,6 +3559,8 @@ namespace Podium.Api.Data.Migrations
                             t.HasCheckConstraint("ck_remote_runs_mode_shape", "(mode = 'argv' AND shell_command IS NULL AND script_body IS NULL) OR (mode = 'shell' AND argv IS NULL AND script_body IS NULL) OR (mode = 'script' AND argv IS NULL AND shell_command IS NULL AND cwd IS NULL)");
 
                             t.HasCheckConstraint("ck_remote_runs_output_cap", "output_cap IS NULL OR output_cap BETWEEN 1048576 AND 67108864");
+
+                            t.HasCheckConstraint("ck_remote_runs_refused_by", "refused_by IS NULL OR refused_by IN ('ceiling', 'policy', 'default')");
 
                             t.HasCheckConstraint("ck_remote_runs_script_extras", "(script_files_json IS NULL AND script_stdin IS NULL) OR mode = 'script'");
 

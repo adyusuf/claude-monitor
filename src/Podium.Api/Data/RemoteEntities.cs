@@ -69,6 +69,10 @@ public sealed class RemoteRun
     public string? ProjectKey { get; set; }
     public string? Kind { get; set; }
 
+    /// <summary>ADR-0020 §4: the access layer that refused the run on its target (<see cref="Podium.Contracts.AccessRefusedBy"/>) and that layer's policy version; NULL otherwise.</summary>
+    public string? RefusedBy { get; set; }
+    public int? AccessVersion { get; set; }
+
     /// <summary>The counts parsed from the output of a <c>test</c> run of a known tool (ADR-0008 §9.16); NULL when none was recognised.</summary>
     public int? TestsPassed { get; set; }
     public int? TestsFailed { get; set; }
