@@ -4,7 +4,8 @@ namespace Podium.Agent.Access;
 
 /// <summary>
 /// Holds a run to its access layers on real paths (ADR-0020 §4). Each layer's folders and applications are resolved to real paths first (an allowed
-/// folder or application that does not resolve is dropped, so a list that named only such entries allows nothing; a denied folder keeps its text).
+/// folder or application that does not resolve, or a folder that resolves to a forbidden root, is dropped, so a list that named only such entries
+/// allows nothing; a denied folder keeps its text).
 /// The run's paths are then matched by identity as well as by text: an ancestor of a path that is one of a layer's folders under another name (a bind
 /// mount, a firmlink, another case or Unicode form) counts as that folder, and a name that equals a folder's but is another folder cannot be judged.
 /// A missing path is judged by its deepest existing ancestor. The lexical rule is <see cref="AccessPolicyMath.Evaluate"/>. Whatever cannot be read
@@ -72,8 +73,9 @@ internal static class AccessGuard
         public Resolved(AccessLayer layer, string os)
         {
             Layer = layer;
-            Allowed = layer.AllowedFolders?.Select(f => PathIdentity.Resolve(f, os, allowMissing: false)).OfType<string>().Where(Directory.Exists)
-                .Distinct(StringComparer.Ordinal).ToList();
+            // An allowed folder whose real path is a forbidden root (a link to "/" or a home root) is dropped: the list then allows less, never all.
+            Allowed = layer.AllowedFolders?.Select(f => PathIdentity.Resolve(f, os, allowMissing: false)).OfType<string>()
+                .Where(f => Directory.Exists(f) && !GrantMatcher.IsForbiddenRoot(f, os)).Distinct(StringComparer.Ordinal).ToList();
             Denied = [.. layer.DeniedFolders.Select(f => PathIdentity.Resolve(f, os, allowMissing: true) ?? f).Distinct(StringComparer.Ordinal)];
             Apps = layer.Applications?.Select(a => PathIdentity.Resolve(a.Path, os, allowMissing: false) is { } real && File.Exists(real) ? a with { Path = real } : null)
                 .OfType<AccessApp>().ToList();
