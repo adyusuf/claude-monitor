@@ -230,8 +230,16 @@ public static class CommandEndpoints
         {
             rule = new ApprovalRule
             {
-                WorkspaceId = ask.WorkspaceId, UserId = ask.UserId, AgentId = ask.AgentId, RepoId = ask.RepoId, ToolName = ask.Tool, Command = ask.Command,
-                CreatedAt = now, CreatedFromRequest = ask.FromRequest, Duration = ask.Duration, ExpiresAt = EndOf(ask),
+                WorkspaceId = ask.WorkspaceId,
+                UserId = ask.UserId,
+                AgentId = ask.AgentId,
+                RepoId = ask.RepoId,
+                ToolName = ask.Tool,
+                Command = ask.Command,
+                CreatedAt = now,
+                CreatedFromRequest = ask.FromRequest,
+                Duration = ask.Duration,
+                ExpiresAt = EndOf(ask),
             };
             db.ApprovalRules.Add(rule);
         }
