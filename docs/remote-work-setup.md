@@ -235,13 +235,29 @@ and Windows short names followed; a network or device path refused):
    `allowedRoots` and `allowedExecutables`), so these verbs run as the admin (`sudo aipod config access ...`, an
    elevated prompt on Windows); an interactive agent keeps it in its `agent.json`. A ceiling with any entry still
    refuses shell and script runs. It applies to the next run; a reinstall keeps it.
-2. **The web policy of the run's repository** (the project page, owners and admins), which only narrows the ceiling.
-   The agent fetches the policies of its repositories when the stamp in its settings changes, and again before a run
-   that names a newer stamp. On a machine with signed approvals (`aipod config approvals required`, step 9) a policy
-   applies only when a pinned owner key signed it; an unsigned or older version leaves the last signed one in place.
+2. **The web policies of the repositories the run touches** (the project page, owners and admins), which only narrow
+   the ceiling. The repositories are the one the run names and every git checkout around its real working directory
+   and around each path a grant fills in, a submodule's enclosing repository included; every policy covering one of
+   them applies. The API delivers every live policy and tombstone of the agent's workspace (the workspace the API
+   names, which a move on the web changes); the agent fetches them when the stamp in its settings changes, and again,
+   with the settings, before a run that names a newer stamp (the stamp also changes with the enforcement switch). On a
+   machine with signed approvals (`aipod config approvals required`, step 9) a policy applies only when a pinned owner
+   key signed it; an unsigned or older version leaves the last signed one in place, and only a newer signed version of
+   the same project (a signed tombstone included) replaces it. A delivery of exactly 200 policies (the cap) is taken as
+   cut, and so is one that mixes workspaces: every run then gets the default until a complete one arrives.
 3. **The default**, where no policy covers the run's repository but the workspace switch *enforce access policies* is
    on, or the machine is production or a database: the run's project folder only, argv runs only, no shell and no
-   script. With the switch off and an ordinary machine, such a run is held to the ceiling only, as before.
+   script. With the switch off and an ordinary machine, such a run is held to the ceiling only, as before. A machine
+   whose role the agent cannot learn (an API older than this release sends none with a run) counts as production.
+
+Two rules hold the run to where it really works:
+
+- **The repository it names must be its working directory's.** A run whose `project` names none of the checkouts around
+  its working directory is refused (`access_cwd_not_allowed`, by the policy layer) wherever a policy or the default
+  applies; with the ceiling only it runs as before, still held to the policy of the checkout it works in.
+- **An interpreter is code it is given.** An argv run of an interpreter (sh, bash, python, node, PowerShell and the
+  like) needs shell from every policy and from the default, and from a ceiling with any entry unless the interpreter is
+  on the ceiling's application list (`access_script_refused`); an empty ceiling treats it as before.
 
 A refused run fails with a code that starts with `access_` (for example `access_cwd_not_allowed`,
 `access_exe_hash`, `access_shell_refused`) and the layer that refused it; the web shows both. `aipod status` prints
@@ -249,9 +265,10 @@ one line about the ceiling and the policies; `aipod config access show` prints t
 state and whether it is signed. A machine reports its ceiling to the web (shown only to its owner and the workspace's
 admins) and, of its project folders, only how many there are.
 
-A run that names a repository is approved with the repository in the signed payload (`ap-approval-v2`). A machine with
-signed approvals that runs an agent older than this release cannot verify such a signature and refuses the run
-(`approval_invalid`); update its agent. The Windows parts (final paths, file identity, the hard-link count) compile but
+**Update the API before the agents.** An agent of this release on an older API gets no role with a run and treats every
+run as on a production machine (the default wherever no policy applies). A run that names a repository is approved with
+the repository in the signed payload (`ap-approval-v2`). A machine with signed approvals that runs an agent older than
+this release cannot verify such a signature and refuses the run (`approval_invalid`); update its agent. The Windows parts (final paths, file identity, the hard-link count) compile but
 have not yet run on a real Windows host.
 
 Known limits of this release, stated plainly:
