@@ -45,17 +45,20 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
     /// <summary>
     /// True when the run may go on: it names no policy, the stamp held, or one the agent caught up with now. False when the API could not deliver the set
     /// the run names (404: an older API, or the agent's user is no longer a member): the run is then refused as <see cref="AccessErrors.Stale"/> and its
-    /// refusal stored for the report.
+    /// refusal stored for the report. The stamp also changes with the workspace's enforcement switch, so the settings are read again first
+    /// (<paramref name="readSettings"/>); a failed read or fetch propagates and the server replays the run.
     /// </summary>
-    public async Task<bool> FreshAsync(RunMessage run, CancellationToken ct)
+    public async Task<bool> FreshAsync(RunMessage run, Func<CancellationToken, Task> readSettings, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(readSettings);
         if (Identity.Peek(config)?.WorkspaceId is not { } workspace) return true;
         // No stamp (an older API) and an empty one are the same: no policy for this machine. A set still held is fetched again once, and an API
         // without the call (404) leaves it in place, which only keeps the run stricter.
         var stamp = run.AccessStamp ?? "";
         var wanted = Marker(workspace, stamp);
         if (wanted == store.Get(LocalStore.AccessSyncedKey)) return true;
+        await readSettings(ct);
         var fetched = await FetchAsync(workspace, wanted, remember: stamp.Length == 0, ct);
         if (fetched || stamp.Length == 0) return true;
         if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
