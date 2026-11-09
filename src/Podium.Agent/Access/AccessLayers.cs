@@ -38,7 +38,7 @@ public sealed class AccessLayers(AgentConfig config)
         {
             using var store = new LocalStore(config.DatabasePath);
             var judged = AccessPolicyVerifier.Load(config, store);
-            var covering = judged.Where(p => p.Keys.Any(k => keys.Contains(k, RepoKeys.Comparer))).ToList();
+            var covering = Covering(judged, keys);
             // A stored policy that names no repository it could be for (unreadable), or a delivery cut at its cap, cannot be placed: every run gets the default.
             var defaultApplies = WorkspaceSettings.Get(config, store, AccessPolicySync.EnforceKey) == "true" || IsStrict(run, policy, store)
                 || judged.Any(p => p.Keys.Count == 0) || store.Get(LocalStore.AccessTruncatedKey) == "true";
@@ -50,6 +50,20 @@ public sealed class AccessLayers(AgentConfig config)
         {
             return [ceiling, AccessPolicyMath.Default([])];
         }
+    }
+
+    /// <summary>
+    /// The stored policies that cover one of these keys. A policy that does not apply (a tombstone, an invalid or ignored message) does not cover a key
+    /// that an applying policy of another project covers: a key moved to another project's live policy is held to that one, not to the default.
+    /// </summary>
+    public static List<AppliedAccessPolicy> Covering(IReadOnlyList<AppliedAccessPolicy> judged, IReadOnlyList<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(judged);
+        ArgumentNullException.ThrowIfNull(keys);
+        var applying = judged.Where(p => p.Document is not null).ToList();
+        bool Holds(AppliedAccessPolicy p, string key) =>
+            p.Document is not null || !applying.Any(other => other.ProjectId != p.ProjectId && other.Keys.Contains(key, RepoKeys.Comparer));
+        return [.. judged.Where(p => p.Keys.Any(k => keys.Contains(k, RepoKeys.Comparer) && Holds(p, k)))];
     }
 
     /// <summary>
