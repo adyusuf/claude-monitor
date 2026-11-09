@@ -11,6 +11,7 @@ export const trAccess: Dictionary["access"] = {
   version: "Sürüm {version}", signed: "İmzalı", signedBy: "{name} imzaladı", unsigned: "İmzasız",
   keys: "Depolar", keysHint: "Bu politikanın kapsadığı depolar; projenin uygulamalarının adreslerinden gelir. Bir depo en fazla bir politikaya aittir.",
   noCandidates: "Bu projenin hiçbir uygulamasında henüz depo adresi yok. Önce bir uygulamaya ekleyin.", noKeys: "Hiç depo listelenmemiş.",
+  nearKeys: "Makineler bu depoları farklı yazılışla bildiriyor (büyük-küçük harf ya da Unicode biçimi). Politika onları yine kapsar: depo anahtarları harf büyüklüğüne bakılmadan karşılaştırılır.",
   projectFolder: "Her makinede projenin kendi klasörüne izin ver", projectFolderHint: "Bir makinede bu depolardan birinin kopyası neredeyse, çalıştırmalar onu kullanabilir.",
   projectFolderShort: "Proje klasörü", allowed: "izinli", notAllowed: "izinli değil",
   osTabs: "İşletim sistemi", os: { linux: "Linux", macos: "macOS", windows: "Windows" },

@@ -9,6 +9,7 @@ export const enAccess = {
   version: "Version {version}", signed: "Signed", signedBy: "Signed by {name}", unsigned: "Not signed",
   keys: "Repositories", keysHint: "The repositories this policy covers, from the addresses of the project's applications. A repository belongs to one policy at most.",
   noCandidates: "No application of this project has a repository address yet. Add one to an application first.", noKeys: "No repository is listed.",
+  nearKeys: "The machines report these repositories spelled differently (letter case or Unicode form). The policy still covers them: repository keys are compared without case.",
   projectFolder: "Allow the project's own folder on each machine", projectFolderHint: "Wherever a machine has a checkout of one of these repositories, runs may use it.",
   projectFolderShort: "Project folder", allowed: "allowed", notAllowed: "not allowed",
   osTabs: "Operating system", os: { linux: "Linux", macos: "macOS", windows: "Windows" },

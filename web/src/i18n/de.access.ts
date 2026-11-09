@@ -11,6 +11,7 @@ export const deAccess: Dictionary["access"] = {
   version: "Version {version}", signed: "Signiert", signedBy: "Signiert von {name}", unsigned: "Nicht signiert",
   keys: "Repositorys", keysHint: "Die Repositorys, die diese Richtlinie abdeckt, aus den Adressen der Anwendungen des Projekts. Ein Repository gehört zu höchstens einer Richtlinie.",
   noCandidates: "Noch keine Anwendung dieses Projekts hat eine Repository-Adresse. Fügen Sie zuerst einer Anwendung eine hinzu.", noKeys: "Kein Repository aufgeführt.",
+  nearKeys: "Die Maschinen melden diese Repositorys anders geschrieben (Groß- und Kleinschreibung oder Unicode-Form). Die Richtlinie deckt sie trotzdem ab: Repository-Schlüssel werden ohne Groß- und Kleinschreibung verglichen.",
   projectFolder: "Den eigenen Ordner des Projekts auf jeder Maschine erlauben", projectFolderHint: "Wo eine Maschine einen Checkout eines dieser Repositorys hat, dürfen Ausführungen ihn nutzen.",
   projectFolderShort: "Projektordner", allowed: "erlaubt", notAllowed: "nicht erlaubt",
   osTabs: "Betriebssystem", os: { linux: "Linux", macos: "macOS", windows: "Windows" },
