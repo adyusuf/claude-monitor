@@ -38,6 +38,9 @@ public sealed class RunCreator(PodiumDb db, ApiConfig config, TimeProvider clock
                             select new { a, m.Os }).FirstOrDefaultAsync(ct);
         if (target is null) return NotFound();
         if (RunRules.Check(req, config, target.Os) is { } invalid) return RunCreateResult.Refused(StatusCodes.Status400BadRequest, invalid);
+        // The run's repository decides its access policy (ADR-0020 §4): it must be one the target reports, kept in the target's spelling.
+        var projectKey = req.ProjectKey is { Length: > 0 } asked ? await TargetKeyAsync(target.a.Id, asked, ct) : null;
+        if (req.ProjectKey is { Length: > 0 } && projectKey is null) return RunCreateResult.Refused(StatusCodes.Status400BadRequest, RunRules.UnknownProject);
         if (req.Mode == RunModes.Script && ScriptRefusal(target.a, req.ScriptInterpreter) is { } refusal) return RunCreateResult.Refused(StatusCodes.Status409Conflict, refusal);
         // An agent that does not report it cannot run files or a stdin text: it would run the script without them, so it is not offered the run.
         if (req.Mode == RunModes.Script && ScriptFiles.Any(req.ScriptFiles, req.ScriptStdin) && target.a.Capabilities?.Contains(AgentCapabilities.ScriptFiles) != true)
@@ -75,7 +78,7 @@ public sealed class RunCreator(PodiumDb db, ApiConfig config, TimeProvider clock
             Cwd = req.Cwd,
             TimeoutSeconds = req.TimeoutSeconds,
             Reason = req.Reason,
-            ProjectKey = req.ProjectKey,
+            ProjectKey = projectKey,
             Kind = req.Kind,
             CreatedAt = now,
             ExpiresAt = now + config.RunPendingLifetime,
@@ -156,6 +159,13 @@ public sealed class RunCreator(PodiumDb db, ApiConfig config, TimeProvider clock
     private static RunCreateResult Again(RunCreate req, RemoteRun run) => RunRules.SameCommand(req, run)
         ? new RunCreateResult(new RunCreated(run.Id, run.Status, run.GrantId, run.ExpiresAt), StatusCodes.Status200OK, null)
         : RunCreateResult.Refused(StatusCodes.Status409Conflict, RemoteErrors.Mismatch);
+
+    /// <summary>The target's own spelling of a repository it reports (machine_projects), compared as <see cref="RepoKeys.Same"/> does; null when it reports none.</summary>
+    private async Task<string?> TargetKeyAsync(Guid targetAgentId, string key, CancellationToken ct)
+    {
+        var reported = await db.MachineProjects.AsNoTracking().Where(p => p.AgentId == targetAgentId).Select(p => p.ProjectKey).ToListAsync(ct);
+        return reported.Where(k => RepoKeys.Same(k, key)).OrderBy(k => !string.Equals(k, key, StringComparison.Ordinal)).FirstOrDefault();
+    }
 
     private async Task<Guid?> SessionAsync(Guid agentId, string? externalId, CancellationToken ct) => externalId is null
         ? null
