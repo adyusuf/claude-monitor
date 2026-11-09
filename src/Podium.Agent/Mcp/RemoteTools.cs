@@ -28,7 +28,7 @@ public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
         "(the value in brackets, for example git:host/org/repo). Pass it whenever the run works in a repository: it decides which access policy " +
         "the target applies, and a shell or script run on a production or database machine is refused unless it names a repository whose " +
         "policy allows shell. A key the target does not " +
-        "report is refused (invalid_project_key); leave it out only for a run that works in no repository.";
+        "report is dropped (the target then judges the run by the checkout its folder is in); leave it out only for a run that works in no repository.";
     public const string GapMarker = "\n[... output cut here: only the start and the end were kept ...]\n";
     private readonly RemoteClient client = new(config, clock);
 
