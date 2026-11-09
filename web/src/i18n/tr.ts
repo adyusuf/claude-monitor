@@ -242,6 +242,7 @@ export const tr: Dictionary = {
   },
   invitation: { accepting: "Çalışma alanına katılınıyor…", accepted: "Çalışma alanına katıldınız." },
   download: {
+    version: "sürüm {v}", olderTitle: "Önceki sürümler", olderHint: "Burada yayımlanan her sürüm saklanır; önceki bir sürümü yalnızca bir sorundan sonra geri dönmek için alın.",
     title: "Ajanı edinin", intro: "Ajan, makinenizde Claude Code'un yanında çalışır ve oturumlarını buraya bildirir.",
     step1: "Sisteminize uygun ajanı indirin ve sakladığınız bir klasöre koyun.",
     step2: "Bu çalışma alanına bağlayın (bir kod çıkar; açılan sayfada onaylayın):",

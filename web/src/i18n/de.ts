@@ -242,6 +242,7 @@ export const de: Dictionary = {
   },
   invitation: { accepting: "Sie treten dem Arbeitsbereich bei…", accepted: "Sie sind dem Arbeitsbereich beigetreten." },
   download: {
+    version: "Version {v}", olderTitle: "Frühere Versionen", olderHint: "Jede hier veröffentlichte Version bleibt erhalten; nehmen Sie eine frühere nur, um nach einem Problem zurückzugehen.",
     title: "Agent herunterladen", intro: "Der Agent läuft neben Claude Code auf Ihrer Maschine und meldet dessen Sitzungen hierher.",
     step1: "Laden Sie den Agent für Ihr System herunter und legen Sie ihn in einen Ordner, den Sie behalten.",
     step2: "Verbinden Sie ihn mit diesem Arbeitsbereich (ein Code erscheint; geben Sie ihn auf der sich öffnenden Seite frei):",

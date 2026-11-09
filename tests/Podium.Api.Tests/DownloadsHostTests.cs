@@ -76,7 +76,7 @@ public sealed class DownloadsHostTests
         Assert.NotNull(offer);
         Assert.Equal(Base + "/aipod-macos-arm64.zip", offer.Url);
         Assert.Equal(("0.4.0", "prod"), (offer.Version, offer.Channel));
-        Assert.Equal([Base + "/manifest.json"], host.Requests);
+        Assert.Equal([Base + "/manifest.json", Base + "/versions.json"], host.Requests); // the list of kept versions is read with it
     }
 
     [Fact]

@@ -81,9 +81,16 @@ export function DownloadPage() {
   const origin = window.location.origin;
   // The download host itself when the server has one (it says so in /version); until then, or when it has none, this site's /downloads, which redirects there.
   const [host, setHost] = useState("");
+  const [current, setCurrent] = useState<string | null>(null);
+  const [older, setOlder] = useState<{ version: string; url: string }[]>([]);
   useEffect(() => {
     let live = true;
-    api.version().then((v) => { if (live && v.downloadsUrl) setHost(v.downloadsUrl); }).catch(() => undefined);
+    api.version().then((v) => {
+      if (!live) return;
+      if (v.downloadsUrl) setHost(v.downloadsUrl);
+      setCurrent(v.agentVersion ?? null);
+      setOlder(v.agentVersions ?? []);
+    }).catch(() => undefined);
     return () => { live = false; };
   }, []);
   const downloads = host || `${origin}/downloads`;
@@ -144,7 +151,7 @@ export function DownloadPage() {
         <Card>
           <ol className="steps">
             <li>
-              <p>{t("download.step1")}</p>
+              <p>{t("download.step1")}{current ? <> <span className="muted">{t("download.version", { v: current })}</span></> : null}</p>
               <ul className="downloads">
                 {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`${host || "/downloads"}/${f.file}`}>{f.os} · {f.label}</a></li>)}
               </ul>
@@ -154,6 +161,22 @@ export function DownloadPage() {
           </ol>
         </Card>
       </SettingsSection>
+      {older.length > 0 ? (
+        <SettingsSection title={t("download.olderTitle")} hint={t("download.olderHint")}>
+          <Card>
+            <ul className="stack-tight">
+              {older.map((o) => (
+                <li key={o.version}>
+                  <strong>{t("download.version", { v: o.version })}</strong>
+                  <ul className="downloads">
+                    {files.map((f) => <li key={f.file}><a className="btn btn-ghost" href={`${o.url}/${f.file}`}>{f.os} · {f.label}</a></li>)}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </SettingsSection>
+      ) : null}
       <p className="muted"><Link to="/">{t("notFound.home")}</Link></p>
     </div>
   );
