@@ -104,7 +104,7 @@ public static partial class Cli
                 await using (var file = Option(args, "--output") is { } target ? new StreamWriter(target) { AutoFlush = true } : null)
                 {
                     var code = await new Login(config, file ?? stdout, clock).RunAsync(server, null, CancellationToken.None);
-                    if (code == 0) DaemonHost.EnsureRunning(config, log);
+                    if (code == 0) await AfterLoginAsync(config, log, clock);
                     return code;
                 }
 

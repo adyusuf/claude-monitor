@@ -1,6 +1,6 @@
 {
   "name": "aipod",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "aipod agent: installs itself, connects to your server, reports sessions and delivers web messages.",
   "author": {
     "name": "aipod"
