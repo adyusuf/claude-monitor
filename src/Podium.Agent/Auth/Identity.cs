@@ -19,16 +19,25 @@ public sealed record Identity(string MachineKey, string? Server = null, Guid? Ag
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    public bool Connected => Server is not null && AgentId is not null;
+    /// <summary>The shortest machine key that counts; a shorter one (or none) is not an identity: "not connected" until login gives one.</summary>
+    public const int MachineKeyMin = 16;
 
-    /// <summary>The saved identity, or null when there is none or it is unreadable. Never creates or changes the file.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasMachineKey => MachineKey is { Length: >= MachineKeyMin };
+
+    public bool Connected => HasMachineKey && Server is not null && AgentId is not null;
+
+    /// <summary>
+    /// The saved agent.json with its settings, or null when there is none or it is unreadable. Never creates or changes the file. One without a valid
+    /// machine key is returned as it is (its settings count) and is never <see cref="Connected"/>.
+    /// </summary>
     public static Identity? Peek(AgentConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
         try
         {
-            return File.Exists(config.IdentityPath)
-                ? JsonSerializer.Deserialize<Identity>(File.ReadAllText(config.IdentityPath), Json) is { MachineKey.Length: >= 16 } saved ? saved : null
+            return File.Exists(config.IdentityPath) && JsonSerializer.Deserialize<Identity>(File.ReadAllText(config.IdentityPath), Json) is { } saved
+                ? saved with { MachineKey = saved.MachineKey ?? "" }
                 : null;
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
@@ -42,8 +51,8 @@ public sealed record Identity(string MachineKey, string? Server = null, Guid? Ag
 
     /// <summary>
     /// The identity every path but login, connect and install reads (hooks, the daemon, MCP, status): the saved one, or, when this home has no
-    /// agent.json yet, the one of an earlier home carried over once (<see cref="IdentityCarryOver"/>). Null when there is none or its machine key is
-    /// not valid: never a new machine key, so a hook can never make the web see a second device.
+    /// agent.json yet, the one of an earlier home carried over once (<see cref="IdentityCarryOver"/>). Null when there is none; one without a valid
+    /// machine key is never <see cref="Connected"/>. Never a new machine key, so a hook can never make the web see a second device.
     /// </summary>
     public static Identity? Find(AgentConfig config)
     {
@@ -52,10 +61,7 @@ public sealed record Identity(string MachineKey, string? Server = null, Guid? Ag
         return !File.Exists(config.IdentityPath) && IdentityCarryOver.TryCarry(config) ? Peek(config) : null;
     }
 
-    /// <summary>
-    /// The identity a settings command edits: the one <see cref="Find"/> gives, else what agent.json holds as it is (a machine key not set yet stays
-    /// unset), else an empty one. It never mints a machine key; login does.
-    /// </summary>
+    /// <summary>The identity a settings command edits: the one <see cref="Find"/> gives (a machine key not set yet stays unset), else an empty one. It never mints one; login does.</summary>
     public static Identity ForEdit(AgentConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -69,10 +75,10 @@ public sealed record Identity(string MachineKey, string? Server = null, Guid? Ag
     public static Identity Load(AgentConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
-        if (Find(config) is { } found) return found;
+        if (Find(config) is { HasMachineKey: true } found) return found;
         config.EnsureHome();
         using var gate = IdentityCarryOver.Lock(config);
-        if (Peek(config) is { } won) return won;
+        if (Peek(config) is { HasMachineKey: true } won) return won;
         var fresh = (Raw(config) ?? None) with { MachineKey = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24)) };
         if (File.Exists(config.IdentityPath))
         {
@@ -80,7 +86,7 @@ public sealed record Identity(string MachineKey, string? Server = null, Guid? Ag
             return fresh;
         }
 
-        return IdentityCarryOver.CreateNew(config.IdentityPath, JsonSerializer.Serialize(fresh, Json)) ? fresh : Peek(config) ?? fresh;
+        return IdentityCarryOver.CreateNew(config.IdentityPath, JsonSerializer.Serialize(fresh, Json)) ? fresh : Peek(config) is { HasMachineKey: true } other ? other : fresh;
     }
 
     /// <summary>agent.json as it is, whatever its machine key; null when there is none. A file that cannot be read throws, as a settings command should.</summary>
