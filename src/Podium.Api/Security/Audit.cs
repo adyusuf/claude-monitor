@@ -41,8 +41,12 @@ public static class AuditActions
     public const string AskCancelled = "ask.cancelled";
     public const string RefreshReuse = "agent.refresh_reuse";
     public const string CommandCreated = "session.command_created";
+    public const string SessionHidden = "session.hidden";
     public const string CommandCancelled = "session.command_cancelled";
     public const string PermissionAnswered = "session.permission_answered";
+    public const string PermissionAutoAllowed = "session.permission_auto_allowed";
+    public const string ApprovalRuleCreated = "approval_rule.created";
+    public const string ApprovalRuleRevoked = "approval_rule.revoked";
     public const string RunCreated = "remote.run_created";
     public const string RunApproved = "remote.run_approved";
     public const string RunDenied = "remote.run_denied";

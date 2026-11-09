@@ -6,13 +6,16 @@ import { trSprints } from "./tr.sprints";
 import { trIntegrations } from "./tr.integrations";
 import { trServerSettings } from "./tr.serverSettings";
 import { trTwoStep } from "./tr.twoStep";
+import { trApprovalRules } from "./tr.approvalRules";
+import { trDashboard } from "./tr.dashboard";
+import { trInstallOptions } from "./tr.installOptions";
 import { trRemote } from "./tr.remote";
 
 // Turkish: the same keys as en.ts (the type makes a missing key a build error).
 export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
-    projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
+    dashboard: "Pano", projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", approvals: "Onaylar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
     themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
@@ -48,7 +51,7 @@ export const tr: Dictionary = {
     account_disabled: "Bu hesap devre dışı.", not_a_member: "O çalışma alanının üyesi değilsiniz.",
     invalid_code: "Bu kod geçersiz ya da süresi dolmuş.", last_owner: "Bir çalışma alanında en az bir sahip olmalı.",
     invalid_answers: "Bu yanıt soruyla uyuşmuyor.",
-    session_ended: "Oturum sona erdi.", invalid_body: "Gönderilecek mesajı yazın.", too_long: "Bu çok uzun.",
+    session_ended: "Oturum sona erdi.", session_not_ended: "Yalnızca biten bir oturum listeden kaldırılabilir.", invalid_body: "Gönderilecek mesajı yazın.", too_long: "Bu çok uzun.",
     out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
     forbidden: "Bunu yapma izniniz yok.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
@@ -116,6 +119,15 @@ export const tr: Dictionary = {
     project: "Proje", host: "Makine", owner: "Sahibi", cost: "Maliyet", lastActivity: "Son etkinlik",
     untitled: "Başlıksız oturum", more: "Daha fazla", live: "Canlı", permissionsWaiting: "{n} yanıt bekliyor",
     unmeasured: "ölçülemiyor", noBranch: "Dal bildirilmedi",
+    claude: {
+      unknown: "Claude: bildirilmedi", none: "Claude kurulu değil", installed: "Claude {version}", running: "Claude {version} · çalışıyor, {n} oturum",
+      stopped: "Claude {version} · çalışmıyor", fromWebOn: "Web'den başlatılabilir", control: "Claude'u başlat ya da durdur", dialog: "{host} üzerinde Claude",
+    },
+    count: "{n} oturum", machineGone: "Bu makine artık bağlı değil.", noneOnMachine: "Bu makinede oturum yok.",
+    noneLoaded: "Şimdiye kadar yüklenenler arasında oturum yok.", noRepo: "Depo bildirilmedi", noMatch: "Eşleşen oturum yok.",
+    fromWeb: "Web'den başlatıldı", fromWebHint: "Bu oturum için Claude Code web'den arka planda başlatıldı.",
+    stop: "Durdur", stopSent: "Durdurma gönderildi. Makine bir sonraki bağlantısında oturumu durdurur; sonuç Claude penceresinde görünür.", stopConfirm: "Bu oturum durdurulsun mu? Konuşması korunur.", hide: "Listeden kaldır",
+    hideConfirm: "Biten bu oturum listeden kaldırılsın mı? Hiçbir şey silinmez; yeniden rapor verirse geri gelir.",
   },
   session: {
     back: "Tüm oturumlar", tasks: "Görevler", noTasks: "Görev yok.", subagents: "Alt ajanlar", noSubagents: "Alt ajan yok.",
@@ -180,6 +192,9 @@ export const tr: Dictionary = {
   integrations: trIntegrations,
   serverSettings: trServerSettings,
   twoStep: trTwoStep,
+  approvalRules: trApprovalRules,
+  dashboard: trDashboard,
+  installOptions: trInstallOptions,
   device: {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
     approve: "Bu makineyi bağla", deny: "Bu ben değilim", approved: "Tamam. Makine bağlandı; bu sayfayı kapatabilirsiniz.",
@@ -240,6 +255,11 @@ export const tr: Dictionary = {
     installerTitle: "Tek adımda kurun (önerilen)",
     installerIntro: "Tek bir komut ajanı ve Claude Code eklentisini kurar, bu makineyi bağlar (bir kod çıkar; açılan sayfada onaylayın). Eski bir ajanı sorduktan sonra değiştirir, ayarlarını ve girişini korur.",
     installerUnix: "macOS ve Linux:", installerWindows: "Windows (PowerShell):",
+  },
+  runsPage: {
+    title: "Çalıştırmalar", intro: "Bu çalışma alanındaki makinelerden istenen her komut, en yenisi önce: kim istedi, nerede, kim karar verdi.",
+    status: "Durum", allMachines: "Tüm makineler", machine: "Makine", command: "Komut", requestedBy: "İsteyen", when: "Ne zaman", decidedBy: "Karar veren",
+    byGrant: "bir izin", byJob: "bir iş", undecided: "henüz yok", details: "Ayrıntılar", detailsOf: "Çalıştırma ayrıntıları", empty: "Bu çalışma alanında henüz hiçbir şey çalışmadı.",
   },
   common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
   remote: trRemote,

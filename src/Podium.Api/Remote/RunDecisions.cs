@@ -42,6 +42,7 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
 
         var now = clock.GetUtcNow();
         var withTotp = false;
+        var codeWindow = false;
         var env = MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment);
         var fn = MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction);
         var strict = MachineRoles.IsStrict(env, fn);
@@ -54,9 +55,12 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
             var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
             // Strict target: no two-step sign-in, no approval (decision §9.13); elsewhere a code is asked of whoever has it on (shell and script).
             if (needsCode && user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
-            if (user.TotpEnabledAt is not null)
+            // Off a strict target a code accepted on this sign-in in the last minutes stands in for one (ADR-0008 §9.13a); the run is then not
+            // marked as approved with a code, so a target that turns strict before it starts still refuses it.
+            codeWindow = user.TotpEnabledAt is not null && !needsCode && await RemoteChecks.RecentCodeAsync(http, db, config, clock);
+            if (user.TotpEnabledAt is not null && !codeWindow)
             {
-                if (!await MfaEndpoints.CheckAsync(db, config, user, req.Code, now, ct))
+                if (!await RemoteChecks.CodeAsync(http, db, config, user, req.Code, now))
                 {
                     return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.MfaRequired);
                 }
@@ -96,7 +100,7 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
                 .SetProperty(r => r.ApprovalNotAfter, signedNotAfter), ct);
         if (changed != 1) return Conflict(RemoteErrors.NotPending);
         Audit.Add(db, http, clock, AuditActions.RunApproved, run.WorkspaceId, userId, targetType: "run", targetId: id,
-            detail: new { hash = req.Hash, mode = run.Mode, totp = withTotp });
+            detail: new { hash = req.Hash, mode = run.Mode, totp = withTotp, codeWindow });
         await db.SaveChangesAsync(ct);
         run.Status = RunStatuses.Approved;
         run.DecidedAt = now;

@@ -122,6 +122,10 @@ public static class DeviceEndpoints
             old.RevokedBy = userId;
         }
 
+        // The old agent's standing approvals (ADR-0019) end with it.
+        var oldIds = previous.Select(a => a.Id).ToList();
+        await db.ApprovalRules.Where(r => oldIds.Contains(r.AgentId) && r.RevokedAt == null).ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, now), ct);
+
         // The partial unique index (one active agent per machine and user) is checked per statement, so the
         // revocations must reach the database before the new agent is inserted.
         await db.SaveChangesAsync(ct);

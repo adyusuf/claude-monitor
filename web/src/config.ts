@@ -51,6 +51,8 @@ export const config = {
   runPageSize: 50,
   /** The nav badge of runs waiting for the user re-reads this often. */
   pendingPollMs: 30_000,
+  // How often the approval band reads the requests waiting on the viewer's sessions (ADR-0019).
+  approvalPollMs: 10_000,
   outputPageSize: 50,
   countdownTickMs: 1_000,
   /** The Allow button of a shell or interpreter run waits this long after the card appears (ADR-0005, "The owner's approval"). */

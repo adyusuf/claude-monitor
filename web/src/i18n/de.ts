@@ -1,6 +1,9 @@
 import type { Dictionary } from "./en";
 import { deMachines } from "./de.machines";
 import { deTwoStep } from "./de.twoStep";
+import { deApprovalRules } from "./de.approvalRules";
+import { deDashboard } from "./de.dashboard";
+import { deInstallOptions } from "./de.installOptions";
 import { deRemote } from "./de.remote";
 import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
@@ -12,7 +15,7 @@ import { deServerSettings } from "./de.serverSettings";
 export const de: Dictionary = {
   app: { name: "Podium", tagline: "Verfolgen Sie Ihre KI-Programmiersitzungen live." },
   nav: {
-    projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
+    dashboard: "Übersicht", projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", runs: "Ausführungen", approvals: "Freigaben", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
     account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
     themeSystem: "System", themeLight: "Hell", themeDark: "Dunkel",
@@ -48,7 +51,7 @@ export const de: Dictionary = {
     account_disabled: "Dieses Konto ist deaktiviert.", not_a_member: "Sie sind kein Mitglied dieses Arbeitsbereichs.",
     invalid_code: "Dieser Code ist ungültig oder abgelaufen.", last_owner: "Ein Arbeitsbereich braucht mindestens einen Eigentümer.",
     invalid_answers: "Diese Antwort passt nicht zur Frage.",
-    session_ended: "Die Sitzung ist beendet.", invalid_body: "Schreiben Sie die Nachricht, die gesendet werden soll.", too_long: "Das ist zu lang.",
+    session_ended: "Die Sitzung ist beendet.", session_not_ended: "Nur eine beendete Sitzung kann aus der Liste entfernt werden.", invalid_body: "Schreiben Sie die Nachricht, die gesendet werden soll.", too_long: "Das ist zu lang.",
     out_of_range: "Dieser Wert liegt außerhalb des zulässigen Bereichs.", invalid_role: "Wählen Sie eine Rolle.", unauthorized: "Ihre Sitzung ist beendet. Melden Sie sich erneut an.",
     forbidden: "Das dürfen Sie nicht.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
     too_many_requests: "Zu viele Versuche. Warten Sie eine Minute.", server_error: "Auf dem Server ist etwas schiefgegangen.",
@@ -116,6 +119,15 @@ export const de: Dictionary = {
     project: "Projekt", host: "Maschine", owner: "Eigentümer", cost: "Kosten", lastActivity: "Letzte Aktivität",
     untitled: "Sitzung ohne Titel", more: "Mehr laden", live: "Live", permissionsWaiting: "{n} warten auf eine Antwort",
     unmeasured: "nicht messbar", noBranch: "Kein Branch gemeldet",
+    claude: {
+      unknown: "Claude: nicht gemeldet", none: "Claude nicht installiert", installed: "Claude {version}", running: "Claude {version} · läuft, {n} Sitzung(en)",
+      stopped: "Claude {version} · läuft nicht", fromWebOn: "Vom Web aus startbar", control: "Claude starten oder stoppen", dialog: "Claude auf {host}",
+    },
+    count: "{n} Sitzung(en)", machineGone: "Diese Maschine ist nicht mehr verbunden.", noneOnMachine: "Keine Sitzung auf dieser Maschine.",
+    noneLoaded: "Keine Sitzung unter den bisher geladenen.", noRepo: "Kein Repository gemeldet", noMatch: "Keine Sitzung passt.",
+    fromWeb: "Vom Web gestartet", fromWebHint: "Claude Code wurde für diese Sitzung vom Web aus im Hintergrund gestartet.",
+    stop: "Stoppen", stopSent: "Stopp gesendet. Die Maschine stoppt die Sitzung bei ihrer nächsten Meldung; das Ergebnis steht in ihrem Claude-Dialog.", stopConfirm: "Diese Sitzung stoppen? Ihre Unterhaltung bleibt erhalten.", hide: "Aus der Liste entfernen",
+    hideConfirm: "Diese beendete Sitzung aus der Liste entfernen? Nichts wird gelöscht; sie kommt zurück, wenn sie sich wieder meldet.",
   },
   session: {
     back: "Alle Sitzungen", tasks: "Aufgaben", noTasks: "Keine Aufgaben.", subagents: "Subagenten", noSubagents: "Keine Subagenten.",
@@ -180,6 +192,9 @@ export const de: Dictionary = {
   integrations: deIntegrations,
   serverSettings: deServerSettings,
   twoStep: deTwoStep,
+  approvalRules: deApprovalRules,
+  dashboard: deDashboard,
+  installOptions: deInstallOptions,
   device: {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",
     approve: "Diese Maschine verbinden", deny: "Das bin nicht ich", approved: "Fertig. Die Maschine ist verbunden; Sie können diese Seite schließen.",
@@ -240,6 +255,11 @@ export const de: Dictionary = {
     installerTitle: "In einem Schritt installieren (empfohlen)",
     installerIntro: "Ein Befehl installiert den Agent und das Claude-Code-Plugin und verbindet diese Maschine (ein Code erscheint; geben Sie ihn auf der sich öffnenden Seite frei). Er ersetzt einen älteren Agent nach Rückfrage und behält dessen Einstellungen und Anmeldung.",
     installerUnix: "macOS und Linux:", installerWindows: "Windows (PowerShell):",
+  },
+  runsPage: {
+    title: "Ausführungen", intro: "Jeder Befehl, den eine Maschine dieses Arbeitsbereichs ausführen sollte, der neueste zuerst: wer ihn wollte, wo, und wer entschied.",
+    status: "Status", allMachines: "Alle Maschinen", machine: "Maschine", command: "Befehl", requestedBy: "Angefordert von", when: "Wann", decidedBy: "Entschieden von",
+    byGrant: "eine Freigabe", byJob: "ein Auftrag", undecided: "noch nicht", details: "Details", detailsOf: "Details der Ausführung", empty: "In diesem Arbeitsbereich wurde noch nichts ausgeführt.",
   },
   common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert" },
   remote: deRemote,

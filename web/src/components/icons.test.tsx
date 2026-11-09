@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { BrandMark, Icon, type IconName } from "./icons";
 
-const names: IconName[] = ["projects", "sessions", "machines", "members", "integrations", "settings", "server", "download", "lock", "check", "progress", "todo", "menu", "branch", "empty"];
+const names: IconName[] = ["projects", "sessions", "machines", "members", "integrations", "settings", "server", "download", "lock", "check", "progress", "todo", "menu", "branch", "empty", "edit", "close", "runs"];
 
 describe("icons", () => {
   it.each(names)("draws the %s icon as a hidden outline svg", (name) => {

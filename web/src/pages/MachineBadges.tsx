@@ -1,14 +1,25 @@
 import type { MachineView, ToolInfo } from "../api/types";
 import { useI18n } from "../i18n";
+import { ENVIRONMENT_ORDER, environmentsOf, FUNCTION_ORDER, functionsOf, normalize } from "../lib/roles";
 import { Icon } from "../components/icons";
 
 /** True for a production or database machine (ADR-0008 §2): the badge turns red and scripts will need a code. */
 export const isStrict = (m: MachineView): boolean => m.effectiveEnvironment === "production" || m.effectiveFunction === "database";
 
-/** "production/database", "test/not set", or "not set"; the server computed the effective role, the claim only tightened it. */
+/** The values of a set with the effective one added when a claim made it stricter than anything set, loosest first. */
+function withEffective<T extends string>(values: T[], effective: T | null | undefined, order: readonly T[]): T[] {
+  return effective && !values.includes(effective) ? normalize([...values, effective], order) : values;
+}
+
+/**
+ * "production/database", "test/not set", "dev+test/web", or "not set"; the server computed the effective role (the claim only tightened it),
+ * and a role with several values names each of them.
+ */
 export function roleCode(m: MachineView, notSet: string): string {
   if (!m.effectiveEnvironment && !m.effectiveFunction) return notSet;
-  return `${m.effectiveEnvironment ?? notSet}/${m.effectiveFunction ?? notSet}`;
+  const envs = m.effectiveEnvironment ? withEffective(environmentsOf(m), m.effectiveEnvironment, ENVIRONMENT_ORDER) : [];
+  const fns = m.effectiveFunction ? withEffective(functionsOf(m), m.effectiveFunction, FUNCTION_ORDER) : [];
+  return `${envs.length > 0 ? envs.join("+") : notSet}/${fns.length > 0 ? fns.join("+") : notSet}`;
 }
 
 /** The effective role, red when strict, with the machine's own claim in the title. */
@@ -44,11 +55,17 @@ function kindText(kind: string, t: (key: "machines.claude.kind.npm" | "machines.
   }
 }
 
-/** The admin's tags as small chips; nothing when there are none (an older API omits them). */
+/** How many tags a row of the machines table shows before it says how many more there are. */
+export const TAG_CHIPS_SHOWN = 5;
+
+/** The admin's tags as small chips, the first few and a count of the rest; nothing when there are none (an older API omits them). */
 export function TagChips({ view: m }: { view: MachineView }) {
-  const entries = Object.entries(m.tags ?? {});
+  const { t } = useI18n();
+  const entries = Object.entries(m.tags ?? {}).sort(([a], [b]) => (a < b ? -1 : 1));
   if (entries.length === 0) return null;
-  return <>{entries.sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => <span key={k} className="badge">{k}={v}</span>)} </>;
+  const rest = entries.length - TAG_CHIPS_SHOWN;
+  return <>{entries.slice(0, TAG_CHIPS_SHOWN).map(([k, v]) => <span key={k} className="badge">{k}={v}</span>)}{rest > 0
+    ? <span className="badge" title={entries.slice(TAG_CHIPS_SHOWN).map(([k, v]) => `${k}=${v}`).join(" ")}>{t("machines.tags.more", { n: rest })}</span> : null} </>;
 }
 
 /** The tool inventory as "name version" chips; an untrusted tool is marked, and an agent that reported nothing says so. */

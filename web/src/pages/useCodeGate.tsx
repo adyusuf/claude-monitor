@@ -18,7 +18,8 @@ export interface CodeGate {
 /**
  * An owner's action that may need a two-step code (ADR-0005): a shell approval answers 403 "mfa_required", a grant or job
  * approval 403 "reauth_required" (the sign-in is not recent). The code field appears on that answer; a wrong code is
- * reported as such. Any other failure is shown as it is.
+ * reported as such. Any other failure is shown as it is. A code accepted in the last 5 minutes on this sign-in stands in for one off a strict
+ * target, so the first attempt (which goes without a code) then passes and no field appears.
  */
 export function useCodeGate(needCode: "mfa_required" | "reauth_required", hint: Key, force = false): CodeGate {
   const { t } = useI18n();
@@ -54,6 +55,7 @@ export function useCodeGate(needCode: "mfa_required" | "reauth_required", hint: 
     <>
       <Field label={t("remote.codeLabel")} hint={t(hint)} value={code} inputMode="numeric" autoComplete="one-time-code" autoFocus
         onChange={(e) => setCode(e.target.value)} />
+      <p className="muted small">{t("remote.codeWindow")}</p>
       <p className="small"><Link to="/two-step">{t("twoStep.help")}</Link></p>
     </>
   ) : null;

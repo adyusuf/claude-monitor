@@ -174,9 +174,17 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("role_environment");
 
+                    b.PrimitiveCollection<List<string>>("RoleEnvironments")
+                        .HasColumnType("text[]")
+                        .HasColumnName("role_environments");
+
                     b.Property<string>("RoleFunction")
                         .HasColumnType("text")
                         .HasColumnName("role_function");
+
+                    b.PrimitiveCollection<List<string>>("RoleFunctions")
+                        .HasColumnType("text[]")
+                        .HasColumnName("role_functions");
 
                     b.Property<DateTimeOffset?>("RoleSetAt")
                         .HasColumnType("timestamp with time zone")
@@ -309,13 +317,17 @@ namespace Podium.Api.Data.Migrations
 
                             t.HasCheckConstraint("ck_agents_role_environment", "role_environment IS NULL OR role_environment IN ('dev', 'test', 'stage', 'preprod', 'production', 'other')");
 
+                            t.HasCheckConstraint("ck_agents_role_environments", "role_environments IS NULL OR role_environments <@ ARRAY['dev', 'test', 'stage', 'preprod', 'production', 'other']::text[]");
+
                             t.HasCheckConstraint("ck_agents_role_function", "role_function IS NULL OR role_function IN ('development', 'application', 'web', 'database', 'ci', 'storage', 'other')");
+
+                            t.HasCheckConstraint("ck_agents_role_functions", "role_functions IS NULL OR role_functions <@ ARRAY['development', 'application', 'web', 'database', 'ci', 'storage', 'other']::text[]");
 
                             t.HasCheckConstraint("ck_agents_services", "services IS NULL OR (jsonb_typeof(services) = 'array' AND jsonb_array_length(services) <= 64)");
 
                             t.HasCheckConstraint("ck_agents_status", "status IN ('active', 'revoked')");
 
-                            t.HasCheckConstraint("ck_agents_tags", "tags IS NULL OR (jsonb_typeof(tags) = 'object' AND jsonb_array_length(jsonb_path_query_array(tags, '$.keyvalue()')) <= 10)");
+                            t.HasCheckConstraint("ck_agents_tags", "tags IS NULL OR (jsonb_typeof(tags) = 'object' AND jsonb_array_length(jsonb_path_query_array(tags, '$.keyvalue()')) <= 100)");
                         });
                 });
 
@@ -672,6 +684,87 @@ namespace Podium.Api.Data.Migrations
                     b.ToTable("approval_keys");
                 });
 
+            modelBuilder.Entity("Podium.Api.Data.ApprovalRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agent_id");
+
+                    b.Property<string>("Command")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("command");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedFromRequest")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_from_request");
+
+                    b.Property<string>("Duration")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("duration");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<Guid?>("RepoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("repo_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("ToolName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("tool_name");
+
+                    b.Property<int>("UseCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("use_count");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval_rules");
+
+                    b.HasIndex("AgentId", "ToolName")
+                        .HasDatabaseName("ix_approval_rules_agent_id_tool_name");
+
+                    b.HasIndex("UserId", "WorkspaceId")
+                        .HasDatabaseName("ix_approval_rules_user_id_workspace_id");
+
+                    b.ToTable("approval_rules", t =>
+                        {
+                            t.HasCheckConstraint("ck_approval_rules_duration", "duration IN ('5m', '10m', '30m', '1h', 'always')");
+
+                            t.HasCheckConstraint("ck_approval_rules_expiry", "(duration = 'always') = (expires_at IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Podium.Api.Data.AuditEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -920,6 +1013,10 @@ namespace Podium.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("harness_kind");
+
+                    b.Property<DateTimeOffset?>("HiddenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hidden_at");
 
                     b.Property<DateTimeOffset>("LastEventAt")
                         .HasColumnType("timestamp with time zone")
@@ -1952,6 +2049,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("CodeCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("code_checked_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -2935,6 +3036,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("answered_by");
 
+                    b.Property<Guid?>("AnsweredByRule")
+                        .HasColumnType("uuid")
+                        .HasColumnName("answered_by_rule");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -2979,6 +3084,9 @@ namespace Podium.Api.Data.Migrations
 
                     b.HasIndex("SessionId", "Status")
                         .HasDatabaseName("ix_permission_requests_session_id_status");
+
+                    b.HasIndex("WorkspaceId", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_permission_requests_workspace_id_status_created_at");
 
                     b.ToTable("permission_requests", t =>
                         {
@@ -4483,6 +4591,16 @@ namespace Podium.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_approval_keys_users_user_id");
+                });
+
+            modelBuilder.Entity("Podium.Api.Data.ApprovalRule", b =>
+                {
+                    b.HasOne("Podium.Api.Data.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_rules_agents_agent_id");
                 });
 
             modelBuilder.Entity("Podium.Api.Data.EventArchive", b =>

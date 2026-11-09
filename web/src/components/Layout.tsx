@@ -4,7 +4,9 @@ import { api } from "../api/endpoints";
 import { useSession } from "../auth/session";
 import { config } from "../config";
 import { languages, useI18n, type Language } from "../i18n";
+import { useApprovalQueue } from "../lib/approvalQueue";
 import { usePendingApprovals } from "../lib/pending";
+import { ApprovalBand } from "./ApprovalBand";
 import { BrandMark, Icon, type IconName } from "./icons";
 
 type Theme = "light" | "dark" | "system";
@@ -42,7 +44,9 @@ export function Layout() {
   const workspaces = me?.workspaces ?? [];
   const current = workspaces.find((w) => w.id === ws) ?? workspaces[0];
   const [menuOpen, setMenuOpen] = useState(false);
-  const pending = usePendingApprovals(current?.id, useLocation().pathname);
+  const path = useLocation().pathname;
+  const pending = usePendingApprovals(current?.id, path);
+  const queue = useApprovalQueue(current?.id, path);
 
   const link = (to: string, label: string, icon: IconName, badge = 0) => (
     <NavLink to={to} className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")} onClick={() => setMenuOpen(false)}>
@@ -70,9 +74,12 @@ export function Layout() {
         ) : null}
         {current ? (
           <nav className="nav">
+            {link(`/w/${current.id}/dashboard`, t("nav.dashboard"), "dashboard")}
             {link(`/w/${current.id}/projects`, t("nav.projects"), "projects")}
             {link(`/w/${current.id}/sessions`, t("nav.sessions"), "sessions")}
             {link(`/w/${current.id}/machines`, t("nav.machines"), "machines", pending)}
+            {link(`/w/${current.id}/approvals`, t("nav.approvals"), "approvals", queue.rows.length)}
+            {link(`/w/${current.id}/runs`, t("nav.runs"), "runs")}
             {link(`/w/${current.id}/members`, t("nav.members"), "members")}
             {link(`/w/${current.id}/integrations`, t("nav.integrations"), "integrations")}
             {current.role === "owner" || current.role === "admin" ? link(`/w/${current.id}/settings`, t("nav.settings"), "settings") : null}
@@ -115,6 +122,10 @@ export function Layout() {
           <span className="topbar-name">{t("app.name")}</span>
         </div>
         <div className="main">
+          {current ? <ApprovalBand ws={current.id} rows={queue.rows} runs={pending} onAnswered={(id) => {
+            queue.drop(id);
+            queue.reload();
+          }} /> : null}
           <Outlet />
         </div>
       </div>

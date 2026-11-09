@@ -46,11 +46,21 @@ export interface MachineView {
   pluginId?: string | null;
   /** The project the mode "always" keeps a session running in (ADR-0014 P3). */
   claudeAutoProject?: string | null;
+  /** How many Claude Code sessions the machine reported running at its last presence report; null when unknown. Absent on an older API. */
+  claudeSessionsLive?: number | null;
+  /** Every environment and function an admin set (roleEnvironment/roleFunction are the strictest of them). Absent on an older API. */
+  roleEnvironments?: MachineEnvironment[] | null;
+  roleFunctions?: MachineFunction[] | null;
 }
-export interface AgentRoleInput { environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string }
+/** The single values are the strictest of the sets (an older API reads only them); environments/functions are every value (08/11/2026). */
+export interface AgentRoleInput {
+  environment: MachineEnvironment | string | null; function: MachineFunction | string | null; code?: string;
+  environments?: (MachineEnvironment | string)[]; functions?: (MachineFunction | string)[];
+}
 export interface AgentRoleView {
   agentId: string; environment: MachineEnvironment | null; function: MachineFunction | null; setAt: string | null; setBy: string | null;
   claimedEnvironment: MachineEnvironment | null; claimedFunction: MachineFunction | null; effectiveEnvironment: MachineEnvironment | null; effectiveFunction: MachineFunction | null;
+  environments?: MachineEnvironment[] | null; functions?: MachineFunction[] | null;
 }
 export type AlertKind = "cpu" | "memory" | "disk" | "offline";
 export interface AlertView {

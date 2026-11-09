@@ -45,7 +45,7 @@ can run the application's tests on a test machine.
   and never replaces a set value with a non-strict one; the "role is set" test (`role_not_set`) looks at the **set**
   value only, so a machine with no set role and a claim of `production` is still refused scripts and asks.
 - **Facts:** what an agent reports about its machine beyond metrics: Claude presence, the **tool inventory**, the
-  **listening services** (opt-in), the **projects** found on it. **Tags** (`key=value`, at most 10) and the **admin
+  **listening services** (opt-in), the **projects** found on it. **Tags** (`key=value`, at most 100; 10 before 08/11/2026) and the **admin
   note** (at most 2 000 characters; there is no second note) are set on the web.
 - **Project history on a machine:** what happened to one project on one agent: its version there, the runs that
   targeted it (tests, builds, deploys), the errors its sessions hit there; recorded automatically.
@@ -72,6 +72,13 @@ can run the application's tests on a test machine.
   red) and printed by `monitor_machines`.
 - **No inference** from host names, no role set by Claude, no CLI setting of the set role.
 
+**Amendment, 08/11/2026: a role is a set.** An admin may give a machine several environments and several functions (each value a chip
+on the web). The sets are stored in `role_environments`/`role_functions` (migration `MachineRoleSets`); `role_environment`/`role_function`
+keep the **strictest** member of each (dev < test < other < stage < preprod < production; development < ci < web < application < storage <
+other < database), and every rule that reads a single role reads that value. So a machine that is also production, or also a database
+server, is strict; Claude is started from the web only when every environment is dev or test; lowering is dropping production (or database)
+from the set. The request takes `environments`/`functions` next to the old single fields (additive). The agent's claim stays one value.
+
 ### 3a′. Facts, tags, note, services and projects (request 1a)
 
 - **Tool inventory (report only, not an execution path).** The agent probes a fixed candidate list by absolute path,
@@ -96,7 +103,7 @@ can run the application's tests on a test machine.
   16/10/2026); Claude reads the list and decides. The tool descriptions say that a script's PATH is the fixed one of
   §3c, so a script that needs a user-owned tool sets its own PATH, which the approver then sees. The `claude` entry's path is
   withheld from `MachineView` (decision 9): members see that Claude Code is there, not where.
-- **Tags** `key=value`: at most 10 per agent, keys and values in `[A-Za-z0-9._-]{1,32}` (`invalid_tag` otherwise), set
+- **Tags** `key=value`: at most 100 per agent (raised from 10 on 08/11/2026), keys and values in `[A-Za-z0-9._-]{1,32}` (`invalid_tag` otherwise), set
   by an admin on the web, audited. Shown everywhere a role is shown. In the session-start block they are **inside the
   untrusted envelope** (§3b): a tag is admin-typed text, not a rule.
 - **Admin note (runbook)**: at most 2 000 characters, set by an admin (`invalid_note` for control characters), untrusted
@@ -324,7 +331,7 @@ That reading is a change to the request's wording and is flagged here for the ma
 | Migration (phase) | Adds |
 |---|---|
 | `MachineRoles` (1) | `agents`: `role_environment`, `role_function` (CHECK on the closed sets of §2, NULL passes), `role_set_at`, `role_set_by`, `claimed_environment`, `claimed_function`, `claude_kind` (`none`, `npm`, `native`, `unsupported`; NULL = unknown), `claude_path`, `claude_version`, `claude_sessions_live`, `claude_sessions_idle`, `presence_at`, `interpreters` jsonb (NULL = unknown, `[]` = none), `tools` jsonb (same convention, ≤ 32 entries, each `{name, path, version, trusted}`), `capabilities` text[] |
-| `MachineFacts` (1b) | `agents`: `tags` jsonb (≤ 10 pairs, CHECK on the count), `tags_set_at`, `tags_set_by`, `admin_note` (≤ 2 000), `admin_note_set_at`, `admin_note_set_by`, `share_services` bool default false, `share_services_set_at`, `share_services_set_by`, `services` jsonb (≤ 64 entries `{port, proto, process}`), `services_at`; new `machine_projects` (`agent_id`, `project_key`, `workspace_id`, `name`, `path_hmac`, `branch`, `head_sha` (≤ 64), `tag` (≤ 64), `last_seen_at`, `source` (`session`, `listed`)) PK (`agent_id`, `project_key`), index (`workspace_id`, `project_key`); `remote_runs.project_key` (≤ 200, NULL), `remote_runs.kind` (`test`, `build`, `deploy`, `other`, NULL) with an index (`target_agent_id`, `project_key`, `created_at` DESC) WHERE `project_key IS NOT NULL` |
+| `MachineFacts` (1b) | `agents`: `tags` jsonb (≤ 10 pairs, CHECK on the count; ≤ 100 from migration `MachineTagsMax100`), `tags_set_at`, `tags_set_by`, `admin_note` (≤ 2 000), `admin_note_set_at`, `admin_note_set_by`, `share_services` bool default false, `share_services_set_at`, `share_services_set_by`, `services` jsonb (≤ 64 entries `{port, proto, process}`), `services_at`; new `machine_projects` (`agent_id`, `project_key`, `workspace_id`, `name`, `path_hmac`, `branch`, `head_sha` (≤ 64), `tag` (≤ 64), `last_seen_at`, `source` (`session`, `listed`)) PK (`agent_id`, `project_key`), index (`workspace_id`, `project_key`); `remote_runs.project_key` (≤ 200, NULL), `remote_runs.kind` (`test`, `build`, `deploy`, `other`, NULL) with an index (`target_agent_id`, `project_key`, `created_at` DESC) WHERE `project_key IS NOT NULL` |
 | `ScriptRuns` (2) | `remote_runs`: `script_interpreter`, `script_body`, `script_args`, `target_environment`, `target_function`, `output_cap` (NULL = the old 1 MiB rule, else 1–64 MiB), `output_read_bytes`, `output_dropped_bytes`, `output_refused_bytes`, `output_missing_from_seq`, `output_chunks`, `output_complete`, `approved_with_totp`; the mode and shape CHECKs widened; `workspace_settings.script_output_max_bytes` (default 8 MiB) |
 | `MachineAsks` (3) | new `machine_asks` (`id`, `workspace_id`, requester agent/user/session, target agent/user/session, `client_key`, `question` 1–8 000, `status`, `answer` ≤ 100 000, `answer_truncated`, `error`, timestamps; CHECK `requester_user_id = target_user_id` and `requester_agent_id <> target_agent_id`; UNIQUE (`requester_agent_id`, `client_key`); indexes for the target queue, the rate cap, the web list, the depth and loop windows, and retention); `agents.accepts_asks`, `accepts_asks_set_at`, `accepts_asks_set_by` |
 
@@ -522,3 +529,23 @@ environment, a hostile repository configuration starts nothing, the output cap d
 - **Not covered.** A message for a machine with no session at all still needs a session to exist: web prompts are addressed
   to a session id (ADR-0002), so a web message to an idle machine with nothing open is a separate design (a machine-addressed
   message: new endpoint, table and web screen).
+
+## Amendment 08/11/2026: a code accepted in the last 5 minutes is not asked again (§9.13a)
+
+- **Asked for.** The maintainer: when the owner gave their two-step code in the last 5 minutes, the code is not asked again.
+- **Decided.** A code (or recovery code) accepted on a browser sign-in stamps that login session (`login_sessions.code_checked_at`).
+  For `ApiConfig.CodeWindow` (5 minutes) after it, every re-authentication check off a strict target passes without a code on
+  that sign-in. This covers turning a machine setting on, a role change that does not lower the role, a grant or job approval on a target that is not strict, an integration
+  setting, and a shell or script run approval. The window applies to that sign-in only, never to an agent token
+  or another browser. A stamp ahead of the clock does not count, and each accepted code restarts the window.
+- **Outside the window.** The window does not count for what reaches as far as a strict approval. Lowering a role (dropping
+  production or database) still needs a sign-in of the last 10 minutes or a fresh code: otherwise a code given for one strict
+  run would let a stolen session lower the machine and approve the rest without a code. The same holds for the server's mail
+  and sign-in settings (a mail relay sees every reset link) and for registering an approval key (`ReauthAsync(window: false)`).
+  The window stamp is set on the tracked login session, so it is saved together with the used TOTP step or recovery code. A
+  request that ends before its save uses up nothing and opens no window. A run approval's audit records `codeWindow`.
+- **Not changed.** On a strict target (production or database) every approval still needs a fresh code (§9.13). A run
+  approved through the window is stored with `approved_with_totp = false`, so a target that turns strict before delivery
+  still cancels it. Turning two-step sign-in off and the recovery-code screens still ask for their own code.
+- **Built in.** `RemoteChecks.RecentCodeAsync` and `CodeAsync`, used by `ReauthAsync`, `ApprovalGateAsync` and the run
+  approval in `RunDecisions`. The web code field says so (`remote.codeWindow`).

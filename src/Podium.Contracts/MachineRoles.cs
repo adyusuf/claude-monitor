@@ -116,6 +116,55 @@ public static class MachineRoles
         _ => $"{environment} {function} machine",
     };
 
+    /// <summary>The environments from the loosest to the strictest: a set of them is served to single-value readers as its strictest one.</summary>
+    public static readonly IReadOnlyList<string> EnvironmentOrder =
+        [MachineEnvironments.Dev, MachineEnvironments.Test, MachineEnvironments.Other, MachineEnvironments.Stage, MachineEnvironments.Preprod, MachineEnvironments.Production];
+
+    /// <summary>The functions from the loosest to the strictest; database is the strict one.</summary>
+    public static readonly IReadOnlyList<string> FunctionOrder =
+        [MachineFunctions.Development, MachineFunctions.Ci, MachineFunctions.Web, MachineFunctions.Application, MachineFunctions.Storage, MachineFunctions.Other, MachineFunctions.Database];
+
+    /// <summary>True for no set or a set of known environments (each at most once is not required: <see cref="Normalize"/> drops repeats).</summary>
+    public static bool IsEnvironments(IReadOnlyList<string>? values) => values is null || values.All(v => MachineEnvironments.All.Contains(v));
+
+    /// <summary>True for no set or a set of known functions.</summary>
+    public static bool IsFunctions(IReadOnlyList<string>? values) => values is null || values.All(v => MachineFunctions.All.Contains(v));
+
+    /// <summary>The set without repeats, loosest first (by <paramref name="order"/>); null when it is empty.</summary>
+    public static IReadOnlyList<string>? Normalize(IEnumerable<string>? values, IReadOnlyList<string> order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        var list = values?.Where(order.Contains).Distinct(StringComparer.Ordinal).OrderBy(v => IndexOf(order, v)).ToList();
+        return list is { Count: > 0 } ? list : null;
+    }
+
+    /// <summary>
+    /// The one value a set is served as to everything that reads a single role: its strictest member, so a machine that is also production is
+    /// production and one that is also a database server is a database server (strict rules never loosen because a role has more values).
+    /// </summary>
+    public static string? Strictest(IEnumerable<string>? values, IReadOnlyList<string> order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return values?.Where(order.Contains).OrderByDescending(v => IndexOf(order, v)).FirstOrDefault();
+    }
+
+    /// <summary>
+    /// The stored set, or the single value as a set of one when there is no set (a row written before sets) or the set disagrees with it (an
+    /// older API wrote only the single column, during a deploy or after a rollback): the single column is what every rule enforces, so it wins.
+    /// </summary>
+    public static IReadOnlyList<string>? SetOf(IReadOnlyList<string>? values, string? one, IReadOnlyList<string> order) =>
+        values is { Count: > 0 } && one is not null && Strictest(values, order) == one ? Normalize(values, order) : one is null ? null : [one];
+
+    private static int IndexOf(IReadOnlyList<string> order, string value)
+    {
+        for (var i = 0; i < order.Count; i++)
+        {
+            if (order[i] == value) return i;
+        }
+
+        return -1;
+    }
+
     /// <summary>"production/database", "test/not set", "not set/database", "not set". A set function is never hidden behind "not set".</summary>
     public static string Code(string? environment, string? function) =>
         environment is null && function is null ? "not set" : $"{environment ?? "not set"}/{function ?? "not set"}";

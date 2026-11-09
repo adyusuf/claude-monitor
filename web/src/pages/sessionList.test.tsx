@@ -5,20 +5,20 @@ import type { SessionRow } from "../api/types";
 import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
 import { SessionsPage } from "./SessionsPage";
 
-const row = (id: string, hostname: string, gitBranch: string | null, lastEventAt: string, title = `Title ${id}`): SessionRow => ({
-  id, harnessKind: "claude_code", title, model: null, gitBranch, status: "idle", startedAt: lastEventAt, lastEventAt, endedAt: null,
-  projectId: "p", projectName: "widgets", agentId: "a", hostname, ownerId: "u1", ownerName: "Owner", costUsd: null, openPermissions: 0,
+const row = (id: string, hostname: string, repo: string | null, lastEventAt: string, title = `Title ${id}`): SessionRow => ({
+  id, harnessKind: "claude_code", title, model: null, gitBranch: "main", status: "idle", startedAt: lastEventAt, lastEventAt, endedAt: null,
+  projectId: "p", projectName: repo, agentId: `agent-${hostname}`, hostname, ownerId: "u1", ownerName: "Owner", costUsd: null, openPermissions: 0,
 });
 
 const route = [{ path: "/w/:ws/sessions", element: <SessionsPage /> }];
 const titles = (machine: HTMLElement) => [...machine.querySelectorAll(".title-text")].map((e) => e.textContent);
 const machineOf = (name: string) => document.querySelector<HTMLElement>(`.session-machine[aria-label="${name}"]`)!;
 
-describe("the sessions list grouped by machine and branch", () => {
+describe("the sessions list grouped by machine and repository", () => {
   beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
   afterEach(() => vi.unstubAllGlobals());
 
-  it("keeps the machines in a fixed order by name, and shows each one's branches and sessions with the most recent activity first", async () => {
+  it("keeps the machines in a fixed order by name, and shows each one's repositories and sessions with the most recent activity first", async () => {
     mockApi({
       "GET /me": { body: ME },
       "GET /workspaces/w1/sessions": { body: { items: [
@@ -34,7 +34,7 @@ describe("the sessions list grouped by machine and branch", () => {
     const machines = [...document.querySelectorAll<HTMLElement>(".session-machine")];
     expect(machines.map((m) => m.getAttribute("aria-label"))).toEqual(["alpha", "zulu"]);
     const alpha = within(machines[0]!);
-    expect(alpha.getAllByRole("heading", { level: 3 }).map((h) => h.textContent?.trim())).toEqual(["main", "No branch reported"]);
+    expect(alpha.getAllByRole("heading", { level: 3 }).map((h) => h.textContent?.trim())).toEqual(["main", "No repository reported"]);
     expect(titles(machines[0]!)).toEqual(["Title new", "Title old", "Title side"]);
     expect(within(machines[1]!).getByRole("heading", { level: 3 })).toHaveTextContent("feature/x");
     expect(alpha.getByRole("heading", { level: 2 })).toHaveTextContent("alpha");

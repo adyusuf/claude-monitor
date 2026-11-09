@@ -8,6 +8,8 @@ export const trMachines: Dictionary["machines"] = {
   updateAvailable: "Güncelleme var: {version}",
   updateHint: "Makinede \"aipod update\" çalıştırın ya da kendini güncellemesine izin verin (çalışma alanı izin veriyorsa: aipod config auto-update on).",
   role: {
+    environments: "Ortamlar", functions: "İşlevler", addEnvironment: "Ortam ekle", addFunction: "İşlev ekle", editValue: "{value} değerini değiştir", removeValue: "{value} değerini kaldır",
+    setHint: "Bir makinenin her birinden birden fazla olabilir. Kuralları en sıkı olan belirler: aynı zamanda production ya da veritabanı sunucusu olan makine sıkı hedeftir.",
     title: "Rol", environment: "Ortam", function: "İşlev", notSet: "belirlenmedi", unknown: "bilinmiyor",
     claimed: "Makinenin kendi beyanı: {role}.", claimTightens: "Beyan rolü yalnızca sıkılaştırır; hiçbir zaman belirlemez ya da gevşetmez.",
     adminOnly: "Rolü yalnızca bir çalışma alanı yöneticisi belirler.", save: "Rolü kaydet", saved: "Rol kaydedildi.",
@@ -26,7 +28,8 @@ export const trMachines: Dictionary["machines"] = {
     hint: "Ajan sabit bir listeyi mutlak yollardan yoklar ve bulduklarını bildirir; --version'ı yalnızca güvenilen ya da kendi hesabının sahip olduğu dosyalar için çalıştırır.",
   },
   tags: {
-    title: "Etiketler", label: "Etiketler (anahtar=değer, boşlukla ayrılmış)", none: "Etiket yok.", save: "Etiketleri kaydet", saved: "Etiketler kaydedildi.",
+    title: "Etiketler", none: "Etiket yok.", saved: "Etiketler kaydedildi.", key: "Etiket anahtarı", value: "Etiket değeri", more: "+{n} daha", add: "Etiket ekle",
+    edit: "{tag} etiketini düzenle", remove: "{tag} etiketini kaldır", duplicate: "Bu anahtar başka bir etikette var.", full: "Bir makinede en fazla {max} etiket olur.",
     hint: "En fazla {max} çift; anahtar ve değerde harf, rakam, nokta, alt çizgi ve tire kullanılır (1 ile 32 karakter). Claude bunları etiket olarak görür, talimat olarak değil.",
   },
   note: {

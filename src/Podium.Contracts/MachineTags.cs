@@ -9,7 +9,7 @@ namespace Podium.Contracts;
 /// </summary>
 public static partial class MachineTags
 {
-    public const int Max = 10;
+    public const int Max = 100;
     public const int PartMax = 32;
     public const int NoteMax = 2000;
 

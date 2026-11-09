@@ -46,6 +46,10 @@ export interface SessionRow {
   openPermissions: number;
   /** The push transport the session's machine has on ("inbox" or "channel"); absent or null when it is off or the agent is older. */
   pushTransport?: string | null;
+  /** Claude Code started this session in the background from the web (ADR-0014); absent on an older API. */
+  startedFromWeb?: boolean;
+  /** The short id of that start, for a stop from the web; null when the web did not start it. */
+  webSessionRef?: string | null;
 }
 export interface TaskRow { id: string; externalId: string; subject: string; status: string; updatedAt: string }
 export interface SubagentRow { id: string; agentType: string; description: string | null; status: string; startedAt: string; endedAt: string | null }
@@ -89,6 +93,61 @@ export interface PermissionRow {
   decision: "allow" | "deny" | null;
   reason: string | null;
   answeredAt: string | null;
+}
+
+/** How many of something are in one state. */
+export interface StateCount { state: string; count: number }
+/** The dashboard's counts (runs and permission answers over the last `days` days). */
+export interface DashboardView {
+  days: number;
+  projects: StateCount[];
+  sprints: StateCount[];
+  runs: StateCount[];
+  /** Permission requests by outcome: allow, auto_allowed, deny, expired, open. */
+  approvals: StateCount[];
+  openAlerts: number;
+}
+
+/** How long an allow stands for the same tool on the same machine (ADR-0019). */
+export type ApprovalDuration = "once" | "5m" | "10m" | "30m" | "1h" | "always";
+export const APPROVAL_DURATIONS: readonly ApprovalDuration[] = ["once", "5m", "10m", "30m", "1h", "always"];
+
+/** A permission request on one of the viewer's own sessions, with where it comes from. */
+export interface ApprovalRequestRow {
+  id: string;
+  sessionId: string;
+  sessionTitle: string | null;
+  projectName: string | null;
+  agentId: string;
+  hostname: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  status: "open" | "answered" | "expired";
+  createdAt: string;
+  expiresAt: string;
+  decision: "allow" | "deny" | null;
+  answeredAt: string | null;
+  answeredByName: string | null;
+  answeredByRule: string | null;
+  /** Whether an allow may stand for a while (not on a strict machine, not a question or a plan, not a too long command). */
+  canRemember: boolean;
+  strict: boolean;
+}
+
+/** One of the viewer's standing approvals. */
+export interface ApprovalRuleRow {
+  id: string;
+  agentId: string;
+  hostname: string;
+  toolName: string;
+  command: string | null;
+  duration: Exclude<ApprovalDuration, "once">;
+  createdAt: string;
+  expiresAt: string | null;
+  useCount: number;
+  lastUsedAt: string | null;
+  /** The project the rule acts in (null: sessions with no project). */
+  projectName?: string | null;
 }
 
 export interface AgentRow {
@@ -175,6 +234,9 @@ export interface WebRunView {
   testsPassed?: number | null;
   testsFailed?: number | null;
   testsSkipped?: number | null;
+  /** Who allowed or denied the run and when; null while it waits. A run a grant or a job allowed names the owner of that grant or job. Absent on an older API. */
+  decidedByName?: string | null;
+  decidedAt?: string | null;
 }
 export interface RunOutputChunk { seq: number; stream: string; body: string; gapBefore: boolean }
 export interface RunOutputPage { chunks: RunOutputChunk[]; nextSeq: number; done: boolean }

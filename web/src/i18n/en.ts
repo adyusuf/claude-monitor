@@ -5,13 +5,16 @@ import { enSprints } from "./en.sprints";
 import { enIntegrations } from "./en.integrations";
 import { enServerSettings } from "./en.serverSettings";
 import { enTwoStep } from "./en.twoStep";
+import { enApprovalRules } from "./en.approvalRules";
+import { enDashboard } from "./en.dashboard";
+import { enInstallOptions } from "./en.installOptions";
 import { enRemote } from "./en.remote";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
 export const en = {
   app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
-    projects: "Projects", sessions: "Sessions", machines: "Machines", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
+    dashboard: "Dashboard", projects: "Projects", sessions: "Sessions", machines: "Machines", runs: "Runs", approvals: "Approvals", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
     account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
     themeSystem: "System", themeLight: "Light", themeDark: "Dark",
@@ -47,7 +50,7 @@ export const en = {
     account_disabled: "This account is disabled.", not_a_member: "You are not a member of that workspace.",
     invalid_code: "That code is not valid or has expired.", last_owner: "A workspace needs at least one owner.",
     invalid_answers: "That answer does not match the question.",
-    session_ended: "The session has ended.", invalid_body: "Write the message to send.", too_long: "That is too long.",
+    session_ended: "The session has ended.", session_not_ended: "Only an ended session can be removed from the list.", invalid_body: "Write the message to send.", too_long: "That is too long.",
     out_of_range: "That value is out of range.", invalid_role: "Pick a role.", unauthorized: "Your session has ended. Sign in again.",
     forbidden: "You are not allowed to do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
@@ -115,6 +118,15 @@ export const en = {
     project: "Project", host: "Machine", owner: "Owner", cost: "Cost", lastActivity: "Last activity",
     untitled: "Untitled session", more: "Load more", live: "Live", permissionsWaiting: "{n} waiting for an answer",
     unmeasured: "cannot be measured", noBranch: "No branch reported",
+    claude: {
+      unknown: "Claude: not reported", none: "Claude not installed", installed: "Claude {version}", running: "Claude {version} · running, {n} session(s)",
+      stopped: "Claude {version} · not running", fromWebOn: "Can be started from the web", control: "Start or stop Claude", dialog: "Claude on {host}",
+    },
+    count: "{n} session(s)", machineGone: "This machine is no longer connected.", noneOnMachine: "No session on this machine.",
+    noneLoaded: "No session among the ones loaded so far.", noRepo: "No repository reported", noMatch: "No session matches.",
+    fromWeb: "Started from the web", fromWebHint: "Claude Code was started in the background for this session from the web.",
+    stop: "Stop", stopSent: "Stop sent. The machine stops the session when it next checks in; the result is in its Claude dialog.", stopConfirm: "Stop this session? Its conversation is kept.", hide: "Remove from the list",
+    hideConfirm: "Remove this ended session from the list? Nothing is deleted, and it comes back if it reports again.",
   },
   session: {
     back: "All sessions", tasks: "Tasks", noTasks: "No tasks.", subagents: "Subagents", noSubagents: "No subagents.",
@@ -179,6 +191,9 @@ export const en = {
   integrations: enIntegrations,
   serverSettings: enServerSettings,
   twoStep: enTwoStep,
+  approvalRules: enApprovalRules,
+  dashboard: enDashboard,
+  installOptions: enInstallOptions,
   device: {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
     approve: "Connect this machine", deny: "This is not me", approved: "Done. The machine is connected; you can close this page.",
@@ -239,6 +254,11 @@ export const en = {
     installerTitle: "Install in one step (recommended)",
     installerIntro: "One command installs the agent and the Claude Code plugin and connects this machine (a code appears; approve it on the page that opens). It replaces an older agent after asking, and keeps its settings and login.",
     installerUnix: "macOS and Linux:", installerWindows: "Windows (PowerShell):",
+  },
+  runsPage: {
+    title: "Runs", intro: "Every command a machine of this workspace was asked to run, newest first: who asked, where, and who decided.",
+    status: "Status", allMachines: "All machines", machine: "Machine", command: "Command", requestedBy: "Requested by", when: "When", decidedBy: "Decided by",
+    byGrant: "a grant", byJob: "a job", undecided: "not yet", details: "Details", detailsOf: "Run details", empty: "Nothing has run in this workspace yet.",
   },
   common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
   remote: enRemote,
