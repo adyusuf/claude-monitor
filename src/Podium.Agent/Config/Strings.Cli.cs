@@ -26,6 +26,7 @@ public static partial class Msg
     public const string StatusClaudeWeb = "cli.status.claudeweb";
     public const string StatusByAutomatic = "cli.status.byauto";
     public const string StatusVersion = "cli.status.version";
+    public const string StatusExecChange = "cli.status.execchange";
     public const string UpdateUsage = "cli.update.usage";
     public const string UpdateNotConnected = "cli.update.notconnected";
     public const string UpdateRefused = "cli.update.refused";
@@ -82,6 +83,7 @@ public static partial class Strings
         E(Msg.StatusServiceSuffix, " (service)", " (hizmet)", " (Dienst)"),
         E(Msg.StatusClaudeWeb, "Claude from the web: {0} session(s) started here running{1}; automatic start: {2}", "Web'den Claude: burada başlatılan {0} oturum çalışıyor{1}; otomatik başlatma: {2}", "Claude aus dem Web: {0} hier gestartete Sitzung(en) laufen{1}; automatischer Start: {2}"),
         E(Msg.StatusByAutomatic, " ({0} by the automatic mode)", " ({0} tanesi otomatik modla)", " ({0} davon durch den automatischen Modus)"),
+        E(Msg.StatusExecChange, "last remote-run level change from the web: sequence {0}, level {1}, {2}", "web'den son uzak çalıştırma düzeyi değişikliği: sıra {0}, düzey {1}, {2}", "letzte Änderung der Remote-Ausführungsstufe aus dem Web: Folge {0}, Stufe {1}, {2}"),
         E(Msg.StatusVersion, "version: {0}", "sürüm: {0}", "Version: {0}"),
         E(Msg.UpdateUsage, "usage: aipod update [--check]", "kullanım: aipod update [--check]", "Verwendung: aipod update [--check]"),
         E(Msg.UpdateNotConnected, "not connected (aipod login --server <url>): the update comes from the server the agent is connected to", "bağlı değil (aipod login --server <url>): güncelleme, ajanın bağlı olduğu sunucudan gelir", "nicht verbunden (aipod login --server <url>): das Update kommt vom Server, mit dem der Agent verbunden ist"),
