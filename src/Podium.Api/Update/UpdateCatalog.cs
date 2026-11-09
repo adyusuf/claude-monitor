@@ -23,6 +23,10 @@ public sealed class UpdateCatalog(ApiConfig config, HttpMessageHandler? handler 
         ? null
         : new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(10) };
     private volatile IReadOnlyList<Entry> remoteEntries = [];
+    private volatile IReadOnlyList<string> remoteVersions = [];
+
+    /// <summary>The most published versions the "Get the agent" page lists.</summary>
+    public const int VersionsMax = 50;
 
     /// <summary>True when the builds are published on a download host, not on this server.</summary>
     public bool IsRemote => remote is not null;
@@ -45,11 +49,54 @@ public sealed class UpdateCatalog(ApiConfig config, HttpMessageHandler? handler 
             while (length < buffer.Length && (read = await body.ReadAsync(buffer.AsMemory(length), ct)) > 0) length += read;
             if (length > RemoteManifestMax || Parse(System.Text.Encoding.UTF8.GetString(buffer, 0, length)) is not { } entries) return;
             remoteEntries = entries;
+            if (await ReadVersionsAsync(ct) is { } versions) remoteVersions = versions;
         }
         catch (Exception e) when (!ct.IsCancellationRequested && e is HttpRequestException or IOException or OperationCanceledException)
         {
             // keep the last good copy; the next refresh tries again
         }
+    }
+
+    /// <summary>
+    /// The download host's <c>versions.json</c> (<c>{"versions": ["0.6.0", "0.5.1"]}</c>, kept by scripts/publish_agent_downloads.sh): every version
+    /// published to this channel, each kept in its own folder. Null when there is none or it is not one; only strict x.y.z versions are taken.
+    /// </summary>
+    private async Task<IReadOnlyList<string>?> ReadVersionsAsync(CancellationToken ct)
+    {
+        using var response = await remote!.GetAsync($"{config.DownloadsUrl}/versions.json", HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > RemoteManifestMax) return null;
+        var text = await response.Content.ReadAsStringAsync(ct);
+        if (text.Length > RemoteManifestMax) return null;
+        try
+        {
+            var list = JsonSerializer.Deserialize<VersionList>(text, JsonSerializerOptions.Web)?.Versions;
+            if (list is null) return null;
+            return [.. list.Where(v => UpdateVersion.TryParse(v, out _)).Distinct(StringComparer.Ordinal)
+                .OrderByDescending(v => UpdateVersion.TryParse(v, out var parsed) ? parsed : new Version()).Take(VersionsMax)];
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The newest version this channel offers now, or null when none is published.</summary>
+    public string? CurrentVersion =>
+        Load().Select(e => e.Version!).Where(v => UpdateVersion.TryParse(v, out _))
+            .OrderByDescending(v => UpdateVersion.TryParse(v, out var parsed) ? parsed : new Version()).FirstOrDefault();
+
+    /// <summary>
+    /// The earlier published versions, newest first, each with the folder that keeps its files (<c>&lt;prefix&gt;/&lt;version&gt;/&lt;channel&gt;</c>
+    /// beside the channel folder AIPOD_DOWNLOADS_URL names). Empty without a download host or a <c>versions.json</c>.
+    /// </summary>
+    public IReadOnlyList<(string Version, string Url)> OlderVersions()
+    {
+        if (config.DownloadsUrl is not { } url) return [];
+        var cut = url.TrimEnd('/').LastIndexOf('/');
+        if (cut <= "https://".Length) return [];
+        var (parent, channel) = (url[..cut], url[(cut + 1)..].TrimEnd('/'));
+        var current = CurrentVersion;
+        return [.. remoteVersions.Where(v => v != current).Select(v => (v, $"{parent}/{v}/{channel}"))];
     }
 
     /// <summary>The newest build for this OS and CPU, or null when none is published.</summary>
@@ -117,6 +164,7 @@ public sealed class UpdateCatalog(ApiConfig config, HttpMessageHandler? handler 
         && UpdateVersion.TryParse(e.Version, out _) && UpdateVersion.TryParse(e.MinSupported, out _);
 
     private sealed record Manifest(string? Format, List<Entry>? Entries);
+    private sealed record VersionList(List<string>? Versions);
     private sealed record Entry(string? Channel, string? Version, string? Os, string? Arch, string? File, string? Sha256, string? MinSupported,
         string? Signature);
 }

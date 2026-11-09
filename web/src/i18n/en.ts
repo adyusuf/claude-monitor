@@ -241,6 +241,7 @@ export const en = {
   },
   invitation: { accepting: "Joining the workspace…", accepted: "You joined the workspace." },
   download: {
+    version: "version {v}", olderTitle: "Earlier versions", olderHint: "Every version published here is kept; take an earlier one only to go back after a problem.",
     title: "Get the agent", intro: "The agent runs beside Claude Code on your machine and reports its sessions here.",
     step1: "Download the agent for your system and put it in a folder you keep.",
     step2: "Connect it to this workspace (a code appears; approve it on the page that opens):",
