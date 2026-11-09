@@ -164,11 +164,17 @@ public sealed class PermissionRequest
 
     /// <summary>The approval rule that allowed the request at once (ADR-0019); null when a person answered or nobody did.</summary>
     public Guid? AnsweredByRule { get; set; }
+
+    /// <summary>
+    /// The session's project (repository) when the request was made: a rule made from this request holds this one, the project the request
+    /// was matched in, even when the session has moved to another since (ADR-0019). Null: none, or a request from before this column.
+    /// </summary>
+    public Guid? RepoId { get; set; }
 }
 
 /// <summary>
-/// An owner's standing allow for one tool on one machine in one project (ADR-0019): for <c>Bash</c> one exact command, for a file tool one
-/// exact path, for a reading tool every input. Only the tools of <see cref="Approvals.ApprovalRules"/> can have one.
+/// An owner's standing allow for one tool on one machine in one project (ADR-0019): for <c>Bash</c> one exact command, for a file or reading
+/// tool one exact path, for a search tool one exact search. Only the tools of <see cref="Approvals.ApprovalRules"/> can have one.
 /// Ends at <see cref="ExpiresAt"/> (null: always) or when revoked; never made or matched on a strict machine.
 /// </summary>
 public sealed class ApprovalRule
@@ -180,7 +186,7 @@ public sealed class ApprovalRule
     /// <summary>The project (repository) of the session the rule was made in; it acts only in sessions of that project (null: none).</summary>
     public Guid? RepoId { get; set; }
     public string ToolName { get; set; } = "";
-    /// <summary>The value the rule pins: the exact command for <c>Bash</c>, the exact path for a file tool; null for a reading tool.</summary>
+    /// <summary>The value the rule pins: the exact command for <c>Bash</c>, the exact path for a file or reading tool, the exact search for a search tool.</summary>
     public string? Command { get; set; }
     public string Duration { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
