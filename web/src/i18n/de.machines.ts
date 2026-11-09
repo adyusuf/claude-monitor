@@ -119,6 +119,8 @@ export const deMachines: Dictionary["machines"] = {
       no_pinned_key: "Auf der Maschine ist kein Schlüssel gepinnt, sie kann also keine Erhöhung aus dem Web prüfen. Pinnen Sie Ihren Schlüssel einmal auf der Maschine: aipod approvers add <Schlüssel>.",
       expired: "Die Änderung kam nach ihrer Frist bei der Maschine an. Speichern Sie erneut.",
       needs_admin: "Diese Maschine ist ein Dienst: Ihre Stufe liegt in einer Datei, die nur der Admin ändern kann. Der Admin führt aipod install --service --exec <Stufe> aus.",
+      invalid: "Die Maschine kennt die verlangte Stufe nicht.",
+      stale: "Die Maschine hat schon eine neuere Änderung verarbeitet, oder diese springt zu weit voraus, daher wurde sie nicht angewendet. Eine neue Anmeldung auf der Maschine beginnt die Zählung neu.",
       unknown: "Die Maschine hat einen Zustand gemeldet, den diese Seite nicht kennt.",
     },
   },

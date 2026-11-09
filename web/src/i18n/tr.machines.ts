@@ -119,6 +119,8 @@ export const trMachines: Dictionary["machines"] = {
       no_pinned_key: "Makinede sabitlenmiş anahtar yok, bu yüzden web'den gelen artırmayı denetleyemez. Anahtarınızı makineye bir kez sabitleyin: aipod approvers add <anahtar>.",
       expired: "Değişiklik makineye süresi dolduktan sonra ulaştı. Yeniden kaydedin.",
       needs_admin: "Bu makine bir hizmet: düzeyi yalnızca yöneticinin değiştirebildiği bir dosyada duruyor. Yönetici aipod install --service --exec <düzey> çalıştırır.",
+      invalid: "Makine istenen düzeyi tanımıyor.",
+      stale: "Makine daha yeni bir değişikliği zaten işlemiş ya da bu değişiklik çok ileri atlamış, bu yüzden uygulanmadı. Makinede yeniden giriş yapmak sayımı sıfırlar.",
       unknown: "Makine bu sayfanın tanımadığı bir durum bildirdi.",
     },
   },

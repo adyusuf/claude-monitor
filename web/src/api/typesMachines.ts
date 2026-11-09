@@ -143,7 +143,7 @@ export interface AgentActionView {
 }
 
 /** ADR-0021: the agent's state for the latest signed exec-level change, and what the machine page reads about it. */
-export type ExecLevelState = "applied" | "signature_refused" | "no_pinned_key" | "expired" | "needs_admin";
+export type ExecLevelState = "applied" | "signature_refused" | "no_pinned_key" | "expired" | "needs_admin" | "invalid" | "stale";
 export interface ExecLevelView {
   agentId: string;
   execLevel: ExecLevel;

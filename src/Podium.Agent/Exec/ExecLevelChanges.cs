@@ -21,17 +21,33 @@ public static class ExecLevelChanges
 
     private static readonly Lock Gate = new();
 
-    /// <summary>Handles the request a settings pass delivered; never throws. Returns true when it was new (a profile is worth sending soon).</summary>
+    /// <summary>An unsigned change may skip this many sequences (an agent that was offline missed some); a bigger jump is taken as stale, so a
+    /// compromised server cannot push the count out of reach with one unsigned lowering.</summary>
+    public const long UnsignedJumpMax = 1000;
+
+    /// <summary>A clock this far behind the browser's still accepts a change signed with the web's lifetime.</summary>
+    public static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Handles the request a settings pass delivered; never throws. The handled sequence is kept per agent id, so a new login (a new agent) starts the
+    /// count over and an old agent's signed change can never apply to the new one. The request the API keeps delivering again is silent; an older or
+    /// implausible one is reported as stale once.
+    /// </summary>
     public static bool Handle(AgentConfig config, LocalStore store, TimeProvider clock, AgentLog log, ExecLevelRequest? request)
     {
-        if (request is null) return false;
+        if (request is null || Identity.Peek(config)?.AgentId is not { } agent) return false;
         try
         {
             lock (Gate)
             {
-                if (long.TryParse(store.Get(SequenceKey), NumberStyles.Integer, CultureInfo.InvariantCulture, out var last) && request.Sequence <= last) return false;
-                var state = Decide(config, request, clock.GetUtcNow());
-                store.SetMany([(SequenceKey, request.Sequence.ToString(CultureInfo.InvariantCulture)), (StateKey, state), (LevelKey, Safe(request.Level))]);
+                var last = LastSequence(store, agent);
+                if (request.Sequence == last) return false;
+                var stale = request.Sequence < last || (request.Signature is null && request.Sequence - last > UnsignedJumpMax);
+                if (stale && store.Get(StateKey) == ExecLevelStates.Stale && store.Get(StaleKey) == Key(agent, request.Sequence)) return false;
+                var state = stale ? ExecLevelStates.Stale : Decide(config, request, clock.GetUtcNow());
+                List<(string, string)> entries = [(StateKey, state), (LevelKey, Safe(request.Level)), (StaleKey, stale ? Key(agent, request.Sequence) : "")];
+                if (!stale) entries.Add((SequenceKey, Key(agent, request.Sequence)));
+                store.SetMany(entries);
                 log.Write($"exec level change from the web: sequence {request.Sequence}, level {Safe(request.Level)}, {state}");
                 return true;
             }
@@ -44,20 +60,38 @@ public static class ExecLevelChanges
         }
     }
 
-    /// <summary>What the last change did, for the profile; null when none was handled.</summary>
-    public static ExecLevelReport? Reported(LocalStore store) =>
-        long.TryParse(store.Get(SequenceKey), NumberStyles.Integer, CultureInfo.InvariantCulture, out var sequence) && store.Get(StateKey) is { Length: > 0 } state
-            ? new ExecLevelReport(sequence, state) : null;
+    private const string StaleKey = "exec_level.stale";
+
+    private static string Key(Guid agent, long sequence) => $"{agent:D}:{sequence.ToString(CultureInfo.InvariantCulture)}";
+
+    /// <summary>The last sequence handled for this agent; 0 for another agent (an earlier login) or none.</summary>
+    private static long LastSequence(LocalStore store, Guid agent)
+    {
+        var stored = store.Get(SequenceKey);
+        var cut = stored?.LastIndexOf(':') ?? -1;
+        return cut > 0 && Guid.TryParse(stored![..cut], out var owner) && owner == agent
+            && long.TryParse(stored[(cut + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var sequence) ? sequence : 0;
+    }
+
+    /// <summary>What the last change did, for the profile; null when none was handled for the agent logged in now.</summary>
+    public static ExecLevelReport? Reported(LocalStore store, Guid? agent = null)
+    {
+        if (store.Get(StateKey) is not { Length: > 0 } state) return null;
+        var stored = state == ExecLevelStates.Stale ? store.Get(StaleKey) : store.Get(SequenceKey);
+        var cut = stored?.LastIndexOf(':') ?? -1;
+        if (cut <= 0 || !Guid.TryParse(stored![..cut], out var owner) || (agent is { } current && owner != current)) return null;
+        return long.TryParse(stored[(cut + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var sequence) ? new ExecLevelReport(sequence, state) : null;
+    }
 
     /// <summary>One line for `aipod status`, or null when no change from the web was handled.</summary>
-    public static string? Describe(LocalStore store) =>
-        Reported(store) is { } r ? Strings.T(Msg.StatusExecChange, r.Sequence, store.Get(LevelKey) ?? "", r.State) : null;
+    public static string? Describe(LocalStore store, Guid? agent = null) =>
+        Reported(store, agent) is { } r ? Strings.T(Msg.StatusExecChange, r.Sequence, store.Get(LevelKey) ?? "", r.State) : null;
 
     private static string Decide(AgentConfig config, ExecLevelRequest request, DateTimeOffset now)
     {
         var level = request.Level;
-        if (ExecLevelSigning.Rank(level) < 0) return ExecLevelStates.SignatureRefused;
-        if (now > request.NotAfter || request.NotAfter - now > ExecLevelSigning.MaxLifetime) return ExecLevelStates.Expired;
+        if (ExecLevelSigning.Rank(level) < 0) return ExecLevelStates.Invalid;
+        if (now > request.NotAfter || request.NotAfter - now > ExecLevelSigning.MaxLifetime + ClockSkew) return ExecLevelStates.Expired;
         if (ExecLevelSigning.Raises(Current(config), level) && Refusal(config, request) is { } refused) return refused;
         if (config.ServiceMode) return ServiceChange(config, level);
         (Identity.Load(config) with { ExecLevel = level }).Save(config);

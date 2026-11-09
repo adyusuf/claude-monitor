@@ -117,6 +117,8 @@ export const enMachines = {
       no_pinned_key: "The machine has no pinned key, so it cannot check a raise from the web. Pin your key on the machine once: aipod approvers add <key>.",
       expired: "The change reached the machine after its deadline. Save again.",
       needs_admin: "This machine is a service: its level lives in a file only the admin can change. The admin runs aipod install --service --exec <level>.",
+      invalid: "The machine does not know the level that was asked for.",
+      stale: "The machine has already handled a newer change, or this one skipped too far ahead, so it was not applied. Logging in again on the machine starts the count over.",
       unknown: "The machine reported a state this page does not know.",
     },
   },

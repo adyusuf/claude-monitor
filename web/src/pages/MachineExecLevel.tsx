@@ -24,6 +24,10 @@ const stateKey = (state: string): Key => {
       return "machines.execLevel.state.expired";
     case "needs_admin":
       return "machines.execLevel.state.needs_admin";
+    case "invalid":
+      return "machines.execLevel.state.invalid";
+    case "stale":
+      return "machines.execLevel.state.stale";
     default:
       return "machines.execLevel.state.unknown";
   }

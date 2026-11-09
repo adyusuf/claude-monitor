@@ -60,7 +60,16 @@ public static class ExecLevelStates
     /// <summary>A service's level lives in its admin-owned exec policy file, which the service cannot change: the admin sets it.</summary>
     public const string NeedsAdmin = "needs_admin";
 
-    public static readonly IReadOnlyList<string> All = [Applied, SignatureRefused, NoPinnedKey, Expired, NeedsAdmin];
+    /// <summary>The level is not one the agent knows.</summary>
+    public const string Invalid = "invalid";
+
+    /// <summary>
+    /// The change's sequence is below the last one this machine handled, or jumps implausibly far without a signature: it is not applied. Logging in
+    /// again on the machine starts the count over.
+    /// </summary>
+    public const string Stale = "stale";
+
+    public static readonly IReadOnlyList<string> All = [Applied, SignatureRefused, NoPinnedKey, Expired, NeedsAdmin, Invalid, Stale];
 }
 
 public static class ExecLevelErrors
