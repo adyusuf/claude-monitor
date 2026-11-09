@@ -1,4 +1,5 @@
 // The API's response shapes for machines, metrics and alerts (ADR-0005). Type-only; re-exported from types.ts.
+import type { MachineAccessView } from "./typesAccess";
 
 export type ExecLevel = "off" | "argv" | "shell";
 export interface DiskSample { mount: string; usedBytes: number; totalBytes: number }
@@ -100,6 +101,8 @@ export interface MachineDetail {
   inventory?: ClaudeInventory | null;
   /** The machine owner has switched the inventory on; while it is off the agent reads and sends nothing. */
   inventoryShared?: boolean;
+  /** The machine's access (ADR-0020 §4): its ceiling (owner and admins only) and each project policy's state here; absent on an older API. */
+  access?: MachineAccessView | null;
 }
 export interface InventorySession { name: string | null; projectKey: string | null; kind: string | null; status: string | null; startedAt: string | null }
 export interface InventoryPlugin { id: string; version: string | null; enabled: boolean; scope: string | null }
