@@ -24,12 +24,12 @@ public sealed record AppliedAccessPolicy(Guid ProjectId, int Version, string Sta
 /// </summary>
 public static class AccessPolicyVerifier
 {
-    /// <summary>Every stored policy judged with the pinned keys and the workspace agent.json names now.</summary>
+    /// <summary>Every stored policy judged with the pinned keys and the workspace the API's settings name now (agent.json's before any pass).</summary>
     public static List<AppliedAccessPolicy> Load(AgentConfig config, LocalStore store)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(store);
-        return Judge(store.AccessPolicies(), ApproversStore.Load(config), Identity.Peek(config)?.WorkspaceId);
+        return Judge(store.AccessPolicies(), ApproversStore.Load(config), AccessPolicySync.CurrentWorkspace(config, store));
     }
 
     public static List<AppliedAccessPolicy> Judge(IReadOnlyList<StoredAccessPolicy> rows, ApproversPolicy approvers, Guid? workspace)
