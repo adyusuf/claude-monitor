@@ -13,11 +13,20 @@ namespace Podium.Agent.Access;
 /// </summary>
 internal static class AccessGuard
 {
-    public static AccessRefusal? Check(IReadOnlyList<AccessLayer> layers, AccessCheck check, string os)
+    /// <param name="interpreter">
+    /// The argv run starts an interpreter (sh, python, node and the like), which can run anything it is given: every layer but the ceiling must allow
+    /// shell, as for a script; the ceiling keeps judging it as an argv run (its own lists, as before). Its folders and executable are judged as well.
+    /// </param>
+    public static AccessRefusal? Check(IReadOnlyList<AccessLayer> layers, AccessCheck check, string os, bool interpreter = false)
     {
         if (layers.Count == 0) return null;
         if (!OsKinds.All.Contains(os)) return Refuse(AccessErrors.Unresolved, layers[0]);
         if (check.Shell || check.Script) return AccessPolicyMath.Evaluate(layers, check, os); // no folder or application limit applies to them
+        if (interpreter && layers.FirstOrDefault(l => l.Kind != AccessRefusedBy.Ceiling && !l.Shell) is { } closed)
+        {
+            return Refuse(AccessErrors.ScriptRefused, closed);
+        }
+
         try
         {
             var resolved = layers.Select(layer => new Resolved(layer, os)).ToList();

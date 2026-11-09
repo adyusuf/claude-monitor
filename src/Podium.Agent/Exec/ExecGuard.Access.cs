@@ -20,6 +20,8 @@ public static partial class ExecGuard
     {
         var check = new AccessCheck(decision.ResolvedCwd, decision.ResolvedPaths ?? [], decision.ResolvedExe, null, run.Mode == RunModes.Shell,
             run.Mode == RunModes.Script);
-        return AccessGuard.Check(layers, check, os) is { } refusal ? ExecDecision.Refuse(refusal) : decision;
+        // An argv run of an interpreter can run any code it is given: it counts as a script for every layer but the ceiling.
+        var interpreter = run.Mode == RunModes.Argv && decision.ResolvedExe is { } exe && GrantMatcher.IsInterpreter(exe, os);
+        return AccessGuard.Check(layers, check, os, interpreter) is { } refusal ? ExecDecision.Refuse(refusal) : decision;
     }
 }
