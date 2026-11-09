@@ -106,4 +106,20 @@ export const deMachines: Dictionary["machines"] = {
     testAsked: "Der Test wartet in der Liste der Läufe unten auf Ihre Freigabe. Prüfen Sie den Befehl und erlauben Sie ihn dann.",
     passed: "{n} bestanden", failed: "{n} fehlgeschlagen", skipped: "{n} übersprungen", kind: { test: "Test", build: "Build", deploy: "Deploy", other: "Sonstiges" },
   },
+  execLevel: {
+    title: "Remote-Läufe auf dieser Maschine", hint: "Was diese Maschine an Remote-Läufen zulässt. Erhöhen wird mit Ihrem Freigabeschlüssel in diesem Browser signiert; Senken braucht keine Signatur.",
+    label: "Remote-Läufe auf dieser Maschine", off: "Aus", argv: "Nur Programme (argv)", shell: "Shell", save: "Stufe ändern",
+    saved: "An die Maschine gesendet. Sie übernimmt die Änderung, wenn sie ihre Einstellungen das nächste Mal liest.", current: "Jetzt: {level}", ownerOnly: "Nur der Besitzer der Maschine ändert das.",
+    noKey: "Das Erhöhen von Remote-Läufen muss signiert sein, und dieser Browser hat keinen Freigabeschlüssel. Erstellen Sie auf Ihrer Kontoseite einen und pinnen Sie ihn einmal auf der Maschine.", makeKey: "Freigabeschlüssel erstellen",
+    keyUnreadable: "Der Freigabeschlüssel dieses Browsers konnte nicht gelesen werden.", codeHint: "Diese Maschine ist Produktion oder eine Datenbank: Geben Sie einen frischen Code Ihrer Authenticator-App ein.",
+    waiting: "Die Änderung (Folge {sequence}) wartet darauf, dass die Maschine sie liest.",
+    state: {
+      applied: "Die Maschine hat die Änderung übernommen: Remote-Läufe sind jetzt {level}.",
+      signature_refused: "Die Maschine hat die Änderung abgelehnt: ihre gepinnten Schlüssel haben die Signatur nicht akzeptiert.",
+      no_pinned_key: "Auf der Maschine ist kein Schlüssel gepinnt, sie kann also keine Erhöhung aus dem Web prüfen. Pinnen Sie Ihren Schlüssel einmal auf der Maschine: aipod approvers add <Schlüssel>.",
+      expired: "Die Änderung kam nach ihrer Frist bei der Maschine an. Speichern Sie erneut.",
+      needs_admin: "Diese Maschine ist ein Dienst: Ihre Stufe liegt in einer Datei, die nur der Admin ändern kann. Der Admin führt aipod install --service --exec <Stufe> aus.",
+      unknown: "Die Maschine hat einen Zustand gemeldet, den diese Seite nicht kennt.",
+    },
+  },
 };
