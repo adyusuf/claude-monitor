@@ -21,7 +21,7 @@ internal static partial class PathIdentity
     /// <summary>The real path, or null when it is not absolute, cannot be resolved or (on Windows) is a network or device path.</summary>
     public static string? Resolve(string? path, string os, bool allowMissing)
     {
-        if (string.IsNullOrEmpty(path) || !OsKinds.All.Contains(os)) return null;
+        if (string.IsNullOrEmpty(path) || !OsKinds.All.Contains(os) || path.Contains('\0', StringComparison.Ordinal)) return null;
         if (os == OsKinds.Windows && IsRefusedWindowsForm(path)) return null;
         var real = ExecPaths.RealPath(path, os, allowMissing);
         if (real is null || os != OsKinds.Windows || !OperatingSystem.IsWindows()) return real;

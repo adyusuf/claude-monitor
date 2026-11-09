@@ -56,7 +56,8 @@ public static class AccessScopes
                 _ => Scopes.Outside,
             };
         }
-        catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException
+            or NotSupportedException)
         {
             return Scopes.Unknown;
         }

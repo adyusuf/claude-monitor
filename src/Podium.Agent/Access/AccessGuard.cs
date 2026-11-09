@@ -30,7 +30,7 @@ internal static class AccessGuard
             var sha = check.Executable is { } exe && AccessPolicyMath.NeedsHash(final, exe, os) ? ExecutableHashes.Of(exe) : null;
             return AccessPolicyMath.Evaluate(final, check with { ExecutableSha256 = sha }, os);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return Refuse(AccessErrors.Unresolved, layers[0]);
         }
