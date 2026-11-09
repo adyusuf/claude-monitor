@@ -104,4 +104,20 @@ export const enMachines = {
     testAsked: "The test is waiting for your approval in the list of runs below. Check the command, then allow it.",
     passed: "{n} passed", failed: "{n} failed", skipped: "{n} skipped", kind: { test: "test", build: "build", deploy: "deploy", other: "other" },
   },
+  execLevel: {
+    title: "Remote runs on this machine", hint: "What this machine lets remote runs do. Turning it up is signed with your approval key in this browser; turning it down needs no signature.",
+    label: "Remote runs on this machine", off: "Off", argv: "Programs only (argv)", shell: "Shell", save: "Change the level",
+    saved: "Sent to the machine. It applies the change the next time it reads its settings.", current: "Now: {level}", ownerOnly: "Only the machine's owner changes this.",
+    noKey: "Turning remote runs up must be signed, and this browser holds no approval key. Make one on your account page, then pin it on the machine once.", makeKey: "Make an approval key",
+    keyUnreadable: "This browser's approval key could not be read.", codeHint: "This machine is production or a database: type a fresh code from your authenticator app.",
+    waiting: "The change (sequence {sequence}) is waiting for the machine to read it.",
+    state: {
+      applied: "The machine applied the change: remote runs are now {level}.",
+      signature_refused: "The machine refused the change: its pinned keys did not accept the signature.",
+      no_pinned_key: "The machine has no pinned key, so it cannot check a raise from the web. Pin your key on the machine once: aipod approvers add <key>.",
+      expired: "The change reached the machine after its deadline. Save again.",
+      needs_admin: "This machine is a service: its level lives in a file only the admin can change. The admin runs aipod install --service --exec <level>.",
+      unknown: "The machine reported a state this page does not know.",
+    },
+  },
 };

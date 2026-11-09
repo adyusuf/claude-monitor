@@ -70,6 +70,7 @@ export const de: Dictionary = {
     totp_required: "Diese Maschine ist ein Produktions- oder Datenbankrechner: Dafür brauchen Sie die Anmeldung in zwei Schritten.",
     approval_required: "Diese Maschine führt nur aus, was ein angehefteter Schlüssel signiert hat. Erzeugen Sie auf Ihrer Kontoseite einen Schlüssel und geben Sie erneut frei.",
     approval_invalid: "Die Signatur passt nicht zu dieser Ausführung, oder der Schlüssel ist nicht registriert. Erzeugen Sie auf Ihrer Kontoseite einen Schlüssel.",
+    exec_level_changed: "Die Stufe für Remote-Läufe dieser Maschine wurde inzwischen geändert. Die Seite wurde neu geladen: Prüfen Sie sie und speichern Sie erneut.", exec_level_invalid: "Diese Stufe oder Frist ist ungültig. Versuchen Sie es erneut.", exec_level_signature_required: "Zum Erhöhen der Remote-Läufe ist Ihr Freigabeschlüssel nötig. Erstellen Sie auf Ihrer Kontoseite einen.",
     invalid_approval_key: "Das ist kein öffentlicher ECDSA-P-256-Schlüssel.", approval_key_limit: "Sie haben bereits die höchste Zahl an Schlüsseln (10). Entfernen Sie zuerst einen.", approval_key_exists: "Dieser Schlüssel ist bereits registriert.",
     schedule_approvals: "Eine Maschine, die signierte Freigaben verlangt, nimmt keine Zeitpläne an: Jede Ausführung dort braucht eine Signatur.",
     invalid_schedule: "Ein Zeitplan wiederholt sich alle 15 Minuten bis 7 Tage oder einmal täglich zu einer Uhrzeit (UTC).",

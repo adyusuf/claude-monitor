@@ -141,3 +141,16 @@ export interface AgentActionView {
   /** A remote write (ADR-0011 §7a): the plugin id or the setting name, and the setting's value. */
   target?: string | null; value?: string | null;
 }
+
+/** ADR-0021: the agent's state for the latest signed exec-level change, and what the machine page reads about it. */
+export type ExecLevelState = "applied" | "signature_refused" | "no_pinned_key" | "expired" | "needs_admin";
+export interface ExecLevelView {
+  agentId: string;
+  execLevel: ExecLevel;
+  sequence: number;
+  report: { sequence: number; state: ExecLevelState | string } | null;
+  reportAt: string | null;
+  /** The pending request: owner and admins only. */
+  pending: { level: ExecLevel; sequence: number; notAfter: string; isSigned: boolean } | null;
+}
+export interface ExecLevelChangeInput { level: ExecLevel; sequence: number; notAfter: string; keyId?: string; signature?: string; code?: string }
