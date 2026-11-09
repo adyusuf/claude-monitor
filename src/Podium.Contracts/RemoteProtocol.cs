@@ -101,13 +101,15 @@ public sealed record GrantTemplate(IReadOnlyList<string> Argv, string Cwd, int M
 /// An approved run sent to its target. NotAfter: the target never starts it later than this. DecidedAt: when the server approved it
 /// (server clock; null from an older API), so a target that refuses a run for an off switch knows whether its last settings read is older.
 /// ProjectKey: the run's repository, which decides its access policy (ADR-0020 §4); AccessStamp: the policy stamp the API had when it sent the run.
+/// TargetStrict: whether the API holds the target as a production or database machine at delivery (its set role or its own claim); null from an
+/// older API, which the agent treats as strict for the access default.
 /// </summary>
 public sealed record RunMessage(Guid Id, string Mode, IReadOnlyList<string>? Argv, string? ShellCommand, string? Cwd,
     int TimeoutSeconds, DateTimeOffset NotAfter, Guid? GrantId, GrantTemplate? Grant, DateTimeOffset? DecidedAt = null,
     string? ScriptInterpreter = null, string? ScriptBody = null, IReadOnlyList<string>? ScriptArgs = null, long? OutputCap = null, bool ApprovedWithTotp = false,
     IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null,
     string? ApprovalKeyId = null, string? ApprovalSignature = null, DateTimeOffset? ApprovalNotAfter = null, string? TargetEnvironment = null, string? TargetFunction = null,
-    string? ProjectKey = null, string? AccessStamp = null);
+    string? ProjectKey = null, string? AccessStamp = null, bool? TargetStrict = null);
 
 public sealed record RunCancelMessage(Guid Id);
 
