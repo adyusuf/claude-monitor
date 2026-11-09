@@ -13,7 +13,7 @@ namespace Podium.Api.AccessPolicies;
 /// <summary>
 /// Saving a project's access policy (ADR-0020 §4 rules 1-3). Only the workspace's owners and admins, re-authenticated; the document valid and already
 /// canonical (the API never rewrites a body a signature may cover); every repo key one of the project's; a signature, when sent, checked against the
-/// caller's registered key for the next version. A save is a compare-and-set on the version (<c>access_policy_changed</c>); a key held by another
+/// caller's registered key for the next version. A save is a compare-and-set on the version (<c>access_policy_changed</c>); a key (compared as RepoKeys.Same does) held by another
 /// live policy is refused (<c>access_key_taken</c>), one held by a cleared policy passes to this one. Audited without paths.
 /// </summary>
 public static class AccessPolicySaves
@@ -39,7 +39,13 @@ public static class AccessPolicySaves
 
         var row = await db.ProjectAccessPolicies.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId, ct);
         var candidates = await AccessPolicyStore.CandidateKeysAsync(db, projectId, await AccessPolicyStore.HeldKeysAsync(db, row?.Id, ct), ct);
-        if (!document.ProjectKeys.All(k => candidates.Contains(k, StringComparer.Ordinal))) return Http.Invalid("document", AccessPolicyErrors.Keys);
+        // Keys compare as RepoKeys.Same does (NFC, no case): each must be a candidate, and no two may name the same repository.
+        if (!document.ProjectKeys.All(k => candidates.Contains(k, RepoKeys.Comparer))
+            || document.ProjectKeys.Distinct(RepoKeys.Comparer).Count() != document.ProjectKeys.Count)
+        {
+            return Http.Invalid("document", AccessPolicyErrors.Keys);
+        }
+
         if ((row?.Version ?? 0) != req.ExpectedVersion) return RemoteChecks.Conflict(AccessPolicyErrors.Changed);
         if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
 
@@ -57,16 +63,20 @@ public static class AccessPolicySaves
         }
 
         var keys = document.ProjectKeys.ToList();
-        var holders = await (from k in db.ProjectAccessPolicyKeys.AsNoTracking()
-                             join p in db.ProjectAccessPolicies.AsNoTracking() on k.PolicyId equals p.Id
-                             where k.WorkspaceId == workspaceId && keys.Contains(k.ProjectKey) && p.ProjectId != projectId
-                             select new { k.PolicyId, k.ProjectKey, p.Cleared }).ToListAsync(ct);
-        if (holders.Any(h => !h.Cleared)) return RemoteChecks.Conflict(AccessPolicyErrors.KeyTaken);
-
         var now = clock.GetUtcNow();
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         try
         {
+            // The workspace's settings row is the lock of its policy keys (first in the global lock order, RemoteLocks): two saves that name the
+            // same repository in another spelling are checked one after the other, since the unique index compares keys exactly.
+            await db.WorkspaceSettings.Where(s => s.WorkspaceId == workspaceId).ExecuteUpdateAsync(s => s.SetProperty(x => x.UpdatedAt, x => x.UpdatedAt), ct);
+            var holders = await HoldersAsync(db, workspaceId, projectId, keys, ct);
+            if (holders.Any(h => !h.Cleared))
+            {
+                await tx.RollbackAsync(ct);
+                return RemoteChecks.Conflict(AccessPolicyErrors.KeyTaken);
+            }
+
             var policyId = row?.Id ?? Guid.CreateVersion7();
             if (row is null)
             {
@@ -93,7 +103,7 @@ public static class AccessPolicySaves
                 return RemoteChecks.Conflict(AccessPolicyErrors.Changed);
             }
 
-            // A cleared policy keeps its keys so its tombstone still reaches the machines; a new policy for one of them takes the key over.
+            // A cleared policy keeps its keys (they say what it covered); a new policy for one of them takes the key over.
             var released = holders.Select(h => h.ProjectKey).ToList();
             if (released.Count > 0)
             {
@@ -115,7 +125,22 @@ public static class AccessPolicySaves
             return RemoteChecks.Conflict(unique.ConstraintName == ProjectIndex ? AccessPolicyErrors.Changed : AccessPolicyErrors.KeyTaken);
         }
 
-        return Results.Ok(await AccessPolicyStore.ViewAsync(db, grant.Project, true, ct));
+        return Results.Ok(await AccessPolicyStore.PageAsync(db, grant.Project, true, ct));
+    }
+
+    private sealed record Holder(Guid PolicyId, string ProjectKey, bool Cleared);
+
+    /// <summary>
+    /// The key rows of other projects' policies in the workspace that name one of these repositories as <see cref="RepoKeys.Same"/> compares them
+    /// (NFC, no case). A workspace holds at most a few thousand keys, so they are read and compared here.
+    /// </summary>
+    private static async Task<List<Holder>> HoldersAsync(PodiumDb db, Guid workspaceId, Guid projectId, List<string> keys, CancellationToken ct)
+    {
+        var rows = await (from k in db.ProjectAccessPolicyKeys.AsNoTracking()
+                          join p in db.ProjectAccessPolicies.AsNoTracking() on k.PolicyId equals p.Id
+                          where k.WorkspaceId == workspaceId && p.ProjectId != projectId
+                          select new Holder(k.PolicyId, k.ProjectKey, p.Cleared)).ToListAsync(ct);
+        return rows.Where(h => keys.Contains(h.ProjectKey, RepoKeys.Comparer)).ToList();
     }
 
     /// <summary>The next version in one compare-and-set: false when the version moved on since the caller read it.</summary>

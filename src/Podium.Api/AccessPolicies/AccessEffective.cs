@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.AccessPolicies;
 
 /// <summary>
-/// A machine's access as its page shows it (ADR-0020 §4): each web policy that reaches the machine, for the machine's OS, narrowed lexically by the
+/// A machine's access as its page shows it (ADR-0020 §4): every web policy of its workspace (all of them reach it), for the machine's OS, narrowed lexically by the
 /// ceiling the agent reported, with the version and state the machine applied. The ceiling's paths go only to the machine's owner and the workspace's
 /// owners and admins (<paramref name="privileged"/>); anyone else sees the policy's own lists, never a path that came from the machine.
 /// </summary>
@@ -22,7 +22,7 @@ public static class AccessEffective
         var ceiling = privileged ? report?.Ceiling : null;
         var enforced = await db.WorkspaceSettings.AsNoTracking().Where(s => s.WorkspaceId == agent.WorkspaceId).Select(s => s.EnforceAccessPolicies)
             .FirstOrDefaultAsync(ct);
-        var rows = await (from p in AccessPolicyDelivery.For(db, agent.Id, agent.WorkspaceId)
+        var rows = await (from p in AccessPolicyDelivery.For(db, agent.WorkspaceId)
                           join project in db.Projects.AsNoTracking() on p.ProjectId equals project.Id
                           select new { p, project.Name }).ToListAsync(ct);
         var applied = (report?.Policies ?? []).GroupBy(a => a.ProjectId).ToDictionary(g => g.Key, g => g.First());

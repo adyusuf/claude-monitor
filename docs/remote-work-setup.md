@@ -254,6 +254,20 @@ signed approvals that runs an agent older than this release cannot verify such a
 (`approval_invalid`); update its agent. The Windows parts (final paths, file identity, the hard-link count) compile but
 have not yet run on a real Windows host.
 
+Known limits of this release, stated plainly:
+
+- **Runs from the web name no repository yet.** The web sends no `projectKey` when it creates a run, so such a run is
+  never covered by a policy. On a production or database machine (and wherever the switch is on) every web-created
+  shell or script run therefore gets the default and is refused (`access_shell_refused`, `access_script_refused`), and
+  no policy can lift that until web runs carry their repository. Runs Claude asks for with a project key are covered
+  by their policy as described above.
+- **Older agents and path approval rules.** An agent older than this release reports no access scope with a
+  permission request, so approval rules for path tools (Read, Edit, Write, MultiEdit, LS, NotebookEdit, and Glob or
+  Grep with a path) stop matching for it and "remember" is not offered for them until its agent is updated; Bash
+  rules are not affected.
+- **A web page loaded before the deploy** signs approvals with payload v1. For a run that names a repository the API
+  then answers 403 `approval_invalid` until the page is reloaded.
+
 ## Residual risks (ADR-0005, "Consequences" and "Open")
 
 Read these before turning `shell` or a wide ceiling on:

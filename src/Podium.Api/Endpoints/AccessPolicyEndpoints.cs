@@ -37,7 +37,7 @@ public static class AccessPolicyEndpoints
         var grant = await ProjectAccess.OfAsync(db, userId, projectId, http.RequestAborted);
         if (grant is null) return Http.NotFound();
         var admin = await Access.MemberAsync(db, userId, grant.Project.WorkspaceId, Roles.Admin, http.RequestAborted) is not null;
-        return Results.Ok(await AccessPolicyStore.ViewAsync(db, grant.Project, admin, http.RequestAborted));
+        return Results.Ok(await AccessPolicyStore.PageAsync(db, grant.Project, admin, http.RequestAborted));
     }
 
     private static Task<IResult> Put(Guid projectId, AccessPolicySave? req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock) =>
@@ -49,14 +49,10 @@ public static class AccessPolicyEndpoints
         if (await Access.MemberAsync(db, http.User.UserId(), wsId, Roles.Viewer, ct) is null) return Http.NotFound();
         if (!AccessPolicyRules.IsValidKey(projectKey)) return Http.Invalid("projectKey", InvalidKey);
         var enforced = await db.WorkspaceSettings.AsNoTracking().Where(s => s.WorkspaceId == wsId).Select(s => s.EnforceAccessPolicies).FirstOrDefaultAsync(ct);
-        var found = await (from k in db.ProjectAccessPolicyKeys.AsNoTracking()
-                           join p in db.ProjectAccessPolicies.AsNoTracking() on k.PolicyId equals p.Id
-                           join project in db.Projects.AsNoTracking() on p.ProjectId equals project.Id
-                           where k.WorkspaceId == wsId && k.ProjectKey == projectKey && p.WorkspaceId == wsId && !p.Cleared
-                           select new { p, project.Name }).FirstOrDefaultAsync(ct);
-        if (found is null) return Http.NotFound();
-        var document = AccessPolicyStore.Read(found.p);
-        return Results.Ok(new AccessKeySummary(found.p.ProjectId, found.Name, found.p.Version, found.p.Signature is not null, document.Shell, projectKey!,
+        if (await AccessPolicyStore.LiveForKeyAsync(db, wsId, projectKey!, ct) is not { } policy) return Http.NotFound();
+        var name = await db.Projects.AsNoTracking().Where(p => p.Id == policy.ProjectId).Select(p => p.Name).FirstAsync(ct);
+        var document = AccessPolicyStore.Read(policy);
+        return Results.Ok(new AccessKeySummary(policy.ProjectId, name, policy.Version, policy.Signature is not null, document.Shell, projectKey!,
             enforced, document));
     }
 }

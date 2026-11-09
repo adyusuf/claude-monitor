@@ -75,16 +75,21 @@ public static class RunNotices
 
     /// <summary>
     /// The run as its target receives it, with the grant it matched so the target can check it again, its repository and the stamp of the target's
-    /// access policies now (ADR-0020 §4), so a target whose policies are older fetches them before it judges the run.
+    /// access policies now (ADR-0020 §4), so a target whose policies are older fetches them before it judges the run, and whether the API holds the
+    /// target as strict now (its set role or its own claim), which decides the access default there.
     /// </summary>
     public static async Task<RunMessage> MessageAsync(PodiumDb db, RemoteRun run, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(run);
-        return await MessageAsync(db, run, await AccessPolicyDelivery.StampAsync(db, run.TargetAgentId, run.WorkspaceId, ct), ct);
+        return await MessageAsync(db, run, await AccessPolicyDelivery.StampAsync(db, run.WorkspaceId, ct), await TargetStrictAsync(db, run.TargetAgentId, ct), ct);
     }
 
-    private static async Task<RunMessage> MessageAsync(PodiumDb db, RemoteRun run, string? accessStamp, CancellationToken ct)
+    /// <summary>The target is production or database by its set role or its own claim at delivery; an agent not found counts as strict.</summary>
+    private static async Task<bool> TargetStrictAsync(PodiumDb db, Guid targetAgentId, CancellationToken ct) =>
+        await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == targetAgentId, ct) is not { } agent || Approvals.ApprovalRules.Strict(agent);
+
+    private static async Task<RunMessage> MessageAsync(PodiumDb db, RemoteRun run, string? accessStamp, bool targetStrict, CancellationToken ct)
     {
         GrantTemplate? grant = null;
         if (run.GrantId is { } grantId)
@@ -95,7 +100,8 @@ public static class RunNotices
 
         return new RunMessage(run.Id, run.Mode, run.Argv, run.ShellCommand, run.Cwd, run.TimeoutSeconds, run.ExpiresAt,
             run.GrantId, grant, run.DecidedAt, run.ScriptInterpreter, run.ScriptBody, run.ScriptArgs, run.OutputCap, run.ApprovedWithTotp, run.ScriptFiles, run.ScriptStdin,
-            run.ApprovalKeyId, run.ApprovalSignature, run.ApprovalNotAfter, run.TargetEnvironment, run.TargetFunction, run.ProjectKey, accessStamp);
+            run.ApprovalKeyId, run.ApprovalSignature, run.ApprovalNotAfter, run.TargetEnvironment, run.TargetFunction, run.ProjectKey, accessStamp,
+            targetStrict);
     }
 
     /// <summary>The approved runs a target still owes an answer for, replayed on every stream connection.</summary>
@@ -108,16 +114,17 @@ public static class RunNotices
             .OrderBy(r => r.CreatedAt).Take(50).ToListAsync(ct);
         var messages = new List<RunMessage>(runs.Count);
         var stamps = new Dictionary<Guid, string?>(); // the target's stamp, read once per workspace of its runs
+        var strict = runs.Count > 0 && await TargetStrictAsync(db, targetAgentId, ct);
         foreach (var run in runs)
         {
             if (broker is not null && await RoleBlocksAsync(db, broker, run, ct)) continue;
             if (!stamps.TryGetValue(run.WorkspaceId, out var stamp))
             {
-                stamp = await AccessPolicyDelivery.StampAsync(db, targetAgentId, run.WorkspaceId, ct);
+                stamp = await AccessPolicyDelivery.StampAsync(db, run.WorkspaceId, ct);
                 stamps[run.WorkspaceId] = stamp;
             }
 
-            messages.Add(await MessageAsync(db, run, stamp, ct));
+            messages.Add(await MessageAsync(db, run, stamp, strict, ct));
         }
 
         return messages;

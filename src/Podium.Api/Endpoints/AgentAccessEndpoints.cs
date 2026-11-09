@@ -5,8 +5,8 @@ using Podium.Api.Security;
 namespace Podium.Api.Endpoints;
 
 /// <summary>
-/// What an agent fetches of the access policies (ADR-0020 §4) when the stamp in its settings moved: the policies of the repositories its machine
-/// reports, tombstones included. Only for an agent whose user is still a member of its workspace; anything else answers 404, which the agent reads
+/// What an agent fetches of the access policies (ADR-0020 §4) when the stamp in its settings moved: every policy of its workspace, tombstones
+/// included, at most <see cref="AccessPolicyDelivery.PoliciesMax"/> (that many may mean cut: the default then applies). Only for an agent whose user is still a member of its workspace; anything else answers 404, which the agent reads
 /// as "keep what you have".
 /// </summary>
 public static class AgentAccessEndpoints
@@ -21,6 +21,6 @@ public static class AgentAccessEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         if (await Access.MemberAsync(db, http.User.UserId(), workspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        return Results.Ok(await AccessPolicyDelivery.PoliciesAsync(db, http.User.AgentId(), workspaceId, http.RequestAborted));
+        return Results.Ok(await AccessPolicyDelivery.PoliciesAsync(db, workspaceId, http.RequestAborted));
     }
 }
