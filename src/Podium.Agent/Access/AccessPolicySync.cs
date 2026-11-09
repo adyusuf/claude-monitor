@@ -92,7 +92,7 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
     /// <summary>
     /// The API delivers every live policy and tombstone of the workspace. Rows of another workspace go. A delivered message replaces the row's delivered
     /// one, and its kept one when it verifies and is newer. A row the full delivery no longer lists goes on a machine that does not require signatures;
-    /// where signatures are required its kept policy stays only while no delivered signed policy of a higher version covers one of its keys. A delivery
+    /// where signatures are required its kept policy stays until a newer signed message of the same project (a signed tombstone included) replaces it. A delivery
     /// at the cap is taken as cut: nothing held is dropped and every run gets the default until a full one arrives.
     /// </summary>
     private void Store(Guid workspace, AgentAccessPolicies answer)
@@ -115,7 +115,6 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
                 keeps ? message.Version : before?.KeptVersion, keeps ? json : before?.KeptMessage);
         }
 
-        var signedDelivered = delivered.Where(m => AccessPolicyVerifier.Keeps(m, null, approvers, workspace)).ToList();
         foreach (var (id, before) in held.Where(h => !rows.ContainsKey(h.Key)))
         {
             if (truncated)
@@ -124,10 +123,8 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
                 continue;
             }
 
-            if (!approvers.Required || AccessPolicyVerifier.Parse(before.KeptMessage) is not { } kept) continue;
-            var replaced = signedDelivered.Any(m => m.Version > kept.Version
-                && m.Document.ProjectKeys.Any(k => kept.Document?.ProjectKeys?.Contains(k, RepoKeys.Comparer) == true));
-            if (!replaced) rows[id] = before with { Version = null, Message = null, IsSigned = false };
+            // Versions count per project: another project's signed message, however new, never releases this one (a replayed old message could).
+            if (approvers.Required && AccessPolicyVerifier.Parse(before.KeptMessage) is not null) rows[id] = before with { Version = null, Message = null, IsSigned = false };
         }
 
         store.ReplaceAccessPolicies([.. rows.Values], Marker(workspace, answer.Stamp ?? ""), truncated); // no stamp and an empty one: no policy
