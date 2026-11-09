@@ -313,16 +313,21 @@ try {
     if ($DryRun) { Say '  [dry run] the machine would be connected (the old login carried over, or a login)' }
     elseif (-not $NoLogin) {
         $env:AP_LANG = 'en'
-        $connected = (& $NewBin status 2>$null) -match '^connected:'
-        if ($connected) {
-            Say 'This machine is already connected (its login was kept).'
+        # The server this machine is connected to now (empty when it is not): a login is kept only for the server asked for.
+        $current = ((& $NewBin status 2>$null) | Where-Object { $_ -match '^connected: ' } | Select-Object -First 1) -replace '^connected: ', ''
+        $current = "$current".Trim().TrimEnd('/')
+        if ($current -and (-not $Server -or $current -ieq $Server)) {
+            Say "This machine is already connected to $current (its login was kept)."
             & $NewBin restart *> $null
         }
         else {
             if (-not $Server) { Die 'no server address to log in to: -Server https://<your server>' }
-            Say 'Connecting this machine: approve the code on the web page it shows.'
+            if ($current) { Say "This machine is connected to $current; logging in to $Server instead: approve the code on the web page it shows." }
+            else { Say 'Connecting this machine: approve the code on the web page it shows.' }
+            # A login keeps the machine key, so the same server's web shows the same machine; the daemon is restarted to read the new login.
             & $NewBin login --server $Server
             if ($LASTEXITCODE -ne 0) { Warn "the login did not finish; run: aipod login --server $Server" }
+            else { & $NewBin restart *> $null }
         }
         # A new machine gets the inbox push (web messages start a turn in an idle session); a saved choice is never touched.
         if ($fresh) { & $NewBin config push inbox *> $null }

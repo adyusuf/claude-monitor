@@ -356,17 +356,29 @@ fi
 
 # ---------------------------------------------------------------- the login
 
-connected() { AP_LANG=en AP_AGENT_HOME="$new_home" "$new_bin" status 2> /dev/null | grep -q '^connected:'; }
+# The server this machine is connected to now (empty when it is not): a login is kept only for the server asked for.
+connected_to() { AP_LANG=en AP_AGENT_HOME="$new_home" "$new_bin" status 2> /dev/null | sed -n 's/^connected: //p' | head -n 1; }
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 if [ "$dry" = 1 ]; then
   say "  [dry run] the machine would be connected (the old login carried over, or a login)"
 elif [ "$want_login" = 1 ]; then
-  if connected; then
-    say "This machine is already connected (its login was kept)."
+  current="$(connected_to)"
+  if [ -n "$current" ] && { [ -z "$server" ] || [ "$(lower "${current%/}")" = "$(lower "${server%/}")" ]; }; then
+    say "This machine is already connected to $current (its login was kept)."
     AP_AGENT_HOME="$new_home" "$new_bin" restart > /dev/null 2>&1 || true
   else
     [ -n "$server" ] || die "no server address to log in to: --server https://<your server>"
-    say "Connecting this machine: approve the code on the web page it shows."
-    AP_AGENT_HOME="$new_home" "$new_bin" login --server "$server" || warn "the login did not finish; run: aipod login --server $server"
+    if [ -n "$current" ]; then
+      say "This machine is connected to $current; logging in to $server instead: approve the code on the web page it shows."
+    else
+      say "Connecting this machine: approve the code on the web page it shows."
+    fi
+    # A login keeps the machine key, so the same server's web shows the same machine; the daemon is restarted to read the new login.
+    if AP_AGENT_HOME="$new_home" "$new_bin" login --server "$server"; then
+      AP_AGENT_HOME="$new_home" "$new_bin" restart > /dev/null 2>&1 || true
+    else
+      warn "the login did not finish; run: aipod login --server $server"
+    fi
   fi
   # A new machine gets the inbox push (web messages start a turn in an idle session); a saved choice is never touched.
   if [ "$fresh" = 1 ]; then AP_AGENT_HOME="$new_home" "$new_bin" config push inbox > /dev/null 2>&1 || true; fi

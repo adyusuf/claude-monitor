@@ -121,6 +121,17 @@ public static partial class Cli
         return true;
     }
 
+    /// <summary>
+    /// After a login: a running daemon still holds the old server, tokens and workspace (it read them when it started), so it is handed over to
+    /// a fresh one that reads the new login; with none running, one is started.
+    /// </summary>
+    public static async Task AfterLoginAsync(AgentConfig config, AgentLog log, TimeProvider clock, Update.IDaemonControl? control = null)
+    {
+        var daemon = control ?? new Update.DaemonControl(config, log, clock);
+        if (daemon.IsRunning()) await RestartAsync(config, log, clock, TextWriter.Null, daemon);
+        else DaemonHost.EnsureRunning(config, log);
+    }
+
     /// <summary>"aipod restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
     public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout, Update.IDaemonControl? control = null)
     {
