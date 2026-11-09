@@ -22,9 +22,15 @@ public sealed class AccessLayers(AgentConfig config)
     public IReadOnlyList<AccessLayer> For(RunMessage run, ExecPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(run);
+        return For(run.ProjectKey, policy, run);
+    }
+
+    /// <summary>The layers for a repository key (a session's project, or a run's when <paramref name="run"/> is given).</summary>
+    public IReadOnlyList<AccessLayer> For(string? projectKey, ExecPolicy policy, RunMessage? run = null)
+    {
         ArgumentNullException.ThrowIfNull(policy);
         var ceiling = AccessCeiling.Layer(policy);
-        var key = string.IsNullOrEmpty(run.ProjectKey) ? null : run.ProjectKey;
+        var key = string.IsNullOrEmpty(projectKey) ? null : projectKey;
         try
         {
             using var store = new LocalStore(config.DatabasePath);
@@ -63,13 +69,12 @@ public sealed class AccessLayers(AgentConfig config)
     /// A strict machine (ADR-0008): the local claim, the role the API froze into a script run, or the role the workspace's machine list last gave this
     /// machine. A role value this build does not know counts as strict.
     /// </summary>
-    public static bool IsStrict(RunMessage run, ExecPolicy policy, LocalStore store)
+    public static bool IsStrict(RunMessage? run, ExecPolicy policy, LocalStore store)
     {
-        ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(store);
-        return MachineRoles.IsStrict(policy.ClaimedEnvironment, policy.ClaimedFunction) || MachineRoles.IsStrict(run.TargetEnvironment, run.TargetFunction)
-            || !MachineRoles.IsEnvironment(run.TargetEnvironment) || !MachineRoles.IsFunction(run.TargetFunction) || store.Get(StrictKey) == "true";
+        return MachineRoles.IsStrict(policy.ClaimedEnvironment, policy.ClaimedFunction) || MachineRoles.IsStrict(run?.TargetEnvironment, run?.TargetFunction)
+            || !MachineRoles.IsEnvironment(run?.TargetEnvironment) || !MachineRoles.IsFunction(run?.TargetFunction) || store.Get(StrictKey) == "true";
     }
 
     /// <summary>Keeps what the workspace's machine list says about this machine's role, for the runs that do not carry it.</summary>
