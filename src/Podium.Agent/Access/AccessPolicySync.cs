@@ -43,15 +43,21 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
     }
 
     /// <summary>
-    /// True when the run may go on: it names no stamp, the stamp held, or one the agent caught up with now. False when the API could not deliver the set
-    /// the run names (an API without the call): the run is then refused as <see cref="AccessErrors.Stale"/> and its refusal stored for the report.
+    /// True when the run may go on: it names no policy, the stamp held, or one the agent caught up with now. False when the API could not deliver the set
+    /// the run names (404: an older API, or the agent's user is no longer a member): the run is then refused as <see cref="AccessErrors.Stale"/> and its
+    /// refusal stored for the report.
     /// </summary>
     public async Task<bool> FreshAsync(RunMessage run, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(run);
-        if (string.IsNullOrEmpty(run.AccessStamp) || Identity.Peek(config)?.WorkspaceId is not { } workspace) return true;
-        var wanted = Marker(workspace, run.AccessStamp);
-        if (wanted == store.Get(LocalStore.AccessSyncedKey) || await FetchAsync(workspace, wanted, remember: false, ct)) return true;
+        if (Identity.Peek(config)?.WorkspaceId is not { } workspace) return true;
+        // No stamp (an older API) and an empty one are the same: no policy for this machine. A set still held is fetched again once, and an API
+        // without the call (404) leaves it in place, which only keeps the run stricter.
+        var stamp = run.AccessStamp ?? "";
+        var wanted = Marker(workspace, stamp);
+        if (wanted == store.Get(LocalStore.AccessSyncedKey)) return true;
+        var fetched = await FetchAsync(workspace, wanted, remember: stamp.Length == 0, ct);
+        if (fetched || stamp.Length == 0) return true;
         if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
         {
             store.ExecEnd(run.Id.ToString(), RunStatuses.Failed, null, AccessErrors.Stale, false, null, AccessRefusedBy.Policy, null);
@@ -75,7 +81,7 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
         }
 
         var answer = json.ValueKind == JsonValueKind.Object ? json.Deserialize<AgentAccessPolicies>(ApiClient.Json) : null;
-        if (answer?.Policies is null || answer.Stamp is null) throw new InvalidDataException("the access policy answer is malformed");
+        if (answer?.Policies is null) throw new InvalidDataException("the access policy answer is malformed");
         Store(workspace, answer);
         return true;
     }
@@ -97,7 +103,7 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
                 keeps ? message.Version : before?.KeptVersion, keeps ? json : before?.KeptMessage);
         }
 
-        store.ReplaceAccessPolicies([.. rows.Values], Marker(workspace, answer.Stamp));
+        store.ReplaceAccessPolicies([.. rows.Values], Marker(workspace, answer.Stamp ?? "")); // no stamp and an empty one: no policy
     }
 
     /// <summary>The stamp held, tagged with its workspace: a login into another workspace never reads the old set as current.</summary>
