@@ -68,7 +68,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
         var inventory = await InventoryAsync(policy, ct);
         var profile = new AgentProfile(level, config.ServiceMode, RuntimeInformation.OSDescription, Environment.UserName, config.ExecMaxConcurrent,
             policy.ClaimedEnvironment, policy.ClaimedFunction, claude, ToolInventory.Interpreters(tools), tools, Capabilities(level, tools, claude), services, projects, PushReported(), ApproversStore.Load(config).Required,
-            PluginIds.IsValid(config.PluginId) ? config.PluginId : null, inventory, AccessOf(policy));
+            PluginIds.IsValid(config.PluginId) ? config.PluginId : null, inventory, AccessOf(policy), ExecLevelChanges.Reported(store, Identity.Peek(config)?.AgentId));
         var json = System.Text.Json.JsonSerializer.Serialize(profile with { Claude = claude is null ? null : claude with { SeenAt = default }, Inventory = inventory is null ? null : inventory with { At = default } }, ApiClient.Json);
         if (json == lastSent) return;
         if (await Guard(() => api.ProfileAsync(profile, ct))) lastSent = json;

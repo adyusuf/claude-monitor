@@ -168,6 +168,7 @@ public static partial class Cli
             : Strings.T(Msg.StatusCommandsNone));
         await stdout.WriteLineAsync(Strings.T(Msg.StatusStopWait, (int)config.StopWait.TotalSeconds));
         await stdout.WriteLineAsync(Strings.T(Msg.StatusRemoteRuns, ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel)), config.ServiceMode ? Strings.T(Msg.StatusServiceSuffix) : ""));
+        if (ExecLevelChanges.Describe(store, identity.AgentId) is { } execChange) await stdout.WriteLineAsync(execChange);
         var started = new Daemon.ClaudeControl(config, new Daemon.SystemClaudeCli(), clock ?? TimeProvider.System).Running();
         var byPolicy = started.Count(w => w.Reason is not null);
         await stdout.WriteLineAsync(Strings.T(Msg.StatusClaudeWeb, started.Count, byPolicy > 0 ? Strings.T(Msg.StatusByAutomatic, byPolicy) : "", Daemon.WorkspaceSettings.Get(config, store, Daemon.ClaudeAutoStart.ModeKey) ?? "off"));

@@ -70,6 +70,7 @@ export const tr: Dictionary = {
     totp_required: "Bu makine canlı ya da veritabanı: burada buna izin vermek için iki adımlı giriş gerekir.",
     approval_required: "Bu makine yalnızca sabitlenmiş bir anahtarın imzaladığını çalıştırır. Hesap sayfanızda bir anahtar üretin ve yeniden izin verin.",
     approval_invalid: "İmza bu çalıştırmayla ya da bu anahtarla uyuşmuyor ya da anahtar kayıtlı değil. Hesap sayfanızda bir anahtar üretin.",
+    exec_level_changed: "Bu makinenin uzaktan çalıştırma düzeyi bu sırada değiştirildi. Sayfa yenilendi: bakın ve yeniden kaydedin.", exec_level_invalid: "Bu düzey ya da süre geçerli değil. Yeniden deneyin.", exec_level_signature_required: "Uzaktan çalıştırmayı artırmak onay anahtarınızı gerektirir. Hesap sayfanızda bir anahtar oluşturun.",
     invalid_approval_key: "Bu bir ECDSA P-256 açık anahtarı değil.", approval_key_limit: "Sahip olabileceğiniz en fazla anahtara (10) sahipsiniz. Önce birini emekli edin.", approval_key_exists: "Bu anahtar zaten kayıtlı.",
     schedule_approvals: "İmzalı onay isteyen bir makineye zamanlama konmaz: orada her çalıştırma bir imza ister.",
     invalid_schedule: "Bir zamanlama 15 dakika ile 7 gün arasında tekrar eder ya da günde bir kez (UTC) belirli bir saatte çalışır.",

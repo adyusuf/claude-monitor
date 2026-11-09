@@ -140,6 +140,24 @@ namespace Podium.Api.Data.Migrations
                         .HasDefaultValue("off")
                         .HasColumnName("exec_level");
 
+                    b.Property<string>("ExecLevelReport")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("exec_level_report");
+
+                    b.Property<DateTimeOffset?>("ExecLevelReportAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("exec_level_report_at");
+
+                    b.Property<string>("ExecLevelRequest")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("exec_level_request");
+
+                    b.Property<long>("ExecLevelSequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("exec_level_sequence");
+
                     b.Property<string>("Interpreters")
                         .HasColumnType("jsonb")
                         .HasColumnName("interpreters");
