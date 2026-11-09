@@ -8,6 +8,7 @@ namespace Podium.Agent.Approvals;
 /// The target's own check of a signed approval (ADR-0010 §4), before it runs anything. In <c>required</c> mode every run needs the signature of a pinned owner key over the
 /// run as THIS agent sees it: its hash is recomputed from the message, so an API that changed the command after the owner signed produces a different hash and a refused
 /// run. A run approved by a grant or a job carries no signature and is refused (the API does not auto-approve for such a target; this is the same rule from the other side).
+/// A run that names a repository must carry a v2 signature over it (ADR-0020 §4; an agent older than this one cannot verify v2 and refuses such a run).
 /// </summary>
 public static class ApprovalVerifier
 {
@@ -36,9 +37,20 @@ public static class ApprovalVerifier
         if (key is null || signature is null) return ApprovalErrors.Invalid;
         if (now > run.ApprovalNotAfter.Value + Grace) return ApprovalErrors.Invalid;
         var hash = HashOf(run, agentId.Value);
-        return hash is not null && ApprovalSigning.Verify(key, ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, agentId.Value, hash, run.ApprovalNotAfter.Value), signature)
-            ? null
-            : ApprovalErrors.Invalid;
+        return hash is not null && ApprovalSigning.Verify(key, PayloadOf(run, agentId.Value, hash), signature) ? null : ApprovalErrors.Invalid;
+    }
+
+    /// <summary>
+    /// What the owner signed for this run (ADR-0020 §4 rule 6): a run that names a repository is signed with it (payload v2), so a server that relabels
+    /// the run after signing fails here; a run that names none is signed as before (v1). A v1 signature never stands for a run with a repository.
+    /// </summary>
+    public static byte[] PayloadOf(RunMessage run, Guid agentId, string hash)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        var notAfter = run.ApprovalNotAfter ?? DateTimeOffset.MinValue;
+        return string.IsNullOrEmpty(run.ProjectKey)
+            ? ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, agentId, hash, notAfter)
+            : ApprovalSigning.PayloadV2(ApprovalSigning.KindRun, run.Id, agentId, hash, notAfter, run.ProjectKey);
     }
 
     /// <summary>The hash of the run as the agent received it, the one the owner's card carried; null for a mode this build does not know.</summary>
