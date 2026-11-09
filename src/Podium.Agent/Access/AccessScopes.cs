@@ -45,10 +45,11 @@ public static class AccessScopes
             var os = AgentConfig.Os;
             var real = PathIdentity.Resolve(value.GetString(), os, allowMissing: true);
             if (real is null) return Scopes.Unknown;
-            // The session's repository and the checkout the path itself lies in: a path in another repository is held to that one's policy too.
-            var (judged, pathKey) = AccessRunKeys.KeyOf(real);
+            // The session's repository and every checkout the path itself lies in: a path in another repository, or in a submodule of one, is held to
+            // those policies too.
+            var (judged, around) = AccessRunKeys.KeysOf(real);
             if (!judged) return Scopes.Unknown;
-            List<string> keys = [.. new[] { store.ProjectKeyOf(session), pathKey }.OfType<string>().Where(k => k.Length > 0).Distinct(RepoKeys.Comparer)];
+            List<string> keys = [.. new[] { store.ProjectKeyOf(session) }.Concat(around).OfType<string>().Where(k => k.Length > 0).Distinct(RepoKeys.Comparer)];
             var saved = Identity.Peek(config);
             var policy = ExecPolicyLoader.Load(config, saved?.ExecLevel, saved?.ClaimedEnvironment, saved?.ClaimedFunction, saved?.ProjectFolders);
             // Only the folders are judged here: Claude's own tools are not the run's executable.
