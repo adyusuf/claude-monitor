@@ -102,6 +102,10 @@ public static class AuditActions
     public const string IntegrationInvited = "integration.person_invited";
     public const string IntegrationPersonLinked = "integration.person_linked";
     public const string ServerSettingsChanged = "server.settings_changed";
+    public const string AccessPolicyUpdated = "access_policy.updated";
+    public const string AccessPolicyCleared = "access_policy.cleared";
+    public const string AccessEnforcementChanged = "workspace.access_enforcement_changed";
+    public const string RunAccessRefused = "run.access_refused";
 }
 
 public static class Audit

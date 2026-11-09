@@ -1,3 +1,4 @@
+using Podium.Api.AccessPolicies;
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Contracts;
@@ -8,7 +9,8 @@ namespace Podium.Api.Remote;
 /// <summary>
 /// The detail of one machine (ADR-0008 §3a′), for the web's machine page and the agent's <c>aipod_machine</c> tool. The caller has
 /// already been checked as a workspace member. Listening services go only to the machine's owner and to admins, and only while the
-/// owner has them switched on; the `claude` path stays out of the tools, as in the list.
+/// owner has them switched on; the `claude` path stays out of the tools, as in the list. The paths of the machine's access ceiling go to the same
+/// people only (ADR-0020 §4).
 /// </summary>
 public static class MachineDetails
 {
@@ -30,7 +32,7 @@ public static class MachineDetails
             servicesAllowed ? MachineFacts.ServicesFrom(agent.Services) : null, servicesAllowed ? agent.ServicesAt : null,
             await ProjectsAsync(db, workspaceId, agentId, agent.UserId == callerUserId, now, ct),
             agent.ShareInventory && (callerIsAdmin || agent.UserId == callerUserId) ? ClaudeInventoryFacts.From(agent.ClaudeInventory, agent.ClaudeInventoryAt) : null,
-            agent.ShareInventory);
+            agent.ShareInventory, await AccessEffective.ViewAsync(db, agent, machine.Os, callerIsAdmin || agent.UserId == callerUserId, ct));
     }
 
     private static async Task<IReadOnlyList<MachineProjectView>> ProjectsAsync(PodiumDb db, Guid workspaceId, Guid agentId, bool owner, DateTimeOffset now,

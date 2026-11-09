@@ -21,6 +21,14 @@ namespace Podium.Agent.Mcp;
 public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
 {
     public const int OutputCharsMax = 50_000;
+
+    /// <summary>The <c>project</c> argument of aipod_run and aipod_script: the run's repository decides its access policy (ADR-0020 §4).</summary>
+    public const string ProjectDescription =
+        "The repository key of the folder the run works in on the target, exactly as aipod_machine lists it under the target's projects " +
+        "(the value in brackets, for example git:host/org/repo). Pass it whenever the run works in a repository: it decides which access policy " +
+        "the target applies, and a shell or script run on a production or database machine is refused unless it names a repository whose " +
+        "policy allows shell. A key the target does not " +
+        "report is refused (invalid_project_key); leave it out only for a run that works in no repository.";
     public const string GapMarker = "\n[... output cut here: only the start and the end were kept ...]\n";
     private readonly RemoteClient client = new(config, clock);
 
@@ -34,7 +42,7 @@ public sealed class RemoteTools(AgentConfig config, TimeProvider clock)
         [Description("Working directory for argv mode (absolute); a grant fixes it.")] string? cwd = null,
         [Description("Timeout in seconds, 1-3600 (default 120).")] int timeoutSeconds = 120,
         [Description("This session's id, so the owner sees which session asked.")] string? sessionId = null,
-        [Description("The project this run belongs to (its key from aipod_machine), so the result shows under it.")] string? project = null,
+        [Description(RemoteTools.ProjectDescription)] string? project = null,
         [Description("test, build, deploy or other, for the project's history.")] string? kind = null)
     {
         if ((argv is { Length: > 0 }) == (shell is { Length: > 0 })) return "Give either argv or shell, not both.";

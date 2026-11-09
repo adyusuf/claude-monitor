@@ -15,6 +15,7 @@ import type {
   IntegrationsView, PersonView, SpaceImportResult, SpaceView, SprintChoice, SprintImportResult, SyncRunView,
 } from "./typesIntegrations";
 import type { ServerIntegrationsView, ServerSettingsInput } from "./typesServerSettings";
+import type { AccessPolicySave, AccessPolicySummary, AccessPolicyView } from "./typesAccess";
 
 const q = (params: Record<string, string | number | boolean | undefined | null>) => {
   const s = new URLSearchParams();
@@ -210,6 +211,16 @@ export const api = {
     request<ServerIntegrationsView>("PUT", `/server/integrations/${encodeURIComponent(id)}`, input),
   /** Sends a test mail to the caller's own address with the saved settings. */
   testServerMail: () => request<void>("POST", "/server/integrations/smtp/test"),
+
+  /** A project's access policy (ADR-0020 §4): any member who sees the project reads it; owners and admins save it, with re-authentication. */
+  accessPolicy: (projectId: string) => request<AccessPolicyView>("GET", `/projects/${projectId}/access-policy`),
+  saveAccessPolicy: (projectId: string, body: AccessPolicySave) => request<AccessPolicyView>("PUT", `/projects/${projectId}/access-policy`, body),
+  /** The policy that covers a repository, for the session page; 404 when none does. */
+  accessPolicyByKey: (ws: string, projectKey: string) =>
+    request<AccessPolicySummary>("GET", `/workspaces/${ws}/access-policies/by-key${q({ projectKey })}`),
+  /** The workspace switch that gives the default to runs without a policy; changing it asks for the code. */
+  saveAccessEnforcement: (ws: string, enforceAccessPolicies: boolean, code?: string) =>
+    request<void>("PUT", `/workspaces/${ws}/settings`, { enforceAccessPolicies, code }),
 };
 
 /** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */

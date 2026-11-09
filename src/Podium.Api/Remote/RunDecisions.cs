@@ -80,7 +80,11 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
                 .Where(k => k.UserId == userId && k.Fingerprint == req.KeyId && k.RetiredAt == null).Select(k => k.PublicKey).FirstOrDefaultAsync(ct);
             var key = ApprovalSigning.FromBase64(registered);
             var bytes = ApprovalSigning.FromBase64(sig);
-            if (key is null || bytes is null || !ApprovalSigning.Verify(key, ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt), bytes))
+            // A run with a repository is signed with it (payload v2, ADR-0020 §4 rule 6), so the server cannot relabel it and change its access policy.
+            var payload = run.ProjectKey is { Length: > 0 } projectKey
+                ? ApprovalSigning.PayloadV2(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt, projectKey)
+                : ApprovalSigning.Payload(ApprovalSigning.KindRun, run.Id, run.TargetAgentId, req.Hash!, run.ExpiresAt);
+            if (key is null || bytes is null || !ApprovalSigning.Verify(key, payload, bytes))
             {
                 return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ApprovalErrors.Invalid);
             }

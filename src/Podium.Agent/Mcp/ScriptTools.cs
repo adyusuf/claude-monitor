@@ -28,7 +28,7 @@ public sealed class ScriptTools(AgentConfig config, TimeProvider clock)
         [Description("Why you need this run, shown to the owner who approves it (at most 500 characters).")] string reason,
         [Description("Arguments passed to the script (at most 32).")] string[]? args = null,
         [Description("Timeout in seconds, 1-3600 (default 120).")] int timeoutSeconds = 120,
-        [Description("The project this run belongs to (its key from aipod_machine), so the result shows under it.")] string? project = null,
+        [Description(RemoteTools.ProjectDescription)] string? project = null,
         [Description("test, build, deploy or other, for the project's history.")] string? kind = null,
         [Description("This session's id, so the owner sees which session asked.")] string? sessionId = null,
         [Description("Extra text files for the script's folder, as {\"relative/path.txt\": \"text\"}: at most 8, 64 KiB each, 256 KiB together, paths of letters, digits, dot, underscore and dash, at most 4 levels, nothing starting with a dot. The owner reads each one.")] Dictionary<string, string>? files = null,

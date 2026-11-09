@@ -20,7 +20,7 @@ public sealed record WebRunView(Guid Id, Guid TargetAgentId, string TargetHostna
     long? OutputCap = null, long? OutputReadBytes = null, long? OutputDroppedBytes = null, long? OutputRefusedBytes = null, int? OutputMissingFromSeq = null,
     int? OutputChunks = null, bool? OutputComplete = null, int? TestsPassed = null, int? TestsFailed = null, int? TestsSkipped = null,
     IReadOnlyList<ScriptFile>? ScriptFiles = null, string? ScriptStdin = null, bool ApprovalsRequired = false, string? ApprovalKeyId = null,
-    string? DecidedByName = null, DateTimeOffset? DecidedAt = null);
+    string? DecidedByName = null, DateTimeOffset? DecidedAt = null, string? RefusedBy = null, int? AccessVersion = null);
 
 public static class RunQueries
 {
@@ -116,7 +116,8 @@ public static class RunQueries
                 OutputMissingFromSeq: r.OutputMissingFromSeq, OutputChunks: r.OutputChunks, OutputComplete: r.OutputComplete,
                 TestsPassed: r.TestsPassed, TestsFailed: r.TestsFailed, TestsSkipped: r.TestsSkipped,
                 ScriptFiles: visible ? r.ScriptFiles : null, ScriptStdin: visible ? r.ScriptStdin : null, ApprovalsRequired: x.ApprovalsRequired, ApprovalKeyId: r.ApprovalKeyId,
-                DecidedByName: r.DecidedBy is { } by && deciderNames.TryGetValue(by, out var name) ? name : null, DecidedAt: r.DecidedAt);
+                DecidedByName: r.DecidedBy is { } by && deciderNames.TryGetValue(by, out var name) ? name : null, DecidedAt: r.DecidedAt,
+                RefusedBy: visible ? r.RefusedBy : null, AccessVersion: visible ? r.AccessVersion : null); // shown with the error they explain (ADR-0020 §4)
         }).ToList();
     }
 }

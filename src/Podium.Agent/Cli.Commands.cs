@@ -138,6 +138,7 @@ public static partial class Cli
         var byPolicy = started.Count(w => w.Reason is not null);
         await stdout.WriteLineAsync(Strings.T(Msg.StatusClaudeWeb, started.Count, byPolicy > 0 ? Strings.T(Msg.StatusByAutomatic, byPolicy) : "", Daemon.WorkspaceSettings.Get(config, store, Daemon.ClaudeAutoStart.ModeKey) ?? "off"));
         await stdout.WriteLineAsync(Approvals.ApproversStore.Describe(Approvals.ApproversStore.Load(config)));
+        await stdout.WriteLineAsync(Access.AccessReports.Describe(config, store, ExecPolicyLoader.Load(config, identity.ExecLevel, identity.ClaimedEnvironment, identity.ClaimedFunction)));
         foreach (var line in PushStatus.Describe(config, store, (clock ?? TimeProvider.System).GetUtcNow(), null, probe is null)) await stdout.WriteLineAsync(line);
         foreach (var line in UpdateCommand.Describe(config, store)) await stdout.WriteLineAsync(line);
         foreach (var line in ClaudeUpdateCommand.Describe(config, store, clock ?? TimeProvider.System)) await stdout.WriteLineAsync(line);

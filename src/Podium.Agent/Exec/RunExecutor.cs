@@ -23,12 +23,12 @@ public static class RunFailures
 
 /// <summary>The one final answer on a run. Duration is on the monotonic clock; BytesRead is raw output including what was dropped.</summary>
 public sealed record RunResult(string Status, int? ExitCode, string? Error, bool OutputTruncated, string? ResolvedExe, long BytesRead,
-    TimeSpan Duration, long BytesDropped = 0, int Chunks = 0)
+    TimeSpan Duration, long BytesDropped = 0, int Chunks = 0, string? RefusedBy = null, int? AccessVersion = null)
 {
     /// <summary>The final status. A script run also says what it read, dropped and sent, so the server can say what is missing (ADR-0008 §3d).</summary>
     public RunStatusUpdate ToUpdate(DateTimeOffset at, bool withOutput = false) => withOutput
-        ? new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, BytesRead, BytesDropped, Chunks)
-        : new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at);
+        ? new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, BytesRead, BytesDropped, Chunks, RefusedBy, AccessVersion)
+        : new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, RefusedBy: RefusedBy, AccessVersion: AccessVersion);
 }
 
 /// <summary>
@@ -104,7 +104,7 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
             return await RefuseAsync(run, RunFailures.GuardFailed, null, began, onStatus);
         }
 
-        if (!decision.Allowed) return await RefuseAsync(run, decision.Error ?? RunFailures.BadRun, null, began, onStatus);
+        if (!decision.Allowed) return await RefuseAsync(run, decision.Error ?? RunFailures.BadRun, null, began, onStatus, decision);
         if (cancel.IsCancellationRequested) return await FinishAsync(run, RunStatuses.Cancelled, null, null, decision.ResolvedExe, began, onStatus, KillReasons.Cancelled, null);
 
         var argv0 = run.Argv is { Count: > 0 } ? run.Argv[0] : null;
@@ -175,8 +175,10 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
         var env = RunEnvironment.Build(home);
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(RunEnvironment.TempDir(config.Home));
         if (run.Mode == RunModes.Shell) return ProcessTree.StartShell(run.ShellCommand!, home, env, decision.ResolvedExe, limits, TrackEvery, Note(run), account);
-        // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4).
-        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), run.Cwd ?? run.Grant?.Cwd ?? home, env, argv0, limits, TrackEvery, Note(run), runAs: account);
+        // A grant fixes the working directory; a run that names none under a grant works there (ADR-0005, B4). It starts in the real directory the
+        // guard judged (ADR-0020 §4), not in the name it was given.
+        return ProcessTree.Start(decision.ResolvedExe!, run.Argv!.Skip(1).ToList(), decision.ResolvedCwd ?? run.Cwd ?? run.Grant?.Cwd ?? home, env, argv0, limits, TrackEvery,
+            Note(run), runAs: account);
     }
 
     // What the process layer reports (an error type name, no content) goes to the agent's log under the run's id.
