@@ -129,7 +129,14 @@ public static class Startup
         var api = app.MapGroup("/api");
         // downloadsUrl (additive): the download host's folder when this server has one (AIPOD_DOWNLOADS_URL), else null. It is a public address, and the web's
         // "Get the agent" page builds its links and install commands from it, so one release package serves every environment.
-        api.MapGet("/version", () => Results.Ok(new { commit = config.Commit, downloadsUrl = config.DownloadsUrl }));
+        // agentVersion and agentVersions (additive): the agent version the download host offers now, and the earlier ones it keeps, each with its folder.
+        api.MapGet("/version", (UpdateCatalog catalog) => Results.Ok(new
+        {
+            commit = config.Commit,
+            downloadsUrl = config.DownloadsUrl,
+            agentVersion = catalog.CurrentVersion,
+            agentVersions = catalog.OlderVersions().Select(v => new { version = v.Version, url = v.Url }),
+        }));
         AuthEndpoints.Map(api);
         ExternalAuthEndpoints.Map(api);
         MeEndpoints.Map(api);
