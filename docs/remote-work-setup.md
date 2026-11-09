@@ -236,6 +236,9 @@ and Windows short names followed; a network or device path refused):
    elevated prompt on Windows); an interactive agent keeps it in its `agent.json`. A ceiling with any entry still
    refuses shell and script runs. It applies to the next run; a reinstall keeps it.
 2. **The web policy of the run's repository** (the project page, owners and admins), which only narrows the ceiling.
+   The run's repository is the `project` key it names; the API accepts only a repository the target machine reports
+   (compared without case and after Unicode NFC, stored in the machine's own spelling; anything else is refused with
+   `invalid_project_key`), and the agent also derives the repository from the run's real working folder.
    The agent fetches the policies of its repositories when the stamp in its settings changes, and again before a run
    that names a newer stamp. On a machine with signed approvals (`aipod config approvals required`, step 9) a policy
    applies only when a pinned owner key signed it; an unsigned or older version leaves the last signed one in place.
@@ -261,7 +264,8 @@ Known limits of this release, stated plainly:
   a project's test command (which always names its repository) and job schedules (argv jobs, which name none and never
   run on a production or database machine). A shell or script run that names no repository is therefore refused on a
   production or database machine, and wherever the switch is on (`access_shell_refused`, `access_script_refused`): no
-  policy can lift it, because none covers it. Name the repository (`project`) for a run that a policy should allow.
+  policy can lift it, because none covers it. Name the repository (`project`, one the target lists in `aipod_machine`)
+  for a run that a policy should allow; the tools' description tells Claude so.
 - **Older agents and path approval rules.** An agent older than this release reports no access scope with a
   permission request, so approval rules for path tools (Read, Edit, Write, MultiEdit, LS, NotebookEdit, and Glob or
   Grep with a path) stop matching for it and "remember" is not offered for them until its agent is updated; Bash
