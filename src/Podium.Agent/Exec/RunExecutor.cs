@@ -23,12 +23,12 @@ public static class RunFailures
 
 /// <summary>The one final answer on a run. Duration is on the monotonic clock; BytesRead is raw output including what was dropped.</summary>
 public sealed record RunResult(string Status, int? ExitCode, string? Error, bool OutputTruncated, string? ResolvedExe, long BytesRead,
-    TimeSpan Duration, long BytesDropped = 0, int Chunks = 0)
+    TimeSpan Duration, long BytesDropped = 0, int Chunks = 0, string? RefusedBy = null, int? AccessVersion = null)
 {
     /// <summary>The final status. A script run also says what it read, dropped and sent, so the server can say what is missing (ADR-0008 §3d).</summary>
     public RunStatusUpdate ToUpdate(DateTimeOffset at, bool withOutput = false) => withOutput
-        ? new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, BytesRead, BytesDropped, Chunks)
-        : new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at);
+        ? new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, BytesRead, BytesDropped, Chunks, RefusedBy, AccessVersion)
+        : new(Status, ExitCode, Error, OutputTruncated, ResolvedExe, at, RefusedBy: RefusedBy, AccessVersion: AccessVersion);
 }
 
 /// <summary>

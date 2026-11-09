@@ -22,6 +22,7 @@ public static partial class AccessCommand
         foreach (var folder in ceiling.DeniedRoots) await stdout.WriteLineAsync("  - " + folder);
         await stdout.WriteLineAsync(ceiling.Executables.Count == 0 ? Strings.T(Msg.AccessShowAppsNone) : Strings.T(Msg.AccessShowApps, ceiling.Executables.Count));
         foreach (var app in ceiling.Executables) await stdout.WriteLineAsync("  * " + app.Path + (app.Sha256 is { } sha ? " (SHA-256 " + sha + ")" : ""));
+        foreach (var line in AccessReports.DescribePolicies(config, policy)) await stdout.WriteLineAsync(line);
         return 0;
     }
 }

@@ -57,6 +57,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         using var metricsStore = new LocalStore(config.DatabasePath);
         var remote = new RemoteRelay(config, remoteStore, api, clock);
         var monitor = new MachineMonitor(config, metricsStore, api, clock, MetricsSource.For(AgentConfig.Os), inventoryReader: new ClaudeInventoryReader(config, new SystemClaudeCli()));
+        var accessSync = new Access.AccessPolicySync(config, settingsStore, api, clock);
         using var machinesStore = new LocalStore(config.DatabasePath);
         var machines = new MachineCache(config, machinesStore, api, clock);
         var executor = new RunExecutor(config, clock, log,
@@ -122,6 +123,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             {
                 await settings.SettingsAsync(ct);
                 await monitor.ProfileAsync(ct);
+                await accessSync.SyncAsync(ct); // after the profile: a failed fetch must not hold the profile back
             }, api, revoked),
             Loop("remote", config.RemotePollEvery, remote.RunOnceAsync, api, revoked),
             Loop("runs", config.FlushEvery, runs.ReportAsync, api, revoked),
