@@ -35,16 +35,59 @@ public static class AccessPolicyStore
 
     /// <summary>
     /// The repo keys a policy of this project may cover: the key of each active application's repository URL (<see cref="RepoKeys.FromRemote"/>),
-    /// and the keys the policy already holds (an application whose URL changed does not take its repository out of the policy). NFC, ordinal order.
+    /// and the keys the policy already holds (an application whose URL changed does not take its repository out of the policy). NFC, ordinal order,
+    /// one spelling per repository as <see cref="RepoKeys.Same"/> compares them: the one the policy holds, else the first in ordinal order.
     /// </summary>
     public static async Task<List<string>> CandidateKeysAsync(PodiumDb db, Guid projectId, IEnumerable<string> held, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         var urls = await db.Applications.AsNoTracking()
             .Where(a => a.ProjectId == projectId && a.Status == ManagedStatuses.Active && a.RepoUrl != null).Select(a => a.RepoUrl).ToListAsync(ct);
-        return urls.Select(RepoKeys.FromRemote).OfType<string>().Concat(held)
+        return held.Concat(urls.Select(RepoKeys.FromRemote).OfType<string>().Order(StringComparer.Ordinal))
             .Select(k => k.Normalize(NormalizationForm.FormC)).Where(AccessPolicyRules.IsValidKey)
-            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+            .Distinct(RepoKeys.Comparer).Order(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>
+    /// The live (not cleared) policy of the workspace that covers the repository, keys compared as <see cref="RepoKeys.Same"/> does; null when none
+    /// does. A workspace holds at most a few thousand keys, so they are read and compared here.
+    /// </summary>
+    public static async Task<ProjectAccessPolicy?> LiveForKeyAsync(PodiumDb db, Guid workspaceId, string key, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        var keys = await (from k in db.ProjectAccessPolicyKeys.AsNoTracking()
+                          join p in db.ProjectAccessPolicies.AsNoTracking() on k.PolicyId equals p.Id
+                          where k.WorkspaceId == workspaceId && p.WorkspaceId == workspaceId && !p.Cleared
+                          select new { k.PolicyId, k.ProjectKey }).ToListAsync(ct);
+        return keys.FirstOrDefault(k => RepoKeys.Same(k.ProjectKey, key)) is { } hit
+            ? await db.ProjectAccessPolicies.AsNoTracking().FirstOrDefaultAsync(p => p.Id == hit.PolicyId, ct)
+            : null;
+    }
+
+    public const int ReportedKeysScanned = 5000;
+
+    /// <summary>
+    /// Keys machines of the workspace report that name one of the candidates' repositories but are spelled differently (case or Unicode form), so
+    /// the page can say a machine's clone URL differs from the application's. They match the policy all the same (<see cref="RepoKeys.Same"/>).
+    /// </summary>
+    public static async Task<List<string>> NearKeysAsync(PodiumDb db, Guid workspaceId, IReadOnlyList<string> candidates, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        if (candidates.Count == 0) return [];
+        var reported = await db.MachineProjects.AsNoTracking().Where(p => p.WorkspaceId == workspaceId).Select(p => p.ProjectKey).Distinct()
+            .OrderBy(k => k).Take(ReportedKeysScanned).ToListAsync(ct);
+        return reported.Where(k => !candidates.Contains(k, StringComparer.Ordinal) && candidates.Contains(k, RepoKeys.Comparer))
+            .Order(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>The project page's answer: the <see cref="AccessPolicyView"/> and, added to it, <c>nearKeys</c> (<see cref="NearKeysAsync"/>).</summary>
+    public static async Task<System.Text.Json.Nodes.JsonObject> PageAsync(PodiumDb db, ManagedProject project, bool canEdit, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        var view = await ViewAsync(db, project, canEdit, ct);
+        var page = JsonSerializer.SerializeToNode(view, Json)!.AsObject();
+        page["nearKeys"] = JsonSerializer.SerializeToNode(await NearKeysAsync(db, project.WorkspaceId, view.CandidateKeys, ct), Json);
+        return page;
     }
 
     /// <summary>

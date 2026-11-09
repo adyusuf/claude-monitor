@@ -30,15 +30,12 @@ public sealed class ApprovalRuleAccess(PodiumDb db)
             && (document.IncludeProjectFolder || AccessPolicyMath.IsUnderAny(lexical, section.AllowedFolders, os));
     }
 
-    /// <summary>The live (not cleared) policy that covers the repository's key in the workspace, or null when none does.</summary>
+    /// <summary>The live (not cleared) policy that covers the repository's key in the workspace (keys compared as RepoKeys.Same does), or null.</summary>
     private async Task<AccessPolicyDocument?> PolicyAsync(Guid workspaceId, Guid repoId, CancellationToken ct)
     {
         if (policies.TryGetValue((workspaceId, repoId), out var known)) return known;
-        var row = await (from r in db.Repos.AsNoTracking()
-                         join k in db.ProjectAccessPolicyKeys.AsNoTracking() on new { r.WorkspaceId, r.Key } equals new { k.WorkspaceId, Key = k.ProjectKey }
-                         join p in db.ProjectAccessPolicies.AsNoTracking() on k.PolicyId equals p.Id
-                         where r.Id == repoId && r.WorkspaceId == workspaceId && !p.Cleared
-                         select p).FirstOrDefaultAsync(ct);
+        var key = await db.Repos.AsNoTracking().Where(r => r.Id == repoId && r.WorkspaceId == workspaceId).Select(r => r.Key).FirstOrDefaultAsync(ct);
+        var row = key is null ? null : await AccessPolicyStore.LiveForKeyAsync(db, workspaceId, key, ct);
         var document = row is null ? null : AccessPolicyStore.Read(row);
         policies[(workspaceId, repoId)] = document;
         return document;
