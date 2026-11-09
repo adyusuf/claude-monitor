@@ -52,9 +52,11 @@ public sealed partial record AgentConfig
             AskConfirmWait = Between(read("AP_ASK_CONFIRM_WAIT"), TimeSpan.FromMinutes(2), 30, 600),
             ProjectFactsEvery = Between(read("AP_PROJECT_FACTS_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
             ExecScriptOutputCeiling = long.TryParse(read("AP_EXEC_SCRIPT_OUTPUT_CEILING"), out var ceiling) ? Math.Clamp(ceiling, 1024L * 1024, 64L * 1024 * 1024) : 64L * 1024 * 1024,
-            // Only the default home of a user's own agent carries an earlier home over: an explicit home (a service, a test) never reads one.
-            LegacyHomes = explicitHome || read("AP_SERVICE") == "1" ? []
-                : LegacyHomesFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)),
+            // A user's own agent carries an earlier home over: the old CM_AGENT_HOME when it is set (as the installer scripts honour it), then, for the
+            // default home only, the old default ones. A service never reads one, nor does an explicit home (a test) without CM_AGENT_HOME.
+            LegacyHomes = read("AP_SERVICE") == "1" ? []
+                : [.. read("CM_AGENT_HOME") is { Length: > 0 } oldHome ? [oldHome] : Array.Empty<string>(),
+                    .. explicitHome ? [] : LegacyHomesFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))],
         };
     }
 
