@@ -95,13 +95,13 @@ public static class AgentEndpoints
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
-        var mine = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => new { a.ShareServices, a.AcceptsClaudeControl, a.ClaudeAutoMode, a.ClaudeAutoProject, a.ShareInventory }).FirstOrDefaultAsync(http.RequestAborted);
+        var mine = await db.Agents.AsNoTracking().Where(a => a.Id == http.User.AgentId()).Select(a => new { a.ShareServices, a.AcceptsClaudeControl, a.ClaudeAutoMode, a.ClaudeAutoProject, a.ShareInventory, a.ExecLevelRequest }).FirstOrDefaultAsync(http.RequestAborted);
         // The automatic Claude start (ADR-0014 P3) is only ever told to an agent whose owner has the switch on AND the workspace allows remote work: anything else reads as off.
         var auto = s.RemoteRunsEnabled && mine is { AcceptsClaudeControl: true, ClaudeAutoMode: ClaudeAutoModes.OnMessage or ClaudeAutoModes.Always } ? mine.ClaudeAutoMode! : ClaudeAutoModes.Off;
         var stamp = await AccessPolicyDelivery.StampAsync(db, workspaceId, http.RequestAborted);
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
             new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, mine?.ShareServices ?? false, auto, auto == ClaudeAutoModes.Always ? mine!.ClaudeAutoProject : null,
-            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies));
+            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies, ExecLevelChanges.Read<ExecLevelRequest>(mine?.ExecLevelRequest)));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
