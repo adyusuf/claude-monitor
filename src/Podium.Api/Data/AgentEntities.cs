@@ -129,6 +129,10 @@ public sealed class Agent
 
     /// <summary>ADR-0010 §4: the machine only runs what a pinned owner key signed; the agent reports it with its profile. False for an older agent.</summary>
     public bool ApprovalsRequired { get; set; }
+
+    /// <summary>ADR-0020 §4: the agent's access report (its ceiling and the state of each policy it received), one JSON document replaced by every profile; NULL from an older agent.</summary>
+    public string? AccessReport { get; set; }
+    public DateTimeOffset? AccessReportAt { get; set; }
 }
 
 public sealed class AgentToken
