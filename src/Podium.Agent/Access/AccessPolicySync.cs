@@ -58,7 +58,7 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
         var stamp = run.AccessStamp ?? "";
         var wanted = Marker(workspace, stamp);
         if (wanted == store.Get(LocalStore.AccessSyncedKey)) return true;
-        await readSettings(ct);
+        if (stamp.Length > 0) await readSettings(ct); // an empty stamp is "no policy, switch off": nothing in the settings to catch up with
         var fetched = await FetchAsync(workspace, wanted, remember: stamp.Length == 0, ct);
         if (fetched || stamp.Length == 0) return true;
         if (store.ExecBegin(run.Id.ToString(), clock.GetUtcNow()))
