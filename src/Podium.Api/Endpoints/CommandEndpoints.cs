@@ -136,11 +136,13 @@ public static class CommandEndpoints
         var now = clock.GetUtcNow();
         if (request.Status != PermissionStatuses.Open || request.ExpiresAt <= now) return Results.Conflict();
         RuleAsk? ask = null;
+        Guid? existing = null;
         if (remember != ApprovalDurations.Once)
         {
-            var (refused, asked) = await RememberAsync(db, http, config, clock, userId, request, remember, req.Code, now);
+            var (refused, asked, standing) = await RememberAsync(db, http, config, clock, userId, request, remember, req.Code, now);
             if (refused is not null) return refused;
             ask = asked;
+            existing = standing;
         }
 
         request.Status = PermissionStatuses.Answered;
@@ -164,9 +166,13 @@ public static class CommandEndpoints
                 added.State = EntityState.Detached;
             }
 
-            await ApplyRuleAsync(db, http, clock, ask);
+            var (again, standing) = await ApplyRuleAsync(db, http, clock, ask);
+            if (again is not null) return again; // the rule cannot stand after all (the cap): nothing is saved, as on the first refusal
+            existing = standing;
             await db.SaveChangesAsync(http.RequestAborted);
         }
+
+        if (ask is not null && existing is { } ruleId) await StandLongerAsync(db, ruleId, ask, http.RequestAborted);
 
         broker.Publish(Broker.Agent(request.AgentId), new StreamMessage(AgentStreamEvents.PermissionAnswer,
             new PermissionAnswerMessage(id, found.Session.ExternalId, request.Decision!, request.Reason, req.Answers)));
@@ -186,68 +192,73 @@ public static class CommandEndpoints
     /// an <c>always</c> rule needs re-authentication. The rule's scope is the request's own, its project the one the request was made in.
     /// A refusal, or the rule asked for (saved with the answer).
     /// </summary>
-    private static async Task<(IResult? Refused, RuleAsk? Ask)> RememberAsync(PodiumDb db, HttpContext http, ApiConfig config, TimeProvider clock,
+    private static async Task<(IResult? Refused, RuleAsk? Ask, Guid? Existing)> RememberAsync(PodiumDb db, HttpContext http, ApiConfig config, TimeProvider clock,
         Guid userId, PermissionRequest request, string remember, string? code, DateTimeOffset now)
     {
         var agent = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == request.AgentId, http.RequestAborted);
         if (agent is null || agent.UserId != userId || agent.Status != AgentStatuses.Active || agent.WorkspaceId != request.WorkspaceId || ApprovalRules.Strict(agent)
             || ApprovalRules.ScopeOf(request.ToolName, request.ToolInput.RootElement) is not { } scope)
         {
-            return (Results.Problem(statusCode: StatusCodes.Status409Conflict, title: RuleNotAllowed), null);
+            return (Results.Problem(statusCode: StatusCodes.Status409Conflict, title: RuleNotAllowed), null, null);
         }
 
-        if (remember == ApprovalDurations.Always && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, code)) return (RemoteChecks.ReauthRefused(), null);
+        if (remember == ApprovalDurations.Always && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, code)) return (RemoteChecks.ReauthRefused(), null, null);
         var ask = new RuleAsk(agent.WorkspaceId, userId, agent.Id, request.RepoId, scope.Tool, scope.Command, remember, now, request.Id);
-        return (await ApplyRuleAsync(db, http, clock, ask), ask);
+        var (refused, existing) = await ApplyRuleAsync(db, http, clock, ask);
+        return (refused, ask, existing);
     }
 
     /// <summary>
-    /// Makes the rule of one scope, starts an ended one again, or extends a live one; a live rule is never narrowed (a shorter allow leaves it
-    /// as it is). Null when the rule is in place, else the refusal (the cap of live rules).
+    /// Puts the rule of one scope in place: a new one is added (saved with the answer); an existing one, live or ended, is named so that
+    /// <see cref="StandLongerAsync"/> makes it stand as long as asked once the answer is saved. A refusal instead: the cap of live rules.
     /// </summary>
-    private static async Task<IResult?> ApplyRuleAsync(PodiumDb db, HttpContext http, TimeProvider clock, RuleAsk ask)
+    private static async Task<(IResult? Refused, Guid? Existing)> ApplyRuleAsync(PodiumDb db, HttpContext http, TimeProvider clock, RuleAsk ask)
     {
         var ct = http.RequestAborted;
         var now = ask.Now;
-        DateTimeOffset? ends = ApprovalDurations.Length(ask.Duration) is { } length ? now + length : null;
-        var rule = await db.ApprovalRules.Where(r => r.AgentId == ask.AgentId && r.UserId == ask.UserId && r.WorkspaceId == ask.WorkspaceId
+        var rule = await db.ApprovalRules.AsNoTracking().Where(r => r.AgentId == ask.AgentId && r.UserId == ask.UserId && r.WorkspaceId == ask.WorkspaceId
                 && r.RepoId == ask.RepoId && r.ToolName == ask.Tool && r.Command == ask.Command && r.RevokedAt == null)
             .OrderBy(r => r.CreatedAt).FirstOrDefaultAsync(ct);
-        if (rule is null || (rule.ExpiresAt is { } ended && ended <= now))
+        var ended = rule is null || rule.ExpiresAt is { } end && end <= now;
+        if (ended)
         {
             var live = await db.ApprovalRules.CountAsync(r => r.UserId == ask.UserId && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now), ct);
-            if (live >= ApprovalRuleLimits.LiveMax) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: RuleLimit);
-            if (rule is null)
-            {
-                rule = new ApprovalRule
-                {
-                    WorkspaceId = ask.WorkspaceId,
-                    UserId = ask.UserId,
-                    AgentId = ask.AgentId,
-                    RepoId = ask.RepoId,
-                    ToolName = ask.Tool,
-                    Command = ask.Command,
-                    CreatedAt = now,
-                    CreatedFromRequest = ask.FromRequest,
-                };
-                db.ApprovalRules.Add(rule);
-            }
-            else
-            {
-                rule.CreatedAt = now; // an ended rule of the same scope starts again (one row per scope)
-                rule.CreatedFromRequest = ask.FromRequest;
-            }
-        }
-        else if (rule.ExpiresAt is not { } until || (ends is { } asked && asked <= until))
-        {
-            return null; // the live rule already stands at least as long: this allow would only narrow it
+            if (live >= ApprovalRuleLimits.LiveMax) return (Results.Problem(statusCode: StatusCodes.Status409Conflict, title: RuleLimit), null);
         }
 
-        rule.Duration = ask.Duration;
-        rule.ExpiresAt = ends;
+        if (rule is null)
+        {
+            rule = new ApprovalRule
+            {
+                WorkspaceId = ask.WorkspaceId, UserId = ask.UserId, AgentId = ask.AgentId, RepoId = ask.RepoId, ToolName = ask.Tool, Command = ask.Command,
+                CreatedAt = now, CreatedFromRequest = ask.FromRequest, Duration = ask.Duration, ExpiresAt = EndOf(ask),
+            };
+            db.ApprovalRules.Add(rule);
+        }
+
         Audit.Add(db, http, clock, AuditActions.ApprovalRuleCreated, ask.WorkspaceId, ask.UserId, targetType: "approval_rule", targetId: rule.Id,
-            detail: new { request = ask.FromRequest, rule.ToolName, rule.Duration });
-        return null;
+            detail: new { request = ask.FromRequest, rule.ToolName, ask.Duration });
+        return (null, db.Entry(rule).State == EntityState.Added ? null : rule.Id);
+    }
+
+    private static DateTimeOffset? EndOf(RuleAsk ask) => ApprovalDurations.Length(ask.Duration) is { } length ? ask.Now + length : null;
+
+    /// <summary>
+    /// Makes an existing rule stand as long as asked, in one conditional update: an ended rule starts again, a live one is extended to a later
+    /// end or to always, and is never narrowed. The database checks the end again on the locked row, so two answers that extend the same rule
+    /// at once leave it at the longer of the two.
+    /// </summary>
+    private static async Task StandLongerAsync(PodiumDb db, Guid ruleId, RuleAsk ask, CancellationToken ct)
+    {
+        var now = ask.Now;
+        var ends = EndOf(ask);
+        await db.ApprovalRules
+            .Where(r => r.Id == ruleId && r.RevokedAt == null && r.ExpiresAt != null && (r.ExpiresAt <= now || ends == null || r.ExpiresAt < ends))
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(r => r.CreatedAt, r => r.ExpiresAt <= now ? now : r.CreatedAt) // an ended rule of the same scope starts again (one row per scope)
+                .SetProperty(r => r.CreatedFromRequest, r => r.ExpiresAt <= now ? ask.FromRequest : r.CreatedFromRequest)
+                .SetProperty(r => r.Duration, ask.Duration)
+                .SetProperty(r => r.ExpiresAt, ends), ct);
     }
 
     /// <summary>
