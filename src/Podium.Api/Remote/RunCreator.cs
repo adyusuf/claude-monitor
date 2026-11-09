@@ -38,9 +38,10 @@ public sealed class RunCreator(PodiumDb db, ApiConfig config, TimeProvider clock
                             select new { a, m.Os }).FirstOrDefaultAsync(ct);
         if (target is null) return NotFound();
         if (RunRules.Check(req, config, target.Os) is { } invalid) return RunCreateResult.Refused(StatusCodes.Status400BadRequest, invalid);
-        // The run's repository decides its access policy (ADR-0020 §4): it must be one the target reports, kept in the target's spelling.
+        // The run's repository decides its access policy (ADR-0020 §4): only one the target reports is kept, in the target's spelling. Another label is
+        // dropped rather than refused (older agents pass their own session's repository): the target still finds the policy of the checkout the run
+        // really works in, so nothing is loosened.
         var projectKey = req.ProjectKey is { Length: > 0 } asked ? await TargetKeyAsync(target.a.Id, asked, ct) : null;
-        if (req.ProjectKey is { Length: > 0 } && projectKey is null) return RunCreateResult.Refused(StatusCodes.Status400BadRequest, RunRules.UnknownProject);
         if (req.Mode == RunModes.Script && ScriptRefusal(target.a, req.ScriptInterpreter) is { } refusal) return RunCreateResult.Refused(StatusCodes.Status409Conflict, refusal);
         // An agent that does not report it cannot run files or a stdin text: it would run the script without them, so it is not offered the run.
         if (req.Mode == RunModes.Script && ScriptFiles.Any(req.ScriptFiles, req.ScriptStdin) && target.a.Capabilities?.Contains(AgentCapabilities.ScriptFiles) != true)
