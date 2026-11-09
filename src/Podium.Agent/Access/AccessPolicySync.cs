@@ -24,13 +24,28 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
     /// <summary>The workspace's switch: "true" when a run whose repository has no policy gets the default.</summary>
     public const string EnforceKey = "settings.enforce_access";
 
+    /// <summary>
+    /// The workspace the API's settings answer names. A move on the web keeps agent.json as it was, so the policies are judged against this one
+    /// (falling back to agent.json's before any settings pass); their signatures bind the workspace id anyway.
+    /// </summary>
+    public const string WorkspaceKey = "settings.access_workspace";
+
     private const string Endpoint = "api/agent/access-policies";
 
     /// <summary>What a settings pass stores of the access fields, in the same transaction as its other keys.</summary>
     public static IEnumerable<(string Key, string Value)> Entries(AgentSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        return [(StampKey, settings.AccessPolicyStamp ?? ""), (EnforceKey, settings.EnforceAccessPolicies ? "true" : "false")];
+        return [(StampKey, settings.AccessPolicyStamp ?? ""), (EnforceKey, settings.EnforceAccessPolicies ? "true" : "false"),
+            (WorkspaceKey, settings.WorkspaceId.ToString("D"))];
+    }
+
+    /// <summary>The workspace this agent's policies belong to: the one the API's settings name, else agent.json's; null when neither is known.</summary>
+    public static Guid? CurrentWorkspace(AgentConfig config, LocalStore store)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(store);
+        return Guid.TryParse(WorkspaceSettings.Get(config, store, WorkspaceKey), out var fromApi) ? fromApi : Identity.Peek(config)?.WorkspaceId;
     }
 
     /// <summary>Fetches the set when the settings name another stamp than the one held (the settings loop).</summary>
@@ -92,17 +107,27 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
     /// <summary>
     /// The API delivers every live policy and tombstone of the workspace. Rows of another workspace go. A delivered message replaces the row's delivered
     /// one, and its kept one when it verifies and is newer. A row the full delivery no longer lists goes on a machine that does not require signatures;
-    /// where signatures are required its kept policy stays only while no delivered signed policy of a higher version covers one of its keys. A delivery
+    /// where signatures are required its kept policy stays until a newer signed message of the same project (a signed tombstone included) replaces it. A delivery
     /// at the cap is taken as cut: nothing held is dropped and every run gets the default until a full one arrives.
     /// </summary>
-    private void Store(Guid workspace, AgentAccessPolicies answer)
+    private void Store(Guid marker, AgentAccessPolicies answer)
     {
+        // The delivery's workspace must be the one the settings name: a mixed or foreign one cannot be placed, so every run gets the default and the
+        // next pass asks again (the stamp is not recorded).
+        var delivered = answer.Policies.Where(m => m is not null).ToList();
+        var workspaces = delivered.Select(m => m.WorkspaceId).Distinct().ToList();
+        if (CurrentWorkspace(config, store) is not { } workspace || workspaces.Count > 1 || (workspaces.Count == 1 && workspaces[0] != workspace))
+        {
+            store.Set(LocalStore.AccessTruncatedKey, "true");
+            return;
+        }
+
         var approvers = ApproversStore.Load(config);
         var ours = workspace.ToString("D");
         var held = store.AccessPolicies().Where(p => p.WorkspaceId == ours).ToDictionary(p => p.ProjectId, StringComparer.Ordinal);
         var now = clock.GetUtcNow();
         var truncated = answer.Policies.Count >= AgentLimits.Policies;
-        var delivered = answer.Policies.Where(m => m is not null && m.WorkspaceId == workspace).Take(AgentLimits.Policies).ToList();
+        delivered = [.. delivered.Take(AgentLimits.Policies)];
         var rows = new Dictionary<string, StoredAccessPolicy>(StringComparer.Ordinal);
         foreach (var message in delivered)
         {
@@ -115,7 +140,6 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
                 keeps ? message.Version : before?.KeptVersion, keeps ? json : before?.KeptMessage);
         }
 
-        var signedDelivered = delivered.Where(m => AccessPolicyVerifier.Keeps(m, null, approvers, workspace)).ToList();
         foreach (var (id, before) in held.Where(h => !rows.ContainsKey(h.Key)))
         {
             if (truncated)
@@ -124,13 +148,12 @@ public sealed class AccessPolicySync(AgentConfig config, LocalStore store, ApiCl
                 continue;
             }
 
-            if (!approvers.Required || AccessPolicyVerifier.Parse(before.KeptMessage) is not { } kept) continue;
-            var replaced = signedDelivered.Any(m => m.Version > kept.Version
-                && m.Document.ProjectKeys.Any(k => kept.Document?.ProjectKeys?.Contains(k, RepoKeys.Comparer) == true));
-            if (!replaced) rows[id] = before with { Version = null, Message = null, IsSigned = false };
+            // Versions count per project: another project's signed message, however new, never releases this one (a replayed old message could).
+            if (approvers.Required && AccessPolicyVerifier.Parse(before.KeptMessage) is not null) rows[id] = before with { Version = null, Message = null, IsSigned = false };
         }
 
-        store.ReplaceAccessPolicies([.. rows.Values], Marker(workspace, answer.Stamp ?? ""), truncated); // no stamp and an empty one: no policy
+        // Rows of another workspace (before a move on the web) are not passed on, so they go.
+        store.ReplaceAccessPolicies([.. rows.Values], Marker(marker, answer.Stamp ?? ""), truncated); // no stamp and an empty one: no policy
     }
 
     /// <summary>The stamp held, tagged with its workspace: a login into another workspace never reads the old set as current.</summary>

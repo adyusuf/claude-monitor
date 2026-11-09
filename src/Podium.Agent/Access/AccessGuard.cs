@@ -15,7 +15,8 @@ internal static class AccessGuard
 {
     /// <param name="interpreter">
     /// The argv run starts an interpreter (sh, python, node and the like), which can run anything it is given: every layer but the ceiling must allow
-    /// shell, as for a script; the ceiling keeps judging it as an argv run (its own lists, as before). Its folders and executable are judged as well.
+    /// shell, as for a script. A ceiling with any list holds it as a script too unless its application list names that interpreter (the admin chose
+    /// it); an empty ceiling judges it as an argv run, as before. Its folders and executable are judged as well.
     /// </param>
     public static AccessRefusal? Check(IReadOnlyList<AccessLayer> layers, AccessCheck check, string os, bool interpreter = false)
     {
@@ -36,6 +37,11 @@ internal static class AccessGuard
             }
 
             List<AccessLayer> final = [.. resolved.Select(r => r.ToLayer())];
+            if (interpreter && final.FirstOrDefault(l => l.Kind == AccessRefusedBy.Ceiling && HasLists(l) && !Lists(l, check.Executable, os)) is { } ceiling)
+            {
+                return Refuse(AccessErrors.ScriptRefused, ceiling);
+            }
+
             var sha = check.Executable is { } exe && AccessPolicyMath.NeedsHash(final, exe, os) ? ExecutableHashes.Of(exe) : null;
             return AccessPolicyMath.Evaluate(final, check with { ExecutableSha256 = sha }, os);
         }
@@ -75,6 +81,11 @@ internal static class AccessGuard
     }
 
     private static AccessRefusal Refuse(string code, AccessLayer layer) => new(code, layer.Kind, layer.Version);
+
+    private static bool HasLists(AccessLayer layer) => layer.AllowedFolders is not null || layer.DeniedFolders.Count > 0 || layer.Applications is not null;
+
+    private static bool Lists(AccessLayer layer, string? executable, string os) =>
+        executable is not null && layer.Applications?.Any(a => string.Equals(a.Path, executable, os == OsKinds.Linux ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)) == true;
 
     /// <summary>One layer with its lists on real paths and the identities of its folders.</summary>
     private sealed class Resolved
