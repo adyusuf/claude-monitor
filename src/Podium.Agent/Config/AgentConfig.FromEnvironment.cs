@@ -52,6 +52,9 @@ public sealed partial record AgentConfig
             AskConfirmWait = Between(read("AP_ASK_CONFIRM_WAIT"), TimeSpan.FromMinutes(2), 30, 600),
             ProjectFactsEvery = Between(read("AP_PROJECT_FACTS_EVERY"), TimeSpan.FromMinutes(5), 30, 3600),
             ExecScriptOutputCeiling = long.TryParse(read("AP_EXEC_SCRIPT_OUTPUT_CEILING"), out var ceiling) ? Math.Clamp(ceiling, 1024L * 1024, 64L * 1024 * 1024) : 64L * 1024 * 1024,
+            // Only the default home of a user's own agent carries an earlier home over: an explicit home (a service, a test) never reads one.
+            LegacyHomes = explicitHome || read("AP_SERVICE") == "1" ? []
+                : LegacyHomesFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)),
         };
     }
 
@@ -63,6 +66,18 @@ public sealed partial record AgentConfig
     public static string DefaultHome() => HomeFor(Os, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     public static string HomeFor(bool windows, string userProfile) => HomeFor(windows ? OsKinds.Windows : OsKinds.MacOs, userProfile);
+
+    /// <summary>
+    /// The homes the agent used before the rename (ADR-0016), the ones the installer scripts carry over from: macOS ~/Library/Application Support/ClaudeMonitor;
+    /// Linux ~/.claude-monitor; Windows %USERPROFILE%\.claude-monitor, then %LOCALAPPDATA%\ClaudeMonitor.
+    /// </summary>
+    public static IReadOnlyList<string> LegacyHomesFor(string os, string userProfile, string localAppData) => os switch
+    {
+        OsKinds.MacOs => [Path.Combine(userProfile, "Library", "Application Support", "ClaudeMonitor")],
+        OsKinds.Windows => [Path.Combine(userProfile, ".claude-monitor"), .. localAppData.Length > 0 ? [Path.Combine(localAppData, "ClaudeMonitor")] : Array.Empty<string>()],
+        OsKinds.Linux => [Path.Combine(userProfile, ".claude-monitor")],
+        _ => [],
+    };
 
     /// <summary>macOS keeps the Library folder; Windows and Linux use a dot folder in the user's profile.</summary>
     public static string HomeFor(string os, string userProfile) =>
