@@ -1,4 +1,5 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { vi } from "vitest";
@@ -75,4 +76,9 @@ export class FakeEventSource {
   close() {
     this.closed = true;
   }
+}
+
+/** Shows one tab of a tabbed page: its cards sit on tabs, and a tab that is not showing is hidden from the queries. */
+export async function openTab(name: string) {
+  await userEvent.click(await screen.findByRole("tab", { name }));
 }

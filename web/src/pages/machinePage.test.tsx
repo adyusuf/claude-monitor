@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WebRunView } from "../api/types";
 import { config } from "../config";
 import { en } from "../i18n/en";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { alert, grant, job, machine, run, sample } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
 import { agent, count, settle } from "./machinesFixture";
@@ -38,6 +38,7 @@ describe("the machine page", () => {
     open();
     expect(await screen.findByRole("heading", { level: 1, name: /laptop-1/ })).toBeInTheDocument();
     expect(screen.getByText("Runs: commands")).toBeInTheDocument();
+    await openTab(en.views.machine.monitoring);
     expect(await screen.findByRole("img", { name: "CPU 33%" })).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
     expect(screen.getByText("/usr/bin/done-cmd")).toBeInTheDocument();
@@ -110,6 +111,7 @@ describe("the machine page", () => {
   it("reads the resolved alerts too when asked", async () => {
     const calls = api();
     open();
+    await openTab(en.views.machine.monitoring);
     await userEvent.click(await screen.findByRole("checkbox", { name: en.remote.showResolved }));
     await waitFor(() => expect(calls.map((c) => c.path)).toContain("/workspaces/w1/alerts?agent=a1&resolved=true"));
   });
@@ -163,6 +165,7 @@ describe("the machine page", () => {
         : { body: fiftyRuns },
     });
     open();
+    await openTab(en.views.machine.work);
     await userEvent.click(await screen.findByRole("button", { name: en.sessions.more }));
     expect(await screen.findByText("/usr/bin/ancient-cmd")).toBeInTheDocument();
     const paged = calls.find((c) => c.path.includes("before="))!;
@@ -181,7 +184,7 @@ describe("the machine page", () => {
   it("offers More only when a full page came back", async () => {
     api();
     open();
-    await screen.findByRole("heading", { level: 1 });
+    await openTab(en.views.machine.work);
     expect(screen.queryByRole("button", { name: en.sessions.more })).toBeNull();
   });
 });

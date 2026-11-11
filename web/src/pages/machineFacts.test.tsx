@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MachineDetail, MachineProjectView, Me } from "../api/types";
 import { en } from "../i18n/en";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { noteOk } from "./MachineFacts";
 import { sortedTags, TAGS_MAX, tagPartOk, withTag } from "./MachineTagsEditor";
@@ -172,6 +172,7 @@ describe("the listening services card", () => {
   it("tells the owner the report is off and turns it on without a code first", async () => {
     const calls = api({ "PUT /agents/a1/services": { body: {} } });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.services.off)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: en.machines.services.turnOn })); // the owner is known once the signed-in user has loaded
     expect(await screen.findByText(en.machines.services.saved)).toBeInTheDocument();
@@ -182,6 +183,7 @@ describe("the listening services card", () => {
     let n = 0;
     const calls = api({ "PUT /agents/a1/services": () => (n++ === 0 ? { status: 403, body: { title: "reauth_required" } } : { body: {} }) });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await screen.findByRole("button", { name: en.machines.services.turnOn }));
     await userEvent.type(await screen.findByLabelText(en.remote.codeLabel), "123456");
     await userEvent.click(screen.getByRole("button", { name: en.machines.services.turnOn }));
@@ -192,6 +194,7 @@ describe("the listening services card", () => {
   it("lists the ports with the process names for the owner and offers to stop", async () => {
     api({}, {}, ME, detail({ servicesShared: true, services: [{ port: 22, proto: "tcp", process: null }, { port: 5432, proto: "tcp", process: "postgres" }], servicesAt: new Date(2026, 9, 5, 9, 30).toISOString() }));
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText("5432 postgres")).toBeInTheDocument();
     expect(screen.getByText("22")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: en.machines.services.turnOff })).toBeInTheDocument();
@@ -200,6 +203,7 @@ describe("the listening services card", () => {
   it("says the list exists but is hidden from someone who is neither owner nor admin", async () => {
     api({}, {}, asRole("viewer"), detail({ servicesShared: true, services: null }), "u2");
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.services.hidden)).toBeInTheDocument();
     expect(screen.getAllByText(en.machines.services.ownerOnly)).toHaveLength(2); // the services card and the asks card say the same sentence
     expect(screen.queryByRole("button", { name: en.machines.services.turnOff })).toBeNull();
@@ -208,6 +212,7 @@ describe("the listening services card", () => {
   it("says the agent has not reported yet when the switch is on and the list is empty", async () => {
     api({}, {}, ME, detail({ servicesShared: true, services: [] }));
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.services.waiting)).toBeInTheDocument();
   });
 });

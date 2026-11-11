@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentActionKind, AgentActionStatus, AgentActionView, MachineDetail } from "../api/types";
 import { config } from "../config";
 import { en } from "../i18n/en";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
 import { agent, count, settle } from "./machinesFixture";
@@ -47,6 +47,7 @@ describe("the agent actions card on the machine page", () => {
   it("shows the owner the four buttons and an empty list", async () => {
     api();
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.actions.none)).toBeInTheDocument();
     for (const kind of ["status", "update_check", "update", "restart"] as const) {
       expect(await button(kind)).toBeEnabled();
@@ -59,6 +60,7 @@ describe("the agent actions card on the machine page", () => {
   it("shows someone who does not own the machine only the owner-only sentence: no buttons, no list read", async () => {
     const calls = api({}, { userId: "u2" });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.actions.ownerOnly)).toBeInTheDocument();
     await settle(calls); // the signed-in user is known by now: the owner check has run against the real user
     expect(screen.getByText(en.machines.actions.ownerOnly)).toBeInTheDocument();
@@ -72,6 +74,7 @@ describe("the agent actions card on the machine page", () => {
   it("sends the status request with no code and says it was asked", async () => {
     const calls = api({ "POST /agents/a1/actions": { body: row({ status: "queued" }) } });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await button("status"));
     expect(await screen.findByText(sentText("status"))).toBeInTheDocument();
     expect(posts(calls)).toHaveLength(1);
@@ -86,6 +89,7 @@ describe("the agent actions card on the machine page", () => {
       "GET /agents/a1/actions": () => ({ body: asked ? [row({ id: "x2", kind: "update_check", status: "queued" })] : [] }),
     });
     open();
+    await openTab(en.views.machine.control);
     const check = await button("update_check");
     await userEvent.click(check);
     await waitFor(() => expect(screen.getByRole("button", { name: en.machines.actions.kind.update_check })).toBeDisabled());
@@ -99,6 +103,7 @@ describe("the agent actions card on the machine page", () => {
     let n = 0;
     const calls = api({ "POST /agents/a1/actions": () => (n++ === 0 ? { status: 403, body: { title: "reauth_required" } } : { body: row({ kind: "restart", status: "queued" }) }) });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await button("restart"));
     const field = await screen.findByLabelText(en.remote.codeLabel);
     expect(screen.getByText(en.machines.actions.enableHint)).toBeInTheDocument();
@@ -115,6 +120,7 @@ describe("the agent actions card on the machine page", () => {
   it("says the code is not valid when the second try is refused for a code again", async () => {
     api({ "POST /agents/a1/actions": { status: 403, body: { title: "reauth_required" } } });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await button("update"));
     await userEvent.type(await screen.findByLabelText(en.remote.codeLabel), "000000");
     await userEvent.click(screen.getByRole("button", { name: en.machines.actions.kind.update }));
@@ -125,6 +131,7 @@ describe("the agent actions card on the machine page", () => {
   it("shows any other refusal as it is and asks for no code", async () => {
     api({ "POST /agents/a1/actions": { status: 409, body: { title: "conflict" } } });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await button("status"));
     expect(await screen.findByText(en.errors.conflict)).toBeInTheDocument();
     expect(screen.queryByLabelText(en.remote.codeLabel)).toBeNull();
@@ -135,6 +142,7 @@ describe("the agent actions card on the machine page", () => {
     let n = 0;
     const calls = api({ "POST /agents/a1/actions": () => (n++ === 0 ? { status: 403, body: { title: "reauth_required" } } : { body: row({ status: "queued" }) }) });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await button("restart")); // the 403 opens the code field
     const field = await screen.findByLabelText(en.remote.codeLabel);
     await userEvent.type(field, "123456");
@@ -148,6 +156,7 @@ describe("the agent actions card on the machine page", () => {
   it("on a production machine shows the code field and its strict hint from the start, and sends the code only with the kinds that change the machine", async () => {
     const calls = api({ "POST /agents/a1/actions": { body: row({ status: "queued" }) } }, { view: { effectiveEnvironment: "production" } });
     open();
+    await openTab(en.views.machine.control);
     const field = await screen.findByLabelText(en.remote.codeLabel);
     expect(screen.getByText(en.machines.actions.strictHint)).toBeInTheDocument();
     expect(screen.queryByText(en.machines.actions.enableHint)).toBeNull();
@@ -176,6 +185,7 @@ describe("the agent actions card on the machine page", () => {
   it("on a production machine keeps Status and Check for update usable without a code while Update and Restart wait for one", async () => {
     api({}, { view: { effectiveEnvironment: "production" } });
     open();
+    await openTab(en.views.machine.control);
     await screen.findByLabelText(en.remote.codeLabel);
     expect(await button("status")).toBeEnabled();
     expect(await button("update_check")).toBeEnabled();
@@ -186,6 +196,7 @@ describe("the agent actions card on the machine page", () => {
   it("links the code field to the authenticator guide", async () => {
     api({}, { view: { effectiveEnvironment: "production" } });
     open();
+    await openTab(en.views.machine.control);
     await screen.findByLabelText(en.remote.codeLabel);
     expect(screen.getByRole("link", { name: en.twoStep.help })).toHaveAttribute("href", "/two-step");
   });
@@ -193,6 +204,7 @@ describe("the agent actions card on the machine page", () => {
   it("treats a database machine as strict too", async () => {
     api({}, { view: { effectiveFunction: "database" } });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByLabelText(en.remote.codeLabel)).toBeInTheDocument();
     expect(screen.getByText(en.machines.actions.strictHint)).toBeInTheDocument();
   });
@@ -200,6 +212,7 @@ describe("the agent actions card on the machine page", () => {
   it("warns that an agent older than the first one with actions ignores them, and not for a current one", async () => {
     api({}, { version: "0.4.4" });
     const { unmount } = open();
+    await openTab(en.views.machine.control);
     await button("status");
     expect(screen.getByText(en.machines.actions.oldAgent.replace("{min}", config.actionsMinAgentVersion))).toBeInTheDocument();
     unmount();
@@ -207,6 +220,7 @@ describe("the agent actions card on the machine page", () => {
 
     api({}, { version: "0.5.0" });
     open();
+    await openTab(en.views.machine.control);
     await button("status");
     expect(screen.queryByText(en.machines.actions.oldAgent.replace("{min}", config.actionsMinAgentVersion))).toBeNull();
   });
@@ -214,6 +228,7 @@ describe("the agent actions card on the machine page", () => {
   it("warns about an agent whose version is not known", async () => {
     api({ "GET /workspaces/w1/agents": { body: [agent({ userId: "u1", version: "" })] } });
     open();
+    await openTab(en.views.machine.control);
     await button("status");
     expect(screen.getByText(en.machines.actions.oldAgent.replace("{min}", config.actionsMinAgentVersion))).toBeInTheDocument();
   });
@@ -229,6 +244,7 @@ describe("the agent actions card on the machine page", () => {
       ],
     });
     open();
+    await openTab(en.views.machine.control);
     await waitFor(() => expect(screen.getByRole("button", { name: en.machines.actions.kind.update })).toBeDisabled());
     expect(screen.getByRole("button", { name: en.machines.actions.kind.restart })).toBeDisabled();
     expect(screen.getByRole("button", { name: en.machines.actions.kind.status })).toBeEnabled();
@@ -241,6 +257,7 @@ describe("the agent actions card on the machine page", () => {
     ];
     api({}, { list: finished.map((f) => row({ id: `r-${f.status}`, kind: f.kind, status: f.status, result: `result-${f.status}` })) });
     open();
+    await openTab(en.views.machine.control);
     for (const f of finished) {
       const line = rowOf(await screen.findByText(`result-${f.status}`));
       expect(line.getByText(en.machines.actions.status[f.status])).toBeInTheDocument();
@@ -251,6 +268,7 @@ describe("the agent actions card on the machine page", () => {
   it("shows the label of a waiting action and no result box when the agent has written nothing", async () => {
     api({}, { list: [row({ id: "w", kind: "restart", status: "queued", result: null }), row({ id: "v", kind: "update", status: "delivered", result: null })] });
     const { container } = open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.actions.status.queued)).toBeInTheDocument();
     expect(screen.getByText(en.machines.actions.status.delivered)).toBeInTheDocument();
     expect(container.querySelector(".action-result")).toBeNull();
@@ -259,6 +277,7 @@ describe("the agent actions card on the machine page", () => {
   it("renders a result that looks like markup as the literal text, not as markup", async () => {
     api({}, { list: [row({ id: "m", kind: "status", status: "failed", result: "<b>x</b> <img src=x onerror=alert(1)>" })] });
     const { container } = open();
+    await openTab(en.views.machine.control);
     const box = await waitFor(() => {
       const el = container.querySelector(".action-result");
       expect(el).not.toBeNull();
@@ -272,6 +291,7 @@ describe("the agent actions card on the machine page", () => {
   it("tells the owner when the machine is offline, and not when it is online", async () => {
     api({}, { view: { online: false } });
     const { unmount } = open();
+    await openTab(en.views.machine.control);
     await button("status");
     expect(screen.getByText(en.machines.actions.offline)).toBeInTheDocument();
     unmount();
@@ -279,6 +299,7 @@ describe("the agent actions card on the machine page", () => {
 
     api();
     open();
+    await openTab(en.views.machine.control);
     await button("status");
     expect(screen.queryByText(en.machines.actions.offline)).toBeNull();
   });
@@ -286,6 +307,7 @@ describe("the agent actions card on the machine page", () => {
   it("shows a failure to read the list", async () => {
     api({ "GET /agents/a1/actions": { status: 403, body: { title: "forbidden" } } });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.errors.forbidden)).toBeInTheDocument();
   });
 
@@ -295,6 +317,7 @@ describe("the agent actions card on the machine page", () => {
       "GET /agents/a1/actions": () => ({ body: finished ? [row({ id: "z", kind: "update_check", status: "succeeded", result: "up to date" })] : [row({ id: "z", kind: "update_check", status: "queued" })] }),
     });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.actions.status.queued)).toBeInTheDocument();
     await settle(calls);
     const before = count(calls, "/agents/a1/actions");
@@ -308,6 +331,7 @@ describe("the agent actions card on the machine page", () => {
   it("shows every member the daemon's version, how it runs, what it may run and when it last spoke, and the owner the actions below", async () => {
     api({}, { view: { execLevel: "argv", serviceMode: true }, userId: "someone-else", version: "0.6.1" });
     open();
+    await openTab(en.views.machine.control);
     await screen.findByText(en.machines.actions.ownerOnly);
     expect(screen.getByText(en.machines.actions.version)).toBeInTheDocument();
     expect(screen.getByText("0.6.1")).toBeInTheDocument();
@@ -321,6 +345,7 @@ describe("the agent actions card on the machine page", () => {
   it("says desktop when the agent does not run as a service and unknown when the version is not known", async () => {
     api({}, { view: { serviceMode: false }, version: "" });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.actions.podDesktop)).toBeInTheDocument();
     expect(screen.getByText(en.machines.actions.versionUnknown)).toBeInTheDocument();
   });
