@@ -6,4 +6,8 @@ export const deViews: typeof enViews = {
     colMember: "Mitglied", colRole: "Rolle", colJoined: "Beigetreten", colInvited: "Eingeladene E-Mail", colExpires: "Läuft ab",
     inviteTitle: "Jemanden einladen",
   },
+  workspace: {
+    tabs: "Bereiche der Arbeitsbereich-Einstellungen", colWhen: "Zeitpunkt", colAction: "Aktion", colActor: "Durchgeführt von", colTarget: "Ziel", colDetail: "Detail",
+    actorUser: "Benutzer", actorAgent: "Maschine", showDetail: "Anzeigen",
+  },
 };

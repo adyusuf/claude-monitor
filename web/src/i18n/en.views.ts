@@ -5,4 +5,8 @@ export const enViews = {
     colMember: "Member", colRole: "Role", colJoined: "Joined", colInvited: "Invited e-mail", colExpires: "Expires",
     inviteTitle: "Invite someone",
   },
+  workspace: {
+    tabs: "Workspace settings sections", colWhen: "When", colAction: "Action", colActor: "Done by", colTarget: "Target", colDetail: "Detail",
+    actorUser: "user", actorAgent: "machine", showDetail: "Show",
+  },
 };
