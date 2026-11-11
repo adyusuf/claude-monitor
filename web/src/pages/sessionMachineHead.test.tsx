@@ -3,12 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MachineDetail, MachineView } from "../api/types";
 import { en } from "../i18n/en";
-import { ME, mockApi, renderAt } from "../test/helpers";
-import { machine } from "../test/remote-fixtures";
+import { mockApi } from "../test/helpers";
+import { machine, renderPlain } from "../test/remote-fixtures";
 import { ClaudeState, SessionMachineHead } from "./SessionMachineHead";
 
 const state = (over: Partial<MachineView>) => {
-  renderAt("/x", [{ path: "/x", element: <ClaudeState view={machine({ claudeVersion: "2.1", ...over })} /> }]);
+  renderPlain(<ClaudeState view={machine({ claudeVersion: "2.1", ...over })} />);
   return screen.getByText(/Claude/);
 };
 
@@ -35,9 +35,9 @@ describe("whether Claude Code is on a machine and running there", () => {
 });
 
 describe("the head of a machine's card on the sessions page", () => {
-  const head = (view: MachineView | undefined, over: { owned?: boolean; count?: number } = {}) => renderAt("/x", [{
-    path: "/x", element: <SessionMachineHead ws="w1" hostname="laptop-1" view={view} owned={over.owned ?? false} agentVersion="0.6.0" count={over.count ?? 4} onChanged={() => undefined} />,
-  }]);
+  const head = (view: MachineView | undefined, over: { owned?: boolean; count?: number } = {}) => renderPlain(
+    <SessionMachineHead ws="w1" hostname="laptop-1" view={view} owned={over.owned ?? false} agentVersion="0.6.0" count={over.count ?? 4} onChanged={() => undefined} />,
+  );
 
   it("shows only the name and says the machine is no longer connected when the page does not know it", () => {
     head(undefined);
@@ -73,7 +73,7 @@ describe("the head of a machine's card on the sessions page", () => {
 
   it("opens the machine's Claude dialog, reads the machine's detail and shows its controls", async () => {
     const detail: MachineDetail = { machine: machine({ agentId: "a1", claudeKind: "native" }), note: null, noteSetAt: null, servicesShared: false, services: null, servicesAt: null, projects: [] };
-    const calls = mockApi({ "GET /me": { body: ME }, "GET /agents/a1/detail": { body: detail }, "GET /agents/a1/actions": { body: [] } });
+    const calls = mockApi({ "GET /agents/a1/detail": { body: detail }, "GET /agents/a1/actions": { body: [] } });
     head(machine({ agentId: "a1", claudeKind: "native" }), { owned: true });
     await userEvent.click(screen.getByRole("button", { name: "Start or stop Claude" }));
     const dialog = await screen.findByRole("dialog", { name: "Claude on laptop-1" });
@@ -83,7 +83,7 @@ describe("the head of a machine's card on the sessions page", () => {
 
   it("shows the error inside the dialog when the machine's detail cannot be read", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    mockApi({ "GET /me": { body: ME }, "GET /agents/a1/detail": { status: 500, body: {} } });
+    mockApi({ "GET /agents/a1/detail": { status: 500, body: {} } });
     head(machine({ agentId: "a1", claudeKind: "native" }), { owned: true });
     await userEvent.click(screen.getByRole("button", { name: "Start or stop Claude" }));
     const dialog = await screen.findByRole("dialog", { name: "Claude on laptop-1" });
@@ -91,7 +91,7 @@ describe("the head of a machine's card on the sessions page", () => {
   });
 
   it("closes the dialog with its close button", async () => {
-    mockApi({ "GET /me": { body: ME }, "GET /agents/a1/detail": { status: 500, body: {} } });
+    mockApi({ "GET /agents/a1/detail": { status: 500, body: {} } });
     head(machine({ agentId: "a1", claudeKind: "native" }), { owned: true });
     await userEvent.click(screen.getByRole("button", { name: "Start or stop Claude" }));
     const dialog = await screen.findByRole("dialog", { name: "Claude on laptop-1" });
