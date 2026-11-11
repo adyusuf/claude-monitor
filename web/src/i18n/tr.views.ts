@@ -17,4 +17,7 @@ export const trViews: typeof enViews = {
     colConnection: "Bağlantı", colConnectedBy: "Bağlayan", colProjects: "İçe aktarılan proje", colLastCheck: "Son kontrol", colDetails: "Ayrıntılar",
     openSettings: "Ayarlar", none: "Henüz bağlı bir Jira sitesi yok.",
   },
+  machine: {
+    tabs: "Makine bölümleri", overview: "Genel bakış", control: "Denetim", work: "İşler", monitoring: "İzleme", access: "Erişim",
+  },
 };

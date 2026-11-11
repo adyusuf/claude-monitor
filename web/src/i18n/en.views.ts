@@ -16,4 +16,7 @@ export const enViews = {
     colConnection: "Connection", colConnectedBy: "Connected by", colProjects: "Projects imported", colLastCheck: "Last check", colDetails: "Details",
     openSettings: "Settings", none: "No Jira site is connected yet.",
   },
+  machine: {
+    tabs: "Machine sections", overview: "Overview", control: "Control", work: "Work", monitoring: "Monitoring", access: "Access",
+  },
 };

@@ -112,11 +112,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }
 .back { color: var(--muted); font-size: 13px; }
 h1 .badge, h1 .pill { margin-left: 8px; vertical-align: middle; }
 .page > .lead { margin-top: -12px; }
-/* a machine has many short cards: on a wide screen they flow down two columns, the title and the notices across both */
+/* a machine tab has several short cards: on a wide screen they flow down two columns */
 @media (min-width: 1200px) {
-  .machine-page { display: block; columns: 2; column-gap: var(--gap); }
-  .machine-page > * { break-inside: avoid; margin-bottom: var(--gap); }
-  .machine-page > .back, .machine-page > .page-head, .machine-page > .notice { column-span: all; }
+  .machine-page .tab-panel { display: block; columns: 2; column-gap: var(--gap); }
+  .machine-page .tab-panel > * { break-inside: avoid; margin-bottom: var(--gap); }
 }
 
 /* ---- components ---- */
