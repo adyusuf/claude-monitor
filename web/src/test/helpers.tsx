@@ -1,4 +1,5 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { vi } from "vitest";
@@ -76,3 +77,16 @@ export class FakeEventSource {
     this.closed = true;
   }
 }
+
+/** Shows one tab of a tabbed page: its cards sit on tabs, and a tab that is not showing is hidden from the queries. */
+export async function openTab(name: string | RegExp) {
+  await userEvent.click(await screen.findByRole("tab", { name }));
+}
+
+/** Opens a machine's card on the sessions page: its session list shows under the card only once it is pressed. The card's name starts with the host (the counts follow with no space in jsdom, so no word boundary). */
+export async function openMachine(host: string) {
+  await userEvent.click(await screen.findByRole("button", { name: startsWith(host) }));
+}
+
+/** A pattern for a name that starts with `text`, whatever characters `text` has (a name such as "Email (SMTP)" holds regex characters). */
+export const startsWith = (text: string) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);

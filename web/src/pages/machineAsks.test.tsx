@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AskView, MachineDetail } from "../api/types";
 import { en } from "../i18n/en";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
@@ -40,6 +40,7 @@ describe("the asks card on the machine page", () => {
   it("tells the owner the machine takes no asks and turns it on with no code first", async () => {
     const calls = api({ "PUT /agents/a1/asks": { body: {} } });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.asks.off)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: en.machines.asks.turnOn })); // the owner is known once the signed-in user has loaded
     expect(await screen.findByText(en.machines.asks.saved)).toBeInTheDocument();
@@ -50,6 +51,7 @@ describe("the asks card on the machine page", () => {
     let n = 0;
     const calls = api({ "PUT /agents/a1/asks": () => (n++ === 0 ? { status: 403, body: { title: "reauth_required" } } : { body: {} }) });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await screen.findByRole("button", { name: en.machines.asks.turnOn }));
     await userEvent.type(await screen.findByLabelText(en.remote.codeLabel), "123456");
     await userEvent.click(screen.getByRole("button", { name: en.machines.asks.turnOn }));
@@ -60,6 +62,7 @@ describe("the asks card on the machine page", () => {
   it("shows the state and offers to stop when the machine takes asks", async () => {
     const calls = api({ "PUT /agents/a1/asks": { body: {} } }, { acceptsAsks: true });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.asks.on)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: en.machines.asks.turnOff }));
     await screen.findByText(en.machines.asks.saved);
@@ -69,6 +72,7 @@ describe("the asks card on the machine page", () => {
   it("lists the asks sent here with their status and shows the question and the answer as plain text", async () => {
     api({ "GET /agents/a1/asks": { body: [ask({ question: "<img src=x onerror=alert(1)> **bold**", answer: "main", answerTruncated: true }), ask({ id: "k2", status: "no_idle_session", question: "Second?", answer: null })] } }, { acceptsAsks: true });
     const { container } = open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(/onerror/)).toBeInTheDocument();
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByText(en.machines.asks.status.answered)).toBeInTheDocument();
@@ -79,12 +83,14 @@ describe("the asks card on the machine page", () => {
   it("says there is no ask yet", async () => {
     api();
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.asks.none)).toBeInTheDocument();
   });
 
   it("shows someone who does not own the machine the state and no switch and no list", async () => {
     const calls = api({}, { acceptsAsks: true }, "u2");
     open();
+    await openTab(en.views.machine.control);
     expect((await screen.findAllByText(en.machines.asks.ownerOnly)).length).toBeGreaterThan(0); // the services card says the same sentence
     expect(screen.queryByRole("button", { name: en.machines.asks.turnOff })).toBeNull();
     expect(calls.filter((c) => c.path === "/agents/a1/asks")).toHaveLength(0);

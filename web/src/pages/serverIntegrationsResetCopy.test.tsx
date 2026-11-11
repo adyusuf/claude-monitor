@@ -2,13 +2,17 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "../i18n/en";
-import { renderAt, type Call } from "../test/helpers";
+import { type Call, openTab, renderAt, startsWith } from "../test/helpers";
 import { github, jira, ORIGIN, serveServerSettings, serverView, smtp } from "../test/server-settings-fixtures";
 import { ServerIntegrationsPage } from "./ServerIntegrationsPage";
 
 const s = en.serverSettings;
 const page = () => renderAt("/server/integrations", [{ path: "/server/integrations", element: <ServerIntegrationsPage /> }]);
-const card = async (name: string) => within((await screen.findByRole("heading", { level: 2, name })).closest("section")!);
+/** The card of an integration: its tab is opened (the tab's name starts with the integration's), then the card is found by its heading. */
+const card = async (name: string) => {
+  await openTab(startsWith(name));
+  return within((await screen.findByRole("heading", { level: 2, name })).closest("section")!);
+};
 const saveMail = () => screen.getByRole("button", { name: s.saveNamed.replace("{name}", s.names.smtp) });
 const puts = (calls: Call[]) => calls.filter((c) => c.method === "PUT");
 const resetTls = s.resetNamed.replace("{name}", s.fields.tls);

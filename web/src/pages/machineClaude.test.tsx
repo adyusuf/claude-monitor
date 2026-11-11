@@ -5,7 +5,7 @@ import type { AgentActionView, MachineDetail, MachineProjectView } from "../api/
 import { de } from "../i18n/de";
 import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { AUTO_STARTS_PER_HOUR, FIRST_PROMPT_MAX, runningSessions } from "./MachineClaude";
 import { MachinePage } from "./MachinePage";
@@ -50,6 +50,7 @@ describe("the Claude card on the machine page", () => {
   it("is off until the owner turns it on, sends no code first and shows no start form", async () => {
     const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { roleEnvironment: "dev", effectiveEnvironment: "dev" });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.claudeControl.off)).toBeInTheDocument();
     expect(screen.queryByText(en.machines.claudeControl.newTitle)).toBeNull();
 
@@ -63,6 +64,7 @@ describe("the Claude card on the machine page", () => {
     let n = 0;
     const calls = api({ "PUT /agents/a1/claude": () => (n++ === 0 ? { status: 403, body: { title: "reauth_required" } } : { body: {} }) }, { roleEnvironment: "test", effectiveEnvironment: "test" });
     open();
+    await openTab(en.views.machine.control);
     await userEvent.click(await screen.findByRole("button", { name: en.machines.claudeControl.turnOn }));
     await userEvent.type(await screen.findByLabelText(en.remote.codeLabel), "123456");
     await userEvent.click(screen.getByRole("button", { name: en.machines.claudeControl.turnOn }));
@@ -73,6 +75,7 @@ describe("the Claude card on the machine page", () => {
   it("starts a session in the chosen project with the chosen mode and says it was asked", async () => {
     const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev, [], [project(), project({ key: "git:host/blog", name: "blog" })]);
     open();
+    await openTab(en.views.machine.control);
     await userEvent.selectOptions(await screen.findByLabelText(en.machines.claudeControl.project), "git:host/blog");
     await userEvent.selectOptions(screen.getByLabelText(en.machines.claudeControl.mode), "plan");
 
@@ -85,6 +88,7 @@ describe("the Claude card on the machine page", () => {
   it("sends a first prompt with the start, trimmed, and clears the box; an empty box sends none", async () => {
     const calls = api({ "POST /agents/a1/actions": { body: action({ status: "queued", sessionRef: null, result: null }) } }, dev);
     open();
+    await openTab(en.views.machine.control);
     const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[\\()]/g, "\\$&")));
     await userEvent.click(await screen.findByRole("button", { name: en.machines.claudeControl.start }));
     expect(await screen.findByText(en.machines.claudeControl.done.started)).toBeInTheDocument();
@@ -101,6 +105,7 @@ describe("the Claude card on the machine page", () => {
   it("counts the characters of the first prompt, says how it is sent, and keeps Start off over the limit", async () => {
     api({}, dev);
     open();
+    await openTab(en.views.machine.control);
     const box = await screen.findByLabelText(new RegExp(en.machines.claudeControl.firstPrompt.replace(/[\\()]/g, "\\$&")));
     expect(screen.getByText(en.machines.claudeControl.firstPromptHint)).toBeInTheDocument();
     expect(screen.getByText(`0 / ${FIRST_PROMPT_MAX}`)).toBeInTheDocument();
@@ -119,6 +124,7 @@ describe("the Claude card on the machine page", () => {
       project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new", trusted: null }),
     ]);
     open();
+    await openTab(en.views.machine.control);
     const select = await screen.findByLabelText(en.machines.claudeControl.project);
     const options = [...select.querySelectorAll("option")];
     expect(options.map((o) => [o.getAttribute("value"), (o as HTMLOptionElement).disabled])).toEqual([["git:host/old", true], ["git:host/blog", false], ["git:host/new", false]]);
@@ -135,6 +141,7 @@ describe("the Claude card on the machine page", () => {
   it("says so and keeps Start off when Claude Code trusts none of the projects", async () => {
     api({}, dev, [], [project({ trusted: false })]);
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.claudeControl.allUntrusted)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
   });
@@ -142,6 +149,7 @@ describe("the Claude card on the machine page", () => {
   it("shows the automatic start off by default, says what it costs and turns it on with the mode in the request", async () => {
     const calls = api({ "PUT /agents/a1/claude": { body: {} } }, dev);
     open();
+    await openTab(en.views.machine.control);
     const select = await screen.findByLabelText(en.machines.claudeControl.auto);
     expect(select).toHaveValue("off");
     expect(screen.getByText(en.machines.claudeControl.autoHint.replace("{n}", String(AUTO_STARTS_PER_HOUR)))).toBeInTheDocument();
@@ -155,6 +163,7 @@ describe("the Claude card on the machine page", () => {
   it("shows the mode the machine says it has and turns it off with off", async () => {
     const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { ...dev, claudeAutoMode: "on_message" });
     open();
+    await openTab(en.views.machine.control);
     const select = await screen.findByLabelText(en.machines.claudeControl.auto);
     expect(select).toHaveValue("on_message");
 
@@ -169,6 +178,7 @@ describe("the Claude card on the machine page", () => {
       project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new" }),
     ]);
     open();
+    await openTab(en.views.machine.control);
 
     await userEvent.selectOptions(await screen.findByLabelText(en.machines.claudeControl.auto), "always");
 
@@ -181,6 +191,7 @@ describe("the Claude card on the machine page", () => {
       project({ key: "git:host/old", name: "old", trusted: false }), project({ key: "git:host/blog", name: "blog", trusted: true }), project({ key: "git:host/new", name: "new" }),
     ]);
     open();
+    await openTab(en.views.machine.control);
     const projectSelect = await screen.findByLabelText(en.machines.claudeControl.autoProject);
     expect(projectSelect).toHaveValue("git:host/blog");
     expect([...projectSelect.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["git:host/blog", "git:host/new"]);
@@ -194,6 +205,7 @@ describe("the Claude card on the machine page", () => {
   it("does not offer always when Claude Code trusts no project, and offers no project choice for the other modes", async () => {
     api({}, { ...dev, claudeAutoMode: "on_message" }, [], [project({ trusted: false })]);
     open();
+    await openTab(en.views.machine.control);
     const select = await screen.findByLabelText(en.machines.claudeControl.auto);
     expect([...select.querySelectorAll("option")].find((o) => o.getAttribute("value") === "always")).toBeDisabled();
     expect(screen.queryByLabelText(en.machines.claudeControl.autoProject)).toBeNull();
@@ -202,6 +214,7 @@ describe("the Claude card on the machine page", () => {
   it("shows no automatic start on a machine where starting Claude is off or not allowed", async () => {
     api({}, { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: false });
     open();
+    await openTab(en.views.machine.control);
     await screen.findByText(en.machines.claudeControl.off);
     expect(screen.queryByLabelText(en.machines.claudeControl.auto)).toBeNull();
   });
@@ -209,6 +222,7 @@ describe("the Claude card on the machine page", () => {
   it("offers only the three careful modes and never bypass, auto or dontAsk", async () => {
     api({}, dev);
     open();
+    await openTab(en.views.machine.control);
     const select = await screen.findByLabelText(en.machines.claudeControl.mode);
     expect([...select.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["manual", "plan", "acceptEdits"]);
   });
@@ -219,6 +233,7 @@ describe("the Claude card on the machine page", () => {
       action({ id: "p1", kind: "claude_stop", sessionRef: "0123abcd", result: "stopped session 0123abcd; its conversation is kept" }),
     ]);
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText("34a6ea9d")).toBeInTheDocument();
     expect(screen.queryByText("0123abcd", { selector: "code" })).toBeNull(); // stopped
 
@@ -231,6 +246,7 @@ describe("the Claude card on the machine page", () => {
   it("shows no start on a production or unset machine and says why", async () => {
     api({}, { roleEnvironment: "production", effectiveEnvironment: "production", acceptsClaudeControl: true });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.claudeControl.notAllowed)).toBeInTheDocument();
     expect(screen.queryByText(en.machines.claudeControl.newTitle)).toBeNull();
   });
@@ -238,12 +254,14 @@ describe("the Claude card on the machine page", () => {
   it("shows no start on a machine a claim made stricter than what the admin set", async () => {
     api({}, { roleEnvironment: "dev", effectiveEnvironment: "production", acceptsClaudeControl: true });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.claudeControl.notAllowed)).toBeInTheDocument();
   });
 
   it("says an older agent ignores it and keeps the start button off", async () => {
     api({}, dev, [], undefined, "0.5.0");
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.claudeControl.oldAgent.replace("{min}", "0.6.0"))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
   });
@@ -251,6 +269,7 @@ describe("the Claude card on the machine page", () => {
   it("says a machine with no project has nothing to start and hides the form", async () => {
     api({}, dev, [], []);
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.claudeControl.noProjects)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: en.machines.claudeControl.start })).toBeDisabled();
   });
@@ -262,6 +281,7 @@ describe("the Claude card on the machine page", () => {
       "GET /agents/a1/metrics": { body: [] }, "GET /agents/a1/detail": { body: detail() }, "GET /agents/a1/asks": { body: [] },
     });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.claudeControl.ownerOnly)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: en.machines.claudeControl.start })).toBeNull();
   });
@@ -269,6 +289,7 @@ describe("the Claude card on the machine page", () => {
   it("lists the Claude actions with their results as text", async () => {
     api({}, dev, [action({ status: "failed", sessionRef: null, result: "Claude Code does not trust that folder yet: <b>open Claude there</b>" })]);
     const { container } = open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(/does not trust that folder yet/)).toBeInTheDocument();
     expect(container.querySelector("b")).toBeNull();
   });
