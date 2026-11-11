@@ -121,6 +121,17 @@ public static partial class Cli
         return true;
     }
 
+    /// <summary>
+    /// After a login: a running daemon still holds the old server, tokens and workspace (it read them when it started), so it is handed over to
+    /// a fresh one that reads the new login; with none running, one is started.
+    /// </summary>
+    public static async Task AfterLoginAsync(AgentConfig config, AgentLog log, TimeProvider clock, Update.IDaemonControl? control = null)
+    {
+        var daemon = control ?? new Update.DaemonControl(config, log, clock);
+        if (daemon.IsRunning()) await RestartAsync(config, log, clock, TextWriter.Null, daemon);
+        else DaemonHost.EnsureRunning(config, log);
+    }
+
     /// <summary>"aipod restart": hands the daemon over to this binary (a new version was just put in place). Nothing to do while not connected.</summary>
     public static async Task<int> RestartAsync(AgentConfig config, AgentLog log, TimeProvider clock, TextWriter stdout, Update.IDaemonControl? control = null)
     {
@@ -157,6 +168,7 @@ public static partial class Cli
             : Strings.T(Msg.StatusCommandsNone));
         await stdout.WriteLineAsync(Strings.T(Msg.StatusStopWait, (int)config.StopWait.TotalSeconds));
         await stdout.WriteLineAsync(Strings.T(Msg.StatusRemoteRuns, ExecPolicyLoader.Describe(ExecPolicyLoader.Load(config, identity.ExecLevel)), config.ServiceMode ? Strings.T(Msg.StatusServiceSuffix) : ""));
+        if (ExecLevelChanges.Describe(store, identity.AgentId) is { } execChange) await stdout.WriteLineAsync(execChange);
         var started = new Daemon.ClaudeControl(config, new Daemon.SystemClaudeCli(), clock ?? TimeProvider.System).Running();
         var byPolicy = started.Count(w => w.Reason is not null);
         await stdout.WriteLineAsync(Strings.T(Msg.StatusClaudeWeb, started.Count, byPolicy > 0 ? Strings.T(Msg.StatusByAutomatic, byPolicy) : "", Daemon.WorkspaceSettings.Get(config, store, Daemon.ClaudeAutoStart.ModeKey) ?? "off"));

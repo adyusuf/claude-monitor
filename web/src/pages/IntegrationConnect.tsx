@@ -4,8 +4,8 @@ import { ApiError } from "../api/client";
 import { Button, Card, Field, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 
-/** Starts the Atlassian sign-in for a Jira address: the API makes the address, the browser goes there and comes back to this page. */
-export function IntegrationConnect({ ws }: { ws: string }) {
+/** Starts the Atlassian sign-in for a Jira address: the API makes the address, the browser goes there and comes back to this page. `bare` leaves out the card (the drawer has its own title). */
+export function IntegrationConnect({ ws, bare }: { ws: string; bare?: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [subdomain, setSubdomain] = useState("");
@@ -28,8 +28,7 @@ export function IntegrationConnect({ ws }: { ws: string }) {
     }
   };
 
-  return (
-    <Card title={t("integrations.connectTitle")}>
+  const form = (
       <form onSubmit={submit} className="stack">
         <Field label={t("integrations.subdomain")} hint={t("integrations.subdomainHint")} value={subdomain} placeholder="acme"
           onChange={(e) => setSubdomain(e.target.value)} autoComplete="off" required />
@@ -38,6 +37,6 @@ export function IntegrationConnect({ ws }: { ws: string }) {
         <p className="muted">{t("integrations.connectHint")}</p>
         <div><Button type="submit" busy={busy}>{t("integrations.connect")}</Button></div>
       </form>
-    </Card>
   );
+  return bare ? form : <Card title={t("integrations.connectTitle")}>{form}</Card>;
 }

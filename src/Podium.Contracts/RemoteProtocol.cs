@@ -8,7 +8,7 @@ public sealed record AgentProfile(string ExecLevel, bool ServiceMode, string? Os
     string? ClaimedEnvironment = null, string? ClaimedFunction = null, ClaudePresence? Claude = null,
     IReadOnlyList<ToolInfo>? Interpreters = null, IReadOnlyList<ToolInfo>? Tools = null, IReadOnlyList<string>? Capabilities = null,
     IReadOnlyList<ServiceInfo>? Services = null, IReadOnlyList<ProjectFact>? Projects = null, string? PushTransport = null, bool? ApprovalsRequired = null, string? PluginId = null,
-    ClaudeInventory? Inventory = null, AccessReport? Access = null);
+    ClaudeInventory? Inventory = null, AccessReport? Access = null, ExecLevelReport? ExecLevelChange = null);
 
 /// <summary>The Claude Code plugin a machine's agent runs under, as <c>name@marketplace</c> (ADR-0013): reported so the web can show which plugin a machine runs under.</summary>
 public static class PluginIds

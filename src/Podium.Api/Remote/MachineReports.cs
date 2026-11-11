@@ -40,6 +40,13 @@ public static class MachineReports
         // ADR-0020 §4: the ceiling and the state of each policy, replaced by every profile; an older agent sends none.
         agent.AccessReport = AccessPolicies.AccessReports.Store(profile.Access);
         agent.AccessReportAt = agent.AccessReport is null ? null : now;
+        // ADR-0021: what the agent did with the latest exec-level change; an older agent sends none and keeps the stored report.
+        if (ExecLevelChanges.Store(profile.ExecLevelChange) is { } execReport)
+        {
+            agent.ExecLevelReport = execReport;
+            agent.ExecLevelReportAt = now;
+        }
+
         if (profile.OsVersion is { Length: > 0 } version)
         {
             var clean = Clean(version, OsVersionMax);

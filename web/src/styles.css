@@ -112,11 +112,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }
 .back { color: var(--muted); font-size: 13px; }
 h1 .badge, h1 .pill { margin-left: 8px; vertical-align: middle; }
 .page > .lead { margin-top: -12px; }
-/* a machine has many short cards: on a wide screen they flow down two columns, the title and the notices across both */
+/* a machine tab has several short cards: on a wide screen they flow down two columns */
 @media (min-width: 1200px) {
-  .machine-page { display: block; columns: 2; column-gap: var(--gap); }
-  .machine-page > * { break-inside: avoid; margin-bottom: var(--gap); }
-  .machine-page > .back, .machine-page > .page-head, .machine-page > .notice { column-span: all; }
+  .machine-page .tab-panel { display: block; columns: 2; column-gap: var(--gap); }
+  .machine-page .tab-panel > * { break-inside: avoid; margin-bottom: var(--gap); }
 }
 
 /* ---- components ---- */
@@ -491,3 +490,17 @@ button.act-text { cursor: pointer; }
 .soft-mark { display: inline-flex; align-items: center; min-width: 28px; justify-content: center; padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--radius-chip); background: var(--raised); font: 500 11.5px var(--mono); }
 .bar-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .dash-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--gap); margin-top: var(--gap); }
+
+/* Tabs (components/Tabs.tsx); the side drawer is the Modal with `side` (components/Drawer.tsx) */
+.tabs > .segmented { flex-wrap: wrap; margin-bottom: 12px; }
+.tab-panel { display: flex; flex-direction: column; gap: 16px; }
+.tabs > .tab-panel[hidden] { display: none !important; }
+
+/* Sessions page: a card per machine, its session list opens under the card (SessionMachineCard) */
+.machine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: var(--gap); align-items: start; }
+.machine-card { display: flex; flex-direction: column; gap: 6px; padding: 16px; text-align: left; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); cursor: pointer; }
+.machine-card:hover { background: var(--raised); }
+.machine-card.open { border-color: var(--text); }
+.machine-card-name { display: flex; align-items: center; gap: 8px; font-weight: 500; overflow-wrap: anywhere; }
+.machine-card-count strong { font-size: 24px; }
+.machine-detail { grid-column: 1 / -1; }

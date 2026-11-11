@@ -24,6 +24,9 @@ internal static class PodiumDbModelRemote
         {
             e.Property(x => x.ExecLevel).HasDefaultValue(ExecLevels.Off);
             e.Property(x => x.ServiceMode).HasDefaultValue(false);
+            e.Property(x => x.ExecLevelSequence).HasDefaultValue(0L);
+            e.Property(x => x.ExecLevelRequest).HasColumnType("jsonb");
+            e.Property(x => x.ExecLevelReport).HasColumnType("jsonb");
             e.ToTable(t => t.HasCheckConstraint("ck_agents_exec_level", In("exec_level", ExecLevels.All)));
         });
         b.Entity<WorkspaceSettings>(e =>

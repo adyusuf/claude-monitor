@@ -1,6 +1,6 @@
 import { request } from "./client";
 import type {
-  AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  ExecLevelChangeInput, ExecLevelView, AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
@@ -28,7 +28,7 @@ const q = (params: Record<string, string | number | boolean | undefined | null>)
 export const api = {
   me: () => request<Me>("GET", "/me"),
   /** The commit this server runs and, when it has one, the download host's folder (the R2 bucket) the agent builds and installers come from. */
-  version: () => request<{ commit: string; downloadsUrl: string | null }>("GET", "/version"),
+  version: () => request<{ commit: string; downloadsUrl: string | null; agentVersion?: string | null; agentVersions?: { version: string; url: string }[] }>("GET", "/version"),
   setMyLanguage: (language: string) => request<void>("PUT", "/me/language", { language }),
   providers: () => request<{ available: string[] }>("GET", "/auth/providers"),
   register: (email: string, password: string, displayName: string) =>
@@ -92,6 +92,8 @@ export const api = {
   setAgentInventory: (agentId: string, share: boolean, code?: string) => request<AgentInventoryView>("PUT", `/agents/${agentId}/inventory`, { share, code }),
   setAgentServices: (agentId: string, share: boolean, code?: string) => request<AgentServicesView>("PUT", `/agents/${agentId}/services`, { share, code }),
   setAgentAsks: (agentId: string, accept: boolean, code?: string) => request<AgentAsksView>("PUT", `/agents/${agentId}/asks`, { accept, code }),
+  agentExecLevel: (agentId: string) => request<ExecLevelView>("GET", `/agents/${agentId}/exec-level`),
+  setAgentExecLevel: (agentId: string, input: ExecLevelChangeInput) => request<ExecLevelView>("PUT", `/agents/${agentId}/exec-level`, input),
   agentActions: (agentId: string) => request<AgentActionView[]>("GET", `/agents/${agentId}/actions`),
   requestAgentAction: (agentId: string, kind: AgentActionKind, code?: string, extra?: { projectKey?: string; permissionMode?: ClaudePermissionMode; sessionRef?: string; firstPrompt?: string; target?: string; value?: string }) =>
     request<AgentActionView>("POST", `/agents/${agentId}/actions`, { kind, code, ...extra }),
