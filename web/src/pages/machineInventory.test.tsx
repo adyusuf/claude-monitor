@@ -5,7 +5,7 @@ import type { ClaudeInventory, MachineDetail, MachineProjectView } from "../api/
 import { de } from "../i18n/de";
 import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
@@ -49,6 +49,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("shows sessions with their project name, plugins with their state, skills and the project's mode and gates", async () => {
     api(inventory());
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText("fix the login")).toBeInTheDocument();
     expect(screen.getAllByText("shop").length).toBeGreaterThan(0);
     expect(screen.getByText("adyusuf@adyusuf-marketplace")).toBeInTheDocument();
@@ -64,6 +65,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("has no card for a member who is not the owner when the API sends none", async () => {
     api(null, {}, false, "someone-else");
     open();
+    await openTab(en.views.machine.control);
     await screen.findByText("shop");
     expect(screen.queryByText(en.machines.inventory.title)).toBeNull();
   });
@@ -72,6 +74,7 @@ describe("the Claude inventory card on the machine page", () => {
     let n = 0;
     const calls = api(null, { "PUT /agents/a1/inventory": () => (n++ === 0 ? { status: 403, body: { title: "reauth_required" } } : { body: {} }) });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.inventory.off)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: en.machines.inventory.turnOn }));
     await userEvent.type(await screen.findByLabelText(en.remote.codeLabel), "123456");
@@ -83,6 +86,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("says it is waiting for the agent when the switch is on and nothing has been reported, and offers turning it off", async () => {
     const calls = api(null, { "PUT /agents/a1/inventory": { body: {} } }, true);
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.inventory.waiting)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: en.machines.inventory.turnOff }));
     await screen.findByText(en.machines.inventory.saved);
@@ -92,6 +96,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("shows an admin who is not the owner the inventory while it is on but no switch", async () => {
     api(inventory(), {}, true, "someone-else");
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText("fix the login")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: en.machines.inventory.turnOff })).toBeNull();
   });
@@ -99,6 +104,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("says unknown for a list the agent could not read and none for an empty one", async () => {
     api(inventory({ sessions: null, plugins: [], skills: [], settings: [] }));
     open();
+    await openTab(en.views.machine.control);
     const card = (await screen.findByText(en.machines.inventory.title)).closest(".card") as HTMLElement;
     expect(within(card).getByText(en.machines.inventory.unknown)).toBeInTheDocument();
     expect(within(card).getByText(en.machines.inventory.noPlugins)).toBeInTheDocument();
@@ -109,6 +115,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("shows a session name that looks like markup as plain text", async () => {
     api(inventory({ sessions: [{ name: "<img src=x onerror=alert(1)>", projectKey: null, kind: null, status: null, startedAt: null }] }));
     const { container } = open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText("<img src=x onerror=alert(1)>")).toBeInTheDocument();
     expect(container.querySelector("img[src='x']")).toBeNull();
   });
@@ -118,6 +125,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("lets the owner enable, disable and update a plugin and install one by id, each asked as a closed action", async () => {
     const calls = api(inventory(), { "POST /agents/a1/actions": { body: { id: "x", status: "queued" } } }, true, "u1", dev);
     open();
+    await openTab(en.views.machine.control);
     await screen.findByText("adyusuf@adyusuf-marketplace");
     const buttons = await screen.findAllByRole("button", { name: en.machines.inventory.disable });
     await userEvent.click(buttons[0]!);
@@ -137,6 +145,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("keeps the install button off until the id has the name@marketplace shape", async () => {
     api(inventory(), {}, true, "u1", dev);
     open();
+    await openTab(en.views.machine.control);
     const field = await screen.findByLabelText(en.machines.inventory.installLabel);
     const button = screen.getByRole("button", { name: en.machines.inventory.install });
     await userEvent.type(field, "no-marketplace");
@@ -148,6 +157,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("asks for a project setting with the project, the name and a value from the lists", async () => {
     const calls = api(inventory(), { "POST /agents/a1/actions": { body: { id: "x", status: "queued" } } }, true, "u1", dev);
     open();
+    await openTab(en.views.machine.control);
     await screen.findByText("adyusuf@adyusuf-marketplace");
     await userEvent.selectOptions(await screen.findByLabelText(en.machines.inventory.setting), "push.prod");
     await userEvent.selectOptions(screen.getByLabelText(en.machines.inventory.value), "false");
@@ -159,6 +169,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("offers only the closed values: modes A to E, four models, yes or no", async () => {
     api(inventory(), {}, true, "u1", dev);
     open();
+    await openTab(en.views.machine.control);
     await screen.findByText("adyusuf@adyusuf-marketplace");
     const value = await screen.findByLabelText(en.machines.inventory.value);
     const values = () => [...value.querySelectorAll("option")].map((o) => o.getAttribute("value"));
@@ -172,6 +183,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("shows no write control and says what is needed when starting Claude from the web is off or the machine is not dev or test", async () => {
     api(inventory(), {}, true, "u1", { roleEnvironment: "dev", effectiveEnvironment: "dev", acceptsClaudeControl: false });
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.inventory.writesOff)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: en.machines.inventory.install })).toBeNull();
   });
@@ -179,6 +191,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("shows an admin who is not the owner no write control", async () => {
     api(inventory(), {}, true, "someone-else", dev);
     open();
+    await openTab(en.views.machine.control);
     await screen.findByText("fix the login");
     expect(screen.queryByRole("button", { name: en.machines.inventory.install })).toBeNull();
     expect(screen.queryByText(en.machines.inventory.writesOff)).toBeNull();
@@ -187,6 +200,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("shows the reason in words when the API refuses a change", async () => {
     api(inventory(), { "POST /agents/a1/actions": { status: 409, body: { title: "action_busy" } } }, true, "u1", dev);
     open();
+    await openTab(en.views.machine.control);
     await screen.findAllByRole("button", { name: en.machines.inventory.disable });
     await userEvent.click(within(screen.getByText("adyusuf@adyusuf-marketplace").closest("li")!).getByRole("button", { name: en.machines.inventory.update }));
     expect(await screen.findByText(en.errors.action_busy)).toBeInTheDocument();
@@ -202,6 +216,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("shows the usage windows as meters with their percentage, when they reset and when they were last seen", async () => {
     api(inventory());
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.inventory.limits)).toBeInTheDocument();
     const five = screen.getByRole("progressbar", { name: en.machines.inventory.fiveHour });
     expect(five).toHaveAttribute("aria-valuenow", "23");
@@ -215,6 +230,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("keeps a meter inside the track when the machine reports more than 100 per cent and marks a nearly full one", async () => {
     api(inventory({ limits: { fiveHour: null, sevenDay: null, spend: { usedPercentage: 140, resetsAt: null }, seenAt: new Date(2026, 9, 5, 9, 55).toISOString() } }));
     const { container } = open();
+    await openTab(en.views.machine.control);
     const bar = await screen.findByRole("progressbar", { name: en.machines.inventory.spend });
     expect(bar).toHaveAttribute("aria-valuenow", "100");
     expect(container.querySelector(".meter-fill.warn")).not.toBeNull();
@@ -224,6 +240,7 @@ describe("the Claude inventory card on the machine page", () => {
   it("says how to get limits when there are none", async () => {
     api(inventory({ limits: null }));
     open();
+    await openTab(en.views.machine.control);
     expect(await screen.findByText(en.machines.inventory.noLimits)).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).toBeNull();
   });

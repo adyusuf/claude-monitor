@@ -5,7 +5,7 @@ import type { MachineDetail, MachineProjectView } from "../api/types";
 import { de } from "../i18n/de";
 import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
@@ -42,6 +42,7 @@ describe("start the test of a project on the machine page", () => {
   it("shows the owner the command the machine reported and starts it by naming only the project", async () => {
     const calls = api([project()], "u1", { "POST /agents/a1/test-runs": { body: { id: "r1", status: "pending_approval" } } });
     open();
+    await openTab(en.views.machine.work);
     expect(await screen.findByText("/usr/bin/dotnet test --no-build")).toBeInTheDocument();
     expect(screen.getByText(en.machines.projects.testIn.replace("{dir}", "/work/shop"))).toBeInTheDocument();
 
@@ -54,6 +55,7 @@ describe("start the test of a project on the machine page", () => {
   it("offers nothing to a member who is not the machine's owner, even when there is a command", async () => {
     api([project({ testArgv: null, testCwd: null })], "someone-else");
     open();
+    await openTab(en.views.machine.work);
     await screen.findByText("shop");
     expect(screen.queryByRole("button", { name: en.machines.projects.startTest })).toBeNull();
   });
@@ -61,6 +63,7 @@ describe("start the test of a project on the machine page", () => {
   it("offers nothing for a project with no test command", async () => {
     api([project({ hasTest: false, testArgv: null, testCwd: null })]);
     open();
+    await openTab(en.views.machine.work);
     await screen.findByText("shop");
     expect(screen.queryByRole("button", { name: en.machines.projects.startTest })).toBeNull();
   });
@@ -68,6 +71,7 @@ describe("start the test of a project on the machine page", () => {
   it("says why when the API refuses", async () => {
     api([project()], "u1", { "POST /agents/a1/test-runs": { status: 409, body: { title: "no_test_command" } } });
     open();
+    await openTab(en.views.machine.work);
     await userEvent.click(await screen.findByRole("button", { name: en.machines.projects.startTest }));
     expect(await screen.findByText(en.errors.no_test_command)).toBeInTheDocument();
     expect(screen.queryByText(en.machines.projects.testAsked)).toBeNull();

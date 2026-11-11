@@ -4,14 +4,18 @@ import { describe, expect, it } from "vitest";
 import { App } from "../App";
 import { Layout } from "../components/Layout";
 import { en } from "../i18n/en";
-import { ME, mockApi, renderAt } from "../test/helpers";
+import { ME, mockApi, openTab, renderAt, startsWith } from "../test/helpers";
 import { field, github, jira, ORIGIN, serveServerSettings, serverView, smtp } from "../test/server-settings-fixtures";
 import { ServerIntegrationsPage } from "./ServerIntegrationsPage";
 
 const s = en.serverSettings;
 const page = () => renderAt("/server/integrations", [{ path: "/server/integrations", element: <ServerIntegrationsPage /> }]);
 /** The card of an integration, found by its heading. */
-const card = async (name: string) => within((await screen.findByRole("heading", { level: 2, name })).closest("section")!);
+/** The card of an integration: its tab is opened (the tab's name starts with the integration's), then the card is found by its heading. */
+const card = async (name: string) => {
+  await openTab(startsWith(name));
+  return within((await screen.findByRole("heading", { level: 2, name })).closest("section")!);
+};
 
 describe("the server settings link in the frame", () => {
   it("shows the link to a server admin, pointing at the page", async () => {
@@ -144,7 +148,9 @@ describe("the server settings page", () => {
   it("keeps the cards in the order the server sends them", async () => {
     serveServerSettings({ "GET /server/integrations": { body: serverView({ integrations: [jira(), smtp(), github()] }) } });
     page();
-    await screen.findByRole("heading", { level: 2, name: s.names.jira });
-    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([s.names.jira, s.names.smtp, s.names.github]);
+    await screen.findByRole("heading", { level: 2, name: s.names.jira }); // the first one is open
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    [s.names.jira, s.names.smtp, s.names.github].forEach((name, i) => expect(tabs[i]).toHaveTextContent(name));
   });
 });
