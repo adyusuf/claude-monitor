@@ -182,8 +182,8 @@ public sealed class DashboardTests(ApiFactory api)
 
         var dashboard = await owner.GetJsonAsync(Url(owner.WorkspaceId));
 
-        Assert.Equal((new Dictionary<string, int> { ["active"] = 1, ["archived"] = 1 }, new Dictionary<string, int> { ["planned"] = 1, ["active"] = 1 }),
-            (Section(dashboard, "projects"), Section(dashboard, "sprints")));
+        Assert.Equal(new Dictionary<string, int> { ["active"] = 1, ["archived"] = 1 }, Section(dashboard, "projects"));
+        Assert.Equal(new Dictionary<string, int> { ["planned"] = 1, ["active"] = 1 }, Section(dashboard, "sprints"));
     }
 
     [Fact]
