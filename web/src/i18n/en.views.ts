@@ -9,4 +9,7 @@ export const enViews = {
     tabs: "Workspace settings sections", colWhen: "When", colAction: "Action", colActor: "Done by", colTarget: "Target", colDetail: "Detail",
     actorUser: "user", actorAgent: "machine", showDetail: "Show",
   },
+  sessions: {
+    pick: "Select a machine to see its sessions.", activeNow: "active now", waiting: "{n} waiting", total: "{n} in total",
+  },
 };

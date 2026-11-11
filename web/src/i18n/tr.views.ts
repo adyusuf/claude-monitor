@@ -10,4 +10,7 @@ export const trViews: typeof enViews = {
     tabs: "Çalışma alanı ayarları bölümleri", colWhen: "Zaman", colAction: "İşlem", colActor: "Yapan", colTarget: "Hedef", colDetail: "Ayrıntı",
     actorUser: "kullanıcı", actorAgent: "makine", showDetail: "Göster",
   },
+  sessions: {
+    pick: "Oturumlarını görmek için bir makine seçin.", activeNow: "şu an etkin", waiting: "{n} bekliyor", total: "toplam {n}",
+  },
 };

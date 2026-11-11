@@ -10,4 +10,7 @@ export const deViews: typeof enViews = {
     tabs: "Bereiche der Arbeitsbereich-Einstellungen", colWhen: "Zeitpunkt", colAction: "Aktion", colActor: "Durchgeführt von", colTarget: "Ziel", colDetail: "Detail",
     actorUser: "Benutzer", actorAgent: "Maschine", showDetail: "Anzeigen",
   },
+  sessions: {
+    pick: "Wählen Sie eine Maschine, um ihre Sitzungen zu sehen.", activeNow: "gerade aktiv", waiting: "{n} wartet", total: "{n} insgesamt",
+  },
 };

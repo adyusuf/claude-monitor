@@ -66,3 +66,11 @@ export function groupSessions(rows: SessionRow[], machines: readonly MachineSeed
   });
   return groups.filter((g) => withEmpty || g.count > 0).sort(byName);
 }
+
+/** What a machine's card summarises: sessions running now (status "active"), those waiting for an answer, and all that are loaded. */
+export interface MachineStats { active: number; waiting: number; total: number }
+
+export function machineStats(group: MachineGroup): MachineStats {
+  const rows = group.repos.flatMap((g) => g.rows);
+  return { active: rows.filter((s) => s.status === "active").length, waiting: rows.filter((s) => s.status === "waiting").length, total: rows.length };
+}
