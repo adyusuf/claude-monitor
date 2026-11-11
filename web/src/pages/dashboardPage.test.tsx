@@ -23,7 +23,10 @@ const spaced = (e: Element) => [...e.children].map(text).filter(Boolean).join(" 
 const barRows = (c: HTMLElement) => [...c.querySelectorAll(".bar-row")].map(spaced);
 
 beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("the dashboard's figures", () => {
   it("counts the machines and how many are online, from the machine list", async () => {
@@ -153,7 +156,7 @@ describe("the dashboard's reading and live refresh", () => {
     await screen.findByRole("heading", { name: "Dashboard" });
     await act(async () => {});
     const before = count(calls, "/workspaces/w1/dashboard");
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     for (const event of ["machine", "run", "permission", "alert"]) act(() => FakeEventSource.last!.emit(event, {}));
     await act(async () => { await vi.advanceTimersByTimeAsync(config.liveDebounceMs + 1); });
     vi.useRealTimers();
@@ -167,7 +170,7 @@ describe("the dashboard's reading and live refresh", () => {
     await screen.findByRole("heading", { name: "Dashboard" });
     await act(async () => {});
     const before = count(calls, "/workspaces/w1/dashboard");
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
     await act(async () => { await vi.advanceTimersByTimeAsync(config.liveDebounceMs + 1); });
     vi.useRealTimers();
@@ -184,7 +187,7 @@ describe("the dashboard's reading and live refresh", () => {
     renderAt("/w/w1/dashboard", route);
     await screen.findByRole("heading", { name: "Dashboard" });
     fail = true;
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     act(() => FakeEventSource.last!.emit("alert", {}));
     await act(async () => { await vi.advanceTimersByTimeAsync(config.liveDebounceMs + 1); });
     vi.useRealTimers();

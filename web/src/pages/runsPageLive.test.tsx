@@ -12,7 +12,10 @@ import { mergeFirstPage, RunsPage } from "./RunsPage";
 const route = [{ path: "/w/:ws/runs", element: <RunsPage /> }];
 
 beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 /**
  * Holds the first request `isHeld` picks until `release` is called. The answer is made when the request is sent, so what comes later is what
@@ -74,7 +77,7 @@ describe("the runs page follows the live stream", () => {
     renderAt("/w/w1/runs", route);
     await screen.findByText("/bin/echo r1");
     const before = runsReads(calls);
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     emit("session");
     emit("permission");
     await act(async () => { await vi.advanceTimersByTimeAsync(config.liveDebounceMs + 1); });
