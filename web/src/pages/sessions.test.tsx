@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventRow, SessionDetail, SessionRow } from "../api/types";
 import { config } from "../config";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openMachine, renderAt } from "../test/helpers";
 import { summary } from "../lib/activity";
 import { SessionPage } from "./SessionPage";
 import { SessionsPage } from "./SessionsPage";
@@ -41,6 +41,7 @@ describe("sessions list", () => {
       },
     });
     renderAt("/w/w1/sessions", sessionsRoute);
+    await openMachine("laptop-1");
     expect(await screen.findByText("Fix the login")).toBeInTheDocument();
     expect(screen.getByText("2 waiting for an answer")).toBeInTheDocument();
     expect(screen.getAllByText("$1.50")).toHaveLength(2);

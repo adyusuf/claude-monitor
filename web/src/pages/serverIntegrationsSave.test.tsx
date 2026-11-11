@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { en } from "../i18n/en";
-import { renderAt, type Call } from "../test/helpers";
+import { type Call, openTab, renderAt, startsWith } from "../test/helpers";
 import { github, jira, serveServerSettings, serverView, smtp } from "../test/server-settings-fixtures";
 import { ServerIntegrationsPage } from "./ServerIntegrationsPage";
 
@@ -148,6 +148,7 @@ describe("the test mail", () => {
     page();
     await mailCard();
     expect(screen.getAllByRole("button", { name: s.testMail })).toHaveLength(1);
+    await openTab(startsWith(s.names.github));
     const gh = within(screen.getByRole("heading", { level: 2, name: s.names.github }).closest("section")!);
     expect(gh.queryByRole("button", { name: s.testMail })).not.toBeInTheDocument();
   });

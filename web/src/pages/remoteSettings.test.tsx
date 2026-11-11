@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { RemoteSettings } from "../api/types";
 import { en } from "../i18n/en";
-import { ME, mockApi, renderAt } from "../test/helpers";
+import { ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { RemoteSettingsCard } from "./RemoteSettingsCard";
 import { WorkspaceSettingsPage } from "./WorkspaceSettingsPage";
 
@@ -190,7 +190,8 @@ describe("the workspace settings page", () => {
     for (const role of ["owner", "admin"]) {
       mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1": { body: info(role) }, "GET /workspaces/w1/audit": { body: { items: [], next: null } }, "GET /workspaces/w1/remote-settings": { body: settings() } });
       const { unmount } = page();
-      expect(await screen.findByText(en.remote.settingsTitle)).toBeInTheDocument();
+      await openTab(en.remote.settingsTitle);
+      expect(await screen.findByRole("heading", { level: 2, name: en.remote.settingsTitle })).toBeInTheDocument();
       expect(await screen.findByLabelText(en.remote.alertCpu)).toBeEnabled();
       unmount();
     }
@@ -199,6 +200,7 @@ describe("the workspace settings page", () => {
   it("shows the card read-only to any other role", async () => {
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1": { body: info("member") }, "GET /workspaces/w1/audit": { body: { items: [], next: null } }, "GET /workspaces/w1/remote-settings": { body: settings() } });
     page();
+    await openTab(en.remote.settingsTitle);
     expect(await screen.findByLabelText(en.remote.alertCpu)).toBeDisabled();
   });
 });

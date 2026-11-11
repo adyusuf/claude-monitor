@@ -1,3 +1,4 @@
+import { screen } from "@testing-library/react";
 import { vi } from "vitest";
 import type { ConnectionView, IntegrationsView, PersonView, SpaceView, SprintChoice, SyncRunView } from "../api/typesIntegrations";
 import { ME, mockApi } from "./helpers";
@@ -14,8 +15,8 @@ export const connection = (over: Partial<ConnectionView> = {}): ConnectionView =
   lastError: null, projectCount: 2, ...over,
 });
 
-/** Options for finding the card heading of one connection: its name starts with exactly this host (the status badge follows it), never merely contains it. */
-export const siteHeading = (host: string) => ({ level: 2, name: (name: string) => name.split(" ")[0] === host });
+/** The host of one connection, in its table row (the status badge sits beside it, so it is found by its own text). */
+export const findSite = (host: string) => screen.findByText(host);
 
 export const integrationsView = (connections: ConnectionView[] = [connection()], over: Partial<IntegrationsView> = {}): IntegrationsView => ({
   available: true, providers: ["jira"], connections, ...over,

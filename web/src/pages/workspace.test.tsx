@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRow } from "../api/types";
 import { config } from "../config";
-import { ME, mockApi, renderAt } from "../test/helpers";
+import { ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { AcceptInvitationPage, AccountPage, DownloadPage } from "./AccountPages";
 import { DevicePage, MachinesPage } from "./MachinesPage";
 import { MembersPage } from "./MembersPage";
@@ -136,11 +136,15 @@ describe("members", () => {
     });
     renderAt("/w/w1/members", [{ path: "/w/:ws/members", element: <MembersPage /> }]);
     expect(await screen.findByText("Diğer Kişi")).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText("E-mail to invite"), "someone+y@gmail.com");
-    await userEvent.click(screen.getByRole("button", { name: "Invite" }));
-    expect(await screen.findByText("Invitation sent.")).toBeInTheDocument();
     await userEvent.selectOptions(within(screen.getByRole("table")).getByLabelText("Role"), "admin");
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await openTab("Invitations (1)");
+    expect(screen.queryByLabelText("E-mail to invite")).toBeNull(); // the invite form is not open on the page
+    await userEvent.click(screen.getByRole("button", { name: "Invite" }));
+    await userEvent.type(screen.getByLabelText("E-mail to invite"), "someone+y@gmail.com");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Invite" }));
+    expect(await screen.findByText("Invitation sent.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull(); // sent: the drawer closes
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/workspaces/w1/invitations/i1")).toBe(true));
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ role: "admin" });
@@ -171,9 +175,13 @@ describe("workspace settings and account", () => {
       "PUT /workspaces/w1/settings": { status: 204 },
     });
     renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    await openTab("Audit log");
     expect(await screen.findByText("workspace.created")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Action" })).toBeInTheDocument(); // the log is a table
+    await openTab("General");
     await userEvent.clear(screen.getByLabelText("Name"));
     await userEvent.type(screen.getByLabelText("Name"), "Renamed");
+    await openTab("Capture");
     await userEvent.click(screen.getByRole("checkbox", { name: /Mask secrets before upload/ }));
     await userEvent.clear(screen.getByLabelText("Keep events for (days)"));
     await userEvent.type(screen.getByLabelText("Keep events for (days)"), "30");
@@ -183,7 +191,7 @@ describe("workspace settings and account", () => {
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ name: "Renamed" });
   });
 
-  it("groups the settings into named sections, each with its own explanation", async () => {
+  it("puts each group of settings on its own tab, with its own heading and explanation", async () => {
     mockApi({
       "GET /me": { body: ME },
       "GET /workspaces/w1": { body: { id: "w1", name: "Team", role: "owner", settings: { maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off" } } },
@@ -191,9 +199,13 @@ describe("workspace settings and account", () => {
     });
     renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
     await screen.findByLabelText("Name");
-    for (const name of ["General", "Capture", "Updates", "Remote work", "Audit log"]) {
+    const names = ["General", "Capture", "Updates", "Remote work", "Audit log"];
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(names); // no Access tab: the API does not report that setting
+    for (const name of names) {
+      await openTab(name);
       expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
     }
+    await openTab("Capture");
     expect(screen.getByText("What machines send and how long it is kept.")).toBeInTheDocument();
   });
 
@@ -205,6 +217,7 @@ describe("workspace settings and account", () => {
       "PUT /workspaces/w1/settings": { status: 204 },
     });
     renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    await openTab("Updates");
     const select = await screen.findByLabelText("Agent updates");
     expect(select).toHaveValue("check");
     await userEvent.selectOptions(select, "on");
@@ -221,6 +234,7 @@ describe("workspace settings and account", () => {
       "PUT /workspaces/w1/settings": { status: 204 },
     });
     renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    await openTab("Updates");
     const box = await screen.findByLabelText(/Allow agents to update Claude Code/);
     expect(box).not.toBeChecked(); // an API that predates the field reads as off
     await userEvent.click(box);
@@ -236,6 +250,7 @@ describe("workspace settings and account", () => {
       "GET /workspaces/w1/audit": { body: { items: [], next: null } },
     });
     renderAt("/w/w1/settings", [{ path: "/w/:ws/settings", element: <WorkspaceSettingsPage /> }]);
+    await openTab("Updates");
     expect(await screen.findByLabelText("Agent updates")).toHaveValue("off");
   });
 
