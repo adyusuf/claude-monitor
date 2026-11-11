@@ -5,13 +5,14 @@ import type { AgentUpdateMode, AuditRow, WorkspaceInfo } from "../api/types";
 import { useSession } from "../auth/session";
 import { Button, Card, Field, Notice, Spinner } from "../components/ui";
 import { SettingsSection } from "../components/SettingsSection";
+import { Tabs } from "../components/Tabs";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
-import { dateTime } from "../lib/format";
 import { AccessEnforcementCard } from "./AccessEnforcementCard";
 import { RemoteSettingsCard } from "./RemoteSettingsCard";
+import { WorkspaceAudit } from "./WorkspaceAudit";
 
-/** Name, capture settings and the audit log (admins). */
+/** Name, capture, updates, remote control, access and the audit log, one tab each (admins). */
 export function WorkspaceSettingsPage() {
   const { ws = "" } = useParams();
   const { t } = useI18n();
@@ -45,68 +46,97 @@ export function WorkspaceSettingsPage() {
   };
 
   if (!info) return notice ? <div className="page"><Notice kind="error">{notice.text}</Notice></div> : <Spinner />;
+  const canEdit = info.role === "owner" || info.role === "admin";
+  // One form holds name, capture and updates, so each of those tabs ends with the same Save.
+  const saveButton = <div><Button onClick={() => void save()}>{t("workspace.save")}</Button></div>;
   return (
     <div className="page">
       <header className="page-head"><h1>{t("workspace.settingsTitle")}</h1></header>
       {notice ? <Notice kind={notice.kind}>{notice.text}</Notice> : null}
-      <SettingsSection title={t("workspace.sectionGeneral")} hint={t("workspace.sectionGeneralHint")}>
-        <Card>
-          <Field label={t("workspace.name")} value={form.name} maxLength={config.nameMax} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </Card>
-      </SettingsSection>
-      <SettingsSection title={t("workspace.sectionCapture")} hint={t("workspace.sectionCaptureHint")}>
-        <Card>
-          <div className="stack">
-            <label className="check">
-              <input type="checkbox" checked={form.maskSecrets} onChange={(e) => setForm({ ...form, maskSecrets: e.target.checked })} />
-              <span>{t("workspace.maskSecrets")}<span className="field-hint">{t("workspace.maskHint")}</span></span>
-            </label>
-            <Field label={t("workspace.retention")} type="number" min={1} max={3650} value={form.retentionDays} hint={t("workspace.retentionHint")}
-              onChange={(e) => setForm({ ...form, retentionDays: Number(e.target.value) })} />
-            <Field label={t("workspace.eventMax")} type="number" min={1024} max={4194304} value={form.eventMaxBytes}
-              onChange={(e) => setForm({ ...form, eventMaxBytes: Number(e.target.value) })} />
-          </div>
-        </Card>
-      </SettingsSection>
-      <SettingsSection title={t("workspace.sectionUpdates")} hint={t("workspace.sectionUpdatesHint")}>
-        <Card>
-          <div className="stack">
-            <div className="field">
-              <label className="field-label" htmlFor="agent-update">{t("workspace.agentUpdate")}</label>
-              <select id="agent-update" className="input" value={form.agentUpdate} aria-describedby="agent-update-note"
-                onChange={(e) => setForm({ ...form, agentUpdate: e.target.value as AgentUpdateMode })}>
-                <option value="off">{t("workspace.agentUpdateOff")}</option>
-                <option value="check">{t("workspace.agentUpdateCheck")}</option>
-                <option value="on">{t("workspace.agentUpdateOn")}</option>
-              </select>
-              <span id="agent-update-note" className="field-hint">{t("workspace.agentUpdateHint")}</span>
-            </div>
-            <label className="check">
-              <input type="checkbox" checked={form.claudeUpdate} onChange={(e) => setForm({ ...form, claudeUpdate: e.target.checked })} />
-              <span>{t("workspace.claudeUpdate")}<span className="field-hint">{t("workspace.claudeUpdateHint")}</span></span>
-            </label>
-          </div>
-        </Card>
-        <div><Button onClick={() => void save()}>{t("workspace.save")}</Button></div>
-      </SettingsSection>
-      <SettingsSection title={t("remote.settingsTitle")} hint={t("remote.settingsHint")}>
-        <RemoteSettingsCard ws={ws} canEdit={info.role === "owner" || info.role === "admin"} titled={false} />
-      </SettingsSection>
-      {info.settings.enforceAccessPolicies !== undefined ? (
-        <SettingsSection title={t("access.enforceTitle")} hint={t("access.enforceSection")}>
-          <AccessEnforcementCard ws={ws} enforce={info.settings.enforceAccessPolicies} canEdit={info.role === "owner" || info.role === "admin"}
-            onChanged={() => void api.workspace(ws).then(setInfo).catch((e: unknown) => setNotice({ kind: "error", text: errorText(e) }))} />
-        </SettingsSection>
-      ) : null}
-      <SettingsSection title={t("workspace.audit")} hint={t("workspace.auditHint")}>
-        <Card>
-          {audit.length === 0 ? <p className="muted">{t("workspace.noAudit")}</p> : (
-            <ul className="plain audit">
-              {audit.map((a) => <li key={a.id}><span className="muted small">{dateTime(a.at)}</span> <code>{a.action}</code></li>)}
-            </ul>
-          )}
-        </Card>
-      </SettingsSection>
+      <Tabs label={t("views.workspace.tabs")} tabs={[
+        {
+          id: "general", label: t("workspace.sectionGeneral"),
+          content: (
+            <SettingsSection title={t("workspace.sectionGeneral")} hint={t("workspace.sectionGeneralHint")}>
+              <Card>
+                <Field label={t("workspace.name")} value={form.name} maxLength={config.nameMax} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </Card>
+              {saveButton}
+            </SettingsSection>
+          ),
+        },
+        {
+          id: "capture", label: t("workspace.sectionCapture"),
+          content: (
+            <SettingsSection title={t("workspace.sectionCapture")} hint={t("workspace.sectionCaptureHint")}>
+              <Card>
+                <div className="stack">
+                  <label className="check">
+                    <input type="checkbox" checked={form.maskSecrets} onChange={(e) => setForm({ ...form, maskSecrets: e.target.checked })} />
+                    <span>{t("workspace.maskSecrets")}<span className="field-hint">{t("workspace.maskHint")}</span></span>
+                  </label>
+                  <Field label={t("workspace.retention")} type="number" min={1} max={3650} value={form.retentionDays} hint={t("workspace.retentionHint")}
+                    onChange={(e) => setForm({ ...form, retentionDays: Number(e.target.value) })} />
+                  <Field label={t("workspace.eventMax")} type="number" min={1024} max={4194304} value={form.eventMaxBytes}
+                    onChange={(e) => setForm({ ...form, eventMaxBytes: Number(e.target.value) })} />
+                </div>
+              </Card>
+              {saveButton}
+            </SettingsSection>
+          ),
+        },
+        {
+          id: "updates", label: t("workspace.sectionUpdates"),
+          content: (
+            <SettingsSection title={t("workspace.sectionUpdates")} hint={t("workspace.sectionUpdatesHint")}>
+              <Card>
+                <div className="stack">
+                  <div className="field">
+                    <label className="field-label" htmlFor="agent-update">{t("workspace.agentUpdate")}</label>
+                    <select id="agent-update" className="input" value={form.agentUpdate} aria-describedby="agent-update-note"
+                      onChange={(e) => setForm({ ...form, agentUpdate: e.target.value as AgentUpdateMode })}>
+                      <option value="off">{t("workspace.agentUpdateOff")}</option>
+                      <option value="check">{t("workspace.agentUpdateCheck")}</option>
+                      <option value="on">{t("workspace.agentUpdateOn")}</option>
+                    </select>
+                    <span id="agent-update-note" className="field-hint">{t("workspace.agentUpdateHint")}</span>
+                  </div>
+                  <label className="check">
+                    <input type="checkbox" checked={form.claudeUpdate} onChange={(e) => setForm({ ...form, claudeUpdate: e.target.checked })} />
+                    <span>{t("workspace.claudeUpdate")}<span className="field-hint">{t("workspace.claudeUpdateHint")}</span></span>
+                  </label>
+                </div>
+              </Card>
+              {saveButton}
+            </SettingsSection>
+          ),
+        },
+        {
+          id: "remote", label: t("remote.settingsTitle"),
+          content: (
+            <SettingsSection title={t("remote.settingsTitle")} hint={t("remote.settingsHint")}>
+              <RemoteSettingsCard ws={ws} canEdit={canEdit} titled={false} />
+            </SettingsSection>
+          ),
+        },
+        {
+          id: "access", label: t("access.enforceTitle"), hidden: info.settings.enforceAccessPolicies === undefined,
+          content: (
+            <SettingsSection title={t("access.enforceTitle")} hint={t("access.enforceSection")}>
+              <AccessEnforcementCard ws={ws} enforce={info.settings.enforceAccessPolicies ?? false} canEdit={canEdit}
+                onChanged={() => void api.workspace(ws).then(setInfo).catch((e: unknown) => setNotice({ kind: "error", text: errorText(e) }))} />
+            </SettingsSection>
+          ),
+        },
+        {
+          id: "audit", label: t("workspace.audit"),
+          content: (
+            <SettingsSection title={t("workspace.audit")} hint={t("workspace.auditHint")}>
+              <Card><WorkspaceAudit rows={audit} /></Card>
+            </SettingsSection>
+          ),
+        },
+      ]} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { enProjects } from "./en.projects";
 import { enIssues } from "./en.issues";
 import { enSprints } from "./en.sprints";
 import { enIntegrations } from "./en.integrations";
+import { enViews } from "./en.views";
 import { enServerSettings } from "./en.serverSettings";
 import { enTwoStep } from "./en.twoStep";
 import { enApprovalRules } from "./en.approvalRules";
@@ -192,6 +193,7 @@ export const en = {
   issues: enIssues,
   sprints: enSprints,
   integrations: enIntegrations,
+  views: enViews,
   serverSettings: enServerSettings,
   twoStep: enTwoStep,
   approvalRules: enApprovalRules,

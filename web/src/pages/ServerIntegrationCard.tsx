@@ -15,7 +15,7 @@ const OWN_CODES = ["invalid_setting", "invalid_value"] as const;
 const KNOWN_NOTES = ["integration_key_missing"] as const;
 
 /** The name, status and note texts of an integration; whatever this web does not know is shown as it is. */
-function useIntegrationTexts() {
+export function useIntegrationTexts() {
   const { t, tx } = useI18n();
   return {
     name: (id: string) => {
@@ -37,7 +37,7 @@ function useIntegrationTexts() {
   };
 }
 
-function badgeClass(status: string): string {
+export function badgeClass(status: string): string {
   switch (status) {
     case IntegrationStatus.ready:
       return "badge ok";

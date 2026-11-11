@@ -10,6 +10,7 @@ import { deProjects } from "./de.projects";
 import { deIssues } from "./de.issues";
 import { deSprints } from "./de.sprints";
 import { deIntegrations } from "./de.integrations";
+import { deViews } from "./de.views";
 import { deServerSettings } from "./de.serverSettings";
 
 // German: the same keys as en.ts (the type makes a missing key a build error). "Sie" throughout.
@@ -193,6 +194,7 @@ export const de: Dictionary = {
   issues: deIssues,
   sprints: deSprints,
   integrations: deIntegrations,
+  views: deViews,
   serverSettings: deServerSettings,
   twoStep: deTwoStep,
   approvalRules: deApprovalRules,
