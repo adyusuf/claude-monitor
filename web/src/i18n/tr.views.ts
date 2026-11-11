@@ -13,4 +13,8 @@ export const trViews: typeof enViews = {
   sessions: {
     pick: "Oturumlarını görmek için bir makine seçin.", activeNow: "şu an etkin", waiting: "{n} bekliyor", total: "toplam {n}",
   },
+  integrations: {
+    colConnection: "Bağlantı", colConnectedBy: "Bağlayan", colProjects: "İçe aktarılan proje", colLastCheck: "Son kontrol", colDetails: "Ayrıntılar",
+    openSettings: "Ayarlar", none: "Henüz bağlı bir Jira sitesi yok.",
+  },
 };

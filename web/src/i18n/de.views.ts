@@ -13,4 +13,8 @@ export const deViews: typeof enViews = {
   sessions: {
     pick: "Wählen Sie eine Maschine, um ihre Sitzungen zu sehen.", activeNow: "gerade aktiv", waiting: "{n} wartet", total: "{n} insgesamt",
   },
+  integrations: {
+    colConnection: "Verbindung", colConnectedBy: "Verbunden von", colProjects: "Importierte Projekte", colLastCheck: "Letzte Prüfung", colDetails: "Details",
+    openSettings: "Einstellungen", none: "Es ist noch keine Jira-Site verbunden.",
+  },
 };

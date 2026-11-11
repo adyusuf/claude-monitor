@@ -12,4 +12,8 @@ export const enViews = {
   sessions: {
     pick: "Select a machine to see its sessions.", activeNow: "active now", waiting: "{n} waiting", total: "{n} in total",
   },
+  integrations: {
+    colConnection: "Connection", colConnectedBy: "Connected by", colProjects: "Projects imported", colLastCheck: "Last check", colDetails: "Details",
+    openSettings: "Settings", none: "No Jira site is connected yet.",
+  },
 };
