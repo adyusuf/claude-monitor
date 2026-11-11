@@ -494,6 +494,7 @@ button.act-text { cursor: pointer; }
 /* Tabs (components/Tabs.tsx); the side drawer is the Modal with `side` (components/Drawer.tsx) */
 .tabs > .segmented { flex-wrap: wrap; margin-bottom: 12px; }
 .tab-panel { display: flex; flex-direction: column; gap: 16px; }
+.tabs > .tab-panel[hidden] { display: none !important; }
 
 /* Sessions page: a card per machine, its session list opens under the card (SessionMachineCard) */
 .machine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: var(--gap); align-items: start; }

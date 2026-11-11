@@ -19,4 +19,5 @@ export const enViews = {
   machine: {
     tabs: "Machine sections", overview: "Overview", control: "Control", work: "Work", monitoring: "Monitoring", access: "Access",
   },
+  serverIntegrations: { tabs: "Server integrations" },
 };

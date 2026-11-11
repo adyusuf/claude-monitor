@@ -20,4 +20,5 @@ export const deViews: typeof enViews = {
   machine: {
     tabs: "Bereiche der Maschine", overview: "Übersicht", control: "Steuerung", work: "Aufgaben", monitoring: "Überwachung", access: "Zugriff",
   },
+  serverIntegrations: { tabs: "Server-Integrationen" },
 };

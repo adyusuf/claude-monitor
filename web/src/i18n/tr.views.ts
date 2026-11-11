@@ -20,4 +20,5 @@ export const trViews: typeof enViews = {
   machine: {
     tabs: "Makine bölümleri", overview: "Genel bakış", control: "Denetim", work: "İşler", monitoring: "İzleme", access: "Erişim",
   },
+  serverIntegrations: { tabs: "Sunucu entegrasyonları" },
 };

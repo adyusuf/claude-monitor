@@ -8,7 +8,10 @@ export interface TabDef {
   hidden?: boolean;
 }
 
-/** A strip of tabs over one visible panel. Only the selected panel is rendered; the arrow keys move between tabs. */
+/**
+ * A strip of tabs over one visible panel; the arrow keys move between tabs. Every panel stays mounted and the others are only hidden, so what a
+ * person typed into a form on one tab is still there when they come back (the page held all of it at once before it was split into tabs).
+ */
 export function Tabs({ tabs, initial, label }: { tabs: TabDef[]; initial?: string; label: string }) {
   const base = useId();
   const visible = tabs.filter((tab) => !tab.hidden);
@@ -40,9 +43,11 @@ export function Tabs({ tabs, initial, label }: { tabs: TabDef[]; initial?: strin
           );
         })}
       </div>
-      <div role="tabpanel" id={`${base}-panel-${current.id}`} aria-labelledby={`${base}-tab-${current.id}`} className="tab-panel">
-        {current.content}
-      </div>
+      {visible.map((tab) => (
+        <div key={tab.id} role="tabpanel" id={`${base}-panel-${tab.id}`} aria-labelledby={`${base}-tab-${tab.id}`} hidden={tab.id !== current.id} className="tab-panel">
+          {tab.content}
+        </div>
+      ))}
     </div>
   );
 }
