@@ -82,3 +82,8 @@ export class FakeEventSource {
 export async function openTab(name: string) {
   await userEvent.click(await screen.findByRole("tab", { name }));
 }
+
+/** Opens a machine's card on the sessions page: its session list shows under the card only once it is pressed. The card's name starts with the host (the counts follow with no space in jsdom, so no word boundary). */
+export async function openMachine(host: string) {
+  await userEvent.click(await screen.findByRole("button", { name: new RegExp(`^${host}`) }));
+}

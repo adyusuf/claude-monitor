@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionRow } from "../api/types";
-import { FakeEventSource, ME, mockApi, renderAt } from "../test/helpers";
+import { FakeEventSource, ME, mockApi, openMachine, renderAt } from "../test/helpers";
 import { SessionsPage } from "./SessionsPage";
 
 const row = (id: string, hostname: string, repo: string | null, lastEventAt: string, title = `Title ${id}`): SessionRow => ({
@@ -29,6 +29,8 @@ describe("the sessions list grouped by machine and repository", () => {
       ], next: null } },
     });
     renderAt("/w/w1/sessions", route);
+    await openMachine("alpha");
+    await openMachine("zulu");
     expect(await screen.findByText("Title new")).toBeInTheDocument();
 
     const machines = [...document.querySelectorAll<HTMLElement>(".session-machine")];
@@ -50,6 +52,8 @@ describe("the sessions list grouped by machine and repository", () => {
     ];
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/sessions": () => ({ body: { items: current, next: null } }) });
     renderAt("/w/w1/sessions", route);
+    await openMachine("alpha");
+    await openMachine("beta");
     await screen.findByText("Title a1");
     expect(titles(machineOf("alpha"))).toEqual(["Title a1", "Title a2"]);
 
@@ -75,6 +79,7 @@ describe("the sessions list grouped by machine and repository", () => {
     let current = [row("a1", "alpha", "main", "2026-10-05T10:00:00Z"), row("a2", "alpha", "main", "2026-10-05T09:00:00Z")];
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/sessions": () => ({ body: { items: current, next: null } }) });
     renderAt("/w/w1/sessions", route);
+    await openMachine("alpha");
     await screen.findByText("Title a1");
 
     act(() => screen.getByText("Title a1").closest("a")!.focus()); // the keyboard reader is on a card of the machine
