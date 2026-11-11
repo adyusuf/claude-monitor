@@ -3,12 +3,13 @@ import { useParams, useSearchParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { IntegrationsView } from "../api/typesIntegrations";
 import { useSession } from "../auth/session";
-import { Notice, Spinner } from "../components/ui";
+import { Drawer } from "../components/Drawer";
+import { Button, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
-import { IntegrationCard } from "./IntegrationCard";
 import { IntegrationConnect } from "./IntegrationConnect";
+import { IntegrationsTable } from "./IntegrationsTable";
 
-/** Work tracker connections of the workspace (ADR-0015): connect Jira, then import spaces and sprints from each connection. */
+/** Work tracker connections of the workspace (ADR-0015): a table with a row per Jira connection; connect another site from a drawer, then import spaces and sprints from each connection. */
 export function IntegrationsPage() {
   const { ws = "" } = useParams();
   const { t, tx } = useI18n();
@@ -17,6 +18,7 @@ export function IntegrationsPage() {
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<IntegrationsView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
   const admin = role === "owner" || role === "admin";
   // The result of the Atlassian round trip is read once, shown, and only then taken out of the address.
@@ -44,16 +46,17 @@ export function IntegrationsPage() {
 
   return (
     <div className="page">
-      <h1>{t("integrations.title")}</h1>
+      <header className="page-head">
+        <h1>{t("integrations.title")}</h1>
+        {admin && view?.available ? <Button onClick={() => setConnecting(true)}>{t("integrations.connectTitle")}</Button> : null}
+      </header>
       <p className="muted">{t("integrations.intro")}</p>
       {result ? <Notice kind={result === "ok" ? "success" : "error"}>{result === "ok" ? t("integrations.result.ok") : resultText(result, t, tx)}</Notice> : null}
       {error ? <Notice kind="error">{error}</Notice> : null}
       {!view ? <Spinner /> : !view.available ? <Notice>{t("integrations.unavailable")}</Notice> : (
-        <>
-          {admin ? <IntegrationConnect ws={ws} /> : null}
-          {view.connections.map((c) => <IntegrationCard key={c.id} connection={c} ws={ws} admin={admin} onChange={() => void load()} />)}
-        </>
+        <IntegrationsTable connections={view.connections} ws={ws} admin={admin} onChange={() => void load()} />
       )}
+      {connecting ? <Drawer title={t("integrations.connectTitle")} onClose={() => setConnecting(false)}><IntegrationConnect ws={ws} bare /></Drawer> : null}
     </div>
   );
 }
