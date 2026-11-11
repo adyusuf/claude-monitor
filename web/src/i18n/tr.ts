@@ -4,6 +4,7 @@ import { trProjects } from "./tr.projects";
 import { trIssues } from "./tr.issues";
 import { trSprints } from "./tr.sprints";
 import { trIntegrations } from "./tr.integrations";
+import { trViews } from "./tr.views";
 import { trServerSettings } from "./tr.serverSettings";
 import { trTwoStep } from "./tr.twoStep";
 import { trApprovalRules } from "./tr.approvalRules";
@@ -193,6 +194,7 @@ export const tr: Dictionary = {
   issues: trIssues,
   sprints: trSprints,
   integrations: trIntegrations,
+  views: trViews,
   serverSettings: trServerSettings,
   twoStep: trTwoStep,
   approvalRules: trApprovalRules,
