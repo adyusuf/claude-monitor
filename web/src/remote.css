@@ -71,6 +71,8 @@ circle.spark-line { fill: var(--accent); stroke: none; }
 /* A dialog over the page (components/Modal) and the workspace's runs table. */
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; overflow-y: auto; background: color-mix(in srgb, var(--ground) 60%, transparent); }
 .modal { width: min(820px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; outline: none; }
+.modal-backdrop.side { align-items: stretch; justify-content: flex-end; padding: 0; }
+.modal.side { width: min(560px, 100vw); border-width: 0 0 0 1px; border-radius: 0; overflow-y: auto; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .modal-head h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .modal-close { background: none; border: none; color: inherit; cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; }

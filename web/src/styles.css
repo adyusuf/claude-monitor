@@ -492,11 +492,9 @@ button.act-text { cursor: pointer; }
 .bar-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .dash-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--gap); margin-top: var(--gap); }
 
-/* Tabs (components/Tabs.tsx) and the side drawer (components/Drawer.tsx) */
+/* Tabs (components/Tabs.tsx); the side drawer is the Modal with `side` (components/Drawer.tsx) */
 .tabs > .segmented { flex-wrap: wrap; margin-bottom: 12px; }
 .tab-panel { display: flex; flex-direction: column; gap: 16px; }
-.drawer-backdrop { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--ground) 60%, transparent); }
-.drawer { position: fixed; inset: 0 0 0 auto; z-index: 51; width: min(520px, 100vw); overflow-y: auto; padding: 20px; background: var(--surface); border-left: 1px solid var(--border); outline: none; }
 
 /* Sessions page: a card per machine, its session list opens under the card (SessionMachineCard) */
 .machine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: var(--gap); align-items: start; }
