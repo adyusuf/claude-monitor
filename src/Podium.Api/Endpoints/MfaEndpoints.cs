@@ -92,43 +92,24 @@ public static class MfaEndpoints
 
     /// <summary>
     /// A code asked outside sign-in (re-authentication, turning two-step sign-in off, deleting the account), counted towards the same lock
-    /// as the second step: refused while the account is locked; a wrong code is counted and audited, and the one that reaches the limit
-    /// locks. A blank code asks for one and is not counted. An accepted code starts the count again, saved with the caller's change.
+    /// as the second step (<see cref="StepUpCounter"/>): the attempt is booked before the code is looked at and refused as locked when it
+    /// cannot be; a wrong code is audited and the one that reaches the limit locks. A blank code asks for one and is not counted. An accepted
+    /// code starts the count again.
     /// </summary>
     public static async Task<StepUpOutcome> StepUpAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, User user, string? code,
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(user);
-        if (user.LockedUntil > now) return StepUpOutcome.Locked;
+        if (user.TotpEnabledAt is null || string.IsNullOrWhiteSpace(code)) return user.LockedUntil > now ? StepUpOutcome.Locked : StepUpOutcome.Wrong;
+        if (!await StepUpCounter.BookAsync(http, config, user.Id, now)) return StepUpOutcome.Locked;
         if (await CheckAsync(db, config, user, code, now, http.RequestAborted))
         {
-            user.FailedSignIns = 0;
+            await StepUpCounter.ResetAsync(http, user.Id, now);
             return StepUpOutcome.Accepted;
         }
 
-        if (user.TotpEnabledAt is null || string.IsNullOrWhiteSpace(code)) return StepUpOutcome.Wrong;
-        return await RecordStepUpFailureAsync(http, config, clock, user.Id, now) ? StepUpOutcome.Locked : StepUpOutcome.Wrong;
-    }
-
-    /// <summary>
-    /// Counts a wrong step-up code in a unit of work of its own (the caller refuses without saving, and nothing else it tracks may be written
-    /// with the count); true when this one locked the account. One statement each, so codes sent at once all count and only one of them locks.
-    /// </summary>
-    private static async Task<bool> RecordStepUpFailureAsync(HttpContext http, ApiConfig config, TimeProvider clock, Guid userId, DateTimeOffset now)
-    {
-        var ct = http.RequestAborted;
-        await using var scope = http.RequestServices.CreateAsyncScope();
-        var own = scope.ServiceProvider.GetRequiredService<PodiumDb>();
-        var limit = config.LockoutAfter;
-        var until = now + config.LockoutFor;
-        await own.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.FailedSignIns, u => u.FailedSignIns + 1), ct);
-        var locked = await own.Users.Where(u => u.Id == userId && u.FailedSignIns >= limit)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.FailedSignIns, 0).SetProperty(u => u.LockedUntil, until), ct) == 1;
-        if (locked) Audit.Add(own, http, clock, AuditActions.AccountLocked, userId: userId);
-        Audit.Add(own, http, clock, AuditActions.SignInFailed, userId: userId, detail: new { step = StepUpStep });
-        await own.SaveChangesAsync(ct);
-        return locked;
+        return await StepUpCounter.MissAsync(http, config, clock, user.Id, now, StepUpStep) ? StepUpOutcome.Locked : StepUpOutcome.Wrong;
     }
 
     private static string RecoveryNormal(string code) => new string(code.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
