@@ -95,7 +95,7 @@ public static class AgentFactsEndpoints
 
         if (req.Share && !agent.ShareServices && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code))
         {
-            return RemoteChecks.ReauthRefused();
+            return RemoteChecks.ReauthRefused(http);
         }
 
         var was = agent.ShareServices;
@@ -127,7 +127,7 @@ public static class AgentFactsEndpoints
 
         if (req.Share && !agent.ShareInventory && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code))
         {
-            return RemoteChecks.ReauthRefused();
+            return RemoteChecks.ReauthRefused(http);
         }
 
         var was = agent.ShareInventory;

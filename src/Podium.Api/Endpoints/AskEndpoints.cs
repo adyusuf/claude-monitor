@@ -57,7 +57,7 @@ public static class AskEndpoints
         var userId = http.User.UserId();
         var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == id && a.Status == AgentStatuses.Active, http.RequestAborted);
         if (agent is null || agent.UserId != userId || await Access.MemberAsync(db, userId, agent.WorkspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        if (req.Accept && !agent.AcceptsAsks && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if (req.Accept && !agent.AcceptsAsks && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused(http);
         var was = agent.AcceptsAsks;
         var now = clock.GetUtcNow();
         agent.AcceptsAsks = req.Accept;

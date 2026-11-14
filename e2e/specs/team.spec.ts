@@ -11,9 +11,13 @@ test("an owner invites a teammate who joins through the mailed link", async ({ b
   const memberAddress = await signUp(member, "member", "Üye Kişi");
 
   await owner.getByRole("link", { name: /Members/ }).click();
-  await owner.getByLabel("E-mail to invite").fill(memberAddress);
-  await owner.locator("form").getByLabel("Role").selectOption("viewer");
+  // The invitations are their own tab, and the form is a drawer behind the Invite button.
+  await owner.getByRole("tab", { name: /Invitations/ }).click();
   await owner.getByRole("button", { name: "Invite" }).click();
+  const drawer = owner.getByRole("dialog");
+  await drawer.getByLabel("E-mail to invite").fill(memberAddress);
+  await drawer.getByLabel("Role").selectOption("viewer");
+  await drawer.getByRole("button", { name: "Invite" }).click();
   await expect(owner.getByText("Invitation sent.")).toBeVisible();
 
   await member.goto(await mailLink(member.request, memberAddress));

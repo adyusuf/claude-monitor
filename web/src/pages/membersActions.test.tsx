@@ -19,6 +19,15 @@ const openInvite = async () => {
   return screen.getByRole("dialog");
 };
 
+describe("members: a refused list", () => {
+  it("shows the error instead of loading forever when the members cannot be read", async () => {
+    mockApi({ ...base(), "GET /workspaces/w1/members": { status: 403, body: { title: "forbidden" } } });
+    renderAt("/w/w1/members", route);
+    expect(await screen.findByText(en.errors.forbidden)).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: en.common.loading })).toBeNull();
+  });
+});
+
 describe("members: refused actions and cancelled confirmations", () => {
   it("shows the error when a role change is refused", async () => {
     mockApi({ ...base(), "PATCH /workspaces/w1/members/u2": { status: 403, body: { title: "forbidden" } } });

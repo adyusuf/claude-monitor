@@ -129,14 +129,19 @@ public static class PrivacyEndpoints
         var ct = http.RequestAborted;
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         if (req.Confirm != ConfirmWord) return Http.Invalid("confirm", "confirm_required");
-        if (user.PasswordHash is not null && (req.Password is null || !Secrets.VerifyPassword(user, req.Password)))
+        // A locked account answers the lock before any proof is looked at; the password and the code both count towards it.
+        if (user.LockedUntil > clock.GetUtcNow()) return AuthEndpoints.Locked();
+        if (user.PasswordHash is not null
+            && await MfaEndpoints.PasswordStepUpAsync(http, config, clock, user, req.Password, clock.GetUtcNow()) is var passwordOutcome
+            && passwordOutcome != StepUpOutcome.Accepted)
         {
-            return Http.Invalid("password", "invalid_credentials");
+            return passwordOutcome == StepUpOutcome.Locked ? AuthEndpoints.Locked() : Http.Invalid("password", "invalid_credentials");
         }
 
-        if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, config, user, req.Code, clock.GetUtcNow(), ct))
+        if (user.TotpEnabledAt is not null
+            && await MfaEndpoints.StepUpAsync(http, db, config, clock, user, req.Code, clock.GetUtcNow()) is var outcome && outcome != StepUpOutcome.Accepted)
         {
-            return Http.Invalid("code", "invalid_code");
+            return outcome == StepUpOutcome.Locked ? AuthEndpoints.Locked() : Http.Invalid("code", "invalid_code");
         }
 
         // Neither a password nor a code to ask for (a GitHub/Google-only account): the proof is a fresh sign-in.

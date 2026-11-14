@@ -27,6 +27,7 @@ foreach ($line in Get-Content (Join-Path $home_ "aipod.env")) { if ($line -match
 
 $work = $null
 try {
+  $backupDir = Get-BackupFolder $home_
   $stamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHHmmssZ")
   $work = New-BackupWork -Environment $Environment -Stamp $stamp
   $db = @{}; foreach ($part in $values["AIPOD_DB"].Split(";")) { $k, $v = $part.Split("=", 2); $db[$k] = $v }
@@ -37,12 +38,12 @@ try {
   Compress-Archive -Path (Join-Path $home_ "archive\*") -DestinationPath (Join-Path $work.Folder "archive.zip") -ErrorAction SilentlyContinue
   Compress-Archive -Path "$($work.Folder)\*" -DestinationPath $work.Zip
 
-  $out = Join-Path $home_ "backups\$Environment-$stamp.cmbak"
+  $out = Join-Path $backupDir "$Environment-$stamp.cmbak"
   Protect-BackupFile -Source $work.Zip -Destination $out -Secret $values["AIPOD_BACKUP_KEY"]
   Remove-BackupWork $work
 
   if ($values["AIPOD_BACKUP_OFFSITE"]) { Copy-Item $out -Destination $values["AIPOD_BACKUP_OFFSITE"] }
-  Get-ChildItem (Join-Path $home_ "backups") -Filter "*.cmbak" | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$KeepDays) } | Remove-Item
+  Get-ChildItem $backupDir -Filter "*.cmbak" | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$KeepDays) } | Remove-Item
   Write-EventLog -LogName Application -Source $source -EventId 1000 -EntryType Information -Message "backup $Environment written: $out"
 } catch {
   Write-EventLog -LogName Application -Source $source -EventId 1001 -EntryType Error -Message "backup $Environment FAILED: $($_.Exception.Message)"

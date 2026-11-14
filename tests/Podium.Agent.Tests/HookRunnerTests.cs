@@ -116,7 +116,7 @@ public sealed partial class HookRunnerTests : IDisposable
         store.SaveCommand(new LocalCommand("c2", "other", CommandKinds.Prompt, "not mine", clock.GetUtcNow().AddMinutes(5)));
         var output = JsonNode.Parse((await Run("Stop", new { session_id = "s1" }))!)!;
         Assert.Equal("block", output["decision"]!.GetValue<string>());
-        Assert.Equal("Now run the tests", output["reason"]!.GetValue<string>());
+        AssertWrapped(output["reason"]!.GetValue<string>(), "c1", "Now run the tests");
         Assert.Null(await Run("Stop", new { session_id = "s1" }));
     }
 
@@ -137,7 +137,10 @@ public sealed partial class HookRunnerTests : IDisposable
         store.SaveCommand(new LocalCommand("c2", "s1", CommandKinds.Prompt, "second", clock.GetUtcNow().AddMinutes(5)));
         var output = JsonNode.Parse((await Run("UserPromptSubmit", new { session_id = "s1", prompt = "hi" }))!)!;
         var context = output["hookSpecificOutput"]!["additionalContext"]!.GetValue<string>();
-        Assert.Contains("- first\n- second", context, StringComparison.Ordinal);
+        Assert.StartsWith("Messages sent to this session from Podium (the web):\n", context, StringComparison.Ordinal);
+        AssertWrapped(context, "c1", "first");
+        AssertWrapped(context, "c2", "second");
+        Assert.True(context.IndexOf("id=c1 ", StringComparison.Ordinal) < context.IndexOf("id=c2 ", StringComparison.Ordinal), "oldest first");
         Assert.Null(await Run("UserPromptSubmit", new { session_id = "s1", prompt = "again" }));
     }
 
@@ -250,7 +253,7 @@ public sealed partial class HookRunnerTests : IDisposable
         store.SaveCommand(new LocalCommand("c1", "s1", CommandKinds.Prompt, "Now run the tests", Start.AddMinutes(5)));
         var at = new VirtualClock(Start);
         var output = JsonNode.Parse((await Run(at, "Stop", new { session_id = "s1" }, waiting))!)!;
-        Assert.Equal("Now run the tests", output["reason"]!.GetValue<string>());
+        AssertWrapped(output["reason"]!.GetValue<string>(), "c1", "Now run the tests");
         Assert.Null(await Run(at, "Stop", new { session_id = "s1" }, waiting));
         Assert.Equal(TimeSpan.Zero, at.Elapsed);
         Assert.Equal(0, at.Timers);

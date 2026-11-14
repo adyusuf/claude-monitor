@@ -61,9 +61,9 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
                 && RemoteChecks.Passed(http, ReauthWays.CodeWindow);
             if (user.TotpEnabledAt is not null && !codeWindow)
             {
-                if (!await RemoteChecks.CodeAsync(http, db, config, user, req.Code, now))
+                if (!await RemoteChecks.CodeAsync(http, db, config, clock, user, req.Code, now))
                 {
-                    return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.MfaRequired);
+                    return RemoteChecks.ReauthRefused(http, RemoteErrors.MfaRequired);
                 }
 
                 withTotp = true;

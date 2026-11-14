@@ -249,7 +249,7 @@ public static class AgentActions
         static int Rank(string mode) => mode switch { ClaudeAutoModes.Always => 2, ClaudeAutoModes.OnMessage => 1, _ => 0 };
         var turningAutoOn = Rank(autoAfter) > Rank(autoBefore) || (autoAfter == ClaudeAutoModes.Always && projectAfter != agent.ClaudeAutoProject);
         if (turningAutoOn && await MachineRefusalAsync(db, agent, requireOptIn: false, http.RequestAborted) is { } machineRefused) return machineRefused;
-        if ((req.Accept && !agent.AcceptsClaudeControl || turningAutoOn) && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if ((req.Accept && !agent.AcceptsClaudeControl || turningAutoOn) && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused(http);
         var was = agent.AcceptsClaudeControl;
         var now = clock.GetUtcNow();
         agent.AcceptsClaudeControl = req.Accept;
