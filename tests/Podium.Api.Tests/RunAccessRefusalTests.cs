@@ -13,6 +13,13 @@ public sealed class RunAccessRefusalTests(ApiFactory api)
     private async Task<(RemoteTeam Team, Guid Id)> RunningAsync()
     {
         var team = await RemoteKit.TeamAsync(api);
+        await using (var db = api.Db())
+        {
+            // A run keeps a repository only when the machine reported it (RunCreator.TargetKeyAsync).
+            db.MachineProjects.Add(new MachineProject { AgentId = team.TargetId, ProjectKey = "shop-repo", WorkspaceId = team.WorkspaceId, Name = "shop", ClaudeTrusted = false });
+            await db.SaveChangesAsync();
+        }
+
         var req = RemoteKit.Argv(team.TargetId, RemoteKit.NewKey(), cwd: "/tmp") with { ProjectKey = "shop-repo" };
         var id = (await RemoteKit.CreateAsync(team.Requester, req)).Id;
         (await RemoteKit.ApproveAsync(team.Owner, id, req)).EnsureSuccessStatusCode();
