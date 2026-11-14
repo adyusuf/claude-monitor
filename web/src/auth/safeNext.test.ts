@@ -16,6 +16,7 @@ describe("safeNext, the guard on where sign-in sends the person afterwards", () 
     ["an empty address", ""],
     ["a protocol-relative address", "//evil.example.net"],
     ["a protocol-relative address with a path", "//evil.example.net/w/w1"],
+    ["a backslash address browsers read as protocol-relative", "/\\evil.example.net"],
     ["an absolute https address", "https://evil.example.net"],
     ["an absolute http address", "http://evil.example.net/w/w1"],
     ["a javascript address", "javascript:alert(1)"],

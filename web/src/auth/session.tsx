@@ -64,7 +64,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Only same-site paths are followed after sign-in (no open redirect). */
+/** Only same-site paths are followed after sign-in (no open redirect); browsers read a leading `/\` as `//`. */
 export function safeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  return next && next.startsWith("/") && next[1] !== "/" && next[1] !== "\\" ? next : "/";
 }
