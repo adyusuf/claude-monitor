@@ -27,6 +27,7 @@ public static partial class Msg
     public const string SvcNotInstalled = "install.svc.notinstalled";
     public const string UninstallFailed = "install.uninstallfailed";
     public const string SvcRemoved = "install.svc.removed";
+    public const string SvcRunGroupKept = "install.svc.rungroupkept";
     public const string SvcNoSystemd = "install.svc.nosystemd";
     public const string SvcNotConnected = "install.svc.notconnected";
     public const string SvcLogsInItself = "install.svc.logsinitself";
@@ -79,6 +80,7 @@ public static partial class Strings
         E(Msg.SvcNotInstalled, "The service is not installed.", "Hizmet kurulu değil.", "Der Dienst ist nicht installiert."),
         E(Msg.UninstallFailed, "Uninstall failed: {0}", "Kaldırma başarısız: {0}", "Deinstallation fehlgeschlagen: {0}"),
         E(Msg.SvcRemoved, "The service is removed. Kept: the home {0}, the exec policy {1} and the binary {2}.", "Hizmet kaldırıldı. Korunanlar: ev dizini {0}, yürütme ilkesi {1} ve ikili dosya {2}.", "Der Dienst ist entfernt. Erhalten bleiben: der Heimatordner {0}, die Ausführungsrichtlinie {1} und das Programm {2}."),
+        E(Msg.SvcRunGroupKept, "The service account {0} stays in the group of the run account {1}; remove it by hand if that account is no longer used.", "Hizmet hesabı {0}, çalıştırma hesabı {1} grubunda kalıyor; o hesap artık kullanılmıyorsa elle çıkarın.", "Das Dienstkonto {0} bleibt in der Gruppe des Ausführungskontos {1}; entfernen Sie es von Hand, wenn dieses Konto nicht mehr verwendet wird."),
         E(Msg.SvcNoSystemd, "this machine does not run systemd; only systemd is supported on Linux.", "bu makine systemd çalıştırmıyor; Linux'ta yalnız systemd desteklenir.", "diese Maschine führt kein systemd aus; unter Linux wird nur systemd unterstützt."),
         E(Msg.SvcNotConnected, "Not connected: install again with --server https://<your aipod server address> so the service can log in by itself.", "Bağlı değil: hizmetin kendiliğinden giriş yapabilmesi için --server https://<aipod sunucu adresiniz> ile yeniden kurun.", "Nicht verbunden: installieren Sie erneut mit --server https://<Ihre aipod-Serveradresse>, damit sich der Dienst selbst anmelden kann."),
         E(Msg.SvcLogsInItself, "The service logs in by itself: it shows a code to approve on the web. Read it with:", "Hizmet kendiliğinden giriş yapar: web'de onaylanacak bir kod gösterir. Şununla okuyun:", "Der Dienst meldet sich selbst an: er zeigt einen Code, der im Web freizugeben ist. Lesen Sie ihn mit:"),
