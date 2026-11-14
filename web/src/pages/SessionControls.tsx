@@ -27,12 +27,16 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(null);
 
-  const load = useCallback(() => api.permissions(sessionId, "open").then(setRows).catch(setError), [sessionId]);
+  const load = useCallback(() => api.permissions(sessionId, "open").then((r) => {
+    setRows(r);
+    setError(null);
+  }).catch(setError), [sessionId]);
   useEffect(() => {
     void load();
   }, [load, version]);
 
-  if (rows.length === 0) return null;
+  // A list that could not be read still shows why; only a read empty list draws nothing.
+  if (rows.length === 0 && !error) return null;
   const answer = async (id: string, decision: "allow" | "deny", answers?: Record<string, string>) => {
     try {
       await api.answer(id, decision, reasons[id]?.trim() || undefined, answers);

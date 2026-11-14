@@ -83,7 +83,7 @@ public static class WorkspaceEndpoints
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
         var before = View(s);
         var enforce = req.EnforceAccessPolicies is { } wanted && wanted != s.EnforceAccessPolicies ? wanted : (bool?)null;
-        if (enforce is not null && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if (enforce is not null && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused(http);
         s.MaskSecrets = req.MaskSecrets ?? s.MaskSecrets;
         s.RetentionDays = req.RetentionDays ?? s.RetentionDays;
         s.EventMaxBytes = req.EventMaxBytes ?? s.EventMaxBytes;

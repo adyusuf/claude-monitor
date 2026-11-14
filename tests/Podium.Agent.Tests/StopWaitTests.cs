@@ -152,7 +152,7 @@ public sealed class StopWaitTests : IDisposable
         var late = new VirtualClock(Start);
         var output = JsonNode.Parse((await new HookRunner(config, store, late).RunAsync("Stop", """{"session_id":"s1"}""", CancellationToken.None))!)!;
         Assert.Equal("block", output["decision"]!.GetValue<string>());
-        Assert.Equal("Next: run the tests", output["reason"]!.GetValue<string>());
+        HookRunnerTests.AssertWrapped(output["reason"]!.GetValue<string>(), "c1", "Next: run the tests");
         Assert.Equal(TimeSpan.Zero, late.Elapsed);
     }
 
@@ -179,7 +179,7 @@ public sealed class StopWaitTests : IDisposable
 
         var output = JsonNode.Parse((await hook.WaitAsync(TimeSpan.FromSeconds(10)))!)!;
         Assert.Equal("block", output["decision"]!.GetValue<string>());
-        Assert.Equal("Arrived while waiting", output["reason"]!.GetValue<string>());
+        HookRunnerTests.AssertWrapped(output["reason"]!.GetValue<string>(), "c1", "Arrived while waiting");
     }
 
     [Fact]

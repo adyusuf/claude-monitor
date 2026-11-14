@@ -81,10 +81,18 @@ function New-BackupWork([string] $Environment, [string] $Stamp, [string] $Temp =
 }
 
 # Removes a run's scratch files, after a failure too: the folder holds the database dump in plain form.
+# <env>\backups. setup-server.ps1 creates it, but a machine set up earlier or a deleted folder made every nightly run fail with
+# DirectoryNotFound and no backup was taken (15/11/2026): the backup makes the folder itself.
+function Get-BackupFolder([string] $EnvHome) {
+  $dir = Join-Path $EnvHome "backups"
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  return $dir
+}
+
 function Remove-BackupWork($Work) {
   foreach ($path in $Work.Folder, $Work.Zip) {
     if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
   }
 }
 
-Export-ModuleMember -Function Protect-BackupFile, Unprotect-BackupFile, New-BackupWork, Remove-BackupWork
+Export-ModuleMember -Function Protect-BackupFile, Unprotect-BackupFile, New-BackupWork, Remove-BackupWork, Get-BackupFolder

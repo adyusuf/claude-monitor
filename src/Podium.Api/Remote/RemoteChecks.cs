@@ -37,6 +37,9 @@ public static class RemoteChecks
     /// </summary>
     public const string ReauthItem = "podium.reauth";
 
+    /// <summary>Set on the request when a code was refused because the account is locked (<see cref="CodeAsync"/>), for <see cref="ReauthRefused"/>.</summary>
+    public const string LockedItem = "podium.code_locked";
+
     private static readonly string[] Open =
         [RunStatuses.PendingApproval, RunStatuses.Approved, RunStatuses.Delivered, RunStatuses.Running];
 
@@ -57,7 +60,7 @@ public static class RemoteChecks
         var user = await db.Users.FirstAsync(u => u.Id == userId, http.RequestAborted);
         if (user.TotpEnabledAt is null) return false;
         if (window && await RecentCodeAsync(http, db, config, clock)) return Passed(http, ReauthWays.CodeWindow);
-        return await CodeAsync(http, db, config, user, code, clock.GetUtcNow());
+        return await CodeAsync(http, db, config, clock, user, code, clock.GetUtcNow());
     }
 
     /// <summary>
@@ -81,11 +84,17 @@ public static class RemoteChecks
     /// login session, so it is written by the caller's save together with the used code's step or recovery code: a request that ends before
     /// saving uses up nothing and opens no window.
     /// </summary>
-    public static async Task<bool> CodeAsync(HttpContext http, PodiumDb db, ApiConfig config, User user, string? code, DateTimeOffset now)
+    /// <remarks>
+    /// The code counts towards the account lock (<see cref="MfaEndpoints.StepUpAsync"/>); a refusal because of the lock is kept on the request
+    /// (<see cref="LockedItem"/>) so that <see cref="ReauthRefused"/> answers it with the lock.
+    /// </remarks>
+    public static async Task<bool> CodeAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, User user, string? code, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(db);
-        if (!await MfaEndpoints.CheckAsync(db, config, user, code, now, http.RequestAborted)) return false;
+        var outcome = await MfaEndpoints.StepUpAsync(http, db, config, clock, user, code, now);
+        if (outcome == StepUpOutcome.Locked) http.Items[LockedItem] = true;
+        if (outcome != StepUpOutcome.Accepted) return false;
         if (http.User.LoginSessionId() is { } id
             && await db.LoginSessions.FirstOrDefaultAsync(s => s.Id == id && s.RevokedAt == null, http.RequestAborted) is { } session)
         {
@@ -115,13 +124,18 @@ public static class RemoteChecks
         ArgumentNullException.ThrowIfNull(target);
         var strict = MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment),
             MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction));
-        if (!strict) return await ReauthAsync(http, db, config, clock, userId, code) ? null : ReauthRefused();
+        if (!strict) return await ReauthAsync(http, db, config, clock, userId, code) ? null : ReauthRefused(http);
         var user = await db.Users.FirstAsync(u => u.Id == userId, http.RequestAborted);
         if (user.TotpEnabledAt is null) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: RemoteErrors.TotpRequired);
-        return await CodeAsync(http, db, config, user, code, clock.GetUtcNow()) ? null : ReauthRefused();
+        return await CodeAsync(http, db, config, clock, user, code, clock.GetUtcNow()) ? null : ReauthRefused(http);
     }
 
-    public static IResult ReauthRefused() => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ReauthRequired);
+    /// <summary>A failed re-authentication: the lock (429) when a code was refused because of it (<see cref="LockedItem"/>), else a 403 with this title.</summary>
+    public static IResult ReauthRefused(HttpContext http, string title = ReauthRequired)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        return http.Items.ContainsKey(LockedItem) ? AuthEndpoints.Locked() : Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: title);
+    }
 
     public static IResult Conflict(string error) => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: error);
 

@@ -64,7 +64,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Only same-site paths are followed after sign-in (no open redirect). */
+/**
+ * Only same-site paths are followed after sign-in (no open redirect). Browsers read `\` as `/` and the URL parser strips control
+ * characters, so `/\evil` or `/<tab>/evil` would become `//evil`: a path holding either is refused.
+ */
 export function safeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const unsafe = !next || !next.startsWith("/") || next[1] === "/" || [...next].some((c) => c < " " || c === "\\");
+  return unsafe ? "/" : next;
 }

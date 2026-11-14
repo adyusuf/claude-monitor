@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CommandRow, PermissionRow } from "../api/types";
 import { type Call, ME, mockApi, renderAt } from "../test/helpers";
@@ -154,5 +154,28 @@ describe("answering a permission request", () => {
     show(<PermissionsCard sessionId="s1" canAnswer={false} version={0} onChange={() => undefined} />);
     expect(await screen.findByText("Only the person whose machine runs this session can send it commands.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+  });
+
+  it("shows the API's error when the list of requests cannot be read", async () => {
+    mockApi({ "GET /me": { body: ME }, "GET /sessions/s1/permission-requests": { status: 403, body: { title: "forbidden" } } });
+    show(<PermissionsCard sessionId="s1" canAnswer version={0} onChange={() => undefined} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("You are not allowed to do that.");
+  });
+
+  it("drops the error once a later read of the requests works and finds none", async () => {
+    let reads = 0;
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /sessions/s1/permission-requests": () => (reads++ === 0 ? { status: 503, body: {} } : { body: [] }),
+    });
+    function Reloading() {
+      const [version, setVersion] = useState(0);
+      return <><button type="button" onClick={() => setVersion((v) => v + 1)}>reload</button><PermissionsCard sessionId="s1" canAnswer version={version} onChange={() => undefined} /></>;
+    }
+    show(<Reloading />);
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "reload" }));
+    await waitFor(() => expect(reads).toBe(2));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 });
