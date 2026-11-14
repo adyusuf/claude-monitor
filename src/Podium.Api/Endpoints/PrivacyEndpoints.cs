@@ -129,9 +129,13 @@ public static class PrivacyEndpoints
         var ct = http.RequestAborted;
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         if (req.Confirm != ConfirmWord) return Http.Invalid("confirm", "confirm_required");
-        if (user.PasswordHash is not null && (req.Password is null || !Secrets.VerifyPassword(user, req.Password)))
+        // A locked account answers the lock before any proof is looked at; the password and the code both count towards it.
+        if (user.LockedUntil > clock.GetUtcNow()) return AuthEndpoints.Locked();
+        if (user.PasswordHash is not null
+            && await MfaEndpoints.PasswordStepUpAsync(http, config, clock, user, req.Password, clock.GetUtcNow()) is var passwordOutcome
+            && passwordOutcome != StepUpOutcome.Accepted)
         {
-            return Http.Invalid("password", "invalid_credentials");
+            return passwordOutcome == StepUpOutcome.Locked ? AuthEndpoints.Locked() : Http.Invalid("password", "invalid_credentials");
         }
 
         if (user.TotpEnabledAt is not null

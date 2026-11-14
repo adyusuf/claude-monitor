@@ -112,6 +112,30 @@ public static class MfaEndpoints
         return await StepUpCounter.MissAsync(http, config, clock, user.Id, now, StepUpStep) ? StepUpOutcome.Locked : StepUpOutcome.Wrong;
     }
 
+    /// <summary>The audit detail's step of a wrong password asked outside sign-in (deleting the account).</summary>
+    public const string StepUpPasswordStep = "step_up_password";
+
+    /// <summary>
+    /// A password asked outside sign-in, counted like <see cref="StepUpAsync"/>: booked before it is verified, refused as locked when it
+    /// cannot be; a wrong one is audited and may lock. A right one gives its booking back and resets nothing (a password alone never undoes
+    /// wrong codes). A missing password is not counted.
+    /// </summary>
+    public static async Task<StepUpOutcome> PasswordStepUpAsync(HttpContext http, ApiConfig config, TimeProvider clock, User user, string? password,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(user);
+        if (string.IsNullOrEmpty(password)) return user.LockedUntil > now ? StepUpOutcome.Locked : StepUpOutcome.Wrong;
+        if (!await StepUpCounter.BookAsync(http, config, user.Id, now)) return StepUpOutcome.Locked;
+        if (Secrets.VerifyPassword(user, password))
+        {
+            await StepUpCounter.ReleaseAsync(http, user.Id);
+            return StepUpOutcome.Accepted;
+        }
+
+        return await StepUpCounter.MissAsync(http, config, clock, user.Id, now, StepUpPasswordStep) ? StepUpOutcome.Locked : StepUpOutcome.Wrong;
+    }
+
     private static string RecoveryNormal(string code) => new string(code.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
     private static async Task<IResult> Setup(HttpContext http, PodiumDb db, ApiConfig config)

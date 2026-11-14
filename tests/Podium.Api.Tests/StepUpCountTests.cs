@@ -92,4 +92,48 @@ public sealed class StepUpCountTests(ApiFactory api)
         api.Clock.Advance(TimeSpan.FromSeconds(30));
         await RemoteKit.AssertProblemAsync(await RegisterKeyAsync(team.Owner, NewSpki(), Wrong(9)), HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
     }
+
+    // ---- the password that deleting an account asks for (F-027) ------------------------------------------------------
+
+    private static Task<HttpResponseMessage> DeleteAsync(TestUser user, string password, string? code = null) =>
+        user.PostAsync("/api/me/delete", new { password, confirm = "DELETE", code });
+
+    [Fact]
+    public async Task Wrong_passwords_on_account_deletion_lock_at_the_limit_and_the_lock_then_refuses_the_right_password()
+    {
+        var user = await api.NewClient().SignedUpAsync("su-del-pw");
+        for (var i = 0; i < Limit - 1; i++)
+        {
+            await RemoteKit.AssertInvalidAsync(await DeleteAsync(user, "wrong password " + i), "password", "invalid_credentials");
+        }
+
+        await RemoteKit.AssertProblemAsync(await DeleteAsync(user, "wrong password 9"), HttpStatusCode.TooManyRequests, "account_locked");
+        await RemoteKit.AssertProblemAsync(await DeleteAsync(user, TestUser.Password), HttpStatusCode.TooManyRequests, "account_locked");
+        Assert.Equal(HttpStatusCode.OK, (await user.Http.GetAsync("/api/me")).StatusCode);
+        Assert.Equal(Limit, await WrongCheckedAsync(user));
+    }
+
+    [Fact]
+    public async Task A_locked_account_answers_the_lock_before_the_deletion_password_is_looked_at()
+    {
+        var user = await api.NewClient().SignedUpAsync("su-del-locked");
+        var secret = await RemoteKit.EnableTotpAsync(api, user);
+        for (var i = 0; i < Limit; i++) await user.PostAsync("/api/me/mfa/disable", new { code = Wrong(i) });
+
+        await RemoteKit.AssertProblemAsync(await DeleteAsync(user, "wrong password"), HttpStatusCode.TooManyRequests, "account_locked");
+        await RemoteKit.AssertProblemAsync(await DeleteAsync(user, TestUser.Password, RemoteKit.TotpNow(api, secret)), HttpStatusCode.TooManyRequests, "account_locked");
+    }
+
+    [Fact]
+    public async Task A_right_deletion_password_does_not_undo_the_wrong_codes()
+    {
+        var user = await api.NewClient().SignedUpAsync("su-del-mix");
+        await RemoteKit.EnableTotpAsync(api, user);
+        for (var i = 0; i < Limit - 1; i++)
+        {
+            await RemoteKit.AssertInvalidAsync(await DeleteAsync(user, TestUser.Password, Wrong(i)), "code", "invalid_code");
+        }
+
+        await RemoteKit.AssertProblemAsync(await DeleteAsync(user, TestUser.Password, Wrong(9)), HttpStatusCode.TooManyRequests, "account_locked");
+    }
 }

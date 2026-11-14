@@ -44,6 +44,18 @@ public static class StepUpCounter
         return locked;
     }
 
+    /// <summary>
+    /// An accepted first factor (a password) gives its booking back and resets nothing, so a known password cannot undo wrong codes.
+    /// </summary>
+    public static async Task ReleaseAsync(HttpContext http, Guid userId)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        await using var scope = http.RequestServices.CreateAsyncScope();
+        var own = scope.ServiceProvider.GetRequiredService<PodiumDb>();
+        await own.Users.Where(u => u.Id == userId && u.FailedSignIns > 0)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.FailedSignIns, u => u.FailedSignIns - 1), http.RequestAborted);
+    }
+
     /// <summary>An accepted code: the count starts again (as a finished sign-in does), written now; a lock set meanwhile stays.</summary>
     public static async Task ResetAsync(HttpContext http, Guid userId, DateTimeOffset now)
     {
