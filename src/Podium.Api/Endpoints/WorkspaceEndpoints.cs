@@ -57,13 +57,16 @@ public static class WorkspaceEndpoints
         return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, View(s)));
     }
 
-    private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db)
+    private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db, TimeProvider clock)
     {
-        if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
+        var userId = http.User.UserId();
+        if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         if (!Http.IsName(req.Name)) return Http.Invalid("name", "invalid_name");
         var workspace = await db.Workspaces.FirstAsync(w => w.Id == id, http.RequestAborted);
+        var before = workspace.Name;
         workspace.Name = req.Name!.Trim();
         workspace.NameSearch = SearchText.Normalize(workspace.Name);
+        Audit.Add(db, http, clock, AuditActions.WorkspaceRenamed, id, userId, detail: new { before, after = workspace.Name });
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
