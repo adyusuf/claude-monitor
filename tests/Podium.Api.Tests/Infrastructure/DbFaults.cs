@@ -12,6 +12,9 @@ public sealed class CommandFault(params string[] parts) : DbCommandInterceptor
     /// <summary>A token source cancelled when a matching command is about to run; null: nothing is cancelled.</summary>
     public CancellationTokenSource? Cancel { get; set; }
 
+    /// <summary>Run once, just before the first matching command executes (for example to make another writer win a race); null: nothing runs.</summary>
+    public Action? Before { get; set; }
+
     public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
@@ -29,6 +32,9 @@ public sealed class CommandFault(params string[] parts) : DbCommandInterceptor
     private void Hit(DbCommand command)
     {
         if (!parts.All(p => command.CommandText.Contains(p, StringComparison.Ordinal))) return;
+        var before = Before;
+        Before = null;
+        before?.Invoke();
         Cancel?.Cancel();
         if (Error is { } error) throw error;
     }
