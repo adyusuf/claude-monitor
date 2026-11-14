@@ -69,7 +69,8 @@ describe("a run in the popup", () => {
   });
 
   it("sends the approval with the run's hash from the popup and reads the list again", async () => {
-    const pending = done("r1", 1, { status: "pending_approval", canDecide: true, hash: "h".repeat(64) });
+    // Allow stays disabled once the wait is over, so the run must still be open whatever the clock says.
+    const pending = done("r1", 1, { status: "pending_approval", canDecide: true, hash: "h".repeat(64), expiresAt: "2099-01-01T00:00:00.000Z" });
     const calls = serve([pending], { "GET /runs/r1": { body: pending }, "POST /runs/r1/approve": { status: 204 } });
     const dialog = await open("r1");
     const before = count(calls, "/workspaces/w1/runs");
