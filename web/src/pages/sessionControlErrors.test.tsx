@@ -155,4 +155,10 @@ describe("answering a permission request", () => {
     expect(await screen.findByText("Only the person whose machine runs this session can send it commands.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
   });
+
+  it("shows the API's error when the list of requests cannot be read", async () => {
+    mockApi({ "GET /me": { body: ME }, "GET /sessions/s1/permission-requests": { status: 403, body: { title: "forbidden" } } });
+    show(<PermissionsCard sessionId="s1" canAnswer version={0} onChange={() => undefined} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("You are not allowed to do that.");
+  });
 });

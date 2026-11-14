@@ -32,7 +32,8 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
     void load();
   }, [load, version]);
 
-  if (rows.length === 0) return null;
+  // A list that could not be read still shows why; only a read empty list draws nothing.
+  if (rows.length === 0 && !error) return null;
   const answer = async (id: string, decision: "allow" | "deny", answers?: Record<string, string>) => {
     try {
       await api.answer(id, decision, reasons[id]?.trim() || undefined, answers);
