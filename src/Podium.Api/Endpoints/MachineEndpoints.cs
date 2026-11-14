@@ -77,7 +77,7 @@ public static class MachineEndpoints
     }
 
     /// <summary>Only the agent's own user moves it, and only into a workspace where they may contribute.
-    /// Sessions already captured stay where they were recorded.</summary>
+    /// Sessions already captured stay where they were recorded; a move into its current workspace changes nothing.</summary>
     private static async Task<IResult> Move(Guid id, MoveRequest req, HttpContext http, PodiumDb db, TimeProvider clock, Broker broker)
     {
         var userId = http.User.UserId();
@@ -90,6 +90,8 @@ public static class MachineEndpoints
         }
 
         var from = agent.WorkspaceId;
+        // Already there: nothing moves, so the role an admin set, the opt-ins and the open runs stay.
+        if (target == from) return Results.NoContent();
         var machine = await db.Machines.FirstAsync(m => m.Id == agent.MachineId, http.RequestAborted);
         var now = clock.GetUtcNow();
         var targetMachine = await db.Machines.FirstOrDefaultAsync(
