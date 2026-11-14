@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using Podium.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -32,6 +33,7 @@ public sealed class RateLimitPolicyTests(ApiFactory api)
         for (var i = 0; i <= Budget; i++)
         {
             using var request = new HttpRequestMessage(new HttpMethod(method), url);
+            if (method == "POST") request.Content = JsonContent.Create(new { });
             statuses.Add((await http.SendAsync(request)).StatusCode);
         }
 
