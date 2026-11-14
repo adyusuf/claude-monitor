@@ -66,10 +66,12 @@ public sealed class ApprovalRuleAutoAllowTests(ApiFactory api)
     public async Task An_auto_allowed_request_leaves_the_session_running_and_never_shows_up_as_open_for_the_owner()
     {
         var (w, _) = await RememberedAsync();
+        // The session that taught the rule is still "waiting" from its first, manual request; a fresh one shows what an auto-allow does.
+        var fresh = await ApprovalRuleKit.StartSessionAsync(api, w.Agent);
 
-        await InlineAsync(w);
+        await InlineAsync(w, session: fresh);
 
-        Assert.NotEqual(SessionStatuses.Waiting, await ApprovalRuleKit.SessionStatusAsync(api, w.Agent, w.Session));
+        Assert.NotEqual(SessionStatuses.Waiting, await ApprovalRuleKit.SessionStatusAsync(api, w.Agent, fresh));
         Assert.Equal(0, (await ApprovalRuleKit.ListRequestsAsync(w.Owner, w.WorkspaceId)).GetArrayLength());
     }
 
