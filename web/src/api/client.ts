@@ -58,9 +58,13 @@ async function toError(response: Response): Promise<ApiError> {
   }
   const fields: Record<string, string> = {};
   for (const [field, codes] of Object.entries(data.errors ?? {})) fields[field] = codes[0] ?? "invalid";
-  const code = Object.values(fields)[0] ?? data.title ?? statusCode(response.status);
+  const title = typeof data.title === "string" && API_CODE.test(data.title) ? data.title : undefined;
+  const code = Object.values(fields)[0] ?? title ?? statusCode(response.status);
   return new ApiError(response.status, code, fields, data);
 }
+
+/** The shape of the codes the API puts in `title`; any other title (the framework's English text on a real 500) is not one. */
+const API_CODE = /^[a-z][a-z0-9_]*$/;
 
 function statusCode(status: number): string {
   switch (status) {
