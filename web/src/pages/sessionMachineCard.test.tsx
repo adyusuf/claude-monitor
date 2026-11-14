@@ -37,11 +37,19 @@ describe("a machine's card on the sessions page", () => {
     expect(figures("alpha")).toBe("alpha | 2 active now | 1 waiting · 5 in total");
   });
 
-  it("puts a plus after the active count while more sessions are still to be loaded, because the count is then a floor", async () => {
+  it("puts a plus after every count (active, waiting and total) while more sessions are still to be loaded, because each is then a floor", async () => {
     page("c1");
     renderAt("/w/w1/sessions", route);
     await screen.findByText("Select a machine to see its sessions.");
-    expect(figures("alpha")).toBe("alpha | 2+ active now | 1 waiting · 5 in total");
+    expect(figures("alpha")).toBe("alpha | 2+ active now | 1+ waiting · 5+ in total");
+  });
+
+  it("puts a plus after the count badge in the opened machine's head while more sessions are still to be loaded", async () => {
+    page("c1");
+    renderAt("/w/w1/sessions", route);
+    await userEvent.click(await screen.findByRole("button", { expanded: false }));
+    const badge = within(document.querySelector(".session-machine-head")!).getByTitle("5+ session(s)");
+    expect(badge).toHaveTextContent(/^5\+$/);
   });
 
   it("leaves the waiting part out when no session waits", async () => {
