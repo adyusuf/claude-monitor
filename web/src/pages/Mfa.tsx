@@ -35,7 +35,7 @@ export function MfaStep({ token, next }: { token?: string; next: string }) {
   return (
     <form className="stack" onSubmit={submit}>
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <Field label={t("auth.mfaCode")} value={code} inputMode="numeric" autoComplete="one-time-code" autoFocus
+      <Field label={t("auth.mfaCode")} value={code} autoComplete="one-time-code" autoFocus
         onChange={(e) => setCode(e.target.value)} />
       <Button type="submit" busy={busy}>{t("auth.mfaVerify")}</Button>
     </form>

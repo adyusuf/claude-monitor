@@ -44,6 +44,17 @@ describe("two-step sign-in", () => {
     expect(Object.keys(body)).toEqual(["code"]);
     expect(body).toEqual({ code: "654321" });
   });
+
+  it("the sign-in code field accepts a recovery code (no numeric keypad)", async () => {
+    const calls = mockApi({ "GET /me": { status: 401 }, "POST /auth/mfa": { status: 204 } });
+    renderAt("/mfa", [{ path: "/mfa", element: <MfaPage /> }, { path: "/", element: <div>home</div> }]);
+    const field = await screen.findByLabelText(/Code from your authenticator app/);
+    expect(field).not.toHaveAttribute("inputmode", "numeric");
+    await userEvent.type(field, "abcde-fghij");
+    await userEvent.click(screen.getByRole("button", { name: "Verify" }));
+    expect(await screen.findByText("home")).toBeInTheDocument();
+    expect(calls.find((c) => c.path === "/auth/mfa")?.body).toEqual({ code: "abcde-fghij" });
+  });
 });
 
 describe("turning two-step sign-in on and off", () => {
