@@ -68,6 +68,7 @@ export function MachineExecLevel({ agentId, view, owned, onChanged }: { agentId:
     setNoKey(false);
     setProblem(null);
     const sequence = state.sequence + 1;
+    let saved = false; // the no-key refusal below also ends the attempt without an error, so "ok" alone does not mean a change was stored
     const ok = await gate.attempt(async (code) => {
       const notAfter = new Date(Math.floor((Date.now() + EXEC_LEVEL_LIFETIME_MS) / 1000) * 1000).toISOString();
       let proof: { keyId: string; signature: string } | null = null;
@@ -87,10 +88,11 @@ export function MachineExecLevel({ agentId, view, owned, onChanged }: { agentId:
         throw e;
       }
 
+      saved = true;
       setDone(true);
       setChoice(null);
     });
-    if (ok) onChanged();
+    if (ok && saved) onChanged();
   };
 
   const report = state?.report ?? null;
