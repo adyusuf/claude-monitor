@@ -60,13 +60,15 @@ describe("i18n", () => {
   const keys = (o: object, prefix = ""): string[] =>
     Object.entries(o).flatMap(([k, v]) => (typeof v === "string" ? [prefix + k] : keys(v as object, `${prefix}${k}.`)));
 
+  const sortedKeys = (o: object) => keys(o).sort();
+
   it("has every English key in Turkish, and no empty text", () => {
-    expect(keys(tr)).toEqual(keys(en));
+    expect(sortedKeys(tr)).toEqual(sortedKeys(en));
     for (const k of keys(tr)) expect(translate(tr, k)).not.toBe("");
   });
 
   it("has every English key in German too, with the same placeholders, and no empty text", () => {
-    expect(keys(de)).toEqual(keys(en));
+    expect(sortedKeys(de)).toEqual(sortedKeys(en));
     const placeholders = (text: string) => (text.match(/\{\w+\}/g) ?? []).sort();
     for (const k of keys(en)) {
       expect(translate(de, k)).not.toBe("");
