@@ -26,6 +26,9 @@ public static partial class Masker
         ("assigned_secret", AssignedSecret()),
     ];
 
+    /// <summary>What a non-empty string under a secret-named key (SecretKey) becomes, whatever its shape.</summary>
+    public const string SecretFieldMark = "[masked:secret_field]";
+
     public static JsonNode? Mask(JsonNode? node) => node switch
     {
         JsonObject o => MaskObject(o),
@@ -51,7 +54,10 @@ public static partial class Masker
     {
         foreach (var key in o.Select(p => p.Key).ToList())
         {
-            o[key] = Mask(o[key]?.DeepClone());
+            // The value alone may hold no keyword ({"password":"hunter2"}); its key says what it is.
+            o[key] = SecretKey().IsMatch(key) && o[key] is JsonValue v && v.TryGetValue<string>(out var s) && s.Length > 0
+                ? JsonValue.Create(SecretFieldMark)
+                : Mask(o[key]?.DeepClone());
         }
 
         return o;
@@ -90,6 +96,10 @@ public static partial class Masker
 
     [GeneratedRegex(@"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}")]
     private static partial Regex Jwt();
+
+    // A JSON key that ends with a secret name (password, DB_PASSWORD, API_KEY, client_secret, Token); token_type or max_tokens do not.
+    [GeneratedRegex(@"(?i)(password|passwd|pwd|secret|token|api[_\-]?key|access[_\-]?key|secret[_\-]?key)$")]
+    private static partial Regex SecretKey();
 
     // An opaque token after the Bearer scheme; it must hold a digit or a symbol, so "Bearer authentication" in prose stays.
     [GeneratedRegex(@"(?i)\bBearer\s+(?<secret>(?=[A-Za-z0-9\-._~+/]*[0-9\-._~+/])[A-Za-z0-9\-._~+/]{16,}=*)")]

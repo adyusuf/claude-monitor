@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Podium.Agent.Capture;
 
 namespace Podium.Agent.Tests;
@@ -46,4 +47,38 @@ public sealed class MaskerTests
     [InlineData("mailto:someone@host.example")]
     [InlineData("https://host.example/a:b@c")]
     public void Ordinary_text_with_keywords_passes_unchanged(string text) => Assert.Equal(text, Masker.MaskText(text));
+
+    [Fact]
+    public void A_string_value_under_a_secret_named_key_is_masked_whatever_its_shape()
+    {
+        var node = JsonNode.Parse("""
+            {"password":"hunter2hunter2","env":{"API_KEY":"plainvalue","DB_Password":"x1"},
+             "args":[{"client_secret":"abc"}],"Token":"t0k"}
+            """)!;
+        var masked = Masker.Mask(node)!;
+        Assert.Equal("[masked:secret_field]", masked["password"]!.GetValue<string>());
+        Assert.Equal("[masked:secret_field]", masked["env"]!["API_KEY"]!.GetValue<string>());
+        Assert.Equal("[masked:secret_field]", masked["env"]!["DB_Password"]!.GetValue<string>());
+        Assert.Equal("[masked:secret_field]", masked["args"]![0]!["client_secret"]!.GetValue<string>());
+        Assert.Equal("[masked:secret_field]", masked["Token"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Keys_that_only_contain_a_secret_word_and_non_string_values_are_left_alone()
+    {
+        var node = JsonNode.Parse("""
+            {"token_type":"Bearer","max_tokens":128,"input_tokens":12,"tokenizer":"bert-base","secretary":"front desk",
+             "password":"","pwd":null,"api_key":{"name":"plain"},"command":"ls -la"}
+            """)!;
+        var masked = Masker.Mask(node)!;
+        Assert.Equal("Bearer", masked["token_type"]!.GetValue<string>());
+        Assert.Equal(128, masked["max_tokens"]!.GetValue<int>());
+        Assert.Equal(12, masked["input_tokens"]!.GetValue<int>());
+        Assert.Equal("bert-base", masked["tokenizer"]!.GetValue<string>());
+        Assert.Equal("front desk", masked["secretary"]!.GetValue<string>());
+        Assert.Equal("", masked["password"]!.GetValue<string>());
+        Assert.Null(masked["pwd"]);
+        Assert.Equal("plain", masked["api_key"]!["name"]!.GetValue<string>());
+        Assert.Equal("ls -la", masked["command"]!.GetValue<string>());
+    }
 }
