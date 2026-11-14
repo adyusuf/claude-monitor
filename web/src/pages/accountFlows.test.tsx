@@ -45,7 +45,8 @@ describe("accepting an invitation", () => {
     });
     renderAt("/invitations/accept?token=invite-1", routes);
     await screen.findByText("home page");
-    const order = calls.map((c) => `${c.method} ${c.path}`);
-    expect(order.slice(order.indexOf("POST /invitations/accept"))).toContain("GET /me");
+    // The page's own first read may come after the POST (the POST is sent from a child effect), so one read proves nothing: the refresh is the second.
+    const reads = calls.filter((c) => c.method === "GET" && c.path === "/me");
+    expect(reads.length).toBeGreaterThanOrEqual(2);
   });
 });
