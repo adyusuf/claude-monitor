@@ -27,7 +27,10 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(null);
 
-  const load = useCallback(() => api.permissions(sessionId, "open").then(setRows).catch(setError), [sessionId]);
+  const load = useCallback(() => api.permissions(sessionId, "open").then((r) => {
+    setRows(r);
+    setError(null);
+  }).catch(setError), [sessionId]);
   useEffect(() => {
     void load();
   }, [load, version]);
