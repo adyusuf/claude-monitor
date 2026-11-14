@@ -27,13 +27,13 @@ def main(argv: list[str]) -> int:
     stage, out, members = Path(argv[1]), Path(argv[2]), argv[3:]
     partial = out.with_name(out.name + ".partial")
     try:
-        with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
             for member in members:
                 for path in entries(stage, member):
                     z.write(path, path.relative_to(stage).as_posix())
-    except FileNotFoundError as e:
+    except Exception as e:  # any failure: no half-written package is left to be picked up
         partial.unlink(missing_ok=True)
-        print(str(e), file=sys.stderr)
+        print(f"{type(e).__name__}: {e}", file=sys.stderr)
         return 1
     partial.replace(out)
     return 0

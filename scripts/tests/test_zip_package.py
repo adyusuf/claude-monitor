@@ -2,6 +2,7 @@
 15/11/2026): the same members and bytes as `zip -r`, with the folders relative to the staging folder."""
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -54,6 +55,30 @@ class ZipPackage(unittest.TestCase):
             self.assertIn("api is not in the stage", r.stderr)
             self.assertFalse(out.exists())
 
+
+    def test_a_file_dated_before_1980_is_packed_like_zip_does(self):
+        # NuGet content carries a 1980-01-01 00:00 UTC date that reads as 1979 west of UTC; zip packs it, zipfile refuses by default.
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp) / "stage"
+            (stage / "api").mkdir(parents=True)
+            old = stage / "api" / "old.dll"
+            old.write_bytes(b"dll")
+            os.utime(old, (0, 0))
+            out = Path(tmp) / "p.zip"
+            r = self.pack(stage, out, "api")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            with zipfile.ZipFile(out) as z:
+                self.assertEqual(z.read("api/old.dll"), b"dll")
+
+    def test_a_failure_while_packing_leaves_no_partial_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp) / "stage"
+            stage.mkdir()
+            (stage / "api").write_bytes(b"x")
+            out = Path(tmp) / "no-such-folder" / "p.zip"  # the package cannot be created here
+            r = self.pack(stage, out, "api")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertEqual(list(Path(tmp).rglob("*.partial")), [])
 
 if __name__ == "__main__":
     unittest.main()
