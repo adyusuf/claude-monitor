@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ApprovalRequestRow } from "../api/types";
 import { en } from "../i18n/en";
-import { type Call, mockApi } from "../test/helpers";
+import { type Call, mockApi, startsWith } from "../test/helpers";
 import { request } from "../test/approvals-fixtures";
 import { renderPlain } from "../test/remote-fixtures";
 import { ApprovalItem } from "./ApprovalItem";
@@ -13,7 +13,7 @@ const show = (row: ApprovalRequestRow, onDone = vi.fn()) => {
   return onDone;
 };
 const answers = (calls: Call[]) => calls.filter((c) => c.method === "POST" && c.path === "/permission-requests/q1/answer");
-const remember = () => screen.getByRole("combobox", { name: en.approvalRules.remember });
+const remember = () => screen.getByRole("combobox", { name: startsWith(en.approvalRules.remember) });
 const allow = () => screen.getByRole("button", { name: en.approvalRules.allow });
 const deny = () => screen.getByRole("button", { name: en.approvalRules.deny });
 
@@ -81,7 +81,7 @@ describe("how long an allow stands", () => {
 
   it("offers no selector and says why for a request that cannot have a standing approval", () => {
     show(request({ canRemember: false }));
-    expect(screen.queryByRole("combobox", { name: en.approvalRules.remember })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: startsWith(en.approvalRules.remember) })).toBeNull();
     expect(screen.getByText(en.approvalRules.noRemember)).toBeInTheDocument();
   });
 

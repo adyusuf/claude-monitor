@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { en } from "../i18n/en";
 import { I18nProvider } from "../i18n";
+import { startsWith } from "../test/helpers";
 import { InstallOptions, installCommands, runAccountNameOk, serverProblem } from "./InstallOptions";
 
 const choice = { mode: "service" as const, exec: "off" as const, server: "https://pod.example.net", runAccount: false, runAccountName: "" };
@@ -118,7 +119,7 @@ describe("the install choices card", () => {
 
   it("shows the service commands for each system once the service mode is picked", async () => {
     show();
-    await userEvent.selectOptions(screen.getByLabelText(en.installOptions.mode), "service");
+    await userEvent.selectOptions(screen.getByLabelText(startsWith(en.installOptions.mode)), "service");
     expect(screen.getByText(`sudo ${linuxPath} install --service --server https://pod.example.net --exec off`)).toBeInTheDocument();
     expect(screen.getByText(en.installOptions.os.windows)).toBeInTheDocument();
     expect(screen.queryByText(en.installOptions.noWindows)).toBeNull();
@@ -126,13 +127,13 @@ describe("the install choices card", () => {
 
   it("explains a refused run account name, then takes a good one and says there is no Windows line", async () => {
     show();
-    await userEvent.selectOptions(screen.getByLabelText(en.installOptions.mode), "service");
+    await userEvent.selectOptions(screen.getByLabelText(startsWith(en.installOptions.mode)), "service");
     await userEvent.click(screen.getByLabelText(en.installOptions.runAccount));
-    await userEvent.type(screen.getByLabelText(en.installOptions.runAccountName), "root");
+    await userEvent.type(screen.getByLabelText(startsWith(en.installOptions.runAccountName)), "root");
     expect(screen.getByText(en.installOptions.runAccountInvalid)).toBeInTheDocument();
-    expect(screen.getByLabelText(en.installOptions.runAccountName)).toHaveAttribute("aria-invalid", "true");
-    await userEvent.clear(screen.getByLabelText(en.installOptions.runAccountName));
-    await userEvent.type(screen.getByLabelText(en.installOptions.runAccountName), "builder");
+    expect(screen.getByLabelText(startsWith(en.installOptions.runAccountName))).toHaveAttribute("aria-invalid", "true");
+    await userEvent.clear(screen.getByLabelText(startsWith(en.installOptions.runAccountName)));
+    await userEvent.type(screen.getByLabelText(startsWith(en.installOptions.runAccountName)), "builder");
     expect(screen.queryByText(en.installOptions.runAccountInvalid)).toBeNull();
     expect(screen.getByText(`sudo ${linuxPath} install --service --server https://pod.example.net --exec off --run-account builder`)).toBeInTheDocument();
     expect(screen.getByText(en.installOptions.noWindows)).toBeInTheDocument();
@@ -140,14 +141,14 @@ describe("the install choices card", () => {
 
   it("shows the https requirement instead of a command for a service on a plain-http address", async () => {
     show("http://pod.example.net");
-    await userEvent.selectOptions(screen.getByLabelText(en.installOptions.mode), "service");
+    await userEvent.selectOptions(screen.getByLabelText(startsWith(en.installOptions.mode)), "service");
     expect(screen.getByText(en.installOptions.serviceHttps)).toBeInTheDocument();
     expect(screen.queryByText(/install --service/)).toBeNull();
   });
 
   it("shows the localhost-only requirement for a standalone install on a plain-http address", async () => {
     show("http://pod.example.net");
-    await userEvent.selectOptions(screen.getByLabelText(en.installOptions.mode), "standalone");
+    await userEvent.selectOptions(screen.getByLabelText(startsWith(en.installOptions.mode)), "standalone");
     expect(screen.getByText(en.installOptions.standaloneHttps)).toBeInTheDocument();
   });
 });
