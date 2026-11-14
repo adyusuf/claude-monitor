@@ -71,8 +71,9 @@ export function MembersPage() {
     }
   };
 
-  if (!members) return <Spinner />;
   const alert = notice ? <Notice kind={notice.kind}>{notice.text}</Notice> : null;
+  // A list that could not be read shows why instead of loading forever.
+  if (!members) return alert ? <div className="page"><header className="page-head"><h1>{t("members.title")}</h1></header>{alert}</div> : <Spinner />;
   return (
     <div className="page">
       <header className="page-head"><h1>{t("members.title")}</h1></header>

@@ -107,6 +107,6 @@ public static class ChannelEnvelopes
     public static string Defuse(string text) =>
         text.Replace("<channel", "<​channel", StringComparison.OrdinalIgnoreCase)
             .Replace("</channel", "<​/channel", StringComparison.OrdinalIgnoreCase)
-            .Replace(Close, Close.Replace('>', '›'), StringComparison.Ordinal)
-            .Replace(Open, Open.Replace('<', '‹'), StringComparison.Ordinal);
+            .Replace(Close, Close.Replace('>', '›'), StringComparison.OrdinalIgnoreCase)
+            .Replace(Open, Open.Replace('<', '‹'), StringComparison.OrdinalIgnoreCase);
 }

@@ -72,7 +72,8 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
 
     /// <summary>
     /// At the end of a turn: a stop ends it; a queued prompt continues it (waiting up to AP_STOP_WAIT, but only while
-    /// the web can be heard; otherwise one look at what already arrived).
+    /// the web can be heard; otherwise one look at what already arrived). The prompt is untrusted input: it continues the
+    /// turn wrapped, labelled as from the web, defused and capped like an inbox message.
     /// </summary>
     private async Task<string?> StopAsync(string session, CancellationToken ct)
     {
@@ -84,7 +85,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             if (store.TakeCommand(session, CommandKinds.Stop, now) is not null) return null; // it is stopping anyway
             if (store.TakeCommand(session, CommandKinds.Prompt, now) is { } prompt)
             {
-                return new JsonObject { ["decision"] = "block", ["reason"] = prompt.Body }.ToJsonString();
+                return new JsonObject { ["decision"] = "block", ["reason"] = Push.ChannelEnvelopes.BuildInbox(prompt, config.PushContentMax, now) }.ToJsonString();
             }
 
             if (now >= deadline) return null;
@@ -92,18 +93,18 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
         }
     }
 
-    /// <summary>Prompts sent from the web while the user typed one: they ride along as context.</summary>
+    /// <summary>Prompts sent from the web while the user typed one: they ride along as context, each wrapped as web input (defused and capped).</summary>
     private string? PromptContext(string session, DateTimeOffset now)
     {
         var texts = new List<string>();
-        while (store.TakeCommand(session, CommandKinds.Prompt, now) is { Body: { } body }) texts.Add(body);
+        while (store.TakeCommand(session, CommandKinds.Prompt, now) is { Body: { } } prompt) texts.Add(Push.ChannelEnvelopes.BuildInbox(prompt, config.PushContentMax, now));
         if (texts.Count == 0) return null;
         return new JsonObject
         {
             ["hookSpecificOutput"] = new JsonObject
             {
                 ["hookEventName"] = "UserPromptSubmit",
-                ["additionalContext"] = "Messages sent to this session from Podium (the web):\n- " + string.Join("\n- ", texts),
+                ["additionalContext"] = "Messages sent to this session from Podium (the web):\n" + string.Join("\n", texts),
             },
         }.ToJsonString();
     }

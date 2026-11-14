@@ -39,5 +39,12 @@ dotnet publish src/Podium.Api -c Release -r win-x64 --self-contained true -o "$s
 printf '{"commit":"%s"}\n' "$commit" > "$stage/release.json"
 mkdir -p "$out"
 rm -f "$out/podium-$commit.zip"
-(cd "$stage" && zip -q -r -X "$out/podium-$commit.zip" api web release.json)
+if command -v zip >/dev/null 2>&1; then
+  (cd "$stage" && zip -q -r -X "$out/podium-$commit.zip" api web release.json)
+else
+  # Git Bash on the Windows server has no zip: pack the same members with Python.
+  py="$(command -v python3 || command -v python || true)"
+  [ -n "$py" ] || { echo "neither zip nor python is installed: the package cannot be packed" >&2; exit 2; }
+  "$py" "$root/scripts/zip_package.py" "$stage" "$out/podium-$commit.zip" api web release.json
+fi
 echo "✓ $out/podium-$commit.zip"

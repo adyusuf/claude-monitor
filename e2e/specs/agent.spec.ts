@@ -15,13 +15,17 @@ test("a machine is connected on /device and its session appears live, then takes
 
   // The session arrives while the list is open: the live stream shows it without a reload.
   await page.goto(sessionsUrl);
-  await expect(page.getByText("No sessions yet.")).toBeVisible();
+  // Sessions are listed under a card per machine; the list is closed until its card is pressed.
+  const card = page.getByRole("button", { name: /e2e-laptop/ });
+  await expect(card).toContainText(/0\s+active now/);
   const session = `e2e-${Date.now()}`;
   await agent.send(session, [
     { hook: "SessionStart", payload: { session_id: session, model: "claude-opus-5-5" } },
     { hook: "UserPromptSubmit", payload: { session_id: session, prompt: "Make the login faster" } },
     { hook: "PostToolUse", payload: { session_id: session, tool_name: "TaskCreate", tool_input: { subject: "Profile the query" }, tool_response: { task: { id: "1" } } } },
   ]);
+  await expect(card).toContainText(/1\s+active now/);
+  await card.click();
   await expect(page.getByText("Make the login faster")).toBeVisible();
   await expect(page.locator(".pill-active")).toBeVisible();
 

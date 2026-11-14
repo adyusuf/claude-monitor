@@ -39,7 +39,7 @@ internal static class ApprovalRuleCreation
             return (Results.Problem(statusCode: StatusCodes.Status409Conflict, title: CommandEndpoints.RuleOutsideAccess), null, null);
         }
 
-        if (remember == ApprovalDurations.Always && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, code)) return (RemoteChecks.ReauthRefused(), null, null);
+        if (remember == ApprovalDurations.Always && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, code)) return (RemoteChecks.ReauthRefused(http), null, null);
         var ask = new RuleAsk(agent.WorkspaceId, userId, agent.Id, request.RepoId, scope.Tool, scope.Command, remember, now, request.Id);
         var (refused, existing) = await ApplyRuleAsync(db, http, clock, ask);
         return (refused, ask, existing);

@@ -13,7 +13,9 @@ test("a command sent from the web shows Claude's answer under it, live, without 
   const session = `e2e-reply-${Date.now()}`;
   await agent.send(session, [{ hook: "SessionStart", payload: { session_id: session, model: "claude-opus-5-5" } }]);
   await page.getByRole("link", { name: /Sessions/ }).first().click();
-  await page.locator("a", { hasText: "e2e-reply" }).or(page.locator("tr, li").filter({ hasText: "widgets" }).first()).first().click();
+  await page.getByRole("button", { name: /e2e-laptop/ }).click(); // the machine's card opens its session list
+  // The session has no title yet (only SessionStart arrived): its link is the first one in the opened machine section's session list.
+  await page.getByRole("region", { name: "e2e-laptop" }).locator(".session-list a.session-link").first().click();
 
   await page.getByPlaceholder(/A message for Claude/).fill("Run the tests");
   await page.getByRole("button", { name: "Send" }).click();
