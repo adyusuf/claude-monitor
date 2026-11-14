@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Podium.Api.Remote;
 using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
+using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Tests;
@@ -135,5 +136,26 @@ public sealed class StepUpCountTests(ApiFactory api)
         }
 
         await RemoteKit.AssertProblemAsync(await DeleteAsync(user, TestUser.Password, Wrong(9)), HttpStatusCode.TooManyRequests, "account_locked");
+    }
+
+    // ---- the strict approval gate --------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Approving_a_grant_on_a_strict_target_locks_at_the_limit_and_then_refuses_a_right_code()
+    {
+        var team = await ScriptKit.TeamAsync(api, "production", "application", ExecLevels.Shell);
+        var secret = await RemoteKit.EnableTotpAsync(api, team.Owner);
+        var grant = await RemoteKit.RequestGrantAsync(team.Requester, RemoteKit.GrantAsk(team.TargetId));
+        var approve = $"/api/grants/{grant.Id}/approve";
+
+        // A fresh sign-in does not count on a strict target, so every one of these is a code the gate checks.
+        for (var i = 0; i < Limit - 1; i++)
+        {
+            await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync(approve, new { code = Wrong(i) }), HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
+        }
+
+        await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync(approve, new { code = Wrong(9) }), HttpStatusCode.TooManyRequests, "account_locked");
+        await RemoteKit.AssertProblemAsync(await team.Owner.PostAsync(approve, new { code = RemoteKit.TotpNow(api, secret) }), HttpStatusCode.TooManyRequests,
+            "account_locked");
     }
 }
