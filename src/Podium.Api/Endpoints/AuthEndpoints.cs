@@ -94,16 +94,17 @@ public static class AuthEndpoints
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "email_not_verified");
         }
 
-        user.FailedSignIns = 0;
         user.LockedUntil = null;
         if (user.TotpEnabledAt is not null)
         {
+            // The count is reset by the finished second step only (MfaEndpoints.SignIn): a fresh password must not undo the wrong codes.
             var token = MfaEndpoints.Pending(db, config, user, now);
             await db.SaveChangesAsync(http.RequestAborted);
             return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "mfa_required",
                 extensions: new Dictionary<string, object?> { ["mfaToken"] = token });
         }
 
+        user.FailedSignIns = 0;
         await Http.IssueLoginAsync(http, db, config, clock, user);
         return Results.NoContent();
     }
