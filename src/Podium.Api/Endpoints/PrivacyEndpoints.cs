@@ -134,9 +134,10 @@ public static class PrivacyEndpoints
             return Http.Invalid("password", "invalid_credentials");
         }
 
-        if (user.TotpEnabledAt is not null && !await MfaEndpoints.CheckAsync(db, config, user, req.Code, clock.GetUtcNow(), ct))
+        if (user.TotpEnabledAt is not null
+            && await MfaEndpoints.StepUpAsync(http, db, config, clock, user, req.Code, clock.GetUtcNow()) is var outcome && outcome != StepUpOutcome.Accepted)
         {
-            return Http.Invalid("code", "invalid_code");
+            return outcome == StepUpOutcome.Locked ? AuthEndpoints.Locked() : Http.Invalid("code", "invalid_code");
         }
 
         // Neither a password nor a code to ask for (a GitHub/Google-only account): the proof is a fresh sign-in.

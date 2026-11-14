@@ -10,6 +10,14 @@ public sealed record MfaSignInRequest(string? Token, string? Code);
 public sealed record MfaSetupResponse(string Secret, string Uri);
 public sealed record RecoveryCodesResponse(IReadOnlyList<string> RecoveryCodes);
 
+/// <summary>How a code asked outside sign-in ended (<see cref="MfaEndpoints.StepUpAsync"/>).</summary>
+public enum StepUpOutcome
+{
+    Accepted,
+    Wrong,
+    Locked,
+}
+
 /// <summary>
 /// Two-step sign-in with an authenticator app (TOTP). Set up, confirmed with a first code, then asked at every sign-in,
 /// password or provider alike: the first step leaves a short-lived pending token and the second exchanges it with a
@@ -79,6 +87,50 @@ public static class MfaEndpoints
         return true;
     }
 
+    /// <summary>The audit detail's step of a wrong code asked outside sign-in (sign-in's second step writes "mfa").</summary>
+    public const string StepUpStep = "step_up";
+
+    /// <summary>
+    /// A code asked outside sign-in (re-authentication, turning two-step sign-in off, deleting the account), counted towards the same lock
+    /// as the second step: refused while the account is locked; a wrong code is counted and audited, and the one that reaches the limit
+    /// locks. A blank code asks for one and is not counted. An accepted code starts the count again, saved with the caller's change.
+    /// </summary>
+    public static async Task<StepUpOutcome> StepUpAsync(HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, User user, string? code,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(user);
+        if (user.LockedUntil > now) return StepUpOutcome.Locked;
+        if (await CheckAsync(db, config, user, code, now, http.RequestAborted))
+        {
+            user.FailedSignIns = 0;
+            return StepUpOutcome.Accepted;
+        }
+
+        if (user.TotpEnabledAt is null || string.IsNullOrWhiteSpace(code)) return StepUpOutcome.Wrong;
+        return await RecordStepUpFailureAsync(http, config, clock, user.Id, now) ? StepUpOutcome.Locked : StepUpOutcome.Wrong;
+    }
+
+    /// <summary>
+    /// Counts a wrong step-up code in a unit of work of its own (the caller refuses without saving, and nothing else it tracks may be written
+    /// with the count); true when this one locked the account. One statement each, so codes sent at once all count and only one of them locks.
+    /// </summary>
+    private static async Task<bool> RecordStepUpFailureAsync(HttpContext http, ApiConfig config, TimeProvider clock, Guid userId, DateTimeOffset now)
+    {
+        var ct = http.RequestAborted;
+        await using var scope = http.RequestServices.CreateAsyncScope();
+        var own = scope.ServiceProvider.GetRequiredService<PodiumDb>();
+        var limit = config.LockoutAfter;
+        var until = now + config.LockoutFor;
+        await own.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.FailedSignIns, u => u.FailedSignIns + 1), ct);
+        var locked = await own.Users.Where(u => u.Id == userId && u.FailedSignIns >= limit)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.FailedSignIns, 0).SetProperty(u => u.LockedUntil, until), ct) == 1;
+        if (locked) Audit.Add(own, http, clock, AuditActions.AccountLocked, userId: userId);
+        Audit.Add(own, http, clock, AuditActions.SignInFailed, userId: userId, detail: new { step = StepUpStep });
+        await own.SaveChangesAsync(ct);
+        return locked;
+    }
+
     private static string RecoveryNormal(string code) => new string(code.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
     private static async Task<IResult> Setup(HttpContext http, PodiumDb db, ApiConfig config)
@@ -121,7 +173,16 @@ public static class MfaEndpoints
     {
         var user = await db.Users.FirstAsync(u => u.Id == http.User.UserId(), http.RequestAborted);
         if (user.TotpEnabledAt is null) return Results.Conflict();
-        if (!await CheckAsync(db, config, user, req.Code, clock.GetUtcNow(), http.RequestAborted)) return Http.Invalid("code", "invalid_code");
+        switch (await StepUpAsync(http, db, config, clock, user, req.Code, clock.GetUtcNow()))
+        {
+            case StepUpOutcome.Accepted:
+                break;
+            case StepUpOutcome.Locked:
+                return AuthEndpoints.Locked();
+            default:
+                return Http.Invalid("code", "invalid_code");
+        }
+
         user.TotpSecret = null;
         user.TotpEnabledAt = null;
         user.TotpLastStep = null;

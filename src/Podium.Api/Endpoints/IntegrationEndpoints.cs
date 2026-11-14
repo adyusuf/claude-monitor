@@ -50,7 +50,7 @@ public static class IntegrationEndpoints
         if (await Access.MemberAsync(db, me, ws, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         if (!settings.JiraAvailable) return Http.Invalid("provider", "integration_unavailable");
         if (JiraOAuth.SiteHost(req?.Subdomain) is not { } host) return Http.Invalid("subdomain", "invalid_site");
-        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, req!.Code)) return RemoteChecks.ReauthRefused();
+        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, req!.Code)) return RemoteChecks.ReauthRefused(http);
         return Results.Ok(await StartAsync(db, config, clock, oauth, me, ws, null, OAuthPurposes.Connect, host, http.RequestAborted));
     }
 

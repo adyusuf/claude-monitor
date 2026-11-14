@@ -47,7 +47,7 @@ public static class AccessPolicySaves
         }
 
         if ((row?.Version ?? 0) != req.ExpectedVersion) return RemoteChecks.Conflict(AccessPolicyErrors.Changed);
-        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused();
+        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused(http);
 
         var version = req.ExpectedVersion + 1;
         var hash = AccessPolicySigning.Hash(document);

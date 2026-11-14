@@ -70,7 +70,7 @@ public static class AgentRoleEndpoints
         if (MachineRoles.IsLowering(agent.RoleEnvironment, agent.RoleFunction, environment, function)
             && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code, window: false))
         {
-            return RemoteChecks.ReauthRefused();
+            return RemoteChecks.ReauthRefused(http);
         }
 
         var before = new { environment = agent.RoleEnvironment, function = agent.RoleFunction, environments = storedEnvironments, functions = storedFunctions };
