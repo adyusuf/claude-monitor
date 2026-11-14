@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Podium.Agent.Auth;
 using Podium.Agent.Capture;
 using Podium.Agent.Config;
@@ -218,7 +219,9 @@ public sealed class PushTests : IDisposable
         Assert.Equal(0, await Pump(pid: 1, env: null).PumpAsync(_ => Task.CompletedTask)); // requeues even when it has nothing to push
         var output = await new HookRunner(home.Config, store, clock).RunAsync("UserPromptSubmit",
             JsonSerializer.Serialize(new { session_id = "s-1", cwd = "/tmp" }), CancellationToken.None);
-        Assert.Contains("Messages sent to this session from Podium", output, StringComparison.Ordinal);
+        var context = JsonNode.Parse(output!)!["hookSpecificOutput"]!["additionalContext"]!.GetValue<string>();
+        Assert.Contains("Messages sent to this session from Podium", context, StringComparison.Ordinal);
+        HookRunnerTests.AssertWrapped(context, "c-1", "hello");
     }
 
     [Fact]
