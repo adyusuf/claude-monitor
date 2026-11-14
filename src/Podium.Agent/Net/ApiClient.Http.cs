@@ -78,7 +78,13 @@ public sealed partial class ApiClient
         {
             if (credentials.Read(Credentials.Refresh) is not { } refresh) return Fail(NoRefreshToken);
             using var response = await http.PostAsJsonAsync("api/agent/token/refresh", new RefreshRequest(refresh), Json, ct);
-            if (!response.IsSuccessStatusCode) return Fail(await RefusalReasonAsync(response, ct));
+            if (!response.IsSuccessStatusCode)
+            {
+                // Only a 401 refuses the token for good. A 429, a 5xx or a proxy's page is passing: the call fails and its loop retries later with the same token.
+                if (response.StatusCode != HttpStatusCode.Unauthorized) await EnsureAsync(response, ct);
+                return Fail(await RefusalReasonAsync(response, ct));
+            }
+
             SaveTokens((await response.Content.ReadFromJsonAsync<TokenResponse>(Json, ct))!);
             return true;
         }
