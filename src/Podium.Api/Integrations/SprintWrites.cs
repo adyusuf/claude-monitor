@@ -56,7 +56,7 @@ public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gat
     {
         ArgumentNullException.ThrowIfNull(sprint);
         ArgumentNullException.ThrowIfNull(unfinished);
-        if (sprint.SourceConnectionId is null) return null;
+        if (sprint.SourceConnectionId is null) return moveTo?.SourceConnectionId is null ? null : MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         if (moveTo is not null && moveTo.SourceConnectionId != sprint.SourceConnectionId) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         var keys = unfinished.Where(i => i.ExternalKey is not null).Select(i => i.ExternalKey!).ToList();
         var target = moveTo is null ? null : await gate.LinkOfAsync(LinkKinds.Sprint, moveTo.Id, ct);
