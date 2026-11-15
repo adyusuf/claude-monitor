@@ -105,7 +105,7 @@ public static class AgentEndpoints
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
-    private static async Task<IResult> Stream(HttpContext http, PodiumDb db, Broker broker, TimeProvider clock)
+    private static async Task<IResult> Stream(HttpContext http, PodiumDb db, Broker broker, TimeProvider clock, ApiConfig config)
     {
         var agentId = http.User.AgentId();
         var subscription = broker.Subscribe(Broker.Agent(agentId));
@@ -126,7 +126,7 @@ public static class AgentEndpoints
             .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)))
             .Concat(asks.Select(a => new StreamMessage(AgentStreamEvents.Ask, a)))
             .Concat(actions.Select(a => new StreamMessage(AgentStreamEvents.Action, a)));
-        return Sse.Stream(subscription, first, http.RequestAborted);
+        return Sse.Stream(subscription, first, config.StreamPingEvery, http.RequestAborted);
     }
 
     private static async Task<IResult> CommandStatus(Guid id, CommandStatusUpdate req, HttpContext http, PodiumDb db,

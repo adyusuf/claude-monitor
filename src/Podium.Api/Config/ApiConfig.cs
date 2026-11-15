@@ -151,6 +151,9 @@ public sealed record ApiConfig
     public int ReplyPreviewChars { get; init; } = 300;
     public int ReplyScanMax { get; init; } = 500;
 
+    /// <summary>How often an idle live stream sends a ping; the workspace stream also re-checks its reader's access then.</summary>
+    public TimeSpan StreamPingEvery { get; init; } = TimeSpan.FromSeconds(20);
+
     /// <summary>USD per million tokens: input, output, cache read, cache write (5-minute TTL, input x 1.25).
     /// A model not listed is NOT priced: its cost stays null ("cannot be measured"), never a guess.</summary>
     public IReadOnlyDictionary<string, ModelPrice> Prices { get; init; } = DefaultPrices;

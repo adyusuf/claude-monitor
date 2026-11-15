@@ -22,6 +22,27 @@ public static class Access
             : null;
     }
 
+    /// <summary>
+    /// Whether a reader of a workspace's live stream may still read it: its login is not signed out or expired, the user is active and still a
+    /// member. Asked again while the stream is open, because the stream outlives the request that opened it.
+    /// </summary>
+    public static async Task<bool> StillReadsAsync(PodiumDb db, TimeProvider clock, Guid userId, Guid? loginSessionId, Guid workspaceId,
+        CancellationToken ct)
+    {
+        if (loginSessionId is not { } loginId)
+        {
+            return false;
+        }
+
+        var now = clock.GetUtcNow();
+        var signedIn = await (from s in db.LoginSessions.AsNoTracking()
+                              join u in db.Users.AsNoTracking() on s.UserId equals u.Id
+                              where s.Id == loginId && s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now
+                                    && u.Status == UserStatuses.Active
+                              select s.Id).AnyAsync(ct);
+        return signedIn && await MemberAsync(db, userId, workspaceId, Roles.Viewer, ct) is not null;
+    }
+
     /// <summary>A session the user may read (any role), with its workspace membership.</summary>
     public static async Task<(HarnessSession Session, WorkspaceMember Member)?> SessionAsync(
         PodiumDb db, Guid userId, Guid sessionId, CancellationToken ct)
