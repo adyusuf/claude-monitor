@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
 using Podium.Contracts;
@@ -29,5 +30,23 @@ public sealed class AgentMoveTests(ApiFactory api)
         Assert.Equal(team.WorkspaceId, row.WorkspaceId);
         Assert.Equal(RunStatuses.PendingApproval, await RemoteKit.StatusOfAsync(api, created.Id));
         Assert.False(await db.AuditEvents.AnyAsync(a => a.Action == AuditActions.AgentMoved && a.TargetId == team.TargetId.ToString()));
+    }
+
+    private static async Task<JsonElement> MovedRowAsync(TestUser admin, Guid workspace, Guid agent) =>
+        (await admin.GetJsonAsync($"/api/workspaces/{workspace}/audit")).GetProperty("items").EnumerateArray()
+            .Single(r => r.GetProperty("action").GetString() == AuditActions.AgentMoved && r.GetProperty("targetId").GetString() == agent.ToString());
+
+    [Fact]
+    public async Task The_move_is_audited_in_the_old_workspace_too()
+    {
+        var team = await RemoteKit.TeamAsync(api);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await MoveAsync(team.Owner, team.TargetId, team.Owner.WorkspaceId)).StatusCode);
+
+        foreach (var (reader, workspace) in new[] { (team.Admin, team.WorkspaceId), (team.Owner, team.Owner.WorkspaceId) })
+        {
+            var detail = (await MovedRowAsync(reader, workspace, team.TargetId)).GetProperty("detail");
+            Assert.Equal((team.WorkspaceId, team.Owner.WorkspaceId), (detail.GetProperty("from").GetGuid(), detail.GetProperty("to").GetGuid()));
+        }
     }
 }

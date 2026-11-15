@@ -130,6 +130,8 @@ public static class MachineEndpoints
         agent.ClaudeInventoryAt = null;
         agent.AccessReport = null; // the access report names the machine's ceiling paths (ADR-0020 §4); the next profile sends it again
         agent.AccessReportAt = null;
+        // Both workspaces' admins see it: the one it left and the one it joined.
+        Audit.Add(db, http, clock, AuditActions.AgentMoved, from, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
         // The move and the end of the agent's remote work in its old workspace commit together.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
