@@ -149,6 +149,7 @@ public static class AuthEndpoints
             u => u.EmailNormalized == normalized && u.Status == UserStatuses.Active, http.RequestAborted);
         if (user?.Email is not null)
         {
+            await EndResetLinksAsync(db, user.Id, clock.GetUtcNow(), http.RequestAborted);
             var token = AddUserToken(db, user.Id, TokenPurposes.ResetPassword, clock.GetUtcNow(), config.EmailTokenLifetime);
             await db.SaveChangesAsync(http.RequestAborted);
             await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
@@ -174,10 +175,16 @@ public static class AuthEndpoints
         user.UpdatedAt = now;
         await db.LoginSessions.Where(s => s.UserId == user.Id && s.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), http.RequestAborted);
+        await EndResetLinksAsync(db, user.Id, now, http.RequestAborted);
         Audit.Add(db, http, clock, AuditActions.PasswordReset, userId: user.Id);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
+
+    /// <summary>Ends every open reset link of the user: only the newest one works, and none outlives a changed password.</summary>
+    private static Task<int> EndResetLinksAsync(PodiumDb db, Guid userId, DateTimeOffset now, CancellationToken ct) =>
+        db.UserTokens.Where(t => t.UserId == userId && t.Purpose == TokenPurposes.ResetPassword && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
 
     private static string AddUserToken(PodiumDb db, Guid userId, string purpose, DateTimeOffset now, TimeSpan lifetime)
     {
