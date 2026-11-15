@@ -37,6 +37,24 @@ public sealed class DashboardTests(ApiFactory api)
     private static async Task AnswerAsync(TestUser owner, Guid request, string decision) =>
         Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsync($"/api/permission-requests/{request}/answer", new { decision })).StatusCode);
 
+    /// <summary>A machine alert written straight to the database: the metric thresholds that open one are not what is under test here.</summary>
+    private async Task AlertAsync(Guid workspace, Guid agent, string kind, string state)
+    {
+        await using var db = api.Db();
+        var now = api.Clock.GetUtcNow();
+        db.MachineAlerts.Add(new MachineAlert
+        {
+            WorkspaceId = workspace,
+            AgentId = agent,
+            Kind = kind,
+            State = state,
+            OpenedAt = now,
+            UpdatedAt = now,
+            ResolvedAt = state == AlertStates.Resolved ? now : null,
+        });
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task The_dashboard_needs_a_signed_in_user()
     {
@@ -187,16 +205,37 @@ public sealed class DashboardTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task Another_workspaces_projects_sprints_and_answers_are_not_counted()
+    public async Task Open_alerts_are_counted_by_workspace_and_only_while_open()
+    {
+        var (owner, agent, _) = await SessionAsync();
+        var (other, otherAgent, _) = await SessionAsync();
+        await AlertAsync(owner.WorkspaceId, agent.Tokens.AgentId, AlertKinds.Cpu, AlertStates.Open);
+        await AlertAsync(owner.WorkspaceId, agent.Tokens.AgentId, AlertKinds.Memory, AlertStates.Open);
+        await AlertAsync(owner.WorkspaceId, agent.Tokens.AgentId, AlertKinds.Disk, AlertStates.Resolved);
+        await AlertAsync(other.WorkspaceId, otherAgent.Tokens.AgentId, AlertKinds.Cpu, AlertStates.Open);
+
+        var dashboard = await owner.GetJsonAsync(Url(owner.WorkspaceId));
+
+        Assert.Equal(2, dashboard.GetProperty("openAlerts").GetInt32());
+    }
+
+    [Fact]
+    public async Task Another_workspaces_projects_sprints_runs_answers_and_alerts_are_not_counted()
     {
         var (other, agent, external) = await SessionAsync();
         var elsewhere = (await ProjectKit.CreateProjectAsync(other, "Elsewhere")).GetProperty("id").GetGuid();
         await SprintKit.SprintAsync(other, elsewhere);
         await AskAsync(agent, external, 120);
+        await AlertAsync(other.WorkspaceId, agent.Tokens.AgentId, AlertKinds.Cpu, AlertStates.Open);
+        var team = await RemoteKit.TeamAsync(api);
+        await RemoteKit.CreateAsync(team.Requester, RemoteKit.Argv(team.TargetId, RemoteKit.NewKey(), cwd: "/tmp"));
         var owner = await api.NewClient().SignedUpAsync("dash-empty");
 
+        var foreign = await team.Admin.GetJsonAsync(Url(team.WorkspaceId));
         var dashboard = await owner.GetJsonAsync(Url(owner.WorkspaceId));
 
-        Assert.Equal((0, 0, 0, 0), (Section(dashboard, "projects").Count, Section(dashboard, "sprints").Count, Section(dashboard, "runs").Count, Section(dashboard, "approvals").Count));
+        Assert.Equal(1, Section(foreign, "runs").Values.Sum()); // the run that must not leak was made
+        Assert.Equal((0, 0, 0, 0, 0), (Section(dashboard, "projects").Count, Section(dashboard, "sprints").Count, Section(dashboard, "runs").Count,
+            Section(dashboard, "approvals").Count, dashboard.GetProperty("openAlerts").GetInt32()));
     }
 }
