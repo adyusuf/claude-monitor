@@ -29,6 +29,20 @@ function chosenLanguage(): string | null {
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+/** The calls whose 401 is not an ended session: the session's own read, and sign-in steps (a wrong password or code answers 401). */
+const sessionReadPath = "/me";
+const signInPrefix = "/auth/";
+
+const sessionEndedListeners = new Set<() => void>();
+
+/** Hears when a call answers 401 because the session ended (expired or revoked) while a page was open; returns the unsubscribe. */
+export function onSessionEnded(listener: () => void): () => void {
+  sessionEndedListeners.add(listener);
+  return () => {
+    sessionEndedListeners.delete(listener);
+  };
+}
+
 /** One call to the API on our own origin. Cookies go along; changes carry the CSRF header the API demands. */
 export async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -45,6 +59,9 @@ export async function request<T>(method: Method, path: string, body?: unknown): 
   if (response.ok) {
     const text = await response.text();
     return (text ? JSON.parse(text) : undefined) as T;
+  }
+  if (response.status === 401 && path !== sessionReadPath && !path.startsWith(signInPrefix)) {
+    for (const listener of sessionEndedListeners) listener();
   }
   throw await toError(response);
 }

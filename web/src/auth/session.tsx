@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
-import { ApiError } from "../api/client";
+import { ApiError, onSessionEnded } from "../api/client";
 import { api } from "../api/endpoints";
 import type { Me } from "../api/types";
 import { Spinner } from "../components/ui";
@@ -47,6 +47,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // A call that finds the session ended (expired or revoked in another tab) signs out here, so RequireAuth sends to /login with the way back.
+  useEffect(() => onSessionEnded(() => setMe(null)), []);
 
   const value = useMemo(() => ({ me, loading, refresh, signOut }), [me, loading, refresh, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
