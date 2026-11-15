@@ -125,7 +125,7 @@ public static class ApplicationEndpoints
         a.NameSearch = SearchText.Normalize(a.Name);
         a.Description = ProjectRules.Clean(i.Description);
         a.Kind = i.Kind ?? a.Kind;
-        a.RepoUrl = ProjectRules.Clean(i.RepoUrl);
+        a.RepoUrl = ProjectRules.CleanRepoLink(i.RepoUrl);
         a.Environments = ProjectJson.Pack((i.Environments ?? []).Select(e => new EnvironmentEntry(e.Name, ProjectRules.Clean(e.Url))).ToList());
         a.TechStack = [.. ProjectRules.CleanList(i.TechStack)];
         a.VersioningScheme = i.VersioningScheme ?? a.VersioningScheme;
