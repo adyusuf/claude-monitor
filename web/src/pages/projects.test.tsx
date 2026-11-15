@@ -78,8 +78,8 @@ describe("the projects page", () => {
     await userEvent.type(screen.getByLabelText("Stakeholder role 1"), "Finance");
     await userEvent.type(screen.getByLabelText("Budget amount"), "250.5");
     await userEvent.type(screen.getByLabelText("Currency"), "eur");
-    await userEvent.type(screen.getByLabelText("Start date"), "2026-02-01");
-    await userEvent.type(screen.getByLabelText("End date"), "2026-03-01");
+    await userEvent.type(screen.getByLabelText("Start date"), "01/02/2026");
+    await userEvent.type(screen.getByLabelText("End date"), "01/03/2026");
     await userEvent.click(screen.getByLabelText("Spike"));
     await userEvent.selectOptions(screen.getByLabelText("Priority scale"), "moscow");
     await userEvent.selectOptions(screen.getByLabelText("Estimation unit"), "t_shirt");
@@ -103,8 +103,8 @@ describe("the projects page", () => {
     renderAt("/w/w1/projects", route);
     await userEvent.click(await screen.findByRole("button", { name: "New project" }));
     await userEvent.type(await screen.findByLabelText("Budget amount"), "10");
-    await userEvent.type(screen.getByLabelText("Start date"), "2026-03-01");
-    await userEvent.type(screen.getByLabelText("End date"), "2026-02-01");
+    await userEvent.type(screen.getByLabelText("Start date"), "01/03/2026");
+    await userEvent.type(screen.getByLabelText("End date"), "01/02/2026");
     await userEvent.click(screen.getByLabelText("Task"));
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
     expect(screen.getByText("Enter a name (up to 100 characters).")).toBeInTheDocument();

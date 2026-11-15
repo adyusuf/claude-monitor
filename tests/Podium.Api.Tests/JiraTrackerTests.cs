@@ -191,8 +191,22 @@ public sealed class JiraTrackerTests : IDisposable
         var ids = await stack.Tracker.ListItemIdsAsync(ctx, "ABC", CancellationToken.None);
         var e = await Assert.ThrowsAsync<TrackerException>(() => stack.Tracker.ListItemIdsAsync(ctx, "A\" OR project = \"OTH", CancellationToken.None));
 
-        Assert.Equal(space.Issues.Where(i => !i.Deleted).Select(i => i.Id).Order(), ids.Order());
+        Assert.Equal(space.Issues.Where(i => !i.Deleted).Select(i => i.Id).Order(), ids!.Order());
         Assert.Equal(TrackerException.Codes.Rejected, e.Code); // the fake accepts only the three queries the code sends: the key stayed inside its quotes
+    }
+
+    [Fact]
+    public async Task An_id_listing_that_reaches_the_page_cap_is_no_listing_so_nothing_is_archived_on_it()
+    {
+        // A search that always has a next page: the cap stops the loop, and a cut list must not read as "the rest was deleted" (F-066).
+        using var endless = new JiraClients(() => new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"issues\":[{\"id\":\"1\"}],\"nextPageToken\":\"more\"}", System.Text.Encoding.UTF8, "application/json"),
+        }));
+
+        var ids = await endless.Tracker.ListItemIdsAsync(new TrackerContext("cloud", _ => Task.FromResult("token")), "ABC", CancellationToken.None);
+
+        Assert.Null(ids);
     }
 
     [Fact]

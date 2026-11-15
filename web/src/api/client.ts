@@ -29,6 +29,20 @@ function chosenLanguage(): string | null {
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+/** The calls whose 401 is not an ended session: the session's own read, and sign-in steps (a wrong password or code answers 401). */
+const sessionReadPath = "/me";
+const signInPrefix = "/auth/";
+
+const sessionEndedListeners = new Set<() => void>();
+
+/** Hears when a call answers 401 because the session ended (expired or revoked) while a page was open; returns the unsubscribe. */
+export function onSessionEnded(listener: () => void): () => void {
+  sessionEndedListeners.add(listener);
+  return () => {
+    sessionEndedListeners.delete(listener);
+  };
+}
+
 /** One call to the API on our own origin. Cookies go along; changes carry the CSRF header the API demands. */
 export async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -46,6 +60,9 @@ export async function request<T>(method: Method, path: string, body?: unknown): 
     const text = await response.text();
     return (text ? JSON.parse(text) : undefined) as T;
   }
+  if (response.status === 401 && path !== sessionReadPath && !path.startsWith(signInPrefix)) {
+    for (const listener of sessionEndedListeners) listener();
+  }
   throw await toError(response);
 }
 
@@ -58,9 +75,13 @@ async function toError(response: Response): Promise<ApiError> {
   }
   const fields: Record<string, string> = {};
   for (const [field, codes] of Object.entries(data.errors ?? {})) fields[field] = codes[0] ?? "invalid";
-  const code = Object.values(fields)[0] ?? data.title ?? statusCode(response.status);
+  const title = typeof data.title === "string" && API_CODE.test(data.title) ? data.title : undefined;
+  const code = Object.values(fields)[0] ?? title ?? statusCode(response.status);
   return new ApiError(response.status, code, fields, data);
 }
+
+/** The shape of the codes the API puts in `title`; any other title (the framework's English text on a real 500) is not one. */
+const API_CODE = /^[a-z][a-z0-9_]*$/;
 
 function statusCode(status: number): string {
   switch (status) {

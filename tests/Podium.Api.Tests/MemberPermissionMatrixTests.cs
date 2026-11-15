@@ -79,6 +79,44 @@ public sealed class MemberPermissionMatrixTests(ApiFactory api)
         Assert.Equal(expected, response.StatusCode);
     }
 
+    [Fact]
+    public async Task An_admin_changing_a_role_changes_it()
+    {
+        var ws = await NewWorkspaceAsync();
+        var admin = await RemoteKit.MemberAsync(api, ws.Owner, "pm-admin-role", "admin");
+
+        var response = await admin.SendAsync(HttpMethod.Patch, $"/api/workspaces/{ws.Owner.WorkspaceId}/members/{ws.Target.Id}", new { role = "viewer" });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal("viewer", await RoleOfAsync(ws.Owner, ws.Owner.WorkspaceId, ws.Target.Id));
+    }
+
+    [Fact]
+    public async Task An_admin_removing_a_member_removes_them_from_the_list()
+    {
+        var ws = await NewWorkspaceAsync();
+        var admin = await RemoteKit.MemberAsync(api, ws.Owner, "pm-admin-remove", "admin");
+
+        var response = await admin.SendAsync(HttpMethod.Delete, $"/api/workspaces/{ws.Owner.WorkspaceId}/members/{ws.Target.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var members = await ws.Owner.GetJsonAsync($"/api/workspaces/{ws.Owner.WorkspaceId}/members");
+        Assert.DoesNotContain(members.EnumerateArray(), m => m.GetProperty("userId").GetGuid() == ws.Target.Id);
+    }
+
+    [Fact]
+    public async Task An_admin_revoking_an_invitation_takes_it_off_the_open_list()
+    {
+        var ws = await NewWorkspaceAsync();
+        var admin = await RemoteKit.MemberAsync(api, ws.Owner, "pm-admin-revoke", "admin");
+
+        var response = await admin.SendAsync(HttpMethod.Delete, $"/api/workspaces/{ws.Owner.WorkspaceId}/invitations/{ws.InvitationId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var open = await ws.Owner.GetJsonAsync($"/api/workspaces/{ws.Owner.WorkspaceId}/invitations");
+        Assert.DoesNotContain(open.EnumerateArray(), i => i.GetProperty("id").GetGuid() == ws.InvitationId);
+    }
+
     private static async Task<string> RoleOfAsync(TestUser viewer, Guid workspaceId, Guid userId)
     {
         var members = await viewer.GetJsonAsync($"/api/workspaces/{workspaceId}/members");

@@ -11,6 +11,12 @@ import { useCodeGate } from "./useCodeGate";
 export const grouped = (fingerprint: string): string => fingerprint.match(/.{1,4}/g)?.join(" ") ?? fingerprint;
 
 /**
+ * A key's name as it goes into the command a person pastes into a shell: letters, digits, spaces, dot, underscore and hyphen only, so quotes,
+ * `$(...)`, backticks, `;` and backslashes in a name can never run anything (the name is a label on the machine, not the registered one).
+ */
+export const shellSafeName = (name: string): string => name.replace(/[^\p{L}\p{N} ._-]+/gu, " ").replace(/ {2,}/g, " ").trim();
+
+/**
  * The approval keys of the signed-in person (ADR-0010 §4): make a key in this browser (its private half never leaves it), register its public half, and see what to type
  * on a machine whose admin pins it. A machine that requires signed approvals runs nothing this key did not sign.
  */
@@ -73,7 +79,7 @@ export function ApprovalKeysCard({ titled = true }: { titled?: boolean } = {}) {
           <div className="stack">
             <p className="small"><strong>{t("approvals.thisBrowser")}</strong> · {local.name} · <code>{grouped(local.fingerprint)}</code> · {registered ? t("approvals.registered") : t("approvals.notRegistered")}</p>
             <p className="muted small">{t("approvals.pinHint")}</p>
-            <CopyText text={`aipod approvers add ${local.publicKey} --name "${local.name.replaceAll('"', "")}"`} />
+            <CopyText text={`aipod approvers add ${local.publicKey} --name "${shellSafeName(local.name) || t("approvals.defaultName")}"`} />
           </div>
         ) : (
           <Field label={t("approvals.name")} value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />

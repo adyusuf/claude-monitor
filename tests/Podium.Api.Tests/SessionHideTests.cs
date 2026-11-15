@@ -120,6 +120,20 @@ public sealed class SessionHideTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task Hiding_an_already_hidden_session_answers_204_again_but_writes_no_second_audit_row()
+    {
+        var (owner, _, _, id) = await SessionAsync();
+        (await owner.PostAsync($"/api/sessions/{id}/hide")).EnsureSuccessStatusCode();
+
+        var again = await owner.PostAsync($"/api/sessions/{id}/hide");
+
+        Assert.Equal(HttpStatusCode.NoContent, again.StatusCode);
+        await using var db = api.Db();
+        Assert.Equal(1, await db.AuditEvents.CountAsync(a => a.Action == "session.hidden" && a.TargetId == id.ToString()));
+        Assert.Empty(await ListedAsync(owner));
+    }
+
+    [Fact]
     public async Task Hiding_tells_the_workspace_stream_so_open_lists_update()
     {
         var (owner, _, _, id) = await SessionAsync();

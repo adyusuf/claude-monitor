@@ -132,6 +132,9 @@ public sealed class DownloadHost(FakeApi api) : HttpMessageHandler
     /// <summary>When true the body carries no length, so only counting the bytes can stop an oversized download.</summary>
     public bool UnknownLength { get; set; }
 
+    /// <summary>When true the headers arrive but the body never sends a byte: only the caller's deadline ends the download.</summary>
+    public bool StallBody { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         var path = request.RequestUri!.AbsolutePath;
@@ -144,6 +147,7 @@ public sealed class DownloadHost(FakeApi api) : HttpMessageHandler
         Downloads.Enqueue(path);
         if (DownloadStatus is { } status) return new HttpResponseMessage(status);
         if (!Files.TryGetValue(path, out var bytes)) return new HttpResponseMessage(HttpStatusCode.NotFound);
+        if (StallBody) return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()), RequestMessage = request };
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = UnknownLength ? new UnknownLengthContent(bytes) : new ByteArrayContent(bytes),
@@ -151,6 +155,30 @@ public sealed class DownloadHost(FakeApi api) : HttpMessageHandler
         // A real handler (SocketsHttpHandler) sets the request that produced the response, which after a redirect is the last one.
         response.RequestMessage = RedirectedTo is { } to ? new HttpRequestMessage(HttpMethod.Get, to) : request;
         return response;
+    }
+
+    private sealed class StalledStream : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => 0; set => throw new NotSupportedException(); }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException("the stalled body is read asynchronously only");
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class UnknownLengthContent(byte[] bytes) : HttpContent

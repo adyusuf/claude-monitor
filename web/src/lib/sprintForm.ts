@@ -3,6 +3,7 @@
 import type { Member } from "../api/types";
 import type { ProjectView } from "../api/typesProjects";
 import type { SprintInput, SprintView } from "../api/typesSprints";
+import { isDay } from "./format";
 import type { FieldErrors } from "./projectForm";
 import { addDays, sprintLimits as limit, today } from "./sprintOptions";
 
@@ -41,12 +42,16 @@ const capacityOk = (value: string): boolean => {
   return Number.isFinite(n) && n >= 0 && n <= limit.capacityMax && Math.round(n * 100) / 100 === n;
 };
 
-/** The first problem of each field, by the codes the API would answer with; empty when the form can be sent. */
-export function checkSprint(d: SprintDraft): FieldErrors {
+/** The first problem of each field, by the codes the API would answer with; empty when the form can be sent. An active sprint keeps both dates. */
+export function checkSprint(d: SprintDraft, datesRequired = false): FieldErrors {
   const errors: FieldErrors = {};
   if (d.name.trim().length > limit.nameMax) errors.name = "too_long";
   if (d.goal.trim().length > limit.goalMax) errors.goal = "too_long";
-  if (d.startDate && d.endDate && d.endDate < d.startDate) errors.endDate = "before_start";
+  if (datesRequired && !d.startDate) errors.startDate = "active_dates_required";
+  if (datesRequired && !d.endDate) errors.endDate = "active_dates_required";
+  if (d.startDate && !isDay(d.startDate)) errors.startDate = "invalid_date";
+  if (d.endDate && !isDay(d.endDate)) errors.endDate = "invalid_date";
+  else if (d.startDate && d.endDate && isDay(d.startDate) && d.endDate < d.startDate) errors.endDate = "before_start";
   if (!capacityOk(d.capacity)) errors.capacity = "out_of_range";
   if (d.teamUserIds.length > limit.teamMax) errors.teamUserIds = "invalid_list";
   return errors;

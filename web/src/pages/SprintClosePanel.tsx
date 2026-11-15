@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/endpoints";
+import type { Page } from "../api/types";
 import type { SprintSummary } from "../api/typesSprints";
 import { Button, Card, Notice } from "../components/ui";
 import { config } from "../config";
@@ -7,14 +8,26 @@ import { useErrorText, useI18n } from "../i18n";
 import { Labeled } from "./ProjectBits";
 import { useSprintTitle } from "./SprintBits";
 
+/** Every page of the planned sprints (newest first), so an older one is offered as a target too. */
+async function readPlanned(sprint: SprintSummary): Promise<SprintSummary[]> {
+  const all: SprintSummary[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: Page<SprintSummary> = await api.sprints(sprint.projectId, { status: "planned", application: sprint.applicationId ?? undefined, limit: config.pageSize, cursor });
+    all.push(...page.items);
+    cursor = page.next;
+  } while (cursor);
+  return all;
+}
+
 /** The planned sprints of the same scope as this one (a project-wide sprint's are the project-wide ones), which can take its unfinished issues. */
 function usePlannedTargets(sprint: SprintSummary) {
   const errorText = useErrorText();
   const [state, setState] = useState<{ targets: SprintSummary[]; error: string | null }>({ targets: [], error: null });
   useEffect(() => {
     let live = true;
-    api.sprints(sprint.projectId, { status: "planned", application: sprint.applicationId ?? undefined, limit: config.pageSize }).then(
-      (page) => live && setState({ targets: page.items.filter((s) => s.id !== sprint.id && s.applicationId === sprint.applicationId), error: null }),
+    readPlanned(sprint).then(
+      (all) => live && setState({ targets: all.filter((s) => s.id !== sprint.id && s.applicationId === sprint.applicationId), error: null }),
       (e: unknown) => live && setState({ targets: [], error: errorText(e) }),
     );
     return () => {

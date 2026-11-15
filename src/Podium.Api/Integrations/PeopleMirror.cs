@@ -25,11 +25,16 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
         var known = await db.IntegrationPeople.Where(p => p.ConnectionId == connection.Id && ids.Contains(p.ExternalAccountId))
             .ToDictionaryAsync(p => p.ExternalAccountId, ct);
         var now = clock.GetUtcNow();
-        var emails = wanted.Where(p => p.Email is not null).Select(p => SearchText.Email(p.Email!)).Distinct().ToList();
+        // The addresses Jira shows, and those an admin typed for people Jira shows none for (kept on the row): a person invited by a typed
+        // address is linked once they accept (F-069).
+        var emails = wanted.Where(p => p.Email is not null).Select(p => SearchText.Email(p.Email!))
+            .Concat(known.Values.Where(r => r.UserId is null && r.EmailNormalized is not null).Select(r => r.EmailNormalized!)).Distinct().ToList();
         var members = await (from u in db.Users.AsNoTracking()
                              join m in db.WorkspaceMembers.AsNoTracking() on u.Id equals m.UserId
                              where m.WorkspaceId == connection.WorkspaceId && m.RemovedAt == null && u.EmailNormalized != null && emails.Contains(u.EmailNormalized)
                              select new { u.Id, Email = u.EmailNormalized! }).ToDictionaryAsync(x => x.Email, x => x.Id, ct);
+        // A member stands for one person of a connection: one already linked (by hand or earlier) gets no second person by e-mail.
+        var linked = (await db.IntegrationPeople.Where(p => p.ConnectionId == connection.Id && p.UserId != null).Select(p => p.UserId!.Value).ToListAsync(ct)).ToHashSet();
         foreach (var p in wanted)
         {
             if (!known.TryGetValue(p.Id, out var row))
@@ -47,7 +52,14 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
             {
                 row.Email = p.Email;
                 row.EmailNormalized = SearchText.Email(p.Email);
-                if (row.UserId is null && members.TryGetValue(row.EmailNormalized, out var user)) row.UserId = user;
+            }
+
+            if (row.UserId is null && row.EmailNormalized is { } normalized && members.TryGetValue(normalized, out var user) && linked.Add(user))
+            {
+                row.UserId = user;
+                // Matched by an address the tool supplied, without anyone confirming: audited, so an admin can see and undo it (F-070).
+                Audit.Add(db, null, clock, AuditActions.IntegrationPersonLinked, connection.WorkspaceId, connection.ConnectorUserId, targetType: "integration_person",
+                    targetId: row.Id, detail: new { userId = user, automatic = true });
             }
         }
 
@@ -62,7 +74,10 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
         if (!connection.AutoInvite) return 0;
         var now = clock.GetUtcNow();
         var candidates = await db.IntegrationPeople.Where(p => p.ConnectionId == connection.Id && p.Active && p.UserId == null && p.InvitedAt == null && p.EmailNormalized != null)
-            .OrderBy(p => p.FirstSeenAt).Take(InviteCap).ToListAsync(ct);
+            // The fewest earlier invitations first (every failed send leaves one): addresses that always fail sink behind those never tried, so they cannot
+            // use up the cap of every run and starve the rest.
+            .OrderBy(p => db.WorkspaceInvitations.Count(i => i.WorkspaceId == connection.WorkspaceId && i.EmailNormalized == p.EmailNormalized))
+            .ThenBy(p => p.FirstSeenAt).Take(InviteCap).ToListAsync(ct);
         if (candidates.Count == 0) return 0;
         var inviter = await db.Users.AsNoTracking().FirstAsync(u => u.Id == connection.ConnectorUserId, ct);
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == connection.WorkspaceId, ct);
@@ -98,6 +113,13 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
                 // The invitation row stays (an admin sees it and can revoke it); the person is tried again on a later run.
                 invitation.RevokedAt = now;
                 log.LogWarning("Invitation mail for integration {Connection} failed: {Type}", connection.Id, e.GetType().Name);
+                if (e is TimeoutException)
+                {
+                    // The mail server does not answer: the run (inside an import or a pass, under the connection's gate) stops here rather than
+                    // wait one timeout per person; the others are tried on a later run.
+                    await db.SaveChangesAsync(ct);
+                    break;
+                }
             }
 
             await db.SaveChangesAsync(ct);

@@ -46,7 +46,8 @@ public sealed class ServerSettingsHiddenTests(ApiFactory api) : IAsyncLifetime
     public async Task A_saved_value_the_environment_hides_is_marked_and_every_other_field_is_not()
     {
         var admin = await ServerAdminKit.AdminAsync(api, "sh-mark");
-        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "page-user", host = "page.example.net" })).EnsureSuccessStatusCode();
+        // A mail server on this machine: the saved user may go to it without STARTTLS (the fallback here has it off).
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "page-user", host = "127.0.0.1" })).EnsureSuccessStatusCode();
         await using var host = HostKit.WithConfig(api, c => HostKit.WithEnv(HostKit.WithEnv(c, "smtp.user", "env-user"), "smtp.port", "2525"));
         var client = await HostKit.SignInAsync(api, host, admin);
 

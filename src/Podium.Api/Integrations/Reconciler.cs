@@ -14,6 +14,9 @@ public sealed class Reconciler(IServiceScopeFactory scopes, ApiConfig config, In
     public static readonly TimeSpan Tick = TimeSpan.FromMinutes(1);
     public static readonly TimeSpan ReceiptKeep = TimeSpan.FromDays(7);
 
+    /// <summary>How long the record of a pass or an import is kept; the page shows only the last ten.</summary>
+    public static readonly TimeSpan RunKeep = TimeSpan.FromDays(30);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(Tick);
@@ -33,9 +36,13 @@ public sealed class Reconciler(IServiceScopeFactory scopes, ApiConfig config, In
             var now = clock.GetUtcNow();
             var due = now - config.IntegrationPassEvery;
             // Always running since ADR-0017 (the Jira app may be saved later): without one there is nothing to pass, only the clean-up below.
+            // A pass that failed leaves LastPassAt where it was (the next good pass reads from there): its own run row keeps it from being
+            // tried again on every tick.
             List<Guid> ids = settings.JiraAvailable
                 ? await db.IntegrationConnections.AsNoTracking()
-                    .Where(c => c.Status == ConnectionStatuses.Active && (c.LastPassAt == null || c.LastPassAt <= due)).Select(c => c.Id).ToListAsync(ct)
+                    .Where(c => c.Status == ConnectionStatuses.Active && (c.LastPassAt == null || c.LastPassAt <= due)
+                                && !db.IntegrationSyncRuns.Any(r => r.ConnectionId == c.Id && r.Kind == SyncKinds.Pass && r.StartedAt > due))
+                    .Select(c => c.Id).ToListAsync(ct)
                 : [];
             foreach (var id in ids)
             {
@@ -59,6 +66,7 @@ public sealed class Reconciler(IServiceScopeFactory scopes, ApiConfig config, In
             {
                 await db.IntegrationWebhookReceipts.Where(r => r.ReceivedAt < now - ReceiptKeep).ExecuteDeleteAsync(ct);
                 await db.IntegrationOAuthStates.Where(s => s.ExpiresAt < now).ExecuteDeleteAsync(ct);
+                await db.IntegrationSyncRuns.Where(r => r.StartedAt < now - RunKeep).ExecuteDeleteAsync(ct);
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

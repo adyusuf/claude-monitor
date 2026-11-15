@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Podium.Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Tests;
 
@@ -108,6 +109,36 @@ public sealed class ApplicationPartTests(ApiFactory api)
         Assert.Equal(("status", "invalid_value"), await ProjectKit.ProblemAsync(await owner.PostAsync($"/api/applications/{app}/releases", new { name = "2.0.0", status = "shipped" })));
         Assert.Equal(("name", "invalid_name"), await ProjectKit.ProblemAsync(await owner.PostAsync($"/api/applications/{app}/releases", new { name = "" })));
         Assert.Equal(HttpStatusCode.NoContent, (await owner.SendAsync(HttpMethod.Put, $"/api/releases/{out1}", new { name = "1.0.0", plannedDate = "2026-11-02", status = "released" })).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("planned", "released", null)]
+    [InlineData("planned", "cancelled", null)]
+    [InlineData("planned", "planned", null)]
+    [InlineData("released", "released", null)]
+    [InlineData("released", "planned", "released")]
+    [InlineData("released", "cancelled", "released")]
+    public async Task A_release_moves_only_forward_and_one_that_went_out_stays_released(string from, string to, string? refusal)
+    {
+        var (owner, _, app) = await SetUpAsync();
+        var release = await IdAsync(await owner.PostAsync($"/api/applications/{app}/releases", new { name = "1.0.0", status = from }));
+
+        var response = await owner.SendAsync(HttpMethod.Put, $"/api/releases/{release}", new { name = "1.0.0", status = to });
+
+        if (refusal is null) Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        else Assert.Equal(("status", refusal), await ProjectKit.ProblemAsync(response));
+        var stored = (await owner.GetJsonAsync($"/api/applications/{app}/releases")).EnumerateArray().Select(r => r.GetProperty("status").GetString()).ToList();
+        Assert.Equal(refusal is null && to == "cancelled" ? [] : [refusal is null ? to : from], stored);
+    }
+
+    [Fact]
+    public async Task A_release_is_not_created_cancelled()
+    {
+        var (owner, _, app) = await SetUpAsync();
+
+        Assert.Equal(("status", "invalid_value"), await ProjectKit.ProblemAsync(await owner.PostAsync($"/api/applications/{app}/releases", new { name = "1.0.0", status = "cancelled" })));
+        await using var db = api.Db();
+        Assert.Equal(0, await db.ApplicationReleases.CountAsync(r => r.ApplicationId == app));
     }
 
     [Fact]

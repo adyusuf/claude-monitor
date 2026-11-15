@@ -164,6 +164,17 @@ public static class ApprovalRules
     }
 
     /// <summary>
+    /// Counts one use of a rule, conditional on it still being live (not revoked, not ended): true when this call counted it, false when it
+    /// no longer stands. Done in the database, so uses at the same moment are all counted and a rule revoked a moment ago allows nothing.
+    /// </summary>
+    public static async Task<bool> CountUseAsync(PodiumDb db, Guid ruleId, DateTimeOffset now, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        return await db.ApprovalRules.Where(r => r.Id == ruleId && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now))
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.UseCount, r => r.UseCount + 1).SetProperty(r => r.LastUsedAt, now), ct) == 1;
+    }
+
+    /// <summary>
     /// The live rule that allows this request, if any: the same machine, project, tool and pinned value, made by the user who owns the machine
     /// now, in its workspace, not revoked and not ended, and the machine active and not strict. A path tool's request matches only inside the
     /// project's access (<see cref="ApprovalRuleAccess"/>).

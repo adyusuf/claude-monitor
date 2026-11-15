@@ -81,6 +81,17 @@ describe("saving an integration", () => {
     expect(mail.queryByText(s.savedDone)).not.toBeInTheDocument();
   });
 
+  it("shows a sign-in refused without STARTTLS at the STARTTLS setting, in this page's own words", async () => {
+    serveServerSettings({ "PUT /server/integrations/smtp": { status: 400, body: { errors: { tls: ["tls_required"] } } } });
+    page();
+    const mail = await mailCard();
+    await userEvent.type(mail.getByLabelText(req(s.fields.user)), "x");
+    await userEvent.click(saveMail());
+    expect(await mail.findByText(s.errors.tls_required)).toBeInTheDocument();
+    expect(mail.queryByText("errors.tls_required")).not.toBeInTheDocument();
+    expect(mail.queryByText(s.savedDone)).not.toBeInTheDocument();
+  });
+
   it("shows a refusal the card has no field for at the top, with the app-wide text of its code", async () => {
     serveServerSettings({ "PUT /server/integrations/smtp": { status: 400, body: { errors: { values: ["set_on_server"] } } } });
     page();

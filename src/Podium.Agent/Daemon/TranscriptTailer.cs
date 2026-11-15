@@ -1,3 +1,5 @@
+using System.Data.Common;
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using Podium.Agent.Capture;
@@ -11,9 +13,10 @@ namespace Podium.Agent.Daemon;
 /// <summary>
 /// Follows the transcript (JSONL) of every session a hook mentioned in the last day: each new complete line becomes a
 /// "transcript" event, and each assistant message's token usage a "usage" event, once per message id (a message is
-/// written in several lines that repeat its usage).
+/// written in several lines that repeat its usage). One transcript that cannot be read, or one line that cannot be taken,
+/// never stops the other transcripts: the failure is logged by type name and that transcript goes on at the next pass.
 /// </summary>
-public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeProvider clock)
+public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeProvider clock, AgentLog log)
 {
     public static readonly TimeSpan ActiveWindow = TimeSpan.FromDays(1);
 
@@ -27,7 +30,14 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         pending = [.. store.UnconfirmedPushes().Select(p => p.Id), .. store.UnconfirmedAsks().Select(a => a.Id)];
         foreach (var t in store.Transcripts(clock.GetUtcNow() - ActiveWindow))
         {
-            taken += Follow(t);
+            try
+            {
+                taken += Follow(t);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or FormatException or DbException)
+            {
+                log.Write($"transcript of session {t.Session} not read: {e.GetType().Name}"); // never its path or content
+            }
         }
 
         return taken;
@@ -43,22 +53,51 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         var recorder = new Recorder(config, store);
         var buffer = new MemoryStream();
         var taken = 0;
+        long lineBytes = 0;
         int b;
-        while ((b = stream.ReadByte()) != -1)
+        try
         {
-            if (b != '\n')
+            while ((b = stream.ReadByte()) != -1)
             {
-                if (buffer.Length < config.TranscriptLineMax) buffer.WriteByte((byte)b);
-                continue;
-            }
+                if (b != '\n')
+                {
+                    lineBytes++;
+                    if (buffer.Length < config.TranscriptLineMax) buffer.WriteByte((byte)b);
+                    continue;
+                }
 
-            offset = stream.Position;
-            var line = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
-            buffer.SetLength(0);
-            if (Take(t, line, project, recorder)) taken++;
+                var lineStart = offset;
+                offset = stream.Position;
+                var line = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+                buffer.SetLength(0);
+                var bytes = lineBytes;
+                lineBytes = 0;
+                try
+                {
+                    if (bytes > config.TranscriptLineMax)
+                    {
+                        // Only its first part was kept, which cannot be parsed: a marker says that a line was there and how big it was.
+                        recorder.Record(EventKinds.Transcript, t.Session, Oversized(line, bytes), project, clock.GetUtcNow(), cut: true);
+                        taken++;
+                    }
+                    else if (Take(t, line, project, recorder))
+                    {
+                        taken++;
+                    }
+                }
+                catch (DbException)
+                {
+                    offset = lineStart; // a busy or locked database is not the line's fault: it is read again at the next pass, not lost
+                    throw;
+                }
+            }
+        }
+        finally
+        {
+            // A partial last line is read again next time; the lines taken before a failure are not, nor a line that failed to parse; a line whose write failed is.
+            store.TranscriptRead(t.Session, offset);
         }
 
-        store.TranscriptRead(t.Session, offset); // a partial last line is read again next time
         return taken;
     }
 
@@ -92,6 +131,71 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         }
 
         return true;
+    }
+
+    /// <summary>How many times the JSON escapes of a kept fragment are undone: content nested in content (a tool result that holds a transcript) is escaped once per level.</summary>
+    private const int UnescapeLevels = 3;
+
+    /// <summary>A line over the limit: its size and a preview cut on a character boundary. The kept part is raw JSONL text, whose escaped quotes (\"api_key\": \"...\") hide a secret from the masker: the escapes are undone before it is masked.</summary>
+    private static JsonObject Oversized(string kept, long bytes)
+    {
+        var text = kept;
+        for (var level = 0; level < UnescapeLevels && text.Contains('\\', StringComparison.Ordinal); level++) text = UnescapeJson(text);
+        var n = Math.Min(text.Length, Recorder.PreviewChars);
+        if (n < text.Length && char.IsHighSurrogate(text[n - 1])) n--;
+        return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = text[..n] };
+    }
+
+    /// <summary>Undoes one level of JSON string escapes in a fragment that may end in the middle of one; a backslash that starts no known escape stays as it is.</summary>
+    internal static string UnescapeJson(string fragment)
+    {
+        var sb = new StringBuilder(fragment.Length);
+        for (var i = 0; i < fragment.Length; i++)
+        {
+            if (fragment[i] != '\\' || i + 1 >= fragment.Length)
+            {
+                sb.Append(fragment[i]);
+                continue;
+            }
+
+            var next = fragment[i + 1];
+            switch (next)
+            {
+                case '"' or '\\' or '/':
+                    sb.Append(next);
+                    i++;
+                    break;
+                case 'n':
+                    sb.Append('\n');
+                    i++;
+                    break;
+                case 't':
+                    sb.Append('\t');
+                    i++;
+                    break;
+                case 'r':
+                    sb.Append('\r');
+                    i++;
+                    break;
+                case 'b':
+                    sb.Append('\b');
+                    i++;
+                    break;
+                case 'f':
+                    sb.Append('\f');
+                    i++;
+                    break;
+                case 'u' when i + 5 < fragment.Length && ushort.TryParse(fragment.AsSpan(i + 2, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var code):
+                    sb.Append((char)code);
+                    i += 5;
+                    break;
+                default:
+                    sb.Append('\\');
+                    break;
+            }
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>Claude's usage block, with the cache writes split by lifetime (they are priced differently).</summary>

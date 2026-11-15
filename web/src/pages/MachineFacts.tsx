@@ -5,11 +5,11 @@ import { useErrorText, useI18n } from "../i18n";
 
 export const NOTE_MAX = 2000;
 
-/** True for text the API accepts as a note: at most 2000 characters, no control characters besides line breaks and tabs. */
+/** True for text the API accepts as a note: at most 2000 characters, no control characters (C0, DEL and C1, as the API's `char.IsControl`) besides line breaks and tabs. */
 export const noteOk = (note: string): boolean =>
   note.length <= NOTE_MAX && [...note].every((c) => {
     const code = c.charCodeAt(0);
-    return (code >= 0x20 && code !== 0x7f) || c === "\n" || c === "\r" || c === "\t";
+    return (code >= 0x20 && code < 0x7f) || code > 0x9f || c === "\n" || c === "\r" || c === "\t";
   });
 
 /** The runbook note of a machine: every member reads it as plain text, an admin edits it. It is untrusted text and is never rendered as markup. */

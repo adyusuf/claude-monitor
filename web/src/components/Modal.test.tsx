@@ -119,6 +119,25 @@ describe("Modal focus", () => {
     expect(opener).toHaveFocus();
   });
 
+  it("leaves focus on a field that took it itself (autoFocus), and gives it back to the opener when it closes", async () => {
+    function Page() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>Open</button>
+          {open ? <Modal title="Code" onClose={() => setOpen(false)}><input aria-label="Code" autoFocus /></Modal> : null}
+        </>
+      );
+    }
+    render(inEnglish(<Page />));
+    const opener = screen.getByRole("button", { name: "Open" });
+    await userEvent.click(opener);
+    expect(screen.getByRole("textbox", { name: "Code" })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
   it("takes Tab from the last control back to the first", async () => {
     render(inEnglish(<Modal title="Sure?" onClose={() => undefined}><button type="button">Yes</button><button type="button">No</button></Modal>));
     const close = screen.getByRole("button", { name: "Close" });

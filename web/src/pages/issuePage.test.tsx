@@ -111,6 +111,14 @@ describe("the issue page: rights and archive", () => {
     expect(screen.queryByRole("button", { name: "Add link" })).not.toBeInTheDocument();
   });
 
+  it("shows no write control, not even Restore, for an issue of an archived project", async () => {
+    serve({ "GET /projects/p1": { body: project({ status: "archived" }) }, "GET /issues/i1": view({}, { archived: true }) });
+    open("/w/w1/projects/p1/issues/i1?edit=1");
+    expect(await screen.findByText("This issue is archived: it is read-only until it is restored.")).toBeInTheDocument();
+    for (const name of ["Edit", "Archive", "Restore", "Add link", "Add test case"]) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
+  });
+
   it("archives after a confirmation and shows the archived banner with Restore", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     let archived = false;

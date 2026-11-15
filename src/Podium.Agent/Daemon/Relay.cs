@@ -39,13 +39,28 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
 
     public void HeartbeatFailed(string errorType) => store.Set(HeartbeatErrorKey, errorType);
 
+    // The batch size the API takes: halved each time it refuses a batch as too large (its MaxBatchEvents is below ours), for this daemon's life.
+    private int batchEvents = config.BatchEvents;
+
     /// <summary>Sends batches until the outbox is empty. Returns the number of events the API acknowledged.</summary>
     public async Task<int> UploadAsync(CancellationToken ct)
     {
         var sent = 0;
-        while (store.NextBatch(config.BatchEvents, config.BatchBytes) is { } batch)
+        while (store.NextBatch(batchEvents, config.BatchBytes) is { } batch)
         {
-            var ack = await api.SendBatchAsync(new EventBatch(batch.Seq, batch.Rows.Select(r => r.Event).ToList()), ct);
+            BatchAck ack;
+            try
+            {
+                ack = await api.SendBatchAsync(new EventBatch(batch.Seq, batch.Rows.Select(r => r.Event).ToList()), ct);
+            }
+            catch (ApiException e) when (e.Status == System.Net.HttpStatusCode.RequestEntityTooLarge && batch.Rows.Count > 1)
+            {
+                // Refused before anything was stored under its number: the same number goes up again with the first half only.
+                batchEvents = Math.Max(1, batch.Rows.Count / 2);
+                store.ShrinkBatch(batch.Seq, batchEvents);
+                continue;
+            }
+
             store.Acknowledge(batch.Seq);
             sent += ack.Duplicate ? 0 : batch.Rows.Count;
             UploadOutcome(null);
@@ -125,8 +140,8 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         // cannot leave one pass's values under the other's tag.
         List<(string Key, string Value)> entries =
         [
-            ("settings.mask_secrets", s.MaskSecrets ? "true" : "false"),
-            ("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
+            (Capture.Recorder.MaskSecretsKey, s.MaskSecrets ? "true" : "false"),
+            (Capture.Recorder.EventMaxBytesKey, s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
             (UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate)),
             .. MachineMonitor.Entries(s),
             (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
@@ -231,7 +246,8 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 store.Set(PushStatus.StreamCommandKey, c.Id.ToString());
                 store.Set(PushStatus.StreamCommandAtKey, Now());
                 if (store.SaveCommand(new LocalCommand(c.Id.ToString(), c.SessionExternalId, c.Kind, c.Body, c.ExpiresAt))) store.Bump(PushStatus.InCountKey);
-                await api.CommandStatusAsync(c.Id.ToString(), CommandStatuses.Delivered, null, ct);
+                // The API refuses "delivered" for a command cancelled (or expired) in the meantime: it is then not handed to the session.
+                if (!await api.CommandStatusAsync(c.Id.ToString(), CommandStatuses.Delivered, null, ct)) store.DropQueuedCommand(c.Id.ToString());
                 return true;
             case AgentStreamEvents.PermissionAnswer:
                 var a = data.Deserialize<PermissionAnswerMessage>(ApiClient.Json)!;

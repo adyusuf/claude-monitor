@@ -7,6 +7,7 @@ import { languages, useI18n, type Language } from "../i18n";
 import { useApprovalQueue } from "../lib/approvalQueue";
 import { usePendingApprovals } from "../lib/pending";
 import { ApprovalBand } from "./ApprovalBand";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { BrandMark, Icon, type IconName } from "./icons";
 
 type Theme = "light" | "dark" | "system";
@@ -44,6 +45,7 @@ export function Layout() {
   const workspaces = me?.workspaces ?? [];
   const current = workspaces.find((w) => w.id === ws) ?? workspaces[0];
   const [menuOpen, setMenuOpen] = useState(false);
+  const [signOutFailed, setSignOutFailed] = useState(false);
   const path = useLocation().pathname;
   const pending = usePendingApprovals(current?.id, path);
   const queue = useApprovalQueue(current?.id, path);
@@ -65,7 +67,7 @@ export function Layout() {
         </div>
         {current ? (
           <label className="switcher">
-            <span className="sr-only">Workspace</span>
+            <span className="sr-only">{t("nav.workspace")}</span>
             <select value={current.id} onChange={(e) => e.target.value === "new" ? navigate("/workspaces/new") : navigate(`/w/${e.target.value}/projects`)}>
               {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               <option value="new">+ {t("nav.newWorkspace")}</option>
@@ -111,14 +113,22 @@ export function Layout() {
             </select>
           </div>
           <button type="button" className="link" onClick={async () => {
-            await signOut();
+            setSignOutFailed(false);
+            try {
+              await signOut();
+            } catch (e) {
+              console.error(e);
+              setSignOutFailed(true);
+              return;
+            }
             navigate("/login");
           }}>{t("nav.signOut")}</button>
+          {signOutFailed ? <span className="field-error" role="alert">{t("nav.signOutFailed")}</span> : null}
         </div>
       </aside>
       <div className="main-col">
         <div className="topbar">
-          <button type="button" className="menu-toggle" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
+          <button type="button" className="menu-toggle" aria-label={t("nav.menu")} onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
           <span className="topbar-name">{t("app.name")}</span>
         </div>
         <div className="main">
@@ -126,7 +136,7 @@ export function Layout() {
             queue.drop(id);
             queue.reload();
           }} /> : null}
-          <Outlet />
+          <ErrorBoundary path={path}><Outlet /></ErrorBoundary>
         </div>
       </div>
     </div>

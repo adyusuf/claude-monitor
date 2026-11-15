@@ -23,7 +23,8 @@ export function SessionPage() {
   const [error, setError] = useState<unknown>(null);
   const [version, setVersion] = useState(0);
   const [view, setView] = useState<"chat" | "raw">("chat");
-  const { rows, reload: reloadRows } = useCommandRows(id, version);
+  const { rows, reload: reloadRows, error: rowsError } = useCommandRows(id, version);
+  const [cancelError, setCancelError] = useState<unknown>(null);
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +46,17 @@ export function SessionPage() {
   useLive(ws, (m) => {
     if (!m.sessionId || m.sessionId === id || isCatchUp(m)) reload();
   });
+
+  // A queued message cancelled from the conversation: a refusal or a failure is shown, and the list is read again either way.
+  const cancel = async (commandId: string) => {
+    setCancelError(null);
+    try {
+      await api.cancelCommand(commandId);
+    } catch (e) {
+      setCancelError(e);
+    }
+    await reloadRows();
+  };
 
   if (error && !detail) return <div className="page"><Notice kind="error">{errorText(error)}</Notice></div>;
   if (!detail) return <Spinner />;
@@ -74,6 +86,7 @@ export function SessionPage() {
 
       <div className="grid">
         <div className="col">
+          {rowsError || cancelError ? <Notice kind="error">{errorText(cancelError ?? rowsError)}</Notice> : null}
           <div className="seg" role="group" aria-label={t("chat.view")}>
             {(["chat", "raw"] as const).map((v) => (
               <button key={v} type="button" className={view === v ? "seg-on" : ""} aria-pressed={view === v} onClick={() => setView(v)}>{t(`chat.view_${v}`)}</button>
@@ -81,13 +94,13 @@ export function SessionPage() {
           </div>
           {view === "chat"
             ? <ChatCard sessionId={id} version={version} canReply={detail.canCommand} onReplied={reload} commands={rows} canCancel={detail.canCommand}
-              onCancel={(commandId) => { void api.cancelCommand(commandId).then(reloadRows).catch(() => reloadRows()); }}
+              onCancel={(commandId) => void cancel(commandId)}
               footer={<>
                 <PermissionsCard inline sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
                 <Composer {...sender} />
               </>} />
             : <>
-              <EventsCard sessionId={id} owner={{ ownerId: s.ownerId, ownerName: s.ownerName }} version={version} />
+              <EventsCard sessionId={id} owner={{ ownerId: s.ownerId, ownerName: s.ownerName }} version={version} commands={rows} />
               <PermissionsCard sessionId={id} canAnswer={detail.canCommand} version={version} onChange={reload} />
             </>}
           {view === "raw" ? <CommandsCard {...sender} rows={rows} withComposer /> : null}

@@ -42,10 +42,9 @@ public sealed class ClaudeNotifierTests
         Assert.Empty(runner.Calls);
     }
 
-    [Fact]
+    [MacOsFact]
     public void On_macOS_it_shows_a_notification_through_osascript_and_says_yes_when_that_worked()
     {
-        if (!OperatingSystem.IsMacOS()) return;
         var runner = new Osascript();
         Assert.True(new SystemNotifier(runner, TimeSpan.FromSeconds(5)).Notify(Text));
         var (file, args) = Assert.Single(runner.Calls);
@@ -58,14 +57,13 @@ public sealed class ClaudeNotifierTests
         Assert.EndsWith("\" with title \"Podium\"", args[1], StringComparison.Ordinal);
     }
 
-    [Fact]
+    [MacOsFact]
     public void On_macOS_a_failing_osascript_is_no_notification()
     {
-        if (!OperatingSystem.IsMacOS()) return;
         Assert.False(new SystemNotifier(new Osascript(exit: 1), TimeSpan.FromSeconds(5)).Notify(Text));
     }
 
-    [Theory]
+    [MacOsTheory]
     [InlineData("He said \"hi\" \\ there")]
     [InlineData("line one\nline two\r\nline three")]
     [InlineData("\" & do shell script \"x\"")]
@@ -73,7 +71,6 @@ public sealed class ClaudeNotifierTests
     [InlineData("it's $(rm -rf ~) `id` ; | > < * ? { } [ ] ' \u2028 \u00e7 \u202e")]
     public void On_macOS_the_message_is_reduced_to_plain_characters_before_it_reaches_AppleScript(string hostile)
     {
-        if (!OperatingSystem.IsMacOS()) return; // elsewhere nothing is ever built or run: see the first test
         var runner = new Osascript();
         new SystemNotifier(runner, TimeSpan.FromSeconds(5)).Notify(hostile);
         var script = Assert.Single(runner.Calls).Args[1];
@@ -86,10 +83,9 @@ public sealed class ClaudeNotifierTests
         Assert.All(shown, c => Assert.True(char.IsAsciiLetterOrDigit(c) || c is ' ' or '.' or ',' or ':' or '-' or '(' or ')' or '`', $"'{c}' reached AppleScript"));
     }
 
-    [Fact]
+    [MacOsFact]
     public void On_macOS_the_agents_own_notice_survives_the_reduction_unchanged()
     {
-        if (!OperatingSystem.IsMacOS()) return;
         var runner = new Osascript();
         new SystemNotifier(runner, TimeSpan.FromSeconds(5)).Notify(Text);
         Assert.Equal($"display notification \"{Text}\" with title \"Podium\"", Assert.Single(runner.Calls).Args[1]);

@@ -38,6 +38,8 @@ public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gat
     {
         ArgumentNullException.ThrowIfNull(sprint);
         if (sprint.SourceConnectionId is null) return null;
+        // A null date means "unchanged" toward the tool, so a cleared date would never reach it: a mirrored sprint keeps the dates it has.
+        if ((start is null && sprint.StartDate is not null) || (end is null && sprint.EndDate is not null)) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.DatesKept);
         var change = new IterationChange(name == sprint.Name ? null : name ?? "", goal == sprint.Goal ? null : goal ?? "", start == sprint.StartDate ? null : start, end == sprint.EndDate ? null : end);
         if (change is { Name: null, Goal: null, Start: null, End: null }) return null;
         return await RunAsync(user, sprint, (ctx, id) => writer.UpdateIterationAsync(ctx, id, change, ct), ct);
@@ -51,12 +53,16 @@ public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gat
             : RunAsync(user, sprint, (ctx, id) => writer.StartIterationAsync(ctx, id, first, last, ct), ct);
     }
 
-    /// <summary>Closing moves the unfinished issues first (to another mirrored sprint or the backlog), then closes.</summary>
+    /// <summary>
+    /// Closing moves the unfinished issues first (to another mirrored sprint or the backlog), then closes. The two calls are not atomic: when the
+    /// move reaches the tool and the close is refused, the tool keeps the move while nothing changes here; the next sync pass brings the issues
+    /// here in line with the tool, and the close can be tried again (MirrorSprintEdgeTests).
+    /// </summary>
     public async Task<IResult?> CloseAsync(Guid user, Sprint sprint, IReadOnlyList<Issue> unfinished, Sprint? moveTo, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(sprint);
         ArgumentNullException.ThrowIfNull(unfinished);
-        if (sprint.SourceConnectionId is null) return null;
+        if (sprint.SourceConnectionId is null) return moveTo?.SourceConnectionId is null ? null : MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         if (moveTo is not null && moveTo.SourceConnectionId != sprint.SourceConnectionId) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         var keys = unfinished.Where(i => i.ExternalKey is not null).Select(i => i.ExternalKey!).ToList();
         var target = moveTo is null ? null : await gate.LinkOfAsync(LinkKinds.Sprint, moveTo.Id, ct);

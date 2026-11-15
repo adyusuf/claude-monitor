@@ -18,6 +18,9 @@ public static class JobSchedules
 {
     public const int Batch = 100;
 
+    /// <summary>The workspace stream's event for a schedule that changed (created, paused, started again or ended, by a person or by this engine).</summary>
+    public const string WorkspaceEvent = "schedule";
+
     // An array, not the contract's set: EF Core translates Contains on an array (IN).
     private static readonly string[] OpenStatuses = [RunStatuses.PendingApproval, RunStatuses.Approved, RunStatuses.Delivered, RunStatuses.Running];
     private static readonly string[] Counted = [RunStatuses.Failed, RunStatuses.TimedOut, RunStatuses.Expired];
@@ -27,7 +30,7 @@ public static class JobSchedules
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(broker);
-        await SettleAsync(db, now, ct);
+        await SettleAsync(db, broker, now, ct);
         var due = await db.JobSchedules.AsNoTracking().Where(s => s.Status == ScheduleStatuses.Active && s.NextRunAt <= now)
             .OrderBy(s => s.NextRunAt).ThenBy(s => s.Id).Take(Batch).ToListAsync(ct);
         foreach (var schedule in due)
@@ -37,7 +40,7 @@ public static class JobSchedules
     }
 
     /// <summary>Counts the outcome of each schedule's last run once it is final: a success clears the failures, a failed, timed-out or expired run adds one, and the third pauses the schedule.</summary>
-    private static async Task SettleAsync(PodiumDb db, DateTimeOffset now, CancellationToken ct)
+    private static async Task SettleAsync(PodiumDb db, Broker broker, DateTimeOffset now, CancellationToken ct)
     {
         var open = await db.JobSchedules.AsNoTracking().Where(s => !s.LastRunSettled && s.LastRunId != null && s.Status != ScheduleStatuses.Ended)
             .OrderBy(s => s.Id).Take(Batch).ToListAsync(ct);
@@ -56,7 +59,11 @@ public static class JobSchedules
                 .ExecuteUpdateAsync(u => u.SetProperty(s => s.LastRunSettled, true).SetProperty(s => s.FailuresInARow, failures)
                     .SetProperty(s => s.Status, pause ? ScheduleStatuses.Paused : schedule.Status)
                     .SetProperty(s => s.PauseReason, pause ? ScheduleReasons.Failures : schedule.PauseReason).SetProperty(s => s.UpdatedAt, now), ct);
-            if (pause) await AuditAsync(db, AuditActions.SchedulePaused, schedule, ScheduleReasons.Failures, now, ct);
+            if (pause)
+            {
+                await AuditAsync(db, AuditActions.SchedulePaused, schedule, ScheduleReasons.Failures, now, ct);
+                Changed(broker, schedule);
+            }
         }
     }
 
@@ -65,25 +72,25 @@ public static class JobSchedules
         var settings = await db.WorkspaceSettings.AsNoTracking().FirstOrDefaultAsync(s => s.WorkspaceId == schedule.WorkspaceId, ct);
         var job = await db.MachineJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == schedule.JobId, ct);
         var target = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == schedule.TargetAgentId, ct);
-        if (job is not { Status: JobStatuses.Active, Argv: { } argv } || argv.Any(a => a.Contains('{'))) { await StopAsync(db, schedule, ScheduleStatuses.Ended, ScheduleReasons.JobRetired, now, ct); return; }
+        if (job is not { Status: JobStatuses.Active, Argv: { } argv } || argv.Any(a => a.Contains('{'))) { await StopAsync(db, broker, schedule, ScheduleStatuses.Ended, ScheduleReasons.JobRetired, now, ct); return; }
         if (target is null || target.Status != AgentStatuses.Active || target.WorkspaceId != schedule.WorkspaceId
             || await Access.MemberAsync(db, schedule.OwnerUserId, schedule.WorkspaceId, Roles.Member, ct) is null)
         {
-            await StopAsync(db, schedule, ScheduleStatuses.Ended, ScheduleReasons.TargetGone, now, ct);
+            await StopAsync(db, broker, schedule, ScheduleStatuses.Ended, ScheduleReasons.TargetGone, now, ct);
             return;
         }
 
         if (MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(target.RoleEnvironment, target.ClaimedEnvironment), MachineRoles.EffectiveFunction(target.RoleFunction, target.ClaimedFunction)))
         {
-            await StopAsync(db, schedule, ScheduleStatuses.Paused, ScheduleReasons.Strict, now, ct); // no unattended runs on production or a database
+            await StopAsync(db, broker, schedule, ScheduleStatuses.Paused, ScheduleReasons.Strict, now, ct); // no unattended runs on production or a database
             return;
         }
 
-        if (target.ApprovalsRequired) { await StopAsync(db, schedule, ScheduleStatuses.Paused, ScheduleReasons.Approvals, now, ct); return; }
-        if (!ExecLevels.Allows(target.ExecLevel, RunModes.Argv)) { await StopAsync(db, schedule, ScheduleStatuses.Paused, ScheduleReasons.ExecLevel, now, ct); return; }
+        if (target.ApprovalsRequired) { await StopAsync(db, broker, schedule, ScheduleStatuses.Paused, ScheduleReasons.Approvals, now, ct); return; }
+        if (!ExecLevels.Allows(target.ExecLevel, RunModes.Argv)) { await StopAsync(db, broker, schedule, ScheduleStatuses.Paused, ScheduleReasons.ExecLevel, now, ct); return; }
 
         var next = ScheduleLimits.Next(schedule.Kind, schedule.IntervalMinutes, schedule.DailyAtMinutes, now);
-        if (next is null) { await StopAsync(db, schedule, ScheduleStatuses.Ended, ScheduleReasons.Owner, now, ct); return; }
+        if (next is null) { await StopAsync(db, broker, schedule, ScheduleStatuses.Ended, ScheduleReasons.Owner, now, ct); return; }
         var tick = schedule.NextRunAt;
 
         // The switch is off, the last run is still open, or the target already has its hands full: this tick is skipped, the schedule stays as it is.
@@ -141,17 +148,19 @@ public static class JobSchedules
     }
 
     /// <summary>Moves an active schedule to paused or ended, once (a compare-and-set on its status), and records why.</summary>
-    public static async Task StopAsync(PodiumDb db, JobSchedule schedule, string status, string reason, DateTimeOffset now, CancellationToken ct)
+    public static async Task StopAsync(PodiumDb db, Broker broker, JobSchedule schedule, string status, string reason, DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(schedule);
         var changed = await db.JobSchedules.Where(s => s.Id == schedule.Id && s.Status == ScheduleStatuses.Active)
             .ExecuteUpdateAsync(u => u.SetProperty(s => s.Status, status).SetProperty(s => s.PauseReason, reason).SetProperty(s => s.UpdatedAt, now), ct);
-        if (changed == 1) await AuditAsync(db, status == ScheduleStatuses.Ended ? AuditActions.ScheduleEnded : AuditActions.SchedulePaused, schedule, reason, now, ct);
+        if (changed != 1) return;
+        await AuditAsync(db, status == ScheduleStatuses.Ended ? AuditActions.ScheduleEnded : AuditActions.SchedulePaused, schedule, reason, now, ct);
+        Changed(broker, schedule);
     }
 
     /// <summary>Ends every live schedule of a job (it was retired): none of them fires again.</summary>
-    public static async Task EndForJobAsync(PodiumDb db, Guid jobId, string reason, DateTimeOffset now, CancellationToken ct)
+    public static async Task EndForJobAsync(PodiumDb db, Broker broker, Guid jobId, string reason, DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         var live = await db.JobSchedules.AsNoTracking().Where(s => s.JobId == jobId && s.Status != ScheduleStatuses.Ended).OrderBy(s => s.Id).ToListAsync(ct);
@@ -159,8 +168,18 @@ public static class JobSchedules
         {
             var changed = await db.JobSchedules.Where(s => s.Id == schedule.Id && s.Status != ScheduleStatuses.Ended)
                 .ExecuteUpdateAsync(u => u.SetProperty(s => s.Status, ScheduleStatuses.Ended).SetProperty(s => s.PauseReason, reason).SetProperty(s => s.UpdatedAt, now), ct);
-            if (changed == 1) await AuditAsync(db, AuditActions.ScheduleEnded, schedule, reason, now, ct);
+            if (changed != 1) continue;
+            await AuditAsync(db, AuditActions.ScheduleEnded, schedule, reason, now, ct);
+            Changed(broker, schedule);
         }
+    }
+
+    /// <summary>Tells the workspace's pages that a schedule changed (after its change was saved).</summary>
+    public static void Changed(Broker broker, JobSchedule schedule)
+    {
+        ArgumentNullException.ThrowIfNull(broker);
+        ArgumentNullException.ThrowIfNull(schedule);
+        broker.Publish(Broker.Workspace(schedule.WorkspaceId), new StreamMessage(WorkspaceEvent, new { id = schedule.Id, targetAgentId = schedule.TargetAgentId }));
     }
 
     private static async Task AuditAsync(PodiumDb db, string action, JobSchedule schedule, string reason, DateTimeOffset now, CancellationToken ct)

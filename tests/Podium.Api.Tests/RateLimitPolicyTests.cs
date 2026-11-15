@@ -15,14 +15,22 @@ public sealed class RateLimitPolicyTests(ApiFactory api)
     private const int Budget = 3; // LimitedFactory allows 3 auth requests per minute
 
     [Theory]
+    [InlineData("POST", "/api/auth/register")]
+    [InlineData("POST", "/api/auth/verify-email")]
     [InlineData("POST", "/api/auth/login")]
+    [InlineData("POST", "/api/auth/password/forgot")]
+    [InlineData("POST", "/api/auth/password/reset")]
     [InlineData("POST", "/api/auth/mfa")]
     [InlineData("GET", "/api/auth/external/github")]
     [InlineData("POST", "/api/device/code")]
     [InlineData("GET", "/api/device/lookup/BCDF-GHJK")]
+    [InlineData("POST", "/api/device/approve")]
+    [InlineData("POST", "/api/device/deny")]
     [InlineData("POST", "/api/agent/token/refresh")]
     [InlineData("POST", "/api/me/delete")]
     [InlineData("POST", "/api/me/mfa/disable")]
+    [InlineData("POST", "/api/workspaces/0190a1b2-0000-7000-8000-000000000001/invitations")]
+    [InlineData("POST", "/api/workspaces")]
     public async Task An_endpoint_with_the_auth_policy_answers_429_once_the_budget_is_spent(string method, string url)
     {
         Assert.NotNull(api); // the shared fixture has set the database and the other variables this API reads

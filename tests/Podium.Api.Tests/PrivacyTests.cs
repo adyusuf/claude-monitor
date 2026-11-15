@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,22 @@ public sealed class PrivacyTests(ApiFactory api)
         Assert.DoesNotContain("export-other", export.ToString(), StringComparison.Ordinal);
         Assert.NotNull(other.User);
         Assert.Equal(HttpStatusCode.Unauthorized, (await api.NewClient().Http.GetAsync("/api/me/export")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Export_writes_an_audit_row_without_content()
+    {
+        var (user, _, _) = await WithSessionAsync("export-audit");
+
+        var response = await user.Http.GetAsync("/api/me/export");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await using var db = api.Db();
+        var row = Assert.Single(await db.AuditEvents.AsNoTracking()
+            .Where(a => a.ActorUserId == user.Id && a.Action == AuditActions.DataExported).ToListAsync());
+        Assert.Null(row.Detail);
+        Assert.Null(row.WorkspaceId);
+        Assert.Null(row.TargetId);
     }
 
     [Fact]

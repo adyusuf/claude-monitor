@@ -5,6 +5,7 @@ using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Security;
 using Podium.Api.Streaming;
+using Podium.Api.Text;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -59,7 +60,8 @@ public static class CommandEndpoints
         if (await Access.SessionAsync(db, userId, id, http.RequestAborted) is not { } found) return Http.NotFound();
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
         if (!CommandKinds.All.Contains(req.Kind ?? "")) return Http.Invalid("kind", "invalid_kind");
-        if (req.Kind == CommandKinds.Prompt && (string.IsNullOrWhiteSpace(req.Body) || req.Body.Length > BodyMax))
+        // A NUL or half a surrogate pair cannot be stored: refused here, not a 500 from the database.
+        if (req.Kind == CommandKinds.Prompt && (string.IsNullOrWhiteSpace(req.Body) || req.Body.Length > BodyMax || !StorableText.Plain(req.Body)))
         {
             return Http.Invalid("body", "invalid_body");
         }
@@ -91,18 +93,22 @@ public static class CommandEndpoints
     private static async Task<IResult> Cancel(Guid id, HttpContext http, PodiumDb db, TimeProvider clock, Broker broker)
     {
         var userId = http.User.UserId();
-        var command = await db.SessionCommands.FirstOrDefaultAsync(c => c.Id == id, http.RequestAborted);
+        var command = await db.SessionCommands.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, http.RequestAborted);
         if (command is null || await Access.SessionAsync(db, userId, command.SessionId, http.RequestAborted) is not { } found)
         {
             return Http.NotFound();
         }
 
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
-        if (command.Status != CommandStatuses.Queued) return Results.Conflict();
-        command.Status = CommandStatuses.Cancelled;
+        // Compare-and-set: only a command still queued is cancelled, so the agent's "delivered" report and this cancel cannot both win.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var cancelled = await db.SessionCommands.Where(c => c.Id == id && c.Status == CommandStatuses.Queued)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommandStatuses.Cancelled), http.RequestAborted);
+        if (cancelled == 0) return Results.Conflict();
         Audit.Add(db, http, clock, AuditActions.CommandCancelled, command.WorkspaceId, userId, targetType: "command", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
-        broker.Publish(Broker.Workspace(command.WorkspaceId), new StreamMessage("command", new { sessionId = command.SessionId, id, status = command.Status }));
+        await tx.CommitAsync(http.RequestAborted);
+        broker.Publish(Broker.Workspace(command.WorkspaceId), new StreamMessage("command", new { sessionId = command.SessionId, id, status = CommandStatuses.Cancelled }));
         return Results.NoContent();
     }
 
@@ -129,12 +135,13 @@ public static class CommandEndpoints
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
         if (!PermissionDecisions.All.Contains(req.Decision ?? "")) return Http.Invalid("decision", "invalid_decision");
         if (req.Reason is { Length: > ReasonMax }) return Http.Invalid("reason", "too_long");
+        if (!StorableText.Plain(req.Reason)) return Http.Invalid("reason", "invalid_reason");
         if (req.Answers is not null && !AnswersFit(request, req.Decision!, req.Answers)) return Http.Invalid("answers", "invalid_answers");
         var remember = req.Remember ?? ApprovalDurations.Once;
         if (!ApprovalDurations.All.Contains(remember)) return Http.Invalid("remember", "invalid_duration");
         if (remember != ApprovalDurations.Once && req.Decision != PermissionDecisions.Allow) return Http.Invalid("remember", RuleNotAllowed);
         var now = clock.GetUtcNow();
-        if (request.Status != PermissionStatuses.Open || request.ExpiresAt <= now) return Results.Conflict();
+        if (request.Status != PermissionStatuses.Open || request.ExpiresAt <= now) return RemoteChecks.Conflict(RemoteErrors.NotPending);
         RuleAsk? ask = null;
         Guid? existing = null;
         if (remember != ApprovalDurations.Once)
@@ -145,20 +152,29 @@ public static class CommandEndpoints
             existing = standing;
         }
 
-        request.Status = PermissionStatuses.Answered;
-        request.Decision = req.Decision;
-        request.Reason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim();
-        request.AnsweredBy = userId;
-        request.AnsweredAt = now;
+        var decision = req.Decision!;
+        var reason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim();
         Audit.Add(db, http, clock, AuditActions.PermissionAnswered, request.WorkspaceId, userId, targetType: "permission_request",
-            targetId: id, detail: new { request.Decision, request.ToolName });
+            targetId: id, detail: new { Decision = decision, request.ToolName });
         // The answer, a new rule or the change to an existing one, and their audit rows are saved together or not at all: an answer that is
-        // not saved stays open (the owner can answer again), and one that is saved always reaches the agent below.
+        // not saved stays open (the owner can answer again), and one that is saved always reaches the agent below. The answer itself is a
+        // compare-and-set on a request still open and not expired: of two answers at once (the band, the approvals page and the session page
+        // show the same request), the database lets one through and the other saves nothing, sends nothing and gets 409.
         for (var attempt = 0; ; attempt++)
         {
             await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
             try
             {
+                var answered = await db.PermissionRequests
+                    .Where(p => p.Id == id && p.Status == PermissionStatuses.Open && p.ExpiresAt > now)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Answered).SetProperty(p => p.Decision, decision)
+                        .SetProperty(p => p.Reason, reason).SetProperty(p => p.AnsweredBy, userId).SetProperty(p => p.AnsweredAt, now), http.RequestAborted);
+                if (answered != 1)
+                {
+                    await tx.RollbackAsync(http.RequestAborted);
+                    return RemoteChecks.Conflict(RemoteErrors.NotPending); // answered meanwhile, or expired: the page says which in words
+                }
+
                 if (ask is not null && existing is { } ruleId && await ApprovalRuleCreation.StandLongerAsync(db, ruleId, ask, http.RequestAborted))
                 {
                     ApprovalRuleCreation.AuditRule(db, http, clock, ask, ruleId);
@@ -187,8 +203,8 @@ public static class CommandEndpoints
         }
 
         broker.Publish(Broker.Agent(request.AgentId), new StreamMessage(AgentStreamEvents.PermissionAnswer,
-            new PermissionAnswerMessage(id, found.Session.ExternalId, request.Decision!, request.Reason, req.Answers)));
-        broker.Publish(Broker.Workspace(request.WorkspaceId), new StreamMessage("permission", new { sessionId = request.SessionId, id, status = request.Status }));
+            new PermissionAnswerMessage(id, found.Session.ExternalId, decision, reason, req.Answers)));
+        broker.Publish(Broker.Workspace(request.WorkspaceId), new StreamMessage("permission", new { sessionId = request.SessionId, id, status = PermissionStatuses.Answered }));
         return Results.NoContent();
     }
 

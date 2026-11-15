@@ -1,4 +1,5 @@
 using Podium.Api.Data;
+using Podium.Api.Endpoints;
 using Podium.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,11 @@ namespace Podium.Api.Projects;
 public sealed record ProjectGrant(ManagedProject Project, WorkspaceMember Member, bool CanEdit, bool CanArchive, bool CanEditApplications)
 {
     public ProjectAccessView View => new(CanEdit, CanArchive, CanEditApplications);
+
+    /// <summary>An archived project is read-only until it is restored: every change below it answers <see cref="ReadOnly"/>.</summary>
+    public bool Archived => Project.Status != ManagedStatuses.Active;
+
+    public static IResult ReadOnly => Http.Invalid("status", "archived");
 }
 
 public static class ProjectAccess

@@ -30,14 +30,14 @@ describe("the sprint list: a new sprint", () => {
     serve();
     open();
     await userEvent.click(await screen.findByRole("button", { name: "New sprint" }));
-    expect(screen.getByLabelText("Start date")).toHaveValue("2026-03-02");
-    expect(screen.getByLabelText("End date")).toHaveValue("2026-03-12");
+    expect(screen.getByLabelText("Start date")).toHaveValue("02/03/2026");
+    expect(screen.getByLabelText("End date")).toHaveValue("12/03/2026");
     expect(screen.getByLabelText("Capacity (Hours)")).toBeInTheDocument();
-    fireChange(screen.getByLabelText("Start date"), "2026-03-09");
-    expect(screen.getByLabelText("End date")).toHaveValue("2026-03-19");
-    fireChange(screen.getByLabelText("End date"), "2026-03-20");
-    fireChange(screen.getByLabelText("Start date"), "2026-03-10");
-    expect(screen.getByLabelText("End date")).toHaveValue("2026-03-20");
+    fireChange(screen.getByLabelText("Start date"), "09/03/2026");
+    expect(screen.getByLabelText("End date")).toHaveValue("19/03/2026");
+    fireChange(screen.getByLabelText("End date"), "20/03/2026");
+    fireChange(screen.getByLabelText("Start date"), "10/03/2026");
+    expect(screen.getByLabelText("End date")).toHaveValue("20/03/2026");
   });
 
   it("asks for a capacity without a unit in a T-shirt project", async () => {
@@ -95,7 +95,7 @@ describe("the sprint list: a new sprint", () => {
     fixToday();
     const calls = serve();
     open("/w/w1/projects/p1/sprints?new=1");
-    fireChange(await screen.findByLabelText("End date"), "2026-03-01");
+    fireChange(await screen.findByLabelText("End date"), "01/03/2026");
     await userEvent.type(screen.getByLabelText("Capacity (Hours)"), "-3");
     await userEvent.click(screen.getByRole("button", { name: "Create sprint" }));
     expect(await screen.findByText("The end date cannot be before the start date.")).toBeInTheDocument();

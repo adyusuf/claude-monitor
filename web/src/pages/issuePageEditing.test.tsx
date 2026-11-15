@@ -74,3 +74,15 @@ describe("the issue page: adding a test case", () => {
     await waitFor(() => expect(screen.getByLabelText("Expected outcome")).toHaveValue(""));
   });
 });
+
+describe("the issue page: following a link to another issue", () => {
+  it("drops the previous issue's form and fields when the next issue fails to load", async () => {
+    serve({ "GET /issues/i3": { status: 500 } });
+    await open();
+    expect(screen.getByRole("heading", { level: 1, name: /#1 Pay with a card/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "#3 Print a receipt" }));
+    expect(await screen.findByText("Something went wrong on the server.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: /Pay with a card/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+});

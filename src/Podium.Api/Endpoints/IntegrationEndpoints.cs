@@ -89,7 +89,7 @@ public static class IntegrationEndpoints
 
     /// <summary>The browser comes back here from Atlassian. Always ends in a redirect to the web page, with the result as a short code.</summary>
     private static async Task<IResult> Callback(string? code, string? state, string? error, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock, JiraOAuth oauth, IntegrationTokens tokens)
+        TimeProvider clock, JiraOAuth oauth, IntegrationTokens tokens, ILoggerFactory logs)
     {
         var me = http.User.UserId();
         var ct = http.RequestAborted;
@@ -106,6 +106,13 @@ public static class IntegrationEndpoints
         catch (TrackerException e)
         {
             return Back(config, row.WorkspaceId, e.Code);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // The state is spent: a verifier sealed under a rotated integration key, or a second connect of the same site saved first (its
+            // unique index), still goes back to the page, which asks to try again. Only the type is logged.
+            logs.CreateLogger(typeof(IntegrationEndpoints)).LogWarning("Jira sign-in callback failed: {Type}", e.GetType().Name);
+            return Back(config, row.WorkspaceId, TrackerException.Codes.Unavailable);
         }
     }
 

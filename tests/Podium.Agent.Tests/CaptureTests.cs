@@ -106,7 +106,7 @@ public sealed class CaptureTests
         var assistant = """{"type":"assistant","message":{"id":"m1","model":"claude-opus-5-5","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":3,"cache_creation":{"ephemeral_5m_input_tokens":7,"ephemeral_1h_input_tokens":2}}}}""";
         File.WriteAllText(transcript, assistant + "\n" + assistant + "\nnot json\n[1]\n{\"type\":\"user\"");
         store.TrackTranscript(new TranscriptCursor("s1", HarnessKinds.ClaudeCode, transcript, 0, "k", "n", "main"), clock.GetUtcNow());
-        var tailer = new TranscriptTailer(home.Config, store, clock);
+        var tailer = new TranscriptTailer(home.Config, store, clock, new AgentLog(home.Config, clock));
         Assert.Equal(2, tailer.RunOnce());
         var events = store.NextBatch(100, int.MaxValue)!.Value.Rows.Select(r => r.Event).ToList();
         Assert.Equal([EventKinds.Transcript, EventKinds.Usage, EventKinds.Transcript], events.Select(e => e.Kind));

@@ -16,6 +16,7 @@ export const deSprints: Dictionary["sprints"] = {
   start: "Starten", delete: "Löschen", deleteConfirm: "Sprint {n} löschen? Seine Vorgänge gehen zurück ins Backlog.",
   edit: "Bearbeiten", editTitle: "Sprint bearbeiten", close: "Sprint abschließen",
   closedBanner: "Dieser Sprint ist abgeschlossen: Er ist schreibgeschützt.",
+  reloadFailed: "Die Änderung wurde gespeichert, aber die Seite konnte nicht neu geladen werden. Laden Sie die Seite neu.",
   closeTitle: "Diesen Sprint abschließen", closeQuestion: "{n} Vorgänge sind nicht fertig. Wohin sollen sie?", closeNone: "Alle Vorgänge sind fertig.",
   moveTo: "Die unfertigen Vorgänge verschieben nach", toBacklog: "Zurück ins Backlog", confirmClose: "Sprint abschließen",
   boardTitle: "Vorgänge des Sprints", noIssues: "In diesem Sprint sind noch keine Vorgänge.", noneInColumn: "Keine.",

@@ -22,17 +22,18 @@ function PathList({ label, paths, empty, extra }: { label: string; paths: string
 /**
  * The folders and applications of one access layer, read-only: allowed, denied, and the applications with their SHA-256 when one is pinned. With
  * projectFolder (a policy that includes the project's own folder) the allowed folders always limit: the listed ones plus the project's folder, and
- * with none listed only the project's folder (AccessPolicyMath.Policy). Without it an empty allowed list is no folder limit.
+ * with none listed only the project's folder (AccessPolicyMath.Policy). Without it an empty allowed list is no folder limit. Under a machine limit
+ * that allows only some folders (ceilingLimits) the project's folder is not promised on top: it counts only where that limit also allows it.
  */
-export function AccessLists({ allowed, denied, applications, projectFolder = false }: {
-  allowed: string[]; denied: string[]; applications: AccessApp[]; projectFolder?: boolean;
+export function AccessLists({ allowed, denied, applications, projectFolder = false, ceilingLimits = false }: {
+  allowed: string[]; denied: string[]; applications: AccessApp[]; projectFolder?: boolean; ceilingLimits?: boolean;
 }) {
   const { t } = useI18n();
   const apps = t("access.applications");
   return (
     <dl className="facts">
       <PathList label={t("access.allowedFolders")} paths={allowed} empty={projectFolder ? t("access.onlyProjectFolder") : t("access.noFolderLimit")}
-        extra={projectFolder ? t("access.plusProjectFolder") : undefined} />
+        extra={projectFolder && !ceilingLimits ? t("access.plusProjectFolder") : undefined} />
       <PathList label={t("access.deniedFolders")} paths={denied} empty={t("access.noneDenied")} />
       <dt>{apps}</dt>
       <dd>

@@ -135,7 +135,7 @@ describe("the project page: editing", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
     expect(await screen.findByLabelText("Name")).toHaveValue("Checkout");
     expect(screen.getByLabelText("Budget amount")).toHaveValue(1500);
-    expect(screen.getByLabelText("Start date")).toHaveValue("2026-01-05");
+    expect(screen.getByLabelText("Start date")).toHaveValue("05/01/2026");
     expect(screen.getByLabelText("Stakeholder name 1")).toHaveValue("Dana");
     expect(screen.getByLabelText("Definition of Done 2")).toHaveValue("Tested");
     await userEvent.clear(screen.getByLabelText("Name"));
@@ -299,7 +299,7 @@ describe("the project page: applications", () => {
     const calls = serve();
     open();
     await userEvent.click(await screen.findByRole("button", { name: "Add an application" }));
-    await userEvent.type(await screen.findByLabelText("Repository address"), "https://user:secret@git.example.org/x");
+    await userEvent.type(await screen.findByLabelText("Repository address"), "git://token@git.example.org/x");
     await userEvent.click(screen.getByLabelText("Development"));
     await userEvent.type(screen.getByLabelText("Address of Development"), "ftp://dev.example.org");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));

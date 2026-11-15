@@ -48,8 +48,10 @@ function GrantRow({ grant: g, onChanged }: { grant: WebGrantView; onChanged: () 
 }
 
 /** A machine's grants: standing permission for one exact command template. The owner may also give one directly. */
-export function GrantList({ grants, agentId, canCreate, onChanged }: {
-  grants: WebGrantView[]; agentId: string; canCreate: boolean; onChanged: () => void;
+export function GrantList({ grants, agentId, canCreate, hasMore = false, onMore, onChanged }: {
+  grants: WebGrantView[]; agentId: string; canCreate: boolean;
+  /** True when a full page came back: older grants can be read with onMore. */
+  hasMore?: boolean; onMore?: () => void; onChanged: () => void;
 }) {
   const { t } = useI18n();
   return (
@@ -57,6 +59,7 @@ export function GrantList({ grants, agentId, canCreate, onChanged }: {
       {grants.length === 0 ? <p className="muted">{t("remote.noGrants")}</p> : (
         <ul className="plain run-list">{grants.map((g) => <GrantRow key={g.id} grant={g} onChanged={onChanged} />)}</ul>
       )}
+      {hasMore && onMore ? <div className="more"><Button variant="ghost" onClick={onMore}>{t("sessions.more")}</Button></div> : null}
       {canCreate ? <GrantForm agentId={agentId} onCreated={onChanged} /> : null}
     </>
   );

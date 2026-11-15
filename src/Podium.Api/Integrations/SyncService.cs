@@ -43,7 +43,8 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
             var link = await db.IntegrationLinks.FirstOrDefaultAsync(l => l.ConnectionId == connection.Id && l.Kind == LinkKinds.Sprint && l.ExternalId == sprintId, ct);
             if (link is null || await tokens.ConnectorContextAsync(connection, ct) is not { } ctx) return 0; // not imported: nothing to keep
             var sprint = await db.Sprints.AsNoTracking().FirstAsync(s => s.Id == link.LocalId, ct);
-            var project = await db.Projects.FirstAsync(p => p.Id == sprint.ProjectId, ct);
+            // An archived project is left alone, as the issue event and the pass leave it (ProjectOfAsync).
+            if (await db.Projects.FirstOrDefaultAsync(p => p.Id == sprint.ProjectId && p.Status == ManagedStatuses.Active, ct) is not { } project) return 0;
             var it = await tracker.GetIterationAsync(ctx, sprintId, ct);
             var counts = new MirrorCounts();
             var items = it is null ? [] : await tracker.ListIterationItemsAsync(ctx, sprintId, ct);
@@ -135,7 +136,8 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
             if (project.Status != ManagedStatuses.Active) continue;
             var changed = await tracker.ListChangedAsync(ctx, [space.Key], since, ct);
             var alive = await tracker.ListItemIdsAsync(ctx, space.Key, ct);
-            var iterations = await tracker.ListIterationsAsync(ctx, space.Key, ct);
+            var listing = await tracker.ListIterationListingAsync(ctx, space.Key, ct);
+            var iterations = listing.Iterations;
             var epics = await import.MissingEpicsAsync(ctx, changed, await KnownKeysAsync(project, ct), ct);
             var everyone = (await tracker.ListPeopleAsync(ctx, space.Key, ct)).Concat(ImportService.PeopleOf(changed.Concat(epics))).Concat(space.Lead is null ? [] : [space.Lead]);
             var persons = await people.UpsertAsync(connection, everyone, counts, ct);
@@ -143,10 +145,13 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
             var state = await MirrorState.LoadAsync(db, connection, project, ct);
             await projects.UpsertAsync(connection, space, project.OwnerUserId, new MirrorCounts(), ct);
             foreach (var it in iterations.Where(i => state.SprintLinks.ContainsKey(i.Id))) sprints.Upsert(state, it, counts);
-            var gone = state.SprintLinks.Where(l => iterations.All(i => i.Id != l.Key)).Select(l => l.Value).ToList();
+            // Only a whole listing tells a deleted sprint from one Jira did not show this time (a refused board would archive them all).
+            var gone = listing.Complete ? state.SprintLinks.Where(l => iterations.All(i => i.Id != l.Key)).Select(l => l.Value).ToList() : [];
             foreach (var g in gone) sprints.Archive(state, g);
             foreach (var item in ImportService.EpicsFirst(epics.Concat(changed))) issues.Upsert(state, item, persons, connection.SiteHost, counts);
-            counts.Archived += issues.ArchiveMissing(state, alive.ToHashSet(StringComparer.Ordinal));
+            // An empty or cut listing is no proof that the issues are gone (the connector may have lost the permission to see them, F-066):
+            // nothing is archived on it.
+            if (alive is { Count: > 0 }) counts.Archived += issues.ArchiveMissing(state, alive.ToHashSet(StringComparer.Ordinal));
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         }

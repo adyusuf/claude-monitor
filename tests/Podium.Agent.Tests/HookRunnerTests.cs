@@ -79,8 +79,8 @@ public sealed partial class HookRunnerTests : IDisposable
     [Fact]
     public async Task Masking_can_be_off_and_an_oversized_payload_becomes_a_marker()
     {
-        store.Set("settings.mask_secrets", "false");
-        store.Set("settings.event_max_bytes", "200");
+        TestWorkspace.Set(home.Config, store, Recorder.MaskSecretsKey, "false"); // read for the workspace in agent.json
+        TestWorkspace.Set(home.Config, store, Recorder.EventMaxBytesKey, "200");
         await Run("PostToolUse", new { session_id = "s1", tool_name = "Read", tool_response = new string('x', 500) + " password=hunter2hunter2" });
         var e = Assert.Single(Queued());
         Assert.True(e.Truncated);
@@ -158,7 +158,9 @@ public sealed partial class HookRunnerTests : IDisposable
         var output = JsonNode.Parse((await running)!)!["hookSpecificOutput"]!;
         Assert.Equal("PermissionRequest", output["hookEventName"]!.GetValue<string>());
         Assert.Equal("deny", output["decision"]!["behavior"]!.GetValue<string>());
-        Assert.Equal("not on Friday", output["decision"]!["message"]!.GetValue<string>());
+        var message = output["decision"]!["message"]!.GetValue<string>(); // the owner's reason is web text: labelled and wrapped (F-242)
+        Assert.StartsWith(HookRunner.DeniedFromTheWeb, message, StringComparison.Ordinal);
+        AssertWrapped(message, asked.LocalId, "not on Friday");
     }
 
     [Fact]

@@ -41,6 +41,47 @@ public sealed class IntegrationAccountTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task An_atlassian_account_that_another_member_already_linked_cannot_be_linked_by_a_second_member()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        var member = await RemoteKit.MemberAsync(api, w.Admin, "ic-twice-member");
+
+        // The member signs in at Atlassian as the connector's account: their Jira writes would be attributed to the connector's Jira user.
+        var result = JiraKit.ResultOf(await JiraKit.ApproveAsync(member, api.Jira, w.Account, await Account(member, w)));
+
+        Assert.Equal("account_in_use", result);
+        await using var db = api.Db();
+        var accounts = await db.IntegrationAccounts.AsNoTracking().Where(a => a.ConnectionId == w.ConnectionId).ToListAsync();
+        Assert.Equal(w.Admin.Id, Assert.Single(accounts).UserId);
+        // The person who holds the link can still sign in again with it.
+        Assert.Equal("ok", JiraKit.ResultOf(await JiraKit.ApproveAsync(w.Admin, api.Jira, w.Account, await Account(w.Admin, w))));
+    }
+
+    [Fact]
+    public async Task The_connector_signing_in_again_with_their_own_account_repairs_a_connection_whose_refresh_was_refused_and_a_member_does_not()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        var member = await RemoteKit.MemberAsync(api, w.Admin, "ic-relink-member");
+        await using (var db = api.Db())
+        {
+            // As IntegrationTokens leaves them after Atlassian refused the connector's refresh token.
+            await db.IntegrationAccounts.Where(a => a.ConnectionId == w.ConnectionId).ExecuteUpdateAsync(a => a.SetProperty(x => x.Status, AccountStatuses.Reauthorize));
+            await db.IntegrationConnections.Where(c => c.Id == w.ConnectionId).ExecuteUpdateAsync(c => c
+                .SetProperty(x => x.Status, ConnectionStatuses.Reauthorize).SetProperty(x => x.LastError, TrackerException.Codes.Unauthorized));
+        }
+
+        var own = api.Jira.Account("Member Own", member.Email, w.Site);
+        Assert.Equal("ok", JiraKit.ResultOf(await JiraKit.ApproveAsync(member, api.Jira, own, await Account(member, w))));
+        Assert.Equal(ConnectionStatuses.Reauthorize, (await JiraKit.ConnectionAsync(w)).Status); // a member's own account reads for nobody else
+
+        Assert.Equal("ok", JiraKit.ResultOf(await JiraKit.ApproveAsync(w.Admin, api.Jira, w.Account, await Account(w.Admin, w))));
+
+        var connection = await JiraKit.ConnectionAsync(w);
+        Assert.Equal((ConnectionStatuses.Active, null, w.Admin.Id), (connection.Status, connection.LastError, connection.ConnectorUserId));
+        Assert.Equal(HttpStatusCode.OK, (await w.Admin.Http.GetAsync($"{w.Base}/spaces")).StatusCode); // the connector's account reads again
+    }
+
+    [Fact]
     public async Task Linking_an_account_needs_a_member_of_that_workspace_and_an_account_that_reaches_the_site()
     {
         var w = await JiraKit.ConnectedAsync(api);

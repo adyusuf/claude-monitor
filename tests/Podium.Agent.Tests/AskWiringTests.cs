@@ -86,7 +86,7 @@ public sealed class AskWiringTests : IDisposable
         var raw = new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
         File.WriteAllText(transcript, JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = $"see {Id(1)} somewhere" } }, raw) + "\n");
         store.TrackTranscript(new TranscriptCursor("s-1", HarnessKinds.ClaudeCode, transcript, 0, null, null, null), Start);
-        var tailer = new TranscriptTailer(home.Config, store, clock);
+        var tailer = new TranscriptTailer(home.Config, store, clock, new AgentLog(home.Config, clock));
         tailer.RunOnce();
         Assert.Equal(LocalStore.AskDelivered, store.AskIn(Id(1))!.State); // the bare id is not the wrapper
 

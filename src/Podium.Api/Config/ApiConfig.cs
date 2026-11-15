@@ -12,6 +12,9 @@ public sealed record ApiConfig
     public required string DatabaseUrl { get; init; }
     public required string PublicOrigin { get; init; }
     public required SmtpSettings Smtp { get; init; }
+
+    /// <summary>How long one mail may take to send before it counts as failed (mails go out inside requests: an invitation run, a test mail).</summary>
+    public TimeSpan MailSendTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public OAuthClient? GitHub { get; init; }
     public OAuthClient? Google { get; init; }
     public required string ArchiveDir { get; init; }
@@ -72,6 +75,9 @@ public sealed record ApiConfig
     /// <summary>The proxies whose X-Forwarded-* headers count (CIDR list); required when TrustProxy is on outside development.</summary>
     public IReadOnlyList<System.Net.IPNetwork> ProxyNetworks { get; init; } = [];
     public int AuthRequestsPerMinute { get; init; } = 20;
+
+    /// <summary>Device-code polls per IP per minute: an agent polls every few seconds, so a fleet behind one address needs more than the auth budget.</summary>
+    public int DeviceTokenRequestsPerMinute { get; init; } = 120;
     public int LockoutAfter { get; init; } = 5;
     public TimeSpan LockoutFor { get; init; } = TimeSpan.FromMinutes(15);
     public TimeSpan MfaPendingLifetime { get; init; } = TimeSpan.FromMinutes(5);
@@ -86,6 +92,8 @@ public sealed record ApiConfig
 
     public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);
     public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromHours(24);
+    /// <summary>At most one reset mail per address in this window: a second Forgot inside it answers the same and mails nothing.</summary>
+    public TimeSpan ResetMailEvery { get; init; } = TimeSpan.FromMinutes(5);
     public TimeSpan InvitationLifetime { get; init; } = TimeSpan.FromDays(7);
     public TimeSpan DeviceCodeLifetime { get; init; } = TimeSpan.FromMinutes(15);
     public int DevicePollSeconds { get; init; } = 5;
@@ -150,6 +158,9 @@ public sealed record ApiConfig
     /// <summary>How much of Claude's answer a command carries, and how many recorded messages are searched for it.</summary>
     public int ReplyPreviewChars { get; init; } = 300;
     public int ReplyScanMax { get; init; } = 500;
+
+    /// <summary>How often an idle live stream sends a ping; the workspace stream also re-checks its reader's access then.</summary>
+    public TimeSpan StreamPingEvery { get; init; } = TimeSpan.FromSeconds(20);
 
     /// <summary>USD per million tokens: input, output, cache read, cache write (5-minute TTL, input x 1.25).
     /// A model not listed is NOT priced: its cost stays null ("cannot be measured"), never a guess.</summary>
@@ -246,6 +257,7 @@ public sealed record ApiConfig
             TrustProxy = trustProxy,
             ProxyNetworks = networks,
             AuthRequestsPerMinute = int.TryParse(env["AIPOD_AUTH_RATE_PER_MINUTE"], out var rate) && rate > 0 ? rate : 20,
+            DeviceTokenRequestsPerMinute = int.TryParse(env["AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE"], out var polls) && polls > 0 ? polls : 120,
         };
     }
 

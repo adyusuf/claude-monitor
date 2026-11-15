@@ -54,6 +54,14 @@ describe("the server settings page", () => {
     expect(screen.queryByText(s.cannotSave)).not.toBeInTheDocument();
   });
 
+  it("warns on the Jira card that workspaces are connected with the app", async () => {
+    serveServerSettings({ "GET /server/integrations": { body: serverView({ integrations: [smtp(), github(), jira({ status: "ready", notes: ["jira_connections_exist"] })] }) } });
+    page();
+    const j = await card(s.names.jira);
+    expect(j.getByText(s.notes.jira_connections_exist)).toBeInTheDocument();
+    expect(j.queryByText("jira_connections_exist")).not.toBeInTheDocument();
+  });
+
   it("shows the callback address with its hint and copies it; e-mail has none", async () => {
     const user = userEvent.setup();
     serveServerSettings();

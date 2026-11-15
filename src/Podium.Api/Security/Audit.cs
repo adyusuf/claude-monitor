@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Podium.Api.Config;
 using Podium.Api.Data;
 
 namespace Podium.Api.Security;
@@ -17,7 +18,9 @@ public static class AuditActions
     public const string PasswordReset = "user.password_reset";
     public const string ProviderLinked = "user.provider_linked";
     public const string AccountDeleted = "user.account_deleted";
+    public const string DataExported = "user.data_exported";
     public const string WorkspaceCreated = "workspace.created";
+    public const string WorkspaceRenamed = "workspace.renamed";
     public const string InvitationCreated = "workspace.invitation_created";
     public const string InvitationAccepted = "workspace.invitation_accepted";
     public const string InvitationRevoked = "workspace.invitation_revoked";
@@ -125,10 +128,14 @@ public static class Audit
             TargetType = targetType,
             TargetId = targetId?.ToString(),
             At = clock.GetUtcNow(),
-            IpHash = Secrets.IpTag(http?.Connection.RemoteIpAddress),
+            IpHash = IpTagOf(http),
             Detail = DetailOf(http, detail),
         });
     }
+
+    /// <summary>The request's address as an audit tag; none when there is no address or no server key to tag it with (never a weaker tag).</summary>
+    private static string? IpTagOf(HttpContext? http) =>
+        http?.RequestServices?.GetService<ApiConfig>() is { } config ? Secrets.IpTag(http.Connection.RemoteIpAddress, config.MfaKey) : null;
 
     /// <summary>
     /// The row's detail, with how the request passed re-authentication when it did (<see cref="Remote.RemoteChecks.ReauthItem"/>), so every row

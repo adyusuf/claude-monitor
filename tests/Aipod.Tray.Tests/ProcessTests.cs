@@ -50,6 +50,37 @@ public sealed class ProcessTests : IDisposable
     }
 
     [Fact]
+    public void The_update_budget_exceeds_every_wait_of_the_updater_it_runs()
+    {
+        var config = Config("/bin/echo");
+        var budget = ProcessCli.UpdateBudget(config);
+        Assert.True(budget > config.ApiCallTimeout + config.UpdateDownloadTimeout + 2 * config.UpdateProbeTimeout + 2 * config.UpdateStopWait + config.UpdateHealthWait,
+            $"the tray would kill `aipod update` after {budget} while the updater may still be swapping the binary");
+    }
+
+    [Fact]
+    public async Task An_update_gets_the_update_budget_while_another_command_keeps_the_short_limit()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var script = Path.Combine(dir, "aipod");
+        await File.WriteAllTextAsync(script, "#!/bin/sh\nsleep 1\necho \"$1\"\n");
+        File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var config = Config(script) with
+        {
+            ApiCallTimeout = TimeSpan.FromSeconds(1),
+            UpdateDownloadTimeout = TimeSpan.FromSeconds(1),
+            UpdateProbeTimeout = TimeSpan.Zero,
+            UpdateStopWait = TimeSpan.Zero,
+            UpdateHealthWait = TimeSpan.Zero,
+        };
+        var cli = new ProcessCli(config, TimeSpan.FromMilliseconds(300));
+
+        var update = await cli.RunAsync(["update"], CancellationToken.None);
+        Assert.Equal((0, "update\n"), (update.ExitCode, update.Output));
+        await Assert.ThrowsAsync<TimeoutException>(() => cli.RunAsync(["update", "--check"], CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Missing_arguments_are_refused() =>
         await Assert.ThrowsAsync<ArgumentNullException>(() => new ProcessCli(Config("/bin/echo")).RunAsync(null!, CancellationToken.None));
 }
@@ -79,6 +110,20 @@ public sealed class AutostartTests
         Assert.Contains("<key>RunAtLoad</key><true/>", plist, StringComparison.Ordinal);
         Assert.Contains("<key>KeepAlive</key><false/>", plist, StringComparison.Ordinal);
         Assert.Equal(Path.Combine("/Users/x", "Library", "LaunchAgents", "aipod.tray.plist"), Autostart.PlistPath("/Users/x"));
+    }
+
+    [Theory]
+    [InlineData("tr", "oturum açıldığında")]
+    [InlineData("de", "bei der Anmeldung")]
+    public void The_autostart_sentences_come_in_the_persons_language(string language, string expected)
+    {
+        using var scope = Strings.Scope(language);
+        var target = new FakeTarget();
+
+        Assert.Contains(expected, Autostart.Enable(target, "/t/aipod-tray", "/Users/x", AutostartOs.MacOs), StringComparison.Ordinal);
+        Assert.Contains(expected, Autostart.Enable(target, @"C:\t\aipod-tray.exe", "/Users/x", AutostartOs.Windows), StringComparison.Ordinal);
+        Assert.DoesNotContain("starts at login", Autostart.Disable(target, "/Users/x", AutostartOs.MacOs), StringComparison.Ordinal);
+        Assert.DoesNotContain("macOS only", Autostart.Enable(target, "/t", "/Users/x", AutostartOs.Other), StringComparison.Ordinal);
     }
 
     [Fact]

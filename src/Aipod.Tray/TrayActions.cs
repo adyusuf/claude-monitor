@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using Podium.Agent.Auth;
 using Podium.Agent.Config;
+using Podium.Agent.Update;
 
 namespace Aipod.Tray;
 
@@ -40,9 +41,9 @@ public sealed class TrayActions(AgentConfig config, IAgentCli cli)
                 if (!IsWebAddress(address)) return new ActionResult(false, Strings.T(Msg.TrayActGiveServer));
                 return await Cli("", ["connect", "--server", address!], ct);
             case TrayCommand.OpenWeb:
-                return Open(Identity.Peek(config)?.Server, Strings.T(Msg.TrayActNoServer));
+                return Open(Identity.Peek(config)?.Server, Strings.T(Msg.TrayActNoServer), webOnly: true);
             case TrayCommand.OpenLog:
-                return File.Exists(config.LogPath) ? Open(config.LogPath, "") : new ActionResult(false, Strings.T(Msg.TrayActNoLog));
+                return File.Exists(config.LogPath) ? Open(config.LogPath, "", webOnly: false) : new ActionResult(false, Strings.T(Msg.TrayActNoLog));
             default:
                 return new ActionResult(false, Strings.T(Msg.TrayActNotCommand));
         }
@@ -66,10 +67,10 @@ public sealed class TrayActions(AgentConfig config, IAgentCli cli)
         }
     }
 
-    private ActionResult Open(string? target, string missing)
+    private ActionResult Open(string? target, string missing, bool webOnly)
     {
         if (target is null) return new ActionResult(false, missing);
-        if (target.Contains("://", StringComparison.Ordinal) && !IsWebAddress(target)) return new ActionResult(false, Strings.T(Msg.TrayActOnlyHttp));
+        if (webOnly && !IsWebAddress(target)) return new ActionResult(false, Strings.T(Msg.TrayActOnlyHttp));
         try
         {
             cli.Open(target);
@@ -87,6 +88,19 @@ public sealed class ProcessCli(AgentConfig config, TimeSpan? timeout = null) : I
 {
     private readonly TimeSpan wait = timeout ?? TimeSpan.FromSeconds(90);
 
+    /// <summary>What a slow install is allowed beyond the updater's own waits, so the tray never kills it mid-swap.</summary>
+    private static readonly TimeSpan UpdateMargin = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// The limit for `aipod update`: above everything the updater may wait for (the check, the download, two binary probes, the stop
+    /// and a rollback's stop, the health wait). Killed earlier it could leave the new binary in place and the daemon stopped (F-320).
+    /// </summary>
+    public static TimeSpan UpdateBudget(AgentConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        return config.ApiCallTimeout + config.UpdateDownloadTimeout + 2 * config.UpdateProbeTimeout + 2 * config.UpdateStopWait + config.UpdateHealthWait + UpdateMargin;
+    }
+
     public async Task<CliResult> RunAsync(IReadOnlyList<string> args, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -100,7 +114,7 @@ public sealed class ProcessCli(AgentConfig config, TimeSpan? timeout = null) : I
         foreach (var arg in args) info.ArgumentList.Add(arg);
         using var process = Process.Start(info) ?? throw new InvalidOperationException("the process did not start");
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        limit.CancelAfter(wait);
+        limit.CancelAfter(IsInstall(args) ? Max(wait, UpdateBudget(config)) : wait);
         var output = process.StandardOutput.ReadToEndAsync(limit.Token);
         var error = process.StandardError.ReadToEndAsync(limit.Token);
         try
@@ -115,6 +129,11 @@ public sealed class ProcessCli(AgentConfig config, TimeSpan? timeout = null) : I
 
         return new CliResult(process.ExitCode, await output + await error);
     }
+
+    /// <summary>`update` without `--check`: the one command that downloads, swaps the binary and restarts the daemon.</summary>
+    private static bool IsInstall(IReadOnlyList<string> args) => args is [UpdateCommand.Verb, ..] && !args.Contains(UpdateCommand.CheckFlag);
+
+    private static TimeSpan Max(TimeSpan a, TimeSpan b) => a > b ? a : b;
 
     public void Open(string target) => Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose();
 }

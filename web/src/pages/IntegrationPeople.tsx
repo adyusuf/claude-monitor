@@ -30,7 +30,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
     void load();
   }, [load]);
 
-  const save = async (person: PersonView, input: { email?: string; userId?: string }) => {
+  const save = async (person: PersonView, input: { email?: string; userId?: string; unlink?: boolean }) => {
     try {
       await api.setIntegrationPerson(person.id, input);
       await load();
@@ -63,7 +63,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
                   {members.map((m) => <option key={m.userId} value={m.userId}>{m.displayName}</option>)}
                 </select>
               </>
-            ) : null}
+            ) : <Button variant="ghost" onClick={() => void save(p, { unlink: true })}>{t("integrations.unlinkMember", { name: p.userName ?? "" })}</Button>}
           </li>
         ))}
       </ul>
