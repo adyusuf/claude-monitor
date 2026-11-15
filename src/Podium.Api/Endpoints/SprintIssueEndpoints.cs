@@ -78,6 +78,8 @@ public static class SprintIssueEndpoints
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.Status is null || !IssueStatuses.All.Contains(req.Status)) return Http.Invalid("status", "invalid_value");
+        // A closed sprint is read-only (the sprint page shows it so): what stayed in it keeps its status.
+        if (f.Issue.SprintId is { } sprintId && await db.Sprints.AnyAsync(s => s.Id == sprintId && s.Status == SprintStatuses.Closed, http.RequestAborted)) return Http.Invalid("status", "closed");
         if (await writes.StatusAsync(userId, f.Grant.Project, f.Issue, req.Status, http.RequestAborted) is { } refused) return refused;
         f.Issue.Status = req.Status;
         f.Issue.UpdatedAt = clock.GetUtcNow();
