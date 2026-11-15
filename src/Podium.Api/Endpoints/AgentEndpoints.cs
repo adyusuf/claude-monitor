@@ -243,8 +243,14 @@ public static class AgentEndpoints
         return Results.Ok(new PermissionRequestCreated(request.Id, request.ExpiresAt, answer));
     }
 
+    /// <summary>
+    /// OBSOLETE (F-196): nothing in the product calls this any more, the answer reaches the agent on its stream. It stays, and keeps returning real
+    /// values, for older agents (rule 4); every answer carries <c>Deprecation: true</c>. It does not return an answer's chosen options (they are
+    /// not stored), so a poller can lose them: another reason to read the stream.
+    /// </summary>
     private static async Task<IResult> GetPermission(Guid id, HttpContext http, PodiumDb db)
     {
+        http.Response.Headers["Deprecation"] = "true";
         var agentId = http.User.AgentId();
         var row = await (from p in db.PermissionRequests.AsNoTracking()
                          join s in db.HarnessSessions.AsNoTracking() on p.SessionId equals s.Id
