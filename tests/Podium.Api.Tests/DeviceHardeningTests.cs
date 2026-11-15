@@ -45,4 +45,32 @@ public sealed class DeviceHardeningTests(ApiFactory api)
         Assert.False(await db.Machines.AnyAsync(m => m.Hostname == "desk-9" && m.WorkspaceId == owner.WorkspaceId));
         Assert.Equal(DeviceTokenErrors.Denied, await ErrorOf(await agent.PostAsJsonAsync("/api/device/token", new DeviceTokenRequest(code.DeviceCode), TestUser.Json)));
     }
+
+    /// <summary>F-020: two polls on one approved code enrol one agent; the second hears the code is used up, never a 500 or a revoked first agent.</summary>
+    [Fact]
+    public async Task Parallel_polls_on_an_approved_code_enrol_exactly_one_agent()
+    {
+        for (var round = 0; round < 4; round++)
+        {
+            var user = await api.NewClient().SignedUpAsync("dev-race");
+            var (code, agent) = await ApprovedCodeAsync(user, user.WorkspaceId);
+            var poll = new DeviceTokenRequest(code.DeviceCode);
+
+            var answers = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => agent.PostAsJsonAsync("/api/device/token", poll, TestUser.Json)));
+
+            Assert.Equal(1, answers.Count(a => a.StatusCode == HttpStatusCode.OK));
+            foreach (var other in answers.Where(a => a.StatusCode != HttpStatusCode.OK))
+            {
+                Assert.Equal(HttpStatusCode.BadRequest, other.StatusCode);
+                Assert.Equal(DeviceTokenErrors.Expired, await ErrorOf(other));
+            }
+
+            var winner = await answers.Single(a => a.StatusCode == HttpStatusCode.OK).Content.ReadFromJsonAsync<TokenResponse>(TestUser.Json);
+            await using var db = api.Db();
+            var agents = await db.Agents.Where(a => a.UserId == user.Id).ToListAsync();
+            var only = Assert.Single(agents);
+            Assert.Equal(AgentStatuses.Active, only.Status);
+            Assert.Equal(winner!.AgentId, only.Id);
+        }
+    }
 }

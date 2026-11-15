@@ -95,10 +95,16 @@ public static class DeviceEndpoints
             return Error(DeviceTokenErrors.Denied);
         }
 
+        // Single use under a race: the code is claimed by a compare-and-set on Status = approved, and the claim, the agent and its
+        // tokens commit together. A parallel poll waits on the claimed row, changes nothing and hears that the code is used up.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var claimed = await db.DeviceAuthorizations.Where(d => d.Id == device.Id && d.Status == DeviceStatuses.Approved)
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, DeviceStatuses.Consumed), http.RequestAborted);
+        if (claimed == 0) return Error(DeviceTokenErrors.Expired);
         var agent = await EnrolAsync(db, device, now, http.RequestAborted);
-        device.Status = DeviceStatuses.Consumed;
         var tokens = AgentTokens.Issue(db, config, agent, now);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.Ok(tokens);
     }
 
