@@ -4,6 +4,7 @@ using Podium.Api.Remote;
 using Podium.Api.Security;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Podium.Api.Endpoints;
 
@@ -36,13 +37,26 @@ public static class ApprovalKeyEndpoints
         if (spki is null || !ApprovalSigning.IsValidPublicKey(spki)) return Http.Invalid("publicKey", RemoteErrors.InvalidApprovalKey);
         if (!await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code, window: false)) return RemoteChecks.ReauthRefused(http);
         var fingerprint = ApprovalSigning.Fingerprint(spki);
+        // One person's registrations run one at a time (their user row is held until commit), so the limit below counts what is really live (F-195).
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.DisplayName, u => u.DisplayName), ct);
         var live = await db.ApprovalKeys.AsNoTracking().Where(k => k.UserId == userId && k.RetiredAt == null).ToListAsync(ct);
         if (live.Any(k => k.Fingerprint == fingerprint)) return RemoteChecks.Conflict("approval_key_exists");
         if (live.Count >= ActiveMax) return RemoteChecks.Conflict(RemoteErrors.ApprovalKeyLimit);
         var key = new ApprovalKey { UserId = userId, Name = name, PublicKey = Convert.ToBase64String(spki), Fingerprint = fingerprint, CreatedAt = clock.GetUtcNow() };
         db.ApprovalKeys.Add(key);
         Audit.Add(db, http, clock, AuditActions.ApprovalKeyRegistered, userId: userId, targetType: "approval_key", targetId: key.Id, detail: new { fingerprint });
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // The same key was registered a moment ago by another call (ux on the user and fingerprint of a live key): that one stands.
+            return RemoteChecks.Conflict("approval_key_exists");
+        }
+
         return Results.Ok(new ApprovalKeyView(key.Id, key.Name, key.Fingerprint, key.PublicKey, key.CreatedAt, null));
     }
 
