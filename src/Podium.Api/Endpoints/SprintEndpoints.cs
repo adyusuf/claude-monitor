@@ -27,11 +27,14 @@ public static class SprintEndpoints
     private static async Task<IResult> List(Guid id, string? status, Guid? application, string? cursor, int? limit, HttpContext http, PodiumDb db, ApiConfig config)
     {
         if (await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
+        if (status is { Length: > 0 } && !SprintStatuses.All.Contains(status)) return Http.Invalid("status", "invalid_value");
+        var before = 0;
+        if (cursor is { Length: > 0 } && !int.TryParse(cursor, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out before)) return Http.Invalid("cursor", "invalid_value");
         var take = Http.Limit(limit, config);
         var query = db.Sprints.AsNoTracking().Where(s => s.ProjectId == id && s.ArchivedAt == null);
         if (status is { Length: > 0 }) query = query.Where(s => s.Status == status);
         if (application is { } app) query = query.Where(s => s.ApplicationId == app);
-        if (int.TryParse(cursor, out var before)) query = query.Where(s => s.Number < before);
+        if (cursor is { Length: > 0 }) query = query.Where(s => s.Number < before);
         var page = await query.OrderByDescending(s => s.Number).Take(take + 1).ToListAsync(http.RequestAborted);
         var shown = page.Take(take).ToList();
         var rows = await SprintViews.SummariesAsync(db, shown, http.RequestAborted);
