@@ -127,7 +127,7 @@ export function MachinePage() {
               <Card title={t("remote.runs")}>
                 <RunList runs={data.runs} ws={ws} version={version} hasMore={data.hasMoreRuns} onMore={() => void data.moreRuns()} onChanged={() => void reload()} />
               </Card>
-              <Card title={t("remote.jobs")}><JobList jobs={data.jobs} onChanged={() => void reload()} /></Card>
+              <Card title={t("remote.jobs")}><JobList jobs={data.jobs} hasMore={data.hasMoreJobs} onMore={() => void data.moreJobs()} onChanged={() => void reload()} /></Card>
               <Card title={t("schedules.title")}><ScheduleList schedules={data.schedules} jobs={data.jobs} canCreate={data.owned} onChanged={() => void reload()} /></Card>
             </>
           ),
@@ -154,7 +154,7 @@ export function MachinePage() {
             <>
               {data.detail?.access ? <Card title={t("access.machineTitle")}><MachineAccess ws={ws} access={data.detail.access} /></Card> : null}
               <Card title={t("remote.grants")}>
-                <GrantList grants={data.grants} agentId={agentId} canCreate={data.owned} onChanged={() => void reload()} />
+                <GrantList grants={data.grants} agentId={agentId} canCreate={data.owned} hasMore={data.hasMoreGrants} onMore={() => void data.moreGrants()} onChanged={() => void reload()} />
               </Card>
             </>
           ),

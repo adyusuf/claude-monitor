@@ -45,8 +45,17 @@ function JobRow({ job: j, onChanged }: { job: WebJobView; onChanged: () => void 
 }
 
 /** A machine's jobs: proposed ones wait for the owner, active ones can be run by name. */
-export function JobList({ jobs, onChanged }: { jobs: WebJobView[]; onChanged: () => void }) {
+export function JobList({ jobs, hasMore = false, onMore, onChanged }: {
+  jobs: WebJobView[];
+  /** True when a full page came back: older jobs can be read with onMore. */
+  hasMore?: boolean; onMore?: () => void; onChanged: () => void;
+}) {
   const { t } = useI18n();
   if (jobs.length === 0) return <p className="muted">{t("remote.noJobs")}</p>;
-  return <ul className="plain run-list">{jobs.map((j) => <JobRow key={j.id} job={j} onChanged={onChanged} />)}</ul>;
+  return (
+    <>
+      <ul className="plain run-list">{jobs.map((j) => <JobRow key={j.id} job={j} onChanged={onChanged} />)}</ul>
+      {hasMore && onMore ? <div className="more"><Button variant="ghost" onClick={onMore}>{t("sessions.more")}</Button></div> : null}
+    </>
+  );
 }

@@ -49,6 +49,8 @@ export const config = {
   metricsMinutes: 60,
   metricsRefreshMs: 60_000,
   runPageSize: 50,
+  /** A machine's grants and jobs come in pages of this many, newest first (they are never deleted, only ended). */
+  remotePageSize: 50,
   /** The nav badge of runs waiting for the user re-reads this often. */
   pendingPollMs: 30_000,
   // How often the approval band reads the requests waiting on the viewer's sessions (ADR-0019).
