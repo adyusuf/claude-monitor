@@ -1,8 +1,10 @@
 using System.Net;
+using System.Net.Mail;
 using Podium.Api.Config;
 using Podium.Api.Mail;
 using Podium.Api.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Podium.Api.Tests;
@@ -75,6 +77,25 @@ public sealed class SmtpMailerSettingsTests(ApiFactory api) : IAsyncLifetime
         var anonymous = await server.NextAsync();
         Assert.Equal((null, null), (anonymous.User, anonymous.Password));
         Assert.Equal([to], anonymous.To);
+    }
+
+    [Fact]
+    public async Task A_send_the_server_refuses_logs_the_kind_of_error_and_neither_the_recipient_nor_the_server_s_reply()
+    {
+        var admin = await ServerAdminKit.AdminAsync(api, "sm-refused");
+        await using var server = new RefusingSmtp(SmtpRefusal.Recipient);
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { host = IPAddress.Loopback.ToString(), port = server.PortText, from = Emails.New("sm-refused-from"), tls = "false" })).EnsureSuccessStatusCode();
+        var to = Emails.New("sm-refused-to");
+        var log = new TracingLog();
+        var mailer = new SmtpMailer(api.Services.GetRequiredService<IntegrationSettings>(), new Logger<SmtpMailer>(log));
+
+        await Assert.ThrowsAsync<SmtpFailedRecipientException>(() => SendAsync(mailer, to));
+
+        var entry = Assert.Single(log.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Contains(nameof(SmtpFailedRecipientException), entry.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(to, entry.Everything, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("no such mailbox", entry.Everything, StringComparison.Ordinal);
     }
 
     [Fact]

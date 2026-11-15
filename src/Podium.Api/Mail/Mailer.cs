@@ -31,8 +31,9 @@ public sealed class SmtpMailer(IntegrationSettings settings, ILogger<SmtpMailer>
         }
         catch (SmtpException e)
         {
-            // The recipient is personal data: only the subject is logged.
-            log.LogError(e, "sending mail failed: {Subject}", message.Subject);
+            // The recipient is personal data, and the exception's message carries the server's reply, which repeats it: only the kind of
+            // error and the subject are logged.
+            log.LogError("sending mail failed: {Type} {Subject}", e.GetType().Name, message.Subject);
             throw;
         }
     }
