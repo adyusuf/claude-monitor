@@ -52,6 +52,8 @@ public static class AgentEndpoints
     private static async Task<IResult> Refresh(RefreshRequest req, HttpContext http, PodiumDb db, ApiConfig config,
         TimeProvider clock, Broker broker)
     {
+        // One transaction: the replaced mark on the old token and its successor are stored together (AgentTokens.RefreshAsync).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, clock.GetUtcNow(), http.RequestAborted);
         if (outcome == AgentTokens.RefreshOutcome.Reused)
         {
@@ -60,6 +62,7 @@ public static class AgentEndpoints
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return outcome == AgentTokens.RefreshOutcome.Issued
             ? Results.Ok(tokens)
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_refresh_token",
