@@ -46,7 +46,11 @@ public static class ServerSettingsEndpoints
         config.AdminWorkspace is { } admin && await Access.MemberAsync(db, http.User.UserId(), admin, Roles.Admin, http.RequestAborted) is not null;
 
     private static async Task<IResult> View(HttpContext http, PodiumDb db, ApiConfig config, IntegrationSettings settings) =>
-        await AdminAsync(http, db, config) ? Results.Ok(ServerSettingsViews.Of(settings, config)) : Http.NotFound();
+        await AdminAsync(http, db, config) ? Results.Ok(ServerSettingsViews.Of(settings, config, await JiraConnectionsAsync(db, http.RequestAborted))) : Http.NotFound();
+
+    /// <summary>The Jira connections of every workspace that are not disconnected: each one stops if Atlassian refuses the app's client id or secret.</summary>
+    private static Task<int> JiraConnectionsAsync(PodiumDb db, CancellationToken ct) =>
+        db.IntegrationConnections.CountAsync(c => c.Provider == Integrations.TrackerProviders.Jira && c.Status != ConnectionStatuses.Disconnected, ct);
 
     private static async Task<IResult> Save(string id, ServerSettingsRequest req, HttpContext http, PodiumDb db, ApiConfig config,
         IntegrationSettings settings, TimeProvider clock)
@@ -111,7 +115,7 @@ public static class ServerSettingsEndpoints
 
         // The rows are committed: the refresh is not cancelled with the request (an admin who closes the tab must not leave this instance on the old values).
         await settings.RefreshAsync(CancellationToken.None);
-        return Results.Ok(ServerSettingsViews.Of(settings, config));
+        return Results.Ok(ServerSettingsViews.Of(settings, config, await JiraConnectionsAsync(db, ct)));
     }
 
     /// <summary>Sends a test mail to the caller's own address with the SMTP values in force; says only whether it went.</summary>

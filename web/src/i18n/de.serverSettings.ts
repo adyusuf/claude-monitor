@@ -9,7 +9,10 @@ export const deServerSettings: Dictionary["serverSettings"] = {
   names: { smtp: "E-Mail (SMTP)", github: "Anmeldung mit GitHub", google: "Anmeldung mit Google", jira: "Jira" },
   status: { ready: "Bereit", incomplete: "Unvollständig", off: "Aus" },
   statusLabel: "Status: {status}",
-  notes: { integration_key_missing: "Auf dem Server fehlt der Integrationsschlüssel: Jira kann seine Tokens erst speichern, wenn er gesetzt ist." },
+  notes: {
+    integration_key_missing: "Auf dem Server fehlt der Integrationsschlüssel: Jira kann seine Tokens erst speichern, wenn er gesetzt ist.",
+    jira_connections_exist: "Arbeitsbereiche sind mit dieser Jira-App verbunden. Eine Client-ID oder ein Geheimnis, das Atlassian ablehnt, stoppt jede Verbindung, bis es hier korrigiert ist.",
+  },
   fields: {
     host: "Server", port: "Port", user: "Benutzername", password: "Passwort", from: "Absenderadresse", tls: "STARTTLS verwenden",
     client_id: "Client-ID", client_secret: "Client-Geheimnis",

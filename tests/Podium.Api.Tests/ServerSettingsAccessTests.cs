@@ -27,6 +27,18 @@ public sealed class ServerSettingsAccessTests(ApiFactory api) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_jira_card_warns_that_workspaces_are_connected_with_the_app_while_a_connection_exists()
+    {
+        await JiraKit.ConnectedAsync(api, tag: "ss-jira-connected");
+        var admin = await ServerAdminKit.AdminAsync(api, "ss-jira-warn");
+
+        var view = await (await ServerAdminKit.GetAsync(admin)).Content.ReadFromJsonAsync<JsonElement>();
+
+        var jira = ServerAdminKit.IntegrationOf(view, "jira");
+        Assert.Contains("jira_connections_exist", jira.GetProperty("notes").EnumerateArray().Select(n => n.GetString()));
+    }
+
+    [Fact]
     public async Task Everyone_outside_the_admin_workspaces_owners_and_admins_gets_404_on_all_three_calls_and_nothing_happens()
     {
         var member = await ServerAdminKit.AdminAsync(api, "ss-member", Roles.Member);

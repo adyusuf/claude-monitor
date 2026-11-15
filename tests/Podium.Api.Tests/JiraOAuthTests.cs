@@ -160,15 +160,22 @@ public sealed class JiraOAuthTests
         return stack.OAuth.ExchangeAsync(stack.Jira.NewCode(account, JiraOAuth.Challenge(verifier), stack.OAuth.RedirectUri), verifier, CancellationToken.None);
     }
 
+    // Only invalid_grant sends the person to sign in again; a wrong or rotated client secret (invalid_client, or access_denied as Atlassian
+    // answers it), a body without an OAuth error, a proxy's page and a 5xx are the server's problem (F-065).
     [Theory]
-    [InlineData(HttpStatusCode.BadRequest, TrackerException.Codes.Unauthorized)]
-    [InlineData(HttpStatusCode.Unauthorized, TrackerException.Codes.Unauthorized)]
-    [InlineData(HttpStatusCode.Forbidden, TrackerException.Codes.Unauthorized)]
-    [InlineData(HttpStatusCode.InternalServerError, TrackerException.Codes.Unavailable)]
-    [InlineData(HttpStatusCode.TooManyRequests, TrackerException.Codes.Unavailable)]
-    public async Task A_refused_token_call_becomes_a_short_code_without_the_response_text(HttpStatusCode status, string code)
+    [InlineData(HttpStatusCode.BadRequest, "{\"error\":\"invalid_grant\",\"error_description\":\"secret detail of the failure\"}", TrackerException.Codes.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden, "{\"error\":\"invalid_grant\",\"error_description\":\"secret detail of the failure\"}", TrackerException.Codes.Unauthorized)]
+    [InlineData(HttpStatusCode.Unauthorized, "{\"error\":\"invalid_client\",\"error_description\":\"secret detail of the failure\"}", TrackerException.Codes.Unavailable)]
+    [InlineData(HttpStatusCode.Unauthorized, "{\"error\":\"access_denied\",\"error_description\":\"secret detail of the failure\"}", TrackerException.Codes.Unavailable)]
+    [InlineData(HttpStatusCode.BadRequest, "{\"error_description\":\"secret detail of the failure\"}", TrackerException.Codes.Unavailable)]
+    [InlineData(HttpStatusCode.Forbidden, "<html>secret detail of the failure</html>", TrackerException.Codes.Unavailable)]
+    [InlineData(HttpStatusCode.BadRequest, "[\"invalid_grant\"]", TrackerException.Codes.Unavailable)]
+    [InlineData(HttpStatusCode.InternalServerError, "{\"error\":\"invalid_grant\"}", TrackerException.Codes.Unauthorized)]
+    [InlineData(HttpStatusCode.InternalServerError, "{\"error_description\":\"secret detail of the failure\"}", TrackerException.Codes.Unavailable)]
+    [InlineData(HttpStatusCode.TooManyRequests, "{\"error_description\":\"secret detail of the failure\"}", TrackerException.Codes.Unavailable)]
+    public async Task A_refused_token_call_becomes_a_short_code_without_the_response_text(HttpStatusCode status, string body, string code)
     {
-        using var stack = new JiraClients(() => new StubHandler(_ => Reply(status, "{\"error_description\":\"secret detail of the failure\"}")));
+        using var stack = new JiraClients(() => new StubHandler(_ => Reply(status, body)));
 
         var e = await Assert.ThrowsAsync<TrackerException>(() => stack.OAuth.RefreshAsync("rt", CancellationToken.None));
 

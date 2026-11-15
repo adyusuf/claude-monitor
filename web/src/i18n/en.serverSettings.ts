@@ -7,7 +7,10 @@ export const enServerSettings = {
   names: { smtp: "Email (SMTP)", github: "GitHub sign-in", google: "Google sign-in", jira: "Jira" },
   status: { ready: "Ready", incomplete: "Incomplete", off: "Off" },
   statusLabel: "Status: {status}",
-  notes: { integration_key_missing: "The integration key is missing on the server: Jira cannot keep its tokens until it is set." },
+  notes: {
+    integration_key_missing: "The integration key is missing on the server: Jira cannot keep its tokens until it is set.",
+    jira_connections_exist: "Workspaces are connected with this Jira app. A client id or secret that Atlassian refuses stops every connection until it is fixed here.",
+  },
   fields: {
     host: "Server", port: "Port", user: "User name", password: "Password", from: "Sender address", tls: "Use STARTTLS",
     client_id: "Client ID", client_secret: "Client secret",
