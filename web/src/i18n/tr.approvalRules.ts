@@ -1,4 +1,5 @@
 import type { Dictionary } from "./en";
+import type { enApprovalRulesErrors } from "./en.approvalRules";
 
 // Onay bandı, penceresi ve Onaylar sayfası (ADR-0019); tr.ts bunu `approvalRules` olarak atar.
 export const trApprovalRules: Dictionary["approvalRules"] = {
@@ -20,4 +21,11 @@ export const trApprovalRules: Dictionary["approvalRules"] = {
   answeredBy: "Cevaplayan", byRule: "geçerli bir onay", decision: { allow: "İzin verildi", deny: "Reddedildi" }, when: "Zaman",
   anyInput: "her girdi",
   moreLine: "+1 satır daha", moreLines: "+{n} satır daha",
+};
+
+/** İzin cevabının ve geçerli onayların kodları (ADR-0019), `errors.<code>` olarak; tr.ts bunu `errors` içine yayar. */
+export const trApprovalRulesErrors: typeof enApprovalRulesErrors = {
+  rule_limit: "Sahip olabileceğiniz en çok geçerli onaya (200) zaten sahipsiniz. Onaylar sayfasında birini geri alın ya da yalnızca bu seferlik izin verin.",
+  rule_not_allowed: "Bu istek şu anda geçerli bir onay alamaz (makine üretim ya da veritabanı olmuş olabilir). Yalnızca bu seferlik izin verin.",
+  invalid_decision: "İzin ver ya da Reddet'i seçin.", invalid_duration: "İznin ne kadar geçerli olacağını listeden seçin.",
 };

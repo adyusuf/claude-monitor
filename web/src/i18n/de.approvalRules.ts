@@ -1,4 +1,5 @@
 import type { Dictionary } from "./en";
+import type { enApprovalRulesErrors } from "./en.approvalRules";
 
 // Das Freigabeband, sein Dialog und die Seite Freigaben (ADR-0019); de.ts weist es als `approvalRules` zu.
 export const deApprovalRules: Dictionary["approvalRules"] = {
@@ -20,4 +21,11 @@ export const deApprovalRules: Dictionary["approvalRules"] = {
   answeredBy: "Beantwortet von", byRule: "eine stehende Freigabe", decision: { allow: "Erlaubt", deny: "Abgelehnt" }, when: "Wann",
   anyInput: "jede Eingabe",
   moreLine: "+1 weitere Zeile", moreLines: "+{n} weitere Zeilen",
+};
+
+/** Die Codes der Antwort auf eine Berechtigungsanfrage und der stehenden Freigaben (ADR-0019), als `errors.<code>`; de.ts fügt sie in `errors` ein. */
+export const deApprovalRulesErrors: typeof enApprovalRulesErrors = {
+  rule_limit: "Sie haben schon die meisten stehenden Freigaben, die möglich sind (200). Widerrufen Sie eine auf der Seite Freigaben, oder erlauben Sie nur dieses eine Mal.",
+  rule_not_allowed: "Diese Anfrage kann jetzt keine stehende Freigabe bekommen (die Maschine ist vielleicht Produktion oder eine Datenbank geworden). Erlauben Sie sie nur dieses eine Mal.",
+  invalid_decision: "Wählen Sie Erlauben oder Ablehnen.", invalid_duration: "Wählen Sie aus der Liste, wie lange die Freigabe gilt.",
 };

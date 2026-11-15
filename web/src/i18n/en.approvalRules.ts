@@ -19,3 +19,10 @@ export const enApprovalRules = {
   anyInput: "any input",
   moreLine: "+1 more line", moreLines: "+{n} more lines",
 };
+
+/** The codes of the permission answer and the standing approvals (ADR-0019), as `errors.<code>`; en.ts spreads it into `errors`. */
+export const enApprovalRulesErrors = {
+  rule_limit: "You already have the most standing approvals you can have (200). Revoke one on the approvals page, or allow just this once.",
+  rule_not_allowed: "This request cannot have a standing approval now (the machine may have become production or a database). Allow it just this once.",
+  invalid_decision: "Pick Allow or Deny.", invalid_duration: "Pick how long the allow stands from the list.",
+};
