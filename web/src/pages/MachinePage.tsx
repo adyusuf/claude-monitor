@@ -36,6 +36,11 @@ const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "sched
 /** One machine in tabs: overview, control, work (projects, runs, jobs, schedules), monitoring (load, alerts) and access (grants). The runs waiting for the owner stay above the tabs. */
 export function MachinePage() {
   const { ws = "", agentId = "" } = useParams();
+  // Keyed on the machine: moving to another one starts with none of the first one's data, drafts or code field.
+  return <MachineContent key={`${ws}/${agentId}`} ws={ws} agentId={agentId} />;
+}
+
+function MachineContent({ ws, agentId }: { ws: string; agentId: string }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { me } = useSession();
