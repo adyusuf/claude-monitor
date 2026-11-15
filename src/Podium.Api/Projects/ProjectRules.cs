@@ -25,7 +25,7 @@ internal static class ProjectRules
         if (!Http.IsName(i.Name, NameMax)) return Http.Invalid("name", "invalid_name");
         if (TooLong(i.Purpose, TextMax)) return Http.Invalid("purpose", "too_long");
         if (TooLong(i.Sponsor, ShortMax)) return Http.Invalid("sponsor", "too_long");
-        if (i.Stakeholders is { } s && (s.Count > StakeholdersMax || s.Any(x => !Http.IsName(x.Name, NameMax) || TooLong(x.Role, NameMax))))
+        if (i.Stakeholders is { } s && (s.Count > StakeholdersMax || s.Any(x => x is null || !Http.IsName(x.Name, NameMax) || TooLong(x.Role, NameMax))))
         {
             return Http.Invalid("stakeholders", "invalid_list");
         }
@@ -50,7 +50,7 @@ internal static class ProjectRules
         if (TooLong(i.Description, TextMax)) return Http.Invalid("description", "too_long");
         if (i.Kind is { } k && !ApplicationKinds.All.Contains(k)) return Http.Invalid("kind", "invalid_value");
         if (!string.IsNullOrWhiteSpace(i.RepoUrl) && !RepoLink(i.RepoUrl.Trim())) return Http.Invalid("repoUrl", "invalid_url");
-        if (i.Environments is { } e && (e.Count > EnvironmentNames.All.Count || e.Any(x => x.Name is null || !EnvironmentNames.All.Contains(x.Name)
+        if (i.Environments is { } e && (e.Count > EnvironmentNames.All.Count || e.Any(x => x is null || x.Name is null || !EnvironmentNames.All.Contains(x.Name)
             || (!string.IsNullOrWhiteSpace(x.Url) && !WebLink(x.Url.Trim())))
             || e.Select(x => x.Name).Distinct().Count() != e.Count))
         {
@@ -63,7 +63,7 @@ internal static class ProjectRules
         }
 
         if (i.VersioningScheme is { } v && !VersioningSchemes.All.Contains(v)) return Http.Invalid("versioningScheme", "invalid_value");
-        if (i.NonFunctionalTargets is { } n && (n.Count > 20 || n.Any(x => x.Kind is null || !TargetKinds.All.Contains(x.Kind) || !Http.IsName(x.Target, LineMax))))
+        if (i.NonFunctionalTargets is { } n && (n.Count > 20 || n.Any(x => x is null || x.Kind is null || !TargetKinds.All.Contains(x.Kind) || !Http.IsName(x.Target, LineMax))))
         {
             return Http.Invalid("nonFunctionalTargets", "invalid_list");
         }
