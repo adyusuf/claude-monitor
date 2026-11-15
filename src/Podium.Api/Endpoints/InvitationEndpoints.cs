@@ -101,6 +101,15 @@ public static class InvitationEndpoints
 
         var member = await db.WorkspaceMembers.FirstOrDefaultAsync(
             m => m.WorkspaceId == invitation.WorkspaceId && m.UserId == userId, http.RequestAborted);
+
+        // Claimed with a compare-and-set in the same transaction as the membership: a revoke or a second accept that
+        // committed after the read above leaves 0 rows, and this one changes nothing.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var claimed = await db.WorkspaceInvitations
+            .Where(i => i.Id == invitation.Id && i.AcceptedAt == null && i.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.AcceptedAt, now), http.RequestAborted);
+        if (claimed != 1) return Http.Invalid("token", "invalid_token");
+
         if (member is null)
         {
             db.WorkspaceMembers.Add(new WorkspaceMember { WorkspaceId = invitation.WorkspaceId, UserId = userId, Role = invitation.Role, JoinedAt = now });
@@ -112,10 +121,10 @@ public static class InvitationEndpoints
             member.JoinedAt = now;
         }
 
-        invitation.AcceptedAt = now;
         Audit.Add(db, http, clock, AuditActions.InvitationAccepted, invitation.WorkspaceId, userId,
             targetType: "invitation", targetId: invitation.Id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.Ok(new { workspaceId = invitation.WorkspaceId });
     }
 }
