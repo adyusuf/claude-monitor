@@ -193,16 +193,23 @@ public static class AuthEndpoints
         return token;
     }
 
-    /// <summary>A valid, unused token of the purpose, marked used. Single use: a second call finds nothing.</summary>
+    /// <summary>
+    /// A valid, unused token of the purpose, marked used. Single use: a second call finds nothing, and of two calls that both read it
+    /// unused only one spends it (compare-and-set on used_at).
+    /// </summary>
     private static async Task<UserToken?> UseTokenAsync(PodiumDb db, string? token, string purpose, TimeProvider clock,
         CancellationToken ct)
     {
         if (string.IsNullOrEmpty(token)) return null;
         var now = clock.GetUtcNow();
         var hash = Secrets.Hash(token);
-        var row = await db.UserTokens.FirstOrDefaultAsync(
+        var row = await db.UserTokens.AsNoTracking().FirstOrDefaultAsync(
             t => t.TokenHash == hash && t.Purpose == purpose && t.UsedAt == null && t.ExpiresAt > now, ct);
-        if (row is not null) row.UsedAt = now;
+        if (row is null) return null;
+        var spent = await db.UserTokens.Where(t => t.Id == row.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
+        if (spent == 0) return null;
+        row.UsedAt = now;
         return row;
     }
 }
