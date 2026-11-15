@@ -55,6 +55,38 @@ public sealed class IntegrationPeopleLinkTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_call_that_changes_nothing_leaves_no_audit_row_and_a_change_of_the_address_is_audited_without_the_address()
+    {
+        var (w, hidden, _) = await WorldAsync();
+        var member = await RemoteKit.MemberAsync(api, w.Admin, "lnk-audit");
+        async Task<List<AuditEvent>> AuditAsync()
+        {
+            await using var db = api.Db();
+            return await db.AuditEvents.AsNoTracking().Where(a => a.Action == "integration.person_linked" && a.TargetId == hidden.ToString()).OrderBy(a => a.Id).ToListAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { unlink = true })).StatusCode); // already unlinked
+        Assert.Empty(await AuditAsync());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { userId = member.Id })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { userId = member.Id })).StatusCode); // the same link again
+        Assert.Single(await AuditAsync());
+
+        var email = $"aud+{Guid.NewGuid():N}@gmail.com";
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { email })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { email })).StatusCode); // the same address again
+        var rows = await AuditAsync();
+        Assert.Equal(2, rows.Count);
+        var detail = rows[^1].Detail!.RootElement;
+        Assert.True(detail.GetProperty("emailChanged").GetBoolean());
+        Assert.Equal(member.Id, detail.GetProperty("userId").GetGuid());
+        Assert.DoesNotContain(email, detail.GetRawText(), StringComparison.Ordinal);
+        Assert.Equal(member.Id, rows[0].Detail!.RootElement.GetProperty("userId").GetGuid());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, rows[0].Detail!.RootElement.GetProperty("previousUserId").ValueKind);
+    }
+
+    [Fact]
     public async Task Unlinking_and_linking_in_one_call_is_refused_and_changes_nothing()
     {
         var (w, hidden, _) = await WorldAsync();

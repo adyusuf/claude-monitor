@@ -114,6 +114,8 @@ public static class IntegrationImportEndpoints
         var connection = person is null ? null : await db.IntegrationConnections.AsNoTracking().FirstOrDefaultAsync(c => c.Id == person.ConnectionId && c.Status != ConnectionStatuses.Disconnected, http.RequestAborted);
         var me = http.User.UserId();
         if (person is null || connection is null || await Access.MemberAsync(db, me, connection.WorkspaceId, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
+        var previousUser = person.UserId;
+        var emailChanged = false;
         if (req.Unlink == true)
         {
             if (req.UserId is not null) return Http.Invalid("unlink", InvalidLink);
@@ -135,12 +137,18 @@ public static class IntegrationImportEndpoints
         if (req.Email is { Length: > 0 } email)
         {
             if (!Http.IsEmail(email)) return Http.Invalid("email", "invalid_email");
+            emailChanged = person.Email != email.Trim();
             person.Email = email.Trim();
             person.EmailNormalized = SearchText.Email(email);
         }
 
-        Audit.Add(db, http, clock, AuditActions.IntegrationPersonLinked, connection.WorkspaceId, me, targetType: "integration_person", targetId: personId,
-            detail: new { userId = person.UserId });
+        // A call that changes nothing leaves no audit row. The address itself stays out of the audit; only that it changed is recorded.
+        if (person.UserId != previousUser || emailChanged)
+        {
+            Audit.Add(db, http, clock, AuditActions.IntegrationPersonLinked, connection.WorkspaceId, me, targetType: "integration_person", targetId: personId,
+                detail: new { userId = person.UserId, previousUserId = previousUser, emailChanged });
+        }
+
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
