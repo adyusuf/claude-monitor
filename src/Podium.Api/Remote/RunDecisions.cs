@@ -124,6 +124,7 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
         var userId = http.User.UserId();
         var run = await OwnedAsync(id, userId, ct);
         if (run is null) return Http.NotFound();
+        if (RemoteChecks.ReasonNulProblem(req.Reason) is { } refused) return refused;
         var now = clock.GetUtcNow();
         var error = req.Reason is { Length: > 0 } reason ? reason[..Math.Min(reason.Length, config.RunReasonMax)] : null;
         var changed = await db.RemoteRuns

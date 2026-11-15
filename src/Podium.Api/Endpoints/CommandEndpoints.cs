@@ -133,6 +133,7 @@ public static class CommandEndpoints
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
         if (!PermissionDecisions.All.Contains(req.Decision ?? "")) return Http.Invalid("decision", "invalid_decision");
         if (req.Reason is { Length: > ReasonMax }) return Http.Invalid("reason", "too_long");
+        if (RemoteChecks.ReasonNulProblem(req.Reason) is { } nul) return nul;
         if (req.Answers is not null && !AnswersFit(request, req.Decision!, req.Answers)) return Http.Invalid("answers", "invalid_answers");
         var remember = req.Remember ?? ApprovalDurations.Once;
         if (!ApprovalDurations.All.Contains(remember)) return Http.Invalid("remember", "invalid_duration");
