@@ -67,16 +67,24 @@ export function Empty({ title, hint, children }: { title: string; hint?: string;
   );
 }
 
+/** A value with a copy button: "Copied" only after the browser says it copied; without the clipboard (or permission) the person is told. */
 export function CopyText({ text }: { text: string }) {
   const { t } = useI18n();
-  const [done, setDone] = useState(false);
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+  const copy = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error("no clipboard");
+      await navigator.clipboard.writeText(text);
+      setCopied("done");
+    } catch {
+      setCopied("failed");
+    }
+  };
   return (
     <div className="copy">
       <code>{text}</code>
-      <Button variant="subtle" onClick={() => {
-        void navigator.clipboard?.writeText(text);
-        setDone(true);
-      }}>{done ? t("common.copied") : t("common.copy")}</Button>
+      <Button variant="subtle" onClick={() => void copy()}>{copied === "done" ? t("common.copied") : t("common.copy")}</Button>
+      {copied === "failed" ? <span className="field-error" role="alert">{t("common.copyFailed")}</span> : null}
     </div>
   );
 }

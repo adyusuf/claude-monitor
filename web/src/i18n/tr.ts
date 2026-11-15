@@ -268,7 +268,7 @@ export const tr: Dictionary = {
     status: "Durum", allMachines: "Tüm makineler", machine: "Makine", command: "Komut", requestedBy: "İsteyen", when: "Ne zaman", decidedBy: "Karar veren",
     byGrant: "bir izin", byJob: "bir iş", undecided: "henüz yok", details: "Ayrıntılar", detailsOf: "Çalıştırma ayrıntıları", empty: "Bu çalışma alanında henüz hiçbir şey çalışmadı.",
   },
-  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
+  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı", copyFailed: "Kopyalanamadı. Seçip elle kopyalayın." },
   remote: trRemote,
   approvals: {
     title: "Onay anahtarları", intro: "Bu tarayıcıda üretilen bir anahtar, izin verdiğiniz çalıştırmaları imzalar. Yöneticisi anahtarı sabitlemiş ve imzalı onayı açmış bir makine, bu anahtarla imzalanmamış hiçbir şeyi çalıştırmaz; ele geçirilmiş bir sunucu bile sizin adınıza çalıştırma başlatamaz. Özel yarı bu tarayıcıdan hiç çıkmaz.",

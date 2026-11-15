@@ -268,7 +268,7 @@ export const de: Dictionary = {
     status: "Status", allMachines: "Alle Maschinen", machine: "Maschine", command: "Befehl", requestedBy: "Angefordert von", when: "Wann", decidedBy: "Entschieden von",
     byGrant: "eine Freigabe", byJob: "ein Auftrag", undecided: "noch nicht", details: "Details", detailsOf: "Details der Ausführung", empty: "In diesem Arbeitsbereich wurde noch nichts ausgeführt.",
   },
-  common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert" },
+  common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert", copyFailed: "Das konnte nicht kopiert werden. Markieren Sie es und kopieren Sie es von Hand." },
   remote: deRemote,
   approvals: {
     title: "Freigabeschlüssel", intro: "Ein in diesem Browser erzeugter Schlüssel signiert die Ausführungen, die Sie erlauben. Eine Maschine, deren Administrator den Schlüssel angeheftet und signierte Freigaben eingeschaltet hat, führt nichts aus, was nicht damit signiert wurde; so kann selbst ein kompromittierter Server in Ihrem Namen keine Ausführung starten. Die private Hälfte verlässt diesen Browser nie.",
