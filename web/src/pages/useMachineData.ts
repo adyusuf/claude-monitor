@@ -59,11 +59,14 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const [hasMoreGrants, setHasMoreGrants] = useState(false);
   const [hasMoreJobs, setHasMoreJobs] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const latestReload = useRef(0);
   const pagedOlder = useRef(false);
   const pagedGrants = useRef(false);
   const pagedJobs = useRef(false);
 
   const reload = useCallback(async () => {
+    // Only the newest read counts: an older one that answers late (another filter, another sign-in state) must not overwrite what the newer one showed.
+    const mine = ++latestReload.current;
     try {
       // An older API has no detail or schedules: the page shows what the list gives. Any other failure keeps what was read before and is shown.
       let partial: unknown = null;
@@ -78,6 +81,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
         optional<MachineDetail | null>(api.machineDetail(agentId), null),
         optional<ScheduleView[]>(api.schedules(agentId), []),
       ]);
+      if (mine !== latestReload.current) return;
       setMachine(machines.find((m) => m.agentId === agentId) ?? null);
       if (detailRow !== undefined) setDetail(detailRow);
       setOwned(agents.some((a) => a.id === agentId && a.userId === userId));
@@ -92,9 +96,9 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       if (scheduleRows !== undefined) setSchedules(scheduleRows);
       setError(partial);
     } catch (e) {
-      setError(e);
+      if (mine === latestReload.current) setError(e);
     } finally {
-      setLoaded(true);
+      if (mine === latestReload.current) setLoaded(true);
     }
   }, [ws, agentId, userId, showResolved]);
 
