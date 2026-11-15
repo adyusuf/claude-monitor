@@ -96,7 +96,7 @@ export function ProjectPage() {
       <ProjectActiveSprints ws={ws} projectId={id} unit={project.estimationUnit} />
       <ProjectMembers projectId={id} workspaceMembers={members} canEdit={access.canEdit && !archived} />
       <ProjectApplications ws={ws} projectId={id} canEdit={access.canEditApplications && !archived} workspaceMembers={members} />
-      <ProjectAccessCard ws={ws} projectId={id} />
+      <ProjectAccessCard key={id} ws={ws} projectId={id} />
     </div>
   );
 }
