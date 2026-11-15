@@ -30,7 +30,7 @@ public static class AuthEndpoints
     }
 
     private static async Task<IResult> Register(RegisterRequest req, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock, IMailer mailer)
+        TimeProvider clock, IMailer mailer, ILoggerFactory logs)
     {
         if (!Http.IsEmail(req.Email)) return Http.Invalid("email", "invalid_email");
         if (!Secrets.PasswordAcceptable(req.Password)) return Http.Invalid("password", "weak_password");
@@ -39,6 +39,7 @@ public static class AuthEndpoints
         var normalized = SearchText.Email(req.Email!);
         if (await db.Users.AnyAsync(u => u.EmailNormalized == normalized, http.RequestAborted))
         {
+            Secrets.HashPassword(new User(), req.Password!); // the hash a new account costs, so timing does not tell a registered address apart
             return Results.Accepted();
         }
 
@@ -49,8 +50,8 @@ public static class AuthEndpoints
         var token = AddUserToken(db, user.Id, TokenPurposes.VerifyEmail, now, config.EmailTokenLifetime);
         Audit.Add(db, http, clock, AuditActions.Register, userId: user.Id);
         await db.SaveChangesAsync(http.RequestAborted);
-        await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http), "verify", user.Email!,
-            Http.Link(config, "/verify-email", token)), http.RequestAborted);
+        SendOffRequest(mailer, MailTemplates.Build(MailTemplates.Language(http), "verify", user.Email!,
+            Http.Link(config, "/verify-email", token)), logs);
         return Results.Accepted();
     }
 
@@ -142,7 +143,7 @@ public static class AuthEndpoints
     }
 
     private static async Task<IResult> Forgot(ForgotRequest req, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock, IMailer mailer)
+        TimeProvider clock, IMailer mailer, ILoggerFactory logs)
     {
         var normalized = SearchText.Email(req.Email ?? "");
         var user = await db.Users.FirstOrDefaultAsync(
@@ -155,8 +156,8 @@ public static class AuthEndpoints
             await EndResetLinksAsync(db, user.Id, clock.GetUtcNow(), http.RequestAborted);
             var token = AddUserToken(db, user.Id, TokenPurposes.ResetPassword, clock.GetUtcNow(), config.EmailTokenLifetime);
             await db.SaveChangesAsync(http.RequestAborted);
-            await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
-                Http.Link(config, "/reset-password", token)), http.RequestAborted);
+            SendOffRequest(mailer, MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
+                Http.Link(config, "/reset-password", token)), logs);
         }
 
         return Results.Accepted();
@@ -182,6 +183,26 @@ public static class AuthEndpoints
         Audit.Add(db, http, clock, AuditActions.PasswordReset, userId: user.Id);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
+    }
+
+    /// <summary>
+    /// Sends an account mail without holding the answer: a known address then costs what an unknown one does (no mail-server time to
+    /// measure), and a mail server that fails cannot turn a known address into a 500 where an unknown one gets 202. The send outlives the
+    /// request (not its token); a failure is logged with the subject only (the address is personal data).
+    /// </summary>
+    private static void SendOffRequest(IMailer mailer, MailMessageData message, ILoggerFactory logs) =>
+        _ = SendLoggedAsync(mailer, message, logs.CreateLogger(typeof(AuthEndpoints)));
+
+    private static async Task SendLoggedAsync(IMailer mailer, MailMessageData message, ILogger log)
+    {
+        try
+        {
+            await mailer.SendAsync(message, CancellationToken.None);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log.LogError("Account mail not sent: {Subject} ({Type})", message.Subject, e.GetType().Name);
+        }
     }
 
     /// <summary>Ends every open reset link of the user: only the newest one works, and none outlives a changed password.</summary>
