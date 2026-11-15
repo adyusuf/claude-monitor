@@ -14,6 +14,9 @@ namespace Podium.Api.Endpoints;
 /// </summary>
 public static class ProjectEndpoints
 {
+    /// <summary>The most people the member list of one project returns.</summary>
+    public const int MembersMax = 500;
+
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("").RequireAuthorization(Schemes.Session);
@@ -144,7 +147,7 @@ public static class ProjectEndpoints
                           join w in db.WorkspaceMembers.AsNoTracking() on new { m.UserId, grant.Project.WorkspaceId } equals new { w.UserId, w.WorkspaceId }
                           where m.ProjectId == id && w.RemovedAt == null
                           orderby u.DisplayName
-                          select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).ToListAsync(http.RequestAborted);
+                          select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
         return Results.Ok(rows);
     }
 
