@@ -18,6 +18,9 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
 {
     public const string StopReason = "Stopped from Podium (sent from the web).";
 
+    /// <summary>The line before the owner's deny reason: who denied it and where from; the reason itself follows wrapped as a web message.</summary>
+    public const string DeniedFromTheWeb = "Denied from Podium (the web) by the session's owner. Their reason follows as a message from the web.";
+
     /// <summary>Returns what the hook prints on stdout (null: nothing).</summary>
     public async Task<string?> RunAsync(string hookEvent, string input, CancellationToken ct)
     {
@@ -126,7 +129,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             if (store.Permission(localId) is { State: PermissionStates.Answered, Decision: { } decision } answered)
             {
                 var result = new JsonObject { ["behavior"] = decision == PermissionDecisions.Allow ? "allow" : "deny" };
-                if (decision != PermissionDecisions.Allow && answered.Reason is { } why) result["message"] = why;
+                if (decision != PermissionDecisions.Allow && answered.Reason is { } why) result["message"] = DenyMessage(localId, session, why);
                 if (decision == PermissionDecisions.Allow && AnsweredInput(payload, answered.Answers) is { } updated) result["updatedInput"] = updated;
                 return new JsonObject
                 {
@@ -139,6 +142,16 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
 
         store.PermissionExpired(localId);
         return null;
+    }
+
+    /// <summary>
+    /// The owner's deny reason as Claude reads it: typed in the web, so it is untrusted input like a prompt from there. A fixed line says who
+    /// denied it; the reason follows wrapped, labelled as from the web, defused and capped like an inbox message.
+    /// </summary>
+    private string DenyMessage(string id, string session, string reason)
+    {
+        var now = clock.GetUtcNow();
+        return DeniedFromTheWeb + "\n" + Push.ChannelEnvelopes.BuildInbox(new LocalCommand(id, session, CommandKinds.Prompt, reason, now), config.PushContentMax, now);
     }
 
     /// <summary>
