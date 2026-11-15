@@ -24,7 +24,7 @@ public static class AskEnvelopes
     {
         ArgumentNullException.ThrowIfNull(ask);
         var body = ChannelEnvelopes.Defuse(ask.Question);
-        if (body.Length > contentMax) body = body[..contentMax] + ChannelEnvelopes.Cut;
+        body = ChannelEnvelopes.Cap(body, contentMax);
         return $"{Notice}\n{ChannelEnvelopes.Open} id={ask.Id} origin=\"machine\" from=\"{RemoteEnvelope.Label(ask.FromLabel)}\"\n{body}\n{ChannelEnvelopes.Close}";
     }
 }
