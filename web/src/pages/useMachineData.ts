@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
 import type { AlertView, MachineDetail, MachineView, MetricSample, ScheduleView, WebGrantView, WebJobView, WebRunView } from "../api/types";
 import { config } from "../config";
@@ -26,6 +27,10 @@ export interface MachineData {
   moreRuns: () => Promise<void>;
 }
 
+/** The answers of an API that has no such endpoint yet (an older server), as opposed to a failure. */
+const NO_ENDPOINT: readonly number[] = [404, 405, 501];
+const noEndpoint = (e: unknown): boolean => e instanceof ApiError && NO_ENDPOINT.includes(e.status);
+
 /** Runs of the first page, then the older ones already loaded that the first page does not reach. */
 function mergeRuns(first: WebRunView[], previous: WebRunView[]): WebRunView[] {
   const last = first.length > 0 ? new Date(first[first.length - 1]!.createdAt).getTime() : Infinity;
@@ -52,14 +57,21 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
 
   const reload = useCallback(async () => {
     try {
+      // An older API has no detail or schedules: the page shows what the list gives. Any other failure keeps what was read before and is shown.
+      let partial: unknown = null;
+      const optional = <T,>(read: Promise<T>, missing: T): Promise<T | undefined> => read.catch((e: unknown) => {
+        if (noEndpoint(e)) return missing;
+        partial = e;
+        return undefined;
+      });
       const [machines, agents, alertRows, runRows, grantRows, jobRows, detailRow, scheduleRows] = await Promise.all([
         api.machines(ws), api.agents(ws), api.alerts(ws, agentId, showResolved),
         api.runs(ws, { agent: agentId, limit: config.runPageSize }), api.grants(agentId), api.jobs(agentId),
-        api.machineDetail(agentId).catch(() => null), // an older API has no detail: the page shows what the list gives
-        api.schedules(agentId).catch(() => [] as ScheduleView[]), // an older API has no schedules
+        optional<MachineDetail | null>(api.machineDetail(agentId), null),
+        optional<ScheduleView[]>(api.schedules(agentId), []),
       ]);
       setMachine(machines.find((m) => m.agentId === agentId) ?? null);
-      setDetail(detailRow);
+      if (detailRow !== undefined) setDetail(detailRow);
       setOwned(agents.some((a) => a.id === agentId && a.userId === userId));
       setAgentVersion(agents.find((a) => a.id === agentId)?.version ?? null);
       setAlerts(alertRows);
@@ -67,8 +79,8 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       if (!pagedOlder.current) setHasMoreRuns(runRows.length >= config.runPageSize);
       setGrants(grantRows);
       setJobs(jobRows);
-      setSchedules(scheduleRows);
-      setError(null);
+      if (scheduleRows !== undefined) setSchedules(scheduleRows);
+      setError(partial);
     } catch (e) {
       setError(e);
     } finally {
