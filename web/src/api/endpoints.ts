@@ -104,7 +104,7 @@ export const api = {
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>
     request<AlertView[]>("GET", `/workspaces/${id}/alerts${q({ agent, resolved: includeResolved ? "true" : "false" })}`),
-  runs: (id: string, opts: { agent?: string; before?: string | null; limit?: number }) =>
+  runs: (id: string, opts: { agent?: string; before?: string | null; beforeId?: string | null; limit?: number }) =>
     request<WebRunView[]>("GET", `/workspaces/${id}/runs${q(opts)}`),
   run: (runId: string) => request<WebRunView>("GET", `/runs/${runId}`),
   runOutput: (runId: string, after: number, limit: number) => request<RunOutputPage>("GET", `/runs/${runId}/output${q({ after, limit })}`),

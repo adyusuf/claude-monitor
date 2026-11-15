@@ -24,12 +24,12 @@ public static class RunEndpoints
         g.MapPost("/runs/{id:guid}/cancel", Cancel);
     }
 
-    private static async Task<IResult> List(Guid id, Guid? agent, DateTimeOffset? before, int? limit, HttpContext http, PodiumDb db,
+    private static async Task<IResult> List(Guid id, Guid? agent, DateTimeOffset? before, Guid? beforeId, int? limit, HttpContext http, PodiumDb db,
         ApiConfig config, TimeProvider clock)
     {
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        return Results.Ok(await RunQueries.ForWebAsync(db, config, id, userId, agent, null, before, Http.Limit(limit, config),
+        return Results.Ok(await RunQueries.ForWebAsync(db, config, id, userId, agent, null, before, beforeId, Http.Limit(limit, config),
             clock.GetUtcNow(), http.RequestAborted));
     }
 
@@ -43,7 +43,7 @@ public static class RunEndpoints
             return Http.NotFound();
         }
 
-        var views = await RunQueries.ForWebAsync(db, config, ws, userId, null, id, null, 1, clock.GetUtcNow(), http.RequestAborted);
+        var views = await RunQueries.ForWebAsync(db, config, ws, userId, null, id, null, null, 1, clock.GetUtcNow(), http.RequestAborted);
         return views.Count == 1 ? Results.Ok(views[0]) : Http.NotFound();
     }
 

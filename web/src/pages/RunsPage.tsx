@@ -132,7 +132,7 @@ export function RunsPage() {
     if (!oldest) return;
     const asked = filter;
     try {
-      const page = await api.runs(ws, { agent: agent || undefined, before: oldest.createdAt, limit: config.runPageSize });
+      const page = await api.runs(ws, { agent: agent || undefined, before: oldest.createdAt, beforeId: oldest.id, limit: config.runPageSize });
       if (shown.current !== asked) return;
       setRuns((r) => [...(r ?? []), ...page.filter((p) => !(r ?? []).some((x) => x.id === p.id))]);
       setHasMore(page.length === config.runPageSize);
