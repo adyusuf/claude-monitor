@@ -81,6 +81,11 @@ describe("the checks", () => {
     expect(checkSprint({ ...ok, endDate: "2026-03-02" })).toEqual({});
   });
 
+  it("refuses a date that is not a real day instead of comparing it", () => {
+    expect(checkSprint({ ...ok, startDate: "13/13", endDate: "2026-03-01" })).toEqual({ startDate: "invalid_date" });
+    expect(checkSprint({ ...ok, endDate: "2026-02-31" })).toEqual({ endDate: "invalid_date" });
+  });
+
   it.each(["-1", "abc", "1.234", "100000000"])("refuses the capacity %s", (capacity) => {
     expect(checkSprint({ ...ok, capacity })).toEqual({ capacity: "out_of_range" });
   });

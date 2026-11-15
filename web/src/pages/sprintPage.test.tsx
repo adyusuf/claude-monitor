@@ -153,8 +153,8 @@ describe("the sprint page: changing the sprint", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
     expect(screen.getByLabelText("Name")).toHaveValue("Launch");
     expect(screen.getByLabelText("Goal")).toHaveValue("Ship the checkout");
-    expect(screen.getByLabelText("Start date")).toHaveValue("2026-03-02");
-    expect(screen.getByLabelText("End date")).toHaveValue("2026-03-13");
+    expect(screen.getByLabelText("Start date")).toHaveValue("02/03/2026");
+    expect(screen.getByLabelText("End date")).toHaveValue("13/03/2026");
     expect(screen.getByLabelText("Capacity (Hours)")).toHaveValue(20);
     await waitFor(() => expect(screen.getByLabelText("Release")).toHaveValue("r1"));
     expect(screen.getByRole("checkbox", { name: "Deniz" })).toBeChecked();
@@ -192,7 +192,7 @@ describe("the sprint page: changing the sprint", () => {
     open("/w/w1/projects/p1/sprints/s1?edit=1");
     const end = await screen.findByLabelText("End date");
     await userEvent.clear(end);
-    await userEvent.type(end, "2026-03-01");
+    await userEvent.type(end, "01/03/2026");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("The end date cannot be before the start date.")).toBeInTheDocument();
     expect(calls.some((c) => c.method === "PUT")).toBe(false);

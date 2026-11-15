@@ -1,6 +1,7 @@
 // The editable form of a project and the checks the form runs before it asks the API (the API checks again, global #7).
 // A form holds text; the input sent to the API holds numbers, nulls and trimmed lines.
 import type { ItemType, EstimationUnit, PriorityScale, ProjectInput, ProjectView, Stakeholder } from "../api/typesProjects";
+import { isDay } from "./format";
 import { ITEM_TYPES, projectLimits as limit } from "./projectOptions";
 
 export interface ProjectDraft {
@@ -71,7 +72,9 @@ export function checkProject(d: ProjectDraft): FieldErrors {
   else if (input.budgetAmount !== null && !(input.budgetAmount >= 0 && input.budgetAmount <= limit.budgetMax)) errors.budgetAmount = "out_of_range";
   else if (input.budgetAmount !== null && (d.budgetAmount.trim().split(".")[1]?.length ?? 0) > limit.budgetDecimals) errors.budgetAmount = "too_many_decimals";
   else if (input.budgetCurrency !== null && !/^[A-Z]{3}$/.test(input.budgetCurrency)) errors.budgetCurrency = "invalid_currency";
-  if (input.startDate && input.endDate && input.endDate < input.startDate) errors.endDate = "before_start";
+  if (input.startDate && !isDay(input.startDate)) errors.startDate = "invalid_date";
+  if (input.endDate && !isDay(input.endDate)) errors.endDate = "invalid_date";
+  else if (input.startDate && input.endDate && isDay(input.startDate) && input.endDate < input.startDate) errors.endDate = "before_start";
   if (input.itemTypes.length === 0) errors.itemTypes = "invalid_list";
   if (!Number.isInteger(input.sprintLengthDays) || input.sprintLengthDays < limit.sprintMin || input.sprintLengthDays > limit.sprintMax) errors.sprintLengthDays = "out_of_range";
   if (tooLongLine(d.definitionOfReady)) errors.definitionOfReady = "invalid_list";

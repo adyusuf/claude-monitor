@@ -135,7 +135,7 @@ describe("the project page: editing", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
     expect(await screen.findByLabelText("Name")).toHaveValue("Checkout");
     expect(screen.getByLabelText("Budget amount")).toHaveValue(1500);
-    expect(screen.getByLabelText("Start date")).toHaveValue("2026-01-05");
+    expect(screen.getByLabelText("Start date")).toHaveValue("05/01/2026");
     expect(screen.getByLabelText("Stakeholder name 1")).toHaveValue("Dana");
     expect(screen.getByLabelText("Definition of Done 2")).toHaveValue("Tested");
     await userEvent.clear(screen.getByLabelText("Name"));

@@ -36,6 +36,7 @@ describe("the project form", () => {
       name: "invalid_name", purpose: "too_long", sponsor: "too_long", stakeholders: "invalid_list", budget: "amount_and_currency", endDate: "before_start",
       itemTypes: "invalid_list", sprintLengthDays: "out_of_range", definitionOfReady: "invalid_list", definitionOfDone: "invalid_list",
     });
+    expect(checkProject({ ...ok, startDate: "1/2", endDate: "2026-02-31" })).toMatchObject({ startDate: "invalid_date", endDate: "invalid_date" });
     expect(checkProject({ ...ok, budgetAmount: "-1", budgetCurrency: "EUR" }).budgetAmount).toBe("out_of_range");
     expect(checkProject({ ...ok, budgetAmount: "1", budgetCurrency: "eur" }).budgetCurrency).toBe("invalid_currency");
     expect(checkProject({ ...ok, budgetAmount: "", budgetCurrency: "EUR" }).budget).toBe("amount_and_currency");

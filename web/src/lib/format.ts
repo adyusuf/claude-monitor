@@ -22,6 +22,22 @@ export function day(iso: string | null | undefined): string {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : (iso ?? "");
 }
 
+/** True for a real calendar day written "2026-10-05" (no 31 February), the form the API takes. */
+export function isDay(iso: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return false;
+  const [year, month, dayOfMonth] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const check = new Date(Date.UTC(year, month - 1, dayOfMonth));
+  return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === dayOfMonth;
+}
+
+/** "2026-10-05" from what a person typed as "05/10/2026" (the one date form, global #12), or null when it is not a real day. */
+export function parseDay(text: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim());
+  const iso = match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+  return isDay(iso) ? iso : null;
+}
+
 export function dateTime(iso: string | null | undefined): string {
   const d = parse(iso);
   if (!d) return "";

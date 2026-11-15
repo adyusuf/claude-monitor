@@ -32,9 +32,12 @@ export const trProjects: Dictionary["projects"] = {
   versions: { semver: "Anlamsal (1.2.3)", calver: "Takvim (2026.10)", none: "Yok" },
   target: { performance: "Performans", accessibility: "Erişilebilirlik", sla: "Kullanılabilirlik (SLA)", security: "Güvenlik", other: "Diğer" },
   components: "Bileşenler ve modüller", noComponents: "Henüz bileşen ya da modül yok.", componentName: "Ad", componentKind: "Tür",
+  archiveComponentConfirm: "\"{name}\" bileşeni arşivlensin mi? Arşivlenen bileşen geri yüklenemez.",
+  dayFormat: "gg/aa/yyyy",
   newComponentName: "Yeni bileşen adı", newComponentKind: "Yeni bileşen türü", addComponent: "Ekle", rename: "Yeniden adlandır",
   componentKinds: { component: "Bileşen", module: "Modül" },
   releases: "Sürüm takvimi", noReleases: "Planlanmış sürüm yok.", releaseName: "Sürüm adı", plannedDate: "Planlanan tarih",
   releaseStatus: "Sürüm durumu", newRelease: "yeni sürüm", addRelease: "Ekle", cancelRelease: "Sürümü iptal et",
+  cancelReleaseConfirm: "\"{name}\" sürümü iptal edilsin mi? İptal edilen sürüm düzenlenemez ve geri getirilemez.",
   release: { planned: "Planlandı", released: "Yayımlandı", cancelled: "İptal edildi" },
 };

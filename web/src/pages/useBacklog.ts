@@ -46,12 +46,15 @@ export function useBacklog(projectId: string, filters: BacklogFilters, scope: Is
   }, [load, filters.q]);
 
   const more = async () => {
+    // The same guard as load(): a page that arrives after the filter, search or scope changed belongs to the old list.
+    const mine = latest.current;
     try {
       const page = await api.issues(projectId, { ...query, cursor: next, limit: config.pageSize });
+      if (mine !== latest.current) return;
       setRows((r) => [...(r ?? []), ...page.items]);
       setNext(page.next);
     } catch (e) {
-      setError(errorText(e));
+      if (mine === latest.current) setError(errorText(e));
     }
   };
 

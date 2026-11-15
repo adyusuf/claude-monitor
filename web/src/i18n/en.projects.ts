@@ -30,9 +30,12 @@ export const enProjects = {
   versions: { semver: "Semantic (1.2.3)", calver: "Calendar (2026.10)", none: "None" },
   target: { performance: "Performance", accessibility: "Accessibility", sla: "Availability (SLA)", security: "Security", other: "Other" },
   components: "Components and modules", noComponents: "No components or modules yet.", componentName: "Name", componentKind: "Kind",
+  archiveComponentConfirm: "Archive component \"{name}\"? A component cannot be restored once archived.",
+  dayFormat: "dd/mm/yyyy",
   newComponentName: "New component name", newComponentKind: "New component kind", addComponent: "Add", rename: "Rename",
   componentKinds: { component: "Component", module: "Module" },
   releases: "Release calendar", noReleases: "No releases planned.", releaseName: "Release name", plannedDate: "Planned date",
   releaseStatus: "Release state", newRelease: "new release", addRelease: "Add", cancelRelease: "Cancel release",
+  cancelReleaseConfirm: "Cancel release \"{name}\"? A cancelled release cannot be edited or brought back.",
   release: { planned: "Planned", released: "Released", cancelled: "Cancelled" },
 };
