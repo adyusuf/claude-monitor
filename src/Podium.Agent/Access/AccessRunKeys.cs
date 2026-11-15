@@ -37,7 +37,6 @@ public static class AccessRunKeys
         return ([.. keys.Distinct(RepoKeys.Comparer)], null, mismatch);
     }
 
-    /// <summary>The refusal of a run whose label names none of its working directory's checkouts.</summary>
     /// <summary>A label that names none of the working directory's checkouts, refused by the layer that makes it matter: a covering policy when one applies, else the default.</summary>
     public static AccessRefusal Mismatch(IReadOnlyList<AccessLayer> layers)
     {
