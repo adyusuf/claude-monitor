@@ -187,6 +187,19 @@ describe("the application page: release calendar", () => {
     expect(within(released).queryByRole("button", { name: "Cancel release" })).not.toBeInTheDocument();
   });
 
+  it("offers only the states the API takes: never cancelled for a new release, only released for one that went out", async () => {
+    serve();
+    open();
+    await screen.findByText("1.0.0");
+    const states = (label: string) => within(screen.getByLabelText(label)).getAllByRole("option").map((o) => (o as HTMLOptionElement).value);
+    expect(states("Release state new release")).toEqual(["planned", "released"]);
+    await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Edit" }));
+    expect(states("Release state 1.0.0")).toEqual(["planned", "released", "cancelled"]);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(within(screen.getByText("0.9.0").closest("li")!).getByRole("button", { name: "Edit" }));
+    expect(states("Release state 0.9.0")).toEqual(["released"]);
+  });
+
   it("adds, edits and cancels a release", async () => {
     const calls = serve({ "POST /applications/a1/releases": { status: 201, body: release() }, "PUT /releases/r1": { status: 204 }, "DELETE /releases/r1": { status: 204 } });
     open();

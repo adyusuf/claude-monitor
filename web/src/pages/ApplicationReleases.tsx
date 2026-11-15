@@ -4,7 +4,7 @@ import type { ReleaseStatus, ReleaseView } from "../api/typesProjects";
 import { Button, Card, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { day } from "../lib/format";
-import { projectLimits, RELEASE_STATUSES } from "../lib/projectOptions";
+import { projectLimits, releaseStatusesFrom } from "../lib/projectOptions";
 
 interface Draft { name: string; plannedDate: string; status: ReleaseStatus }
 const blank: Draft = { name: "", plannedDate: "", status: "planned" };
@@ -51,12 +51,12 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
 
   const input = (d: Draft) => ({ name: d.name, plannedDate: d.plannedDate || null, status: d.status });
 
-  const fields = (d: Draft, label: string, onChange: (d: Draft) => void) => (
+  const fields = (d: Draft, label: string, onChange: (d: Draft) => void, from: ReleaseStatus | null) => (
     <>
       <input className="input" aria-label={`${t("projects.releaseName")} ${label}`} placeholder={t("projects.releaseName")} maxLength={projectLimits.nameMax} value={d.name} onChange={(e) => onChange({ ...d, name: e.target.value })} />
       <input className="input" type="date" aria-label={`${t("projects.plannedDate")} ${label}`} value={d.plannedDate} onChange={(e) => onChange({ ...d, plannedDate: e.target.value })} />
       <select className="input" aria-label={`${t("projects.releaseStatus")} ${label}`} value={d.status} onChange={(e) => onChange({ ...d, status: e.target.value as ReleaseStatus })}>
-        {RELEASE_STATUSES.map((s) => <option key={s} value={s}>{t(`projects.release.${s}`)}</option>)}
+        {releaseStatusesFrom(from).map((s) => <option key={s} value={s}>{t(`projects.release.${s}`)}</option>)}
       </select>
     </>
   );
@@ -73,7 +73,7 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
                   e.preventDefault();
                   if (!blankName(editing.draft.name)) void act(() => api.putRelease(r.id, input(editing.draft)), () => setEditing(null));
                 }}>
-                  {fields(editing.draft, r.name, (d) => setEditing({ id: r.id, draft: d }))}
+                  {fields(editing.draft, r.name, (d) => setEditing({ id: r.id, draft: d }), r.status)}
                   <Button type="submit">{t("common.save")}</Button>
                   <Button variant="ghost" onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
                 </form>
@@ -100,7 +100,7 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
           e.preventDefault();
           if (!blankName(draft.name)) void act(() => api.addRelease(applicationId, input(draft)), () => setDraft(blank));
         }}>
-          {fields(draft, t("projects.newRelease"), setDraft)}
+          {fields(draft, t("projects.newRelease"), setDraft, null)}
           <Button type="submit">{t("projects.addRelease")}</Button>
         </form>
       ) : null}
