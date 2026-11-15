@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Podium.Api.Data;
 using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
@@ -53,6 +55,9 @@ public sealed class PermissionAnswerRaceTests(ApiFactory api)
         throw new InvalidOperationException("stream ended");
     }
 
+    private static async Task<string?> TitleAsync(HttpResponseMessage response) =>
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString();
+
     [Fact]
     public async Task Two_answers_at_once_give_one_answer_one_conflict_one_message_to_the_agent_and_no_rule_from_the_loser()
     {
@@ -67,7 +72,8 @@ public sealed class PermissionAnswerRaceTests(ApiFactory api)
             () => ApprovalRuleKit.AnswerAsync(w.Owner, request.Id, PermissionDecisions.Deny));
 
         Assert.Single(answers, a => a.StatusCode == HttpStatusCode.NoContent);
-        Assert.Single(answers, a => a.StatusCode == HttpStatusCode.Conflict);
+        var lost = Assert.Single(answers, a => a.StatusCode == HttpStatusCode.Conflict);
+        Assert.Equal(RemoteErrors.NotPending, await TitleAsync(lost)); // the page can say why: answered meanwhile, or expired
         var allowWon = answers[0].StatusCode == HttpStatusCode.NoContent;
         var row = await ApprovalRuleKit.RequestRowAsync(api, request.Id);
         Assert.Equal((PermissionStatuses.Answered, allowWon ? PermissionDecisions.Allow : PermissionDecisions.Deny), (row.Status, row.Decision));
@@ -88,6 +94,7 @@ public sealed class PermissionAnswerRaceTests(ApiFactory api)
         var answer = await ApprovalRuleKit.AnswerAsync(w.Owner, request.Id, PermissionDecisions.Allow, ApprovalDurations.FiveMinutes);
 
         Assert.Equal(HttpStatusCode.Conflict, answer.StatusCode);
+        Assert.Equal(RemoteErrors.NotPending, await TitleAsync(answer));
         Assert.Equal(PermissionStatuses.Open, (await ApprovalRuleKit.RequestRowAsync(api, request.Id)).Status);
         Assert.Empty(await ApprovalRuleKit.RulesAsync(api, w.WorkspaceId));
         Assert.Empty(await ApprovalRuleKit.AuditAsync(api, w.WorkspaceId, AuditActions.PermissionAnswered));

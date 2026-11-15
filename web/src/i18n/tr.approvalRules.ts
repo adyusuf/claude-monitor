@@ -9,7 +9,7 @@ export const trApprovalRules: Dictionary["approvalRules"] = {
   waiting: "Bekleyenler", noneWaiting: "Seni bekleyen bir şey yok.",
   rules: "Geçerli onaylar", noRules: "Geçerli bir onayın yok.",
   recent: "Son cevaplananlar", noRecent: "Son zamanlarda cevaplanan bir şey yok.",
-  session: "Oturum", machine: "Makine", tool: "Araç", command: "Komut", input: "Girdi", expires: "Bekleme sonu", untitled: "Adsız oturum",
+  session: "Oturum", machine: "Makine", tool: "Araç", command: "Komut", input: "Girdi", expires: "Bekleme sonu", expired: "Süre doldu: bu istek artık makinede soruluyor.", untitled: "Adsız oturum",
   remember: "Şu süre izin ver", duration: { once: "Yalnızca bu sefer", "5m": "5 dakika", "10m": "10 dakika", "30m": "30 dakika", "1h": "1 saat", always: "Her zaman" },
   rememberHint: "Süre bitene kadar bu makinede, bu projede aynı araç kendiliğinden onaylanır: Bash için yalnızca bu komutun aynısı, dosya için yalnızca bu dosya.",
   rememberHintAlways: "Her zaman, Onaylar sayfasında geri alana ya da çalışma alanının oturumları sakladığı süre boyunca kullanılmayana kadar sürer ve kodunu sorar.",

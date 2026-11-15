@@ -134,7 +134,7 @@ public static class CommandEndpoints
         if (!ApprovalDurations.All.Contains(remember)) return Http.Invalid("remember", "invalid_duration");
         if (remember != ApprovalDurations.Once && req.Decision != PermissionDecisions.Allow) return Http.Invalid("remember", RuleNotAllowed);
         var now = clock.GetUtcNow();
-        if (request.Status != PermissionStatuses.Open || request.ExpiresAt <= now) return Results.Conflict();
+        if (request.Status != PermissionStatuses.Open || request.ExpiresAt <= now) return RemoteChecks.Conflict(RemoteErrors.NotPending);
         RuleAsk? ask = null;
         Guid? existing = null;
         if (remember != ApprovalDurations.Once)
@@ -165,7 +165,7 @@ public static class CommandEndpoints
                 if (answered != 1)
                 {
                     await tx.RollbackAsync(http.RequestAborted);
-                    return Results.Conflict();
+                    return RemoteChecks.Conflict(RemoteErrors.NotPending); // answered meanwhile, or expired: the page says which in words
                 }
 
                 if (ask is not null && existing is { } ruleId && await ApprovalRuleCreation.StandLongerAsync(db, ruleId, ask, http.RequestAborted))

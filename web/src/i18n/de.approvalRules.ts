@@ -9,7 +9,7 @@ export const deApprovalRules: Dictionary["approvalRules"] = {
   waiting: "Wartend", noneWaiting: "Nichts wartet auf Sie.",
   rules: "Stehende Freigaben", noRules: "Sie haben keine stehenden Freigaben.",
   recent: "Zuletzt beantwortet", noRecent: "Zuletzt wurde nichts beantwortet.",
-  session: "Sitzung", machine: "Maschine", tool: "Werkzeug", command: "Befehl", input: "Eingabe", expires: "Wartet bis", untitled: "Sitzung ohne Titel",
+  session: "Sitzung", machine: "Maschine", tool: "Werkzeug", command: "Befehl", input: "Eingabe", expires: "Wartet bis", expired: "Die Zeit ist um: diese Anfrage wird jetzt auf der Maschine gestellt.", untitled: "Sitzung ohne Titel",
   remember: "Erlauben für", duration: { once: "Nur dieses Mal", "5m": "5 Minuten", "10m": "10 Minuten", "30m": "30 Minuten", "1h": "1 Stunde", always: "Immer" },
   rememberHint: "Dasselbe Werkzeug auf dieser Maschine in diesem Projekt wird dann bis zum Ende von selbst erlaubt: für Bash nur genau dieser Befehl, für eine Datei nur diese Datei.",
   rememberHintAlways: "Immer gilt, bis Sie es auf der Seite Freigaben widerrufen oder bis es so lange unbenutzt bleibt, wie der Arbeitsbereich seine Sitzungen behält, und fragt nach Ihrem Code.",

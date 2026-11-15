@@ -7,7 +7,8 @@ import { Button, Json, Notice } from "../components/ui";
 import { VisibleText } from "../components/VisibleText";
 import { config } from "../config";
 import { useI18n } from "../i18n";
-import { time } from "../lib/format";
+import { countdown, time } from "../lib/format";
+import { useNow } from "../lib/useNow";
 import { PlanPrompt, PLAN_TOOL, QUESTION_TOOL } from "./PermissionPrompts";
 import { useCodeGate } from "./useCodeGate";
 
@@ -48,6 +49,8 @@ export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalReq
   const question = row.toolName === QUESTION_TOOL;
   const command = commandOf(row);
   const extras = bashExtras(row);
+  const now = useNow(config.countdownTickMs);
+  const over = countdown(row.expiresAt, now) === null; // the agent no longer waits: an answer now would only conflict
 
   const answer = async (decision: "allow" | "deny") => {
     const always = decision === "allow" && remember === "always";
@@ -85,11 +88,12 @@ export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalReq
           ) : <p className="muted small">{row.strict ? t("approvalRules.strictNoRemember") : t("approvalRules.noRemember")}</p>}
           {remember === "always" ? gate.field : null}
           {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}
+          {over ? <p className="muted small">{t("approvalRules.expired")}</p> : null}
           <div className="permission-actions">
             <input className="input" aria-label={t("approvalRules.reason")} placeholder={t("approvalRules.reason")} maxLength={config.reasonMax}
               value={reason} onChange={(e) => setReason(e.target.value)} />
-            <Button busy={gate.busy} disabled={remember === "always" && !gate.ready} onClick={() => void answer("allow")}>{row.toolName === PLAN_TOOL ? t("chat.approvePlan") : t("approvalRules.allow")}</Button>
-            <Button variant="danger" busy={gate.busy} onClick={() => void answer("deny")}>{row.toolName === PLAN_TOOL ? t("chat.rejectPlan") : t("approvalRules.deny")}</Button>
+            <Button busy={gate.busy} disabled={over || (remember === "always" && !gate.ready)} onClick={() => void answer("allow")}>{row.toolName === PLAN_TOOL ? t("chat.approvePlan") : t("approvalRules.allow")}</Button>
+            <Button variant="danger" busy={gate.busy} disabled={over} onClick={() => void answer("deny")}>{row.toolName === PLAN_TOOL ? t("chat.rejectPlan") : t("approvalRules.deny")}</Button>
           </div>
         </>
       )}
