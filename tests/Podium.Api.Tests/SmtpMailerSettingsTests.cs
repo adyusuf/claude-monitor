@@ -19,7 +19,7 @@ public sealed class SmtpMailerSettingsTests(ApiFactory api) : IAsyncLifetime
 
     public Task DisposeAsync() => ServerAdminKit.ResetSettingsAsync(api);
 
-    private SmtpMailer Mailer() => new(api.Services.GetRequiredService<IntegrationSettings>(), NullLogger<SmtpMailer>.Instance);
+    private SmtpMailer Mailer() => new(api.Services.GetRequiredService<IntegrationSettings>(), api.Services.GetRequiredService<ApiConfig>(), NullLogger<SmtpMailer>.Instance);
 
     private static async Task SendAsync(SmtpMailer mailer, string to)
     {
@@ -87,7 +87,7 @@ public sealed class SmtpMailerSettingsTests(ApiFactory api) : IAsyncLifetime
         (await ServerAdminKit.PutAsync(admin, "smtp", new { host = IPAddress.Loopback.ToString(), port = server.PortText, from = Emails.New("sm-refused-from"), tls = "false" })).EnsureSuccessStatusCode();
         var to = Emails.New("sm-refused-to");
         var log = new TracingLog();
-        var mailer = new SmtpMailer(api.Services.GetRequiredService<IntegrationSettings>(), new Logger<SmtpMailer>(log));
+        var mailer = new SmtpMailer(api.Services.GetRequiredService<IntegrationSettings>(), api.Services.GetRequiredService<ApiConfig>(), new Logger<SmtpMailer>(log));
 
         await Assert.ThrowsAsync<SmtpFailedRecipientException>(() => SendAsync(mailer, to));
 
@@ -96,6 +96,25 @@ public sealed class SmtpMailerSettingsTests(ApiFactory api) : IAsyncLifetime
         Assert.Contains(nameof(SmtpFailedRecipientException), entry.Text, StringComparison.Ordinal);
         Assert.DoesNotContain(to, entry.Everything, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("no such mailbox", entry.Everything, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_mail_server_that_does_not_answer_ends_the_send_after_the_send_timeout_as_a_timeout_not_a_cancellation()
+    {
+        var admin = await ServerAdminKit.AdminAsync(api, "sm-silent");
+        await using var server = new RefusingSmtp(SmtpRefusal.Silent);
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { host = IPAddress.Loopback.ToString(), port = server.PortText, from = Emails.New("sm-silent-from"), tls = "false" })).EnsureSuccessStatusCode();
+        var log = new ListLogger<SmtpMailer>();
+        var config = api.Services.GetRequiredService<ApiConfig>() with { MailSendTimeout = TimeSpan.FromSeconds(1) };
+        var mailer = new SmtpMailer(api.Services.GetRequiredService<IntegrationSettings>(), config, log);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        // The caller's own token would end it after 30 seconds, as a cancellation; the mailer's timeout comes first.
+        await Assert.ThrowsAsync<TimeoutException>(() => SendAsync(mailer, Emails.New("sm-silent-to")));
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(15), $"took {clock.Elapsed}");
+        Assert.Contains(nameof(TimeoutException), Assert.Single(log.Entries).Text, StringComparison.Ordinal);
+        Assert.Equal(TimeSpan.FromSeconds(30), ConfigKit.Dev().MailSendTimeout); // the default
     }
 
     [Fact]

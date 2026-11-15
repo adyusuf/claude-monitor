@@ -98,6 +98,13 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
                 // The invitation row stays (an admin sees it and can revoke it); the person is tried again on a later run.
                 invitation.RevokedAt = now;
                 log.LogWarning("Invitation mail for integration {Connection} failed: {Type}", connection.Id, e.GetType().Name);
+                if (e is TimeoutException)
+                {
+                    // The mail server does not answer: the run (inside an import or a pass, under the connection's gate) stops here rather than
+                    // wait one timeout per person; the others are tried on a later run.
+                    await db.SaveChangesAsync(ct);
+                    break;
+                }
             }
 
             await db.SaveChangesAsync(ct);

@@ -132,7 +132,7 @@ public static class ServerSettingsEndpoints
             await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, user.Language), MailTemplates.Test, user.Email), http.RequestAborted);
         }
         catch (Exception e) when (e is System.Net.Mail.SmtpException or InvalidOperationException or IOException
-                                      or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException)
+                                      or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException or TimeoutException)
         {
             logs.CreateLogger(typeof(ServerSettingsEndpoints)).LogWarning("Test mail failed: {Type}", e.GetType().Name);
             return Http.Invalid("smtp", MailFailed);
