@@ -56,7 +56,7 @@ export const de: Dictionary = {
     invalid_answers: "Diese Antwort passt nicht zur Frage.",
     session_ended: "Die Sitzung ist beendet.", session_not_ended: "Nur eine beendete Sitzung kann aus der Liste entfernt werden.", invalid_body: "Schreiben Sie die Nachricht, die gesendet werden soll.", too_long: "Das ist zu lang.",
     out_of_range: "Dieser Wert liegt außerhalb des zulässigen Bereichs.", invalid_role: "Wählen Sie eine Rolle.", unauthorized: "Ihre Sitzung ist beendet. Melden Sie sich erneut an.",
-    forbidden: "Das dürfen Sie nicht.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
+    forbidden: "Das dürfen Sie nicht.", csrf: "Der Server hat diese Änderung abgelehnt, weil sie nicht von einer Seite dieser Website kam. Laden Sie die Seite neu und versuchen Sie es erneut.", owner_only: "Das kann nur der Eigentümer der Maschine.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
     too_many_requests: "Zu viele Versuche. Warten Sie eine Minute.", server_error: "Auf dem Server ist etwas schiefgegangen.",
     request_failed: "Die Anfrage ist fehlgeschlagen.", network: "Der Server ist nicht erreichbar.",
     account_locked: "Zu viele falsche Versuche bei diesem Konto. Versuchen Sie es in 15 Minuten erneut.",

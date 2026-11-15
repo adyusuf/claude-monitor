@@ -56,7 +56,7 @@ export const tr: Dictionary = {
     invalid_answers: "Bu yanıt soruyla uyuşmuyor.",
     session_ended: "Oturum sona erdi.", session_not_ended: "Yalnızca biten bir oturum listeden kaldırılabilir.", invalid_body: "Gönderilecek mesajı yazın.", too_long: "Bu çok uzun.",
     out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
-    forbidden: "Bunu yapma izniniz yok.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
+    forbidden: "Bunu yapma izniniz yok.", csrf: "Sunucu bu değişikliği, bu sitenin kendi sayfasından gelmediği için reddetti. Sayfayı yenileyip tekrar deneyin.", owner_only: "Bunu yalnızca makinenin sahibi yapabilir.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
     account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
