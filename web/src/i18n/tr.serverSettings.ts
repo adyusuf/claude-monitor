@@ -27,5 +27,6 @@ export const trServerSettings: Dictionary["serverSettings"] = {
   errors: {
     invalid_setting: "Bu entegrasyonda böyle bir ayar yok.",
     invalid_value: "Bu değer bu ayar için geçerli değil.",
+    tls_required: "Kullanıcı adı ya da parola, e-posta sunucusu bu makinede değilse yalnızca STARTTLS açıkken gönderilir. STARTTLS'i açın ya da onları kaldırın.",
   },
 };
