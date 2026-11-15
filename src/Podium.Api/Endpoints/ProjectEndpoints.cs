@@ -138,9 +138,11 @@ public static class ProjectEndpoints
     {
         var grant = await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
+        // Only people still in the workspace: a removed member is no longer listed, with or without a project row.
         var rows = await (from m in db.ProjectMembers.AsNoTracking()
                           join u in db.Users.AsNoTracking() on m.UserId equals u.Id
-                          where m.ProjectId == id
+                          join w in db.WorkspaceMembers.AsNoTracking() on new { m.UserId, grant.Project.WorkspaceId } equals new { w.UserId, w.WorkspaceId }
+                          where m.ProjectId == id && w.RemovedAt == null
                           orderby u.DisplayName
                           select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).ToListAsync(http.RequestAborted);
         return Results.Ok(rows);

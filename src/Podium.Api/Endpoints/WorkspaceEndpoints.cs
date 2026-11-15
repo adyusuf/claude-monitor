@@ -176,6 +176,9 @@ public static class WorkspaceEndpoints
         target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
+        // Their project roles go with them, so an invitation back starts from the workspace role alone.
+        await db.ProjectMembers.Where(m => m.UserId == userId && db.Projects.Any(p => p.Id == m.ProjectId && p.WorkspaceId == id))
+            .ExecuteDeleteAsync(http.RequestAborted);
         await db.SaveChangesAsync(http.RequestAborted);
         var notices = new List<Action>();
         await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices, agents);
