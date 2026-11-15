@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ME, mockApi, renderAt } from "../test/helpers";
@@ -69,6 +69,22 @@ describe("the spaces of a connection", () => {
     expect(screen.getByRole("button", { name: "Import selected (2)" })).toBeEnabled();
     await userEvent.click(screen.getByRole("checkbox", { name: "Select Shop" }));
     expect(screen.getByRole("button", { name: "Import selected (1)" })).toBeEnabled();
+  });
+
+  it("stops the selection at the 20 spaces the API takes and says so, and picking one off frees a place", async () => {
+    const many = Array.from({ length: 21 }, (_, i) => space({ key: `K${i}`, name: `Space ${i}` }));
+    serve({ [spacesPath]: { body: many } });
+    open();
+    await show();
+    await screen.findByRole("checkbox", { name: "Select Space 0" });
+    for (let i = 0; i < 20; i++) fireEvent.click(screen.getByLabelText(`Select Space ${i}`));
+    expect(screen.getByRole("button", { name: "Import selected (20)" })).toBeEnabled();
+    expect(screen.getByText("At most 20 spaces can be imported at once.")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Space 20" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Select Space 0" })).toBeEnabled(); // a picked one can still be taken off
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Space 0" }));
+    expect(screen.getByRole("checkbox", { name: "Select Space 20" })).toBeEnabled();
+    expect(screen.queryByText("At most 20 spaces can be imported at once.")).not.toBeInTheDocument();
   });
 
   it("lets a person who may not import read the list but not pick, and shows no import button", async () => {

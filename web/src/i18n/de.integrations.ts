@@ -24,7 +24,7 @@ export const deIntegrations: Dictionary["integrations"] = {
   syncNow: "Jetzt prüfen", syncing: "Prüfe…", disconnect: "Trennen", disconnectConfirm: "{site} trennen? Das Importierte bleibt, wird aber nicht mehr aktualisiert.",
   spacesTitle: "Bereiche", spacesHint: "Wählen Sie die Jira-Bereiche, die als Projekte übernommen werden, mit Backlog, Epics und Personen.",
   loadSpaces: "Jira-Bereiche anzeigen", noSpaces: "Dieses Konto sieht keine Bereiche.", imported: "Importiert", importSelected: "Auswahl importieren ({n})",
-  openProject: "Projekt öffnen", sprintsOf: "Sprints…", selectSpace: "{name} auswählen",
+  openProject: "Projekt öffnen", sprintsOf: "Sprints…", spacesLimit: "Es können höchstens {n} Bereiche auf einmal importiert werden.", selectSpace: "{name} auswählen",
   importResult: "{key}: {created} neu, {updated} aktualisiert", importProblem: "{key}: {error}",
   sprintsTitle: "Sprints von {name}", sprintsHint: "Wählen Sie die Sprints, die mit ihren Issues importiert werden. Neue Jira-Sprints erscheinen hier; sie werden nur importiert, wenn Sie sie wählen.",
   noSprints: "Dieser Bereich hat keine Sprints (oder kein Board).", importSprints: "Gewählte Sprints importieren ({n})",

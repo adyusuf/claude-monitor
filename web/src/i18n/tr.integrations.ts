@@ -24,7 +24,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   syncNow: "Şimdi kontrol et", syncing: "Kontrol ediliyor…", disconnect: "Bağlantıyı kes", disconnectConfirm: "{site} bağlantısı kesilsin mi? İçe alınanlar kalır ama güncellenmez.",
   spacesTitle: "Alanlar", spacesHint: "Proje olarak almak istediğiniz Jira alanlarını seçin; backlog'u, epic'leri ve kişileri de gelir.",
   loadSpaces: "Jira alanlarını göster", noSpaces: "Bu hesap hiç alan görmüyor.", imported: "İçe alındı", importSelected: "Seçilenleri içe al ({n})",
-  openProject: "Projeyi aç", sprintsOf: "Sprintler…", selectSpace: "{name} seç",
+  openProject: "Projeyi aç", sprintsOf: "Sprintler…", spacesLimit: "Bir seferde en fazla {n} alan içe alınabilir.", selectSpace: "{name} seç",
   importResult: "{key}: {created} yeni, {updated} güncellendi", importProblem: "{key}: {error}",
   sprintsTitle: "{name} sprintleri", sprintsHint: "İssue'larıyla birlikte almak istediğiniz sprintleri seçin. Jira'da açılan yeni sprintler burada görünür; siz seçmeden alınmaz.",
   noSprints: "Bu alanda sprint (ya da board) yok.", importSprints: "Seçilen sprintleri içe al ({n})",
