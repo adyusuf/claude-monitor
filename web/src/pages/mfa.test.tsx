@@ -55,6 +55,20 @@ describe("two-step sign-in", () => {
     expect(await screen.findByText("home")).toBeInTheDocument();
     expect(calls.find((c) => c.path === "/auth/mfa")?.body).toEqual({ code: "abcde-fghij" });
   });
+
+  it("goes on to the next page a provider sign-in carried, and never off the site", async () => {
+    mockApi({ "GET /me": { status: 401 }, "POST /auth/mfa": { status: 204 } });
+    const routes = [{ path: "/mfa", element: <MfaPage /> }, { path: "/invitations/accept", element: <div>accept page</div> }, { path: "/", element: <div>home</div> }];
+    const { unmount } = renderAt(`/mfa?next=${encodeURIComponent("/invitations/accept?token=abc")}`, routes);
+    await userEvent.type(await screen.findByLabelText(/Code from your authenticator app/), "654321");
+    await userEvent.click(screen.getByRole("button", { name: "Verify" }));
+    expect(await screen.findByText("accept page")).toBeInTheDocument();
+    unmount();
+    renderAt(`/mfa?next=${encodeURIComponent("//evil.example.net")}`, routes);
+    await userEvent.type(await screen.findByLabelText(/Code from your authenticator app/), "654321");
+    await userEvent.click(screen.getByRole("button", { name: "Verify" }));
+    expect(await screen.findByText("home")).toBeInTheDocument();
+  });
 });
 
 describe("turning two-step sign-in on and off", () => {

@@ -40,6 +40,17 @@ describe("sign in", () => {
     expect(screen.getByText(/locked for a while/)).toBeInTheDocument();
     expect(screen.getByText(/resetting the password opens it at once/)).toBeInTheDocument();
   });
+
+  it("carries a same-site next through the provider buttons and drops an unsafe one", async () => {
+    mockApi(signedOut);
+    const next = "/invitations/accept?token=abc";
+    const { unmount } = renderAt(`/login?next=${encodeURIComponent(next)}`, [{ path: "/login", element: <LoginPage /> }]);
+    expect(await screen.findByText("Continue with GitHub")).toHaveAttribute("href", `/api/auth/external/github?mode=signin&next=${encodeURIComponent(next)}`);
+    expect(screen.getByText("Continue with Google")).toHaveAttribute("href", `/api/auth/external/google?mode=signin&next=${encodeURIComponent(next)}`);
+    unmount();
+    renderAt(`/login?next=${encodeURIComponent("//evil.example.net")}`, [{ path: "/login", element: <LoginPage /> }]);
+    expect(await screen.findByText("Continue with GitHub")).toHaveAttribute("href", "/api/auth/external/github?mode=signin");
+  });
 });
 
 describe("register", () => {

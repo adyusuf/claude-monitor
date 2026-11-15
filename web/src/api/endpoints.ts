@@ -225,7 +225,8 @@ export const api = {
     request<void>("PUT", `/workspaces/${ws}/settings`, { enforceAccessPolicies, code }),
 };
 
-/** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */
-export const providerUrl = (provider: string, mode: "signin" | "link") => `/api/auth/external/${provider}?mode=${mode}`;
+/** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch); `next` is a same-site path already checked with safeNext. */
+export const providerUrl = (provider: string, mode: "signin" | "link", next = "/") =>
+  `/api/auth/external/${provider}?mode=${mode}${next === "/" ? "" : `&next=${encodeURIComponent(next)}`}`;
 export const exportUrl = "/api/me/export";
 export const streamUrl = (workspaceId: string) => `/api/workspaces/${workspaceId}/stream`;

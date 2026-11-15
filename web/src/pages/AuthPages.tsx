@@ -11,8 +11,9 @@ import { MfaStep } from "./Mfa";
 
 const emailShape = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function Providers() {
+function Providers({ next = null }: { next?: string | null }) {
   const { t } = useI18n();
+  const target = safeNext(next); // the page the provider sign-in returns to (the API checks it again)
   const [available, setAvailable] = useState<string[]>([]);
   useEffect(() => {
     api.providers().then((p) => setAvailable(p.available)).catch(() => setAvailable([]));
@@ -21,8 +22,8 @@ function Providers() {
   return (
     <div className="providers">
       <div className="divider"><span>{t("auth.or")}</span></div>
-      {available.includes("github") ? <a className="btn btn-ghost wide" href={providerUrl("github", "signin")}>{t("auth.withGithub")}</a> : null}
-      {available.includes("google") ? <a className="btn btn-ghost wide" href={providerUrl("google", "signin")}>{t("auth.withGoogle")}</a> : null}
+      {available.includes("github") ? <a className="btn btn-ghost wide" href={providerUrl("github", "signin", target)}>{t("auth.withGithub")}</a> : null}
+      {available.includes("google") ? <a className="btn btn-ghost wide" href={providerUrl("google", "signin", target)}>{t("auth.withGoogle")}</a> : null}
     </div>
   );
 }
@@ -67,7 +68,7 @@ export function LoginPage() {
         <Field label={t("auth.password")} type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         <Button type="submit" busy={busy}>{t("auth.signIn")}</Button>
       </form>
-      <Providers />
+      <Providers next={params.get("next")} />
       <p className="auth-links"><Link to="/forgot">{t("auth.forgot")}</Link></p>
       <p className="auth-links">{t("auth.noAccount")} <Link to="/register">{t("auth.signUp")}</Link></p>
     </AuthFrame>
