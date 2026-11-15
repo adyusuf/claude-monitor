@@ -29,7 +29,7 @@ public static class WorkspaceEndpoints
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("/workspaces").RequireAuthorization(Schemes.Session);
-        g.MapPost("/", Create);
+        g.MapPost("/", Create).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         g.MapGet("/{id:guid}", Get);
         g.MapPatch("/{id:guid}", Rename);
         g.MapPut("/{id:guid}/settings", PutSettings);
@@ -142,6 +142,8 @@ public static class WorkspaceEndpoints
             return Http.Invalid("role", "last_owner");
         }
 
+        // The role they already hold: nothing changes, so nothing is written to the audit log.
+        if (target.Role == req.Role) return Results.NoContent();
         var before = target.Role;
         target.Role = req.Role;
         Audit.Add(db, http, clock, AuditActions.RoleChanged, id, actor.UserId, targetType: "user", targetId: userId,

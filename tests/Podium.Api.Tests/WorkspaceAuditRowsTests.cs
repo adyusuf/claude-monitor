@@ -108,6 +108,19 @@ public sealed class WorkspaceAuditRowsTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task Setting_the_role_a_member_already_has_writes_no_role_changed_row()
+    {
+        var owner = await api.NewClient().SignedUpAsync("aud-same-owner");
+        var member = await RemoteKit.MemberAsync(api, owner, "aud-same-member");
+
+        var response = await owner.SendAsync(HttpMethod.Patch, $"/api/workspaces/{owner.WorkspaceId}/members/{member.Id}", new { role = "member" });
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
+        var page = await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/audit?limit=100");
+        Assert.DoesNotContain(page.GetProperty("items").EnumerateArray(), a => a.GetProperty("action").GetString() == AuditActions.RoleChanged);
+    }
+
+    [Fact]
     public async Task Removing_a_member_writes_a_member_removed_row_naming_the_member()
     {
         var owner = await api.NewClient().SignedUpAsync("aud-rm-owner");
