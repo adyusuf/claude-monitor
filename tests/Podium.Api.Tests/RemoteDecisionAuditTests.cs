@@ -34,7 +34,7 @@ public sealed class RemoteDecisionAuditTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task A_grant_approval_whose_audit_row_fails_stays_requested_and_its_two_step_code_is_not_used_up()
+    public async Task A_grant_approval_whose_audit_row_fails_stays_requested_and_its_accepted_two_step_code_is_spent()
     {
         var team = await RemoteKit.TeamAsync(api);
         (await team.Admin.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/role", new { environment = "production", function = "application" })).EnsureSuccessStatusCode();
@@ -49,8 +49,13 @@ public sealed class RemoteDecisionAuditTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.InternalServerError, (await owner.PostAsync($"/api/grants/{grant.Id}/approve", new { code })).StatusCode);
 
         Assert.Equal(GrantStatuses.Requested, await GrantStatusAsync(grant.Id));
+        // The accepted code is spent at once (a two-step code is single use, whatever happens to the decision afterwards): the same code is
+        // refused, and a code of the next 30-second step approves.
         fault.Error = null;
-        Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsync($"/api/grants/{grant.Id}/approve", new { code })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.PostAsync($"/api/grants/{grant.Id}/approve", new { code })).StatusCode);
+        api.Clock.Advance(TimeSpan.FromSeconds(31));
+        var next = RemoteKit.TotpNow(api, secret);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsync($"/api/grants/{grant.Id}/approve", new { code = next })).StatusCode);
         Assert.Equal(GrantStatuses.Active, await GrantStatusAsync(grant.Id));
     }
 

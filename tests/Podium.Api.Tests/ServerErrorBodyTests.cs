@@ -1,9 +1,6 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
-using Podium.Api.Mail;
 using Podium.Api.Tests.Infrastructure;
 
 namespace Podium.Api.Tests;
@@ -21,8 +18,9 @@ public sealed partial class ServerErrorBodyTests(ApiFactory api)
     [Fact]
     public async Task A_real_500_is_a_problem_body_whose_title_is_not_an_api_code_and_hides_the_exception()
     {
-        var mailer = new FlakyMailer(api.Mail) { Down = true };
-        await using var host = api.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<IMailer>(mailer)));
+        // The register call stores the account first: a database that goes down at that statement is a real unhandled exception.
+        var fault = new CommandFault("INSERT INTO users") { Error = new DatabaseDownException() };
+        await using var host = HostKit.WithInterceptor(api, fault);
         var client = JiraKit.ClientOf(api, host);
 
         var response = await client.PostAsync("/api/auth/register",
@@ -31,7 +29,7 @@ public sealed partial class ServerErrorBodyTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         var text = await response.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("the mail server is down", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("the database is down", text, StringComparison.Ordinal);
         var body = JsonSerializer.Deserialize<JsonElement>(text);
         Assert.Equal(500, body.GetProperty("status").GetInt32());
         var title = body.GetProperty("title").GetString();
