@@ -2,7 +2,9 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Layout } from "../components/Layout";
+import { de } from "../i18n/de";
 import { en } from "../i18n/en";
+import { tr } from "../i18n/tr";
 import { ME, mockApi, renderAt } from "../test/helpers";
 import { AccountPage } from "./AccountPages";
 
@@ -14,14 +16,25 @@ describe("the frame", () => {
     expect(screen.getByRole("link", { name: /Workspace settings/ })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText("Language"), "tr");
     expect(await screen.findByRole("link", { name: /Oturumlar/ })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: tr.nav.workspace })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText("Tema"), "dark");
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     await userEvent.selectOptions(screen.getByLabelText("Tema"), "system");
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
-    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    await userEvent.click(screen.getByRole("button", { name: tr.nav.menu }));
     await userEvent.click(screen.getByRole("button", { name: "Çıkış" }));
     expect(await screen.findByText("login page")).toBeInTheDocument();
     expect(calls.some((c) => c.path === "/auth/logout")).toBe(true);
+  });
+
+  it("names the workspace switcher and the menu button from the language's keys", async () => {
+    mockApi({ "GET /me": { body: ME } });
+    renderAt("/w/w1/x", [{ path: "/w/:ws/*", element: <Layout /> }]);
+    expect(await screen.findByRole("combobox", { name: en.nav.workspace })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.nav.menu })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText(en.nav.language), "de");
+    expect(await screen.findByRole("combobox", { name: de.nav.workspace })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: de.nav.menu })).toBeInTheDocument();
   });
 
   it("keeps the user signed in and says so when the sign-out fails, and signs out on a retry that works", async () => {

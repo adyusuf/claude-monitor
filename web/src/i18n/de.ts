@@ -20,6 +20,7 @@ export const de: Dictionary = {
     dashboard: "Übersicht", projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", runs: "Ausführungen", approvals: "Freigaben", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
     account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", signOutFailed: "Die Abmeldung wurde nicht abgeschlossen, Sie sind noch angemeldet. Versuchen Sie es erneut.", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
+    workspace: "Arbeitsbereich", menu: "Menü",
     themeSystem: "System", themeLight: "Hell", themeDark: "Dunkel",
   },
   auth: {
