@@ -79,7 +79,7 @@ public static partial class Strings
         return all.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private static IEnumerable<Entry> Entries() => [.. CliEntries(), .. LoginEntries(), .. InstallEntries(), .. TrayEntries(), .. StatusEntries(), .. AccessEntries()];
+    private static IEnumerable<Entry> Entries() => [.. CliEntries(), .. LoginEntries(), .. InstallEntries(), .. TrayEntries(), .. StatusEntries(), .. AccessEntries(), .. RemoteEntries()];
 
     private static Entry E(string key, string en, string tr, string de) => new(key, en, tr, de);
 

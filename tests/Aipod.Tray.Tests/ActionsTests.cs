@@ -111,6 +111,21 @@ public sealed class ActionsTests : IDisposable
         Assert.Contains("Win32Exception", failed.Text, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("calc.exe")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("/usr/bin/open")]
+    public async Task A_saved_server_that_is_not_a_web_address_is_never_handed_to_the_system(string saved)
+    {
+        home.Connect(saved);
+
+        var result = await Actions().RunAsync(TrayCommand.OpenWeb, null, CancellationToken.None);
+
+        Assert.Equal(new ActionResult(false, "Only http and https addresses are opened."), result);
+        Assert.Empty(cli.Opened);
+    }
+
     [Fact]
     public async Task Showing_the_window_and_quitting_are_not_the_actions_business()
     {

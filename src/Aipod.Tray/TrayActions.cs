@@ -41,9 +41,9 @@ public sealed class TrayActions(AgentConfig config, IAgentCli cli)
                 if (!IsWebAddress(address)) return new ActionResult(false, Strings.T(Msg.TrayActGiveServer));
                 return await Cli("", ["connect", "--server", address!], ct);
             case TrayCommand.OpenWeb:
-                return Open(Identity.Peek(config)?.Server, Strings.T(Msg.TrayActNoServer));
+                return Open(Identity.Peek(config)?.Server, Strings.T(Msg.TrayActNoServer), webOnly: true);
             case TrayCommand.OpenLog:
-                return File.Exists(config.LogPath) ? Open(config.LogPath, "") : new ActionResult(false, Strings.T(Msg.TrayActNoLog));
+                return File.Exists(config.LogPath) ? Open(config.LogPath, "", webOnly: false) : new ActionResult(false, Strings.T(Msg.TrayActNoLog));
             default:
                 return new ActionResult(false, Strings.T(Msg.TrayActNotCommand));
         }
@@ -67,10 +67,10 @@ public sealed class TrayActions(AgentConfig config, IAgentCli cli)
         }
     }
 
-    private ActionResult Open(string? target, string missing)
+    private ActionResult Open(string? target, string missing, bool webOnly)
     {
         if (target is null) return new ActionResult(false, missing);
-        if (target.Contains("://", StringComparison.Ordinal) && !IsWebAddress(target)) return new ActionResult(false, Strings.T(Msg.TrayActOnlyHttp));
+        if (webOnly && !IsWebAddress(target)) return new ActionResult(false, Strings.T(Msg.TrayActOnlyHttp));
         try
         {
             cli.Open(target);

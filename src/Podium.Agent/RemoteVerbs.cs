@@ -29,7 +29,7 @@ public static class RemoteVerbs
         ArgumentNullException.ThrowIfNull(config);
         if (!(connected?.Invoke() ?? Identity_Connected(config)))
         {
-            await stderr.WriteLineAsync("This machine is not connected: run aipod login --server <url> (or install --standalone --server <url>) first.");
+            await stderr.WriteLineAsync(Strings.T(Msg.RemoteNotConnected));
             return 1;
         }
 
@@ -55,7 +55,7 @@ public static class RemoteVerbs
         }
         catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)
         {
-            await stderr.WriteLineAsync($"Unexpected answer: {e.GetType().Name}.");
+            await stderr.WriteLineAsync(Strings.T(Msg.RemoteUnexpected, e.GetType().Name));
             return 1;
         }
     }
@@ -143,8 +143,8 @@ public static class RemoteVerbs
         var list = await client.JobsAsync();
         if (!list.Ok) return await Failed(stderr, list.Error!);
         var job = list.Value!.FirstOrDefault(j => j.Id == id);
-        if (job is null) return await Say(stderr, $"No job {id} in this workspace.");
-        if (job.Status != JobStatuses.Active) return await Say(stderr, $"Job {id} is {job.Status}; only an approved job runs.");
+        if (job is null) return await Say(stderr, Strings.T(Msg.RemoteNoJob, id));
+        if (job.Status != JobStatuses.Active) return await Say(stderr, Strings.T(Msg.RemoteJobNotActive, id, job.Status));
         var clientKey = Guid.NewGuid().ToString();
         var create = new RunCreate(clientKey, job.TargetAgentId, RunModes.Argv, job.Argv, null, job.Cwd, job.TimeoutSeconds, Option(args, "--reason") ?? "started from the command line", null, job.Id);
         return await SubmitRunAsync(client, create, stdout, stderr);
@@ -157,20 +157,20 @@ public static class RemoteVerbs
         foreach (var spec in Values(args, "--file"))
         {
             var cut = spec.IndexOf('=', StringComparison.Ordinal);
-            if (cut < 1 || cut == spec.Length - 1) return await Fail(stderr, $"--file takes <path in the run's folder>=<local file>, not \"{spec}\".");
+            if (cut < 1 || cut == spec.Length - 1) return await Fail(stderr, Strings.T(Msg.RemoteFileSpec, spec));
             var local = spec[(cut + 1)..];
-            if (!File.Exists(local) || new FileInfo(local).Length > ScriptFiles.FileMax * 4L) return await Fail(stderr, $"The file {local} is missing or too large.");
+            if (!File.Exists(local) || new FileInfo(local).Length > ScriptFiles.FileMax * 4L) return await Fail(stderr, Strings.T(Msg.RemoteFileMissing, local));
             files.Add(new ScriptFile(spec[..cut], await File.ReadAllTextAsync(local)));
         }
 
         string? stdin = null;
         if (Option(args, "--stdin") is { } stdinFile)
         {
-            if (!File.Exists(stdinFile) || new FileInfo(stdinFile).Length > ScriptFiles.StdinMax * 4L) return await Fail(stderr, $"The stdin file {stdinFile} is missing or too large.");
+            if (!File.Exists(stdinFile) || new FileInfo(stdinFile).Length > ScriptFiles.StdinMax * 4L) return await Fail(stderr, Strings.T(Msg.RemoteStdinMissing, stdinFile));
             stdin = await File.ReadAllTextAsync(stdinFile);
         }
 
-        if (ScriptFiles.Validate(files, stdin) is not null) return await Fail(stderr, "The files or the stdin are not acceptable: at most 8 text files of 64 KiB (256 KiB together) at relative paths of letters, digits, dot, underscore and dash, and a stdin of at most 65536 characters.");
+        if (ScriptFiles.Validate(files, stdin) is not null) return await Fail(stderr, Strings.T(Msg.RemoteAttachmentsBad));
         return (files.Count > 0 ? files : null, stdin);
     }
 
@@ -194,7 +194,7 @@ public static class RemoteVerbs
         if (Option(args, "--script") is { } file)
         {
             if (Option(args, "--interpreter") is not { } interpreter) return await Usage(stderr, usage);
-            if (!File.Exists(file) || new FileInfo(file).Length > ScriptInterpreters.BodyCeiling * 4L) return await Say(stderr, $"The script file {file} is missing or too large.");
+            if (!File.Exists(file) || new FileInfo(file).Length > ScriptInterpreters.BodyCeiling * 4L) return await Say(stderr, Strings.T(Msg.RemoteScriptMissing, file));
             var body = await File.ReadAllTextAsync(file);
             var scriptArgs = Values(args, "--arg");
             var attached = await ReadAttachmentsAsync(args, stderr);
@@ -219,13 +219,13 @@ public static class RemoteVerbs
         var outcome = await client.CreateRunAsync(create);
         if (outcome.Pending)
         {
-            await stdout.WriteLineAsync($"Queued as request {create.ClientKey}. Read it with: aipod result {create.ClientKey}");
+            await stdout.WriteLineAsync(Strings.T(Msg.RemoteQueued, create.ClientKey, create.ClientKey));
             return 0;
         }
 
         if (!outcome.Ok) return await Failed(stderr, outcome.Error!);
         var run = outcome.Value!;
-        await stdout.WriteLineAsync($"Run {run.Id}: {run.Status}.{(run.Status == RunStatuses.PendingApproval ? " Its owner approves it on the web (until " + run.ExpiresAt.ToString("u", CultureInfo.InvariantCulture) + ")." : "")} Read it with: aipod result {run.Id} --wait 30");
+        await stdout.WriteLineAsync(Strings.T(Msg.RemoteRunQueued, run.Id, run.Status, run.Status == RunStatuses.PendingApproval ? Strings.T(Msg.RemoteOwnerApproves, run.ExpiresAt.ToString("u", CultureInfo.InvariantCulture)) : ""));
         return 0;
     }
 
@@ -242,12 +242,12 @@ public static class RemoteVerbs
         var outcome = await client.CreateAskAsync(new AskCreate(clientKey, target.AgentId!.Value, TextMask.Mask(question)));
         if (outcome.Pending)
         {
-            await stdout.WriteLineAsync($"Queued as request {clientKey}. Read it with: aipod result {clientKey} --wait 30");
+            await stdout.WriteLineAsync(Strings.T(Msg.RemoteQueued, clientKey, clientKey + " --wait 30"));
             return 0;
         }
 
         if (!outcome.Ok) return await Failed(stderr, outcome.Error!);
-        await stdout.WriteLineAsync($"Ask {outcome.Value!.Id} sent to {RemoteEnvelope.Label(target.Hostname)}. Read the answer with: aipod result {outcome.Value.Id} --wait 30");
+        await stdout.WriteLineAsync(Strings.T(Msg.RemoteAskSent, outcome.Value!.Id, RemoteEnvelope.Label(target.Hostname)));
         return 0;
     }
 
@@ -270,10 +270,10 @@ public static class RemoteVerbs
     private static async Task<int> AskResultAsync(RemoteClient client, Guid typed, int wait, int offset, TextWriter stdout, TextWriter stderr)
     {
         var id = await client.AskIdAsync(typed.ToString());
-        if (id is null) return await Say(stderr, $"Ask {typed} was not created.");
+        if (id is null) return await Say(stderr, Strings.T(Msg.RemoteAskNotCreated, typed));
         var view = await client.WaitAskAsync(id.Value, wait);
-        if (view is null) return await Say(stderr, $"Ask {id} is not known to this agent yet; try again shortly.");
-        await stdout.WriteLineAsync($"Ask {id} to {RemoteEnvelope.Label(view.TargetHostname)}: {view.Status}");
+        if (view is null) return await Say(stderr, Strings.T(Msg.RemoteAskUnknown, id));
+        await stdout.WriteLineAsync(Strings.T(Msg.RemoteAskLine, id, RemoteEnvelope.Label(view.TargetHostname), view.Status));
         if (view.Answer is { } text) await stdout.WriteLineAsync(text[Math.Min(offset, text.Length)..]);
         return view.Status is AskStatuses.Queued or AskStatuses.Delivered or AskStatuses.Answered ? 0 : 1;
     }
@@ -281,11 +281,12 @@ public static class RemoteVerbs
     private static async Task<int> RunResultAsync(RemoteClient client, Guid typed, int wait, int offset, TextWriter stdout, TextWriter stderr)
     {
         var key = await client.RunIdAsync(typed.ToString());
-        if (key is null) return await Say(stderr, $"Run {typed} was not created.");
-        if (await client.ReadRunAsync(key, wait) is not { } snapshot) return await Say(stderr, $"Run {typed} is not known to this agent yet; try again shortly.");
+        if (key is null) return await Say(stderr, Strings.T(Msg.RemoteRunNotCreated, typed));
+        if (await client.ReadRunAsync(key, wait) is not { } snapshot) return await Say(stderr, Strings.T(Msg.RemoteRunUnknown, typed));
         var (run, view) = (snapshot.Run, snapshot.View);
-        await stdout.WriteLineAsync(view is null ? $"Run {key}: {run.Status}"
-            : string.Create(CultureInfo.InvariantCulture, $"Run {key} on {RemoteEnvelope.Label(view.TargetHostname)}: {view.Status}{(view.ExitCode is { } x ? $", exit code {x}" : "")}{(view.Error is { } e ? $", error {RemoteEnvelope.Code(e)}" : "")}"));
+        await stdout.WriteLineAsync(view is null ? Strings.T(Msg.RemoteRunLine, key, run.Status)
+            : Strings.T(Msg.RemoteRunLineOn, key, RemoteEnvelope.Label(view.TargetHostname), view.Status,
+                view.ExitCode is { } x ? Strings.T(Msg.RemoteExitCode, x) : "", view.Error is { } e ? Strings.T(Msg.RemoteErrorCode, RemoteEnvelope.Code(e)) : ""));
         if (snapshot.Completeness is { } completeness) await stdout.WriteLineAsync(completeness);
         var text = new StringBuilder();
         foreach (var c in snapshot.Chunks)
@@ -295,7 +296,7 @@ public static class RemoteVerbs
         }
 
         if (text.Length > 0) await stdout.WriteAsync(text.ToString(Math.Min(offset, text.Length), text.Length - Math.Min(offset, text.Length)));
-        if (!run.Done) await stdout.WriteLineAsync(run.Status == RunStatuses.PendingApproval ? "\nWaiting for the owner's approval on the web." : "\nNot finished yet.");
+        if (!run.Done) await stdout.WriteLineAsync(Strings.T(run.Status == RunStatuses.PendingApproval ? Msg.RemoteWaitingApproval : Msg.RemoteNotFinished));
         return view?.Status switch { RunStatuses.Succeeded => 0, RunStatuses.Failed or RunStatuses.TimedOut or RunStatuses.Denied or RunStatuses.Expired or RunStatuses.Cancelled => 1, _ => 0 };
     }
 
@@ -332,7 +333,7 @@ public static class RemoteVerbs
 
     private static async Task<int> Usage(TextWriter stderr, string usage)
     {
-        await stderr.WriteLineAsync("usage: " + usage);
+        await stderr.WriteLineAsync(Strings.T(Msg.RemoteUsage, usage));
         return 2;
     }
 }

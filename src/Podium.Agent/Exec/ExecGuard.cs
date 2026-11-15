@@ -37,11 +37,8 @@ public static partial class ExecGuard
     private const string WindowsSystemFallback = @"C:\Windows\System32";
 
     public static ExecDecision Check(RunMessage run, ExecPolicy policy, string os, string agentHome, Func<string, string?>? toolPath = null,
-        Func<string, bool>? trusted = null, IReadOnlyList<AccessLayer>? access = null)
-    {
-        var decision = CheckRun(run, policy, os, agentHome, toolPath, trusted);
-        return decision.Allowed && access is not null ? WithAccess(decision, run, access, os) : decision;
-    }
+        Func<string, bool>? trusted = null) =>
+        CheckRun(run, policy, os, agentHome, toolPath, trusted);
 
     private static ExecDecision CheckRun(RunMessage run, ExecPolicy policy, string os, string agentHome, Func<string, string?>? toolPath,
         Func<string, bool>? trusted)

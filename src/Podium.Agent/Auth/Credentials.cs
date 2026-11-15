@@ -47,7 +47,7 @@ public static class Credentials
     }
 }
 
-/// <summary>Tests only (AP_CREDENTIALS=file): one file per account, readable by the user only.</summary>
+/// <summary>Tests only (AP_CREDENTIALS=file, honoured only with an explicit AP_AGENT_HOME): one file per account, readable by the user only.</summary>
 public sealed class FileCredentialStore(string home) : ICredentialStore
 {
     private string PathOf(string account) => Path.Combine(home, "cred-" + account);
@@ -57,7 +57,13 @@ public sealed class FileCredentialStore(string home) : ICredentialStore
     public void Write(string account, string secret)
     {
         Directory.CreateDirectory(home);
-        File.WriteAllText(PathOf(account), secret);
+        var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None };
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite; // never group or other, not even before the chmod
+        using (var stream = new StreamWriter(new FileStream(PathOf(account), options)))
+        {
+            stream.Write(secret);
+        }
+
         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(PathOf(account), UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
