@@ -23,6 +23,7 @@ public static partial class MachineTags
     public static bool IsNote(string? note) =>
         note is null || (note.Length <= NoteMax && note.All(c => !char.IsControl(c) || c is '\n' or '\r' or '\t'));
 
-    [GeneratedRegex("^[A-Za-z0-9._-]+$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    // \z, not $: in .NET $ also matches before a final line break, so "a\n" would pass.
+    [GeneratedRegex(@"^[A-Za-z0-9._-]+\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex Part();
 }
