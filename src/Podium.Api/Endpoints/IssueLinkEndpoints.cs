@@ -34,9 +34,15 @@ public static class IssueLinkEndpoints
         }
 
         var (blocker, blocked) = req.Kind == IssueLinkKinds.Blocks ? (id, otherId) : (otherId, id);
-        if (await db.IssueLinks.CountAsync(l => l.BlockerIssueId == id || l.BlockedIssueId == id, http.RequestAborted) >= PerIssueMax)
+        // The project lock makes the cap, duplicate and loop checks and the insert one step: two calls at once cannot both pass.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, issue.ProjectId, http.RequestAborted);
+        foreach (var end in new[] { id, otherId })
         {
-            return Http.Invalid("otherIssueId", "limit_reached");
+            if (await db.IssueLinks.CountAsync(l => l.BlockerIssueId == end || l.BlockedIssueId == end, http.RequestAborted) >= PerIssueMax)
+            {
+                return Http.Invalid("otherIssueId", "limit_reached");
+            }
         }
 
         var pairs = await db.IssueLinks.AsNoTracking().Where(l => l.ProjectId == issue.ProjectId)
@@ -55,6 +61,7 @@ public static class IssueLinkEndpoints
         });
         Audit.Add(db, http, clock, AuditActions.IssueLinkChanged, issue.WorkspaceId, userId, targetType: "issue", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
