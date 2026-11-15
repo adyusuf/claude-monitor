@@ -15,13 +15,15 @@ interface Props {
   /** The people who can be in the team (workspace members who are not viewers, plus whoever already is). */
   people: Member[];
   releases: ReleaseOption[];
+  /** An active sprint keeps its start and end dates (the API refuses to clear them). */
+  datesRequired?: boolean;
   submitLabel: string;
   onSubmit: (draft: SprintDraft) => Promise<void>;
   onCancel: () => void;
 }
 
 /** The fields of a sprint, for a new one and for changing one. Checks on the client first; the API's refusal is shown as a notice. */
-export function SprintForm({ initial, project, people, releases, submitLabel, onSubmit, onCancel }: Props) {
+export function SprintForm({ initial, project, people, releases, datesRequired = false, submitLabel, onSubmit, onCancel }: Props) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [draft, setDraft] = useState(initial);
@@ -40,7 +42,7 @@ export function SprintForm({ initial, project, people, releases, submitLabel, on
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const found = checkSprint(draft);
+    const found = checkSprint(draft, datesRequired);
     setErrors(found);
     setFailure(null);
     if (Object.keys(found).length > 0) return;

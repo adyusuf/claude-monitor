@@ -131,6 +131,13 @@ public static class IssueEndpoints
         f.Issue.ArchivedAt = archive ? now : null;
         f.Issue.UpdatedAt = now;
         f.Issue.UpdatedBy = userId;
+        // Closing skips archived issues, so an unfinished one comes back to where the close would have sent it: the backlog.
+        if (!archive && f.Issue.SprintId is { } sprintId && f.Issue.Status is not (IssueStatuses.Done or IssueStatuses.Cancelled)
+            && await db.Sprints.AnyAsync(s => s.Id == sprintId && s.Status == SprintStatuses.Closed, http.RequestAborted))
+        {
+            SprintIssueEndpoints.Release(f.Issue, null, userId, now);
+        }
+
         Audit.Add(db, http, clock, action, f.Issue.WorkspaceId, userId, targetType: "issue", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();

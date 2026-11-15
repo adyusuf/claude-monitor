@@ -22,10 +22,13 @@ internal static class SprintRules
         return null;
     }
 
-    /// <summary>The relational rules: the team must be able to work, the release must be live and belong to the project (and to the sprint's application).</summary>
-    public static async Task<IResult?> CheckReferencesAsync(PodiumDb db, ManagedProject project, Guid? applicationId, SprintInput i, CancellationToken ct)
+    /// <summary>
+    /// The relational rules: the team must be able to work, the release must be live and belong to the project (and to the sprint's application).
+    /// Only people joining the team are checked: someone already in it who has since left or become a viewer does not block an edit.
+    /// </summary>
+    public static async Task<IResult?> CheckReferencesAsync(PodiumDb db, ManagedProject project, Guid? applicationId, SprintInput i, IReadOnlyCollection<Guid> team, CancellationToken ct)
     {
-        foreach (var user in i.TeamUserIds ?? [])
+        foreach (var user in (i.TeamUserIds ?? []).Where(u => !team.Contains(u)))
         {
             if (!await ProjectRules.IsWorkerAsync(db, user, project.WorkspaceId, ct)) return Http.Invalid("teamUserIds", "not_a_member");
         }

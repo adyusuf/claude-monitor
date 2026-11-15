@@ -20,6 +20,7 @@ public sealed class MirrorGate(PodiumDb db, IntegrationTokens tokens)
     public const string TypeLocked = "mirrored_type_locked";
     public const string NoArchive = "mirrored_no_archive";
     public const string FieldLocked = "mirrored_field_locked";
+    public const string DatesKept = "mirrored_dates_kept";
 
     public async Task<(WriteGate? Gate, IResult? Refusal)> OpenAsync(Guid connectionId, Guid userId, CancellationToken ct)
     {
