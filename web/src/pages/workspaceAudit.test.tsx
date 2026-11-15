@@ -32,6 +32,26 @@ describe("the audit tab of the workspace settings", () => {
     expect(screen.queryByRole("button", { name: en.sessions.more })).toBeNull();
   });
 
+  it("shows the user or machine that acted, the target and the recorded before and after", async () => {
+    mockApi({
+      "GET /me": { body: ME }, "GET /workspaces/w1": { body: info },
+      "GET /workspaces/w1/audit": { body: { next: null, items: [
+        { ...row(2, "workspace.role_changed"), targetType: "user", targetId: "u9", detail: { before: "member", after: "admin" } },
+        { ...row(1, "agent.revoked"), actorUserId: null, actorAgentId: "a7", targetType: "agent", targetId: "a8", detail: {} },
+      ] } },
+    });
+    page();
+    await openTab(en.workspace.audit);
+    const [, changed, revoked] = await screen.findAllByRole("row");
+
+    expect(changed).toHaveTextContent(`${en.views.workspace.actorUser} u1`);
+    expect(changed).toHaveTextContent("user u9");
+    expect(changed).toHaveTextContent('{"before":"member","after":"admin"}');
+    expect(revoked).toHaveTextContent(`${en.views.workspace.actorAgent} a7`);
+    expect(revoked).toHaveTextContent("agent a8");
+    expect(revoked).not.toHaveTextContent(en.views.workspace.showDetail); // an empty detail has nothing to show
+  });
+
   it("keeps the rows it has and shows why when the older page cannot be read", async () => {
     mockApi({
       "GET /me": { body: ME }, "GET /workspaces/w1": { body: info },
