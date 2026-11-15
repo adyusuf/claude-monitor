@@ -43,7 +43,8 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
             var link = await db.IntegrationLinks.FirstOrDefaultAsync(l => l.ConnectionId == connection.Id && l.Kind == LinkKinds.Sprint && l.ExternalId == sprintId, ct);
             if (link is null || await tokens.ConnectorContextAsync(connection, ct) is not { } ctx) return 0; // not imported: nothing to keep
             var sprint = await db.Sprints.AsNoTracking().FirstAsync(s => s.Id == link.LocalId, ct);
-            var project = await db.Projects.FirstAsync(p => p.Id == sprint.ProjectId, ct);
+            // An archived project is left alone, as the issue event and the pass leave it (ProjectOfAsync).
+            if (await db.Projects.FirstOrDefaultAsync(p => p.Id == sprint.ProjectId && p.Status == ManagedStatuses.Active, ct) is not { } project) return 0;
             var it = await tracker.GetIterationAsync(ctx, sprintId, ct);
             var counts = new MirrorCounts();
             var items = it is null ? [] : await tracker.ListIterationItemsAsync(ctx, sprintId, ct);
