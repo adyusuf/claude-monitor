@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Security;
@@ -46,10 +47,22 @@ public sealed class IntegrationTokens(PodiumDb db, IServiceScopeFactory scopes, 
                           ?? throw new TrackerException(TrackerException.Codes.Unauthorized);
             if (account.Status != AccountStatuses.Active) throw new TrackerException(TrackerException.Codes.Unauthorized);
             var now = clock.GetUtcNow();
-            if (account.AccessExpiresAt - now > Skew) return Open(config, account.AccessToken);
+            string refresh;
             try
             {
-                var tokens = await oauth.RefreshAsync(Open(config, account.RefreshToken), ct);
+                if (account.AccessExpiresAt - now > Skew) return Open(config, account.AccessToken);
+                refresh = Open(config, account.RefreshToken);
+            }
+            catch (Exception e) when (e is CryptographicException or FormatException)
+            {
+                // Sealed under an integration key that was rotated since, or damaged: only a new sign-in seals it again.
+                await MarkReauthorizeAsync(own, account, now, ct);
+                throw new TrackerException(TrackerException.Codes.Unauthorized);
+            }
+
+            try
+            {
+                var tokens = await oauth.RefreshAsync(refresh, ct);
                 account.AccessToken = Seal(config, tokens.Access);
                 account.RefreshToken = Seal(config, tokens.Refresh);
                 account.AccessExpiresAt = now.AddSeconds(tokens.ExpiresInSeconds);

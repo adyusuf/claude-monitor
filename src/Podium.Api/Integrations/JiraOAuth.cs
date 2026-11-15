@@ -151,13 +151,26 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
             throw new TrackerException(await OAuthErrorAsync(response, ct) == InvalidGrant ? TrackerException.Codes.Unauthorized : TrackerException.Codes.Unavailable);
         }
 
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        using var doc = await ParseTokenAnswerAsync(response, ct);
         var root = doc.RootElement;
         var access = JiraParse.Str(root, "access_token");
         var refresh = JiraParse.Str(root, "refresh_token");
         var seconds = root.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var n) ? n : 3600;
         if (access is not { Length: > 0 } || refresh is not { Length: > 0 }) throw new TrackerException(TrackerException.Codes.Rejected);
         return new TokenSet(access, refresh, Math.Clamp(seconds, 60, 86400));
+    }
+
+    /// <summary>A successful token answer as JSON; one that is not (a proxy's page, an empty body) is rejected, not a crash of the caller.</summary>
+    private static async Task<JsonDocument> ParseTokenAnswerAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        }
+        catch (JsonException)
+        {
+            throw new TrackerException(TrackerException.Codes.Rejected);
+        }
     }
 
     /// <summary>The OAuth <c>error</c> of a refused token call (RFC 6749 §5.2), or null when the body holds none. The rest of the body is never kept.</summary>

@@ -197,6 +197,18 @@ public sealed class JiraOAuthTests
     }
 
     [Theory]
+    [InlineData("<html>a proxy page</html>")]
+    [InlineData("")]
+    public async Task A_successful_token_answer_that_is_not_json_is_rejected(string body)
+    {
+        using var stack = new JiraClients(() => new StubHandler(_ => Reply(HttpStatusCode.OK, body)));
+
+        var e = await Assert.ThrowsAsync<TrackerException>(() => stack.OAuth.RefreshAsync("rt", CancellationToken.None));
+
+        Assert.Equal(TrackerException.Codes.Rejected, e.Code);
+    }
+
+    [Theory]
     [InlineData(5, 60)]
     [InlineData(100000, 86400)]
     [InlineData(1800, 1800)]
