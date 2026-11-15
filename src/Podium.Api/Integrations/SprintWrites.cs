@@ -38,6 +38,8 @@ public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gat
     {
         ArgumentNullException.ThrowIfNull(sprint);
         if (sprint.SourceConnectionId is null) return null;
+        // A null date means "unchanged" toward the tool, so a cleared date would never reach it: a mirrored sprint keeps the dates it has.
+        if ((start is null && sprint.StartDate is not null) || (end is null && sprint.EndDate is not null)) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.DatesKept);
         var change = new IterationChange(name == sprint.Name ? null : name ?? "", goal == sprint.Goal ? null : goal ?? "", start == sprint.StartDate ? null : start, end == sprint.EndDate ? null : end);
         if (change is { Name: null, Goal: null, Start: null, End: null }) return null;
         return await RunAsync(user, sprint, (ctx, id) => writer.UpdateIterationAsync(ctx, id, change, ct), ct);

@@ -30,4 +30,21 @@ public sealed class MirrorSprintEdgeTests(ApiFactory api)
         Assert.Equal(local, await SprintKit.IssueSprintAsync(s.W.Member, localIssue));
     }
 
+    [Fact]
+    public async Task Clearing_a_date_of_a_mirrored_sprint_is_refused_and_nothing_changes_here_or_in_jira()
+    {
+        var s = await JiraWriteSprintKit.OpenAsync(api);
+        var id = await s.IdAsync("Plan A");
+
+        var noEnd = await EditAsync(s.W.Member, id, new Dictionary<string, object?> { ["endDate"] = null });
+        var noStart = await EditAsync(s.W.Member, id, new Dictionary<string, object?> { ["startDate"] = null, ["name"] = "Renamed too" });
+
+        await JiraWriteKit.AssertRefusedAsync(noEnd, HttpStatusCode.Conflict, "mirrored_dates_kept");
+        await JiraWriteKit.AssertRefusedAsync(noStart, HttpStatusCode.Conflict, "mirrored_dates_kept");
+        Assert.Empty(s.W.Jira.Writes(s.W.Site));
+        var row = await s.RowAsync("Plan A");
+        Assert.Equal((new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 13)), (row.StartDate, row.EndDate));
+        Assert.Equal(HttpStatusCode.NoContent, (await EditAsync(s.W.Member, await s.IdAsync("Plan B"), new { goal = "No dates in Jira either" })).StatusCode);
+    }
+
 }

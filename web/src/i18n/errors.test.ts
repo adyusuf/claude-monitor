@@ -9,7 +9,7 @@ const webCodes = [
   // sprints (SprintEndpoints, SprintIssueEndpoints, SprintRules, SprintWrites)
   "too_long", "before_start", "out_of_range", "invalid_list", "not_a_member", "invalid_release", "invalid_application", "archived", "closed",
   "not_planned", "not_active", "dates_required", "active_dates_required", "sprint_active", "invalid_sprint", "invalid_issue", "wrong_scope",
-  "limit_reached", "invalid_value", "mirrored_scope", "mirrored_detached", "jira_account_required", "jira_no_board",
+  "limit_reached", "invalid_value", "mirrored_scope", "mirrored_dates_kept", "mirrored_detached", "jira_account_required", "jira_no_board",
   // workspace settings (WorkspaceEndpoints)
   "invalid_mode",
   // answering a permission request (CommandEndpoints)
