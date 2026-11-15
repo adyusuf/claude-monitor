@@ -84,6 +84,8 @@ public static class SprintEndpoints
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
         if (sprint.Status == SprintStatuses.Closed) return Http.Invalid("status", "closed");
+        // Starting needs both dates; a running sprint keeps them (a cleared date would also mean "unchanged" toward a tool).
+        if (sprint.Status == SprintStatuses.Active && (req.StartDate is null || req.EndDate is null)) return Http.Invalid(req.StartDate is null ? "startDate" : "endDate", "active_dates_required");
         if (SprintRules.Check(req) is { } invalid) return invalid;
         if (await SprintRules.CheckReferencesAsync(db, f.Grant.Project, sprint.ApplicationId, req, http.RequestAborted) is { } bad) return bad;
         var now = clock.GetUtcNow();

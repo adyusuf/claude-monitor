@@ -104,7 +104,7 @@ export const tr: Dictionary = {
     limit_reached: "Buraya sığabilecek en çok sayıya ulaşıldı.", archived: "Bu arşivlendi. Önce geri yükleyin.",
     invalid_parent: "Üst iş, bu projenin bir epic'i olmalı.", invalid_application: "Bu projenin bir uygulamasını seçin.", invalid_component: "Seçilen uygulamanın bir bileşenini seçin.", invalid_release: "Seçilen uygulamanın bir sürümünü seçin.", bug_only: "Hata ayrıntılarını yalnızca bir hata taşıyabilir.", invalid_issue: "Bu projeden başka bir iş seçin.", self_link: "Bir iş kendisine bağlanamaz.", cycle: "Bu bağlantı, işlerin birbirini döngü içinde engellemesine yol açar.", duplicate_link: "Bu iki iş zaten bağlı.",
     released: "Yayımlanmış bir sürüm iptal edilemez.", cancelled: "İptal edilmiş bir sürüm değiştirilemez.",
-    sprint_active: "Bu kapsamda başka bir sprint zaten aktif. Önce onu kapatın.", dates_required: "Sprinti başlatmadan önce başlangıç ve bitiş tarihlerini girin.",
+    sprint_active: "Bu kapsamda başka bir sprint zaten aktif. Önce onu kapatın.", dates_required: "Sprinti başlatmadan önce başlangıç ve bitiş tarihlerini girin.", active_dates_required: "Aktif bir sprintin başlangıç ve bitiş tarihleri silinemez.",
     invalid_sprint: "Aynı kapsamdan planlanmış bir sprint seçin.", wrong_scope: "Bu sprint bir uygulamaya ait: yalnızca o uygulamanın işlerini alır.",
     closed: "Bu sprint kapandı.", not_planned: "Yalnızca planlanmış bir sprint silinebilir.",
     invalid_run: "Bu çalışma alanından bir çalıştırma seçin.",

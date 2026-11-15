@@ -103,7 +103,7 @@ export const en = {
     limit_reached: "The most that fits here has been reached.", archived: "This is archived. Restore it first.",
     invalid_parent: "The parent must be an epic of this project.", invalid_application: "Pick an application of this project.", invalid_component: "Pick a component of the chosen application.", invalid_release: "Pick a release of the chosen application.", bug_only: "Only a bug carries the bug details.", invalid_issue: "Pick another issue of this project.", self_link: "An issue cannot be linked to itself.", cycle: "That link would make the issues block each other in a loop.", duplicate_link: "These two issues are already linked.",
     released: "A release that went out cannot be cancelled.", cancelled: "A cancelled release cannot be changed.",
-    sprint_active: "Another sprint of this scope is already active. Close it first.", dates_required: "Set the start and end dates before starting the sprint.",
+    sprint_active: "Another sprint of this scope is already active. Close it first.", dates_required: "Set the start and end dates before starting the sprint.", active_dates_required: "An active sprint keeps its start and end dates.",
     invalid_sprint: "Pick a planned sprint of the same scope.", wrong_scope: "This sprint belongs to an application: it takes only that application's issues.",
     closed: "This sprint is closed.", not_planned: "Only a planned sprint can be deleted.",
     invalid_run: "Pick a run of this workspace.",

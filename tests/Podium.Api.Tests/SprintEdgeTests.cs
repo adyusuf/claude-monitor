@@ -24,4 +24,20 @@ public sealed class SprintEdgeTests(ApiFactory api)
         Assert.Equal(["In progress", "In review"], await IssueKit.TitlesAsync(t.Owner, $"/api/projects/{t.Project}/issues?scope=backlog"));
     }
 
+    [Fact]
+    public async Task An_active_sprint_keeps_its_dates_while_a_planned_one_may_drop_them()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var active = await SprintKit.SprintAsync(t.Owner, t.Project);
+        var planned = await SprintKit.SprintAsync(t.Owner, t.Project);
+        (await SprintKit.StartAsync(t.Owner, active)).EnsureSuccessStatusCode();
+
+        Assert.Equal(("startDate", "active_dates_required"), await ProjectKit.ProblemAsync(await t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{active}", new { goal = "x", endDate = "2026-11-13" })));
+        Assert.Equal(("endDate", "active_dates_required"), await ProjectKit.ProblemAsync(await t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{active}", new { goal = "x", startDate = "2026-11-02" })));
+        var s = (await SprintKit.ViewAsync(t.Owner, active)).GetProperty("sprint");
+        Assert.Equal(("2026-11-02", "2026-11-13", "Ship it"), (s.GetProperty("startDate").GetString(), s.GetProperty("endDate").GetString(), s.GetProperty("goal").GetString()));
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{active}", new { startDate = "2026-11-02", endDate = "2026-11-20" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{planned}", new { goal = "No dates yet" })).StatusCode);
+    }
+
 }

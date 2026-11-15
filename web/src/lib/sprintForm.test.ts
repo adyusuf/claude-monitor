@@ -69,6 +69,13 @@ describe("the checks", () => {
     expect(checkSprint({ ...ok, startDate: "", endDate: "2026-01-01" })).toEqual({});
   });
 
+  it("refuses to clear a date of an active sprint, as the API does, while a planned one may go without", () => {
+    expect(checkSprint({ ...ok, startDate: "" }, true)).toEqual({ startDate: "active_dates_required" });
+    expect(checkSprint({ ...ok, endDate: "" }, true)).toEqual({ endDate: "active_dates_required" });
+    expect(checkSprint(ok, true)).toEqual({});
+    expect(checkSprint({ ...ok, startDate: "", endDate: "" }, false)).toEqual({});
+  });
+
   it("refuses an end before the start, but accepts the same day", () => {
     expect(checkSprint({ ...ok, endDate: "2026-03-01" })).toEqual({ endDate: "before_start" });
     expect(checkSprint({ ...ok, endDate: "2026-03-02" })).toEqual({});
