@@ -14,9 +14,9 @@ export function IntegrationSprints({ id, spaceKey, name, ws, projectId, canImpor
   const [sprints, setSprints] = useState<SprintChoice[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [notices, setNotices] = useState<{ kind: "error" | "success"; text: string }[]>([]);
 
-  const load = () => api.integrationSprints(id, spaceKey).then(setSprints).catch((e) => setNotice({ kind: "error", text: errorText(e) }));
+  const load = () => api.integrationSprints(id, spaceKey).then(setSprints).catch((e) => setNotices([{ kind: "error", text: errorText(e) }]));
   useEffect(() => {
     void load();
     // load closes over errorText, which is a fresh function each render
@@ -33,12 +33,17 @@ export function IntegrationSprints({ id, spaceKey, name, ws, projectId, canImpor
     setBusy(true);
     try {
       const results = await api.importSprints(id, spaceKey, [...picked]);
-      const bad = results.find((r) => r.outcome !== "ok");
-      setNotice(bad ? { kind: "error", text: tx(`errors.${bad.outcome}`) } : { kind: "success", text: t("integrations.result.ok") });
+      const nameOf = (sprintId: string) => sprints?.find((s) => s.id === sprintId)?.name ?? sprintId;
+      // All done is one line; otherwise a line per sprint, so what did import is not read as a plain failure.
+      setNotices(results.every((r) => r.outcome === "ok")
+        ? [{ kind: "success", text: t("integrations.result.ok") }]
+        : results.map((r) => r.outcome === "ok"
+          ? { kind: "success" as const, text: t("integrations.sprintImported", { name: nameOf(r.sprintId) }) }
+          : { kind: "error" as const, text: t("integrations.importProblem", { key: nameOf(r.sprintId), error: tx(`errors.${r.outcome}`) }) }));
       setPicked(new Set());
       await load();
     } catch (e) {
-      setNotice({ kind: "error", text: errorText(e) });
+      setNotices([{ kind: "error", text: errorText(e) }]);
     } finally {
       setBusy(false);
     }
@@ -51,7 +56,7 @@ export function IntegrationSprints({ id, spaceKey, name, ws, projectId, canImpor
         <Button variant="ghost" onClick={onClose}>{t("integrations.close")}</Button>
       </div>
       <p className="muted">{t("integrations.sprintsHint")}</p>
-      {notice ? <Notice kind={notice.kind}>{notice.text}</Notice> : null}
+      {notices.map((n, i) => <Notice key={i} kind={n.kind}>{n.text}</Notice>)}
       {!sprints ? <Spinner /> : sprints.length === 0 ? <p className="muted">{t("integrations.noSprints")}</p> : (
         <ul className="plain">
           {sprints.map((s) => (

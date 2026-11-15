@@ -101,16 +101,18 @@ describe("the sprints of an imported space", () => {
     expect(screen.getByRole("button", { name: "Import selected sprints (0)" })).toBeDisabled();
   });
 
-  it("shows the translated error of the first sprint that did not import instead of a success", async () => {
+  it("lists one line per sprint when some did not import: the ones that did beside the one that failed, not a plain failure", async () => {
     serve({
       [listPath]: { body: threeSprints() },
       [importPath]: { body: [{ sprintId: "10", outcome: "ok", created: 1, updated: 0 }, { sprintId: "11", outcome: "tracker_rate_limited", created: 0, updated: 0 }] },
     });
     open();
     await userEvent.click(await screen.findByRole("checkbox", { name: "Select Sprint 10" }));
-    await userEvent.click(screen.getByRole("button", { name: "Import selected sprints (1)" }));
-    const notice = await screen.findByText("Jira asks to slow down. Try again in a minute.");
-    expect(notice.closest(".notice")).toHaveClass("notice-error");
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Sprint 11" }));
+    await userEvent.click(screen.getByRole("button", { name: "Import selected sprints (2)" }));
+    const failed = await screen.findByText("Sprint 11: Jira asks to slow down. Try again in a minute.");
+    expect(failed.closest(".notice")).toHaveClass("notice-error");
+    expect(screen.getByText("Sprint imported: Sprint 10").closest(".notice")).toHaveClass("notice-success");
     expect(screen.queryByText("Done.")).not.toBeInTheDocument();
   });
 
