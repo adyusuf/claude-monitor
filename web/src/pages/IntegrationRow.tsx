@@ -7,9 +7,12 @@ import { dateTime } from "../lib/format";
 
 export type IntegrationPanel = "spaces" | "people" | "checks" | "settings";
 
-/** One Jira connection as a table row: how it stands, links that open its spaces, people, checks and settings in a drawer, and (admins) check now and disconnect. */
-export function IntegrationRow({ connection: c, admin, onOpen, onChange, onError }: {
-  connection: ConnectionView; admin: boolean; onOpen: (panel: IntegrationPanel) => void; onChange: () => void; onError: (text: string) => void;
+/**
+ * One Jira connection as a table row: how it stands, links that open its spaces, people, checks and settings in a drawer, and (admins) check now
+ * and disconnect. Check now is left out while Jira is not available on the server (canCheck false); disconnect never is.
+ */
+export function IntegrationRow({ connection: c, admin, canCheck = true, onOpen, onChange, onError }: {
+  connection: ConnectionView; admin: boolean; canCheck?: boolean; onOpen: (panel: IntegrationPanel) => void; onChange: () => void; onError: (text: string) => void;
 }) {
   const { t, tx } = useI18n();
   const errorText = useErrorText();
@@ -48,7 +51,9 @@ export function IntegrationRow({ connection: c, admin, onOpen, onChange, onError
       <td className="right">
         {admin ? (
           <span className="row-actions">
-            <Button variant="ghost" busy={busy} onClick={() => void act(async () => { await api.syncIntegration(c.id); })}>{busy ? t("integrations.syncing") : t("integrations.syncNow")}</Button>
+            {canCheck ? (
+              <Button variant="ghost" busy={busy} onClick={() => void act(async () => { await api.syncIntegration(c.id); })}>{busy ? t("integrations.syncing") : t("integrations.syncNow")}</Button>
+            ) : null}
             <Button variant="danger" disabled={busy} onClick={() => { if (window.confirm(t("integrations.disconnectConfirm", { site: c.siteHost }))) void act(() => api.disconnectIntegration(c.id)); }}>
               {t("integrations.disconnect")}
             </Button>
