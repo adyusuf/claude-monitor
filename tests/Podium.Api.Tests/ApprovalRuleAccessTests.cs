@@ -172,6 +172,19 @@ public sealed class ApprovalRuleAccessTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_policy_that_lists_no_allowed_folder_and_leaves_out_the_projects_own_is_no_folder_limit_as_on_the_agent_but_still_honours_its_denied_folders()
+    {
+        var w = await ApprovalRuleKit.WorldAsync(api);
+        await PolicyAsync(w, new AccessOsRules([], ["/work/secret"], []), includeProjectFolder: false);
+
+        var allowed = await RememberReadAsync(w, ReadPath);
+        var denied = await RememberReadAsync(w, "/work/secret/key.txt");
+
+        Assert.Equal(HttpStatusCode.NoContent, allowed.StatusCode);
+        await RemoteKit.AssertProblemAsync(denied, HttpStatusCode.Conflict, CommandEndpoints.RuleOutsideAccess);
+    }
+
+    [Fact]
     public async Task A_cleared_policy_is_no_limit_so_the_agents_inside_mark_decides_again()
     {
         var w = await ApprovalRuleKit.WorldAsync(api);
