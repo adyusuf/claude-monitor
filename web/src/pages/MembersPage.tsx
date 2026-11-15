@@ -42,14 +42,17 @@ export function MembersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws, admin]);
 
+  /** Runs one change and reloads; false when the server refused it (the reason is shown). */
   const act = async (work: () => Promise<unknown>, success?: string) => {
     try {
       await work();
-      if (success) setNotice({ kind: "success", text: success });
-      await load();
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
+      return false;
     }
+    if (success) setNotice({ kind: "success", text: success });
+    await load();
+    return true;
   };
 
   const invite = (e: FormEvent) => {
@@ -64,8 +67,8 @@ export function MembersPage() {
   const leave = async (userId: string) => {
     const self = userId === me?.id;
     if (!window.confirm(self ? t("members.leaveConfirm") : t("members.removeConfirm"))) return;
-    await act(() => api.removeMember(ws, userId));
-    if (self) {
+    const removed = await act(() => api.removeMember(ws, userId));
+    if (removed && self) {
       await refresh();
       navigate("/");
     }
