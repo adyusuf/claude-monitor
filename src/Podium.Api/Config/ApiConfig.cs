@@ -75,6 +75,9 @@ public sealed record ApiConfig
     /// <summary>The proxies whose X-Forwarded-* headers count (CIDR list); required when TrustProxy is on outside development.</summary>
     public IReadOnlyList<System.Net.IPNetwork> ProxyNetworks { get; init; } = [];
     public int AuthRequestsPerMinute { get; init; } = 20;
+
+    /// <summary>Device-code polls per IP per minute: an agent polls every few seconds, so a fleet behind one address needs more than the auth budget.</summary>
+    public int DeviceTokenRequestsPerMinute { get; init; } = 120;
     public int LockoutAfter { get; init; } = 5;
     public TimeSpan LockoutFor { get; init; } = TimeSpan.FromMinutes(15);
     public TimeSpan MfaPendingLifetime { get; init; } = TimeSpan.FromMinutes(5);
@@ -254,6 +257,7 @@ public sealed record ApiConfig
             TrustProxy = trustProxy,
             ProxyNetworks = networks,
             AuthRequestsPerMinute = int.TryParse(env["AIPOD_AUTH_RATE_PER_MINUTE"], out var rate) && rate > 0 ? rate : 20,
+            DeviceTokenRequestsPerMinute = int.TryParse(env["AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE"], out var polls) && polls > 0 ? polls : 120,
         };
     }
 

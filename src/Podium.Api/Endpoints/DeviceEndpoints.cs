@@ -13,10 +13,13 @@ public sealed record DeviceDecision(string? UserCode, Guid? WorkspaceId);
 /// <summary>Connecting an agent (RFC 8628 device authorisation): the agent polls, a signed-in person approves.</summary>
 public static class DeviceEndpoints
 {
+    /// <summary>The poll of <c>/device/token</c> has its own, looser per-IP budget (<see cref="ApiConfig.DeviceTokenRequestsPerMinute"/>).</summary>
+    public const string TokenRateLimitPolicy = "device-token";
+
     public static void Map(RouteGroupBuilder api)
     {
         api.MapPost("/device/code", Code).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
-        api.MapPost("/device/token", Token).AllowAnonymous();
+        api.MapPost("/device/token", Token).RequireRateLimiting(TokenRateLimitPolicy).AllowAnonymous();
         var web = api.MapGroup("/device").RequireAuthorization(Schemes.Session).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         web.MapGet("/lookup/{userCode}", Lookup);
         web.MapPost("/approve", Approve);
