@@ -81,4 +81,17 @@ public sealed class MaskerTests
         Assert.Equal("plain", masked["api_key"]!["name"]!.GetValue<string>());
         Assert.Equal("ls -la", masked["command"]!.GetValue<string>());
     }
+
+    [Fact]
+    public void Text_the_patterns_cannot_scan_in_time_is_masked_whole_instead_of_stalling_the_hook()
+    {
+        // Thousands of key headers with no END: each one makes the private-key pattern look to the end of the text.
+        var hostile = string.Concat(Enumerable.Repeat("-----BEGIN RSA PRIVATE KEY-----\n", 60_000)) + "tail";
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        var masked = Masker.MaskText(hostile);
+
+        Assert.Equal(Masker.UnscannedMark, masked); // nothing of text that could not be checked is kept
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(30), $"took {clock.Elapsed}");
+    }
 }
