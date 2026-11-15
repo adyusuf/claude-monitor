@@ -28,9 +28,16 @@ internal static class SprintRules
     /// </summary>
     public static async Task<IResult?> CheckReferencesAsync(PodiumDb db, ManagedProject project, Guid? applicationId, SprintInput i, IReadOnlyCollection<Guid> team, CancellationToken ct)
     {
-        foreach (var user in (i.TeamUserIds ?? []).Where(u => !team.Contains(u)))
+        var joining = (i.TeamUserIds ?? []).Where(u => !team.Contains(u)).Distinct().ToList();
+        if (joining.Count > 0)
         {
-            if (!await ProjectRules.IsWorkerAsync(db, user, project.WorkspaceId, ct)) return Http.Invalid("teamUserIds", "not_a_member");
+            // One query for the whole team: the memberships of the people joining, in a live workspace (as Access.MemberAsync reads one).
+            var roles = await db.WorkspaceMembers.AsNoTracking()
+                .Where(m => m.WorkspaceId == project.WorkspaceId && joining.Contains(m.UserId) && m.RemovedAt == null)
+                .Join(db.Workspaces.Where(w => w.Status == WorkspaceStatuses.Active), m => m.WorkspaceId, w => w.Id, (m, _) => new { m.UserId, m.Role })
+                .ToListAsync(ct);
+            var workers = roles.Where(m => Roles.Rank(m.Role) >= Roles.Rank(Roles.Member)).Select(m => m.UserId).ToHashSet();
+            if (joining.Any(u => !workers.Contains(u))) return Http.Invalid("teamUserIds", "not_a_member");
         }
 
         if (i.ReleaseId is { } release)

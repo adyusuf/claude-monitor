@@ -14,6 +14,7 @@ export const enSprints = {
   start: "Start", delete: "Delete", deleteConfirm: "Delete sprint {n}? Its issues go back to the backlog.",
   edit: "Edit", editTitle: "Edit the sprint", close: "Close sprint",
   closedBanner: "This sprint is closed: it is read-only.",
+  reloadFailed: "The change was saved, but the page could not be reloaded. Reload the page.",
   closeTitle: "Close this sprint", closeQuestion: "{n} issues are not finished. Where do they go?", closeNone: "Every issue is finished.",
   moveTo: "Move the unfinished issues to", toBacklog: "Back to the backlog", confirmClose: "Close the sprint",
   boardTitle: "Issues of the sprint", noIssues: "No issues in this sprint yet.", noneInColumn: "None.",
