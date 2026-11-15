@@ -80,6 +80,8 @@ export function SessionsPage() {
     clearTimeout(pause.current);
     pause.current = setTimeout(() => void load(true), config.liveDebounceMs);
   }, [load]);
+  // A reload scheduled with the previous `load` would read the previous filter and, being the newest read, show its rows under the new one: the new `load` replaces it.
+  useEffect(() => () => clearTimeout(pause.current), [load]);
   const live = useLive(ws, reload);
 
   const more = async () => {
