@@ -23,6 +23,12 @@ public sealed class InvitationAcceptTests(ApiFactory api)
         return members.EnumerateArray().Single(m => m.GetProperty("userId").GetGuid() == userId).GetProperty("role").GetString()!;
     }
 
+    private static async Task<DateTimeOffset> JoinedAtAsync(TestUser reader, Guid workspaceId, Guid userId)
+    {
+        var members = await reader.GetJsonAsync($"/api/workspaces/{workspaceId}/members");
+        return members.EnumerateArray().Single(m => m.GetProperty("userId").GetGuid() == userId).GetProperty("joinedAt").GetDateTimeOffset();
+    }
+
     [Fact]
     public async Task A_second_accept_of_the_same_token_is_refused_and_adds_no_second_membership_or_audit_row()
     {
@@ -52,6 +58,20 @@ public sealed class InvitationAcceptTests(ApiFactory api)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("admin", await RoleOfAsync(owner, owner.WorkspaceId, invitee.Id));
+    }
+
+    [Fact]
+    public async Task An_upgrade_keeps_the_date_the_member_joined()
+    {
+        var owner = await api.NewClient().SignedUpAsync("acc-joined-owner");
+        var invitee = await api.NewClient().SignedUpAsync("acc-joined-invitee");
+        (await invitee.PostAsync("/api/invitations/accept", new { token = await InviteAsync(owner, invitee, "member") })).EnsureSuccessStatusCode();
+        var joined = await JoinedAtAsync(owner, owner.WorkspaceId, invitee.Id);
+        api.Clock.Advance(TimeSpan.FromHours(1));
+
+        (await invitee.PostAsync("/api/invitations/accept", new { token = await InviteAsync(owner, invitee, "admin") })).EnsureSuccessStatusCode();
+
+        Assert.Equal(("admin", joined), (await RoleOfAsync(owner, owner.WorkspaceId, invitee.Id), await JoinedAtAsync(owner, owner.WorkspaceId, invitee.Id)));
     }
 
     [Fact]

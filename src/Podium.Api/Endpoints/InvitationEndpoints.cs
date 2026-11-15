@@ -145,9 +145,10 @@ public static class InvitationEndpoints
         }
         else if (member.RemovedAt is not null || Roles.Rank(invitation.Role) > Roles.Rank(member.Role))
         {
+            // A member who comes back starts again; an active one moved up keeps the date they first joined.
+            if (member.RemovedAt is not null) member.JoinedAt = now;
             member.RemovedAt = null;
             member.Role = invitation.Role;
-            member.JoinedAt = now;
         }
 
         Audit.Add(db, http, clock, AuditActions.InvitationAccepted, invitation.WorkspaceId, userId,
