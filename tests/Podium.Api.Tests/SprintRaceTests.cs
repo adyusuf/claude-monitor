@@ -12,6 +12,38 @@ public sealed class SprintRaceTests(ApiFactory api)
     private const int Rounds = 5;
 
     [Fact]
+    public async Task Of_several_sprints_started_at_once_in_one_scope_exactly_one_becomes_active()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var sprints = new List<Guid>();
+        for (var n = 0; n < 4; n++) sprints.Add(await SprintKit.SprintAsync(t.Owner, t.Project));
+
+        var answers = await Task.WhenAll(sprints.Select(id => SprintKit.StartAsync(t.Owner, id)));
+
+        Assert.Single(answers, a => a.StatusCode == HttpStatusCode.NoContent);
+        foreach (var refused in answers.Where(a => a.StatusCode != HttpStatusCode.NoContent)) Assert.Equal(("status", "sprint_active"), await ProjectKit.ProblemAsync(refused));
+        await using var db = api.Db();
+        Assert.Equal(1, await db.Sprints.CountAsync(s => s.ProjectId == t.Project && s.Status == SprintStatuses.Active));
+    }
+
+    [Fact]
+    public async Task Sprints_created_at_once_and_while_a_sync_imports_sprints_get_different_numbers()
+    {
+        var later = new List<FakeSprint>();
+        var w = await JiraWriteKit.OpenAsync(api, (site, space) => later.AddRange(Enumerable.Range(0, 3).Select(n => site.Sprint(space, $"Later {n}", "future"))));
+
+        var created = Task.WhenAll(Enumerable.Range(0, 6).Select(n => w.Member.PostAsync($"/api/projects/{w.Project}/sprints", new { name = $"Parallel {n}" })));
+        var imported = JiraKit.ImportSprintsAsync(w.World, JiraWriteKit.Key, [.. later.Select(x => x.Id)]);
+        var pass = JiraKit.PassAsync(w.World);
+        await Task.WhenAll(created, imported, pass);
+
+        Assert.All(await created, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
+        var numbers = (await JiraKit.SprintsAsync(w.World, w.Project)).Select(s => s.Number).ToList();
+        Assert.Equal(9, numbers.Count);
+        Assert.Equal(numbers.Count, numbers.Distinct().Count());
+    }
+
+    [Fact]
     public async Task An_issue_added_while_the_sprint_closes_never_stays_unfinished_in_the_closed_sprint()
     {
         var t = await IssueKit.TeamAsync(api);
