@@ -4,6 +4,7 @@ import { api } from "../api/endpoints";
 import { APPROVAL_DURATIONS, type ApprovalDuration, type ApprovalRequestRow } from "../api/types";
 import { Icon } from "../components/icons";
 import { Button, Json, Notice } from "../components/ui";
+import { VisibleText } from "../components/VisibleText";
 import { config } from "../config";
 import { useI18n } from "../i18n";
 import { time } from "../lib/format";
@@ -36,7 +37,8 @@ export function previewOf(row: { toolName: string; toolInput: Record<string, unk
 
 /**
  * One permission request waiting on the viewer's session (ADR-0019): where it comes from, what it asks, and Allow / Deny with how long the allow
- * stands. A question is answered on its session page (it needs the chosen options); a strict machine's request is decided once.
+ * stands. A question is answered on its session page (it needs the chosen options); a strict machine's request is decided once. The command and
+ * the input show every character that is not plain ASCII as its escape (ADR-0005), so what is read is what runs.
  */
 export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalRequestRow; onDone: (id: string) => void }) {
   const { t } = useI18n();
@@ -66,8 +68,8 @@ export function ApprovalItem({ ws, row, onDone }: { ws: string; row: ApprovalReq
         {row.projectName ? <span className="muted"> · <Icon name="projects" /> {row.projectName}</span> : null}
         {row.strict ? <span className="badge warn">{t("machines.role.strict")}</span> : null}
       </p>
-      {command !== null ? <><pre className="code approval-command">{command}</pre>{extras ? <Json value={extras} /> : null}</>
-        : row.toolName === PLAN_TOOL ? <PlanPrompt input={row.toolInput} /> : question ? null : <Json value={row.toolInput} />}
+      {command !== null ? <><pre className="code approval-command"><VisibleText text={command} /></pre>{extras ? <Json value={extras} visible /> : null}</>
+        : row.toolName === PLAN_TOOL ? <PlanPrompt input={row.toolInput} /> : question ? null : <Json value={row.toolInput} visible />}
       {question ? (
         <p className="small">{t("approvalRules.questionOnSession")} <Link to={`/w/${ws}/sessions/${row.sessionId}`}>{t("approvalRules.openSession")}</Link></p>
       ) : (
