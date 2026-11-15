@@ -7,8 +7,8 @@ import { useErrorText, useI18n } from "../i18n";
 import { date } from "../lib/format";
 
 /** The sprints of one imported space, live from the tool: pick the ones to bring in with their issues. */
-export function IntegrationSprints({ id, spaceKey, name, ws, projectId, onClose }:
-  { id: string; spaceKey: string; name: string; ws: string; projectId: string | null; onClose: () => void }) {
+export function IntegrationSprints({ id, spaceKey, name, ws, projectId, canImport, onClose }:
+  { id: string; spaceKey: string; name: string; ws: string; projectId: string | null; canImport: boolean; onClose: () => void }) {
   const { t, tx } = useI18n();
   const errorText = useErrorText();
   const [sprints, setSprints] = useState<SprintChoice[] | null>(null);
@@ -56,7 +56,7 @@ export function IntegrationSprints({ id, spaceKey, name, ws, projectId, onClose 
         <ul className="plain">
           {sprints.map((s) => (
             <li key={s.id} className="check">
-              <input type="checkbox" aria-label={t("integrations.selectSprint", { name: s.name })} checked={picked.has(s.id)} disabled={s.imported} onChange={() => toggle(s.id)} />
+              <input type="checkbox" aria-label={t("integrations.selectSprint", { name: s.name })} checked={picked.has(s.id)} disabled={s.imported || !canImport} onChange={() => toggle(s.id)} />
               <span>
                 {s.name} <span className="badge">{t(`integrations.sprintState.${s.state}`)}</span>{" "}
                 {s.start || s.end ? <span className="muted">{date(s.start)} – {date(s.end)}</span> : null}{" "}
@@ -66,7 +66,7 @@ export function IntegrationSprints({ id, spaceKey, name, ws, projectId, onClose 
           ))}
         </ul>
       )}
-      <Button busy={busy} disabled={picked.size === 0} onClick={() => void run()}>{t("integrations.importSprints", { n: picked.size })}</Button>
+      {canImport ? <Button busy={busy} disabled={picked.size === 0} onClick={() => void run()}>{t("integrations.importSprints", { n: picked.size })}</Button> : null}
     </div>
   );
 }

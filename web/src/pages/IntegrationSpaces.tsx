@@ -7,7 +7,8 @@ import { useErrorText, useI18n } from "../i18n";
 import { IntegrationSprints } from "./IntegrationSprints";
 
 /** Lists the spaces of the site live, imports the chosen ones as projects, and opens the sprint chooser of an imported one. */
-export function IntegrationSpaces({ id, ws, canImport, onImported }: { id: string; ws: string; canImport: boolean; onImported: () => void }) {
+export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImported }:
+  { id: string; ws: string; canImport: boolean; canImportSprints: boolean; onImported: () => void }) {
   const { t, tx } = useI18n();
   const errorText = useErrorText();
   const [spaces, setSpaces] = useState<SpaceView[] | null>(null);
@@ -74,7 +75,7 @@ export function IntegrationSpaces({ id, ws, canImport, onImported }: { id: strin
         </ul>
       )}
       {spaces && canImport ? <Button busy={busy} disabled={picked.size === 0} onClick={() => void run()}>{t("integrations.importSelected", { n: picked.size })}</Button> : null}
-      {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} onClose={() => setSprintsOf(null)} /> : null}
+      {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} canImport={canImportSprints} onClose={() => setSprintsOf(null)} /> : null}
     </div>
   );
 }

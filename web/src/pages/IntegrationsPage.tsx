@@ -21,6 +21,7 @@ export function IntegrationsPage() {
   const [connecting, setConnecting] = useState(false);
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
   const admin = role === "owner" || role === "admin";
+  const member = admin || role === "member"; // a viewer reads and changes nothing
   // The result of the Atlassian round trip is read once, shown, and only then taken out of the address.
   const incoming = params.get("result");
   const [result] = useState(incoming); // the round trip is a full page load, so the first value is the one
@@ -56,7 +57,7 @@ export function IntegrationsPage() {
       {view && !view.available ? <Notice>{t("integrations.unavailable")}</Notice> : null}
       {/* Without Jira the connections stay listed, read-only, so an admin can still disconnect them. */}
       {!view ? <Spinner /> : !view.available && view.connections.length === 0 ? null : (
-        <IntegrationsTable connections={view.connections} ws={ws} admin={admin} available={view.available} onChange={() => void load()} />
+        <IntegrationsTable connections={view.connections} ws={ws} admin={admin} member={member} available={view.available} onChange={() => void load()} />
       )}
       {connecting ? <Drawer title={t("integrations.connectTitle")} onClose={() => setConnecting(false)}><IntegrationConnect ws={ws} bare /></Drawer> : null}
     </div>

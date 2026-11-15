@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ME, mockApi, renderAt } from "../test/helpers";
-import { space } from "../test/integrations-fixtures";
+import { space, sprintChoice } from "../test/integrations-fixtures";
 import { IntegrationSpaces } from "./IntegrationSpaces";
 
 const spacesPath = "GET /integrations/c1/spaces";
@@ -11,10 +11,10 @@ const twoSpaces = () => [space(), space({ key: "OPS", name: "Operations", import
 
 /** Every route this part calls, plus the sign-in check the providers make. */
 const serve = (routes: Parameters<typeof mockApi>[0]) => mockApi({ "GET /me": { body: ME }, ...routes });
-const open = (canImport = true) => {
+const open = (canImport = true, canImportSprints = true) => {
   const onImported = vi.fn();
   renderAt("/", [
-    { path: "/", element: <IntegrationSpaces id="c1" ws="w1" canImport={canImport} onImported={onImported} /> },
+    { path: "/", element: <IntegrationSpaces id="c1" ws="w1" canImport={canImport} canImportSprints={canImportSprints} onImported={onImported} /> },
     { path: "/w/:ws/projects/:projectId", element: <div>project page</div> },
   ]);
   return onImported;
@@ -134,6 +134,16 @@ describe("the spaces of a connection", () => {
     expect(await screen.findByRole("heading", { name: "Sprints of Operations" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("heading", { name: "Sprints of Operations" })).not.toBeInTheDocument();
+  });
+
+  it("opens the sprint chooser read-only when sprint import is not allowed, without hiding the space import", async () => {
+    serve({ [spacesPath]: { body: twoSpaces() }, "GET /integrations/c1/spaces/OPS/sprints": { body: [sprintChoice()] } });
+    open(true, false);
+    await show();
+    await userEvent.click(await screen.findByRole("button", { name: "Sprints…" }));
+    expect(await screen.findByRole("checkbox", { name: "Select Sprint 10" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^Import selected sprints/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Import selected \(/ })).toBeInTheDocument();
   });
 
   it("goes to the project from the link", async () => {
