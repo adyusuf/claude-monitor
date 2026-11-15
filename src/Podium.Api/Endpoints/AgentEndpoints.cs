@@ -57,7 +57,9 @@ public static class AgentEndpoints
         var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, clock.GetUtcNow(), http.RequestAborted);
         if (outcome == AgentTokens.RefreshOutcome.Reused)
         {
-            Audit.Add(db, http, clock, AuditActions.RefreshReuse, agentId: agentId);
+            // The row goes to the agent's workspace: the audit log is read per workspace, and a copied token is what its admins must see.
+            var workspaceId = await db.Agents.Where(a => a.Id == agentId).Select(a => (Guid?)a.WorkspaceId).FirstOrDefaultAsync(http.RequestAborted);
+            Audit.Add(db, http, clock, AuditActions.RefreshReuse, workspaceId, agentId: agentId);
             broker.Publish(Broker.Agent(agentId!.Value), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         }
 
