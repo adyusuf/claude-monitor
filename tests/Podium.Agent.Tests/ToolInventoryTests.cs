@@ -226,10 +226,9 @@ public sealed class ToolInventoryTests
         Assert.True(list.Count <= ToolInventory.CandidatesMax);
     }
 
-    [Fact]
+    [MacOsFact] // the real run is pinned to macOS: /bin/sh there is root-owned and answers --version
     public void Live_finds_the_system_shell_as_a_trusted_tool_with_a_version_on_this_machine()
     {
-        if (!OperatingSystem.IsMacOS()) return; // the real run is pinned to macOS: /bin/sh there is root-owned and answers --version
         using var home = new TempHome(c => c with { ToolVersionTimeout = TimeSpan.FromSeconds(3) });
 
         var sh = Assert.Single(ToolInventory.Live(home.Config, OsKinds.MacOs), t => t.Name == ToolNames.Sh);

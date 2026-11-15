@@ -50,6 +50,37 @@ public sealed class ProcessTests : IDisposable
     }
 
     [Fact]
+    public void The_update_budget_exceeds_every_wait_of_the_updater_it_runs()
+    {
+        var config = Config("/bin/echo");
+        var budget = ProcessCli.UpdateBudget(config);
+        Assert.True(budget > config.ApiCallTimeout + config.UpdateDownloadTimeout + 2 * config.UpdateProbeTimeout + 2 * config.UpdateStopWait + config.UpdateHealthWait,
+            $"the tray would kill `aipod update` after {budget} while the updater may still be swapping the binary");
+    }
+
+    [Fact]
+    public async Task An_update_gets_the_update_budget_while_another_command_keeps_the_short_limit()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var script = Path.Combine(dir, "aipod");
+        await File.WriteAllTextAsync(script, "#!/bin/sh\nsleep 1\necho \"$1\"\n");
+        File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var config = Config(script) with
+        {
+            ApiCallTimeout = TimeSpan.FromSeconds(1),
+            UpdateDownloadTimeout = TimeSpan.FromSeconds(1),
+            UpdateProbeTimeout = TimeSpan.Zero,
+            UpdateStopWait = TimeSpan.Zero,
+            UpdateHealthWait = TimeSpan.Zero,
+        };
+        var cli = new ProcessCli(config, TimeSpan.FromMilliseconds(300));
+
+        var update = await cli.RunAsync(["update"], CancellationToken.None);
+        Assert.Equal((0, "update\n"), (update.ExitCode, update.Output));
+        await Assert.ThrowsAsync<TimeoutException>(() => cli.RunAsync(["update", "--check"], CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Missing_arguments_are_refused() =>
         await Assert.ThrowsAsync<ArgumentNullException>(() => new ProcessCli(Config("/bin/echo")).RunAsync(null!, CancellationToken.None));
 }
