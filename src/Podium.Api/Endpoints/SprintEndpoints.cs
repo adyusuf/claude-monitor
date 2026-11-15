@@ -105,9 +105,10 @@ public static class SprintEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status != SprintStatuses.Planned) return Http.Invalid("status", "not_planned");
         if (await writes.DeleteAsync(userId, sprint, http.RequestAborted) is { } refused) return refused;
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var now = clock.GetUtcNow();
         foreach (var issue in await db.Issues.Where(i => i.SprintId == id).ToListAsync(http.RequestAborted))
         {
@@ -129,10 +130,10 @@ public static class SprintEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status != SprintStatuses.Planned) return Http.Invalid("status", "not_planned");
         if (sprint.StartDate is null || sprint.EndDate is null) return Http.Invalid("startDate", "dates_required");
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        await IssueEndpoints.LockProjectAsync(db, sprint.ProjectId, http.RequestAborted);
         // A sprint mirrored from a tool may run next to others, as the tool allows (ADR-0015 §4).
         var taken = sprint.SourceConnectionId is null && await db.Sprints.AnyAsync(s => s.ProjectId == sprint.ProjectId && s.Status == SprintStatuses.Active && s.ArchivedAt == null
             && s.ApplicationId == sprint.ApplicationId, http.RequestAborted);
@@ -164,6 +165,8 @@ public static class SprintEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status != SprintStatuses.Active) return Http.Invalid("status", "not_active");
         if (req.MoveUnfinishedTo is { } target
             && !await db.Sprints.AnyAsync(s => s.Id == target && s.ProjectId == sprint.ProjectId && s.Status == SprintStatuses.Planned && s.ArchivedAt == null
@@ -172,7 +175,6 @@ public static class SprintEndpoints
             return Http.Invalid("moveUnfinishedTo", "invalid_sprint");
         }
 
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var now = clock.GetUtcNow();
         var unfinished = await db.Issues.Where(i => i.SprintId == id && i.ArchivedAt == null && i.Status != IssueStatuses.Done && i.Status != IssueStatuses.Cancelled)
             .ToListAsync(http.RequestAborted);
@@ -191,6 +193,17 @@ public static class SprintEndpoints
         await db.SaveChangesAsync(http.RequestAborted);
         await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
+    }
+
+    /// <summary>
+    /// Takes the project's row lock (inside the caller's transaction) and reads the sprint again, so a change that committed while this request
+    /// waited is seen: sprint changes of one project run one after another. False when the sprint was deleted meanwhile.
+    /// </summary>
+    internal static async Task<bool> LockAsync(PodiumDb db, Sprint sprint, CancellationToken ct)
+    {
+        await IssueEndpoints.LockProjectAsync(db, sprint.ProjectId, ct);
+        await db.Entry(sprint).ReloadAsync(ct);
+        return sprint.ArchivedAt is null;
     }
 
     private static void Fill(Sprint s, SprintInput i, Guid userId, DateTimeOffset now)

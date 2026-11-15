@@ -26,10 +26,12 @@ public static class SprintIssueEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
-        if (sprint.Status == SprintStatuses.Closed) return Http.Invalid("status", "closed");
         var ids = req.IssueIds?.Distinct().ToList() ?? [];
         if (ids.Count == 0) return Http.Invalid("issueIds", "invalid_list");
         if (ids.Count > AddMax) return Http.Invalid("issueIds", "limit_reached");
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await SprintEndpoints.LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
+        if (sprint.Status == SprintStatuses.Closed) return Http.Invalid("status", "closed");
 
         var issues = await db.Issues.Where(i => ids.Contains(i.Id) && i.ProjectId == sprint.ProjectId && i.ArchivedAt == null).ToListAsync(http.RequestAborted);
         if (issues.Count != ids.Count || issues.Any(i => i.SprintId is not null && i.SprintId != id)) return Http.Invalid("issueIds", "invalid_issue");
@@ -46,6 +48,7 @@ public static class SprintIssueEndpoints
 
         Audit.Add(db, http, clock, AuditActions.SprintIssuesChanged, sprint.WorkspaceId, userId, targetType: "sprint", targetId: id, detail: new { added = issues.Count });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
@@ -55,6 +58,8 @@ public static class SprintIssueEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await SprintEndpoints.LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status == SprintStatuses.Closed) return Http.Invalid("status", "closed");
         var issue = await db.Issues.FirstOrDefaultAsync(i => i.Id == issueId && i.SprintId == id, http.RequestAborted);
         if (issue is null) return Http.NotFound();
@@ -62,6 +67,7 @@ public static class SprintIssueEndpoints
         Release(issue, null, userId, clock.GetUtcNow());
         Audit.Add(db, http, clock, AuditActions.SprintIssuesChanged, sprint.WorkspaceId, userId, targetType: "sprint", targetId: id, detail: new { removed = 1 });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
