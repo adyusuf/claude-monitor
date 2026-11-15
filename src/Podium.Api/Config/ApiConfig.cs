@@ -86,6 +86,8 @@ public sealed record ApiConfig
 
     public TimeSpan LoginSessionLifetime { get; init; } = TimeSpan.FromDays(14);
     public TimeSpan EmailTokenLifetime { get; init; } = TimeSpan.FromHours(24);
+    /// <summary>At most one reset mail per address in this window: a second Forgot inside it answers the same and mails nothing.</summary>
+    public TimeSpan ResetMailEvery { get; init; } = TimeSpan.FromMinutes(5);
     public TimeSpan InvitationLifetime { get; init; } = TimeSpan.FromDays(7);
     public TimeSpan DeviceCodeLifetime { get; init; } = TimeSpan.FromMinutes(15);
     public int DevicePollSeconds { get; init; } = 5;

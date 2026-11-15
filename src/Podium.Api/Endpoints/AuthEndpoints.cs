@@ -147,7 +147,10 @@ public static class AuthEndpoints
         var normalized = SearchText.Email(req.Email ?? "");
         var user = await db.Users.FirstOrDefaultAsync(
             u => u.EmailNormalized == normalized && u.Status == UserStatuses.Active, http.RequestAborted);
-        if (user?.Email is not null)
+        var since = clock.GetUtcNow() - config.ResetMailEvery;
+        // One mail per address per window, whatever the number of callers or their addresses: the link already mailed keeps working.
+        if (user?.Email is not null && !await db.UserTokens.AnyAsync(
+                t => t.UserId == user.Id && t.Purpose == TokenPurposes.ResetPassword && t.CreatedAt > since, http.RequestAborted))
         {
             await EndResetLinksAsync(db, user.Id, clock.GetUtcNow(), http.RequestAborted);
             var token = AddUserToken(db, user.Id, TokenPurposes.ResetPassword, clock.GetUtcNow(), config.EmailTokenLifetime);
