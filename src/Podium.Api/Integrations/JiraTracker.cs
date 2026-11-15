@@ -39,18 +39,22 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
         }
     }
 
-    public async Task<IReadOnlyList<ExternalIteration>> ListIterationsAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
+    public async Task<IReadOnlyList<ExternalIteration>> ListIterationsAsync(TrackerContext ctx, string containerKey, CancellationToken ct) =>
+        (await ListIterationListingAsync(ctx, containerKey, ct)).Iterations;
+
+    public async Task<IterationListing> ListIterationListingAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
     {
         var sprints = new Dictionary<string, ExternalIteration>();
-        foreach (var board in await BoardsAsync(ctx, containerKey, ct))
+        var refused = new Refusal();
+        foreach (var board in await BoardsAsync(ctx, containerKey, ct, refused))
         {
-            await foreach (var s in PagedAsync(ctx, $"/rest/agile/1.0/board/{board}/sprint?maxResults={PageSize}", "values", ct, tolerate: true))
+            await foreach (var s in PagedAsync(ctx, $"/rest/agile/1.0/board/{board}/sprint?maxResults={PageSize}", "values", ct, tolerate: true, refused))
             {
                 if (JiraParse.Iteration(s, containerKey) is { } it) sprints.TryAdd(it.Id, it);
             }
         }
 
-        return [.. sprints.Values.OrderBy(s => long.TryParse(s.Id, CultureInfo.InvariantCulture, out var n) ? n : long.MaxValue)];
+        return new IterationListing([.. sprints.Values.OrderBy(s => long.TryParse(s.Id, CultureInfo.InvariantCulture, out var n) ? n : long.MaxValue)], !refused.Seen);
     }
 
     public async Task<IReadOnlyList<ExternalItem>> ListBacklogAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
@@ -201,10 +205,10 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
     public async Task<string?> FirstBoardIdAsync(TrackerContext ctx, string containerKey, CancellationToken ct) =>
         (await BoardsAsync(ctx, containerKey, ct)).FirstOrDefault();
 
-    private async Task<List<string>> BoardsAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
+    private async Task<List<string>> BoardsAsync(TrackerContext ctx, string containerKey, CancellationToken ct, Refusal? refused = null)
     {
         var boards = new List<string>();
-        await foreach (var b in PagedAsync(ctx, $"/rest/agile/1.0/board?projectKeyOrId={Uri.EscapeDataString(containerKey)}&maxResults={PageSize}", "values", ct, tolerate: true))
+        await foreach (var b in PagedAsync(ctx, $"/rest/agile/1.0/board?projectKeyOrId={Uri.EscapeDataString(containerKey)}&maxResults={PageSize}", "values", ct, tolerate: true, refused))
         {
             if (b.TryGetProperty("id", out var id)) boards.Add(id.ToString());
         }
@@ -243,7 +247,7 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
 
     /// <summary>Pages of the agile API (<c>startAt</c>, a <c>values</c> or <c>issues</c> array, <c>isLast</c> or a short page).</summary>
     private async IAsyncEnumerable<JsonElement> PagedAsync(TrackerContext ctx, string path, string array,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct, bool tolerate = false)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct, bool tolerate = false, Refusal? refused = null)
     {
         for (var start = 0; start < PageSize * PageCap; start += PageSize)
         {
@@ -254,7 +258,10 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
             }
             catch (TrackerException e) when (tolerate && e.Code is TrackerException.Codes.Rejected or TrackerException.Codes.NotFound or TrackerException.Codes.Forbidden)
             {
-                yield break; // a space with no Jira Software, or no board the caller may see, simply has none
+                // A space with no Jira Software, or no board the caller may see, simply has none; the caller that must tell "none" from "not
+                // shown" is told.
+                if (refused is not null) refused.Seen = true;
+                yield break;
             }
 
             using (doc)
@@ -273,6 +280,12 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
         if (known.SprintId is { } s) list += "," + s;
         if (known.StoryPointsId is { } p) list += "," + p;
         return list;
+    }
+
+    /// <summary>Set when a tolerated list was refused or not found (an async iterator cannot hand back an out value).</summary>
+    private sealed class Refusal
+    {
+        public bool Seen { get; set; }
     }
 
     private static string Jql(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
