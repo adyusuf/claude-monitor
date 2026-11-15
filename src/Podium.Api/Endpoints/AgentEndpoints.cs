@@ -18,7 +18,7 @@ public static class AgentEndpoints
 {
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapPost("/agent/token/refresh", Refresh).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+        api.MapPost("/agent/token/refresh", Refresh).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
         // Outside the version gate on purpose: an agent below the minimum version must still be able to fetch its update.
         api.MapGet("/agent/latest", Latest).RequireAuthorization(Schemes.Agent);
         var g = api.MapGroup("/agent").RequireAuthorization(Schemes.Agent).AddEndpointFilter(VersionGate);

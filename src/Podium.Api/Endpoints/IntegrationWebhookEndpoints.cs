@@ -16,7 +16,7 @@ public static class IntegrationWebhookEndpoints
     public const int BodyMax = 256 * 1024;
     private const string DeliveryHeader = "X-Atlassian-Webhook-Identifier";
 
-    public static void Map(RouteGroupBuilder api) => api.MapPost("/integrations/jira/webhook/{id:guid}", Receive);
+    public static void Map(RouteGroupBuilder api) => api.MapPost("/integrations/jira/webhook/{id:guid}", Receive).AllowAnonymous();
 
     private static async Task<IResult> Receive(Guid id, HttpContext http, PodiumDb db, IntegrationSettings settings, TimeProvider clock, SyncInbox inbox)
     {

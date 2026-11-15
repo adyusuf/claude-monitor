@@ -20,7 +20,7 @@ public static class AuthEndpoints
 
     public static void Map(RouteGroupBuilder api)
     {
-        var auth = api.MapGroup("/auth").RequireRateLimiting(RateLimitPolicy);
+        var auth = api.MapGroup("/auth").RequireRateLimiting(RateLimitPolicy).AllowAnonymous();
         auth.MapPost("/register", Register);
         auth.MapPost("/verify-email", VerifyEmail);
         auth.MapPost("/login", Login);

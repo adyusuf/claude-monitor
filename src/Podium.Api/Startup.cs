@@ -70,7 +70,9 @@ public static class Startup
             .AddScheme<AuthenticationSchemeOptions, SessionAuthHandler>(Schemes.Session, null)
             .AddScheme<AuthenticationSchemeOptions, AgentAuthHandler>(Schemes.Agent, null)
             .AddExternalProviders(config);
+        // Fail-closed (global #6): an endpoint that names no policy needs a signed-in user; the public ones say AllowAnonymous.
         services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(Schemes.Session).RequireAuthenticatedUser().Build())
             .AddPolicy(Schemes.Session, p => p.AddAuthenticationSchemes(Schemes.Session).RequireAuthenticatedUser())
             .AddPolicy(Schemes.Agent, p => p.AddAuthenticationSchemes(Schemes.Agent).RequireAuthenticatedUser());
         services.AddRateLimiter(o =>
@@ -136,7 +138,7 @@ public static class Startup
             downloadsUrl = config.DownloadsUrl,
             agentVersion = catalog.CurrentVersion,
             agentVersions = catalog.OlderVersions().Select(v => new { version = v.Version, url = v.Url }),
-        }));
+        })).AllowAnonymous();
         AuthEndpoints.Map(api);
         ExternalAuthEndpoints.Map(api);
         MeEndpoints.Map(api);
@@ -181,13 +183,19 @@ public static class Startup
         ServerSettingsEndpoints.Map(api);
         AccessPolicyEndpoints.Map(api);
         AgentAccessEndpoints.Map(api);
-        api.MapFallback(() => Results.NotFound());
+        api.MapFallback(() => Results.NotFound()).AllowAnonymous();
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
+        // A path no endpoint answers would meet the fallback policy (401): a missing download stays a 404, and so does any path without a web root.
+        app.Map(DownloadsPath + "/{**rest}", () => Results.NotFound()).AllowAnonymous();
         if (files is not null)
         {
             // The single-page app answers every non-API path; /api/* never falls through to it (global #17).
             app.MapFallbackToFile("{*path:regex(^(?!api/|downloads/).*$)}", "index.html",
-                new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
+                new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages }).AllowAnonymous();
+        }
+        else
+        {
+            app.MapFallback("{**path}", () => Results.NotFound()).AllowAnonymous();
         }
     }
 

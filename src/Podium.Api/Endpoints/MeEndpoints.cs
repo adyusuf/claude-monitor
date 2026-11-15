@@ -19,7 +19,7 @@ public static class MeEndpoints
     {
         api.MapGet("/me", Me).RequireAuthorization(Schemes.Session);
         api.MapPut("/me/language", SetLanguage).RequireAuthorization(Schemes.Session);
-        api.MapGet("/auth/providers", Available);
+        api.MapGet("/auth/providers", Available).AllowAnonymous();
     }
 
     private static async Task<IResult> Me(HttpContext http, PodiumDb db, ApiConfig config)

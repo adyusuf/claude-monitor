@@ -20,8 +20,8 @@ public static class ExternalAuthEndpoints
 
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapGet("/auth/external/{provider}", Start).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
-        api.MapGet("/auth/external/{provider}/done", Done);
+        api.MapGet("/auth/external/{provider}", Start).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
+        api.MapGet("/auth/external/{provider}/done", Done).AllowAnonymous();
     }
 
     private static IResult Start(string provider, string? mode, IntegrationSettings settings)

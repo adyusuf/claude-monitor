@@ -31,7 +31,7 @@ public static class MfaEndpoints
         me.MapPost("/setup", Setup);
         me.MapPost("/enable", Enable);
         me.MapPost("/disable", Disable).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
-        api.MapPost("/auth/mfa", SignIn).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+        api.MapPost("/auth/mfa", SignIn).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
     }
 
     /// <summary>For a user with MFA on: the pending token the second step needs (single use, minutes long).</summary>
