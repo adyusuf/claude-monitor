@@ -194,6 +194,68 @@ public sealed class SessionContextTests : IDisposable
         Assert.Equal(1, runs.Count(r => r.Out.Contains("only once", StringComparison.Ordinal)));
     }
 
+    private sealed class BrokenWriter : StringWriter
+    {
+        public override Task WriteAsync(string? value) => throw new IOException("stdout is closed");
+    }
+
+    private sealed class SlowReader(string text, TimeSpan delay) : StringReader(text)
+    {
+        public override string ReadToEnd()
+        {
+            Thread.Sleep(delay);
+            return base.ReadToEnd();
+        }
+    }
+
+    [Fact]
+    public async Task A_prompt_whose_print_fails_goes_back_to_the_queue_instead_of_being_lost()
+    {
+        Queue("cmd-1", "s-1", "must not be lost");
+
+        var code = await Capture.SessionContext.RunAsync(home.Config, new BrokenWriter(), new StringWriter(), TimeProvider.System, new StringReader(Hook("s-1")));
+
+        Assert.Equal(0, code);
+        using var store = new LocalStore(home.Config.DatabasePath);
+        Assert.Empty(store.TakenCommands()); // the web is not told "applied"
+        Assert.Equal("cmd-1", StillWaiting("s-1")!.Id);
+    }
+
+    [Fact]
+    public async Task A_read_that_outlasts_the_wait_takes_no_prompt_afterwards()
+    {
+        Queue("cmd-1", "s-1", "must not be lost");
+        var config = home.Config with { ContextReadWait = TimeSpan.FromMilliseconds(30) };
+        var (stdout, stderr) = (new StringWriter(), new StringWriter());
+
+        var code = await Capture.SessionContext.RunAsync(config, stdout, stderr, TimeProvider.System, new SlowReader(Hook("s-1"), TimeSpan.FromMilliseconds(150)));
+        await Task.Delay(600); // the abandoned read ends meanwhile
+
+        Assert.Equal(0, code);
+        Assert.Equal("", stdout.ToString());
+        Assert.Contains("TimeoutException", stderr.ToString(), StringComparison.Ordinal);
+        using var store = new LocalStore(home.Config.DatabasePath);
+        Assert.Empty(store.TakenCommands());
+        Assert.Equal("cmd-1", StillWaiting("s-1")!.Id);
+    }
+
+    [Fact]
+    public void A_taken_prompt_can_be_requeued_once_and_only_while_taken()
+    {
+        Queue("cmd-1", "s-1", "body");
+        using var store = new LocalStore(home.Config.DatabasePath);
+        Assert.Equal("cmd-1", store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow)!.Id);
+
+        store.RequeueTakenCommand("cmd-1");
+
+        Assert.Empty(store.TakenCommands());
+        Assert.Equal("cmd-1", store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow)!.Id); // queued again, then taken again
+        store.MarkCommandReported("cmd-1");
+        store.RequeueTakenCommand("cmd-1"); // reported is final: a later requeue changes nothing
+
+        Assert.Null(store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow));
+    }
+
     [Fact]
     public void The_output_is_one_json_object_whatever_the_text()
     {

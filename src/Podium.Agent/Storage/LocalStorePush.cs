@@ -29,6 +29,9 @@ public sealed partial class LocalStore
     public string? SessionOf(int parentPid) =>
         Scalar("SELECT session FROM session_bindings WHERE parent_pid = $p ORDER BY seen_at DESC, rowid DESC LIMIT 1", ("$p", parentPid)) as string;
 
+    /// <summary>Forgets bindings no hook refreshed since <paramref name="olderThan"/>: a process id the system reused must not map a new process to an old session. Returns how many.</summary>
+    public int PruneBindings(DateTimeOffset olderThan) => Exec("DELETE FROM session_bindings WHERE seen_at < $t", ("$t", Iso(olderThan)));
+
     // ---- the life of a pushed prompt -----------------------------------------------------------------------------
 
     /// <summary>

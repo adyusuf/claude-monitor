@@ -82,6 +82,41 @@ public sealed class PushTests : IDisposable
         Assert.Equal("", ChannelEnvelopes.Build(new LocalCommand("c", "s", CommandKinds.Prompt, null, Start.AddHours(1)), 10, Start).Content);
     }
 
+    private static bool WellFormed(string text)
+    {
+        try
+        {
+            _ = new System.Text.UTF8Encoding(false, throwOnInvalidBytes: true).GetBytes(text);
+            return true;
+        }
+        catch (System.Text.EncoderFallbackException)
+        {
+            return false;
+        }
+    }
+
+    [Theory]
+    [InlineData(5)] // "aaaa" + the emoji's high surrogate: the cut falls between the two halves
+    [InlineData(4)] // the cut falls before the emoji
+    [InlineData(6)] // the cut falls after the emoji
+    public void A_cut_never_splits_an_emoji_in_any_envelope(int max)
+    {
+        const string text = "aaaa\U0001F600bbbb";
+        var command = new LocalCommand("c", "s", CommandKinds.Prompt, text, Start.AddHours(1));
+        var ask = new AskIn("0198f1c2-7a55-7d3a-9b1e-2f6c3a4d5e60", "label", text, null, Start, LocalStore.AskQueued, null, null);
+
+        var texts = new[]
+        {
+            ChannelEnvelopes.Build(command, max, Start).Content,
+            ChannelEnvelopes.BuildInbox(command, max, Start),
+            ChannelEnvelopes.BuildFirstPrompt(Guid.NewGuid(), text, max, Start),
+            AskEnvelopes.Build(ask, max),
+        };
+
+        Assert.All(texts, t => Assert.True(WellFormed(t), "the text holds half of a surrogate pair"));
+        Assert.All(texts, t => Assert.Contains("[cut:", t, StringComparison.Ordinal));
+    }
+
     // ---- the local life of a pushed prompt -------------------------------------------------------------------------
 
     [Fact]

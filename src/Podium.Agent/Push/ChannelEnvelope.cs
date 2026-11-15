@@ -59,7 +59,7 @@ public static class ChannelEnvelopes
     {
         ArgumentNullException.ThrowIfNull(command);
         var body = Defuse(command.Body ?? "");
-        if (body.Length > contentMax) body = body[..contentMax] + Cut;
+        body = Cap(body, contentMax);
         var meta = new Dictionary<string, string> { ["origin"] = "web", ["message_id"] = command.Id };
         return new ChannelEnvelope(command.Id, command.Session, body, meta);
     }
@@ -73,7 +73,7 @@ public static class ChannelEnvelopes
     {
         ArgumentNullException.ThrowIfNull(command);
         var body = Defuse(command.Body ?? "");
-        if (body.Length > contentMax) body = body[..contentMax] + Cut;
+        body = Cap(body, contentMax);
         var sent = now.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
         return $"{InboxNotice}\n{Open} id={command.Id} origin=\"web\" session_id=\"{command.Session}\" sent_at=\"{sent}\"\n{body}\n{Close}";
     }
@@ -86,7 +86,7 @@ public static class ChannelEnvelopes
     {
         ArgumentNullException.ThrowIfNull(text);
         var body = Defuse(text);
-        if (body.Length > contentMax) body = body[..contentMax] + Cut;
+        body = Cap(body, contentMax);
         var sent = now.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
         return $"{InboxNotice}\n{Open} id={actionId:N} origin=\"web\" session_id=\"new\" sent_at=\"{sent}\"\n{body}\n{Close}";
     }
@@ -102,6 +102,19 @@ public static class ChannelEnvelopes
     public static bool AppearsIn(string line, string id) =>
         line.Contains($"{Open} id={id}", StringComparison.Ordinal) || line.Contains($"{NoticeMarker} {id} ", StringComparison.Ordinal)
         || line.Contains($"message_id=\"{id}\"", StringComparison.Ordinal) || line.Contains($"message_id=\\\"{id}\\\"", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Cuts a text to at most <paramref name="max"/> characters and says so. The cut never falls inside an emoji or another surrogate pair: half of one cannot be
+    /// encoded, and would end the push loop that tries to send it.
+    /// </summary>
+    public static string Cap(string body, int max)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (body.Length <= max) return body;
+        var end = Math.Max(max, 0);
+        if (end is > 0 && end < body.Length && char.IsHighSurrogate(body[end - 1]) && char.IsLowSurrogate(body[end])) end--;
+        return body[..end] + Cut;
+    }
 
     /// <summary>Breaks the sequences that could close the wrapper or forge another channel tag.</summary>
     public static string Defuse(string text) =>
