@@ -63,11 +63,14 @@ public static class ApprovalKeyEndpoints
     private static async Task<IResult> Retire(Guid id, HttpContext http, PodiumDb db, TimeProvider clock)
     {
         var userId = http.User.UserId();
+        // The retirement and its audit row commit together or not at all (F-194).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var changed = await db.ApprovalKeys.Where(k => k.Id == id && k.UserId == userId && k.RetiredAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(k => k.RetiredAt, clock.GetUtcNow()), http.RequestAborted);
         if (changed != 1) return Http.NotFound();
         Audit.Add(db, http, clock, AuditActions.ApprovalKeyRetired, userId: userId, targetType: "approval_key", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 }
