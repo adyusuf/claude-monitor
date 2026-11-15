@@ -37,6 +37,13 @@ describe("the frame", () => {
     expect(screen.getByRole("button", { name: de.nav.menu })).toBeInTheDocument();
   });
 
+  it.each([["owner", true], ["admin", true], ["member", false], ["viewer", false]])("shows the workspace settings link for the role %s: %s", async (role, shown) => {
+    mockApi({ "GET /me": { body: { ...ME, workspaces: [{ id: "w1", name: "Team", role }] } } });
+    renderAt("/w/w1/x", [{ path: "/w/:ws/*", element: <Layout /> }]);
+    expect(await screen.findByRole("link", { name: /Sessions/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Workspace settings/ }) !== null).toBe(shown);
+  });
+
   it("keeps the user signed in and says so when the sign-out fails, and signs out on a retry that works", async () => {
     let tries = 0;
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
