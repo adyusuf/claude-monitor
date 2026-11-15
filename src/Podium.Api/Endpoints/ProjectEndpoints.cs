@@ -158,6 +158,9 @@ public static class ProjectEndpoints
         if (req.Role is null || !ProjectRoles.All.Contains(req.Role)) return Http.Invalid("role", "invalid_role");
         if (await Access.MemberAsync(db, userId, grant.Project.WorkspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.Invalid("userId", "not_a_member");
 
+        // The project lock turns "look for the row, then add it" into one step: two calls at once cannot both add the same person.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
         var row = await db.ProjectMembers.FirstOrDefaultAsync(m => m.ProjectId == id && m.UserId == userId, http.RequestAborted);
         var now = clock.GetUtcNow();
         if (row is null) db.ProjectMembers.Add(new ProjectMember { ProjectId = id, UserId = userId, Role = req.Role, AddedBy = actor, AddedAt = now });
@@ -165,6 +168,7 @@ public static class ProjectEndpoints
         Audit.Add(db, http, clock, AuditActions.ProjectMemberChanged, grant.Project.WorkspaceId, actor, targetType: "project", targetId: id,
             detail: new { userId, role = req.Role });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 

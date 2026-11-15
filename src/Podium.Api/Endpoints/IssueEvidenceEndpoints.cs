@@ -118,6 +118,9 @@ public static class IssueEvidenceEndpoints
         var url = req.Url?.Trim();
         if (string.IsNullOrEmpty(url) || !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || !ProjectRules.WebLink(url)) return Http.Invalid("url", "invalid_url");
         if (req.Title is { } title && title.Trim().Length > ProjectRules.ShortMax) return Http.Invalid("title", "too_long");
+        // The project lock keeps the cap exact; the unique (issue, address) key answers a duplicate the lock cannot see (an automatic link).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, f.Issue.ProjectId, http.RequestAborted);
         if (await db.IssueCodeLinks.AnyAsync(c => c.IssueId == id && c.Url == url, http.RequestAborted)) return Http.Invalid("url", "duplicate_link");
         if (await db.IssueCodeLinks.CountAsync(c => c.IssueId == id, http.RequestAborted) >= CodeLinksMax) return Http.Invalid("url", "limit_reached");
         var row = new IssueCodeLink
@@ -133,7 +136,16 @@ public static class IssueEvidenceEndpoints
         };
         db.IssueCodeLinks.Add(row);
         Audit.Add(db, http, clock, AuditActions.IssueCodeLinkChanged, row.WorkspaceId, userId, targetType: "issue", targetId: id);
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e))
+        {
+            return Http.Invalid("url", "duplicate_link");
+        }
+
+        await tx.CommitAsync(http.RequestAborted);
         return Results.Created($"/api/code-links/{row.Id}", IssueViews.View(row));
     }
 
