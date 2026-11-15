@@ -99,6 +99,15 @@ public static class InvitationEndpoints
             return Http.Invalid("token", "invitation_other_address");
         }
 
+        // The invitation speaks for its inviter: one who has left, or could no longer give this role (an admin or owner of at least
+        // its rank), voids it.
+        var inviter = await db.WorkspaceMembers.AsNoTracking().FirstOrDefaultAsync(
+            m => m.WorkspaceId == invitation.WorkspaceId && m.UserId == invitation.InvitedBy && m.RemovedAt == null, http.RequestAborted);
+        if (inviter is null || Roles.Rank(inviter.Role) < Math.Max(Roles.Rank(Roles.Admin), Roles.Rank(invitation.Role)))
+        {
+            return Http.Invalid("token", "invalid_token");
+        }
+
         var member = await db.WorkspaceMembers.FirstOrDefaultAsync(
             m => m.WorkspaceId == invitation.WorkspaceId && m.UserId == userId, http.RequestAborted);
         if (member is null)
