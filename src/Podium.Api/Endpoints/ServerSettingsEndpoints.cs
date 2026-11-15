@@ -105,9 +105,13 @@ public static class ServerSettingsEndpoints
             row.UpdatedBy = me;
         }
 
-        // Which settings changed, never their values.
+        // Which settings changed and which of them were removed, never their values.
         Audit.Add(db, http, clock, AuditActions.ServerSettingsChanged, config.AdminWorkspace, me, targetType: "integration", targetId: id,
-            detail: new { fields = changes.Select(c => c.Field.Name).Order(StringComparer.Ordinal).ToList() });
+            detail: new
+            {
+                fields = changes.Select(c => c.Field.Name).Order(StringComparer.Ordinal).ToList(),
+                removed = changes.Where(c => c.Value is null).Select(c => c.Field.Name).Order(StringComparer.Ordinal).ToList(),
+            });
         try
         {
             await db.SaveChangesAsync(ct);
