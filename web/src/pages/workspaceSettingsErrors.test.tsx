@@ -58,12 +58,13 @@ describe("loading the workspace settings", () => {
     expect(screen.queryByRole("tab")).toBeNull();
   });
 
-  it("still shows the page, with an empty audit log, when only the audit log cannot be read", async () => {
+  it("still shows the page, with the reason on the audit tab, when only the audit log cannot be read", async () => {
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1": { body: info() }, "GET /workspaces/w1/audit": { status: 500 } });
     page();
     expect(await screen.findByLabelText(en.workspace.name)).toHaveValue("Team");
     await openTab(en.workspace.audit);
-    expect(screen.getByText(en.workspace.noAudit)).toBeInTheDocument();
+    expect(await screen.findByText(en.errors.server_error)).toBeInTheDocument();
+    expect(screen.queryByText(en.workspace.noAudit)).toBeNull();
   });
 
   it("keeps what was typed on a tab when the person visits another tab and comes back", async () => {

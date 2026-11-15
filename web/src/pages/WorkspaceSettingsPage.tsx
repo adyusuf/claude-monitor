@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "../api/endpoints";
-import type { AgentUpdateMode, AuditRow, WorkspaceInfo } from "../api/types";
+import type { AgentUpdateMode, WorkspaceInfo } from "../api/types";
 import { useSession } from "../auth/session";
 import { Button, Card, Field, Notice, Spinner } from "../components/ui";
 import { SettingsSection } from "../components/SettingsSection";
@@ -21,7 +21,7 @@ export function WorkspaceSettingsPage() {
   const [info, setInfo] = useState<WorkspaceInfo | null>(null);
   const [form, setForm] = useState<{ name: string; maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate: boolean }>(
     { name: "", maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off", claudeUpdate: false });
-  const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [auditVersion, setAuditVersion] = useState(0);
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
   useEffect(() => {
@@ -29,7 +29,6 @@ export function WorkspaceSettingsPage() {
       setInfo(w);
       setForm({ name: w.name, ...w.settings, agentUpdate: w.settings.agentUpdate ?? "off", claudeUpdate: w.settings.claudeUpdate ?? false });
     }).catch((e) => setNotice({ kind: "error", text: errorText(e) }));
-    api.audit(ws).then((p) => setAudit(p.items)).catch(() => setAudit([]));
     // errorText changes identity every render; the workspace id is what matters
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws]);
@@ -39,6 +38,7 @@ export function WorkspaceSettingsPage() {
       if (form.name !== info?.name) await api.renameWorkspace(ws, form.name);
       await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes, agentUpdate: form.agentUpdate, claudeUpdate: form.claudeUpdate });
       await refresh();
+      setAuditVersion((v) => v + 1);
       setNotice({ kind: "success", text: t("workspace.saved") });
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
@@ -124,7 +124,10 @@ export function WorkspaceSettingsPage() {
           content: (
             <SettingsSection title={t("access.enforceTitle")} hint={t("access.enforceSection")}>
               <AccessEnforcementCard ws={ws} enforce={info.settings.enforceAccessPolicies ?? false} canEdit={canEdit}
-                onChanged={() => void api.workspace(ws).then(setInfo).catch((e: unknown) => setNotice({ kind: "error", text: errorText(e) }))} />
+                onChanged={() => {
+                  setAuditVersion((v) => v + 1);
+                  void api.workspace(ws).then(setInfo).catch((e: unknown) => setNotice({ kind: "error", text: errorText(e) }));
+                }} />
             </SettingsSection>
           ),
         },
@@ -132,7 +135,7 @@ export function WorkspaceSettingsPage() {
           id: "audit", label: t("workspace.audit"),
           content: (
             <SettingsSection title={t("workspace.audit")} hint={t("workspace.auditHint")}>
-              <Card><WorkspaceAudit rows={audit} /></Card>
+              <Card><WorkspaceAudit ws={ws} version={auditVersion} /></Card>
             </SettingsSection>
           ),
         },
