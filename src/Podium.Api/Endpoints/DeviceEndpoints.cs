@@ -87,6 +87,14 @@ public static class DeviceEndpoints
                 return Error(tooSoon ? DeviceTokenErrors.SlowDown : DeviceTokenErrors.Pending);
         }
 
+        // The approval was given under a membership that may be gone by now: it is asked again before the agent exists.
+        if (await Access.MemberAsync(db, device.ApprovedBy!.Value, device.WorkspaceId!.Value, Roles.Viewer, http.RequestAborted) is null)
+        {
+            device.Status = DeviceStatuses.Denied;
+            await db.SaveChangesAsync(http.RequestAborted);
+            return Error(DeviceTokenErrors.Denied);
+        }
+
         var agent = await EnrolAsync(db, device, now, http.RequestAborted);
         device.Status = DeviceStatuses.Consumed;
         var tokens = AgentTokens.Issue(db, config, agent, now);
