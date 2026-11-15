@@ -53,8 +53,10 @@ export function IntegrationsPage() {
       <p className="muted">{t("integrations.intro")}</p>
       {result ? <Notice kind={result === "ok" ? "success" : "error"}>{result === "ok" ? t("integrations.result.ok") : resultText(result, t, tx)}</Notice> : null}
       {error ? <Notice kind="error">{error}</Notice> : null}
-      {!view ? <Spinner /> : !view.available ? <Notice>{t("integrations.unavailable")}</Notice> : (
-        <IntegrationsTable connections={view.connections} ws={ws} admin={admin} onChange={() => void load()} />
+      {view && !view.available ? <Notice>{t("integrations.unavailable")}</Notice> : null}
+      {/* Without Jira the connections stay listed, read-only, so an admin can still disconnect them. */}
+      {!view ? <Spinner /> : !view.available && view.connections.length === 0 ? null : (
+        <IntegrationsTable connections={view.connections} ws={ws} admin={admin} available={view.available} onChange={() => void load()} />
       )}
       {connecting ? <Drawer title={t("integrations.connectTitle")} onClose={() => setConnecting(false)}><IntegrationConnect ws={ws} bare /></Drawer> : null}
     </div>

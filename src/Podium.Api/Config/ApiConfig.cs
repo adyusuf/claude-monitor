@@ -12,6 +12,9 @@ public sealed record ApiConfig
     public required string DatabaseUrl { get; init; }
     public required string PublicOrigin { get; init; }
     public required SmtpSettings Smtp { get; init; }
+
+    /// <summary>How long one mail may take to send before it counts as failed (mails go out inside requests: an invitation run, a test mail).</summary>
+    public TimeSpan MailSendTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public OAuthClient? GitHub { get; init; }
     public OAuthClient? Google { get; init; }
     public required string ArchiveDir { get; init; }

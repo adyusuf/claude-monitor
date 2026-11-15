@@ -11,8 +11,12 @@ public interface IMailer
     Task SendAsync(MailMessageData message, CancellationToken ct);
 }
 
-/// <summary>Plain SMTP with STARTTLS (Gmail / Google Workspace in production, Mailpit in development); the values in force at each send (ADR-0017).</summary>
-public sealed class SmtpMailer(IntegrationSettings settings, ILogger<SmtpMailer> log) : IMailer
+/// <summary>
+/// Plain SMTP with STARTTLS (Gmail / Google Workspace in production, Mailpit in development); the values in force at each send (ADR-0017). A send
+/// that takes longer than <see cref="ApiConfig.MailSendTimeout"/> ends in a <see cref="TimeoutException"/> (SmtpClient's own Timeout applies to
+/// synchronous sends only).
+/// </summary>
+public sealed class SmtpMailer(IntegrationSettings settings, ApiConfig config, ILogger<SmtpMailer> log) : IMailer
 {
     public async Task SendAsync(MailMessageData message, CancellationToken ct)
     {
@@ -25,14 +29,24 @@ public sealed class SmtpMailer(IntegrationSettings settings, ILogger<SmtpMailer>
         }
 
         using var mail = new MailMessage(smtp.From, message.To, message.Subject, message.Body);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(config.MailSendTimeout);
         try
         {
-            await client.SendMailAsync(mail, ct);
+            await client.SendMailAsync(mail, timeout.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // The caller did not cancel: the mail server did not answer in time. Not a cancellation, so a caller that goes on after a failed
+            // mail (an invitation run) does not take it for a shutdown.
+            log.LogError("sending mail failed: {Type} {Subject}", nameof(TimeoutException), message.Subject);
+            throw new TimeoutException("The mail server did not answer in time.");
         }
         catch (SmtpException e)
         {
-            // The recipient is personal data: only the subject is logged.
-            log.LogError(e, "sending mail failed: {Subject}", message.Subject);
+            // The recipient is personal data, and the exception's message carries the server's reply, which repeats it: only the kind of
+            // error and the subject are logged.
+            log.LogError("sending mail failed: {Type} {Subject}", e.GetType().Name, message.Subject);
             throw;
         }
     }

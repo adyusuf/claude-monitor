@@ -30,5 +30,6 @@ export const deServerSettings: Dictionary["serverSettings"] = {
   errors: {
     invalid_setting: "Diese Integration hat keine solche Einstellung.",
     invalid_value: "Dieser Wert ist für diese Einstellung nicht gültig.",
+    tls_required: "Benutzername oder Passwort werden nur mit eingeschaltetem STARTTLS gesendet, außer der Mailserver läuft auf diesem Rechner. Schalten Sie STARTTLS ein oder entfernen Sie sie.",
   },
 };

@@ -9,7 +9,7 @@ namespace Podium.Api.Integrations;
 /// imported spaces, and sprint events. A site that cannot take them (the address is not public https, or Jira refuses) leaves the connection
 /// working on the reconciliation pass alone; nothing here throws for that.
 /// </summary>
-public sealed class WebhookManager(ApiConfig config, JiraApi api, IntegrationTokens tokens, TimeProvider clock)
+public sealed class WebhookManager(ApiConfig config, JiraApi api, IntegrationTokens tokens, TimeProvider clock, ILogger<WebhookManager> log)
 {
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
     public static readonly TimeSpan ExtendWhenLeft = TimeSpan.FromDays(20);
@@ -92,6 +92,12 @@ public sealed class WebhookManager(ApiConfig config, JiraApi api, IntegrationTok
         catch (TrackerException)
         {
             // Jira expires an unextended webhook after 30 days anyway; a failed removal is not worth failing the caller.
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // Not the tracker's doing: a stored token that no longer opens (the integration key was rotated or is missing). Disconnect is the
+            // way out of exactly that, so it must not fail here; the webhooks expire on their own.
+            log.LogWarning("Webhook removal for integration {Connection} failed: {Type}", connection.Id, e.GetType().Name);
         }
     }
 

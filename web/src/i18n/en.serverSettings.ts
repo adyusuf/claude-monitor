@@ -28,5 +28,6 @@ export const enServerSettings = {
   errors: {
     invalid_setting: "This integration does not have that setting.",
     invalid_value: "That value is not valid for this setting.",
+    tls_required: "A user name or password is sent only with STARTTLS on, unless the mail server runs on this machine. Turn STARTTLS on or remove them.",
   },
 };

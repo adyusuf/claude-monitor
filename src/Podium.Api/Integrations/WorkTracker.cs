@@ -18,6 +18,12 @@ public sealed record ExternalContainer(string Id, string Key, string Name, strin
 /// <summary>A sprint. <see cref="State"/> is the tool's word, mapped by the importer.</summary>
 public sealed record ExternalIteration(string Id, string Name, string State, string? Goal, DateOnly? Start, DateOnly? End, string ContainerKey);
 
+/// <summary>
+/// The sprints of a container and whether the listing is whole: false when the tool refused or did not find a board or sprint list (read as
+/// "none"), so a sprint missing from it may be hidden rather than gone.
+/// </summary>
+public sealed record IterationListing(IReadOnlyList<ExternalIteration> Iterations, bool Complete);
+
 /// <summary>An issue. Every text is untrusted; the importer caps and cleans it.</summary>
 public sealed record ExternalItem(
     string Id,
@@ -69,6 +75,9 @@ public interface IWorkTracker
 
     /// <summary>Every sprint of the container's boards, each once.</summary>
     Task<IReadOnlyList<ExternalIteration>> ListIterationsAsync(TrackerContext ctx, string containerKey, CancellationToken ct);
+
+    /// <summary>The same sprints, with whether the listing is whole (the reconciliation pass archives only on a whole one).</summary>
+    Task<IterationListing> ListIterationListingAsync(TrackerContext ctx, string containerKey, CancellationToken ct);
 
     /// <summary>The issues in no open sprint, in the tool's own order.</summary>
     Task<IReadOnlyList<ExternalItem>> ListBacklogAsync(TrackerContext ctx, string containerKey, CancellationToken ct);

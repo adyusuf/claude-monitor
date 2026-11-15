@@ -89,7 +89,7 @@ public sealed class ServerSettingsSaveTests(ApiFactory api) : IAsyncLifetime
     public async Task An_empty_value_removes_the_saved_one_and_a_field_left_out_stays_as_it_is()
     {
         var admin = await ServerAdminKit.AdminAsync(api, "ss-clear");
-        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "mailer", password = Password, host = "mail.example.net" })).EnsureSuccessStatusCode();
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "mailer", password = Password, host = "mail.example.net", tls = "true" })).EnsureSuccessStatusCode();
 
         var cleared = await ServerAdminKit.PutAsync(admin, "smtp", new { user = "" });
 

@@ -22,6 +22,10 @@ public static class ServerSettingsEndpoints
     public const string MailFailed = "mail_failed";
     public const string NoEmail = "no_email";
     public const string SettingsConflict = "settings_conflict";
+    public const string TlsRequired = "tls_required";
+
+    /// <summary>The one host name that is this machine; a mail server here may take a sign-in without STARTTLS (Mailpit in development).</summary>
+    public const string LoopbackName = "localhost";
 
     /// <summary>The longest value in bytes: it is sealed (28 bytes more, base64) into a column of 4000 characters, whatever the characters are.</summary>
     public const int ValueMaxBytes = 2900;
@@ -71,6 +75,8 @@ public static class ServerSettingsEndpoints
             if (!string.IsNullOrEmpty(value) && !Valid(field, value)) return Http.Invalid(name, InvalidValue);
             changes.Add((field, string.IsNullOrEmpty(value) ? null : value));
         }
+
+        if (id == IntegrationIds.Smtp && PlainSignIn(settings, config, changes)) return Http.Invalid(IntegrationCatalog.Tls, TlsRequired);
 
         var me = http.User.UserId();
         if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, req.Code, window: false)) return RemoteChecks.ReauthRefused(http);
@@ -130,7 +136,7 @@ public static class ServerSettingsEndpoints
             await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, user.Language), MailTemplates.Test, user.Email), http.RequestAborted);
         }
         catch (Exception e) when (e is System.Net.Mail.SmtpException or InvalidOperationException or IOException
-                                      or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException)
+                                      or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException or TimeoutException)
         {
             logs.CreateLogger(typeof(ServerSettingsEndpoints)).LogWarning("Test mail failed: {Type}", e.GetType().Name);
             return Http.Invalid("smtp", MailFailed);
@@ -138,6 +144,28 @@ public static class ServerSettingsEndpoints
 
         return Results.NoContent();
     }
+
+    /// <summary>
+    /// Whether this save would leave a user or password for a mail server off this machine with STARTTLS off: the mailer would sign in in clear.
+    /// Judged on the values in force after the save (the environment's, the page's and this request's); a save that touches none of host, tls,
+    /// user and password does not make that combination and is not refused for it.
+    /// </summary>
+    private static bool PlainSignIn(IntegrationSettings settings, ApiConfig config, List<(SettingField Field, string? Value)> changes)
+    {
+        if (!changes.Any(c => c.Field.Name is IntegrationCatalog.Host or IntegrationCatalog.Tls or IntegrationCatalog.User or IntegrationCatalog.Password)) return false;
+        var page = new Dictionary<string, string>(settings.Current.Page, StringComparer.Ordinal);
+        foreach (var (field, value) in changes)
+        {
+            if (value is null) page.Remove(field.Key);
+            else page[field.Key] = value;
+        }
+
+        var smtp = IntegrationSettings.Compose(config, page).Smtp;
+        return !smtp.StartTls && (!string.IsNullOrEmpty(smtp.User) || !string.IsNullOrEmpty(smtp.Password)) && !Loopback(smtp.Host);
+    }
+
+    private static bool Loopback(string host) =>
+        string.Equals(host, LoopbackName, StringComparison.OrdinalIgnoreCase) || (System.Net.IPAddress.TryParse(host, out var ip) && System.Net.IPAddress.IsLoopback(ip));
 
     internal static bool Valid(SettingField field, string value)
     {
