@@ -5,17 +5,12 @@ import { Button, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { AUTO_STARTS_PER_HOUR, CLAUDE_START_ENVIRONMENTS, FIRST_PROMPT_MAX } from "../lib/machineLimits";
 import { versionAtLeast } from "../lib/version";
 import { useCodeGate } from "./useCodeGate";
 
 const MODES: readonly ClaudePermissionMode[] = ["manual", "plan", "acceptEdits"];
 const AUTO_MODES: readonly ClaudeAutoMode[] = ["off", "on_message", "always"];
-/** The longest first prompt the API takes (AgentActionKinds.ClaudeFirstPromptMax). */
-export const FIRST_PROMPT_MAX = 2000;
-/** What the agent starts by itself at most per hour (AgentConfig.ClaudeAutoStartsPerHour): said on the page so nobody is surprised by the cost. */
-export const AUTO_STARTS_PER_HOUR = 3;
-/** The environments Claude may be started in from the web (ADR-0014): the machine's class as an admin set it. */
-const ALLOWED_ENVIRONMENTS = ["dev", "test"];
 
 /** The sessions started from this page that nobody has stopped: a successful start that names a session, with no successful stop of that session after it. */
 export function runningSessions(actions: AgentActionView[]): AgentActionView[] {
@@ -45,7 +40,7 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const [pendingAuto, setPendingAuto] = useState<{ mode: ClaudeAutoMode; project?: string } | null>(null); // an automatic-start change the API asked a code for: the code field retries this one
   const accepting = view.acceptsClaudeControl === true;
   const autoMode: ClaudeAutoMode = view.claudeAutoMode ?? "off";
-  const allowed = view.roleEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.effectiveEnvironment);
+  const allowed = view.roleEnvironment != null && CLAUDE_START_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && CLAUDE_START_ENVIRONMENTS.includes(view.effectiveEnvironment);
   const newEnough = versionAtLeast(agentVersion, config.claudeMinAgentVersion);
   const claudeActions = actions.filter((a) => a.kind === "claude_start" || a.kind === "claude_stop");
   const running = runningSessions(actions);

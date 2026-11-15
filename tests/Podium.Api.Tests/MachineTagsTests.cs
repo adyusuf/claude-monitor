@@ -36,7 +36,7 @@ public sealed class MachineTagsTests(ApiFactory api)
         Assert.Equal(expected, MachineTags.IsPart(text));
 
     [Fact]
-    public void Tags_are_valid_up_to_ten_pairs_and_the_note_refuses_control_characters_but_not_line_breaks()
+    public void Tags_are_valid_up_to_the_maximum_number_of_pairs_and_the_note_refuses_control_characters_but_not_line_breaks()
     {
         Assert.True(MachineTags.IsValid(null));
         Assert.True(MachineTags.IsValid(Enumerable.Range(0, MachineTags.Max).ToDictionary(i => $"k{i}", i => $"v{i}")));

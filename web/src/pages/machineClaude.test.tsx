@@ -7,7 +7,8 @@ import { en } from "../i18n/en";
 import { tr } from "../i18n/tr";
 import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { machine } from "../test/remote-fixtures";
-import { AUTO_STARTS_PER_HOUR, FIRST_PROMPT_MAX, runningSessions } from "./MachineClaude";
+import { AUTO_STARTS_PER_HOUR, FIRST_PROMPT_MAX } from "../lib/machineLimits";
+import { runningSessions } from "./MachineClaude";
 import { MachinePage } from "./MachinePage";
 import { agent } from "./machinesFixture";
 

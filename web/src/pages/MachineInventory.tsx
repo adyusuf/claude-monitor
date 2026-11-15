@@ -5,6 +5,7 @@ import { Button, Notice } from "../components/ui";
 import { config } from "../config";
 import { useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { CLAUDE_START_ENVIRONMENTS } from "../lib/machineLimits";
 import { versionAtLeast } from "../lib/version";
 import { type Ask, InstallPlugin, PluginButtons, SettingForm } from "./InventoryWrites";
 import { useCodeGate } from "./useCodeGate";
@@ -140,9 +141,8 @@ export function MachineInventory({ agentId, detail, owned, agentVersion, onChang
   const [asked, setAsked] = useState(false);
   const shared = detail.inventoryShared === true;
   const view = detail.machine;
-  const environments = ["dev", "test"];
   const canWrite = owned && shared && view.acceptsClaudeControl === true && view.online && versionAtLeast(agentVersion, config.claudeMinAgentVersion)
-    && view.roleEnvironment != null && environments.includes(view.roleEnvironment) && view.effectiveEnvironment != null && environments.includes(view.effectiveEnvironment);
+    && view.roleEnvironment != null && CLAUDE_START_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && CLAUDE_START_ENVIRONMENTS.includes(view.effectiveEnvironment);
   const ask: Ask = async (kind, extra) => {
     setAsked(false);
     if (await writeGate.attempt((code) => api.requestAgentAction(agentId, kind, code, extra).then(() => undefined))) {
