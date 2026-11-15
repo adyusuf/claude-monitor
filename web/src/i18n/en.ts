@@ -286,7 +286,7 @@ export const en = {
     newHint: "A schedule runs an approved job by itself. It stops after three failed runs in a row, never overlaps its own last run, and you can stop it here at any time.",
     noJobs: "A schedule needs an active job without a placeholder in its command.",
   },
-  notFound: { title: "Page not found", home: "Go to projects" },
+  notFound: { title: "Page not found", home: "Go to projects" }, pageError: { title: "This page could not be shown", hint: "Something on it failed to load. Reload the page, or pick another one from the menu.", reload: "Reload the page" },
 };
 
 export type Dictionary = typeof en;

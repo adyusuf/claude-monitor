@@ -7,6 +7,7 @@ import { languages, useI18n, type Language } from "../i18n";
 import { useApprovalQueue } from "../lib/approvalQueue";
 import { usePendingApprovals } from "../lib/pending";
 import { ApprovalBand } from "./ApprovalBand";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { BrandMark, Icon, type IconName } from "./icons";
 
 type Theme = "light" | "dark" | "system";
@@ -135,7 +136,7 @@ export function Layout() {
             queue.drop(id);
             queue.reload();
           }} /> : null}
-          <Outlet />
+          <ErrorBoundary path={path}><Outlet /></ErrorBoundary>
         </div>
       </div>
     </div>

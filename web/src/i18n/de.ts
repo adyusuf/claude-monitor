@@ -287,5 +287,5 @@ export const de: Dictionary = {
     newHint: "Ein Zeitplan führt einen freigegebenen Auftrag von selbst aus. Er stoppt nach drei fehlgeschlagenen Ausführungen hintereinander, überschneidet sich nie mit seiner letzten Ausführung, und Sie können ihn hier jederzeit stoppen.",
     noJobs: "Ein Zeitplan braucht einen aktiven Auftrag ohne Platzhalter im Befehl.",
   },
-  notFound: { title: "Seite nicht gefunden", home: "Zu den Sitzungen" },
+  notFound: { title: "Seite nicht gefunden", home: "Zu den Sitzungen" }, pageError: { title: "Diese Seite konnte nicht angezeigt werden", hint: "Etwas auf ihr ließ sich nicht laden. Laden Sie die Seite neu oder wählen Sie eine andere im Menü.", reload: "Seite neu laden" },
 };

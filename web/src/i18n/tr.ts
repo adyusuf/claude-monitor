@@ -287,5 +287,5 @@ export const tr: Dictionary = {
     newHint: "Bir zamanlama onaylı bir işi kendi kendine çalıştırır. Üst üste üç başarısız çalıştırmadan sonra durur, kendi son çalıştırmasıyla çakışmaz ve burada istediğiniz an durdurabilirsiniz.",
     noJobs: "Bir zamanlama için komutunda yer tutucu olmayan etkin bir iş gerekir.",
   },
-  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" },
+  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" }, pageError: { title: "Bu sayfa gösterilemedi", hint: "Sayfadaki bir şey yüklenemedi. Sayfayı yenileyin ya da menüden başka bir sayfa seçin.", reload: "Sayfayı yenile" },
 };
