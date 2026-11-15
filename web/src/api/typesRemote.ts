@@ -1,5 +1,5 @@
 // Remote work (ADR-0005, ADR-0010): runs and their output, grants, jobs, the remote settings, schedules and approval keys.
-// Type-only; re-exported from types.ts.
+// Types, and the code lists the API sends; re-exported from types.ts.
 
 export type RunStatus =
   | "pending_approval" | "approved" | "delivered" | "running" | "succeeded" | "failed" | "timed_out" | "denied" | "expired" | "cancelled";
@@ -121,6 +121,9 @@ export interface WebJobView {
 }
 
 export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number; scriptOutputMaxBytes?: number; remoteSchedulesEnabled?: boolean }
+
+/** Why a schedule stopped (ScheduleReasons in src/Podium.Contracts/ScheduleProtocol.cs); each has a text in every language. Only grows, like the contracts. */
+export const SCHEDULE_REASONS = ["owner", "failures", "strict", "exec_level", "job_retired", "disabled", "target_gone", "approvals"] as const;
 
 /** ADR-0010 §3: an approved job run on a schedule by the API. */
 export interface ScheduleView {

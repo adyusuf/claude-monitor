@@ -281,7 +281,7 @@ export const en = {
     enabledHint: "Lets an owner run an approved job again and again by itself, on a machine that is not production or a database. Off by default; switching it off stops every tick.",
     every: "every {n} minutes", daily: "every day at {time} UTC", next: "Next run", last: "Last run", failures: "Failed in a row", why: "Why it stopped",
     status: { active: "Running by itself", paused: "Paused", ended: "Ended" },
-    reason: { owner: "The owner stopped it", failures: "Three runs in a row failed", strict: "The machine became production or a database", exec_level: "The machine no longer allows commands", job_retired: "The job was retired", disabled: "Schedules were switched off", target_gone: "The machine or its owner is gone" },
+    reason: { owner: "The owner stopped it", failures: "Three runs in a row failed", strict: "The machine became production or a database", exec_level: "The machine no longer allows commands", job_retired: "The job was retired", disabled: "Schedules were switched off", target_gone: "The machine or its owner is gone", approvals: "The machine now requires signed approvals" },
     pause: "Pause", resume: "Start again", end: "End", create: "Start the schedule", job: "Job", kind: "Repeats", kindInterval: "Every some minutes", kindDaily: "Once a day", minutes: "Minutes between runs (15 to 10080)", timeUtc: "Time of day (UTC, HH:MM)",
     newHint: "A schedule runs an approved job by itself. It stops after three failed runs in a row, never overlaps its own last run, and you can stop it here at any time.",
     noJobs: "A schedule needs an active job without a placeholder in its command.",

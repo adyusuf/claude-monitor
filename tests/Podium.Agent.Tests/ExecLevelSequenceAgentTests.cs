@@ -111,4 +111,23 @@ public sealed class ExecLevelSequenceAgentTests : ExecLevelAgentFixture
         Assert.Equal(new ExecLevelReport(1, ExecLevelStates.Applied), ExecLevelChanges.Reported(Store, NewLogin));
         Assert.Null(ExecLevelChanges.Reported(Store, Agent));
     }
+
+    [Fact]
+    public void A_failure_saving_the_level_leaves_the_sequence_unrecorded_is_logged_and_the_next_pass_applies_it()
+    {
+        SaveIdentity(Agent, ExecLevels.Shell);
+        var blocker = Home.Config.IdentityPath + ".tmp";
+        Directory.CreateDirectory(blocker); // agent.json cannot be written: the file it is written through is a folder
+        var change = Bare(ExecLevels.Off, 1);
+
+        Assert.False(Handle(change));
+        Assert.Equal(ExecLevels.Shell, LevelOnDisk());
+        Assert.Null(ExecLevelChanges.Reported(Store, Agent));
+        Assert.Contains("exec level change failed (", File.ReadAllText(Home.Config.LogPath), StringComparison.Ordinal);
+
+        Directory.Delete(blocker);
+        Assert.True(Handle(change));
+        Assert.Equal(ExecLevels.Off, LevelOnDisk());
+        Assert.Equal(new ExecLevelReport(1, ExecLevelStates.Applied), ExecLevelChanges.Reported(Store, Agent));
+    }
 }

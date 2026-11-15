@@ -31,6 +31,7 @@ public sealed class MachineTagsTests(ApiFactory api)
     [InlineData("has space", false)]
     [InlineData("a=b", false)]
     [InlineData("\u00fcn\u00ef", false)]
+    [InlineData("a\n", false)]
     public void A_tag_part_is_one_to_thirty_two_safe_ascii_characters(string text, bool expected) =>
         Assert.Equal(expected, MachineTags.IsPart(text));
 
@@ -42,6 +43,7 @@ public sealed class MachineTagsTests(ApiFactory api)
         Assert.False(MachineTags.IsValid(Enumerable.Range(0, MachineTags.Max + 1).ToDictionary(i => $"k{i}", i => $"v{i}")));
         Assert.False(MachineTags.IsValid(new Dictionary<string, string> { ["ok"] = "no way" }));
         Assert.False(MachineTags.IsValid(new Dictionary<string, string> { [new string('k', 33)] = "v" }));
+        Assert.False(MachineTags.IsValid(new Dictionary<string, string> { ["env"] = "prod\n" }));
         Assert.True(MachineTags.IsNote("line one\nline two\ttabbed"));
         Assert.False(MachineTags.IsNote("bell\a"));
         Assert.False(MachineTags.IsNote(new string('x', MachineTags.NoteMax + 1)));
