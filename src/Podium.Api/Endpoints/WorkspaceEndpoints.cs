@@ -176,6 +176,7 @@ public static class WorkspaceEndpoints
         await db.SaveChangesAsync(http.RequestAborted);
         var notices = new List<Action>();
         await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices, agents);
+        await Integrations.IntegrationMembers.ForRemovedMemberAsync(db, id, userId, now, http.RequestAborted);
         await tx.CommitAsync(http.RequestAborted);
         notices.ForEach(n => n());
         foreach (var agentId in agents) broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));
