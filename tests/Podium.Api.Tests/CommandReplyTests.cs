@@ -132,6 +132,8 @@ public sealed class CommandReplyTests(ApiFactory api)
         var t0 = api.Clock.GetUtcNow();
         // More assistant messages than one scan reads (ReplyScanMax, 500) between the two commands, in two batches (a batch holds 500).
         var chatter = Enumerable.Range(1, 501).Select(i => Line(s.External, Text($"message {i}"), t0.AddSeconds(i))).ToArray();
+        // The messages are dated in the past of the server's clock: a message dated beyond the allowed clock skew counts as now (F-130).
+        api.Clock.Advance(TimeSpan.FromSeconds(510));
         await SendAsync(s, chatter[..250]);
         await SendAsync(s, chatter[250..]);
 

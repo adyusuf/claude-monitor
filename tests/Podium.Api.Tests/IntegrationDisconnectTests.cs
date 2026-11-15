@@ -36,7 +36,7 @@ public sealed class IntegrationDisconnectTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task A_removal_that_fails_for_a_reason_that_is_not_the_tracker_s_is_logged_by_its_type_only_and_does_not_reach_the_caller()
+    public async Task A_removal_with_a_token_that_cannot_be_opened_asks_for_a_new_sign_in_and_neither_reaches_the_caller_nor_logs_the_token()
     {
         var w = await JiraKit.ConnectedAsync(api);
         await using (var db = api.Db())
@@ -54,9 +54,9 @@ public sealed class IntegrationDisconnectTests(ApiFactory api)
 
         await webhooks.TryRemoveAsync(connection, CancellationToken.None);
 
-        var line = Assert.Single(log.Entries);
-        Assert.Equal(LogLevel.Warning, line.Level);
-        Assert.Contains(nameof(CryptographicException), line.Text, StringComparison.Ordinal);
-        Assert.Contains(w.ConnectionId.ToString(), line.Text, StringComparison.Ordinal);
+        // Since F-072 an unopenable token is a normal outcome (sign in again): the account is marked, the removal ends quietly, and nothing but a type name could be logged.
+        await using var after = api.Db();
+        Assert.All(await after.IntegrationAccounts.Where(a => a.ConnectionId == w.ConnectionId).ToListAsync(), a => Assert.Equal(AccountStatuses.Reauthorize, a.Status));
+        Assert.All(log.Entries, line => Assert.DoesNotContain("AAAA", line.Text, StringComparison.Ordinal));
     }
 }
