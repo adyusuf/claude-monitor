@@ -28,3 +28,18 @@ describe("integrations in the frame and the routes", () => {
     expect(await findSite("acme.atlassian.net")).toBeInTheDocument();
   });
 });
+
+describe("the landing page after a failed Atlassian round trip", () => {
+  it("forwards the result code to the integrations page of the first workspace, where it is shown", async () => {
+    serveIntegrations();
+    renderAt("/?result=invalid_state", [{ path: "*", element: <App /> }]);
+    expect(await screen.findByText("That sign-in has expired. Start again.")).toBeInTheDocument();
+    expect(await findSite("acme.atlassian.net")).toBeInTheDocument();
+  });
+
+  it("still goes to the projects of the first workspace without a result code", async () => {
+    serveIntegrations({ "GET /workspaces/w1/projects": { body: [] } });
+    renderAt("/", [{ path: "*", element: <App /> }]);
+    expect(await screen.findByRole("heading", { level: 1, name: "Projects" })).toBeInTheDocument();
+  });
+});
