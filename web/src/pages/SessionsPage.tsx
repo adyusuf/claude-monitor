@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ApiError } from "../api/client";
 import { api } from "../api/endpoints";
@@ -7,7 +7,7 @@ import { useSession } from "../auth/session";
 import { Button, Empty, Notice, Spinner } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
-import { debounce, useLive } from "../lib/live";
+import { useLive } from "../lib/live";
 import { SessionList } from "./SessionList";
 
 const FILTERS: (SessionStatus | "")[] = ["", "active", "waiting", "idle", "ended"];
@@ -33,9 +33,22 @@ export function SessionsPage() {
   const [error, setError] = useState<unknown>(null);
   const [now, setNow] = useState(() => Date.now());
 
-  const load = useCallback(async () => {
+  // How many pages the reader has: a reload (a live event, a change made here) reads as many again, so "Load more" is not undone.
+  const pages = useRef(1);
+
+  const load = useCallback(async (keep = false) => {
+    if (!keep) pages.current = 1;
+    const read = async () => {
+      let page = await api.sessions(ws, { q: query, status, limit: config.pageSize });
+      let items = page.items;
+      for (let i = 1; i < pages.current && page.next; i++) {
+        page = await api.sessions(ws, { q: query, status, cursor: page.next, limit: config.pageSize });
+        items = [...items, ...page.items];
+      }
+      return { items, next: page.next };
+    };
     try {
-      const [page, views, list] = await Promise.all([api.sessions(ws, { q: query, status, limit: config.pageSize }), orNone(api.machines(ws)), orNone(api.agents(ws))]);
+      const [page, views, list] = await Promise.all([read(), orNone(api.machines(ws)), orNone(api.agents(ws))]);
       setRows(page.items);
       setMachines(views);
       setAgents(list.filter((a) => a.status === "active"));
@@ -57,7 +70,12 @@ export function SessionsPage() {
   }, []);
 
   const filtered = query.trim() !== "" || status !== "";
-  const reload = useMemo(() => debounce(() => void load()), [load]);
+  // One reload after a burst of live messages, keeping the pages the reader has (as `debounce` does; written out because it reads the page count).
+  const pause = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const reload = useCallback(() => {
+    clearTimeout(pause.current);
+    pause.current = setTimeout(() => void load(true), config.liveDebounceMs);
+  }, [load]);
   const live = useLive(ws, reload);
 
   const more = async () => {
@@ -65,6 +83,7 @@ export function SessionsPage() {
     const page = await api.sessions(ws, { q: query, status, cursor: next, limit: config.pageSize });
     setRows((r) => [...(r ?? []), ...page.items]);
     setNext(page.next);
+    pages.current++;
   };
 
   return (
@@ -90,7 +109,7 @@ export function SessionsPage() {
           : <Empty title={t("sessions.empty")} hint={t("sessions.emptyHint")}><Link className="btn btn-primary" to="/download">{t("nav.download")}</Link></Empty>
       ) : (
         <SessionList ws={ws} rows={rows} machines={machines} withEmpty={!filtered} agents={agents} userId={me?.id} now={now} complete={next === null}
-          onChanged={() => void load()} />
+          onChanged={() => void load(true)} />
       )}
       {next ? <div className="more"><Button variant="ghost" onClick={() => void more()}>{t("sessions.more")}</Button></div> : null}
     </div>
