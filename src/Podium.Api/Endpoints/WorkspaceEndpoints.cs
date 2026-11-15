@@ -57,13 +57,16 @@ public static class WorkspaceEndpoints
         return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, View(s)));
     }
 
-    private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db)
+    private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db, TimeProvider clock)
     {
-        if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
+        var userId = http.User.UserId();
+        if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         if (!Http.IsName(req.Name)) return Http.Invalid("name", "invalid_name");
         var workspace = await db.Workspaces.FirstAsync(w => w.Id == id, http.RequestAborted);
+        var before = workspace.Name;
         workspace.Name = req.Name!.Trim();
         workspace.NameSearch = SearchText.Normalize(workspace.Name);
+        Audit.Add(db, http, clock, AuditActions.WorkspaceRenamed, id, userId, detail: new { before, after = workspace.Name });
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
@@ -173,6 +176,9 @@ public static class WorkspaceEndpoints
         target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
+        // Their project roles go with them, so an invitation back starts from the workspace role alone.
+        await db.ProjectMembers.Where(m => m.UserId == userId && db.Projects.Any(p => p.Id == m.ProjectId && p.WorkspaceId == id))
+            .ExecuteDeleteAsync(http.RequestAborted);
         await db.SaveChangesAsync(http.RequestAborted);
         var notices = new List<Action>();
         await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices, agents);

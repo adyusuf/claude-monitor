@@ -41,13 +41,16 @@ public sealed class Archiver(IServiceScopeFactory scopes, ApiConfig config, Time
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    /// <summary>Archives every complete workspace-day that is past retention. Returns how many files it wrote.</summary>
+    /// <summary>
+    /// Archives every complete workspace-day that is past retention. Returns how many files it wrote. A workspace that fails (a day file
+    /// that cannot be written) does not stop the others; the failures are thrown together at the end (<see cref="Chores"/>).
+    /// </summary>
     public static async Task<int> RunOnceAsync(PodiumDb db, string archiveDir, DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         var written = 0;
         var settings = await db.WorkspaceSettings.AsNoTracking().ToListAsync(ct);
-        foreach (var s in settings)
+        await Chores.RunAsync(db, ct, [.. settings.Select(s => (Func<Task>)(async () =>
         {
             var cutoff = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero).AddDays(-s.RetentionDays);
             while (true)
@@ -60,7 +63,7 @@ public sealed class Archiver(IServiceScopeFactory scopes, ApiConfig config, Time
                 await ArchiveDayAsync(db, archiveDir, s.WorkspaceId, day, now, ct);
                 written++;
             }
-        }
+        }))]);
 
         return written;
     }

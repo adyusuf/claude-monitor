@@ -37,6 +37,20 @@ public sealed class WorkspaceAuditRowsTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task Renaming_a_workspace_writes_a_workspace_renamed_row_with_before_and_after()
+    {
+        var owner = await api.NewClient().SignedUpAsync("aud-rename");
+        var before = (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}")).GetProperty("name").GetString();
+        (await owner.SendAsync(HttpMethod.Patch, $"/api/workspaces/{owner.WorkspaceId}", new { name = "Renamed Team" })).EnsureSuccessStatusCode();
+
+        var row = await RowAsync(owner, owner.WorkspaceId, AuditActions.WorkspaceRenamed);
+
+        var detail = row.GetProperty("detail");
+        Assert.Equal((owner.Id, before, "Renamed Team"),
+            (row.GetProperty("actorUserId").GetGuid(), detail.GetProperty("before").GetString(), detail.GetProperty("after").GetString()));
+    }
+
+    [Fact]
     public async Task Inviting_writes_an_invitation_created_row_with_the_invited_role()
     {
         var owner = await api.NewClient().SignedUpAsync("aud-inv-owner");
