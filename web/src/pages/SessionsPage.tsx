@@ -35,8 +35,11 @@ export function SessionsPage() {
 
   // How many pages the reader has: a reload (a live event, a change made here) reads as many again, so "Load more" is not undone.
   const pages = useRef(1);
+  // Which read is the newest: the answer of an older one (a slow reply for text the reader has since changed) is dropped, never shown.
+  const latest = useRef(0);
 
   const load = useCallback(async (keep = false) => {
+    const mine = ++latest.current;
     if (!keep) pages.current = 1;
     const read = async () => {
       let page = await api.sessions(ws, { q: query, status, limit: config.pageSize });
@@ -49,13 +52,14 @@ export function SessionsPage() {
     };
     try {
       const [page, views, list] = await Promise.all([read(), orNone(api.machines(ws)), orNone(api.agents(ws))]);
+      if (mine !== latest.current) return;
       setRows(page.items);
       setMachines(views);
       setAgents(list.filter((a) => a.status === "active"));
       setNext(page.next);
       setError(null);
     } catch (e) {
-      setError(e);
+      if (mine === latest.current) setError(e);
     }
   }, [ws, query, status]);
 
@@ -80,10 +84,16 @@ export function SessionsPage() {
 
   const more = async () => {
     if (!next) return;
-    const page = await api.sessions(ws, { q: query, status, cursor: next, limit: config.pageSize });
-    setRows((r) => [...(r ?? []), ...page.items]);
-    setNext(page.next);
-    pages.current++;
+    const issued = latest.current;
+    try {
+      const page = await api.sessions(ws, { q: query, status, cursor: next, limit: config.pageSize });
+      if (issued !== latest.current) return; // a newer read replaced the list this page belongs to
+      setRows((r) => [...(r ?? []), ...page.items]);
+      setNext(page.next);
+      pages.current++;
+    } catch (e) {
+      setError(e); // the rows already shown stay
+    }
   };
 
   return (
