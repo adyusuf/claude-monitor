@@ -145,20 +145,29 @@ public static class CommandEndpoints
             existing = standing;
         }
 
-        request.Status = PermissionStatuses.Answered;
-        request.Decision = req.Decision;
-        request.Reason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim();
-        request.AnsweredBy = userId;
-        request.AnsweredAt = now;
+        var decision = req.Decision!;
+        var reason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim();
         Audit.Add(db, http, clock, AuditActions.PermissionAnswered, request.WorkspaceId, userId, targetType: "permission_request",
-            targetId: id, detail: new { request.Decision, request.ToolName });
+            targetId: id, detail: new { Decision = decision, request.ToolName });
         // The answer, a new rule or the change to an existing one, and their audit rows are saved together or not at all: an answer that is
-        // not saved stays open (the owner can answer again), and one that is saved always reaches the agent below.
+        // not saved stays open (the owner can answer again), and one that is saved always reaches the agent below. The answer itself is a
+        // compare-and-set on a request still open and not expired: of two answers at once (the band, the approvals page and the session page
+        // show the same request), the database lets one through and the other saves nothing, sends nothing and gets 409.
         for (var attempt = 0; ; attempt++)
         {
             await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
             try
             {
+                var answered = await db.PermissionRequests
+                    .Where(p => p.Id == id && p.Status == PermissionStatuses.Open && p.ExpiresAt > now)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Answered).SetProperty(p => p.Decision, decision)
+                        .SetProperty(p => p.Reason, reason).SetProperty(p => p.AnsweredBy, userId).SetProperty(p => p.AnsweredAt, now), http.RequestAborted);
+                if (answered != 1)
+                {
+                    await tx.RollbackAsync(http.RequestAborted);
+                    return Results.Conflict();
+                }
+
                 if (ask is not null && existing is { } ruleId && await ApprovalRuleCreation.StandLongerAsync(db, ruleId, ask, http.RequestAborted))
                 {
                     ApprovalRuleCreation.AuditRule(db, http, clock, ask, ruleId);
@@ -187,8 +196,8 @@ public static class CommandEndpoints
         }
 
         broker.Publish(Broker.Agent(request.AgentId), new StreamMessage(AgentStreamEvents.PermissionAnswer,
-            new PermissionAnswerMessage(id, found.Session.ExternalId, request.Decision!, request.Reason, req.Answers)));
-        broker.Publish(Broker.Workspace(request.WorkspaceId), new StreamMessage("permission", new { sessionId = request.SessionId, id, status = request.Status }));
+            new PermissionAnswerMessage(id, found.Session.ExternalId, decision, reason, req.Answers)));
+        broker.Publish(Broker.Workspace(request.WorkspaceId), new StreamMessage("permission", new { sessionId = request.SessionId, id, status = PermissionStatuses.Answered }));
         return Results.NoContent();
     }
 
