@@ -81,6 +81,9 @@ public static class Startup
             o.AddPolicy(AuthEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = config.AuthRequestsPerMinute, Window = TimeSpan.FromMinutes(1) }));
+            o.AddPolicy(DeviceEndpoints.TokenRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = config.DeviceTokenRequestsPerMinute, Window = TimeSpan.FromMinutes(1) }));
         });
         services.AddProblemDetails();
         services.Configure<ForwardedHeadersOptions>(o =>

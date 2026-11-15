@@ -58,24 +58,28 @@ public sealed partial class ApiClient
     private async Task<HttpResponseMessage> SendAsync(Func<HttpRequestMessage> build, CancellationToken ct,
         HttpCompletionOption completion = HttpCompletionOption.ResponseContentRead)
     {
-        var response = await SendOnceAsync(build, completion, ct);
-        if (response.StatusCode != HttpStatusCode.Unauthorized || !await RefreshAsync(ct)) return response;
+        var sent = credentials.Read(Credentials.Access);
+        var response = await SendOnceAsync(build, sent, completion, ct);
+        if (response.StatusCode != HttpStatusCode.Unauthorized || !await RefreshAsync(sent, ct)) return response;
         response.Dispose();
-        return await SendOnceAsync(build, completion, ct);
+        return await SendOnceAsync(build, credentials.Read(Credentials.Access), completion, ct);
     }
 
-    private async Task<HttpResponseMessage> SendOnceAsync(Func<HttpRequestMessage> build, HttpCompletionOption completion, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendOnceAsync(Func<HttpRequestMessage> build, string? access, HttpCompletionOption completion, CancellationToken ct)
     {
         using var request = build();
-        if (credentials.Read(Credentials.Access) is { } access) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access);
+        if (access is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access);
         return await http.SendAsync(request, completion, ct);
     }
 
-    private async Task<bool> RefreshAsync(CancellationToken ct)
+    /// <summary>Refreshes the tokens after a 401 on <paramref name="refused"/>. A call that waited for the lock while another one
+    /// refreshed finds a different access token stored and uses that one instead of spending a second refresh token.</summary>
+    private async Task<bool> RefreshAsync(string? refused, CancellationToken ct)
     {
         await refreshing.WaitAsync(ct);
         try
         {
+            if (credentials.Read(Credentials.Access) is { } current && current != refused) return true;
             if (credentials.Read(Credentials.Refresh) is not { } refresh) return Fail(NoRefreshToken);
             using var response = await http.PostAsJsonAsync("api/agent/token/refresh", new RefreshRequest(refresh), Json, ct);
             if (!response.IsSuccessStatusCode)

@@ -7,13 +7,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.Background;
 
 /// <summary>
-/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, and keep the
+/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens and device codes, and keep the
 /// monthly partitions of session_events created ahead of need (the default partition catches anything else).
 /// </summary>
 public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock, ILogger<Housekeeper> log) : BackgroundService
 {
     public static readonly TimeSpan Every = TimeSpan.FromMinutes(1);
     public const int MonthsAhead = 2;
+
+    /// <summary>How long an ended agent token or device code is kept (for the log of what happened) before it is deleted.</summary>
+    public static readonly TimeSpan KeepEndedCredentials = TimeSpan.FromDays(7);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -50,6 +53,7 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
         ArgumentNullException.ThrowIfNull(db);
         // An approval rule holds a command the session ran: a week after it ended (revoked or expired) it is gone (ADR-0019).
         var ruleCutoff = now - ApprovalRuleLimits.KeepEnded;
+        var credentialCutoff = now - KeepEndedCredentials;
         await Chores.RunAsync(db, ct,
             () => SessionExpiry.CommandsAsync(db, now, broker, ct),
             () => SessionExpiry.PermissionsAsync(db, now, broker, ct),
@@ -58,6 +62,11 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
             () => db.DeviceAuthorizations
                 .Where(d => (d.Status == DeviceStatuses.Pending || d.Status == DeviceStatuses.Approved) && d.ExpiresAt <= now)
                 .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, DeviceStatuses.Expired), ct),
+            // Agent tokens and device codes are kept a while after they end, then deleted; a replaced refresh token ends with its expiry,
+            // so a copied one is still recognised as a reuse for as long as it could have worked.
+            () => db.AgentTokens.Where(t => t.ExpiresAt <= credentialCutoff || (t.RevokedAt != null && t.RevokedAt <= credentialCutoff))
+                .ExecuteDeleteAsync(ct),
+            () => db.DeviceAuthorizations.Where(d => d.ExpiresAt <= credentialCutoff).ExecuteDeleteAsync(ct),
             () => EnsurePartitionsAsync(db, now, ct));
     }
 
