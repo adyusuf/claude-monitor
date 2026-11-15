@@ -139,7 +139,8 @@ public static class IntegrationImportEndpoints
             person.EmailNormalized = SearchText.Email(email);
         }
 
-        Audit.Add(db, http, clock, AuditActions.IntegrationPersonLinked, connection.WorkspaceId, me, targetType: "integration_person", targetId: personId);
+        Audit.Add(db, http, clock, AuditActions.IntegrationPersonLinked, connection.WorkspaceId, me, targetType: "integration_person", targetId: personId,
+            detail: new { userId = person.UserId });
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }

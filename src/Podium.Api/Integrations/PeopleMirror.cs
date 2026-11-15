@@ -54,7 +54,13 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
                 row.EmailNormalized = SearchText.Email(p.Email);
             }
 
-            if (row.UserId is null && row.EmailNormalized is { } normalized && members.TryGetValue(normalized, out var user) && linked.Add(user)) row.UserId = user;
+            if (row.UserId is null && row.EmailNormalized is { } normalized && members.TryGetValue(normalized, out var user) && linked.Add(user))
+            {
+                row.UserId = user;
+                // Matched by an address the tool supplied, without anyone confirming: audited, so an admin can see and undo it (F-070).
+                Audit.Add(db, null, clock, AuditActions.IntegrationPersonLinked, connection.WorkspaceId, connection.ConnectorUserId, targetType: "integration_person",
+                    targetId: row.Id, detail: new { userId = user, automatic = true });
+            }
         }
 
         await db.SaveChangesAsync(ct);

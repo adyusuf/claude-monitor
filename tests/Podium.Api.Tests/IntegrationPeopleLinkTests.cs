@@ -45,6 +45,13 @@ public sealed class IntegrationPeopleLinkTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { unlink = true })).StatusCode);
 
         Assert.Null(await UserOfAsync(hidden));
+        // Each change is audited with the member it now stands for (F-070): the link with the member's id, the unlink with none.
+        await using var db = api.Db();
+        var audit = await db.AuditEvents.AsNoTracking().Where(a => a.Action == "integration.person_linked" && a.TargetId == hidden.ToString())
+            .OrderBy(a => a.Id).ToListAsync();
+        var users = audit.Select(a => a.Detail?.RootElement.TryGetProperty("userId", out var u) == true ? u.ToString() : "absent").ToList();
+        Assert.Equal(member.Id.ToString(), users[0]);
+        Assert.Equal("", users[^1]); // JSON null
     }
 
     [Fact]
