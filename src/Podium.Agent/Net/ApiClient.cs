@@ -62,8 +62,10 @@ public sealed partial class ApiClient(HttpClient http, ICredentialStore credenti
     public void SaveTokens(TokenResponse tokens)
     {
         ArgumentNullException.ThrowIfNull(tokens);
-        credentials.Write(Credentials.Access, tokens.AccessToken);
+        // The refresh token first: the server already replaced the old one, so a stop between the two writes must leave the new one
+        // (an old access token costs one more refresh; an old refresh token would be judged a reuse and revoke the agent).
         credentials.Write(Credentials.Refresh, tokens.RefreshToken);
+        credentials.Write(Credentials.Access, tokens.AccessToken);
         Disconnected = false;
         DisconnectReason = null;
     }
