@@ -76,6 +76,7 @@ public static class SprintIssueEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.Status is null || !IssueStatuses.All.Contains(req.Status)) return Http.Invalid("status", "invalid_value");
         // A closed sprint is read-only (the sprint page shows it so): what stayed in it keeps its status.

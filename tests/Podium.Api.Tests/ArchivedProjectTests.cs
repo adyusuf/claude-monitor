@@ -33,6 +33,7 @@ public sealed class ArchivedProjectTests(ApiFactory api)
         {
             (HttpMethod.Put, $"/api/issues/{issue}", new { title = "Changed" }),
             (HttpMethod.Put, $"/api/issues/{issue}/position", new { afterIssueId = other }),
+            (HttpMethod.Put, $"/api/issues/{issue}/status", new { status = "done" }),
             (HttpMethod.Delete, $"/api/issues/{issue}", null),
             (HttpMethod.Post, $"/api/issues/{shelved}/restore", null),
             (HttpMethod.Post, $"/api/issues/{other}/links", new { kind = "blocks", otherIssueId = shelved }),
