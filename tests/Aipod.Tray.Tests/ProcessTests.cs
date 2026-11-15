@@ -112,6 +112,20 @@ public sealed class AutostartTests
         Assert.Equal(Path.Combine("/Users/x", "Library", "LaunchAgents", "aipod.tray.plist"), Autostart.PlistPath("/Users/x"));
     }
 
+    [Theory]
+    [InlineData("tr", "oturum açıldığında")]
+    [InlineData("de", "bei der Anmeldung")]
+    public void The_autostart_sentences_come_in_the_persons_language(string language, string expected)
+    {
+        using var scope = Strings.Scope(language);
+        var target = new FakeTarget();
+
+        Assert.Contains(expected, Autostart.Enable(target, "/t/aipod-tray", "/Users/x", AutostartOs.MacOs), StringComparison.Ordinal);
+        Assert.Contains(expected, Autostart.Enable(target, @"C:\t\aipod-tray.exe", "/Users/x", AutostartOs.Windows), StringComparison.Ordinal);
+        Assert.DoesNotContain("starts at login", Autostart.Disable(target, "/Users/x", AutostartOs.MacOs), StringComparison.Ordinal);
+        Assert.DoesNotContain("macOS only", Autostart.Enable(target, "/t", "/Users/x", AutostartOs.Other), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Each_system_gets_its_own_way_and_other_systems_get_a_sentence_and_no_write()
     {

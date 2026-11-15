@@ -1,5 +1,6 @@
 using System.Security;
 using System.Text;
+using Podium.Agent.Config;
 
 namespace Aipod.Tray;
 
@@ -60,16 +61,16 @@ public static class Autostart
         if ((os ?? Current) == AutostartOs.MacOs)
         {
             target.WriteFile(PlistPath(userHome), Plist(tray));
-            return $"The tray starts at login ({PlistPath(userHome)}).";
+            return Strings.T(Msg.TrayAutostartOn, PlistPath(userHome));
         }
 
         if ((os ?? Current) == AutostartOs.Windows)
         {
             target.SetRunValue(RunValueName, $"\"{tray}\"");
-            return "The tray starts at login (HKCU Run).";
+            return Strings.T(Msg.TrayAutostartOnRun);
         }
 
-        return "Starting at login is set up for Windows and macOS only.";
+        return Strings.T(Msg.TrayAutostartOnlyWinMac);
     }
 
     public static string Disable(IAutostartTarget target, string userHome, AutostartOs? os = null)
@@ -78,16 +79,16 @@ public static class Autostart
         if ((os ?? Current) == AutostartOs.MacOs)
         {
             target.DeleteFile(PlistPath(userHome));
-            return "The tray no longer starts at login.";
+            return Strings.T(Msg.TrayAutostartOff);
         }
 
         if ((os ?? Current) == AutostartOs.Windows)
         {
             target.DeleteRunValue(RunValueName);
-            return "The tray no longer starts at login.";
+            return Strings.T(Msg.TrayAutostartOff);
         }
 
-        return "Starting at login is set up for Windows and macOS only.";
+        return Strings.T(Msg.TrayAutostartOnlyWinMac);
     }
 }
 
