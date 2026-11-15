@@ -18,6 +18,7 @@ export const trApprovalRules: Dictionary["approvalRules"] = {
   questionOnSession: "Bir soru: oturum sayfasında cevapla.", openSession: "Oturumu aç",
   allow: "İzin ver", deny: "Reddet", reason: "Gerekçe (isteğe bağlı)",
   ends: "Bitiş", never: "geri alınana kadar", uses: "Kullanım", lastUsed: "Son kullanım", neverUsed: "hiç", revoke: "Geri al", revokeConfirm: "Bu geçerli onay geri alınsın mı? Bir sonraki istek yine sorulur.",
+  endedOnDevice: "bu cihazın saatine göre süre doldu",
   answeredBy: "Cevaplayan", byRule: "geçerli bir onay", decision: { allow: "İzin verildi", deny: "Reddedildi" }, when: "Zaman",
   anyInput: "her girdi",
   moreLine: "+1 satır daha", moreLines: "+{n} satır daha",

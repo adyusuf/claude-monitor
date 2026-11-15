@@ -15,6 +15,7 @@ export const enApprovalRules = {
   questionOnSession: "A question: answer it on the session page.", openSession: "Open the session",
   allow: "Allow", deny: "Deny", reason: "Reason (optional)",
   ends: "Ends", never: "until revoked", uses: "Used", lastUsed: "Last used", neverUsed: "never", revoke: "Revoke", revokeConfirm: "Revoke this standing approval? The next request asks again.",
+  endedOnDevice: "time passed on this device",
   answeredBy: "Answered by", byRule: "a standing approval", decision: { allow: "Allowed", deny: "Denied" }, when: "When",
   anyInput: "any input",
   moreLine: "+1 more line", moreLines: "+{n} more lines",
