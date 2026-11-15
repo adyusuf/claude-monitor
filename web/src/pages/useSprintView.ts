@@ -3,7 +3,7 @@ import { api } from "../api/endpoints";
 import type { IssueSummary } from "../api/typesIssues";
 import type { SprintView } from "../api/typesSprints";
 import { config } from "../config";
-import { useErrorText } from "../i18n";
+import { useErrorText, useI18n } from "../i18n";
 
 /**
  * One sprint and its issues, with the way every change goes: do the call, then read the sprint and its issues again so the counts, the sums and
@@ -11,6 +11,7 @@ import { useErrorText } from "../i18n";
  */
 export function useSprintView(sprintId: string, projectId: string) {
   const errorText = useErrorText();
+  const { t } = useI18n();
   const [view, setView] = useState<SprintView | null>(null);
   const [issues, setIssues] = useState<IssueSummary[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
@@ -34,17 +35,21 @@ export function useSprintView(sprintId: string, projectId: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
-  /** Runs a change; true when it went through. `reload: false` is for a change after which the sprint is gone (a deletion). */
+  /**
+   * Runs a change; true when it went through, even if reading the sprint again failed (the change is then saved: a notice says to reload, and a
+   * caller that closes its panel on true must not leave it open for a second try). `reload: false` is for a change after which the sprint is gone (a deletion).
+   */
   const act = async (work: () => Promise<unknown>, reload = true): Promise<boolean> => {
     try {
       setError(null);
       await work();
-      if (reload) await refresh();
-      return true;
     } catch (e) {
       setError(errorText(e));
       return false;
     }
+
+    if (reload) await refresh().catch(() => setError(t("sprints.reloadFailed")));
+    return true;
   };
 
   const more = async () => {

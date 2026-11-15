@@ -7,7 +7,10 @@ export const enServerSettings = {
   names: { smtp: "Email (SMTP)", github: "GitHub sign-in", google: "Google sign-in", jira: "Jira" },
   status: { ready: "Ready", incomplete: "Incomplete", off: "Off" },
   statusLabel: "Status: {status}",
-  notes: { integration_key_missing: "The integration key is missing on the server: Jira cannot keep its tokens until it is set." },
+  notes: {
+    integration_key_missing: "The integration key is missing on the server: Jira cannot keep its tokens until it is set.",
+    jira_connections_exist: "Workspaces are connected with this Jira app. A client id or secret that Atlassian refuses stops every connection until it is fixed here.",
+  },
   fields: {
     host: "Server", port: "Port", user: "User name", password: "Password", from: "Sender address", tls: "Use STARTTLS",
     client_id: "Client ID", client_secret: "Client secret",
@@ -25,5 +28,6 @@ export const enServerSettings = {
   errors: {
     invalid_setting: "This integration does not have that setting.",
     invalid_value: "That value is not valid for this setting.",
+    tls_required: "A user name or password is sent only with STARTTLS on, unless the mail server runs on this machine. Turn STARTTLS on or remove them.",
   },
 };

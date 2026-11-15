@@ -146,6 +146,10 @@ public static class RemoteChecks
         return code is null ? null : Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: RemoteErrors.BadTemplate, detail: code);
     }
 
+    /// <summary>A 400 when the owner's reason holds a NUL (Postgres text cannot store it, so it would end in a 500); the length is the caller's own rule.</summary>
+    public static IResult? ReasonNulProblem(string? reason) =>
+        reason is { } r && r.Contains('\0') ? Http.Invalid("reason", InvalidReason) : null;
+
     public static IResult? ReasonProblem(string? reason, ApiConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);

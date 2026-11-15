@@ -70,7 +70,9 @@ public static class Startup
             .AddScheme<AuthenticationSchemeOptions, SessionAuthHandler>(Schemes.Session, null)
             .AddScheme<AuthenticationSchemeOptions, AgentAuthHandler>(Schemes.Agent, null)
             .AddExternalProviders(config);
+        // Fail-closed (global #6): an endpoint that names no policy needs a signed-in user; the public ones say AllowAnonymous.
         services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(Schemes.Session).RequireAuthenticatedUser().Build())
             .AddPolicy(Schemes.Session, p => p.AddAuthenticationSchemes(Schemes.Session).RequireAuthenticatedUser())
             .AddPolicy(Schemes.Agent, p => p.AddAuthenticationSchemes(Schemes.Agent).RequireAuthenticatedUser());
         services.AddRateLimiter(o =>
@@ -79,6 +81,9 @@ public static class Startup
             o.AddPolicy(AuthEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = config.AuthRequestsPerMinute, Window = TimeSpan.FromMinutes(1) }));
+            o.AddPolicy(DeviceEndpoints.TokenRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = config.DeviceTokenRequestsPerMinute, Window = TimeSpan.FromMinutes(1) }));
         });
         services.AddProblemDetails();
         services.Configure<ForwardedHeadersOptions>(o =>
@@ -96,7 +101,7 @@ public static class Startup
     {
         if (config.TrustProxy) app.UseForwardedHeaders();
         app.UseExceptionHandler();
-        app.Use(SecurityHeaders);
+        app.Use((http, next) => SecurityHeaders(http, next, config.SecureCookies));
         app.Use((http, next) => Csrf(http, next, config));
         var files = config.WebRoot is { Length: > 0 } root && Directory.Exists(root)
             ? new PhysicalFileProvider(Path.GetFullPath(root))
@@ -136,7 +141,7 @@ public static class Startup
             downloadsUrl = config.DownloadsUrl,
             agentVersion = catalog.CurrentVersion,
             agentVersions = catalog.OlderVersions().Select(v => new { version = v.Version, url = v.Url }),
-        }));
+        })).AllowAnonymous();
         AuthEndpoints.Map(api);
         ExternalAuthEndpoints.Map(api);
         MeEndpoints.Map(api);
@@ -181,13 +186,19 @@ public static class Startup
         ServerSettingsEndpoints.Map(api);
         AccessPolicyEndpoints.Map(api);
         AgentAccessEndpoints.Map(api);
-        api.MapFallback(() => Results.NotFound());
+        api.MapFallback(() => Results.NotFound()).AllowAnonymous();
         if (config.DownloadsUrl is { } downloads) DownloadsRedirect.Map(app, downloads);
+        // A path no endpoint answers would meet the fallback policy (401): a missing download stays a 404, and so does any path without a web root.
+        app.Map(DownloadsPath + "/{**rest}", () => Results.NotFound()).AllowAnonymous();
         if (files is not null)
         {
             // The single-page app answers every non-API path; /api/* never falls through to it (global #17).
             app.MapFallbackToFile("{*path:regex(^(?!api/|downloads/).*$)}", "index.html",
-                new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages });
+                new StaticFileOptions { FileProvider = files, OnPrepareResponse = NoCacheForPages }).AllowAnonymous();
+        }
+        else
+        {
+            app.MapFallback("{**path}", () => Results.NotFound()).AllowAnonymous();
         }
     }
 
@@ -225,9 +236,11 @@ public static class Startup
         if (ctx.File.Name.EndsWith(".html", StringComparison.Ordinal)) ctx.Context.Response.Headers.CacheControl = "no-cache";
     }
 
-    private static Task SecurityHeaders(HttpContext http, Func<Task> next)
+    public static Task SecurityHeaders(HttpContext http, Func<Task> next, bool https)
     {
         var h = http.Response.Headers;
+        // Only when the public origin is https (production requires it): a development http origin must not pin its host to https.
+        if (https) h.StrictTransportSecurity = "max-age=31536000";
         h.XContentTypeOptions = "nosniff";
         h.XFrameOptions = "DENY";
         h["Referrer-Policy"] = "same-origin";

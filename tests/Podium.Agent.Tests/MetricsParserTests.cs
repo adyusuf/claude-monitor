@@ -184,11 +184,11 @@ public sealed class MetricsParserTests
     }
 
     [Fact]
-    public void On_a_mac_the_source_gives_plausible_cpu_and_memory_and_a_source_for_another_os_gives_none()
-    {
-        Assert.Null(MetricsSource.For("plan9").Sample(DateTimeOffset.UtcNow));
-        if (!OperatingSystem.IsMacOS()) return;
+    public void A_source_for_another_os_gives_none() => Assert.Null(MetricsSource.For("plan9").Sample(DateTimeOffset.UtcNow));
 
+    [MacOsFact]
+    public void On_a_mac_the_source_gives_plausible_cpu_and_memory()
+    {
         var now = DateTimeOffset.UtcNow;
         var sample = MetricsSource.For(OsKinds.MacOs).Sample(now)!;
         Assert.Equal(now, sample.SampledAt);
@@ -198,10 +198,9 @@ public sealed class MetricsParserTests
         Assert.All(sample.Disks, d => Assert.InRange(d.UsedBytes, 0, d.TotalBytes));
     }
 
-    [Fact]
+    [LinuxFact]
     public void A_linux_source_reads_its_files_and_a_missing_file_gives_no_sample()
     {
-        if (!OperatingSystem.IsLinux()) return;
         using var home = new TempHome();
         var stat = Path.Combine(home.Dir, "stat");
         var mem = Path.Combine(home.Dir, "meminfo");

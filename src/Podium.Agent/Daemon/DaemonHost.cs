@@ -50,7 +50,7 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
         var beat = new Relay(config, beatStore, api, clock);
         var settings = new Relay(config, settingsStore, api, clock);
         Relay stream;
-        var tailer = new TranscriptTailer(config, flushStore, clock);
+        var tailer = new TranscriptTailer(config, flushStore, clock, log);
         using var updateStore = new LocalStore(config.DatabasePath);
         using var remoteStore = new LocalStore(config.DatabasePath);
         using var execStore = new LocalStore(config.DatabasePath);
@@ -111,10 +111,10 @@ public sealed partial class DaemonHost(AgentConfig config, TimeProvider clock, A
             Loop("update", config.UpdatePollEvery, updates.RunAsync, api, revoked),
             Loop("flush", config.FlushEvery, async ct =>
             {
-                tailer.RunOnce();
                 await relay.PermissionsAsync(ct);
                 await relay.UploadAsync(ct);
                 await relay.ReportCommandsAsync(ct);
+                tailer.RunOnce(); // last: what it takes goes up at the next pass, and a failure here holds none of the steps above back
             }, api, revoked, error => relay.UploadOutcome(error)),
             Loop("inbox", config.PushPollEvery, ct => inbox.PumpAsync(ct), api, revoked),
             Loop("asks", config.PushPollEvery, ct => asks.PumpAsync(ct), api, revoked),

@@ -8,7 +8,7 @@ using Podium.Contracts;
 
 namespace Podium.Agent.Tests;
 
-public sealed class RelayTests : IDisposable
+public sealed partial class RelayTests : IDisposable
 {
     private readonly TempHome home = new();
     private readonly ManualClock clock = new(DateTimeOffset.UtcNow);
@@ -64,6 +64,37 @@ public sealed class RelayTests : IDisposable
         var seqs = fake.Seen.Where(s => s.Path == "/api/agent/batches").Select(s => JsonSerializer.Deserialize<EventBatch>(s.Body, ApiClient.Json)!.BatchSeq).ToList();
         Assert.Equal([1L, 2L, 2L], seqs);
         Assert.All(fake.Seen, s => Assert.Equal("access-1", s.Auth));
+    }
+
+    [Fact]
+    public async Task A_batch_refused_as_too_large_is_halved_and_later_batches_keep_the_smaller_size()
+    {
+        // The API's MaxBatchEvents is below the agent's batch size: every batch of two is refused, a batch of one is taken.
+        Queue("s", 4);
+        fake.On("POST /api/agent/batches", body =>
+        {
+            var batch = JsonSerializer.Deserialize<EventBatch>(body, ApiClient.Json)!;
+            return batch.Events.Count > 1
+                ? (HttpStatusCode.RequestEntityTooLarge, """{"title":"batch_too_large"}""")
+                : (HttpStatusCode.OK, JsonSerializer.Serialize(new BatchAck(batch.BatchSeq, false, batch.Events.Count), ApiClient.Json));
+        });
+
+        Assert.Equal(4, await relay.UploadAsync(CancellationToken.None));
+
+        Assert.Equal(0, store.OutboxCount());
+        var sent = fake.Seen.Where(s => s.Path == "/api/agent/batches").Select(s => JsonSerializer.Deserialize<EventBatch>(s.Body, ApiClient.Json)!).ToList();
+        Assert.Equal([2, 1, 1, 1, 1], sent.Select(b => b.Events.Count));
+        Assert.Equal([1L, 1L, 2L, 3L, 4L], sent.Select(b => b.BatchSeq)); // the refused number is reused: the API stored nothing under it
+        Assert.Equal([0, 1, 2, 3], sent.Skip(1).Select(b => b.Events[0].Payload.GetProperty("i").GetInt32())); // in order, none lost
+    }
+
+    [Fact]
+    public async Task A_single_event_refused_as_too_large_stays_in_the_outbox()
+    {
+        Queue("s", 1);
+        fake.On("POST /api/agent/batches", HttpStatusCode.RequestEntityTooLarge, """{"title":"batch_too_large"}""");
+        await Assert.ThrowsAsync<ApiException>(() => relay.UploadAsync(CancellationToken.None));
+        Assert.Equal(1, store.OutboxCount());
     }
 
     [Fact]
@@ -189,6 +220,19 @@ public sealed class RelayTests : IDisposable
         await relay.ReportCommandsAsync(CancellationToken.None);
         Assert.Contains(fake.Seen, s => s.Body.Contains("applied", StringComparison.Ordinal));
         Assert.Empty(store.TakenCommands());
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict)]
+    [InlineData(HttpStatusCode.NotFound)]
+    public async Task A_command_the_api_settled_before_its_delivery_report_is_not_handed_to_the_session(HttpStatusCode refused)
+    {
+        fake.On("POST /api/agent/commands/*", refused, "{}");
+        var command = new AgentCommandMessage(Guid.NewGuid(), Guid.NewGuid(), "s1", CommandKinds.Prompt, "cancelled meanwhile", clock.GetUtcNow().AddMinutes(5));
+        Assert.True(await relay.OnStreamAsync(AgentStreamEvents.Command, JsonSerializer.SerializeToElement(command, ApiClient.Json), CancellationToken.None));
+        Assert.Null(store.TakeCommand("s1", CommandKinds.Prompt, clock.GetUtcNow()));
+        Assert.Empty(store.TakePromptsForPush("s1", CommandKinds.Prompt, clock.GetUtcNow()));
+        Assert.Equal(0, store.WaitingCommands(clock.GetUtcNow()).Count);
     }
 
     [Fact]

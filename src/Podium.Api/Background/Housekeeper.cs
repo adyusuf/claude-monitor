@@ -7,13 +7,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.Background;
 
 /// <summary>
-/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, and keep the
+/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens and device codes, and keep the
 /// monthly partitions of session_events created ahead of need (the default partition catches anything else).
 /// </summary>
 public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock, ILogger<Housekeeper> log) : BackgroundService
 {
     public static readonly TimeSpan Every = TimeSpan.FromMinutes(1);
     public const int MonthsAhead = 2;
+
+    /// <summary>How long an ended agent token or device code is kept (for the log of what happened) before it is deleted.</summary>
+    public static readonly TimeSpan KeepEndedCredentials = TimeSpan.FromDays(7);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -23,10 +26,7 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
-                var db = scope.ServiceProvider.GetRequiredService<PodiumDb>();
-                await RunOnceAsync(db, clock.GetUtcNow(), stoppingToken);
-                await RemoteHousekeeping.RunOnceAsync(db, scope.ServiceProvider.GetRequiredService<ApiConfig>(),
-                    scope.ServiceProvider.GetRequiredService<Broker>(), clock.GetUtcNow(), stoppingToken);
+                await PassAsync(scope.ServiceProvider, clock, stoppingToken);
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
@@ -36,22 +36,38 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    public static async Task RunOnceAsync(PodiumDb db, DateTimeOffset now, CancellationToken ct)
+    /// <summary>One pass of every chore, these and the remote ones, in one scope.</summary>
+    public static async Task PassAsync(IServiceProvider services, TimeProvider clock, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(clock);
+        var db = services.GetRequiredService<PodiumDb>();
+        await Chores.RunAsync(db, ct,
+            () => RunOnceAsync(db, clock.GetUtcNow(), ct, services.GetRequiredService<Broker>()),
+            () => RemoteHousekeeping.RunOnceAsync(db, services.GetRequiredService<ApiConfig>(), services.GetRequiredService<Broker>(), clock.GetUtcNow(), ct));
+    }
+
+    /// <summary>Each chore runs even when one before it fails (<see cref="Chores"/>).</summary>
+    public static async Task RunOnceAsync(PodiumDb db, DateTimeOffset now, CancellationToken ct, Broker? broker = null)
     {
         ArgumentNullException.ThrowIfNull(db);
-        await db.SessionCommands
-            .Where(c => (c.Status == CommandStatuses.Queued || c.Status == CommandStatuses.Delivered) && c.ExpiresAt <= now)
-            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommandStatuses.Expired), ct);
-        await db.PermissionRequests.Where(p => p.Status == PermissionStatuses.Open && p.ExpiresAt <= now)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Expired), ct);
         // An approval rule holds a command the session ran: a week after it ended (revoked or expired) it is gone (ADR-0019).
         var ruleCutoff = now - ApprovalRuleLimits.KeepEnded;
-        await db.ApprovalRules.Where(r => (r.RevokedAt != null && r.RevokedAt <= ruleCutoff) || (r.ExpiresAt != null && r.ExpiresAt <= ruleCutoff))
-            .ExecuteDeleteAsync(ct);
-        await db.DeviceAuthorizations
-            .Where(d => (d.Status == DeviceStatuses.Pending || d.Status == DeviceStatuses.Approved) && d.ExpiresAt <= now)
-            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, DeviceStatuses.Expired), ct);
-        await EnsurePartitionsAsync(db, now, ct);
+        var credentialCutoff = now - KeepEndedCredentials;
+        await Chores.RunAsync(db, ct,
+            () => SessionExpiry.CommandsAsync(db, now, broker, ct),
+            () => SessionExpiry.PermissionsAsync(db, now, broker, ct),
+            () => db.ApprovalRules.Where(r => (r.RevokedAt != null && r.RevokedAt <= ruleCutoff) || (r.ExpiresAt != null && r.ExpiresAt <= ruleCutoff))
+                .ExecuteDeleteAsync(ct),
+            () => db.DeviceAuthorizations
+                .Where(d => (d.Status == DeviceStatuses.Pending || d.Status == DeviceStatuses.Approved) && d.ExpiresAt <= now)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, DeviceStatuses.Expired), ct),
+            // Agent tokens and device codes are kept a while after they end, then deleted; a replaced refresh token ends with its expiry,
+            // so a copied one is still recognised as a reuse for as long as it could have worked.
+            () => db.AgentTokens.Where(t => t.ExpiresAt <= credentialCutoff || (t.RevokedAt != null && t.RevokedAt <= credentialCutoff))
+                .ExecuteDeleteAsync(ct),
+            () => db.DeviceAuthorizations.Where(d => d.ExpiresAt <= credentialCutoff).ExecuteDeleteAsync(ct),
+            () => EnsurePartitionsAsync(db, now, ct));
     }
 
     /// <summary>session_events_yYYYYmMM for this month and the next ones. Idempotent.</summary>

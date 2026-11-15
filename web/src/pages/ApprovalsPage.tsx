@@ -3,13 +3,15 @@ import { useParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { ApprovalRequestRow, ApprovalRuleRow } from "../api/types";
 import { Button, Card, Notice, Spinner } from "../components/ui";
+import { config } from "../config";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
 import { isCatchUp, useLive } from "../lib/live";
+import { useNow } from "../lib/useNow";
 import { ApprovalItem } from "./ApprovalItem";
 
-/** A standing approval: its machine, tool and command, how long it lasts and how often it answered; Revoke ends it. */
-function RuleRow({ rule, onRevoked }: { rule: ApprovalRuleRow; onRevoked: () => void }) {
+/** A standing approval: its machine, tool and command, how long it lasts, how often it answered and when last; Revoke ends it. */
+function RuleRow({ rule, endedOnDevice, onRevoked }: { rule: ApprovalRuleRow; endedOnDevice: boolean; onRevoked: () => void }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [busy, setBusy] = useState(false);
@@ -33,8 +35,12 @@ function RuleRow({ rule, onRevoked }: { rule: ApprovalRuleRow; onRevoked: () => 
       <td>{rule.toolName}</td>
       <td>{rule.command !== null ? <code className="rule-command">{rule.command}</code> : <span className="muted">{t("approvalRules.anyInput")}</span>}</td>
       <td>{t(`approvalRules.duration.${rule.duration}`)}</td>
-      <td>{rule.expiresAt ? dateTime(rule.expiresAt) : <span className="muted">{t("approvalRules.never")}</span>}</td>
+      <td>
+        {rule.expiresAt ? dateTime(rule.expiresAt) : <span className="muted">{t("approvalRules.never")}</span>}
+        {endedOnDevice ? <> <span className="muted small">{t("approvalRules.endedOnDevice")}</span></> : null}
+      </td>
       <td className="num">{rule.useCount}</td>
+      <td>{rule.lastUsedAt ? dateTime(rule.lastUsedAt) : <span className="muted">{t("approvalRules.neverUsed")}</span>}</td>
       <td>
         <Button variant="ghost" busy={busy} onClick={() => void revoke()}>{t("approvalRules.revoke")}</Button>
         {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
@@ -55,6 +61,7 @@ export function ApprovalsPage() {
   const [rules, setRules] = useState<ApprovalRuleRow[]>([]);
   const [recent, setRecent] = useState<ApprovalRequestRow[]>([]);
   const [error, setError] = useState<unknown>(null);
+  const now = useNow(config.countdownTickMs);
   const load = useCallback(async () => {
     try {
       const [w, r, a] = await Promise.all([api.workspacePermissions(ws), api.approvalRules(ws), api.workspacePermissions(ws, "answered")]);
@@ -70,7 +77,7 @@ export function ApprovalsPage() {
     void load();
   }, [load]);
   const live = useLive(ws, (m) => {
-    if (m.event === "permission" || isCatchUp(m)) void load();
+    if (m.event === "permission" || m.event === "approval_rule" || isCatchUp(m)) void load();
   });
 
   return (
@@ -91,9 +98,9 @@ export function ApprovalsPage() {
             <table className="table table-rows">
               <thead><tr>
                 <th>{t("approvalRules.machine")}</th><th>{t("approvalRules.tool")}</th><th>{t("approvalRules.command")}</th>
-                <th>{t("approvalRules.remember")}</th><th>{t("approvalRules.ends")}</th><th className="num">{t("approvalRules.uses")}</th><th />
+                <th>{t("approvalRules.remember")}</th><th>{t("approvalRules.ends")}</th><th className="num">{t("approvalRules.uses")}</th><th>{t("approvalRules.lastUsed")}</th><th />
               </tr></thead>
-              <tbody>{rules.map((r) => <RuleRow key={r.id} rule={r} onRevoked={() => void load()} />)}</tbody>
+              <tbody>{rules.map((r) => <RuleRow key={r.id} rule={r} endedOnDevice={r.expiresAt !== null && Date.parse(r.expiresAt) <= now} onRevoked={() => void load()} />)}</tbody>
             </table>
           </div>
         )}

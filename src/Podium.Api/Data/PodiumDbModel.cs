@@ -61,7 +61,7 @@ internal static class PodiumDbModel
             e.HasIndex(x => x.UserId);
         });
         b.Entity<Workspace>(e =>
-            e.ToTable(t => t.HasCheckConstraint("ck_workspaces_status", In("status", WorkspaceStatuses.Active, "archived"))));
+            e.ToTable(t => t.HasCheckConstraint("ck_workspaces_status", In("status", WorkspaceStatuses.Active, WorkspaceStatuses.Archived))));
         b.Entity<WorkspaceMember>(e =>
         {
             e.HasKey(x => new { x.WorkspaceId, x.UserId });

@@ -36,11 +36,20 @@ describe("the project form", () => {
       name: "invalid_name", purpose: "too_long", sponsor: "too_long", stakeholders: "invalid_list", budget: "amount_and_currency", endDate: "before_start",
       itemTypes: "invalid_list", sprintLengthDays: "out_of_range", definitionOfReady: "invalid_list", definitionOfDone: "invalid_list",
     });
+    expect(checkProject({ ...ok, startDate: "1/2", endDate: "2026-02-31" })).toMatchObject({ startDate: "invalid_date", endDate: "invalid_date" });
     expect(checkProject({ ...ok, budgetAmount: "-1", budgetCurrency: "EUR" }).budgetAmount).toBe("out_of_range");
     expect(checkProject({ ...ok, budgetAmount: "1", budgetCurrency: "eur" }).budgetCurrency).toBe("invalid_currency");
     expect(checkProject({ ...ok, budgetAmount: "", budgetCurrency: "EUR" }).budget).toBe("amount_and_currency");
     expect(checkProject({ ...ok, sprintLengthDays: "1.5" }).sprintLengthDays).toBe("out_of_range");
     expect(checkProject({ ...ok, stakeholders: Array.from({ length: 51 }, () => ({ name: "a", role: "" })) }).stakeholders).toBe("invalid_list");
+  });
+
+  it("takes a budget up to the column's limit with at most two decimals, as the API does", () => {
+    const ok = { ...emptyProjectDraft("u1"), name: "n", budgetCurrency: "EUR" };
+    expect(checkProject({ ...ok, budgetAmount: "999999999999.99" })).toEqual({});
+    expect(checkProject({ ...ok, budgetAmount: "1000000000000" }).budgetAmount).toBe("out_of_range");
+    expect(checkProject({ ...ok, budgetAmount: "10.005" }).budgetAmount).toBe("too_many_decimals");
+    expect(checkProject({ ...ok, budgetAmount: "10.5" })).toEqual({});
   });
 });
 
@@ -56,10 +65,11 @@ describe("the application form", () => {
   it("checks the repository and environment addresses like the API does", () => {
     const ok = { ...emptyApplicationDraft(), name: "a" };
     expect(checkApplication(ok)).toEqual({});
-    for (const url of ["https://git.example.org/x", "ssh://git@git.example.org/x", "git://git.example.org/x", "git@git.example.org:team/x.git"]) {
+    for (const url of ["https://git.example.org/x", "ssh://git@git.example.org/x", "git://git.example.org/x", "git@git.example.org:team/x.git",
+      "https://user@bitbucket.example.org/ws/repo.git", "https://u:p@git.example.org/x"]) {
       expect(checkApplication({ ...ok, repoUrl: url })).toEqual({});
     }
-    for (const url of ["ftp://git.example.org/x", "https://u:p@git.example.org/x", "not a url", `https://git.example.org/${"x".repeat(500)}`]) {
+    for (const url of ["ftp://git.example.org/x", "ssh://u:p@git.example.org/x", "git://token@git.example.org/x", "not a url", `https://git.example.org/${"x".repeat(500)}`]) {
       expect(checkApplication({ ...ok, repoUrl: url }).repoUrl).toBe("invalid_url");
     }
     expect(checkApplication({ ...ok, environments: [{ name: "dev", url: "https://dev.example.org" }, { name: "test", url: "" }] })).toEqual({});

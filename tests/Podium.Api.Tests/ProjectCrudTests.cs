@@ -114,6 +114,19 @@ public sealed class ProjectCrudTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task Budget_at_the_column_limit_saves_and_above_it_or_with_three_decimals_is_refused()
+    {
+        var user = await api.NewClient().SignedUpAsync("pj-budget");
+        var url = $"/api/workspaces/{user.WorkspaceId}/projects";
+
+        var top = await user.PostAsync(url, new { name = "Top", budgetAmount = 999_999_999_999.99m, budgetCurrency = "EUR" });
+        Assert.Equal(HttpStatusCode.Created, top.StatusCode);
+        Assert.Equal(999_999_999_999.99m, (await top.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("budgetAmount").GetDecimal());
+        Assert.Equal(("budgetAmount", "out_of_range"), await ProjectKit.ProblemAsync(await user.PostAsync(url, new { name = "Over", budgetAmount = 1_000_000_000_000m, budgetCurrency = "EUR" })));
+        Assert.Equal(("budgetAmount", "too_many_decimals"), await ProjectKit.ProblemAsync(await user.PostAsync(url, new { name = "Fine", budgetAmount = 10.005m, budgetCurrency = "EUR" })));
+    }
+
+    [Fact]
     public async Task Two_active_projects_cannot_share_a_name_even_in_another_case_or_accent_but_an_archived_name_is_free_again()
     {
         var user = await api.NewClient().SignedUpAsync("pj-dup");

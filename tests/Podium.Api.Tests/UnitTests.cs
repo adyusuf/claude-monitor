@@ -35,8 +35,21 @@ public sealed class UnitTests
         Assert.Equal("BCDF-GHJK", Secrets.NormalizeUserCode("bcdf ghjk"));
         Assert.Equal("ABC", Secrets.NormalizeUserCode("abc"));
         Assert.Equal("", Secrets.NormalizeUserCode(null));
-        Assert.Null(Secrets.IpTag(null));
-        Assert.Equal(16, Secrets.IpTag(System.Net.IPAddress.Loopback)!.Length);
+        Assert.Null(Secrets.IpTag(null, new byte[32]));
+        Assert.Equal(16, Secrets.IpTag(System.Net.IPAddress.Loopback, new byte[32])!.Length);
+    }
+
+    [Fact]
+    public void The_audit_ip_tag_is_not_the_unsalted_hash_of_the_address()
+    {
+        var ip = System.Net.IPAddress.Parse("203.0.113.7");
+
+        var key = Convert.FromHexString(new string('1', 64));
+
+        Assert.NotEqual(Secrets.Hash("ip:" + ip)[..16], Secrets.IpTag(ip, key));
+        Assert.Equal(Secrets.IpTag(ip, key), Secrets.IpTag(ip, key));
+        Assert.NotEqual(Secrets.IpTag(ip, key), Secrets.IpTag(ip, Convert.FromHexString(new string('2', 64))));
+        Assert.NotEqual(Secrets.IpTag(ip, key), Secrets.IpTag(System.Net.IPAddress.Parse("203.0.113.8"), key));
     }
 
     [Theory]
@@ -151,6 +164,7 @@ public sealed class UnitTests
             ["AIPOD_PROXY_NETWORKS"] = "173.245.48.0/20, 2400:cb00::/32",
             ["AIPOD_BACKGROUND_JOBS"] = "off",
             ["AIPOD_AUTH_RATE_PER_MINUTE"] = "5",
+            ["AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE"] = "7",
             ["AIPOD_MFA_KEY"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         }).Build(), development: false);
         Assert.Equal("https://aipod.invalid", prod.PublicOrigin);
@@ -160,6 +174,7 @@ public sealed class UnitTests
         Assert.Equal(["173.245.48.0/20", "2400:cb00::/32"], prod.ProxyNetworks.Select(n => n.ToString()));
         Assert.False(prod.BackgroundJobs);
         Assert.Equal(5, prod.AuthRequestsPerMinute);
+        Assert.Equal(7, prod.DeviceTokenRequestsPerMinute);
         Assert.Equal("id", prod.Google!.ClientId);
 
         IConfiguration With(string origin, string mfaKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

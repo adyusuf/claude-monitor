@@ -44,9 +44,12 @@ export function DashboardPage() {
   const { ws = "" } = useParams();
   const { t } = useI18n();
   const errorText = useErrorText();
-  const [view, setView] = useState<DashboardView | null>(null);
-  const [machines, setMachines] = useState<MachineView[]>([]);
-  const [error, setError] = useState<unknown>(null);
+  // What was read is kept with the workspace it belongs to: after a switch (browser back or forward) the old figures and error are not shown under the new one.
+  const [read, setRead] = useState<{ ws: string; view: DashboardView; machines: MachineView[] } | null>(null);
+  const [failure, setFailure] = useState<{ ws: string; error: unknown } | null>(null);
+  const view = read?.ws === ws ? read.view : null;
+  const machines = read?.ws === ws ? read.machines : [];
+  const error = failure?.ws === ws ? failure.error : null;
   // Each live change asks for one read after a short pause; a read the next one overtook is dropped, so older figures never win.
   const [tick, setTick] = useState(0);
   const reload = useMemo(() => debounce(() => setTick((n) => n + 1)), []);
@@ -54,11 +57,10 @@ export function DashboardPage() {
     let current = true;
     Promise.all([api.dashboard(ws), api.machines(ws)]).then(([d, m]) => {
       if (!current) return;
-      setView(d);
-      setMachines(m);
-      setError(null);
+      setRead({ ws, view: d, machines: m });
+      setFailure(null);
     }).catch((e: unknown) => {
-      if (current) setError(e);
+      if (current) setFailure({ ws, error: e });
     });
     return () => {
       current = false;

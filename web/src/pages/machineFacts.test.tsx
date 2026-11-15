@@ -71,6 +71,14 @@ describe("the tag and note helpers", () => {
     expect(noteOk("bell\u0007")).toBe(false);
     expect(noteOk("x".repeat(2001))).toBe(false);
   });
+
+  it("refuses the same control characters the API refuses: DEL and the C1 range U+0080 to U+009F, but not the no-break space after it", () => {
+    expect(noteOk("del\u007f")).toBe(false);
+    expect(noteOk("c1 \u0080")).toBe(false);
+    expect(noteOk("next-line\u0085")).toBe(false);
+    expect(noteOk("c1 end \u009f")).toBe(false);
+    expect(noteOk("no-break space   is plain text")).toBe(true);
+  });
 });
 
 describe("tags and the note on the machine page", () => {

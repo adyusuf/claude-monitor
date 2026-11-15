@@ -44,6 +44,7 @@ describe("the integrations page: the result of the Atlassian round trip", () => 
     ["denied", "Atlassian did not give access, nothing was connected."],
     ["invalid_state", "That sign-in has expired. Start again."],
     ["site_not_found", "Your Atlassian login cannot reach that Jira address."],
+    ["account_in_use", "That Atlassian account is already linked by someone else on this connection."],
   ])("shows %s as an error notice with its own text", (code, text) => {
     const html = firstRender(`?result=${code}`);
     expect(html).toContain("notice-error");

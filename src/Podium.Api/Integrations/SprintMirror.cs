@@ -69,7 +69,8 @@ public sealed class SprintMirror(PodiumDb db, TimeProvider clock)
         foreach (var issue in state.Issues.Values.Where(i => i.SprintId == sprint.Id))
         {
             issue.SprintId = null;
-            if (issue.Status is IssueStatuses.InProgress or IssueStatuses.InReview) issue.Status = IssueStatuses.Ready;
+            // An issue that mirrors the tool's keeps the tool's status (as SprintIssueEndpoints.Release does): the sync reads it from there.
+            if (issue.ExternalKey is null && issue.Status is IssueStatuses.InProgress or IssueStatuses.InReview) issue.Status = IssueStatuses.Ready;
         }
     }
 }

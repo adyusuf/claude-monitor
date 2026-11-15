@@ -79,12 +79,12 @@ export function checkIssue(d: IssueDraft, project: ProjectView): FieldErrors {
   return errors;
 }
 
-/** A pull request or commit address: http or https, no user information, within the length the API takes. */
+/** A pull request or commit address: https only (the API refuses http), no user information, within the length the API takes. */
 export function codeLinkUrlOk(value: string): boolean {
   if (value.length > limit.urlMax) return false;
   try {
     const url = new URL(value);
-    return ["https:", "http:"].includes(url.protocol) && url.hostname !== "" && url.username === "" && url.password === "";
+    return url.protocol === "https:" && url.hostname !== "" && url.username === "" && url.password === "";
   } catch {
     return false;
   }

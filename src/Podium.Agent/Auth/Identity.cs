@@ -105,7 +105,14 @@ public sealed record Identity(string MachineKey, string? Server = null, Guid? Ag
         ArgumentNullException.ThrowIfNull(config);
         config.EnsureHome();
         var temp = config.IdentityPath + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(this, Json));
+        var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None };
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite; // the machine key: never group or other, not even for a moment
+        using (var stream = new StreamWriter(new FileStream(temp, options)))
+        {
+            stream.Write(JsonSerializer.Serialize(this, Json));
+        }
+
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite); // a temp left by a crash keeps its old mode otherwise
         File.Move(temp, config.IdentityPath, overwrite: true);
     }
 }

@@ -18,7 +18,7 @@ public sealed partial record AgentConfig
         {
             Home = explicitHome ? read("AP_AGENT_HOME")! : DefaultHome(),
             ServerOverride = read("AP_SERVER") is { Length: > 0 } s ? s.TrimEnd('/') : null,
-            CredentialStore = read("AP_CREDENTIALS") == "file" ? "file" : "keychain",
+            CredentialStore = explicitHome && read("AP_CREDENTIALS") == "file" ? "file" : "keychain", // the plaintext store only inside a home that was named on purpose
             PermissionWait = Seconds(read("AP_PERMISSION_WAIT"), TimeSpan.FromSeconds(120), WaitMaxSeconds),
             StopWait = Seconds(read("AP_STOP_WAIT"), TimeSpan.Zero, WaitMaxSeconds),
             StopWaitFromEnvironment = read("AP_STOP_WAIT") is { Length: > 0 },

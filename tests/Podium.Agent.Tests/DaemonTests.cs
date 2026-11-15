@@ -196,11 +196,10 @@ public sealed class DaemonTests
         Assert.Equal(OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsLinux() ? "linux" : "unsupported", AgentConfig.Os);
     }
 
-    [Fact]
+    [MacOsFact]
     [System.Runtime.Versioning.SupportedOSPlatform("macos")]
     public void Credentials_go_to_the_keychain_through_the_security_tool_without_arguments_carrying_the_secret()
     {
-        if (!OperatingSystem.IsMacOS()) return;
         using var home = new TempHome();
         // A stand-in for /usr/bin/security: it records its arguments and stdin and keeps one secret in a file.
         var store = Path.Combine(home.Dir, "fake-keychain");

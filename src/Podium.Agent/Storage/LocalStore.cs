@@ -194,6 +194,10 @@ public sealed partial class LocalStore : IDisposable
 
     public void Acknowledge(long seq) => Exec("DELETE FROM outbox WHERE batch = $b", ("$b", seq));
 
+    /// <summary>Keeps the first rows of a numbered batch the API refused as too large; the rest get a later number.</summary>
+    public void ShrinkBatch(long seq, int keep) =>
+        Exec("UPDATE outbox SET batch = NULL WHERE batch = $b AND id NOT IN (SELECT id FROM outbox WHERE batch = $b ORDER BY id LIMIT $k)", ("$b", seq), ("$k", keep));
+
     private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
     // ---- plumbing ---------------------------------------------------------------------------------------------

@@ -214,7 +214,7 @@ An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a li
 
 - **Export** (`GET /api/me/export`): one JSON file, streamed: the profile, sign-in providers, memberships, machines,
   commands sent, the user's own audit trail, and every session run on the user's machines with its tasks, usage and
-  events.
+  events. Each export writes a `user.data_exported` audit row (no detail) before the first byte.
 - **Deletion** (`POST /api/me/delete`, with the password when there is one and the word `DELETE`): refused (409
   `sole_owner`) while the user is the only owner of a workspace that has other members. Otherwise, in one transaction:
   the personal fields are cleared (`users.email`, name, password hash; status `deleted`), provider links deleted,

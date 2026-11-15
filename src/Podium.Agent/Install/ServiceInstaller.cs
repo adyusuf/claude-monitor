@@ -124,6 +124,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
                 case OsKinds.Linux:
                     if (!File.Exists(Definition()))
                     {
+                        RemoveRunAccountAccess(l); // a drop-in outlives a removed definition (a partial uninstall): it must not stay behind
                         output.WriteLine(Strings.T(Msg.SvcNotInstalled));
                         return 0;
                     }
@@ -131,7 +132,7 @@ public sealed partial class ServiceInstaller(TextWriter output, Func<string, IRe
                     if (os == OsKinds.Linux) Step("stop and disable the service", Systemctl, ["disable", "--now", l.Names.ServiceName]);
                     else run(Launchctl, ["bootout", $"system/{l.Names.Label}"]); // not loaded is fine
                     File.Delete(Definition());
-                    RemoveRunAccountAccess();
+                    RemoveRunAccountAccess(l);
                     if (os == OsKinds.Linux) Step("reload systemd", Systemctl, ["daemon-reload"]);
                     break;
                 default:

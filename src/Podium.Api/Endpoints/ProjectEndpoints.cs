@@ -14,6 +14,9 @@ namespace Podium.Api.Endpoints;
 /// </summary>
 public static class ProjectEndpoints
 {
+    /// <summary>The most people the member list of one project returns.</summary>
+    public const int MembersMax = 500;
+
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("").RequireAuthorization(Schemes.Session);
@@ -138,11 +141,13 @@ public static class ProjectEndpoints
     {
         var grant = await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
+        // Only people still in the workspace: a removed member is no longer listed, with or without a project row.
         var rows = await (from m in db.ProjectMembers.AsNoTracking()
                           join u in db.Users.AsNoTracking() on m.UserId equals u.Id
-                          where m.ProjectId == id
+                          join w in db.WorkspaceMembers.AsNoTracking() on new { m.UserId, grant.Project.WorkspaceId } equals new { w.UserId, w.WorkspaceId }
+                          where m.ProjectId == id && w.RemovedAt == null
                           orderby u.DisplayName
-                          select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).ToListAsync(http.RequestAborted);
+                          select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
         return Results.Ok(rows);
     }
 
@@ -152,9 +157,13 @@ public static class ProjectEndpoints
         var grant = await ProjectAccess.OfAsync(db, actor, id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
         if (!grant.CanEdit) return Results.Forbid();
+        if (grant.Archived) return ProjectGrant.ReadOnly;
         if (req.Role is null || !ProjectRoles.All.Contains(req.Role)) return Http.Invalid("role", "invalid_role");
         if (await Access.MemberAsync(db, userId, grant.Project.WorkspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.Invalid("userId", "not_a_member");
 
+        // The project lock turns "look for the row, then add it" into one step: two calls at once cannot both add the same person.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
         var row = await db.ProjectMembers.FirstOrDefaultAsync(m => m.ProjectId == id && m.UserId == userId, http.RequestAborted);
         var now = clock.GetUtcNow();
         if (row is null) db.ProjectMembers.Add(new ProjectMember { ProjectId = id, UserId = userId, Role = req.Role, AddedBy = actor, AddedAt = now });
@@ -162,6 +171,7 @@ public static class ProjectEndpoints
         Audit.Add(db, http, clock, AuditActions.ProjectMemberChanged, grant.Project.WorkspaceId, actor, targetType: "project", targetId: id,
             detail: new { userId, role = req.Role });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
@@ -171,6 +181,7 @@ public static class ProjectEndpoints
         var grant = await ProjectAccess.OfAsync(db, actor, id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
         if (!grant.CanEdit) return Results.Forbid();
+        if (grant.Archived) return ProjectGrant.ReadOnly;
         var row = await db.ProjectMembers.FirstOrDefaultAsync(m => m.ProjectId == id && m.UserId == userId, http.RequestAborted);
         if (row is null) return Http.NotFound();
         db.ProjectMembers.Remove(row);

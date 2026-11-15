@@ -130,6 +130,25 @@ public sealed class InboxPushTests : IDisposable
         Assert.Equal("c-2", store.TakeCommand("s-2", CommandKinds.Prompt, Start)!.Id);
     }
 
+    [Theory]
+    [InlineData(false, PushTransports.Inbox)]
+    [InlineData(true, PushTransports.Channel)]
+    public async Task Turning_push_off_requeues_a_pushed_unconfirmed_prompt_for_the_hook(bool pushEnabled, string transportAfter)
+    {
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);
+        Queue("c-1", "s-1");
+        Assert.Equal(1, await Pump().PumpAsync(CancellationToken.None)); // pushed, never seen in the transcript
+        Assert.Null(store.TakeCommand("s-1", CommandKinds.Prompt, Start)); // a hook does not take a pushed prompt
+
+        clock.Advance(home.Config.InboxConfirmWait);
+        // Push switched off (or moved to the channel) while the prompt waited for its confirmation.
+        Assert.Equal(0, await Pump(home.Config with { PushEnabled = pushEnabled, PushTransport = transportAfter }).PumpAsync(CancellationToken.None));
+
+        Assert.Empty(store.UnconfirmedPushes());
+        Assert.Equal("c-1", store.TakeCommand("s-1", CommandKinds.Prompt, clock.GetUtcNow())!.Id);
+        Assert.Single(transport.Sent); // requeued for the hooks, not written to the socket again
+    }
+
     [Fact]
     public async Task Push_off_or_through_the_channel_writes_nothing()
     {
@@ -244,6 +263,30 @@ public sealed class InboxPushTests : IDisposable
         Assert.Equal(["s-1"], store.Inboxes().Select(i => i.Session));
         store.DropInbox("s-1");
         Assert.Empty(store.Inboxes());
+    }
+
+    [Fact]
+    public void A_binding_nobody_refreshes_is_pruned_so_a_reused_pid_does_not_map_to_a_dead_session()
+    {
+        store.BindSession("dead", 4242, Start.AddDays(-40)); // its process id was reused by another program since
+        store.BindSession("live", 5151, Start.AddDays(-2));
+
+        Assert.Equal(1, store.PruneBindings(Start.AddDays(-30)));
+
+        Assert.Null(store.SessionOf(4242));
+        Assert.Equal("live", store.SessionOf(5151));
+    }
+
+    [Fact]
+    public async Task The_daemons_pass_prunes_old_bindings_also_with_the_inbox_push_turned_off()
+    {
+        store.BindSession("dead", 4242, Start - InboxPump.InboxLifetime - TimeSpan.FromMinutes(1));
+        store.BindSession("live", 5151, Start - TimeSpan.FromDays(2));
+
+        await Pump(home.Config with { PushEnabled = false }).PumpAsync(CancellationToken.None);
+
+        Assert.Null(store.SessionOf(4242));
+        Assert.Equal("live", store.SessionOf(5151));
     }
 
     [Fact]

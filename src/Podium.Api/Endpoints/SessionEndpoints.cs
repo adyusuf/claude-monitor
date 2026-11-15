@@ -45,9 +45,16 @@ public static class SessionEndpoints
         // One statement checks that it ended and hides it, so a resume in between cannot be hidden. The mark is the session's own last event time
         // (the agent's clock, like LastEventAt), never the server's: a machine whose clock runs ahead would otherwise keep showing the session.
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        var hidden = await db.HarnessSessions.Where(s => s.Id == id && s.Status == SessionStatuses.Ended)
+        // A session hidden already (its mark is its last event time) is not hidden again: no second audit row, no second stream message.
+        var hidden = await db.HarnessSessions.Where(s => s.Id == id && s.Status == SessionStatuses.Ended && (s.HiddenAt == null || s.HiddenAt != s.LastEventAt))
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.HiddenAt, x => x.LastEventAt), http.RequestAborted);
-        if (hidden == 0) return Http.Invalid("session", SessionNotEnded);
+        if (hidden == 0)
+        {
+            return await db.HarnessSessions.AnyAsync(s => s.Id == id && s.Status == SessionStatuses.Ended, http.RequestAborted)
+                ? Results.NoContent()
+                : Http.Invalid("session", SessionNotEnded);
+        }
+
         Audit.Add(db, http, clock, AuditActions.SessionHidden, found.Session.WorkspaceId, userId, targetType: "session", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
         await tx.CommitAsync(http.RequestAborted);
@@ -161,10 +168,14 @@ public static class SessionEndpoints
         return Results.Ok(new Page<EventRow>(rows.Take(take).ToList(), next));
     }
 
-    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker)
+    /// <summary>The workspace's live stream: opened by a member only, and ended at a ping once the reader is no longer a member or signed in.</summary>
+    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker, ApiConfig config, TimeProvider clock)
     {
-        if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        return Sse.Stream(broker.Subscribe(Broker.Workspace(id)), [new StreamMessage("ready", new { workspaceId = id })], http.RequestAborted);
+        var userId = http.User.UserId();
+        if (await Access.MemberAsync(db, userId, id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
+        var login = http.User.LoginSessionId();
+        return Sse.Stream(broker.Subscribe(Broker.Workspace(id)), [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
+            http.RequestAborted, ct => Access.StillReadsAsync(db, clock, userId, login, id, ct));
     }
 }
 

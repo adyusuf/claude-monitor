@@ -95,6 +95,21 @@ describe("i18n", () => {
     expect(languages.map((l) => l.code)).toEqual(["en", "tr", "de"]);
   });
 
+  // Every `Results.Problem` title (literal or constant) and Startup answer a signed-in page can receive, collected from src/Podium.Api on
+  // 15/11/2026; the agent-only ones (batch_too_large, invalid_refresh_token, no_update, upgrade_required, asks, agent runs) are left out.
+  const problemTitles = [
+    "csrf", "account_locked", "conflict", "email_not_verified", "invalid_credentials", "mfa_required", "reauth_required", "reauthorize",
+    "sole_owner", "owner_only", "action_busy", "claude_start_pending", "no_test_command", "approval_invalid", "approval_required",
+    "exec_level_invalid", "exec_level_changed", "access_policy_changed", "bad_template", "totp_required", "settings_conflict",
+    "jira_account_required", "jira_changed", "jira_no_board", "jira_transition_unavailable", "mirrored_no_archive", "mirrored_scope",
+    "mirrored_type_locked", "mirrored_field_locked", "tracker_changed", "tracker_unavailable", "tracker_forbidden", "tracker_rejected",
+    "tracker_not_found", "tracker_rate_limited",
+  ];
+
+  it.each(problemTitles)("every problem title the API sends has an errors text: %s", (title) => {
+    for (const dict of [en, tr, de]) expect(translate(dict, `errors.${title}`)).not.toBe(`errors.${title}`);
+  });
+
   it("fills placeholders and shows an unknown key rather than nothing", () => {
     expect(translate(en, "auth.passwordHint", { n: 10 })).toBe("At least 10 characters.");
     expect(translate(en, "sessions.permissionsWaiting", {})).toBe("{n} waiting for an answer");
@@ -145,6 +160,21 @@ describe("api client", () => {
     expect((await code("/d")).code).toBe("server_error");
     expect((await code("/e")).code).toBe("request_failed");
     expect((await code("/zzz")).code).toBe("not_found");
+  });
+
+  it("ignores a framework title that is not a code and keeps a code with digits", async () => {
+    // The body the API's exception handler writes on a real 500 (ServerErrorBodyTests reads it from the API).
+    const framework = { type: "https://tools.ietf.org/html/rfc9110#section-15.6.1", title: "An error occurred while processing your request.", status: 500 };
+    mockApi({
+      "POST /a": { status: 500, body: framework },
+      "POST /b": { status: 409, body: { title: "Conflict" } },
+      "POST /c": { status: 400, body: { title: "policy_sha256" } },
+    });
+    const code = async (p: string) => (await request("POST", p).catch((e: ApiError) => e)) as ApiError;
+    const a = await code("/a");
+    expect([a.status, a.code, a.data.title]).toEqual([500, "server_error", framework.title]);
+    expect((await code("/b")).code).toBe("conflict");
+    expect((await code("/c")).code).toBe("policy_sha256");
   });
 });
 

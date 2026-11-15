@@ -29,6 +29,9 @@ public sealed partial class LocalStore
     public string? SessionOf(int parentPid) =>
         Scalar("SELECT session FROM session_bindings WHERE parent_pid = $p ORDER BY seen_at DESC, rowid DESC LIMIT 1", ("$p", parentPid)) as string;
 
+    /// <summary>Forgets bindings no hook refreshed since <paramref name="olderThan"/>: a process id the system reused must not map a new process to an old session. Returns how many.</summary>
+    public int PruneBindings(DateTimeOffset olderThan) => Exec("DELETE FROM session_bindings WHERE seen_at < $t", ("$t", Iso(olderThan)));
+
     // ---- the life of a pushed prompt -----------------------------------------------------------------------------
 
     /// <summary>
@@ -162,9 +165,16 @@ public sealed partial class LocalStore
         return (read, unread);
     }
 
-    /// <summary>The text of a prompt that was applied and is older than the retention is forgotten (the row stays: its id is what stops a prompt being taken twice). Returns how many.</summary>
+    /// <summary>
+    /// The text of a prompt older than the retention is forgotten: one applied before it, and one that expired before it without being applied
+    /// (still queued, or pushed and never confirmed). The row stays: its id is what stops a prompt being taken twice. Returns how many.
+    /// </summary>
     public int ForgetCommandBodies(DateTimeOffset before) =>
-        Exec("UPDATE commands SET body = NULL WHERE body IS NOT NULL AND state IN ('taken', 'reported') AND taken_at IS NOT NULL AND taken_at < $t", ("$t", Iso(before)));
+        Exec("""
+            UPDATE commands SET body = NULL WHERE body IS NOT NULL AND (
+                (state IN ('taken', 'reported') AND taken_at IS NOT NULL AND taken_at < $t)
+                OR (state IN ('queued', 'pushed') AND expires_at < $t))
+            """, ("$t", Iso(before)));
 
     public int PushedTotal() => (int)(long)(Scalar("SELECT COUNT(*) FROM pushes WHERE confirmed_at IS NOT NULL") ?? 0L);
 }

@@ -81,6 +81,7 @@ export const trMachines: Dictionary["machines"] = {
     auto: "Otomatik başlatma",
     autoModes: { off: "Kapalı", on_message: "Bir soru geldiğinde ve boşta oturum yokken", always: "Bir projede hep bir oturum açık tut" },
     autoProject: "Oturum tutulacak proje",
+    retryAuto: "Otomatik başlatmayı uygula",
     autoHint: "Varsayılan kapalı. Başka bir makine bu makineye bir proje hakkında soru sorduğunda ve burada soruyu alacak boşta bir Claude oturumu yoksa, bu makine o projede bir arka plan oturumu başlatır; “hep bir açık tut” seçtiğiniz projede hiç oturum yoksa da, biri bitince de yenisini başlatır. Oturumlar manual kipte çalışır (riskli her adım bir kişiyi bekler). Makine için saatte en fazla {n}, oturumu olan projeye ikincisi hiç. Her oturum makine sahibinin Claude hesabını ve planını kullanır. Açmak ya da artırmak için yakın zamanlı giriş gerekir.",
     firstPromptHint: "Yeni oturuma web'den gelen bir mesaj olarak, öyle etiketlenerek gönderilir: oturum onu emir değil okunacak metin sayar ve yan etkisi olan bir şeyden önce makinede sorar. Boş bırakırsanız boşta bir oturum açılır. Ajan alana dek saklanır, denetim kaydına hiç yazılmaz.",
     modes: { manual: "Riskli adımlardan önce sor (manual)", plan: "Yalnızca plan", acceptEdits: "Dosya düzenlemelerini kabul et" },

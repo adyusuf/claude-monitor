@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { api } from "../api/endpoints";
+import { useMemo, useState } from "react";
 import type { CommandRow } from "../api/types";
-import { Button, Card } from "../components/ui";
+import { Button, Card, Notice } from "../components/ui";
 import { config } from "../config";
-import { useI18n } from "../i18n";
+import { useErrorText, useI18n } from "../i18n";
 import { ActivityClass } from "../lib/activity";
 import { isOpen, type OpenKeys, withOpen } from "../lib/fold";
 import { ACTIVITY_FILTERS, ActivityFilter, type ActivityFilterName, buildTimeline, filterItems, groupRows, isFilter, type Row, type TimelineItem } from "../lib/timeline";
@@ -29,19 +28,15 @@ function rememberFilter(filter: ActivityFilterName) {
 }
 
 /**
- * The session's activity, newest first, an older page at a time. What enters the session (a command sent from the web,
+ * The session's activity, newest first, an older page at a time; `commands` are the ones the page read (the same list as the history). What enters the session (a command sent from the web,
  * a prompt typed in the harness) stands out; Claude's answers are plain; tool calls and background events are quiet.
  */
-export function EventsCard({ sessionId, owner, version }: { sessionId: string; owner: Who; version: number }) {
+export function EventsCard({ sessionId, owner, version, commands }: { sessionId: string; owner: Who; version: number; commands: CommandRow[] }) {
   const { t } = useI18n();
-  const { held: rows, next, older } = useEventFeed(sessionId, version, { pageSize: config.eventPageSize, refreshSize: config.eventPageSize });
-  const [commands, setCommands] = useState<CommandRow[]>([]);
+  const errorText = useErrorText();
+  const { held: rows, next, older, error } = useEventFeed(sessionId, version, { pageSize: config.eventPageSize, refreshSize: config.eventPageSize });
   const [filter, setFilter] = useState<ActivityFilterName>(storedFilter);
   const [opened, setOpened] = useState<OpenKeys>(new Set());
-
-  useEffect(() => {
-    api.commands(sessionId).then(setCommands).catch(() => setCommands([]));
-  }, [sessionId, version]);
 
   const choose = (f: ActivityFilterName) => {
     setFilter(f);
@@ -80,13 +75,14 @@ export function EventsCard({ sessionId, owner, version }: { sessionId: string; o
           </button>
         ))}
       </div>
+      {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
       {pinned.length > 0 ? (
         <>
           <h3 className="sub">{t("activity.pendingTitle")}</h3>
           <ol className="act-list">{pinned.map(line)}</ol>
         </>
       ) : null}
-      {empty ? <p className="muted">{t("session.noEvents")}</p> : grouped.length === 0 && pinned.length === 0 ? <p className="muted">{t("activity.emptyFilter")}</p> : (
+      {empty ? (error ? null : <p className="muted">{t("session.noEvents")}</p>) : grouped.length === 0 && pinned.length === 0 ? <p className="muted">{t("activity.emptyFilter")}</p> : (
         <ol className="act-list">
           {grouped.map((row) => row.kind === "item" ? line(row.item) : (
             <GroupLine key={row.key} row={row} open={isOpen(opened, groupKeys(row))} onToggle={toggleGroup}>

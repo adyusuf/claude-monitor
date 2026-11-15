@@ -11,9 +11,12 @@ import { IntegrationSpaces } from "./IntegrationSpaces";
 
 /**
  * The Jira connections of the workspace, one row each (several sites can be connected; each is imported and checked on its own). The spaces, the
- * people, the recent checks and the settings of a connection each open in a drawer from a link in its row.
+ * people, the recent checks and the settings of a connection each open in a drawer from a link in its row. When Jira is not available on the
+ * server, nothing that would call Jira is offered (import, check now); disconnect stays.
  */
-export function IntegrationsTable({ connections, ws, admin, onChange }: { connections: ConnectionView[]; ws: string; admin: boolean; onChange: () => void }) {
+export function IntegrationsTable({ connections, ws, admin, member, available = true, onChange }: {
+  connections: ConnectionView[]; ws: string; admin: boolean; member: boolean; available?: boolean; onChange: () => void;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState<{ id: string; panel: IntegrationPanel } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,10 +27,10 @@ export function IntegrationsTable({ connections, ws, admin, onChange }: { connec
   };
   const body = (c: ConnectionView, panel: IntegrationPanel): ReactNode => {
     switch (panel) {
-      case "spaces": return <IntegrationSpaces id={c.id} ws={ws} canImport={admin} onImported={onChange} />;
+      case "spaces": return <IntegrationSpaces id={c.id} ws={ws} canImport={admin && available} canImportSprints={member && available} onImported={onChange} />;
       case "people": return admin ? <IntegrationPeople id={c.id} ws={ws} /> : null;
       case "checks": return <IntegrationChecks id={c.id} />;
-      case "settings": return <IntegrationSettings connection={c} admin={admin} onChange={onChange} />;
+      case "settings": return <IntegrationSettings connection={c} admin={admin} canLink={member && available} onChange={onChange} />;
       default: return null;
     }
   };
@@ -46,7 +49,7 @@ export function IntegrationsTable({ connections, ws, admin, onChange }: { connec
             </thead>
             <tbody>
               {connections.map((c) => (
-                <IntegrationRow key={c.id} connection={c} admin={admin} onChange={onChange}
+                <IntegrationRow key={c.id} connection={c} admin={admin} canCheck={available} onChange={onChange}
                   onError={setError} onOpen={(panel) => { setError(null); setOpen({ id: c.id, panel }); }} />
               ))}
             </tbody>

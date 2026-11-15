@@ -55,6 +55,15 @@ describe("members: refused actions and cancelled confirmations", () => {
     expect(screen.queryByText("home page")).toBeNull();
   });
 
+  it("stays on the page and shows why when the last owner tries to leave", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockApi({ ...base(), "DELETE /workspaces/w1/members/u1": { status: 400, body: { errors: { userId: ["last_owner"] } } } });
+    renderAt("/w/w1/members", route);
+    await userEvent.click(await screen.findByRole("button", { name: en.members.leave }));
+    expect(await screen.findByText(en.errors.last_owner)).toBeInTheDocument();
+    expect(screen.queryByText("home page")).toBeNull();
+  });
+
   it("reads the signed-in user again and goes home after the person leaves", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const calls = mockApi({ ...base(), "DELETE /workspaces/w1/members/u1": { status: 204 } });
@@ -114,5 +123,15 @@ describe("members: the invitation drawer", () => {
     await userEvent.click(within(drawer).getByRole("button", { name: en.members.invite }));
     await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(en.errors.conflict)).toBeInTheDocument());
     expect(within(screen.getByRole("dialog")).getByLabelText(en.members.inviteEmail)).toHaveValue("new+member@gmail.com");
+  });
+
+  it.each([["already_member"], ["invitation_pending"]] as const)("names a refused duplicate invitation (%s) inside the drawer", async (code) => {
+    mockApi({ ...base(), "POST /workspaces/w1/invitations": { status: 409, body: { title: code } } });
+    renderAt("/w/w1/members", route);
+    await screen.findByText("Diğer Kişi");
+    const drawer = await openInvite();
+    await userEvent.type(within(drawer).getByLabelText(en.members.inviteEmail), "new+member@gmail.com");
+    await userEvent.click(within(drawer).getByRole("button", { name: en.members.invite }));
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(en.errors[code])).toBeInTheDocument());
   });
 });

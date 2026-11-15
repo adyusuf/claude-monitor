@@ -1,5 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 import { App } from "../App";
 import { en } from "../i18n/en";
@@ -39,6 +40,17 @@ describe("sign in", () => {
     expect(await screen.findByText(en.errors.invalid_credentials)).toBeInTheDocument();
     expect(screen.getByText(/locked for a while/)).toBeInTheDocument();
     expect(screen.getByText(/resetting the password opens it at once/)).toBeInTheDocument();
+  });
+
+  it("carries a same-site next through the provider buttons and drops an unsafe one", async () => {
+    mockApi(signedOut);
+    const next = "/invitations/accept?token=abc";
+    const { unmount } = renderAt(`/login?next=${encodeURIComponent(next)}`, [{ path: "/login", element: <LoginPage /> }]);
+    expect(await screen.findByText("Continue with GitHub")).toHaveAttribute("href", `/api/auth/external/github?mode=signin&next=${encodeURIComponent(next)}`);
+    expect(screen.getByText("Continue with Google")).toHaveAttribute("href", `/api/auth/external/google?mode=signin&next=${encodeURIComponent(next)}`);
+    unmount();
+    renderAt(`/login?next=${encodeURIComponent("//evil.example.net")}`, [{ path: "/login", element: <LoginPage /> }]);
+    expect(await screen.findByText("Continue with GitHub")).toHaveAttribute("href", "/api/auth/external/github?mode=signin");
   });
 });
 
@@ -112,11 +124,25 @@ describe("mail links", () => {
   });
 });
 
+/** Shows the router's current path and query, so a test can read where a redirect went. */
+function Where() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="where">{pathname + search}</output>;
+}
+
 describe("routing", () => {
   it("sends a signed-out visitor to sign in, with the way back", async () => {
     mockApi(signedOut);
-    renderAt("/w/w1/sessions", [{ path: "*", element: <App /> }]);
+    renderAt("/w/w1/sessions", [{ path: "*", element: <><Where /><App /></> }]);
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByTestId("where")).toHaveTextContent("/login?next=%2Fw%2Fw1%2Fsessions");
+  });
+
+  it("keeps the query of the page it came from in the way back", async () => {
+    mockApi(signedOut);
+    renderAt("/w/w1/sessions?q=a%20b", [{ path: "*", element: <><Where /><App /></> }]);
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByTestId("where")).toHaveTextContent("/login?next=%2Fw%2Fw1%2Fsessions%3Fq%3Da%2520b");
   });
 
   it("opens the first workspace, and a user without one creates one", async () => {

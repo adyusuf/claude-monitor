@@ -19,7 +19,7 @@ public static class MeEndpoints
     {
         api.MapGet("/me", Me).RequireAuthorization(Schemes.Session);
         api.MapPut("/me/language", SetLanguage).RequireAuthorization(Schemes.Session);
-        api.MapGet("/auth/providers", Available);
+        api.MapGet("/auth/providers", Available).AllowAnonymous();
     }
 
     private static async Task<IResult> Me(HttpContext http, PodiumDb db, ApiConfig config)
@@ -30,7 +30,7 @@ public static class MeEndpoints
             .Select(l => l.Provider).OrderBy(p => p).ToListAsync(http.RequestAborted);
         var workspaces = await (from m in db.WorkspaceMembers.AsNoTracking()
                                 join w in db.Workspaces.AsNoTracking() on m.WorkspaceId equals w.Id
-                                where m.UserId == userId && m.RemovedAt == null && w.Status == "active"
+                                where m.UserId == userId && m.RemovedAt == null && w.Status == WorkspaceStatuses.Active
                                 orderby w.Name
                                 select new MeWorkspace(w.Id, w.Name, m.Role)).ToListAsync(http.RequestAborted);
         return Results.Ok(new MeResponse(user.Id, user.Email, user.DisplayName, user.PasswordHash is not null, providers, workspaces,

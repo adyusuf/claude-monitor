@@ -151,7 +151,7 @@ public sealed class Login(AgentConfig config, TextWriter output, TimeProvider cl
     }
 
     /// <summary>
-    /// The workspace's switches (updating Claude Code, updating the agent, remote runs) belonged to the workspace this machine
+    /// The workspace's switches (updating Claude Code, updating the agent, remote runs, masking and the event size) belonged to the workspace this machine
     /// was in; the next one may forbid them, so they read as unread (off) until the daemon's next settings pass. Done before
     /// the new tokens are saved; a pass still in flight is caught by the workspace tag (WorkspaceSettings).
     /// </summary>

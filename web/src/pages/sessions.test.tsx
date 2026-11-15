@@ -57,6 +57,26 @@ describe("sessions list", () => {
     await waitFor(() => expect(reads).toBeGreaterThan(before));
   });
 
+  it("keeps the pages the reader loaded when a live event reloads the list", async () => {
+    let renamed = false;
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1/sessions": (c) => (c.path.includes("cursor=c1")
+        ? { body: { items: [row({ id: "s3", title: null, status: "ended" })], next: null } }
+        : { body: { items: [row({ title: renamed ? "Fix the login, renamed" : "Fix the login" }), row({ id: "s2", title: "Waiting one" })], next: "c1" } }),
+    });
+    renderAt("/w/w1/sessions", sessionsRoute);
+    await openMachine("laptop-1");
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    expect(await screen.findByText("Untitled session")).toBeInTheDocument();
+
+    renamed = true;
+    act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
+    expect(await screen.findByText("Fix the login, renamed")).toBeInTheDocument();
+    expect(screen.getByText("Untitled session")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+  });
+
   it("guides an empty workspace to the agent download", async () => {
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1/sessions": { body: { items: [], next: null } } });
     renderAt("/w/w1/sessions", sessionsRoute);

@@ -96,6 +96,7 @@ public static class IssueEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         var issue = f.Issue;
         var project = f.Grant.Project;
         if (issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
@@ -126,11 +127,19 @@ public static class IssueEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.Issue.ExternalKey is not null) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.NoArchive);
         var now = clock.GetUtcNow();
         f.Issue.ArchivedAt = archive ? now : null;
         f.Issue.UpdatedAt = now;
         f.Issue.UpdatedBy = userId;
+        // Closing skips archived issues, so an unfinished one comes back to where the close would have sent it: the backlog.
+        if (!archive && f.Issue.SprintId is { } sprintId && f.Issue.Status is not (IssueStatuses.Done or IssueStatuses.Cancelled)
+            && await db.Sprints.AnyAsync(s => s.Id == sprintId && s.Status == SprintStatuses.Closed, http.RequestAborted))
+        {
+            SprintIssueEndpoints.Release(f.Issue, null, userId, now);
+        }
+
         Audit.Add(db, http, clock, action, f.Issue.WorkspaceId, userId, targetType: "issue", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
@@ -142,6 +151,7 @@ public static class IssueEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         var issue = f.Issue;
         var anchor = req.AfterIssueId is { } anchorId ? await db.Issues.AsNoTracking().FirstOrDefaultAsync(i => i.Id == anchorId && i.ProjectId == issue.ProjectId, http.RequestAborted) : null;
         if (req.AfterIssueId is not null && anchor is null) return Http.Invalid("afterIssueId", "invalid_issue");

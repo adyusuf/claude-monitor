@@ -104,4 +104,14 @@ describe("under a command", () => {
     await userEvent.click(screen.getByRole("button", { name: "See the whole reply" }));
     expect(await screen.findByText("The reply is no longer available.")).toBeInTheDocument();
   });
+
+  it("says the same, keeps the preview's place and the button usable, when reading the whole reply fails", async () => {
+    mockApi({ "GET /me": { body: ME }, "GET /sessions/s1/events": { status: 500 } });
+    show(command({ replyEventId: 7, replyText: "Start", replyMore: true }));
+    await userEvent.click(screen.getByRole("button", { name: "See the whole reply" }));
+    expect(await screen.findByText("The reply is no longer available.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show less" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(screen.getByText("Start…")).toBeInTheDocument();
+  });
 });

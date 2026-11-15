@@ -187,6 +187,47 @@ describe("the conversation: long output, plans, notes, catching up and scrolling
     expect(await screen.findByText("reply 4")).toBeInTheDocument();
   });
 
+  it("shows New messages when something arrives while scrolled up, and pressing it scrolls to the end and hides it", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 500 });
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 2000 });
+    let items = [said(5, "reply 5")];
+    base(() => ({ items, next: null }));
+    renderAt("/w/w1/sessions/s1", route);
+    const box = await screen.findByLabelText("Session conversation");
+    let top = 0;
+    Object.defineProperty(box, "scrollTop", { configurable: true, get: () => top, set: (v: number) => { top = v; } });
+    top = 1000; // 500 px above the end: the reader scrolled up
+    fireEvent.scroll(box);
+
+    items = [said(6, "reply 6"), said(5, "reply 5")];
+    act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
+    expect(await screen.findByText("reply 6")).toBeInTheDocument();
+    expect(top).toBe(1000); // the reader's place is kept
+    const button = screen.getByRole("button", { name: "New messages ↓" });
+
+    await userEvent.click(button);
+    expect(top).toBe(2000);
+    expect(screen.queryByRole("button", { name: "New messages ↓" })).toBeNull();
+  });
+
+  it("follows a new message without the New messages button while the reader is at the end", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 500 });
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 2000 });
+    let items = [said(5, "reply 5")];
+    base(() => ({ items, next: null }));
+    renderAt("/w/w1/sessions/s1", route);
+    const box = await screen.findByLabelText("Session conversation");
+    let top = 1500;
+    Object.defineProperty(box, "scrollTop", { configurable: true, get: () => top, set: (v: number) => { top = v; } });
+    fireEvent.scroll(box);
+
+    items = [said(6, "reply 6"), said(5, "reply 5")];
+    act(() => FakeEventSource.last!.emit("session", { sessionId: "s1" }));
+    expect(await screen.findByText("reply 6")).toBeInTheDocument();
+    expect(top).toBe(2000);
+    expect(screen.queryByRole("button", { name: "New messages ↓" })).toBeNull();
+  });
+
   it("shows what waits for permission inside the conversation, where it can be answered", async () => {
     base(() => ({ items: [said(1, "hello")], next: null }), {
       "GET /sessions/s1/permission-requests": { body: [{ id: "p1", toolName: "Bash", toolInput: { command: "git push" }, status: "open", createdAt: "", expiresAt: at, decision: null, reason: null, answeredAt: null }] },

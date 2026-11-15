@@ -13,10 +13,13 @@ public sealed record DeviceDecision(string? UserCode, Guid? WorkspaceId);
 /// <summary>Connecting an agent (RFC 8628 device authorisation): the agent polls, a signed-in person approves.</summary>
 public static class DeviceEndpoints
 {
+    /// <summary>The poll of <c>/device/token</c> has its own, looser per-IP budget (<see cref="ApiConfig.DeviceTokenRequestsPerMinute"/>).</summary>
+    public const string TokenRateLimitPolicy = "device-token";
+
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapPost("/device/code", Code).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
-        api.MapPost("/device/token", Token);
+        api.MapPost("/device/code", Code).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
+        api.MapPost("/device/token", Token).RequireRateLimiting(TokenRateLimitPolicy).AllowAnonymous();
         var web = api.MapGroup("/device").RequireAuthorization(Schemes.Session).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         web.MapGet("/lookup/{userCode}", Lookup);
         web.MapPost("/approve", Approve);
@@ -26,9 +29,9 @@ public static class DeviceEndpoints
     private static async Task<IResult> Code(DeviceCodeRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
     {
         if (req.MachineKey is not { Length: >= 16 and <= 200 }) return Http.Invalid("machineKey", "invalid");
-        if (!Http.IsName(req.Hostname, 255)) return Http.Invalid("hostname", "invalid");
+        if (!IsMachineFact(req.Hostname, 255)) return Http.Invalid("hostname", "invalid");
         if (!OsKinds.All.Contains(req.Os)) return Http.Invalid("os", "invalid");
-        if (!Http.IsName(req.Arch, 20)) return Http.Invalid("arch", "invalid");
+        if (!IsMachineFact(req.Arch, 20)) return Http.Invalid("arch", "invalid");
         if (!Version.TryParse(req.AgentVersion, out var version)) return Http.Invalid("agentVersion", "invalid");
         if (version < config.MinimumAgentVersion) return UpgradeRequired();
 
@@ -59,6 +62,11 @@ public static class DeviceEndpoints
             config.DevicePollSeconds, (int)config.DeviceCodeLifetime.TotalSeconds));
     }
 
+    /// <summary>A hostname or arch is shown to the approver and to every member and reaches agent tools: one plain line, so no
+    /// format character either (bidi overrides, zero-width marks), on top of the control characters <see cref="Http.IsName"/> refuses.</summary>
+    private static bool IsMachineFact(string? value, int max) =>
+        Http.IsName(value, max) && !value!.Any(c => char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format);
+
     private static async Task<IResult> Token(DeviceTokenRequest req, HttpContext http, PodiumDb db, ApiConfig config,
         TimeProvider clock)
     {
@@ -87,10 +95,24 @@ public static class DeviceEndpoints
                 return Error(tooSoon ? DeviceTokenErrors.SlowDown : DeviceTokenErrors.Pending);
         }
 
+        // The approval was given under a membership that may be gone by now: it is asked again before the agent exists.
+        if (await Access.MemberAsync(db, device.ApprovedBy!.Value, device.WorkspaceId!.Value, Roles.Viewer, http.RequestAborted) is null)
+        {
+            device.Status = DeviceStatuses.Denied;
+            await db.SaveChangesAsync(http.RequestAborted);
+            return Error(DeviceTokenErrors.Denied);
+        }
+
+        // Single use under a race: the code is claimed by a compare-and-set on Status = approved, and the claim, the agent and its
+        // tokens commit together. A parallel poll waits on the claimed row, changes nothing and hears that the code is used up.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var claimed = await db.DeviceAuthorizations.Where(d => d.Id == device.Id && d.Status == DeviceStatuses.Approved)
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, DeviceStatuses.Consumed), http.RequestAborted);
+        if (claimed == 0) return Error(DeviceTokenErrors.Expired);
         var agent = await EnrolAsync(db, device, now, http.RequestAborted);
-        device.Status = DeviceStatuses.Consumed;
         var tokens = AgentTokens.Issue(db, config, agent, now);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.Ok(tokens);
     }
 

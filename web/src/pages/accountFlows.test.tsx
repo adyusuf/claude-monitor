@@ -26,15 +26,20 @@ describe("turning two-step sign-in off", () => {
 });
 
 describe("accepting an invitation", () => {
-  const routes = [{ path: "/invitations/accept", element: <AcceptInvitationPage /> }, { path: "/", element: <div>home page</div> }];
+  const routes = [
+    { path: "/invitations/accept", element: <AcceptInvitationPage /> },
+    { path: "/w/:ws/projects", element: <div>workspace page</div> },
+    { path: "/", element: <div>home page</div> },
+  ];
 
-  it("sends the token from the link and takes the person home once joined", async () => {
+  it("sends the token from the link and takes the person to the workspace they joined (F-058)", async () => {
     const calls = mockApi({
       "GET /me": { body: ME },
-      "POST /invitations/accept": { body: { workspaceId: "w1" } },
+      "POST /invitations/accept": { body: { workspaceId: "w2" } },
     });
     renderAt("/invitations/accept?token=invite-1", routes);
-    expect(await screen.findByText("home page")).toBeInTheDocument();
+    expect(await screen.findByText("workspace page")).toBeInTheDocument();
+    expect(screen.queryByText("home page")).not.toBeInTheDocument();
     expect(calls.find((c) => c.path === "/invitations/accept")?.body).toEqual({ token: "invite-1" });
   });
 
@@ -44,7 +49,7 @@ describe("accepting an invitation", () => {
       "POST /invitations/accept": { body: { workspaceId: "w1" } },
     });
     renderAt("/invitations/accept?token=invite-1", routes);
-    await screen.findByText("home page");
+    await screen.findByText("workspace page");
     // The page's own first read may come after the POST (the POST is sent from a child effect), so one read proves nothing: the refresh is the second.
     const reads = calls.filter((c) => c.method === "GET" && c.path === "/me");
     expect(reads.length).toBeGreaterThanOrEqual(2);

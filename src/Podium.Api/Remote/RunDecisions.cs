@@ -97,16 +97,26 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
         }
 
         var startBy = RunNotices.StartBy(config, now);
+        // The status change, its audit row and the used two-step code (written by the same save) commit together or not at all (F-194).
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var changed = await db.RemoteRuns
             .Where(r => r.Id == id && r.Status == RunStatuses.PendingApproval && r.ExpiresAt > now && r.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Approved).SetProperty(r => r.DecidedAt, now)
                 .SetProperty(r => r.DecidedBy, userId).SetProperty(r => r.ExpiresAt, startBy)
                 .SetProperty(r => r.ApprovedWithTotp, withTotp).SetProperty(r => r.ApprovalKeyId, signedKey).SetProperty(r => r.ApprovalSignature, signature)
                 .SetProperty(r => r.ApprovalNotAfter, signedNotAfter), ct);
-        if (changed != 1) return Conflict(RemoteErrors.NotPending);
+        if (changed != 1)
+        {
+            // Lost to another answer or the expiry: a code that was accepted is still used up.
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return Conflict(RemoteErrors.NotPending);
+        }
+
         Audit.Add(db, http, clock, AuditActions.RunApproved, run.WorkspaceId, userId, targetType: "run", targetId: id,
             detail: new { hash = req.Hash, mode = run.Mode, totp = withTotp, codeWindow });
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         run.Status = RunStatuses.Approved;
         run.DecidedAt = now;
         run.ExpiresAt = startBy;
@@ -124,8 +134,10 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
         var userId = http.User.UserId();
         var run = await OwnedAsync(id, userId, ct);
         if (run is null) return Http.NotFound();
+        if (RemoteChecks.ReasonNulProblem(req.Reason) is { } refused) return refused;
         var now = clock.GetUtcNow();
         var error = req.Reason is { Length: > 0 } reason ? reason[..Math.Min(reason.Length, config.RunReasonMax)] : null;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var changed = await db.RemoteRuns
             .Where(r => r.Id == id && r.Status == RunStatuses.PendingApproval && r.TargetUserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Denied).SetProperty(r => r.DecidedAt, now)
@@ -133,6 +145,7 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
         if (changed != 1) return Conflict(RemoteErrors.NotPending);
         Audit.Add(db, http, clock, AuditActions.RunDenied, run.WorkspaceId, userId, targetType: "run", targetId: id);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         run.Status = RunStatuses.Denied;
         RunNotices.Changed(broker, run);
         return Results.NoContent();
@@ -150,11 +163,13 @@ public sealed class RunDecisions(PodiumDb db, ApiConfig config, TimeProvider clo
         }
 
         var now = clock.GetUtcNow();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var changed = await db.RemoteRuns.Where(r => r.Id == id && Cancellable.Contains(r.Status))
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Cancelled).SetProperty(r => r.EndedAt, now), ct);
         if (changed != 1) return Conflict(RemoteErrors.NotPending);
         Audit.Add(db, http, clock, AuditActions.RunCancelled, run.WorkspaceId, userId, agentId, targetType: "run", targetId: id);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         var was = run.Status;
         run.Status = RunStatuses.Cancelled;
         RunNotices.Changed(broker, run);

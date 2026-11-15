@@ -19,7 +19,8 @@ export function GrantForm({ agentId, onCreated }: { agentId: string; onCreated: 
   const elements = template.split("\n").map((line) => line.replace(/\r$/, "")).filter((line) => line !== "");
   const submit = async () => {
     if (elements.length === 0 || !cwd.trim()) return setInvalid(t("remote.grantIncomplete"));
-    if (!(timeout >= 1 && timeout <= config.grantTimeoutMax) || !(days >= 1 && days <= config.grantDaysMax)) return setInvalid(t("errors.out_of_range"));
+    // The API takes whole numbers (int): a fraction is refused here, not left to the server.
+    if (!(Number.isInteger(timeout) && timeout >= 1 && timeout <= config.grantTimeoutMax) || !(Number.isInteger(days) && days >= 1 && days <= config.grantDaysMax)) return setInvalid(t("errors.out_of_range"));
     setInvalid(null);
     const input = { template: elements, cwd: cwd.trim(), maxTimeoutSeconds: timeout, days, reason: reason.trim() || undefined };
     if (await gate.attempt((code) => api.createGrant(agentId, { ...input, code }).then(() => undefined))) {

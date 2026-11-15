@@ -27,11 +27,14 @@ public static class SprintEndpoints
     private static async Task<IResult> List(Guid id, string? status, Guid? application, string? cursor, int? limit, HttpContext http, PodiumDb db, ApiConfig config)
     {
         if (await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
+        if (status is { Length: > 0 } && !SprintStatuses.All.Contains(status)) return Http.Invalid("status", "invalid_value");
+        var before = 0;
+        if (cursor is { Length: > 0 } && !int.TryParse(cursor, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out before)) return Http.Invalid("cursor", "invalid_value");
         var take = Http.Limit(limit, config);
         var query = db.Sprints.AsNoTracking().Where(s => s.ProjectId == id && s.ArchivedAt == null);
         if (status is { Length: > 0 }) query = query.Where(s => s.Status == status);
         if (application is { } app) query = query.Where(s => s.ApplicationId == app);
-        if (int.TryParse(cursor, out var before)) query = query.Where(s => s.Number < before);
+        if (cursor is { Length: > 0 }) query = query.Where(s => s.Number < before);
         var page = await query.OrderByDescending(s => s.Number).Take(take + 1).ToListAsync(http.RequestAborted);
         var shown = page.Take(take).ToList();
         var rows = await SprintViews.SummariesAsync(db, shown, http.RequestAborted);
@@ -53,7 +56,7 @@ public static class SprintEndpoints
             return Http.Invalid("applicationId", "invalid_application");
         }
 
-        if (await SprintRules.CheckReferencesAsync(db, project, req.ApplicationId, req, http.RequestAborted) is { } bad) return bad;
+        if (await SprintRules.CheckReferencesAsync(db, project, req.ApplicationId, req, [], http.RequestAborted) is { } bad) return bad;
 
         var now = clock.GetUtcNow();
         var sprint = new Sprint { WorkspaceId = project.WorkspaceId, ProjectId = id, ApplicationId = req.ApplicationId, CreatedBy = userId, CreatedAt = now };
@@ -83,31 +86,41 @@ public static class SprintEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status == SprintStatuses.Closed) return Http.Invalid("status", "closed");
+        // Starting needs both dates; a running sprint keeps them (a cleared date would also mean "unchanged" toward a tool).
+        if (sprint.Status == SprintStatuses.Active && (req.StartDate is null || req.EndDate is null)) return Http.Invalid(req.StartDate is null ? "startDate" : "endDate", "active_dates_required");
         if (SprintRules.Check(req) is { } invalid) return invalid;
-        if (await SprintRules.CheckReferencesAsync(db, f.Grant.Project, sprint.ApplicationId, req, http.RequestAborted) is { } bad) return bad;
+        var current = await db.SprintMembers.Where(m => m.SprintId == id).ToListAsync(http.RequestAborted);
+        if (await SprintRules.CheckReferencesAsync(db, f.Grant.Project, sprint.ApplicationId, req, [.. current.Select(m => m.UserId)], http.RequestAborted) is { } bad) return bad;
         var now = clock.GetUtcNow();
         if (await writes.UpdateAsync(userId, sprint, ProjectRules.Clean(req.Name), ProjectRules.Clean(req.Goal), req.StartDate, req.EndDate, http.RequestAborted) is { } refused) return refused;
         Fill(sprint, req, userId, now);
-        var current = await db.SprintMembers.Where(m => m.SprintId == id).ToListAsync(http.RequestAborted);
         SetTeam(db, id, current, req.TeamUserIds, now);
         Audit.Add(db, http, clock, AuditActions.SprintUpdated, sprint.WorkspaceId, userId, targetType: "sprint", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
-    /// <summary>A planned sprint is archived and its issues go back to the backlog.</summary>
+    /// <summary>A planned sprint is archived and its issues go back to the backlog, where work in flight becomes "ready" (as Remove and Close do).</summary>
     private static async Task<IResult> Delete(Guid id, HttpContext http, PodiumDb db, TimeProvider clock, SprintWrites writes)
     {
         var userId = http.User.UserId();
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status != SprintStatuses.Planned) return Http.Invalid("status", "not_planned");
         if (await writes.DeleteAsync(userId, sprint, http.RequestAborted) is { } refused) return refused;
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var now = clock.GetUtcNow();
-        await db.Issues.Where(i => i.SprintId == id).ExecuteUpdateAsync(s => s.SetProperty(i => i.SprintId, (Guid?)null).SetProperty(i => i.UpdatedAt, now), http.RequestAborted);
+        foreach (var issue in await db.Issues.Where(i => i.SprintId == id).ToListAsync(http.RequestAborted))
+        {
+            SprintIssueEndpoints.Release(issue, null, userId, now);
+        }
+
         sprint.ArchivedAt = now;
         sprint.UpdatedAt = now;
         sprint.UpdatedBy = userId;
@@ -123,10 +136,10 @@ public static class SprintEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status != SprintStatuses.Planned) return Http.Invalid("status", "not_planned");
         if (sprint.StartDate is null || sprint.EndDate is null) return Http.Invalid("startDate", "dates_required");
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        await IssueEndpoints.LockProjectAsync(db, sprint.ProjectId, http.RequestAborted);
         // A sprint mirrored from a tool may run next to others, as the tool allows (ADR-0015 §4).
         var taken = sprint.SourceConnectionId is null && await db.Sprints.AnyAsync(s => s.ProjectId == sprint.ProjectId && s.Status == SprintStatuses.Active && s.ArchivedAt == null
             && s.ApplicationId == sprint.ApplicationId, http.RequestAborted);
@@ -158,6 +171,8 @@ public static class SprintEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status != SprintStatuses.Active) return Http.Invalid("status", "not_active");
         if (req.MoveUnfinishedTo is { } target
             && !await db.Sprints.AnyAsync(s => s.Id == target && s.ProjectId == sprint.ProjectId && s.Status == SprintStatuses.Planned && s.ArchivedAt == null
@@ -166,7 +181,6 @@ public static class SprintEndpoints
             return Http.Invalid("moveUnfinishedTo", "invalid_sprint");
         }
 
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var now = clock.GetUtcNow();
         var unfinished = await db.Issues.Where(i => i.SprintId == id && i.ArchivedAt == null && i.Status != IssueStatuses.Done && i.Status != IssueStatuses.Cancelled)
             .ToListAsync(http.RequestAborted);
@@ -185,6 +199,17 @@ public static class SprintEndpoints
         await db.SaveChangesAsync(http.RequestAborted);
         await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
+    }
+
+    /// <summary>
+    /// Takes the project's row lock (inside the caller's transaction) and reads the sprint again, so a change that committed while this request
+    /// waited is seen: sprint changes of one project run one after another. False when the sprint was deleted meanwhile.
+    /// </summary>
+    internal static async Task<bool> LockAsync(PodiumDb db, Sprint sprint, CancellationToken ct)
+    {
+        await IssueEndpoints.LockProjectAsync(db, sprint.ProjectId, ct);
+        await db.Entry(sprint).ReloadAsync(ct);
+        return sprint.ArchivedAt is null;
     }
 
     private static void Fill(Sprint s, SprintInput i, Guid userId, DateTimeOffset now)

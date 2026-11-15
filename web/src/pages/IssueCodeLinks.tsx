@@ -7,7 +7,7 @@ import { codeLinkUrlOk } from "../lib/issueForm";
 import { CODE_LINK_KINDS, issueLimits } from "../lib/issueOptions";
 import { WebText } from "./ProjectBits";
 
-/** The pull requests and commits of an issue. An address is a link only when it is http or https; anything else stays plain text. */
+/** The pull requests and commits of an issue. An address is a link only when it is http or https (new ones must be https); anything else stays plain text. */
 export function IssueCodeLinks({ issueId, canWrite }: { issueId: string; canWrite: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();

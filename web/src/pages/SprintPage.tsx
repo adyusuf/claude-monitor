@@ -77,7 +77,7 @@ export function SprintPage() {
       {editing && canEdit ? (
         <Card title={t("sprints.editTitle")}>
           <SprintForm initial={draftOfSprint(view)} project={project} people={teamCandidates(context.members, view.team.map((m) => m.userId))}
-            releases={kept} submitLabel={t("common.save")} onSubmit={save} onCancel={() => setEditing(false)} />
+            releases={kept} datesRequired={s.status === "active"} submitLabel={t("common.save")} onSubmit={save} onCancel={() => setEditing(false)} />
         </Card>
       ) : <SprintFacts view={view} unit={unit} />}
       {closing && canEdit ? (

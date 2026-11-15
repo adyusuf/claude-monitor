@@ -17,6 +17,9 @@ public static class UpdateCommand
 {
     public const string Verb = "update";
 
+    /// <summary>Looks only; installs nothing.</summary>
+    public const string CheckFlag = "--check";
+
     /// <summary>What the daemon passes when it starts an install by itself.</summary>
     public const string AutoFlag = "--auto";
 

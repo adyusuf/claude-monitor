@@ -6,8 +6,12 @@ import { Button, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { IntegrationSprints } from "./IntegrationSprints";
 
+/** What the API takes in one import (it refuses more with invalid_list). */
+const IMPORT_MAX = 20;
+
 /** Lists the spaces of the site live, imports the chosen ones as projects, and opens the sprint chooser of an imported one. */
-export function IntegrationSpaces({ id, ws, canImport, onImported }: { id: string; ws: string; canImport: boolean; onImported: () => void }) {
+export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImported }:
+  { id: string; ws: string; canImport: boolean; canImportSprints: boolean; onImported: () => void }) {
   const { t, tx } = useI18n();
   const errorText = useErrorText();
   const [spaces, setSpaces] = useState<SpaceView[] | null>(null);
@@ -59,7 +63,7 @@ export function IntegrationSpaces({ id, ws, canImport, onImported }: { id: strin
         <ul className="plain">
           {spaces.map((s) => (
             <li key={s.key} className="check">
-              <input type="checkbox" aria-label={t("integrations.selectSpace", { name: s.name })} checked={picked.has(s.key)} disabled={!canImport} onChange={() => toggle(s.key)} />
+              <input type="checkbox" aria-label={t("integrations.selectSpace", { name: s.name })} checked={picked.has(s.key)} disabled={!canImport || (!picked.has(s.key) && picked.size >= IMPORT_MAX)} onChange={() => toggle(s.key)} />
               <span className="grow">
                 <strong>{s.name}</strong> <span className="muted">{s.key}</span>{" "}
                 {s.imported && s.projectId ? (
@@ -73,8 +77,9 @@ export function IntegrationSpaces({ id, ws, canImport, onImported }: { id: strin
           ))}
         </ul>
       )}
+      {spaces && canImport && picked.size >= IMPORT_MAX ? <p className="muted">{t("integrations.spacesLimit", { n: IMPORT_MAX })}</p> : null}
       {spaces && canImport ? <Button busy={busy} disabled={picked.size === 0} onClick={() => void run()}>{t("integrations.importSelected", { n: picked.size })}</Button> : null}
-      {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} onClose={() => setSprintsOf(null)} /> : null}
+      {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} canImport={canImportSprints} onClose={() => setSprintsOf(null)} /> : null}
     </div>
   );
 }

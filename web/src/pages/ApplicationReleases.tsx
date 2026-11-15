@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/endpoints";
 import type { ReleaseStatus, ReleaseView } from "../api/typesProjects";
+import { DayInput } from "../components/DayInput";
 import { Button, Card, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
-import { day } from "../lib/format";
-import { projectLimits, RELEASE_STATUSES } from "../lib/projectOptions";
+import { day, isDay } from "../lib/format";
+import { projectLimits, releaseStatusesFrom } from "../lib/projectOptions";
 
 interface Draft { name: string; plannedDate: string; status: ReleaseStatus }
 const blank: Draft = { name: "", plannedDate: "", status: "planned" };
@@ -38,6 +39,12 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
     return true;
   };
 
+  const badDate = (d: Draft) => {
+    if (d.plannedDate === "" || isDay(d.plannedDate)) return false;
+    setError(t("errors.invalid_date"));
+    return true;
+  };
+
   const act = async (work: () => Promise<unknown>, done?: () => void) => {
     try {
       setError(null);
@@ -51,12 +58,12 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
 
   const input = (d: Draft) => ({ name: d.name, plannedDate: d.plannedDate || null, status: d.status });
 
-  const fields = (d: Draft, label: string, onChange: (d: Draft) => void) => (
+  const fields = (d: Draft, label: string, onChange: (d: Draft) => void, from: ReleaseStatus | null) => (
     <>
       <input className="input" aria-label={`${t("projects.releaseName")} ${label}`} placeholder={t("projects.releaseName")} maxLength={projectLimits.nameMax} value={d.name} onChange={(e) => onChange({ ...d, name: e.target.value })} />
-      <input className="input" type="date" aria-label={`${t("projects.plannedDate")} ${label}`} value={d.plannedDate} onChange={(e) => onChange({ ...d, plannedDate: e.target.value })} />
+      <DayInput label={`${t("projects.plannedDate")} ${label}`} value={d.plannedDate} onChange={(plannedDate) => onChange({ ...d, plannedDate })} />
       <select className="input" aria-label={`${t("projects.releaseStatus")} ${label}`} value={d.status} onChange={(e) => onChange({ ...d, status: e.target.value as ReleaseStatus })}>
-        {RELEASE_STATUSES.map((s) => <option key={s} value={s}>{t(`projects.release.${s}`)}</option>)}
+        {releaseStatusesFrom(from).map((s) => <option key={s} value={s}>{t(`projects.release.${s}`)}</option>)}
       </select>
     </>
   );
@@ -71,9 +78,9 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
               {editing?.id === r.id ? (
                 <form className="row-input grow" onSubmit={(e) => {
                   e.preventDefault();
-                  if (!blankName(editing.draft.name)) void act(() => api.putRelease(r.id, input(editing.draft)), () => setEditing(null));
+                  if (!blankName(editing.draft.name) && !badDate(editing.draft)) void act(() => api.putRelease(r.id, input(editing.draft)), () => setEditing(null));
                 }}>
-                  {fields(editing.draft, r.name, (d) => setEditing({ id: r.id, draft: d }))}
+                  {fields(editing.draft, r.name, (d) => setEditing({ id: r.id, draft: d }), r.status)}
                   <Button type="submit">{t("common.save")}</Button>
                   <Button variant="ghost" onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
                 </form>
@@ -86,7 +93,7 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
                   {canEdit ? (
                     <span className="row-actions">
                       <Button variant="ghost" onClick={() => setEditing({ id: r.id, draft: { name: r.name, plannedDate: r.plannedDate ?? "", status: r.status } })}>{t("projects.edit")}</Button>
-                      {r.status === "released" ? null : <Button variant="ghost" onClick={() => void act(() => api.cancelRelease(r.id))}>{t("projects.cancelRelease")}</Button>}
+                      {r.status === "released" ? null : <Button variant="ghost" onClick={() => { if (window.confirm(t("projects.cancelReleaseConfirm", { name: r.name }))) void act(() => api.cancelRelease(r.id)); }}>{t("projects.cancelRelease")}</Button>}
                     </span>
                   ) : null}
                 </>
@@ -98,9 +105,9 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
       {canEdit ? (
         <form className="row-input add-row" onSubmit={(e) => {
           e.preventDefault();
-          if (!blankName(draft.name)) void act(() => api.addRelease(applicationId, input(draft)), () => setDraft(blank));
+          if (!blankName(draft.name) && !badDate(draft)) void act(() => api.addRelease(applicationId, input(draft)), () => setDraft(blank));
         }}>
-          {fields(draft, t("projects.newRelease"), setDraft)}
+          {fields(draft, t("projects.newRelease"), setDraft, null)}
           <Button type="submit">{t("projects.addRelease")}</Button>
         </form>
       ) : null}

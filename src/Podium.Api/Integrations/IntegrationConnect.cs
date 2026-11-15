@@ -10,6 +10,7 @@ public static class IntegrationConnect
 {
     public const string Ok = "ok";
     public const string SiteNotFound = "site_not_found";
+    public const string AccountInUse = "account_in_use";
 
     public static async Task<string> CompleteAsync(PodiumDb db, ApiConfig config, TimeProvider clock, JiraOAuth oauth, IntegrationOAuthState state,
         string code, HttpContext http)
@@ -30,12 +31,24 @@ public static class IntegrationConnect
                 && c.Status != ConnectionStatuses.Disconnected, ct);
             if (connection is null || await Access.MemberAsync(db, state.UserId, state.WorkspaceId, Roles.Member, ct) is null) return "invalid_state";
             if (connection.CloudId != site.Id) return SiteNotFound;
+            // The connector's account reads for everybody: their own new sign-in repairs a connection their refused refresh left needing one.
+            if (connection.ConnectorUserId == state.UserId && connection.Status == ConnectionStatuses.Reauthorize)
+            {
+                connection.Status = ConnectionStatuses.Active;
+                connection.LastError = null;
+                connection.UpdatedAt = now;
+            }
         }
         else
         {
             if (await Access.MemberAsync(db, state.UserId, state.WorkspaceId, Roles.Admin, ct) is null) return "invalid_state";
             connection = await db.IntegrationConnections.FirstOrDefaultAsync(c => c.WorkspaceId == state.WorkspaceId && c.Provider == TrackerProviders.Jira
                 && c.SiteHost == state.SiteHost && c.Status != ConnectionStatuses.Disconnected, ct);
+            // A site connected again after a disconnect gets its last connection back: the projects and issues imported then are linked to
+            // it, so importing a space again finds them. Only for the same site (cloud id): a site made anew at the address starts afresh.
+            connection ??= await db.IntegrationConnections.Where(c => c.WorkspaceId == state.WorkspaceId && c.Provider == TrackerProviders.Jira
+                && c.SiteHost == state.SiteHost && c.Status == ConnectionStatuses.Disconnected && c.CloudId == site.Id)
+                .OrderByDescending(c => c.UpdatedAt).ThenByDescending(c => c.CreatedAt).FirstOrDefaultAsync(ct);
             if (connection is null)
             {
                 connection = new IntegrationConnection
@@ -57,6 +70,8 @@ public static class IntegrationConnect
             connection.UpdatedAt = now;
         }
 
+        // One Atlassian account stands for one person of a connection, or their Jira writes would be attributed to someone else's Jira user.
+        if (await db.IntegrationAccounts.AnyAsync(a => a.ConnectionId == connection.Id && a.ExternalAccountId == accountId && a.UserId != state.UserId, ct)) return AccountInUse;
         var account = await db.IntegrationAccounts.FirstOrDefaultAsync(a => a.ConnectionId == connection.Id && a.UserId == state.UserId, ct);
         if (account is null)
         {

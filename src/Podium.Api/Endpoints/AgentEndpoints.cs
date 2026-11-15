@@ -18,7 +18,7 @@ public static class AgentEndpoints
 {
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapPost("/agent/token/refresh", Refresh).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+        api.MapPost("/agent/token/refresh", Refresh).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
         // Outside the version gate on purpose: an agent below the minimum version must still be able to fetch its update.
         api.MapGet("/agent/latest", Latest).RequireAuthorization(Schemes.Agent);
         var g = api.MapGroup("/agent").RequireAuthorization(Schemes.Agent).AddEndpointFilter(VersionGate);
@@ -52,14 +52,19 @@ public static class AgentEndpoints
     private static async Task<IResult> Refresh(RefreshRequest req, HttpContext http, PodiumDb db, ApiConfig config,
         TimeProvider clock, Broker broker)
     {
+        // One transaction: the replaced mark on the old token and its successor are stored together (AgentTokens.RefreshAsync).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, clock.GetUtcNow(), http.RequestAborted);
         if (outcome == AgentTokens.RefreshOutcome.Reused)
         {
-            Audit.Add(db, http, clock, AuditActions.RefreshReuse, agentId: agentId);
+            // The row goes to the agent's workspace: the audit log is read per workspace, and a copied token is what its admins must see.
+            var workspaceId = await db.Agents.Where(a => a.Id == agentId).Select(a => (Guid?)a.WorkspaceId).FirstOrDefaultAsync(http.RequestAborted);
+            Audit.Add(db, http, clock, AuditActions.RefreshReuse, workspaceId, agentId: agentId);
             broker.Publish(Broker.Agent(agentId!.Value), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return outcome == AgentTokens.RefreshOutcome.Issued
             ? Results.Ok(tokens)
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_refresh_token",
@@ -105,7 +110,7 @@ public static class AgentEndpoints
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
-    private static async Task<IResult> Stream(HttpContext http, PodiumDb db, Broker broker, TimeProvider clock)
+    private static async Task<IResult> Stream(HttpContext http, PodiumDb db, Broker broker, TimeProvider clock, ApiConfig config)
     {
         var agentId = http.User.AgentId();
         var subscription = broker.Subscribe(Broker.Agent(agentId));
@@ -126,7 +131,7 @@ public static class AgentEndpoints
             .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)))
             .Concat(asks.Select(a => new StreamMessage(AgentStreamEvents.Ask, a)))
             .Concat(actions.Select(a => new StreamMessage(AgentStreamEvents.Action, a)));
-        return Sse.Stream(subscription, first, http.RequestAborted);
+        return Sse.Stream(subscription, first, config.StreamPingEvery, http.RequestAborted);
     }
 
     private static async Task<IResult> CommandStatus(Guid id, CommandStatusUpdate req, HttpContext http, PodiumDb db,
@@ -142,6 +147,7 @@ public static class AgentEndpoints
         }
 
         var now = clock.GetUtcNow();
+        var was = command.Status;
         command.Status = req.Status!;
         command.Result = req.Result is { Length: > 500 } r ? r[..500] : req.Result;
         if (req.Status == CommandStatuses.Delivered)
@@ -157,7 +163,13 @@ public static class AgentEndpoints
             // An unknown value is dropped, not refused: a newer agent may name a way this API does not know yet.
             if (req.Status == CommandStatuses.Applied && req.Transport is { } transport && CommandTransports.All.Contains(transport)) command.Transport = transport;
         }
+        // Compare-and-set on the status read above: a cancel (or another report) that changed it since wins, and this report is a 409.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var moved = await db.SessionCommands.Where(c => c.Id == id && c.Status == was)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, command.Status), http.RequestAborted);
+        if (moved == 0) return Results.Conflict();
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(command.WorkspaceId),
             new StreamMessage("command", new { sessionId = command.SessionId, id, status = command.Status }));
         return Results.NoContent();
@@ -198,10 +210,15 @@ public static class AgentEndpoints
         };
         db.PermissionRequests.Add(request);
 
+        // The rule's use is counted in the same transaction as the request it answers (F-162).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         // An approval rule answers at once, but only to an agent that reads the answer in this response (ADR-0019 §7, §8).
         var agent = req.InlineAnswer ? await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted) : null;
         var rule = agent is null ? null
             : await ApprovalRules.MatchAsync(db, agent, request.RepoId, req.ToolName, req.ToolInput, request.AccessScope, now, http.RequestAborted);
+        // The use is a conditional write on a rule still live (as a grant's is), so a rule revoked or ended a moment ago allows nothing and
+        // requests at the same moment all count; a request it does not allow waits for the owner like any other.
+        if (rule is not null && !await ApprovalRules.CountUseAsync(db, rule.Id, now, http.RequestAborted)) rule = null;
         PermissionAnswerMessage? answer = null;
         if (rule is not null)
         {
@@ -210,25 +227,30 @@ public static class AgentEndpoints
             request.AnsweredBy = rule.UserId;
             request.AnsweredAt = now;
             request.AnsweredByRule = rule.Id;
-            rule.UseCount++;
-            rule.LastUsedAt = now;
             Audit.Add(db, http, clock, AuditActions.PermissionAutoAllowed, session.WorkspaceId, rule.UserId, targetType: "permission_request",
                 targetId: request.Id, detail: new { rule = rule.Id, request.ToolName });
             answer = new PermissionAnswerMessage(request.Id, session.ExternalId, PermissionDecisions.Allow, null);
         }
-        else
+        else if (session.Status != SessionStatuses.Ended)
         {
-            session.Status = SessionStatuses.Waiting;
+            session.Status = SessionStatuses.Waiting; // an ended session stays ended, as in the event projector
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(session.WorkspaceId),
             new StreamMessage("permission", new { sessionId = session.Id, id = request.Id, status = request.Status }));
         return Results.Ok(new PermissionRequestCreated(request.Id, request.ExpiresAt, answer));
     }
 
+    /// <summary>
+    /// OBSOLETE (F-196): nothing in the product calls this any more, the answer reaches the agent on its stream. It stays, and keeps returning real
+    /// values, for older agents (rule 4); every answer carries <c>Deprecation: true</c>. It does not return an answer's chosen options (they are
+    /// not stored), so a poller can lose them: another reason to read the stream.
+    /// </summary>
     private static async Task<IResult> GetPermission(Guid id, HttpContext http, PodiumDb db)
     {
+        http.Response.Headers["Deprecation"] = "true";
         var agentId = http.User.AgentId();
         var row = await (from p in db.PermissionRequests.AsNoTracking()
                          join s in db.HarnessSessions.AsNoTracking() on p.SessionId equals s.Id

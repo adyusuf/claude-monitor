@@ -41,17 +41,30 @@ public static class IssueRunEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.RunId is not { } runId || !await db.RemoteRuns.AnyAsync(r => r.Id == runId && r.WorkspaceId == f.Issue.WorkspaceId, http.RequestAborted))
         {
             return Http.Invalid("runId", "invalid_run");
         }
 
+        // The project lock keeps the cap exact; the primary key (issue, run) answers a duplicate that still slips through.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, f.Issue.ProjectId, http.RequestAborted);
         if (await db.IssueRuns.AnyAsync(l => l.IssueId == id && l.RunId == runId, http.RequestAborted)) return Http.Invalid("runId", "duplicate_link");
         if (await db.IssueRuns.CountAsync(l => l.IssueId == id, http.RequestAborted) >= PerIssueMax) return Http.Invalid("runId", "limit_reached");
         db.IssueRuns.Add(new IssueRun { IssueId = id, RunId = runId, LinkedBy = userId, LinkedAt = clock.GetUtcNow() });
         Audit.Add(db, http, clock, AuditActions.IssueRunLinkChanged, f.Issue.WorkspaceId, userId, targetType: "issue", targetId: id);
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e))
+        {
+            return Http.Invalid("runId", "duplicate_link");
+        }
+
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
@@ -60,6 +73,7 @@ public static class IssueRunEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         var link = await db.IssueRuns.FirstOrDefaultAsync(l => l.IssueId == id && l.RunId == runId, http.RequestAborted);
         if (link is null) return Http.NotFound();
         db.IssueRuns.Remove(link);

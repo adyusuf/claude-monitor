@@ -1,34 +1,21 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
 namespace Podium.Agent.Access;
 
 /// <summary>
-/// The SHA-256 of an executable an access layer lists with a hash (ADR-0020 §4), cached by the file's identity, size and modification time so a program
-/// is read once until it changes. Null when the file cannot be read: the hash then matches nothing and the run is refused.
+/// The SHA-256 of an executable an access layer lists with a hash (ADR-0020 §4), read from the file every time it is asked for: a cache keyed on the
+/// file's identity, size and modification time missed a file swapped in place for one of the same size with its time put back (the change time is not
+/// readable the same way on every OS here). Null when the file cannot be read: the hash then matches nothing and the run is refused.
 /// </summary>
 internal static class ExecutableHashes
 {
-    private const int MaxCached = 256;
-    private static readonly ConcurrentDictionary<(FileId Id, long Size, long Ticks), string> Cache = new();
-
     public static string? Of(string realPath)
     {
         try
         {
-            var info = new FileInfo(realPath);
-            if (!info.Exists) return null;
-            var key = PathIdentity.Of(realPath) is { } id ? (id, info.Length, info.LastWriteTimeUtc.Ticks) : ((FileId, long, long)?)null;
-            if (key is { } k && Cache.TryGetValue(k, out var cached)) return cached;
+            if (!File.Exists(realPath)) return null;
             using var stream = new FileStream(realPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            var hash = Convert.ToHexStringLower(SHA256.HashData(stream));
-            if (key is { } store)
-            {
-                if (Cache.Count >= MaxCached) Cache.Clear();
-                Cache[store] = hash;
-            }
-
-            return hash;
+            return Convert.ToHexStringLower(SHA256.HashData(stream));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

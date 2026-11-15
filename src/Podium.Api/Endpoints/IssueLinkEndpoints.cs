@@ -22,6 +22,7 @@ public static class IssueLinkEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         var issue = f.Issue;
         if (issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.Kind is null || !IssueLinkKinds.All.Contains(req.Kind)) return Http.Invalid("kind", "invalid_value");
@@ -33,9 +34,15 @@ public static class IssueLinkEndpoints
         }
 
         var (blocker, blocked) = req.Kind == IssueLinkKinds.Blocks ? (id, otherId) : (otherId, id);
-        if (await db.IssueLinks.CountAsync(l => l.BlockerIssueId == id || l.BlockedIssueId == id, http.RequestAborted) >= PerIssueMax)
+        // The project lock makes the cap, duplicate and loop checks and the insert one step: two calls at once cannot both pass.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, issue.ProjectId, http.RequestAborted);
+        foreach (var end in new[] { id, otherId })
         {
-            return Http.Invalid("otherIssueId", "limit_reached");
+            if (await db.IssueLinks.CountAsync(l => l.BlockerIssueId == end || l.BlockedIssueId == end, http.RequestAborted) >= PerIssueMax)
+            {
+                return Http.Invalid("otherIssueId", "limit_reached");
+            }
         }
 
         var pairs = await db.IssueLinks.AsNoTracking().Where(l => l.ProjectId == issue.ProjectId)
@@ -54,6 +61,7 @@ public static class IssueLinkEndpoints
         });
         Audit.Add(db, http, clock, AuditActions.IssueLinkChanged, issue.WorkspaceId, userId, targetType: "issue", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
@@ -63,6 +71,7 @@ public static class IssueLinkEndpoints
         var link = await db.IssueLinks.FirstOrDefaultAsync(l => l.Id == id, http.RequestAborted);
         if (link is null || await ProjectAccess.IssueAsync(db, userId, link.BlockerIssueId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         db.IssueLinks.Remove(link);
         Audit.Add(db, http, clock, AuditActions.IssueLinkChanged, link.WorkspaceId, userId, targetType: "issue", targetId: link.BlockerIssueId);
         await db.SaveChangesAsync(http.RequestAborted);

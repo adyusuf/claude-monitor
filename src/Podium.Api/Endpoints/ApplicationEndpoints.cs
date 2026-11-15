@@ -82,6 +82,7 @@ public static class ApplicationEndpoints
         var found = await ProjectAccess.ApplicationAsync(db, userId, id, http.RequestAborted);
         if (found is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.App.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (ProjectRules.Check(req) is { } invalid) return invalid;
         if (await TechOwnerInvalidAsync(db, req, f.App.WorkspaceId, http.RequestAborted)) return Http.Invalid("techOwnerUserId", "not_a_member");
@@ -103,6 +104,13 @@ public static class ApplicationEndpoints
         var found = await ProjectAccess.ApplicationAsync(db, userId, id, http.RequestAborted);
         if (found is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (status == ManagedStatuses.Active && f.App.Status != ManagedStatuses.Active
+            && await db.Applications.CountAsync(a => a.ProjectId == f.App.ProjectId && a.Status == ManagedStatuses.Active, http.RequestAborted) >= PerProjectMax)
+        {
+            return Http.Invalid("name", "limit_reached");
+        }
+
         f.App.Status = status;
         f.App.UpdatedAt = clock.GetUtcNow();
         f.App.UpdatedBy = userId;
@@ -117,7 +125,7 @@ public static class ApplicationEndpoints
         a.NameSearch = SearchText.Normalize(a.Name);
         a.Description = ProjectRules.Clean(i.Description);
         a.Kind = i.Kind ?? a.Kind;
-        a.RepoUrl = ProjectRules.Clean(i.RepoUrl);
+        a.RepoUrl = ProjectRules.CleanRepoLink(i.RepoUrl);
         a.Environments = ProjectJson.Pack((i.Environments ?? []).Select(e => new EnvironmentEntry(e.Name, ProjectRules.Clean(e.Url))).ToList());
         a.TechStack = [.. ProjectRules.CleanList(i.TechStack)];
         a.VersioningScheme = i.VersioningScheme ?? a.VersioningScheme;

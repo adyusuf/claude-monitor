@@ -20,6 +20,9 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
 {
     public const string HostSuffix = ".atlassian.net";
 
+    /// <summary>The token endpoint's OAuth error for a grant that is used, revoked or stale: the only one that means sign in again.</summary>
+    public const string InvalidGrant = "invalid_grant";
+
     /// <summary>Classic scopes of the platform API: read and write issues, read people, register webhooks.</summary>
     public static readonly IReadOnlyList<string> PlatformScopes = ["read:jira-work", "write:jira-work", "read:jira-user", "manage:jira-webhook"];
 
@@ -142,18 +145,46 @@ public sealed partial class JiraOAuth(IHttpClientFactory clients, ApiConfig conf
         using var response = await SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)
         {
-            // invalid_grant (a used or revoked refresh token, a stale code) is the person's to fix by signing in again.
-            throw new TrackerException(response.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden
-                ? TrackerException.Codes.Unauthorized : TrackerException.Codes.Unavailable);
+            // Only invalid_grant (a used or revoked refresh token, a stale code) is the person's to fix by signing in again. Anything else (a
+            // wrong or rotated client secret answers invalid_client or access_denied, a 5xx, a body that is no OAuth error) is the server's:
+            // unavailable, so no account or connection is sent to sign in again for it.
+            throw new TrackerException(await OAuthErrorAsync(response, ct) == InvalidGrant ? TrackerException.Codes.Unauthorized : TrackerException.Codes.Unavailable);
         }
 
-        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        using var doc = await ParseTokenAnswerAsync(response, ct);
         var root = doc.RootElement;
         var access = JiraParse.Str(root, "access_token");
         var refresh = JiraParse.Str(root, "refresh_token");
         var seconds = root.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var n) ? n : 3600;
         if (access is not { Length: > 0 } || refresh is not { Length: > 0 }) throw new TrackerException(TrackerException.Codes.Rejected);
         return new TokenSet(access, refresh, Math.Clamp(seconds, 60, 86400));
+    }
+
+    /// <summary>A successful token answer as JSON; one that is not (a proxy's page, an empty body) is rejected, not a crash of the caller.</summary>
+    private static async Task<JsonDocument> ParseTokenAnswerAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        }
+        catch (JsonException)
+        {
+            throw new TrackerException(TrackerException.Codes.Rejected);
+        }
+    }
+
+    /// <summary>The OAuth <c>error</c> of a refused token call (RFC 6749 §5.2), or null when the body holds none. The rest of the body is never kept.</summary>
+    private static async Task<string?> OAuthErrorAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            return doc.RootElement.ValueKind == JsonValueKind.Object ? JiraParse.Str(doc.RootElement, "error") : null;
+        }
+        catch (JsonException)
+        {
+            return null; // not JSON (a proxy's error page): no OAuth error, so not the person's to fix
+        }
     }
 
     private async Task<JsonDocument> GetAsync(string url, string accessToken, CancellationToken ct)

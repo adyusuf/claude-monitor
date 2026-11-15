@@ -3,9 +3,16 @@
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function date(iso: string | null | undefined): string {
-  if (!iso) return "";
+/** The moment as a Date, or null for empty or unparseable input (the formatters below then show nothing, never NaN). */
+function parse(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
   const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function date(iso: string | null | undefined): string {
+  const d = parse(iso);
+  if (!d) return "";
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
@@ -15,21 +22,38 @@ export function day(iso: string | null | undefined): string {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : (iso ?? "");
 }
 
+/** True for a real calendar day written "2026-10-05" (no 31 February), the form the API takes. */
+export function isDay(iso: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return false;
+  const [year, month, dayOfMonth] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const check = new Date(Date.UTC(year, month - 1, dayOfMonth));
+  return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === dayOfMonth;
+}
+
+/** "2026-10-05" from what a person typed as "05/10/2026" (the one date form, global #12), or null when it is not a real day. */
+export function parseDay(text: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim());
+  const iso = match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+  return isDay(iso) ? iso : null;
+}
+
 export function dateTime(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
+  const d = parse(iso);
+  if (!d) return "";
   return `${date(iso)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function time(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
+  const d = parse(iso);
+  if (!d) return "";
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /** "05/10/2026 10:04:09": a moment to the second. */
 export function dateTimeSeconds(iso: string | null | undefined): string {
-  return iso ? `${date(iso)} ${time(iso)}` : "";
+  const d = parse(iso);
+  return d ? `${date(iso)} ${time(iso)}` : "";
 }
 
 /** "42s", "3m 07s", "1h 05m 09s": how long something took, from milliseconds. Translated units come from the caller. */
