@@ -31,7 +31,7 @@ import { useMachineData } from "./useMachineData";
 import { Icon } from "../components/icons";
 
 /** The live events that change what this page shows. */
-const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "machine", "action"];
+const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "schedule", "machine", "action"];
 
 /** One machine in tabs: overview, control, work (projects, runs, jobs, schedules), monitoring (load, alerts) and access (grants). The runs waiting for the owner stay above the tabs. */
 export function MachinePage() {
@@ -115,7 +115,7 @@ export function MachinePage() {
               {data.owned || data.detail.inventory ? (
                 <Card title={t("machines.inventory.title")}><MachineInventory agentId={agentId} detail={data.detail} owned={data.owned} agentVersion={data.agentVersion} onChanged={() => void reload()} /></Card>
               ) : null}
-              <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
+              <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} version={version} onChanged={() => void reload()} /></Card>
             </>
           ) : null,
         },

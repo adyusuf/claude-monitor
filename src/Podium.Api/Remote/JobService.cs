@@ -160,7 +160,7 @@ public sealed class JobService(PodiumDb db, ApiConfig config, TimeProvider clock
         job.Status = JobStatuses.Retired;
         Changed(job);
         await CancelByJobAsync(db, broker, id, now, ct);
-        await JobSchedules.EndForJobAsync(db, id, ScheduleReasons.JobRetired, now, ct); // a retired job fires nothing more
+        await JobSchedules.EndForJobAsync(db, broker, id, ScheduleReasons.JobRetired, now, ct); // a retired job fires nothing more
         return Results.NoContent();
     }
 

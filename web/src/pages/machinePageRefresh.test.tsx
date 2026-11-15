@@ -7,7 +7,7 @@ import { en } from "../i18n/en";
 import { FakeEventSource, ME, mockApi, openTab, renderAt } from "../test/helpers";
 import { job, machine } from "../test/remote-fixtures";
 import { MachinePage } from "./MachinePage";
-import { agent, settle } from "./machinesFixture";
+import { agent, count, settle } from "./machinesFixture";
 
 beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
 afterEach(() => {
@@ -94,5 +94,32 @@ describe("a live re-read of the machine page that partly fails", () => {
     expect(await screen.findByText(en.errors.server_error)).toBeInTheDocument();
     expect(screen.getByText(en.schedules.status.active)).toBeInTheDocument();
     expect(screen.queryByText(en.schedules.none)).toBeNull();
+  });
+});
+
+describe("what a live message makes the machine page read again", () => {
+  it("reads the schedules again after a schedule message (a pause or end by the server)", async () => {
+    const calls = api({ "GET /agents/a1/detail": { body: detail() } });
+    open();
+    await screen.findByRole("heading", { level: 1 });
+    await settle(calls);
+    const base = count(calls, "/agents/a1/schedules");
+
+    await liveReread("schedule");
+
+    expect(count(calls, "/agents/a1/schedules")).toBe(base + 1);
+  });
+
+  it("reads the owner's asks again on a live re-read, not only when the opt-in changes", async () => {
+    const calls = api({ "GET /agents/a1/detail": { body: detail() } });
+    open();
+    await openTab(en.views.machine.control);
+    await screen.findByText(en.machines.asks.none);
+    await settle(calls);
+    const base = count(calls, "/agents/a1/asks");
+
+    await liveReread("run");
+
+    expect(count(calls, "/agents/a1/asks")).toBe(base + 1);
   });
 });
