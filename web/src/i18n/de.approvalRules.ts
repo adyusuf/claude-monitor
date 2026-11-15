@@ -17,7 +17,7 @@ export const deApprovalRules: Dictionary["approvalRules"] = {
   noRemember: "Diese Anfrage wird einmal beantwortet: dieses Werkzeug, diese Eingabe oder Datei kann keine stehende Freigabe haben.",
   questionOnSession: "Eine Frage: beantworten Sie sie auf der Sitzungsseite.", openSession: "Sitzung öffnen",
   allow: "Erlauben", deny: "Ablehnen", reason: "Grund (optional)",
-  ends: "Endet", never: "bis zum Widerruf", uses: "Verwendet", lastUsed: "Zuletzt verwendet", revoke: "Widerrufen", revokeConfirm: "Diese stehende Freigabe widerrufen? Die nächste Anfrage fragt wieder.",
+  ends: "Endet", never: "bis zum Widerruf", uses: "Verwendet", lastUsed: "Zuletzt verwendet", neverUsed: "nie", revoke: "Widerrufen", revokeConfirm: "Diese stehende Freigabe widerrufen? Die nächste Anfrage fragt wieder.",
   answeredBy: "Beantwortet von", byRule: "eine stehende Freigabe", decision: { allow: "Erlaubt", deny: "Abgelehnt" }, when: "Wann",
   anyInput: "jede Eingabe",
   moreLine: "+1 weitere Zeile", moreLines: "+{n} weitere Zeilen",
