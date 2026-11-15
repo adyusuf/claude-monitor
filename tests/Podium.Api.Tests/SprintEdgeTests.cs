@@ -40,4 +40,20 @@ public sealed class SprintEdgeTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{planned}", new { goal = "No dates yet" })).StatusCode);
     }
 
+    [Fact]
+    public async Task A_team_member_who_became_a_viewer_does_not_block_later_edits_but_cannot_join_anew()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var sprint = await SprintKit.SprintAsync(t.Owner, t.Project, new { goal = "Team", teamUserIds = new[] { t.Owner.Id, t.Reviewer.Id } });
+        var other = await SprintKit.SprintAsync(t.Owner, t.Project);
+        (await t.Owner.SendAsync(HttpMethod.Patch, $"/api/workspaces/{t.Owner.WorkspaceId}/members/{t.Reviewer.Id}", new { role = "viewer" })).EnsureSuccessStatusCode();
+        Task<HttpResponseMessage> Put(Guid id, object body) => t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{id}", body);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await Put(sprint, new { goal = "Changed", teamUserIds = new[] { t.Owner.Id, t.Reviewer.Id } })).StatusCode);
+        Assert.Equal(2, (await SprintKit.ViewAsync(t.Owner, sprint)).GetProperty("team").GetArrayLength());
+        Assert.Equal(("teamUserIds", "not_a_member"), await ProjectKit.ProblemAsync(await Put(other, new { teamUserIds = new[] { t.Reviewer.Id } })));
+        Assert.Equal(HttpStatusCode.NoContent, (await Put(sprint, new { goal = "Dropped", teamUserIds = new[] { t.Owner.Id } })).StatusCode);
+        Assert.Equal(("teamUserIds", "not_a_member"), await ProjectKit.ProblemAsync(await Put(sprint, new { teamUserIds = new[] { t.Owner.Id, t.Reviewer.Id } })));
+        Assert.Equal(1, (await SprintKit.ViewAsync(t.Owner, sprint)).GetProperty("team").GetArrayLength());
+    }
 }

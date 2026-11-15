@@ -53,7 +53,7 @@ public static class SprintEndpoints
             return Http.Invalid("applicationId", "invalid_application");
         }
 
-        if (await SprintRules.CheckReferencesAsync(db, project, req.ApplicationId, req, http.RequestAborted) is { } bad) return bad;
+        if (await SprintRules.CheckReferencesAsync(db, project, req.ApplicationId, req, [], http.RequestAborted) is { } bad) return bad;
 
         var now = clock.GetUtcNow();
         var sprint = new Sprint { WorkspaceId = project.WorkspaceId, ProjectId = id, ApplicationId = req.ApplicationId, CreatedBy = userId, CreatedAt = now };
@@ -87,11 +87,11 @@ public static class SprintEndpoints
         // Starting needs both dates; a running sprint keeps them (a cleared date would also mean "unchanged" toward a tool).
         if (sprint.Status == SprintStatuses.Active && (req.StartDate is null || req.EndDate is null)) return Http.Invalid(req.StartDate is null ? "startDate" : "endDate", "active_dates_required");
         if (SprintRules.Check(req) is { } invalid) return invalid;
-        if (await SprintRules.CheckReferencesAsync(db, f.Grant.Project, sprint.ApplicationId, req, http.RequestAborted) is { } bad) return bad;
+        var current = await db.SprintMembers.Where(m => m.SprintId == id).ToListAsync(http.RequestAborted);
+        if (await SprintRules.CheckReferencesAsync(db, f.Grant.Project, sprint.ApplicationId, req, [.. current.Select(m => m.UserId)], http.RequestAborted) is { } bad) return bad;
         var now = clock.GetUtcNow();
         if (await writes.UpdateAsync(userId, sprint, ProjectRules.Clean(req.Name), ProjectRules.Clean(req.Goal), req.StartDate, req.EndDate, http.RequestAborted) is { } refused) return refused;
         Fill(sprint, req, userId, now);
-        var current = await db.SprintMembers.Where(m => m.SprintId == id).ToListAsync(http.RequestAborted);
         SetTeam(db, id, current, req.TeamUserIds, now);
         Audit.Add(db, http, clock, AuditActions.SprintUpdated, sprint.WorkspaceId, userId, targetType: "sprint", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
