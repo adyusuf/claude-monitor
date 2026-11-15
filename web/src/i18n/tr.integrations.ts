@@ -7,6 +7,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   unavailable: "Jira bu sunucuda henüz kurulu değil. Önce bakımcı bir Atlassian uygulaması kaydeder (SETUP'a bakın).",
   connectTitle: "Jira'yı bağla", subdomain: "Jira adresi", subdomainHint: "Jira alt alan adınız; acme.atlassian.net için \"acme\".",
   twoStepCode: "Kimlik doğrulayıcı uygulamanızdaki kod", connect: "Atlassian ile bağlan",
+  reauthSignIn: "Bir site bağlamak için yakın zamanda oturum açmış olmanız gerekir. Oturumu kapatın, yeniden açın ve 10 dakika içinde bağlayın.",
   connectHint: "Atlassian'da oturum açar ve Podium'un Jira'nızı okumasına ve yazmasına izin verirsiniz. Atlassian parolanız Podium'a ulaşmaz.",
   result: {
     ok: "Tamam.", denied: "Atlassian erişim vermedi, hiçbir şey bağlanmadı.", invalid_state: "Bu oturum açma süresi doldu. Yeniden başlayın.",

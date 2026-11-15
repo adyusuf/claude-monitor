@@ -5,6 +5,7 @@ export const enIntegrations = {
   unavailable: "Jira is not set up on this server yet. The maintainer registers an Atlassian app first (see SETUP).",
   connectTitle: "Connect Jira", subdomain: "Jira address", subdomainHint: "Your Jira sub-domain, such as \"acme\" for acme.atlassian.net.",
   twoStepCode: "Code from your authenticator app", connect: "Connect with Atlassian",
+  reauthSignIn: "Connecting a site needs a recent sign-in. Sign out, sign in again, and connect within 10 minutes.",
   connectHint: "You sign in at Atlassian and allow Podium to read and write your Jira. Your Atlassian password never reaches Podium.",
   result: {
     ok: "Done.", denied: "Atlassian did not give access, nothing was connected.", invalid_state: "That sign-in has expired. Start again.",
