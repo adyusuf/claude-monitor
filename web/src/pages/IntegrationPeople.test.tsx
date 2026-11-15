@@ -51,6 +51,7 @@ describe("the people of a connection", () => {
     const linked = within(await rowOf("Max Member"));
     expect(linked.queryByLabelText("E-mail")).not.toBeInTheDocument();
     expect(linked.queryByLabelText("Link to a member")).not.toBeInTheDocument();
+    expect(free.queryByRole("button", { name: /^Unlink/ })).not.toBeInTheDocument();
   });
 
   it("keeps Save off until an e-mail is typed, saves the trimmed address and loads the people again", async () => {
@@ -96,6 +97,27 @@ describe("the people of a connection", () => {
     expect(await screen.findByText("member: Deniz")).toBeInTheDocument();
     expect(saves(calls).map((c) => c.body)).toEqual([{ userId: "u2" }]);
     expect(screen.queryByLabelText("Link to a member")).not.toBeInTheDocument();
+  });
+
+  it("unlinks a linked person, after which the chooser is offered again (F-068)", async () => {
+    let listed = 0;
+    const calls = serve({
+      [peoplePath]: () => ({ body: ++listed === 1 ? [person({ userId: "u2", userName: "Deniz" })] : [person()] }),
+      [savePath]: { status: 204 },
+    });
+    open();
+    const row = within(await rowOf("Mia Jira"));
+    await userEvent.click(row.getByRole("button", { name: "Unlink Deniz" }));
+    expect(await screen.findByLabelText("Link to a member")).toBeInTheDocument();
+    expect(saves(calls).map((c) => c.body)).toEqual([{ unlink: true }]);
+    expect(screen.queryByText("member: Deniz")).not.toBeInTheDocument();
+  });
+
+  it("explains that a member linked to another person must be unlinked there first", async () => {
+    serve({ [peoplePath]: { body: [person()] }, [savePath]: { status: 400, body: { title: "already_linked" } } });
+    open();
+    await userEvent.selectOptions(within(await rowOf("Mia Jira")).getByLabelText("Link to a member"), "u2");
+    expect(await screen.findByRole("alert")).toHaveTextContent("That member is already linked to another person of this site. Unlink them there first.");
   });
 
   it("does not save when the empty choice is picked", async () => {

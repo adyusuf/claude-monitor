@@ -31,7 +31,7 @@ export const deIntegrations: Dictionary["integrations"] = {
   sprintState: { planned: "Geplant", active: "Aktiv", closed: "Abgeschlossen" }, selectSprint: "{name} auswählen",
   sprintImported: "Sprint importiert: {name}", close: "Schließen",
   peopleTitle: "Personen aus Jira", peopleHint: "Eine Person mit sichtbarer E-Mail-Adresse, die nicht im Arbeitsbereich ist, wird bei aktiven Einladungen als Betrachter eingeladen.",
-  noEmail: "keine E-Mail", invited: "eingeladen", linked: "Mitglied: {name}", inactive: "inaktiv", setEmail: "E-Mail setzen", linkMember: "Mit Mitglied verknüpfen",
+  noEmail: "keine E-Mail", invited: "eingeladen", linked: "Mitglied: {name}", inactive: "inaktiv", setEmail: "E-Mail setzen", linkMember: "Mit Mitglied verknüpfen", unlinkMember: "Verknüpfung mit {name} lösen",
   email: "E-Mail", save: "Speichern",
   runsTitle: "Letzte Prüfungen", noRuns: "Noch nichts gelaufen.",
   runKind: { import: "Import", webhook: "Update aus Jira", pass: "Prüfung" }, runStatus: { running: "Läuft", ok: "Fertig", partial: "Teilweise fertig", failed: "Fehlgeschlagen" },

@@ -29,7 +29,7 @@ export const enIntegrations = {
   sprintState: { planned: "Planned", active: "Active", closed: "Closed" }, selectSprint: "Select {name}",
   sprintImported: "Sprint imported: {name}", close: "Close",
   peopleTitle: "People from Jira", peopleHint: "A person with a visible e-mail address who is not in the workspace is invited as a viewer when invitations are on.",
-  noEmail: "no e-mail", invited: "invited", linked: "member: {name}", inactive: "inactive", setEmail: "Set e-mail", linkMember: "Link to a member",
+  noEmail: "no e-mail", invited: "invited", linked: "member: {name}", inactive: "inactive", setEmail: "Set e-mail", linkMember: "Link to a member", unlinkMember: "Unlink {name}",
   email: "E-mail", save: "Save",
   runsTitle: "Recent checks", noRuns: "Nothing has run yet.",
   runKind: { import: "Import", webhook: "Update from Jira", pass: "Check" }, runStatus: { running: "Running", ok: "Done", partial: "Partly done", failed: "Failed" },

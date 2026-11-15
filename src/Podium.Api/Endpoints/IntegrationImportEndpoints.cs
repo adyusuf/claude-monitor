@@ -14,6 +14,8 @@ namespace Podium.Api.Endpoints;
 public static class IntegrationImportEndpoints
 {
     public const int ImportMax = 20;
+    public const string AlreadyLinked = "already_linked";
+    public const string InvalidLink = "invalid_link";
 
     public static void Map(RouteGroupBuilder api)
     {
@@ -112,9 +114,21 @@ public static class IntegrationImportEndpoints
         var connection = person is null ? null : await db.IntegrationConnections.AsNoTracking().FirstOrDefaultAsync(c => c.Id == person.ConnectionId && c.Status != ConnectionStatuses.Disconnected, http.RequestAborted);
         var me = http.User.UserId();
         if (person is null || connection is null || await Access.MemberAsync(db, me, connection.WorkspaceId, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
+        if (req.Unlink == true)
+        {
+            if (req.UserId is not null) return Http.Invalid("unlink", InvalidLink);
+            person.UserId = null;
+        }
+
         if (req.UserId is { } user)
         {
             if (await Access.MemberAsync(db, user, connection.WorkspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.Invalid("userId", "not_a_member");
+            // A member stands for one person of a connection: the tool account used for them must not depend on which row is read first.
+            if (await db.IntegrationPeople.AnyAsync(p => p.ConnectionId == person.ConnectionId && p.UserId == user && p.Id != person.Id, http.RequestAborted))
+            {
+                return Http.Invalid("userId", AlreadyLinked);
+            }
+
             person.UserId = user;
         }
 

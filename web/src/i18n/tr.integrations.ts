@@ -31,7 +31,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   sprintState: { planned: "Planlandı", active: "Aktif", closed: "Kapandı" }, selectSprint: "{name} seç",
   sprintImported: "Sprint içe alındı: {name}", close: "Kapat",
   peopleTitle: "Jira'daki kişiler", peopleHint: "E-postası görünen ve çalışma alanında olmayan kişi, davetler açıksa izleyici olarak davet edilir.",
-  noEmail: "e-posta yok", invited: "davet edildi", linked: "üye: {name}", inactive: "pasif", setEmail: "E-posta gir", linkMember: "Bir üyeye bağla",
+  noEmail: "e-posta yok", invited: "davet edildi", linked: "üye: {name}", inactive: "pasif", setEmail: "E-posta gir", linkMember: "Bir üyeye bağla", unlinkMember: "{name} bağlantısını kaldır",
   email: "E-posta", save: "Kaydet",
   runsTitle: "Son kontroller", noRuns: "Henüz bir şey çalışmadı.",
   runKind: { import: "İçe alma", webhook: "Jira'dan güncelleme", pass: "Kontrol" }, runStatus: { running: "Çalışıyor", ok: "Bitti", partial: "Kısmen bitti", failed: "Başarısız" },

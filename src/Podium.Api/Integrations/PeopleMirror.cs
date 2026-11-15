@@ -30,6 +30,8 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
                              join m in db.WorkspaceMembers.AsNoTracking() on u.Id equals m.UserId
                              where m.WorkspaceId == connection.WorkspaceId && m.RemovedAt == null && u.EmailNormalized != null && emails.Contains(u.EmailNormalized)
                              select new { u.Id, Email = u.EmailNormalized! }).ToDictionaryAsync(x => x.Email, x => x.Id, ct);
+        // A member stands for one person of a connection: one already linked (by hand or earlier) gets no second person by e-mail.
+        var linked = (await db.IntegrationPeople.Where(p => p.ConnectionId == connection.Id && p.UserId != null).Select(p => p.UserId!.Value).ToListAsync(ct)).ToHashSet();
         foreach (var p in wanted)
         {
             if (!known.TryGetValue(p.Id, out var row))
@@ -47,7 +49,7 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
             {
                 row.Email = p.Email;
                 row.EmailNormalized = SearchText.Email(p.Email);
-                if (row.UserId is null && members.TryGetValue(row.EmailNormalized, out var user)) row.UserId = user;
+                if (row.UserId is null && members.TryGetValue(row.EmailNormalized, out var user) && linked.Add(user)) row.UserId = user;
             }
         }
 
