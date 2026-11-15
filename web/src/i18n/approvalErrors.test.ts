@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { deApprovalRulesErrors } from "./de.approvalRules";
+import { enApprovalRulesErrors } from "./en.approvalRules";
 import { dictionaries, translate } from "./index";
+import { trApprovalRulesErrors } from "./tr.approvalRules";
 
 /**
  * Every error code the permission answer and the approval-rule endpoints return (CommandEndpoints.Answer, ApprovalRuleCreation,
@@ -23,4 +26,11 @@ describe("the error texts of the approvals", () => {
     expect(translate(dictionaries.en, "errors.rule_limit")).toMatch(/standing approvals/);
     expect(translate(dictionaries.en, "errors.rule_not_allowed")).toMatch(/this once/);
   });
+
+  it.each([["en", enApprovalRulesErrors], ["tr", trApprovalRulesErrors], ["de", deApprovalRulesErrors]] as const)(
+    "show the text of the approval-rules file in %s, never a copy of the same key written later in the dictionary", (language, rulesErrors) => {
+      for (const [code, text] of Object.entries(rulesErrors)) {
+        expect(translate(dictionaries[language], `errors.${code}`), code).toBe(text);
+      }
+    });
 });

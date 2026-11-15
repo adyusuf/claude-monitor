@@ -24,5 +24,4 @@ export const enApprovalRules = {
 export const enApprovalRulesErrors = {
   rule_limit: "You already have the most standing approvals you can have (200). Revoke one on the approvals page, or allow just this once.",
   rule_not_allowed: "This request cannot have a standing approval now (the machine may have become production or a database). Allow it just this once.",
-  invalid_decision: "Pick Allow or Deny.", invalid_duration: "Pick how long the allow stands from the list.",
 };

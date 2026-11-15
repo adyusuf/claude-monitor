@@ -27,5 +27,4 @@ export const trApprovalRules: Dictionary["approvalRules"] = {
 export const trApprovalRulesErrors: typeof enApprovalRulesErrors = {
   rule_limit: "Sahip olabileceğiniz en çok geçerli onaya (200) zaten sahipsiniz. Onaylar sayfasında birini geri alın ya da yalnızca bu seferlik izin verin.",
   rule_not_allowed: "Bu istek şu anda geçerli bir onay alamaz (makine üretim ya da veritabanı olmuş olabilir). Yalnızca bu seferlik izin verin.",
-  invalid_decision: "İzin ver ya da Reddet'i seçin.", invalid_duration: "İznin ne kadar geçerli olacağını listeden seçin.",
 };
