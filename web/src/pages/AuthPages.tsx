@@ -6,7 +6,7 @@ import { safeNext, useSession } from "../auth/session";
 import { AuthFrame } from "../components/Layout";
 import { Button, Field, Notice } from "../components/ui";
 import { config } from "../config";
-import { useErrorText, useI18n } from "../i18n";
+import { useErrorText, useI18n, useKnownErrorText } from "../i18n";
 import { MfaStep } from "./Mfa";
 
 const emailShape = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,14 +29,15 @@ function Providers({ next = null }: { next?: string | null }) {
 }
 
 export function LoginPage() {
-  const { t, tx } = useI18n();
+  const { t } = useI18n();
   const errorText = useErrorText();
+  const knownErrorText = useKnownErrorText();
   const { refresh } = useSession();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(params.get("error") ? tx(`errors.${params.get("error")}`) : null);
+  const [error, setError] = useState<string | null>(knownErrorText(params.get("error")));
   const [busy, setBusy] = useState(false);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
 
@@ -57,7 +58,7 @@ export function LoginPage() {
   };
 
   if (mfaToken) {
-    return <AuthFrame title={t("auth.mfaTitle")}><MfaStep token={mfaToken} next={params.get("next") ?? "/"} /></AuthFrame>;
+    return <AuthFrame title={t("auth.mfaTitle")}><MfaStep token={mfaToken} next={params.get("next") ?? "/"} onBack={() => setMfaToken(null)} /></AuthFrame>;
   }
 
   return (
@@ -156,20 +157,25 @@ export function VerifyEmailPage() {
 }
 
 export function ForgotPage() {
-  const { t } = useI18n();
+  const { t, tx } = useI18n();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [limited, setLimited] = useState(false);
   return (
     <AuthFrame title={t("auth.forgotTitle")}>
       {sent ? <Notice kind="success">{t("auth.forgotSent")}</Notice> : (
         <form className="stack" onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
-          await api.forgot(email).catch(() => undefined);
+          setLimited(false);
+          // A 429 says nothing about the address, so it is shown; every other failure keeps the neutral answer.
+          const rateLimited = await api.forgot(email).then(() => false, (err) => err instanceof ApiError && err.status === 429);
           setBusy(false);
-          setSent(true);
+          if (rateLimited) setLimited(true);
+          else setSent(true);
         }}>
+          {limited ? <Notice kind="error">{tx("errors.too_many_requests")}</Notice> : null}
           <Field label={t("auth.email")} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <Button type="submit" busy={busy}>{t("auth.sendLink")}</Button>
         </form>

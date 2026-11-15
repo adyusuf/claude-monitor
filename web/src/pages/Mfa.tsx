@@ -8,7 +8,7 @@ import { Button, Card, CopyText, Field, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 
 /** The second step of a sign-in: a code for the pending token the first step left. */
-export function MfaStep({ token, next }: { token?: string; next: string }) {
+export function MfaStep({ token, next, onBack }: { token?: string; next: string; onBack?: () => void }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { refresh } = useSession();
@@ -38,6 +38,15 @@ export function MfaStep({ token, next }: { token?: string; next: string }) {
       <Field label={t("auth.mfaCode")} value={code} autoComplete="one-time-code" autoFocus
         onChange={(e) => setCode(e.target.value)} />
       <Button type="submit" busy={busy}>{t("auth.mfaVerify")}</Button>
+      <p className="auth-links">
+        <Link to={next === "/" ? "/login" : `/login?next=${encodeURIComponent(next)}`}
+          onClick={(e) => {
+            if (onBack) {
+              e.preventDefault();
+              onBack();
+            }
+          }}>{t("auth.backToSignIn")}</Link>
+      </p>
     </form>
   );
 }
