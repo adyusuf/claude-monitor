@@ -1,4 +1,6 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
+import { Link } from "react-router";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DashboardView } from "../api/types";
 import { config } from "../config";
@@ -193,5 +195,38 @@ describe("the dashboard's reading and live refresh", () => {
     vi.useRealTimers();
     expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong on the server.");
     expect(spaced(tile("Open alerts"))).toBe("Open alerts 7");
+  });
+});
+
+describe("the dashboard when the workspace changes under it", () => {
+  it("drops the previous workspace's figures at once and shows the new workspace's read, not the old figures", async () => {
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1/dashboard": { body: view({ openAlerts: 7 }) },
+      "GET /workspaces/w1/machines": { body: [machine()] },
+      "GET /workspaces/w2/dashboard": { status: 500, body: {} },
+      "GET /workspaces/w2/machines": { body: [] },
+    });
+    renderAt("/w/w1/dashboard", [{ path: "/w/:ws/dashboard", element: <><Link to="/w/w2/dashboard">other workspace</Link><DashboardPage /></> }]);
+    await screen.findByRole("heading", { name: "Dashboard" });
+    expect(spaced(tile("Open alerts"))).toBe("Open alerts 7");
+    await userEvent.click(screen.getByRole("link", { name: "other workspace" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong on the server.");
+    expect(screen.queryByText("Open alerts", { selector: ".stat-label" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "laptop-1" })).toBeNull();
+  });
+
+  it("does not show the previous workspace's error under the new workspace while it is reading", async () => {
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /workspaces/w1/dashboard": { status: 500, body: {} },
+      "GET /workspaces/w1/machines": { body: [] },
+    });
+    const answer = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation((input, init) => (String(input).includes("/workspaces/w2/") ? new Promise<Response>(() => undefined) : answer(input, init)));
+    renderAt("/w/w1/dashboard", [{ path: "/w/:ws/dashboard", element: <><Link to="/w/w2/dashboard">other workspace</Link><DashboardPage /></> }]);
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "other workspace" }));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
