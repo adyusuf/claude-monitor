@@ -73,4 +73,19 @@ public sealed class DeviceHardeningTests(ApiFactory api)
             Assert.Equal(winner!.AgentId, only.Id);
         }
     }
+
+    /// <summary>F-214: a hostname or arch is one visible line; format characters (bidi overrides, zero-width marks) are refused like control characters.</summary>
+    [Theory]
+    [InlineData("desk‮exe", "x64")]
+    [InlineData("desk​7", "x64")]
+    [InlineData("desk⁦", "x64")]
+    [InlineData("desk-7", "x6‮4")]
+    [InlineData("desk-7", "x6‍4")]
+    public async Task A_device_code_request_with_format_characters_is_refused(string host, string arch)
+    {
+        var response = await api.CreateClient().PostAsJsonAsync("/api/device/code",
+            new DeviceCodeRequest("machine-key-long-enough", host, OsKinds.MacOs, arch, "0.3.0"), TestUser.Json);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

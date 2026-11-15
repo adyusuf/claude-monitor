@@ -26,9 +26,9 @@ public static class DeviceEndpoints
     private static async Task<IResult> Code(DeviceCodeRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
     {
         if (req.MachineKey is not { Length: >= 16 and <= 200 }) return Http.Invalid("machineKey", "invalid");
-        if (!Http.IsName(req.Hostname, 255)) return Http.Invalid("hostname", "invalid");
+        if (!IsMachineFact(req.Hostname, 255)) return Http.Invalid("hostname", "invalid");
         if (!OsKinds.All.Contains(req.Os)) return Http.Invalid("os", "invalid");
-        if (!Http.IsName(req.Arch, 20)) return Http.Invalid("arch", "invalid");
+        if (!IsMachineFact(req.Arch, 20)) return Http.Invalid("arch", "invalid");
         if (!Version.TryParse(req.AgentVersion, out var version)) return Http.Invalid("agentVersion", "invalid");
         if (version < config.MinimumAgentVersion) return UpgradeRequired();
 
@@ -58,6 +58,11 @@ public static class DeviceEndpoints
         return Results.Ok(new DeviceCodeResponse(deviceCode, userCode, config.PublicOrigin + "/device",
             config.DevicePollSeconds, (int)config.DeviceCodeLifetime.TotalSeconds));
     }
+
+    /// <summary>A hostname or arch is shown to the approver and to every member and reaches agent tools: one plain line, so no
+    /// format character either (bidi overrides, zero-width marks), on top of the control characters <see cref="Http.IsName"/> refuses.</summary>
+    private static bool IsMachineFact(string? value, int max) =>
+        Http.IsName(value, max) && !value!.Any(c => char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format);
 
     private static async Task<IResult> Token(DeviceTokenRequest req, HttpContext http, PodiumDb db, ApiConfig config,
         TimeProvider clock)
