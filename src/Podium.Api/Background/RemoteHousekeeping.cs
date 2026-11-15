@@ -27,13 +27,15 @@ public static class RemoteHousekeeping
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(config);
-        await ExpireRunsAsync(db, broker, now, ct);
-        await ExpireAsksAsync(db, config, broker, now, ct);
-        await db.MachineGrants.Where(g => (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested) && g.ExpiresAt <= now)
-            .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Expired), ct);
-        await JobSchedules.FireDueAsync(db, config, broker, now, ct);
-        await OfflineAsync(db, config, broker, now, ct);
-        await RetentionAsync(db, config, now, ct);
+        // Each chore runs even when one before it fails: retention is last and must not stop with an earlier one (Chores).
+        await Chores.RunAsync(db, ct,
+            () => ExpireRunsAsync(db, broker, now, ct),
+            () => ExpireAsksAsync(db, config, broker, now, ct),
+            () => db.MachineGrants.Where(g => (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested) && g.ExpiresAt <= now)
+                .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Expired), ct),
+            () => JobSchedules.FireDueAsync(db, config, broker, now, ct),
+            () => OfflineAsync(db, config, broker, now, ct),
+            () => RetentionAsync(db, config, now, ct));
     }
 
     /// <summary>

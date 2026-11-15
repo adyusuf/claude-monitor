@@ -28,6 +28,47 @@ public sealed class ServiceUninstallTests : IDisposable
         Assert.Empty(mac.Calls);
     }
 
+    private static ServiceInstaller WithSudoers(ServiceInstallerFixture fx) =>
+        new(fx.Output, fx.Run, fx.Os, true, fx.Layout, fx.Definition, fx.RunDir, (_, _) => fx.DsclList) { SudoersFolder = $"{fx.Dir}/sudoers.d" };
+
+    [Fact]
+    public void A_sudoers_drop_in_left_without_a_service_definition_is_still_removed_and_the_group_left_behind_is_named()
+    {
+        foreach (var fx in new[] { linux, mac })
+        {
+            Assert.Equal(0, WithSudoers(fx).Install(fx.Current, ExecLevels.Argv, allowRoot: false, runAccount: "ap-run"));
+            File.Delete(fx.Definition); // a partial earlier uninstall, or a hand-removed unit
+            fx.Calls.Clear();
+
+            Assert.Equal(0, WithSudoers(fx).Uninstall());
+
+            Assert.False(File.Exists($"{fx.Dir}/sudoers.d/aipod-run"), $"{fx.Os}: the drop-in still lets the service act as the run account");
+            Assert.Contains("The service is not installed.", fx.Text, StringComparison.Ordinal);
+            Assert.Contains("Removed the sudoers drop-in", fx.Text, StringComparison.Ordinal);
+            Assert.Contains("aipod stays in the group of the run account ap-run", fx.Text, StringComparison.Ordinal);
+            Assert.Empty(fx.Calls); // no service manager is asked about a service that is not there
+        }
+    }
+
+    [Fact]
+    public void A_full_uninstall_names_the_group_membership_it_leaves()
+    {
+        Assert.Equal(0, WithSudoers(linux).Install(linux.Current, ExecLevels.Argv, allowRoot: false, runAccount: "ap-run"));
+
+        Assert.Equal(0, WithSudoers(linux).Uninstall());
+
+        Assert.Contains("aipod stays in the group of the run account ap-run", linux.Text, StringComparison.Ordinal);
+        Assert.Contains("The service is removed. Kept:", linux.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_a_run_account_nothing_is_said_about_a_group()
+    {
+        Assert.Equal(0, WithSudoers(linux).Install(linux.Current, ExecLevels.Argv, allowRoot: false));
+        Assert.Equal(0, WithSudoers(linux).Uninstall());
+        Assert.DoesNotContain("group of the run account", linux.Text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Uninstalling_without_admin_rights_asks_for_root()
     {

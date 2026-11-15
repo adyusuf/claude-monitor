@@ -36,7 +36,8 @@ public static class TestRuns
         if (project is not { TestArgv: { } argv, TestCwd: { } cwd }) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: AgentActionErrors.NoTestCommand);
 
         var run = new RunCreate($"podium-test-{Guid.NewGuid():N}", agentId, RunModes.Argv, argv, null, cwd, TimeoutSeconds, Reason, ProjectKey: key, Kind: RunKinds.Test);
-        var result = await creator.CreateAsync(run, agentId, userId, agent.WorkspaceId, http);
+        // A second press, or a second tab, gets the run that is already open instead of a second one (its key is new on every call, so the key cannot dedupe).
+        var result = await creator.CreateAsync(run, agentId, userId, agent.WorkspaceId, http, reuseOpenTest: true);
         return result.Run is { } created ? Results.Ok(created) : Results.Problem(statusCode: result.Status, title: result.Error);
     }
 }

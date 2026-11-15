@@ -5,6 +5,7 @@ import { Button, Notice } from "../components/ui";
 import { VisibleText } from "../components/VisibleText";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
+import { SCHEDULE_INTERVAL_MAX_MINUTES, SCHEDULE_INTERVAL_MIN_MINUTES } from "../lib/machineLimits";
 import { useCodeGate } from "./useCodeGate";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -78,7 +79,7 @@ function NewSchedule({ jobs, onChanged }: { jobs: WebJobView[]; onChanged: () =>
     setProblem(null);
     const interval = Number(minutes);
     const daily = minutesOf(time);
-    if (kind === "interval" && !(Number.isInteger(interval) && interval >= 15 && interval <= 10080)) return setProblem(t("errors.invalid_schedule"));
+    if (kind === "interval" && !(Number.isInteger(interval) && interval >= SCHEDULE_INTERVAL_MIN_MINUTES && interval <= SCHEDULE_INTERVAL_MAX_MINUTES)) return setProblem(t("errors.invalid_schedule"));
     if (kind === "daily" && daily === null) return setProblem(t("errors.invalid_schedule"));
     const body = kind === "interval" ? { jobId: chosen, kind, intervalMinutes: interval } : { jobId: chosen, kind, dailyAtMinutes: daily! };
     if (await gate.attempt((code) => api.createSchedule({ ...body, code }).then(() => undefined))) onChanged();
@@ -98,7 +99,7 @@ function NewSchedule({ jobs, onChanged }: { jobs: WebJobView[]; onChanged: () =>
         </select>
       </label>
       {kind === "interval"
-        ? <label className="field"><span>{t("schedules.minutes")}</span><input className="input" type="number" min={15} max={10080} value={minutes} onChange={(e) => setMinutes(e.target.value)} /></label>
+        ? <label className="field"><span>{t("schedules.minutes")}</span><input className="input" type="number" min={SCHEDULE_INTERVAL_MIN_MINUTES} max={SCHEDULE_INTERVAL_MAX_MINUTES} value={minutes} onChange={(e) => setMinutes(e.target.value)} /></label>
         : <label className="field"><span>{t("schedules.timeUtc")}</span><input className="input" value={time} placeholder="03:00" onChange={(e) => setTime(e.target.value)} /></label>}
       {gate.field}
       {gate.error ? <Notice kind="error">{gate.error}</Notice> : null}

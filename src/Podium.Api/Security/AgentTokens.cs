@@ -12,7 +12,10 @@ namespace Podium.Api.Security;
 /// </summary>
 public static class AgentTokens
 {
-    public static TokenResponse Issue(PodiumDb db, ApiConfig config, Agent agent, DateTimeOffset now, AgentToken? replaces = null)
+    public static TokenResponse Issue(PodiumDb db, ApiConfig config, Agent agent, DateTimeOffset now) =>
+        Issue(db, config, agent, now, Guid.CreateVersion7());
+
+    private static TokenResponse Issue(PodiumDb db, ApiConfig config, Agent agent, DateTimeOffset now, Guid refreshId)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(config);
@@ -29,6 +32,7 @@ public static class AgentTokens
         };
         var refreshRow = new AgentToken
         {
+            Id = refreshId,
             AgentId = agent.Id,
             Kind = AgentTokenKinds.Refresh,
             TokenHash = Secrets.Hash(refresh),
@@ -36,12 +40,6 @@ public static class AgentTokens
             ExpiresAt = now + config.AgentRefreshLifetime,
         };
         db.AgentTokens.AddRange(accessRow, refreshRow);
-        if (replaces is not null)
-        {
-            replaces.ReplacedBy = refreshRow.Id;
-            replaces.LastUsedAt = now;
-        }
-
         return new TokenResponse(access, refresh, accessRow.ExpiresAt, refreshRow.ExpiresAt, agent.Id, agent.WorkspaceId);
     }
 
@@ -79,7 +77,18 @@ public static class AgentTokens
             return (RefreshOutcome.Invalid, null, row.AgentId, reason);
         }
 
-        return (RefreshOutcome.Issued, Issue(db, config, agent, now, row), agent.Id, null);
+        // Single use under a race: the replace is a compare-and-set on ReplacedBy IS NULL. The caller's transaction holds the row
+        // until the successor is stored, so a second refresh with the same token waits, changes nothing and is judged a reuse.
+        var successor = Guid.CreateVersion7();
+        var claimed = await db.AgentTokens.Where(t => t.Id == row.Id && t.ReplacedBy == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.ReplacedBy, successor).SetProperty(t => t.LastUsedAt, now), ct);
+        if (claimed == 0)
+        {
+            await RevokeAllAsync(db, row.AgentId, now, ct);
+            return (RefreshOutcome.Reused, null, row.AgentId, RefreshReasons.Reused);
+        }
+
+        return (RefreshOutcome.Issued, Issue(db, config, agent, now, successor), agent.Id, null);
     }
 
     public static Task RevokeAllAsync(PodiumDb db, Guid agentId, DateTimeOffset now, CancellationToken ct) =>

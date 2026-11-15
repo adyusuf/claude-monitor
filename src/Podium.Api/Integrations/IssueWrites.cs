@@ -15,7 +15,7 @@ public sealed record IssueFacts(string Type, string Title, string? Description, 
 /// the issue is not mirrored or only Podium-only fields changed), or the refusal to send back. The tool's new change value is stored on the
 /// link, so the echo of our own write is recognised. Nothing here saves; the endpoint's save carries it.
 /// </summary>
-public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate)
+public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate, TimeProvider clock)
 {
     public async Task<IResult?> UpdateAsync(Guid user, ManagedProject project, IssueFacts before, Issue after, CancellationToken ct)
     {
@@ -102,7 +102,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
                 ExternalKey = key,
                 LocalId = issue.Id,
                 ExternalUpdated = await writer.ItemStampAsync(open.Ctx, key, ct),
-                SyncedAt = DateTimeOffset.UtcNow,
+                SyncedAt = clock.GetUtcNow(),
             });
         }
         catch (TrackerException e)

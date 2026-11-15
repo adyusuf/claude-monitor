@@ -37,7 +37,7 @@ internal static class IssueRules
         if (i.Status is { } s && !IssueStatuses.All.Contains(s)) return Http.Invalid("status", "invalid_value");
         if (TooLong(i.Description, TextMax)) return Http.Invalid("description", "too_long");
         if (TooLong(i.TechnicalDesign, TextMax)) return Http.Invalid("technicalDesign", "too_long");
-        if (i.AcceptanceCriteria is { } c && (c.Count > CriteriaMax || c.Any(x => !Part(x.Given) || !Part(x.When) || !Part(x.Then)))) return Http.Invalid("acceptanceCriteria", "invalid_list");
+        if (i.AcceptanceCriteria is { } c && (c.Count > CriteriaMax || c.Any(x => x is null || !Part(x.Given) || !Part(x.When) || !Part(x.Then)))) return Http.Invalid("acceptanceCriteria", "invalid_list");
         if (TooLong(i.BugEnvironment, ProjectRules.ShortMax)) return Http.Invalid("bugEnvironment", "too_long");
         if (TooLong(i.ReproSteps, StepsMax)) return Http.Invalid("reproSteps", "too_long");
         if (TooLong(i.ExpectedResult, ResultMax)) return Http.Invalid("expectedResult", "too_long");
@@ -92,6 +92,13 @@ internal static class IssueRules
             && !await db.Applications.AnyAsync(a => a.Id == app && a.ProjectId == project.Id && a.Status == ManagedStatuses.Active, ct))
         {
             return Http.Invalid("applicationId", "invalid_application");
+        }
+
+        // An application's sprint holds only that application's issues (adding checks it too): the issue keeps it until it leaves the sprint.
+        if (issue.SprintId is { } sprint
+            && await db.Sprints.AnyAsync(s => s.Id == sprint && s.ApplicationId != null && s.ApplicationId != issue.ApplicationId, ct))
+        {
+            return Http.Invalid("applicationId", "wrong_scope");
         }
 
         if (issue.ComponentId is { } component

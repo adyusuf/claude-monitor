@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalKeys as shared, createApprovalKeys, fingerprintOf, memoryStore, payloadFor, SIGNING } from "./approvalKey";
+import { approvalKeys as shared, createApprovalKeys, fingerprintOf, memoryStore, payloadFor, payloadV2For, runPayload, SIGNING } from "./approvalKey";
 
 // Made by Node's WebCrypto for the C# test of the same name: the agent's verifier checks this very signature.
 // The public half of a throwaway test key (its private half was discarded): a test vector, not a secret.
@@ -79,5 +79,29 @@ describe("a signature the agent's C# code is checked against", () => {
     expect(bytes(BROWSER_SIGNATURE)).toHaveLength(64);
     expect(await verify(BROWSER_KEY, BROWSER_SIGNATURE, BROWSER_PAYLOAD)).toBe(true);
     expect(await verify(BROWSER_KEY, BROWSER_SIGNATURE, BROWSER_PAYLOAD.replace("1792000000", "1792000001"))).toBe(false);
+  });
+});
+
+// Payload v2 (ADR-0020 §4 rule 6), shared with ApprovalPayloadV2Tests.cs (agent) and RunPayloadV2Tests.cs (API): the run's repository is signed with
+// it. Made once by Node's WebCrypto with a throwaway key whose private half was discarded: a test vector, not a secret.
+const V2_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjAki8RDcqzMRG5/pFxCllxu5rY3N8smmesYh1PciGOvtLmcS1b7FxgGyhGzerDrnYBGknIb08ft4ivfiLNc0nQ=="; // gitleaks:allow
+const V2_SIGNATURE = "SIRzFY7FcIeh60XUKL29arrtxxWU/xkXzP7kdgKkzX4wCNP7xEs0F+TaanAew7PCmEAvgw7DnsWhMBILBhwnSA==";
+const SHOP = "git:git.example.invalid/team/shop";
+const V2_PAYLOAD = BROWSER_PAYLOAD.replace("ap-approval-v1", "ap-approval-v2") + "\n" + SHOP;
+const RUN = { id: "0198F1C2-7A55-7D3A-9B1E-2F6C3A4D5E60", targetAgentId: "0198F1C2-7A55-7D3A-9B1E-2F6C3A4D5E61", expiresAt: new Date(1_792_000_000_000).toISOString() };
+
+describe("payload v2: the repository is signed with the run", () => {
+  it("is the v1 lines under the v2 tag with the repository key last, and the shared signature verifies over it and over no other label", async () => {
+    expect(payloadV2For("run", RUN.id, RUN.targetAgentId, "ab".repeat(32), RUN.expiresAt, SHOP)).toBe(V2_PAYLOAD);
+    expect(await verify(V2_KEY, V2_SIGNATURE, V2_PAYLOAD)).toBe(true);
+    expect(await verify(V2_KEY, V2_SIGNATURE, V2_PAYLOAD.replace("team/shop", "team/other"))).toBe(false);
+    expect(await verify(V2_KEY, V2_SIGNATURE, BROWSER_PAYLOAD)).toBe(false);
+  });
+
+  it("is what a run with a repository signs, and a run without one signs v1", () => {
+    expect(runPayload({ ...RUN, projectKey: SHOP }, "ab".repeat(32))).toBe(V2_PAYLOAD);
+    expect(runPayload({ ...RUN, projectKey: null }, "ab".repeat(32))).toBe(BROWSER_PAYLOAD);
+    expect(runPayload({ ...RUN, projectKey: "" }, "ab".repeat(32))).toBe(BROWSER_PAYLOAD);
+    expect(runPayload(RUN, "ab".repeat(32))).toBe(BROWSER_PAYLOAD);
   });
 });

@@ -78,7 +78,7 @@ export function ApplicationComponents({ applicationId, canEdit }: { applicationI
                   {canEdit ? (
                     <span className="row-actions">
                       <Button variant="ghost" onClick={() => setEditing({ id: c.id, draft: { name: c.name, kind: c.kind } })}>{t("projects.rename")}</Button>
-                      <Button variant="ghost" onClick={() => void act(() => api.archiveComponent(c.id))}>{t("projects.archive")}</Button>
+                      <Button variant="ghost" onClick={() => { if (window.confirm(t("projects.archiveComponentConfirm", { name: c.name }))) void act(() => api.archiveComponent(c.id)); }}>{t("projects.archive")}</Button>
                     </span>
                   ) : null}
                 </>

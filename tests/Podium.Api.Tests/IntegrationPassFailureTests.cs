@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Integrations;
@@ -10,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Podium.Api.Tests;
 
 /// <summary>
-/// A pass that fails for a reason that is not the tracker's (here: a stored token that cannot be opened) closes its own run as failed, and the loop goes on
+/// A pass that fails for a reason that is not the tracker's (here: bad data, a project link to a project that is not there) closes its own run as failed, and the loop goes on
 /// with the next connection and the clean-up; a shutdown is still not swallowed.
 /// </summary>
 [Collection(ApiGroup.Name)]
@@ -19,7 +18,10 @@ public sealed class IntegrationPassFailureTests(ApiFactory api)
     private Reconciler ReconcilerOn(IServiceProvider services, ListLogger<Reconciler> log) => new(services.GetRequiredService<IServiceScopeFactory>(),
         services.GetRequiredService<ApiConfig>(), services.GetRequiredService<IntegrationSettings>(), api.Clock, log);
 
-    /// <summary>A connected site with one imported space; when broken, its stored tokens cannot be opened (not a tracker failure).</summary>
+    /// <summary>
+    /// A connected site with one imported space; when broken, the space's link points at a project that does not exist (bad data, not a tracker
+    /// failure). A token that cannot be opened is no longer that kind of failure: it means sign in again (F-072, IntegrationTokenTests).
+    /// </summary>
     private async Task<JiraWorld> WorldAsync(string space, bool broken)
     {
         var w = await JiraKit.ConnectedAsync(api, site => site.Space(space).Issue("One"));
@@ -27,8 +29,9 @@ public sealed class IntegrationPassFailureTests(ApiFactory api)
         if (broken)
         {
             await using var db = api.Db();
-            await db.IntegrationAccounts.Where(a => a.ConnectionId == w.ConnectionId)
-                .ExecuteUpdateAsync(a => a.SetProperty(x => x.AccessToken, "AAAA").SetProperty(x => x.RefreshToken, "AAAA"));
+            var nowhere = Guid.NewGuid();
+            await db.IntegrationLinks.Where(l => l.ConnectionId == w.ConnectionId && l.Kind == LinkKinds.Project)
+                .ExecuteUpdateAsync(l => l.SetProperty(x => x.LocalId, nowhere));
         }
 
         return w;
@@ -98,13 +101,20 @@ public sealed class IntegrationPassFailureTests(ApiFactory api)
         var line = Assert.Single(log.Entries);
         Assert.Equal(LogLevel.Warning, line.Level);
         Assert.Contains(bad.ConnectionId.ToString(), line.Text, StringComparison.Ordinal);
-        Assert.Contains(nameof(CryptographicException), line.Text, StringComparison.Ordinal);
+        Assert.Contains(nameof(InvalidOperationException), line.Text, StringComparison.Ordinal);
 
-        // The next look tries the failing connection again, and leaves the one that is up to date alone.
+        // The next look leaves both alone: the failing one, too, waits for the pass interval (ADR-0015 §6).
+        await reconciler.RunOnceAsync(CancellationToken.None);
+
+        Assert.Single(await RunsAsync(bad));
+        Assert.Single(await RunsAsync(good));
+        Assert.Single(log.Entries);
+
+        // After the interval the failing connection is tried again.
+        api.Clock.Advance(api.Services.GetRequiredService<ApiConfig>().IntegrationPassEvery + TimeSpan.FromSeconds(1));
         await reconciler.RunOnceAsync(CancellationToken.None);
 
         Assert.Equal([SyncStatuses.Failed, SyncStatuses.Failed], (await RunsAsync(bad)).Select(r => r.Status));
-        Assert.Single(await RunsAsync(good));
         Assert.Equal(2, log.Entries.Count);
     }
 
@@ -115,7 +125,7 @@ public sealed class IntegrationPassFailureTests(ApiFactory api)
         await using var scope = api.Services.CreateAsyncScope();
         var connection = await scope.ServiceProvider.GetRequiredService<PodiumDb>().IntegrationConnections.AsNoTracking().FirstAsync(c => c.Id == w.ConnectionId);
 
-        await Assert.ThrowsAsync<CryptographicException>(() => scope.ServiceProvider.GetRequiredService<SyncService>().PassAsync(connection, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<SyncService>().PassAsync(connection, CancellationToken.None));
 
         var run = Assert.Single(await RunsAsync(w));
         Assert.Equal((SyncStatuses.Failed, SyncService.InternalError, true), (run.Status, run.Error, run.EndedAt is not null));

@@ -139,6 +139,33 @@ public sealed class IntegrationTokenTests(ApiFactory api)
         Assert.Equal((ConnectionStatuses.Reauthorize, "tracker_unauthorized"), (connection.Status, connection.LastError));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_token_that_cannot_be_opened_any_more_marks_the_account_and_the_connection_for_a_new_sign_in(bool stillValid)
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        var account = await AccountAsync(w);
+        var otherKey = Config with { IntegrationKey = new byte[32] }; // as if the integration key was rotated after the tokens were sealed
+        await using (var db = api.Db())
+        {
+            var access = IntegrationTokens.Seal(otherKey, "at-old");
+            var refresh = IntegrationTokens.Seal(otherKey, "rt-old");
+            await db.IntegrationAccounts.Where(a => a.Id == account.Id).ExecuteUpdateAsync(a => a.SetProperty(x => x.AccessToken, access).SetProperty(x => x.RefreshToken, refresh));
+        }
+
+        await ExpireInAsync(w, stillValid ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(-1));
+        var requests = api.Jira.Requests.Count;
+
+        var e = await Assert.ThrowsAsync<TrackerException>(() => AccessAsync(account.Id));
+
+        Assert.Equal(TrackerException.Codes.Unauthorized, e.Code);
+        Assert.Equal(AccountStatuses.Reauthorize, (await AccountAsync(w)).Status);
+        var connection = await JiraKit.ConnectionAsync(w);
+        Assert.Equal((ConnectionStatuses.Reauthorize, TrackerException.Codes.Unauthorized), (connection.Status, connection.LastError));
+        Assert.Equal(requests, api.Jira.Requests.Count); // nothing unopened was sent to Atlassian
+    }
+
     [Fact]
     public async Task An_account_that_does_not_exist_gives_nothing()
     {

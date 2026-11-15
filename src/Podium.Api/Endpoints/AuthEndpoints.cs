@@ -20,7 +20,7 @@ public static class AuthEndpoints
 
     public static void Map(RouteGroupBuilder api)
     {
-        var auth = api.MapGroup("/auth").RequireRateLimiting(RateLimitPolicy);
+        var auth = api.MapGroup("/auth").RequireRateLimiting(RateLimitPolicy).AllowAnonymous();
         auth.MapPost("/register", Register);
         auth.MapPost("/verify-email", VerifyEmail);
         auth.MapPost("/login", Login);
@@ -30,7 +30,7 @@ public static class AuthEndpoints
     }
 
     private static async Task<IResult> Register(RegisterRequest req, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock, IMailer mailer)
+        TimeProvider clock, IMailer mailer, ILoggerFactory logs)
     {
         if (!Http.IsEmail(req.Email)) return Http.Invalid("email", "invalid_email");
         if (!Secrets.PasswordAcceptable(req.Password)) return Http.Invalid("password", "weak_password");
@@ -39,6 +39,7 @@ public static class AuthEndpoints
         var normalized = SearchText.Email(req.Email!);
         if (await db.Users.AnyAsync(u => u.EmailNormalized == normalized, http.RequestAborted))
         {
+            Secrets.HashPassword(new User(), req.Password!); // the hash a new account costs, so timing does not tell a registered address apart
             return Results.Accepted();
         }
 
@@ -49,8 +50,8 @@ public static class AuthEndpoints
         var token = AddUserToken(db, user.Id, TokenPurposes.VerifyEmail, now, config.EmailTokenLifetime);
         Audit.Add(db, http, clock, AuditActions.Register, userId: user.Id);
         await db.SaveChangesAsync(http.RequestAborted);
-        await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http), "verify", user.Email!,
-            Http.Link(config, "/verify-email", token)), http.RequestAborted);
+        SendOffRequest(mailer, MailTemplates.Build(MailTemplates.Language(http), "verify", user.Email!,
+            Http.Link(config, "/verify-email", token)), logs);
         return Results.Accepted();
     }
 
@@ -142,17 +143,21 @@ public static class AuthEndpoints
     }
 
     private static async Task<IResult> Forgot(ForgotRequest req, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock, IMailer mailer)
+        TimeProvider clock, IMailer mailer, ILoggerFactory logs)
     {
         var normalized = SearchText.Email(req.Email ?? "");
         var user = await db.Users.FirstOrDefaultAsync(
             u => u.EmailNormalized == normalized && u.Status == UserStatuses.Active, http.RequestAborted);
-        if (user?.Email is not null)
+        var since = clock.GetUtcNow() - config.ResetMailEvery;
+        // One mail per address per window, whatever the number of callers or their addresses: the link already mailed keeps working.
+        if (user?.Email is not null && !await db.UserTokens.AnyAsync(
+                t => t.UserId == user.Id && t.Purpose == TokenPurposes.ResetPassword && t.CreatedAt > since, http.RequestAborted))
         {
+            await EndResetLinksAsync(db, user.Id, clock.GetUtcNow(), http.RequestAborted);
             var token = AddUserToken(db, user.Id, TokenPurposes.ResetPassword, clock.GetUtcNow(), config.EmailTokenLifetime);
             await db.SaveChangesAsync(http.RequestAborted);
-            await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
-                Http.Link(config, "/reset-password", token)), http.RequestAborted);
+            SendOffRequest(mailer, MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
+                Http.Link(config, "/reset-password", token)), logs);
         }
 
         return Results.Accepted();
@@ -174,10 +179,36 @@ public static class AuthEndpoints
         user.UpdatedAt = now;
         await db.LoginSessions.Where(s => s.UserId == user.Id && s.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), http.RequestAborted);
+        await EndResetLinksAsync(db, user.Id, now, http.RequestAborted);
         Audit.Add(db, http, clock, AuditActions.PasswordReset, userId: user.Id);
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
+
+    /// <summary>
+    /// Sends an account mail without holding the answer: a known address then costs what an unknown one does (no mail-server time to
+    /// measure), and a mail server that fails cannot turn a known address into a 500 where an unknown one gets 202. The send outlives the
+    /// request (not its token); a failure is logged with the subject only (the address is personal data).
+    /// </summary>
+    private static void SendOffRequest(IMailer mailer, MailMessageData message, ILoggerFactory logs) =>
+        _ = SendLoggedAsync(mailer, message, logs.CreateLogger(typeof(AuthEndpoints)));
+
+    private static async Task SendLoggedAsync(IMailer mailer, MailMessageData message, ILogger log)
+    {
+        try
+        {
+            await mailer.SendAsync(message, CancellationToken.None);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log.LogError("Account mail not sent: {Subject} ({Type})", message.Subject, e.GetType().Name);
+        }
+    }
+
+    /// <summary>Ends every open reset link of the user: only the newest one works, and none outlives a changed password.</summary>
+    private static Task<int> EndResetLinksAsync(PodiumDb db, Guid userId, DateTimeOffset now, CancellationToken ct) =>
+        db.UserTokens.Where(t => t.UserId == userId && t.Purpose == TokenPurposes.ResetPassword && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
 
     private static string AddUserToken(PodiumDb db, Guid userId, string purpose, DateTimeOffset now, TimeSpan lifetime)
     {
@@ -193,16 +224,23 @@ public static class AuthEndpoints
         return token;
     }
 
-    /// <summary>A valid, unused token of the purpose, marked used. Single use: a second call finds nothing.</summary>
+    /// <summary>
+    /// A valid, unused token of the purpose, marked used. Single use: a second call finds nothing, and of two calls that both read it
+    /// unused only one spends it (compare-and-set on used_at).
+    /// </summary>
     private static async Task<UserToken?> UseTokenAsync(PodiumDb db, string? token, string purpose, TimeProvider clock,
         CancellationToken ct)
     {
         if (string.IsNullOrEmpty(token)) return null;
         var now = clock.GetUtcNow();
         var hash = Secrets.Hash(token);
-        var row = await db.UserTokens.FirstOrDefaultAsync(
+        var row = await db.UserTokens.AsNoTracking().FirstOrDefaultAsync(
             t => t.TokenHash == hash && t.Purpose == purpose && t.UsedAt == null && t.ExpiresAt > now, ct);
-        if (row is not null) row.UsedAt = now;
+        if (row is null) return null;
+        var spent = await db.UserTokens.Where(t => t.Id == row.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
+        if (spent == 0) return null;
+        row.UsedAt = now;
         return row;
     }
 }

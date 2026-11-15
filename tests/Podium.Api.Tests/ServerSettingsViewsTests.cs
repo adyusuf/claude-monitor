@@ -35,6 +35,20 @@ public sealed class ServerSettingsViewsTests
     }
 
     [Fact]
+    public void Jira_connections_add_a_warning_to_the_jira_card_only_and_leave_its_status_as_it_was()
+    {
+        var config = ConfigKit.Dev(("AIPOD_JIRA_CLIENT_ID", "j-id"), ("AIPOD_JIRA_CLIENT_SECRET", "j-secret-value"));
+
+        var none = ServerSettingsViews.Of(ConfigKit.Settings(config), config, jiraConnections: 0);
+        var some = ServerSettingsViews.Of(ConfigKit.Settings(config), config, jiraConnections: 3);
+
+        Assert.Empty(Of(none, "jira").Notes);
+        Assert.Equal([ServerSettingsViews.NoteJiraConnections], Of(some, "jira").Notes);
+        Assert.Equal(("ready", "ready"), (Of(none, "jira").Status, Of(some, "jira").Status)); // a warning, not a missing value
+        Assert.All(some.Integrations.Where(i => i.Id != "jira"), i => Assert.Empty(i.Notes));
+    }
+
+    [Fact]
     public void An_app_with_only_its_id_is_incomplete_and_with_both_it_is_ready_and_its_secret_value_is_never_in_the_view()
     {
         var idOnly = View(ConfigKit.Dev(("AIPOD_GITHUB_CLIENT_ID", "gh-id")));

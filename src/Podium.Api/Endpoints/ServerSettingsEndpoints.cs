@@ -22,6 +22,10 @@ public static class ServerSettingsEndpoints
     public const string MailFailed = "mail_failed";
     public const string NoEmail = "no_email";
     public const string SettingsConflict = "settings_conflict";
+    public const string TlsRequired = "tls_required";
+
+    /// <summary>The one host name that is this machine; a mail server here may take a sign-in without STARTTLS (Mailpit in development).</summary>
+    public const string LoopbackName = "localhost";
 
     /// <summary>The longest value in bytes: it is sealed (28 bytes more, base64) into a column of 4000 characters, whatever the characters are.</summary>
     public const int ValueMaxBytes = 2900;
@@ -46,7 +50,11 @@ public static class ServerSettingsEndpoints
         config.AdminWorkspace is { } admin && await Access.MemberAsync(db, http.User.UserId(), admin, Roles.Admin, http.RequestAborted) is not null;
 
     private static async Task<IResult> View(HttpContext http, PodiumDb db, ApiConfig config, IntegrationSettings settings) =>
-        await AdminAsync(http, db, config) ? Results.Ok(ServerSettingsViews.Of(settings, config)) : Http.NotFound();
+        await AdminAsync(http, db, config) ? Results.Ok(ServerSettingsViews.Of(settings, config, await JiraConnectionsAsync(db, http.RequestAborted))) : Http.NotFound();
+
+    /// <summary>The Jira connections of every workspace that are not disconnected: each one stops if Atlassian refuses the app's client id or secret.</summary>
+    private static Task<int> JiraConnectionsAsync(PodiumDb db, CancellationToken ct) =>
+        db.IntegrationConnections.CountAsync(c => c.Provider == Integrations.TrackerProviders.Jira && c.Status != ConnectionStatuses.Disconnected, ct);
 
     private static async Task<IResult> Save(string id, ServerSettingsRequest req, HttpContext http, PodiumDb db, ApiConfig config,
         IntegrationSettings settings, TimeProvider clock)
@@ -67,6 +75,8 @@ public static class ServerSettingsEndpoints
             if (!string.IsNullOrEmpty(value) && !Valid(field, value)) return Http.Invalid(name, InvalidValue);
             changes.Add((field, string.IsNullOrEmpty(value) ? null : value));
         }
+
+        if (id == IntegrationIds.Smtp && PlainSignIn(settings, config, changes)) return Http.Invalid(IntegrationCatalog.Tls, TlsRequired);
 
         var me = http.User.UserId();
         if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, req.Code, window: false)) return RemoteChecks.ReauthRefused(http);
@@ -95,9 +105,13 @@ public static class ServerSettingsEndpoints
             row.UpdatedBy = me;
         }
 
-        // Which settings changed, never their values.
+        // Which settings changed and which of them were removed, never their values.
         Audit.Add(db, http, clock, AuditActions.ServerSettingsChanged, config.AdminWorkspace, me, targetType: "integration", targetId: id,
-            detail: new { fields = changes.Select(c => c.Field.Name).Order(StringComparer.Ordinal).ToList() });
+            detail: new
+            {
+                fields = changes.Select(c => c.Field.Name).Order(StringComparer.Ordinal).ToList(),
+                removed = changes.Where(c => c.Value is null).Select(c => c.Field.Name).Order(StringComparer.Ordinal).ToList(),
+            });
         try
         {
             await db.SaveChangesAsync(ct);
@@ -111,7 +125,7 @@ public static class ServerSettingsEndpoints
 
         // The rows are committed: the refresh is not cancelled with the request (an admin who closes the tab must not leave this instance on the old values).
         await settings.RefreshAsync(CancellationToken.None);
-        return Results.Ok(ServerSettingsViews.Of(settings, config));
+        return Results.Ok(ServerSettingsViews.Of(settings, config, await JiraConnectionsAsync(db, ct)));
     }
 
     /// <summary>Sends a test mail to the caller's own address with the SMTP values in force; says only whether it went.</summary>
@@ -126,7 +140,7 @@ public static class ServerSettingsEndpoints
             await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, user.Language), MailTemplates.Test, user.Email), http.RequestAborted);
         }
         catch (Exception e) when (e is System.Net.Mail.SmtpException or InvalidOperationException or IOException
-                                      or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException)
+                                      or System.Net.Sockets.SocketException or System.Security.Authentication.AuthenticationException or TimeoutException)
         {
             logs.CreateLogger(typeof(ServerSettingsEndpoints)).LogWarning("Test mail failed: {Type}", e.GetType().Name);
             return Http.Invalid("smtp", MailFailed);
@@ -134,6 +148,28 @@ public static class ServerSettingsEndpoints
 
         return Results.NoContent();
     }
+
+    /// <summary>
+    /// Whether this save would leave a user or password for a mail server off this machine with STARTTLS off: the mailer would sign in in clear.
+    /// Judged on the values in force after the save (the environment's, the page's and this request's); a save that touches none of host, tls,
+    /// user and password does not make that combination and is not refused for it.
+    /// </summary>
+    private static bool PlainSignIn(IntegrationSettings settings, ApiConfig config, List<(SettingField Field, string? Value)> changes)
+    {
+        if (!changes.Any(c => c.Field.Name is IntegrationCatalog.Host or IntegrationCatalog.Tls or IntegrationCatalog.User or IntegrationCatalog.Password)) return false;
+        var page = new Dictionary<string, string>(settings.Current.Page, StringComparer.Ordinal);
+        foreach (var (field, value) in changes)
+        {
+            if (value is null) page.Remove(field.Key);
+            else page[field.Key] = value;
+        }
+
+        var smtp = IntegrationSettings.Compose(config, page).Smtp;
+        return !smtp.StartTls && (!string.IsNullOrEmpty(smtp.User) || !string.IsNullOrEmpty(smtp.Password)) && !Loopback(smtp.Host);
+    }
+
+    private static bool Loopback(string host) =>
+        string.Equals(host, LoopbackName, StringComparison.OrdinalIgnoreCase) || (System.Net.IPAddress.TryParse(host, out var ip) && System.Net.IPAddress.IsLoopback(ip));
 
     internal static bool Valid(SettingField field, string value)
     {

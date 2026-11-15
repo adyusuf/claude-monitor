@@ -19,6 +19,8 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
     public const string Ok = "ok";
     public const string NotFound = "space_not_found";
     public const string NeedsSignIn = "reauthorize";
+    /// <summary>The audit's word for a project role given because the person leads the space in the tool.</summary>
+    public const string LeadSource = "jira_lead";
 
     public Task<IReadOnlyList<SpaceImportResult>> ImportSpacesAsync(IntegrationConnection connection, IReadOnlyList<string> keys, Guid actor, CancellationToken ct)
     {
@@ -39,6 +41,11 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
                 catch (TrackerException e)
                 {
                     outcome = e.Code;
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    await CloseUnexpectedAsync(run);
+                    throw;
                 }
 
                 await FinishRunAsync(run, counts, outcome, ct);
@@ -67,6 +74,11 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
             catch (TrackerException e)
             {
                 results.AddRange(sprintIds.Select(s => new SprintImportResult(s, e.Code, 0, 0)));
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                await CloseUnexpectedAsync(run);
+                throw;
             }
 
             await FinishRunAsync(run, counts, results.Any(r => r.Outcome != Ok) ? SyncStatuses.Partial : Ok, ct);
@@ -152,6 +164,9 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
         if (await db.ProjectMembers.AnyAsync(m => m.ProjectId == project.Id && m.UserId == user, ct)) return;
         if (await Access.MemberAsync(db, user, project.WorkspaceId, Roles.Member, ct) is null) return;
         db.ProjectMembers.Add(new ProjectMember { ProjectId = project.Id, UserId = user, Role = ProjectRoles.Manager, AddedBy = project.OwnerUserId, AddedAt = clock.GetUtcNow() });
+        // The lead of the space manages the project here without anyone confirming it (ADR-0015 §1 decision 4): audited, so it can be seen and changed.
+        Audit.Add(db, null, clock, AuditActions.ProjectMemberChanged, project.WorkspaceId, project.OwnerUserId, targetType: "project", targetId: project.Id,
+            detail: new { userId = user, role = ProjectRoles.Manager, source = LeadSource });
     }
 
     private async Task EnsureWebhooksAsync(IntegrationConnection connection, CancellationToken ct)
@@ -173,6 +188,18 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
         db.IntegrationSyncRuns.Add(run);
         await db.SaveChangesAsync(ct);
         return run;
+    }
+
+    /// <summary>
+    /// Closes a run that failed for a reason that is not the tracker's (bad data, a bug, a database that went away), the way PassAsync does: on a clean
+    /// tracker, because the failed save may have left the context unusable. The error goes on to the caller, which is logged by the host.
+    /// </summary>
+    private async Task CloseUnexpectedAsync(IntegrationSyncRun run)
+    {
+        db.ChangeTracker.Clear();
+        var ended = clock.GetUtcNow();
+        await db.IntegrationSyncRuns.Where(r => r.Id == run.Id).ExecuteUpdateAsync(s => s
+            .SetProperty(r => r.Status, SyncStatuses.Failed).SetProperty(r => r.Error, SyncService.InternalError).SetProperty(r => r.EndedAt, ended), CancellationToken.None);
     }
 
     private async Task FinishRunAsync(IntegrationSyncRun run, MirrorCounts counts, string outcome, CancellationToken ct)

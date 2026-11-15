@@ -38,6 +38,8 @@ public static class IssueEvidenceEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (Invalid(req) is { } invalid) return invalid;
         if (await db.IssueTestCases.CountAsync(t => t.IssueId == id, http.RequestAborted) >= TestCasesMax) return Http.Invalid("title", "limit_reached");
         var row = new IssueTestCase { WorkspaceId = f.Issue.WorkspaceId, IssueId = id, CreatedAt = clock.GetUtcNow() };
@@ -54,6 +56,8 @@ public static class IssueEvidenceEndpoints
         var row = await db.IssueTestCases.FirstOrDefaultAsync(t => t.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.IssueAsync(db, userId, row.IssueId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (Invalid(req) is { } invalid) return invalid;
         Fill(row, req);
         Audit.Add(db, http, clock, AuditActions.IssueTestCaseChanged, row.WorkspaceId, userId, targetType: "issue", targetId: row.IssueId);
@@ -67,6 +71,8 @@ public static class IssueEvidenceEndpoints
         var row = await db.IssueTestCases.FirstOrDefaultAsync(t => t.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.IssueAsync(db, userId, row.IssueId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         db.IssueTestCases.Remove(row);
         Audit.Add(db, http, clock, AuditActions.IssueTestCaseChanged, row.WorkspaceId, userId, targetType: "issue", targetId: row.IssueId);
         await db.SaveChangesAsync(http.RequestAborted);
@@ -79,6 +85,8 @@ public static class IssueEvidenceEndpoints
         var row = await db.IssueTestCases.FirstOrDefaultAsync(t => t.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.IssueAsync(db, userId, row.IssueId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.Result is null || !TestResults.All.Contains(req.Result)) return Http.Invalid("result", "invalid_value");
         if (req.Note is { } note && note.Trim().Length > ProjectRules.TextMax) return Http.Invalid("note", "too_long");
         row.Result = req.Result;
@@ -104,10 +112,15 @@ public static class IssueEvidenceEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.Kind is null || !CodeLinkKinds.All.Contains(req.Kind)) return Http.Invalid("kind", "invalid_value");
         var url = req.Url?.Trim();
         if (string.IsNullOrEmpty(url) || !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || !ProjectRules.WebLink(url)) return Http.Invalid("url", "invalid_url");
         if (req.Title is { } title && title.Trim().Length > ProjectRules.ShortMax) return Http.Invalid("title", "too_long");
+        // The project lock keeps the cap exact; the unique (issue, address) key answers a duplicate the lock cannot see (an automatic link).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, f.Issue.ProjectId, http.RequestAborted);
         if (await db.IssueCodeLinks.AnyAsync(c => c.IssueId == id && c.Url == url, http.RequestAborted)) return Http.Invalid("url", "duplicate_link");
         if (await db.IssueCodeLinks.CountAsync(c => c.IssueId == id, http.RequestAborted) >= CodeLinksMax) return Http.Invalid("url", "limit_reached");
         var row = new IssueCodeLink
@@ -123,7 +136,16 @@ public static class IssueEvidenceEndpoints
         };
         db.IssueCodeLinks.Add(row);
         Audit.Add(db, http, clock, AuditActions.IssueCodeLinkChanged, row.WorkspaceId, userId, targetType: "issue", targetId: id);
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e))
+        {
+            return Http.Invalid("url", "duplicate_link");
+        }
+
+        await tx.CommitAsync(http.RequestAborted);
         return Results.Created($"/api/code-links/{row.Id}", IssueViews.View(row));
     }
 
@@ -133,6 +155,8 @@ public static class IssueEvidenceEndpoints
         var row = await db.IssueCodeLinks.FirstOrDefaultAsync(c => c.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.IssueAsync(db, userId, row.IssueId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         db.IssueCodeLinks.Remove(row);
         Audit.Add(db, http, clock, AuditActions.IssueCodeLinkChanged, row.WorkspaceId, userId, targetType: "issue", targetId: row.IssueId);
         await db.SaveChangesAsync(http.RequestAborted);

@@ -8,9 +8,9 @@ import { IntegrationSettings } from "./IntegrationSettings";
 
 afterEach(() => vi.unstubAllGlobals());
 
-const open = (over: Partial<ConnectionView> = {}, admin = true) => {
+const open = (over: Partial<ConnectionView> = {}, admin = true, canLink = true) => {
   const onChange = vi.fn();
-  renderAt("/", [{ path: "/", element: <IntegrationSettings connection={connection(over)} admin={admin} onChange={onChange} /> }]);
+  renderAt("/", [{ path: "/", element: <IntegrationSettings connection={connection(over)} admin={admin} canLink={canLink} onChange={onChange} /> }]);
   return onChange;
 };
 const writes = (calls: Call[]) => calls.filter((c) => c.method !== "GET" && c.path.startsWith("/integrations/c1"));
@@ -106,6 +106,14 @@ describe("the settings of a connection: your own account", () => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://auth.atlassian.com/authorize?state=me"));
     expect(calls.some((c) => c.method === "POST" && c.path === "/integrations/c1/account/connect")).toBe(true);
     await waitFor(() => expect(onChange).toHaveBeenCalled());
+  });
+
+  it("offers a viewer no link button, only the state of the account, as the API refuses a viewer", async () => {
+    serve();
+    open({ myAccountLinked: false, myAccountStatus: null }, false, false);
+    expect(await screen.findByText(/Not linked: you can read/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Link my account" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in again" })).not.toBeInTheDocument();
   });
 
   it("shows the translated problem and does not navigate when linking fails", async () => {

@@ -19,7 +19,7 @@ export const connection = (over: Partial<ConnectionView> = {}): ConnectionView =
 export const findSite = (host: string) => screen.findByText(host);
 
 export const integrationsView = (connections: ConnectionView[] = [connection()], over: Partial<IntegrationsView> = {}): IntegrationsView => ({
-  available: true, providers: ["jira"], connections, ...over,
+  available: true, trackerProviders: ["jira"], connections, ...over,
 });
 
 export const space = (over: Partial<SpaceView> = {}): SpaceView => ({

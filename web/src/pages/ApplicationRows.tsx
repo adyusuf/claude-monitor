@@ -4,6 +4,7 @@ import { Button } from "../components/ui";
 import { useI18n } from "../i18n";
 import type { ApplicationDraft } from "../lib/applicationForm";
 import { ENVIRONMENT_NAMES, projectLimits, TARGET_KINDS } from "../lib/projectOptions";
+import { normalizeSearch } from "../lib/searchText";
 import { Group } from "./ProjectBits";
 
 /** The environments an application runs in: a box per environment, and an optional address for each one that is ticked. */
@@ -41,7 +42,7 @@ export function TechStackEditor({ items, onChange, error }: { items: string[]; o
   const [text, setText] = useState("");
   const add = () => {
     const name = text.trim();
-    if (name !== "" && !items.some((i) => i.toLowerCase() === name.toLowerCase()) && items.length < projectLimits.techStackMax) onChange([...items, name]);
+    if (name !== "" && !items.some((i) => normalizeSearch(i) === normalizeSearch(name)) && items.length < projectLimits.techStackMax) onChange([...items, name]);
     setText("");
   };
   return (

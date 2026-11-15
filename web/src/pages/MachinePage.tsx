@@ -31,11 +31,16 @@ import { useMachineData } from "./useMachineData";
 import { Icon } from "../components/icons";
 
 /** The live events that change what this page shows. */
-const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "machine", "action"];
+const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "schedule", "machine", "action"];
 
 /** One machine in tabs: overview, control, work (projects, runs, jobs, schedules), monitoring (load, alerts) and access (grants). The runs waiting for the owner stay above the tabs. */
 export function MachinePage() {
   const { ws = "", agentId = "" } = useParams();
+  // Keyed on the machine: moving to another one starts with none of the first one's data, drafts or code field.
+  return <MachineContent key={`${ws}/${agentId}`} ws={ws} agentId={agentId} />;
+}
+
+function MachineContent({ ws, agentId }: { ws: string; agentId: string }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { me } = useSession();
@@ -45,6 +50,7 @@ export function MachinePage() {
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
   const isAdmin = role === "owner" || role === "admin";
   const { reload } = data;
+  const readError = data.error ?? data.metricsError ?? data.moreError;
 
   const refresh = useMemo(() => debounce(() => {
     void reload();
@@ -80,7 +86,7 @@ export function MachinePage() {
         </div>
         <div className="head-side"><ExecBadge level={m.execLevel} /><ServiceBadge serviceMode={m.serviceMode} /></div>
       </header>
-      {data.error ? <Notice kind="error">{errorText(data.error)}</Notice> : null}
+      {readError ? <Notice kind="error">{errorText(readError)}</Notice> : null}
       {m.execLevel === "off" ? <Notice>{t("remote.execOffNote")}</Notice> : null}
       {waiting.length > 0 ? (
         <section className="stack" aria-label={t("remote.waiting")}>
@@ -115,7 +121,7 @@ export function MachinePage() {
               {data.owned || data.detail.inventory ? (
                 <Card title={t("machines.inventory.title")}><MachineInventory agentId={agentId} detail={data.detail} owned={data.owned} agentVersion={data.agentVersion} onChanged={() => void reload()} /></Card>
               ) : null}
-              <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} onChanged={() => void reload()} /></Card>
+              <Card title={t("machines.asks.title")}><MachineAsks agentId={agentId} view={m} owned={data.owned} version={version} onChanged={() => void reload()} /></Card>
             </>
           ) : null,
         },
@@ -127,7 +133,7 @@ export function MachinePage() {
               <Card title={t("remote.runs")}>
                 <RunList runs={data.runs} ws={ws} version={version} hasMore={data.hasMoreRuns} onMore={() => void data.moreRuns()} onChanged={() => void reload()} />
               </Card>
-              <Card title={t("remote.jobs")}><JobList jobs={data.jobs} onChanged={() => void reload()} /></Card>
+              <Card title={t("remote.jobs")}><JobList jobs={data.jobs} hasMore={data.hasMoreJobs} onMore={() => void data.moreJobs()} onChanged={() => void reload()} /></Card>
               <Card title={t("schedules.title")}><ScheduleList schedules={data.schedules} jobs={data.jobs} canCreate={data.owned} onChanged={() => void reload()} /></Card>
             </>
           ),
@@ -154,7 +160,7 @@ export function MachinePage() {
             <>
               {data.detail?.access ? <Card title={t("access.machineTitle")}><MachineAccess ws={ws} access={data.detail.access} /></Card> : null}
               <Card title={t("remote.grants")}>
-                <GrantList grants={data.grants} agentId={agentId} canCreate={data.owned} onChanged={() => void reload()} />
+                <GrantList grants={data.grants} agentId={agentId} canCreate={data.owned} hasMore={data.hasMoreGrants} onMore={() => void data.moreGrants()} onChanged={() => void reload()} />
               </Card>
             </>
           ),

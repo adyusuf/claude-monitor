@@ -62,8 +62,10 @@ public sealed partial class ApiClient(HttpClient http, ICredentialStore credenti
     public void SaveTokens(TokenResponse tokens)
     {
         ArgumentNullException.ThrowIfNull(tokens);
-        credentials.Write(Credentials.Access, tokens.AccessToken);
+        // The refresh token first: the server already replaced the old one, so a stop between the two writes must leave the new one
+        // (an old access token costs one more refresh; an old refresh token would be judged a reuse and revoke the agent).
         credentials.Write(Credentials.Refresh, tokens.RefreshToken);
+        credentials.Write(Credentials.Access, tokens.AccessToken);
         Disconnected = false;
         DisconnectReason = null;
     }
@@ -119,11 +121,13 @@ public sealed partial class ApiClient(HttpClient http, ICredentialStore credenti
         return await ReadAsync<UpdateOffer>(response, t);
     }, ct);
 
-    public Task CommandStatusAsync(string id, string status, string? result, CancellationToken ct, DateTimeOffset? at = null, string? transport = null) => WithinDeadlineAsync(async t =>
+    /// <summary>Reports a command's status; false when the API did not take it because the command is already settled or gone (409, 404).</summary>
+    public Task<bool> CommandStatusAsync(string id, string status, string? result, CancellationToken ct, DateTimeOffset? at = null, string? transport = null) => WithinDeadlineAsync(async t =>
     {
         using var response = await SendAsync(() => Json_(HttpMethod.Post, $"api/agent/commands/{id}/status", new CommandStatusUpdate(status, result, at, transport)), t);
-        if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.NotFound) return; // already settled or gone
+        if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.NotFound) return false; // already settled or gone
         await EnsureAsync(response, t);
+        return true;
     }, ct);
 
     public Task<PermissionRequestCreated?> CreatePermissionAsync(PermissionRequestCreate request, CancellationToken ct) => WithinDeadlineAsync(async t =>

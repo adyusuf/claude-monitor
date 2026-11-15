@@ -16,6 +16,7 @@ export const trSprints: Dictionary["sprints"] = {
   start: "Başlat", delete: "Sil", deleteConfirm: "Sprint {n} silinsin mi? İşleri iş listesine döner.",
   edit: "Düzenle", editTitle: "Sprinti düzenle", close: "Sprinti kapat",
   closedBanner: "Bu sprint kapandı: yalnızca okunabilir.",
+  reloadFailed: "Değişiklik kaydedildi ama sayfa yeniden yüklenemedi. Sayfayı yenileyin.",
   closeTitle: "Bu sprinti kapat", closeQuestion: "{n} iş bitmedi. Nereye gitsinler?", closeNone: "Tüm işler bitti.",
   moveTo: "Bitmeyen işlerin gideceği yer", toBacklog: "İş listesine geri", confirmClose: "Sprinti kapat",
   boardTitle: "Sprintin işleri", noIssues: "Bu sprintte henüz iş yok.", noneInColumn: "Yok.",

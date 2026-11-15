@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/endpoints";
 import { ApiError } from "../api/client";
 import type { AgentRow, DeviceLookup, MachineView } from "../api/types";
@@ -66,6 +66,7 @@ export function MachinesPage() {
       ]);
       setRows(agents);
       setViews(new Map(machines.map((m) => [m.agentId, m])));
+      setError(null);
     } catch (e) {
       setError(e);
     }
@@ -80,6 +81,7 @@ export function MachinesPage() {
 
   const revoke = async (id: string) => {
     if (!window.confirm(t("machines.revokeConfirm"))) return;
+    setError(null);
     try {
       await api.revokeAgent(id);
       await load();
@@ -95,7 +97,7 @@ export function MachinesPage() {
         <Link className="btn btn-primary" to="/download">{t("machines.connect")}</Link>
       </header>
       {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
-      {rows === null ? <Spinner /> : rows.length === 0 ? <Empty title={t("machines.empty")} hint={t("sessions.emptyHint")} /> : (
+      {rows === null ? (error ? null : <Spinner />) : rows.length === 0 ? <Empty title={t("machines.empty")} hint={t("sessions.emptyHint")} /> : (
         <Card>
           <div className="table-scroll">
             <table className="table table-rows">
@@ -126,7 +128,6 @@ export function DevicePage() {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { me } = useSession();
-  const navigate = useNavigate();
   const [params] = useSearchParams();
   const [code, setCode] = useState(params.get("code") ?? "");
   const [device, setDevice] = useState<DeviceLookup | null>(null);
@@ -181,10 +182,11 @@ export function DevicePage() {
           <p className="muted">{t("device.details", { host: device.hostname, os: device.os, arch: device.arch, version: device.agentVersion })}</p>
           <label className="field">
             <span className="field-label">{t("device.workspace")}</span>
-            <select className="input" value={workspace} onChange={(e) => e.target.value === "new" ? navigate("/workspaces/new") : setWorkspace(e.target.value)}>
+            <select className="input" value={workspace} onChange={(e) => setWorkspace(e.target.value)}>
               {(me?.workspaces ?? []).filter((w) => w.role !== "viewer").map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </label>
+          {workspace ? null : <p className="muted">{t("device.noWorkspace")} <Link to="/workspaces/new">{t("device.createWorkspace")}</Link></p>}
           <div className="row-actions">
             <Button variant="ghost" disabled={!workspace} onClick={() => void decide(false)}>{t("device.deny")}</Button>
             <Button disabled={!workspace} onClick={() => void decide(true)}>{t("device.approve")}</Button>

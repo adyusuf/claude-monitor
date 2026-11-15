@@ -122,6 +122,41 @@ public sealed class AccessEnforcementTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_change_inside_the_code_window_passes_without_a_code_and_the_row_says_code_window()
+    {
+        var owner = await api.NewClient().SignedUpAsync("enf-window");
+        var secret = await RemoteKit.EnableTotpAsync(api, owner);
+        api.Clock.Advance(PastWindow);
+        (await SetAsync(owner, true, RemoteKit.TotpNow(api, secret))).EnsureSuccessStatusCode();
+        api.Clock.Advance(TimeSpan.FromMinutes(1)); // inside the five-minute code window, outside the sign-in window
+
+        var response = await SetAsync(owner, false);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.False(await EnforcedAsync(owner));
+        var ways = (await ChangesAsync(owner.WorkspaceId)).Select(r => r.Detail!.RootElement.GetProperty("reauth").GetString());
+        Assert.Equal([ReauthWays.Code, ReauthWays.CodeWindow], ways);
+    }
+
+    [Fact]
+    public async Task A_refused_re_authentication_leaves_the_other_fields_of_the_same_body_unchanged()
+    {
+        var owner = await api.NewClient().SignedUpAsync("enf-refused");
+        var before = (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}")).GetProperty("settings");
+        var retention = before.GetProperty("retentionDays").GetInt32() + 1;
+        var mask = !before.GetProperty("maskSecrets").GetBoolean();
+        api.Clock.Advance(PastWindow);
+
+        var response = await owner.SendAsync(HttpMethod.Put, SettingsUrl(owner), new { enforceAccessPolicies = true, retentionDays = retention, maskSecrets = mask });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var after = (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}")).GetProperty("settings");
+        Assert.Equal((before.GetProperty("retentionDays").GetInt32(), before.GetProperty("maskSecrets").GetBoolean(), false),
+            (after.GetProperty("retentionDays").GetInt32(), after.GetProperty("maskSecrets").GetBoolean(), after.GetProperty("enforceAccessPolicies").GetBoolean()));
+        Assert.Empty(await ChangesAsync(owner.WorkspaceId));
+    }
+
+    [Fact]
     public async Task An_admin_who_is_not_an_owner_can_change_it()
     {
         var owner = await api.NewClient().SignedUpAsync("enf-owner");

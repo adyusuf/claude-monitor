@@ -23,7 +23,11 @@ public sealed class RunCreator(PodiumDb db, ApiConfig config, TimeProvider clock
 {
     private const string UniqueViolation = "23505";
 
-    public async Task<RunCreateResult> CreateAsync(RunCreate req, Guid agentId, Guid userId, Guid workspaceId, HttpContext http)
+    /// <param name="reuseOpenTest">
+    /// For "Start the test" from the web: a test run of the same project that is still open (waiting, approved or running) is returned instead of making a second one.
+    /// The check runs under the locks taken below, so two requests at the same moment cannot both create one.
+    /// </param>
+    public async Task<RunCreateResult> CreateAsync(RunCreate req, Guid agentId, Guid userId, Guid workspaceId, HttpContext http, bool reuseOpenTest = false)
     {
         ArgumentNullException.ThrowIfNull(req);
         var ct = http.RequestAborted;
@@ -89,6 +93,11 @@ public sealed class RunCreator(PodiumDb db, ApiConfig config, TimeProvider clock
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (await LockAsync(workspaceId, userId, target.a.Id, target.a.UserId, req.Mode, ct) is { } refused) return refused;
         // A target that requires signed approvals takes no job or grant: each run waits for a signature of its own (ADR-0010 §4).
+        if (reuseOpenTest && run.Kind == RunKinds.Test && projectKey is not null && await OpenTestRunAsync(run, now, ct) is { } open)
+        {
+            return new RunCreateResult(new RunCreated(open.Id, open.Status, open.GrantId, open.ExpiresAt), StatusCodes.Status200OK, null);
+        }
+
         var approvedBy = target.a.ApprovalsRequired ? null : await ApproveByJobAsync(req, run, now, ct) ?? await ApproveByGrantAsync(run, target.Os, now, ct);
         if (approvedBy is null
             && await db.RemoteRuns.CountAsync(r => r.TargetAgentId == run.TargetAgentId && r.Status == RunStatuses.PendingApproval, ct)
@@ -117,6 +126,14 @@ public sealed class RunCreator(PodiumDb db, ApiConfig config, TimeProvider clock
         if (run.Status == RunStatuses.Approved) await RunNotices.DeliverAsync(broker, db, run, ct);
         return new RunCreateResult(new RunCreated(run.Id, run.Status, run.GrantId, run.ExpiresAt), StatusCodes.Status200OK, null);
     }
+
+    /// <summary>The newest test run of this requester on this target and project that nobody has finished or let lapse; null when there is none.</summary>
+    private async Task<RemoteRun?> OpenTestRunAsync(RemoteRun run, DateTimeOffset now, CancellationToken ct) =>
+        await db.RemoteRuns.AsNoTracking()
+            .Where(r => r.RequesterAgentId == run.RequesterAgentId && r.TargetAgentId == run.TargetAgentId && r.Kind == RunKinds.Test && r.ProjectKey == run.ProjectKey
+                        && (r.Status == RunStatuses.Running
+                            || ((r.Status == RunStatuses.PendingApproval || r.Status == RunStatuses.Approved || r.Status == RunStatuses.Delivered) && r.ExpiresAt > now)))
+            .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).FirstOrDefaultAsync(ct);
 
     public static string RunHash(RemoteRun run) => run.Mode == RunModes.Script
         ? GrantMatcher.ScriptHash(run.ScriptInterpreter ?? "", run.ScriptBody ?? "", run.ScriptArgs, run.TimeoutSeconds, run.TargetAgentId,

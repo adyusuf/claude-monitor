@@ -228,4 +228,22 @@ public sealed class IssueCrudTests(ApiFactory api)
         Assert.Equal(["issue.created", "issue.updated", "issue.moved", "issue.archived", "issue.restored"], rows.Select(r => r.Action));
         Assert.All(rows, r => Assert.DoesNotContain("Hush", r.Detail?.RootElement.GetRawText() ?? "", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task An_issue_in_an_application_sprint_keeps_that_application_until_it_leaves_the_sprint()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var second = (await ProjectKit.CreateApplicationAsync(t.Owner, t.Project, "Mobile")).GetProperty("id").GetGuid();
+        var sprint = await SprintKit.SprintAsync(t.Owner, t.Project, new { applicationId = t.Application });
+        var id = await IssueKit.IssueAsync(t.Owner, t.Project, "Web issue", "story", new { applicationId = t.Application });
+        (await SprintKit.AddAsync(t.Owner, sprint, id)).EnsureSuccessStatusCode();
+
+        Assert.Equal(("applicationId", "wrong_scope"), await ProjectKit.ProblemAsync(await t.Owner.SendAsync(HttpMethod.Put, $"/api/issues/{id}", new { title = "Web issue", applicationId = second })));
+        Assert.Equal(("applicationId", "wrong_scope"), await ProjectKit.ProblemAsync(await t.Owner.SendAsync(HttpMethod.Put, $"/api/issues/{id}", new { title = "Web issue" })));
+        Assert.Equal(t.Application, (await IssueKit.ViewAsync(t.Owner, id)).GetProperty("issue").GetProperty("applicationId").GetGuid());
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/issues/{id}", new { title = "Renamed", applicationId = t.Application })).StatusCode);
+
+        (await t.Owner.SendAsync(HttpMethod.Delete, $"/api/sprints/{sprint}/issues/{id}")).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/issues/{id}", new { title = "Renamed", applicationId = second })).StatusCode);
+    }
 }

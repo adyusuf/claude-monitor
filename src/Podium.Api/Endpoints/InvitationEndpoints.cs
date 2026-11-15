@@ -13,10 +13,15 @@ public sealed record InvitationResponse(Guid Id, string Email, string Role, Date
 /// <summary>E-mail invitations. Accepting needs the invited address on a signed-in, verified account.</summary>
 public static class InvitationEndpoints
 {
+    /// <summary>409 title: the address is an active member already at the invited rank or above (the invitation could change nothing).</summary>
+    public const string AlreadyMember = "already_member";
+    /// <summary>409 title: the address has an open invitation to this workspace (revoke it to send a new one).</summary>
+    public const string InvitationPending = "invitation_pending";
+
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("").RequireAuthorization(Schemes.Session);
-        g.MapPost("/workspaces/{id:guid}/invitations", Invite);
+        g.MapPost("/workspaces/{id:guid}/invitations", Invite).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         g.MapGet("/workspaces/{id:guid}/invitations", List);
         g.MapDelete("/workspaces/{id:guid}/invitations/{invitationId:guid}", Revoke);
         g.MapPost("/invitations/accept", Accept);
@@ -34,11 +39,26 @@ public static class InvitationEndpoints
         if (Roles.Rank(role) > Roles.Rank(actor.Role)) return Results.Forbid();
 
         var now = clock.GetUtcNow();
+        var normalized = SearchText.Email(req.Email!);
+        var memberRole = await db.WorkspaceMembers.AsNoTracking().Where(m => m.WorkspaceId == id && m.RemovedAt == null)
+            .Join(db.Users.Where(u => u.EmailNormalized == normalized), m => m.UserId, u => u.Id, (m, _) => m.Role)
+            .FirstOrDefaultAsync(http.RequestAborted);
+        if (memberRole is not null && Roles.Rank(memberRole) >= Roles.Rank(role))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: AlreadyMember);
+        }
+
+        if (await db.WorkspaceInvitations.AnyAsync(i => i.WorkspaceId == id && i.EmailNormalized == normalized && i.AcceptedAt == null
+                && i.RevokedAt == null && i.ExpiresAt > now, http.RequestAborted))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: InvitationPending);
+        }
+
         var token = Secrets.NewToken();
         var invitation = new WorkspaceInvitation
         {
             WorkspaceId = id,
-            EmailNormalized = SearchText.Email(req.Email!),
+            EmailNormalized = normalized,
             Role = role,
             TokenHash = Secrets.Hash(token),
             InvitedBy = userId,
@@ -99,23 +119,48 @@ public static class InvitationEndpoints
             return Http.Invalid("token", "invitation_other_address");
         }
 
+        // The invitation speaks for its inviter: one who has left, or could no longer give this role (an admin or owner of at least
+        // its rank), voids it.
+        var inviter = await db.WorkspaceMembers.AsNoTracking().FirstOrDefaultAsync(
+            m => m.WorkspaceId == invitation.WorkspaceId && m.UserId == invitation.InvitedBy && m.RemovedAt == null, http.RequestAborted);
+        if (inviter is null || Roles.Rank(inviter.Role) < Math.Max(Roles.Rank(Roles.Admin), Roles.Rank(invitation.Role)))
+        {
+            return Http.Invalid("token", "invalid_token");
+        }
+
+        // An archived workspace takes no new member (/me hides it): refused, and the invitation stays unspent.
+        if (!await db.Workspaces.AsNoTracking().AnyAsync(w => w.Id == invitation.WorkspaceId && w.Status == WorkspaceStatuses.Active, http.RequestAborted))
+        {
+            return Http.Invalid("token", "invalid_token");
+        }
+
         var member = await db.WorkspaceMembers.FirstOrDefaultAsync(
             m => m.WorkspaceId == invitation.WorkspaceId && m.UserId == userId, http.RequestAborted);
+
+        // Claimed with a compare-and-set in the same transaction as the membership: a revoke or a second accept that
+        // committed after the read above leaves 0 rows, and this one changes nothing.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var claimed = await db.WorkspaceInvitations
+            .Where(i => i.Id == invitation.Id && i.AcceptedAt == null && i.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.AcceptedAt, now), http.RequestAborted);
+        if (claimed != 1) return Http.Invalid("token", "invalid_token");
+
         if (member is null)
         {
             db.WorkspaceMembers.Add(new WorkspaceMember { WorkspaceId = invitation.WorkspaceId, UserId = userId, Role = invitation.Role, JoinedAt = now });
         }
         else if (member.RemovedAt is not null || Roles.Rank(invitation.Role) > Roles.Rank(member.Role))
         {
+            // A member who comes back starts again; an active one moved up keeps the date they first joined.
+            if (member.RemovedAt is not null) member.JoinedAt = now;
             member.RemovedAt = null;
             member.Role = invitation.Role;
-            member.JoinedAt = now;
         }
 
-        invitation.AcceptedAt = now;
         Audit.Add(db, http, clock, AuditActions.InvitationAccepted, invitation.WorkspaceId, userId,
             targetType: "invitation", targetId: invitation.Id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.Ok(new { workspaceId = invitation.WorkspaceId });
     }
 }

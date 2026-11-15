@@ -20,11 +20,11 @@ public static class ExternalAuthEndpoints
 
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapGet("/auth/external/{provider}", Start).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
-        api.MapGet("/auth/external/{provider}/done", Done);
+        api.MapGet("/auth/external/{provider}", Start).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
+        api.MapGet("/auth/external/{provider}/done", Done).AllowAnonymous();
     }
 
-    private static IResult Start(string provider, string? mode, IntegrationSettings settings)
+    private static IResult Start(string provider, string? mode, string? next, IntegrationSettings settings)
     {
         if (!Providers.All.Contains(provider) || settings.Provider(provider) is null)
         {
@@ -32,13 +32,15 @@ public static class ExternalAuthEndpoints
         }
 
         var safeMode = mode == ModeLink ? ModeLink : ModeSignIn;
+        // The page a sign-in started for (an invitation link) rides in the protected state; linking always returns to settings.
+        var target = safeMode == ModeSignIn ? SafeNext(next) : "/";
         return Results.Challenge(new AuthenticationProperties
         {
-            RedirectUri = $"/api/auth/external/{provider}/done?mode={safeMode}",
+            RedirectUri = $"/api/auth/external/{provider}/done?mode={safeMode}{NextQuery(target)}",
         }, [provider]);
     }
 
-    private static async Task<IResult> Done(string provider, string? mode, HttpContext http, PodiumDb db, ApiConfig config,
+    private static async Task<IResult> Done(string provider, string? mode, string? next, HttpContext http, PodiumDb db, ApiConfig config,
         TimeProvider clock)
     {
         var external = await http.AuthenticateAsync(Schemes.External);
@@ -51,10 +53,13 @@ public static class ExternalAuthEndpoints
 
         var email = external.Principal!.FindFirstValue(ClaimTypes.Email);
         var verified = external.Principal.FindFirstValue(ExternalProviders.EmailVerifiedClaim) == "true";
-        var name = external.Principal.FindFirstValue(ClaimTypes.Name) ?? email ?? provider;
+        // The name the provider gives passes the rule a typed one does; one that fails it (blank, too long, a control character) is replaced by the address.
+        var suppliedName = external.Principal.FindFirstValue(ClaimTypes.Name);
+        var name = Http.IsName(suppliedName) ? suppliedName! : email ?? provider;
         var existing = await db.UserLogins.FirstOrDefaultAsync(
             l => l.Provider == provider && l.ProviderSubject == subject, http.RequestAborted);
         var now = clock.GetUtcNow();
+        var target = SafeNext(next); // checked again: this address can be called without the state
 
         if (mode == ModeLink)
         {
@@ -82,11 +87,11 @@ public static class ExternalAuthEndpoints
                 await db.SaveChangesAsync(http.RequestAborted);
                 // In a cookie only the second step receives, not in the address (history, logs, Referer).
                 http.Response.Cookies.Append(ApiConfig.MfaCookie, token, MfaEndpoints.PendingCookie(config, now + config.MfaPendingLifetime));
-                return Back(config, "/mfa");
+                return Back(config, target == "/" ? "/mfa" : "/mfa?next=" + Uri.EscapeDataString(target));
             }
 
             await Http.IssueLoginAsync(http, db, config, clock, user);
-            return Back(config, "/");
+            return Back(config, target);
         }
 
         if (email is null || !verified) return Back(config, "/login?error=provider_email_unverified");
@@ -101,8 +106,21 @@ public static class ExternalAuthEndpoints
         Audit.Add(db, http, clock, AuditActions.Register, userId: created.Id, detail: new { provider });
         await db.SaveChangesAsync(http.RequestAborted);
         await Http.IssueLoginAsync(http, db, config, clock, created);
-        return Back(config, "/");
+        return Back(config, target);
     }
+
+    /// <summary>
+    /// A same-site path to return to, else the start page: it must start with one slash, and hold no second slash or
+    /// backslash right after it, no backslash and no control character (browsers read those as another host). The same
+    /// rule as the web's safeNext.
+    /// </summary>
+    internal static string SafeNext(string? next) =>
+        next is { Length: > 0 } && next[0] == '/' && (next.Length == 1 || next[1] != '/')
+            && !next.Any(c => c == '\\' || char.IsControl(c))
+            ? next
+            : "/";
+
+    private static string NextQuery(string target) => target == "/" ? "" : "&next=" + Uri.EscapeDataString(target);
 
     private static void AddLogin(PodiumDb db, Guid userId, string provider, string subject, string? email, DateTimeOffset now) =>
         db.UserLogins.Add(new UserLogin

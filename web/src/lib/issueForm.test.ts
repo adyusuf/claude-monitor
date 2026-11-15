@@ -30,9 +30,9 @@ describe("the issue form helpers", () => {
     expect(estimateOk("5", "t_shirt")).toBe(false);
   });
 
-  it("accepts only web addresses without user information within the length", () => {
+  it("accepts only https addresses without user information within the length", () => {
     expect(codeLinkUrlOk("https://git.example.org/pr/1")).toBe(true);
-    expect(codeLinkUrlOk("http://git.example.org/pr/1")).toBe(true);
+    expect(codeLinkUrlOk("http://git.example.org/pr/1")).toBe(false);
     expect(codeLinkUrlOk("javascript:alert(1)")).toBe(false);
     expect(codeLinkUrlOk("https://u:p@git.example.org/")).toBe(false);
     expect(codeLinkUrlOk("https://u@git.example.org/")).toBe(false);

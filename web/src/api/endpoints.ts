@@ -104,7 +104,7 @@ export const api = {
   metrics: (agentId: string, minutes: number) => request<MetricSample[]>("GET", `/agents/${agentId}/metrics${q({ minutes })}`),
   alerts: (id: string, agent: string, includeResolved: boolean) =>
     request<AlertView[]>("GET", `/workspaces/${id}/alerts${q({ agent, resolved: includeResolved ? "true" : "false" })}`),
-  runs: (id: string, opts: { agent?: string; before?: string | null; limit?: number }) =>
+  runs: (id: string, opts: { agent?: string; before?: string | null; beforeId?: string | null; limit?: number }) =>
     request<WebRunView[]>("GET", `/workspaces/${id}/runs${q(opts)}`),
   run: (runId: string) => request<WebRunView>("GET", `/runs/${runId}`),
   runOutput: (runId: string, after: number, limit: number) => request<RunOutputPage>("GET", `/runs/${runId}/output${q({ after, limit })}`),
@@ -115,12 +115,12 @@ export const api = {
   retireApprovalKey: (id: string) => request<void>("POST", `/me/approval-keys/${id}/retire`),
   denyRun: (runId: string, reason?: string) => request<void>("POST", `/runs/${runId}/deny`, { reason }),
   cancelRun: (runId: string) => request<void>("POST", `/runs/${runId}/cancel`),
-  grants: (agentId: string) => request<WebGrantView[]>("GET", `/agents/${agentId}/grants`),
+  grants: (agentId: string, page: { before?: string | null; limit?: number } = {}) => request<WebGrantView[]>("GET", `/agents/${agentId}/grants${q(page)}`),
   createGrant: (agentId: string, input: GrantInput) => request<WebGrantView>("POST", `/agents/${agentId}/grants`, input),
   approveGrant: (grantId: string, code?: string) => request<void>("POST", `/grants/${grantId}/approve`, { code }),
   denyGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/deny`),
   revokeGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/revoke`),
-  jobs: (agentId: string) => request<WebJobView[]>("GET", `/agents/${agentId}/jobs`),
+  jobs: (agentId: string, page: { before?: string | null; limit?: number } = {}) => request<WebJobView[]>("GET", `/agents/${agentId}/jobs${q(page)}`),
   approveJob: (jobId: string, code?: string) => request<void>("POST", `/jobs/${jobId}/approve`, { code }),
   denyJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/deny`),
   retireJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/retire`),
@@ -204,7 +204,7 @@ export const api = {
   importSprints: (id: string, key: string, sprintIds: string[]) =>
     request<SprintImportResult[]>("POST", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints/import`, { sprintIds }),
   integrationPeople: (id: string) => request<PersonView[]>("GET", `/integrations/${id}/people`),
-  setIntegrationPerson: (personId: string, input: { email?: string; userId?: string }) => request<void>("PUT", `/integrations/people/${personId}`, input),
+  setIntegrationPerson: (personId: string, input: { email?: string; userId?: string; unlink?: boolean }) => request<void>("PUT", `/integrations/people/${personId}`, input),
   syncIntegration: (id: string) => request<SyncRunView>("POST", `/integrations/${id}/sync`),
   integrationRuns: (id: string) => request<SyncRunView[]>("GET", `/integrations/${id}/runs`),
 
@@ -225,7 +225,8 @@ export const api = {
     request<void>("PUT", `/workspaces/${ws}/settings`, { enforceAccessPolicies, code }),
 };
 
-/** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch). */
-export const providerUrl = (provider: string, mode: "signin" | "link") => `/api/auth/external/${provider}?mode=${mode}`;
+/** The address a page links to for signing in or linking with a provider (a full page navigation, not fetch); `next` is a same-site path already checked with safeNext. */
+export const providerUrl = (provider: string, mode: "signin" | "link", next = "/") =>
+  `/api/auth/external/${provider}?mode=${mode}${next === "/" ? "" : `&next=${encodeURIComponent(next)}`}`;
 export const exportUrl = "/api/me/export";
 export const streamUrl = (workspaceId: string) => `/api/workspaces/${workspaceId}/stream`;

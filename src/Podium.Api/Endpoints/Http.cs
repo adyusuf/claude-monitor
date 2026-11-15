@@ -30,8 +30,9 @@ public static class Http
         }
     }
 
+    /// <summary>One line of text: no control character (a line break, NUL, a tab), which could also put its own lines into a mail that quotes the name.</summary>
     public static bool IsName(string? value, int max = 100) =>
-        !string.IsNullOrWhiteSpace(value) && value.Trim().Length <= max;
+        !string.IsNullOrWhiteSpace(value) && value.Trim().Length <= max && !value.Any(char.IsControl);
 
     /// <summary>Clamps a page size into 1..max; the default is 25.</summary>
     public static int Limit(int? limit, ApiConfig config) => Math.Clamp(limit ?? 25, 1, config.PageSizeMax);

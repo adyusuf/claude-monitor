@@ -1,7 +1,7 @@
 import type { Dictionary } from "./en";
 import { deMachines } from "./de.machines";
 import { deTwoStep } from "./de.twoStep";
-import { deApprovalRules } from "./de.approvalRules";
+import { deApprovalRules, deApprovalRulesErrors } from "./de.approvalRules";
 import { deDashboard } from "./de.dashboard";
 import { deInstallOptions } from "./de.installOptions";
 import { deRemote } from "./de.remote";
@@ -18,8 +18,9 @@ export const de: Dictionary = {
   app: { name: "Podium", tagline: "Verfolgen Sie Ihre KI-Programmiersitzungen live." },
   nav: {
     dashboard: "Übersicht", projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", runs: "Ausführungen", approvals: "Freigaben", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
-    account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
+    account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", signOutFailed: "Die Abmeldung wurde nicht abgeschlossen, Sie sind noch angemeldet. Versuchen Sie es erneut.", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
+    workspace: "Arbeitsbereich", menu: "Menü",
     themeSystem: "System", themeLight: "Hell", themeDark: "Dunkel",
   },
   auth: {
@@ -36,9 +37,10 @@ export const de: Dictionary = {
   },
   errors: {
     ...deAccessErrors,
-    jira_changed: "Es hat sich in Jira geändert, seit Sie nachgesehen haben. Neu laden und erneut versuchen.", jira_transition_unavailable: "Jira kennt keinen Schritt von diesem Status zu jenem.", jira_no_board: "Der Jira-Bereich hat kein Board, auf dem ein Sprint angelegt werden könnte.", mirrored_scope: "Ein Issue und ein Sprint müssen beide aus Jira oder beide aus Podium stammen.", mirrored_type_locked: "Der Typ eines Jira-Issues wird in Jira geführt.", mirrored_no_archive: "Ein Jira-Issue kann hier nicht archiviert werden. Brechen Sie es stattdessen ab.", mirrored_field_locked: "Name und Zweck eines Jira-Projekts werden in Jira geführt.", mirrored_detached: "Dies wurde aus Jira importiert und die Verbindung besteht nicht mehr. Verbinden Sie die Site erneut.", assignee_not_in_jira: "Podium kennt kein Jira-Konto dieser Person. Verknüpfen Sie es auf der Seite Integrationen.",
+    ...deApprovalRulesErrors,
+    jira_changed: "Es hat sich in Jira geändert, seit Sie nachgesehen haben. Neu laden und erneut versuchen.", jira_transition_unavailable: "Jira kennt keinen Schritt von diesem Status zu jenem.", jira_no_board: "Der Jira-Bereich hat kein Board, auf dem ein Sprint angelegt werden könnte.", mirrored_scope: "Ein Issue und ein Sprint müssen beide aus Jira oder beide aus Podium stammen.", mirrored_type_locked: "Der Typ eines Jira-Issues wird in Jira geführt.", mirrored_no_archive: "Ein Jira-Issue kann hier nicht archiviert werden. Brechen Sie es stattdessen ab.", mirrored_field_locked: "Name und Zweck eines Jira-Projekts werden in Jira geführt.", mirrored_dates_kept: "Ein Sprint aus Jira behält seine Daten. Ändern Sie sie oder leeren Sie sie in Jira.", mirrored_detached: "Dies wurde aus Jira importiert und die Verbindung besteht nicht mehr. Verbinden Sie die Site erneut.", assignee_not_in_jira: "Podium kennt kein Jira-Konto dieser Person. Verknüpfen Sie es auf der Seite Integrationen.",
     invalid_site: "Geben Sie Ihre Jira-Subdomain ein, etwa acme für acme.atlassian.net.", integration_unavailable: "Jira ist auf diesem Server nicht eingerichtet.",
-    reauthorize: "Die Verbindung braucht eine neue Anmeldung bei Atlassian.", jira_account_required: "Verknüpfen Sie zuerst Ihr eigenes Atlassian-Konto.",
+    reauthorize: "Die Verbindung braucht eine neue Anmeldung bei Atlassian.", jira_account_required: "Verknüpfen Sie zuerst Ihr eigenes Atlassian-Konto.", already_linked: "Dieses Mitglied ist schon mit einer anderen Person dieser Site verknüpft. Lösen Sie diese Verknüpfung zuerst.",
     tracker_unauthorized: "Atlassian hat die Anmeldung abgelehnt. Verbinden Sie erneut.", tracker_forbidden: "Jira erlaubt das diesem Konto nicht.",
     tracker_not_found: "Jira kennt das nicht.", tracker_rate_limited: "Jira bittet um weniger Tempo. Versuchen Sie es in einer Minute erneut.",
     tracker_unavailable: "Jira ist gerade nicht erreichbar.", internal_error: "Die Prüfung ist auf dem Server fehlgeschlagen. Sie wird erneut versucht.", tracker_rejected: "Jira hat das nicht akzeptiert.", tracker_changed: "In Jira hat sich das geändert. Sehen Sie es sich erneut an.",
@@ -53,10 +55,10 @@ export const de: Dictionary = {
     sign_in_first: "Melden Sie sich zuerst an und verknüpfen Sie den Anbieter dann.", provider_in_use: "Dieses Anbieterkonto ist mit einem anderen Benutzer verknüpft.",
     account_disabled: "Dieses Konto ist deaktiviert.", not_a_member: "Sie sind kein Mitglied dieses Arbeitsbereichs.",
     invalid_code: "Dieser Code ist ungültig oder abgelaufen.", last_owner: "Ein Arbeitsbereich braucht mindestens einen Eigentümer.",
-    invalid_answers: "Diese Antwort passt nicht zur Frage.",
+    invalid_answers: "Diese Antwort passt nicht zur Frage.", invalid_decision: "Wählen Sie Erlauben oder Ablehnen.", invalid_duration: "Wählen Sie aus der Liste, wie lange die Antwort gilt.",
     session_ended: "Die Sitzung ist beendet.", session_not_ended: "Nur eine beendete Sitzung kann aus der Liste entfernt werden.", invalid_body: "Schreiben Sie die Nachricht, die gesendet werden soll.", too_long: "Das ist zu lang.",
-    out_of_range: "Dieser Wert liegt außerhalb des zulässigen Bereichs.", invalid_role: "Wählen Sie eine Rolle.", unauthorized: "Ihre Sitzung ist beendet. Melden Sie sich erneut an.",
-    forbidden: "Das dürfen Sie nicht.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
+    too_many_decimals: "Verwenden Sie höchstens zwei Nachkommastellen.", out_of_range: "Dieser Wert liegt außerhalb des zulässigen Bereichs.", invalid_role: "Wählen Sie eine Rolle.", invalid_mode: "Wählen Sie einen Modus aus der Liste.", unauthorized: "Ihre Sitzung ist beendet. Melden Sie sich erneut an.",
+    forbidden: "Das dürfen Sie nicht.", csrf: "Der Server hat diese Änderung abgelehnt, weil sie nicht von einer Seite dieser Website kam. Laden Sie die Seite neu und versuchen Sie es erneut.", owner_only: "Das kann nur der Eigentümer der Maschine.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
     too_many_requests: "Zu viele Versuche. Warten Sie eine Minute.", server_error: "Auf dem Server ist etwas schiefgegangen.",
     request_failed: "Die Anfrage ist fehlgeschlagen.", network: "Der Server ist nicht erreichbar.",
     account_locked: "Zu viele falsche Versuche bei diesem Konto. Versuchen Sie es in 15 Minuten erneut.",
@@ -67,6 +69,7 @@ export const de: Dictionary = {
     target_cannot_run: "Diese Maschine kann das jetzt nicht ausführen (ihre Stufe ist aus, oder sie ist getrennt).", target_busy: "Diese Maschine ist mit anderen Ausführungen beschäftigt.",
     bad_template: "Diese Befehlsvorlage ist für diese Maschine nicht gültig: Das Programm muss ein vollständiger Pfad sein, und manche Programme können nie freigegeben werden.",
     grant_conflict: "Für diese Vorlage gibt es schon eine Freigabe.", invalid_reason: "Diese Begründung ist zu lang.", not_member: "Diese Person ist kein Mitglied dieses Arbeitsbereichs.",
+    already_member: "Diese Person ist schon Mitglied mit dieser oder einer höheren Rolle.", invitation_pending: "Für diese Adresse gibt es schon eine offene Einladung. Widerrufen Sie sie, um eine neue zu senden.",
     invalid_machine_role: "Wählen Sie eine Umgebung und eine Funktion aus den Listen.",
     totp_required: "Diese Maschine ist ein Produktions- oder Datenbankrechner: Dafür brauchen Sie die Anmeldung in zwei Schritten.",
     approval_required: "Diese Maschine führt nur aus, was ein angehefteter Schlüssel signiert hat. Erzeugen Sie auf Ihrer Kontoseite einen Schlüssel und geben Sie erneut frei.",
@@ -100,13 +103,13 @@ export const de: Dictionary = {
     invalid_plugin: "Ein Plugin wird name@marketplace geschrieben, nur mit Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich.", invalid_setting: "Wählen Sie eine Einstellung und einen Wert aus den Listen.", action_busy: "Der Agent ist noch mit einer anderen Änderung dieser Art beschäftigt. Warten Sie, bis sie fertig ist.",
     name_taken: "Dieser Name wird hier schon verwendet. Wählen Sie einen anderen.", invalid_list: "Prüfen Sie die Liste: Ein Eintrag ist leer, zu lang, doppelt oder nicht erlaubt, oder es sind zu viele.",
     amount_and_currency: "Geben Sie den Budgetbetrag und seine Währung zusammen an oder keines von beiden.", invalid_currency: "Verwenden Sie drei Großbuchstaben, zum Beispiel EUR.",
-    before_start: "Das Enddatum darf nicht vor dem Startdatum liegen.", invalid_value: "Wählen Sie einen Wert aus der Liste.", invalid_url: "Diese Adresse ist hier nicht erlaubt. Verwenden Sie für das Repository eine https-, ssh- oder git-Adresse und für eine Umgebung eine http- oder https-Adresse, ohne Passwort.",
+    before_start: "Das Enddatum darf nicht vor dem Startdatum liegen.", invalid_date: "Geben Sie ein gültiges Datum als TT/MM/JJJJ ein.", invalid_value: "Wählen Sie einen Wert aus der Liste.", invalid_url: "Diese Adresse ist hier nicht erlaubt. Verwenden Sie für das Repository eine https-, ssh- oder git-Adresse und für eine Umgebung eine http- oder https-Adresse, ohne Passwort und mit Benutzername nur in einer ssh-Adresse.",
     limit_reached: "Die höchste hier mögliche Anzahl ist erreicht.", archived: "Das ist archiviert. Stellen Sie es zuerst wieder her.",
     invalid_parent: "Das übergeordnete Element muss ein Epic dieses Projekts sein.", invalid_application: "Wählen Sie eine Anwendung dieses Projekts.", invalid_component: "Wählen Sie eine Komponente der gewählten Anwendung.", invalid_release: "Wählen Sie ein Release der gewählten Anwendung.", bug_only: "Nur ein Fehler trägt die Fehlerdetails.", invalid_issue: "Wählen Sie einen anderen Vorgang dieses Projekts.", self_link: "Ein Vorgang kann nicht mit sich selbst verknüpft werden.", cycle: "Diese Verknüpfung würde dazu führen, dass sich die Vorgänge gegenseitig in einer Schleife blockieren.", duplicate_link: "Diese beiden Vorgänge sind bereits verknüpft.",
     released: "Ein Release, das ausgeliefert wurde, kann nicht abgebrochen werden.", cancelled: "Ein abgebrochenes Release kann nicht geändert werden.",
-    sprint_active: "Ein anderer Sprint dieses Bereichs ist bereits aktiv. Schließen Sie ihn zuerst ab.", dates_required: "Legen Sie Start- und Enddatum fest, bevor Sie den Sprint starten.",
+    sprint_active: "Ein anderer Sprint dieses Bereichs ist bereits aktiv. Schließen Sie ihn zuerst ab.", dates_required: "Legen Sie Start- und Enddatum fest, bevor Sie den Sprint starten.", active_dates_required: "Ein aktiver Sprint behält sein Start- und Enddatum.",
     invalid_sprint: "Wählen Sie einen geplanten Sprint desselben Bereichs.", wrong_scope: "Dieser Sprint gehört zu einer Anwendung: Er nimmt nur deren Vorgänge auf.",
-    closed: "Dieser Sprint ist abgeschlossen.", not_planned: "Nur ein geplanter Sprint kann gelöscht werden.",
+    closed: "Dieser Sprint ist abgeschlossen.", not_planned: "Nur ein geplanter Sprint kann gelöscht werden.", not_active: "Dieser Sprint ist nicht mehr aktiv. Laden Sie die Seite neu.",
     invalid_run: "Wählen Sie einen Lauf dieses Arbeitsbereichs.",
     invalid_auto_mode: "Der automatische Modus ist on_message oder off.",
     invalid_auto_project: "Wählen Sie ein Projekt, das diese Maschine gemeldet hat und dem Claude Code vertraut.",
@@ -205,6 +208,7 @@ export const de: Dictionary = {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",
     approve: "Diese Maschine verbinden", deny: "Das bin nicht ich", approved: "Fertig. Die Maschine ist verbunden; Sie können diese Seite schließen.",
     denied: "Die Anfrage wurde abgelehnt.", details: "{host} · {os} {arch} · Agent {version}",
+    noWorkspace: "Sie dürfen noch in keinem Arbeitsbereich mitarbeiten. Erstellen Sie zuerst einen Arbeitsbereich und kehren Sie dann zu dieser Seite zurück.", createWorkspace: "Arbeitsbereich erstellen",
   },
   members: {
     title: "Mitglieder", invite: "Einladen", inviteEmail: "E-Mail-Adresse zum Einladen", role: "Rolle", invited: "Einladung gesendet.",
@@ -268,7 +272,7 @@ export const de: Dictionary = {
     status: "Status", allMachines: "Alle Maschinen", machine: "Maschine", command: "Befehl", requestedBy: "Angefordert von", when: "Wann", decidedBy: "Entschieden von",
     byGrant: "eine Freigabe", byJob: "ein Auftrag", undecided: "noch nicht", details: "Details", detailsOf: "Details der Ausführung", empty: "In diesem Arbeitsbereich wurde noch nichts ausgeführt.",
   },
-  common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert" },
+  common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert", copyFailed: "Das konnte nicht kopiert werden. Markieren Sie es und kopieren Sie es von Hand." },
   remote: deRemote,
   approvals: {
     title: "Freigabeschlüssel", intro: "Ein in diesem Browser erzeugter Schlüssel signiert die Ausführungen, die Sie erlauben. Eine Maschine, deren Administrator den Schlüssel angeheftet und signierte Freigaben eingeschaltet hat, führt nichts aus, was nicht damit signiert wurde; so kann selbst ein kompromittierter Server in Ihrem Namen keine Ausführung starten. Die private Hälfte verlässt diesen Browser nie.",
@@ -282,10 +286,10 @@ export const de: Dictionary = {
     enabledHint: "Lässt einen Eigentümer einen freigegebenen Auftrag immer wieder von selbst ausführen, auf einer Maschine, die kein Produktions- oder Datenbankrechner ist. Standardmäßig aus; das Ausschalten stoppt jeden Takt.",
     every: "alle {n} Minuten", daily: "täglich um {time} UTC", next: "Nächste Ausführung", last: "Letzte Ausführung", failures: "Nacheinander fehlgeschlagen", why: "Warum er gestoppt wurde",
     status: { active: "Läuft von selbst", paused: "Pausiert", ended: "Beendet" },
-    reason: { owner: "Der Eigentümer hat ihn gestoppt", failures: "Drei Ausführungen hintereinander sind fehlgeschlagen", strict: "Die Maschine wurde zu einem Produktions- oder Datenbankrechner", exec_level: "Die Maschine erlaubt keine Befehle mehr", job_retired: "Der Auftrag wurde entfernt", disabled: "Zeitpläne wurden ausgeschaltet", target_gone: "Die Maschine oder ihr Eigentümer ist nicht mehr da" },
+    reason: { owner: "Der Eigentümer hat ihn gestoppt", failures: "Drei Ausführungen hintereinander sind fehlgeschlagen", strict: "Die Maschine wurde zu einem Produktions- oder Datenbankrechner", exec_level: "Die Maschine erlaubt keine Befehle mehr", job_retired: "Der Auftrag wurde entfernt", disabled: "Zeitpläne wurden ausgeschaltet", target_gone: "Die Maschine oder ihr Eigentümer ist nicht mehr da", approvals: "Die Maschine verlangt jetzt signierte Freigaben" },
     pause: "Pausieren", resume: "Wieder starten", end: "Beenden", create: "Zeitplan starten", job: "Auftrag", kind: "Wiederholt", kindInterval: "Alle paar Minuten", kindDaily: "Einmal am Tag", minutes: "Minuten zwischen den Ausführungen (15 bis 10080)", timeUtc: "Uhrzeit (UTC, HH:MM)",
     newHint: "Ein Zeitplan führt einen freigegebenen Auftrag von selbst aus. Er stoppt nach drei fehlgeschlagenen Ausführungen hintereinander, überschneidet sich nie mit seiner letzten Ausführung, und Sie können ihn hier jederzeit stoppen.",
     noJobs: "Ein Zeitplan braucht einen aktiven Auftrag ohne Platzhalter im Befehl.",
   },
-  notFound: { title: "Seite nicht gefunden", home: "Zu den Sitzungen" },
+  notFound: { title: "Seite nicht gefunden", home: "Zu den Sitzungen" }, pageError: { title: "Diese Seite konnte nicht angezeigt werden", hint: "Etwas auf ihr ließ sich nicht laden. Laden Sie die Seite neu oder wählen Sie eine andere im Menü.", reload: "Seite neu laden" },
 };

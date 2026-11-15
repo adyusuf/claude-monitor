@@ -1,3 +1,4 @@
+using Podium.Agent.Config;
 using Podium.Agent.Exec;
 using Podium.Contracts;
 
@@ -73,13 +74,19 @@ public sealed partial class ServiceInstaller
         }
     }
 
-    /// <summary>Uninstalling the service removes the drop-in too: it is the part that lets one account act as another, and nothing should be left of it.</summary>
-    private void RemoveRunAccountAccess()
+    /// <summary>
+    /// Uninstalling the service removes the drop-in too: it is the part that lets one account act as another, and nothing should be left of it.
+    /// The service account's membership in the run account's group is not undone (the run account may serve something else): it is named.
+    /// </summary>
+    private void RemoveRunAccountAccess(ServiceLayout l)
     {
-        if (os is OsKinds.Linux or OsKinds.MacOs && File.Exists(SudoersPath))
+        if (os is not (OsKinds.Linux or OsKinds.MacOs)) return;
+        if (File.Exists(SudoersPath))
         {
             File.Delete(SudoersPath);
             output.WriteLine("Removed the sudoers drop-in that let the service act as the run account.");
         }
+
+        if (ExecPolicyLoader.ReadExisting(l.ExecConfigPath)?.RunAccount is { } account) output.WriteLine(Strings.T(Msg.SvcRunGroupKept, l.Account, account));
     }
 }

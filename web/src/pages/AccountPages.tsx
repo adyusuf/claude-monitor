@@ -5,7 +5,7 @@ import { useSession } from "../auth/session";
 import { SettingsSection } from "../components/SettingsSection";
 import { Card, CopyText, Notice } from "../components/ui";
 import { config } from "../config";
-import { useErrorText, useI18n } from "../i18n";
+import { useErrorText, useI18n, useKnownErrorText } from "../i18n";
 import { AccountDataCards } from "./AccountData";
 import { ApprovalKeysCard } from "./ApprovalKeysCard";
 import { InstallOptions } from "./InstallOptions";
@@ -16,14 +16,15 @@ const PROVIDERS = [{ id: "github", name: "GitHub" }, { id: "google", name: "Goog
 
 /** Sign-in methods: link GitHub or Google to this account (never silently, ADR-0002). */
 export function AccountPage() {
-  const { t, tx } = useI18n();
+  const { t } = useI18n();
+  const knownErrorText = useKnownErrorText();
   const { me } = useSession();
   const [params] = useSearchParams();
-  const error = params.get("error");
+  const error = knownErrorText(params.get("error"));
   return (
     <div className="page">
       <h1>{t("account.title")}</h1>
-      {error ? <Notice kind="error">{tx(`errors.${error}`)}</Notice> : null}
+      {error ? <Notice kind="error">{error}</Notice> : null}
       <SettingsSection title={t("account.sectionProfile")} hint={t("account.sectionProfileHint")}>
         <Card>
           <p><strong>{me?.displayName}</strong></p>
@@ -63,11 +64,13 @@ export function AcceptInvitationPage() {
   const { t } = useI18n();
   const errorText = useErrorText();
   const { refresh } = useSession();
+  const [joined, setJoined] = useState<string | null>(null);
   const { state, error } = useTokenOnce(async (token) => {
-    await accept(token);
+    const { workspaceId } = await accept(token);
     await refresh();
+    setJoined(workspaceId);
   });
-  if (state === "done") return <Navigate to="/" replace />;
+  if (state === "done") return <Navigate to={joined ? `/w/${joined}/projects` : "/"} replace />;
   return (
     <div className="page narrow">
       {state === "working" ? <Notice>{t("invitation.accepting")}</Notice> : <Notice kind="error">{errorText(error)}</Notice>}

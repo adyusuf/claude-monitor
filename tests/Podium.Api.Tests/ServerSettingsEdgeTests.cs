@@ -92,7 +92,7 @@ public sealed class ServerSettingsEdgeTests(ApiFactory api) : IAsyncLifetime
     public async Task Removing_a_hidden_value_next_to_a_valid_one_saves_both_and_a_refused_value_in_the_same_request_saves_neither()
     {
         var admin = await ServerAdminKit.AdminAsync(api, "se-hidden-mix");
-        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "page-user", host = "page.example.net" })).EnsureSuccessStatusCode();
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "page-user", host = "page.example.net", tls = "true" })).EnsureSuccessStatusCode();
         await using var host = HostKit.WithConfig(api, c => HostKit.WithEnv(c, "smtp.user", "env-user"));
         var client = await HostKit.SignInAsync(api, host, admin);
 
@@ -103,6 +103,41 @@ public sealed class ServerSettingsEdgeTests(ApiFactory api) : IAsyncLifetime
 
         Assert.Null(await RowAsync("smtp.user"));
         Assert.Equal("other.example.net", (await RowAsync("smtp.host"))!.Value);
+    }
+
+    // ---- a sign-in to the mail server only over STARTTLS ----------------------------------------------------------
+
+    [Fact]
+    public async Task A_user_or_password_with_starttls_off_for_a_mail_server_off_this_machine_is_refused_and_nothing_is_saved()
+    {
+        var admin = await ServerAdminKit.AdminAsync(api, "se-tls");
+        var audited = await AuditedAsync(admin);
+
+        Assert.Equal("tls_required", await ErrorOfAsync(await ServerAdminKit.PutAsync(admin, "smtp", new { host = "mail.example.net", tls = "false", user = "mailer", password = "pw-1" }), "tls"));
+        Assert.Equal("tls_required", await ErrorOfAsync(await ServerAdminKit.PutAsync(admin, "smtp", new { host = "mail.example.net", tls = "false", password = "pw-1" }), "tls"));
+        // The plain setting saved first, the credentials after: the combination is what is refused, whichever request makes it.
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { host = "mail.example.net", tls = "false" })).EnsureSuccessStatusCode();
+        Assert.Equal("tls_required", await ErrorOfAsync(await ServerAdminKit.PutAsync(admin, "smtp", new { user = "mailer" }), "tls"));
+
+        Assert.Null(await RowAsync("smtp.user"));
+        Assert.Null(await RowAsync("smtp.password"));
+        Assert.Equal(audited + 1, await AuditedAsync(admin));
+        Assert.Null(api.Services.GetRequiredService<IntegrationSettings>().Smtp.User);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("::1")]
+    [InlineData("LOCALHOST")]
+    public async Task A_user_and_password_with_starttls_off_are_taken_for_a_mail_server_on_this_machine_and_with_starttls_on_for_any(string loopback)
+    {
+        var admin = await ServerAdminKit.AdminAsync(api, "se-tls-ok");
+
+        Assert.Equal(HttpStatusCode.OK, (await ServerAdminKit.PutAsync(admin, "smtp", new { host = loopback, tls = "false", user = "mailer", password = "pw-1" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ServerAdminKit.PutAsync(admin, "smtp", new { host = "mail.example.net", tls = "true" })).StatusCode);
+        // Leaving the remote server and switching STARTTLS off again is refused; removing the sign-in at the same time is not.
+        Assert.Equal("tls_required", await ErrorOfAsync(await ServerAdminKit.PutAsync(admin, "smtp", new { tls = "false" }), "tls"));
+        Assert.Equal(HttpStatusCode.OK, (await ServerAdminKit.PutAsync(admin, "smtp", new { tls = "false", user = "", password = "" })).StatusCode);
     }
 
     // ---- values are limited in bytes ------------------------------------------------------------------------------

@@ -39,10 +39,31 @@ public sealed class IntegrationManageTests(ApiFactory api)
         // Everything of a disconnected connection is closed to its people.
         Assert.Equal(HttpStatusCode.NotFound, (await w.Admin.Http.GetAsync($"{w.Base}/spaces")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await w.Admin.SendAsync(HttpMethod.Put, w.Base, new { autoInvite = true })).StatusCode);
-        // The site can be connected again: a new connection, and the old row is still there.
+        // The site can be connected again: the same connection comes back (its imported rows are linked to it), so importing the space
+        // again finds its project and issues instead of making a second "Name (KEY)" project with copies (F-067).
         var again = api.Jira.Account("Again", w.Admin.Email, w.Site);
         Assert.Equal("ok", JiraKit.ResultOf(await JiraKit.ApproveAsync(w.Admin, api.Jira, again, await JiraKit.StartAsync(w.Admin, w.Site.Subdomain))));
+        Assert.Equal(1, await CountConnectionsAsync(w.WorkspaceId));
+        Assert.Equal((ConnectionStatuses.Active, again.Id), ((await JiraKit.ConnectionAsync(w)).Status,
+            (await db.IntegrationAccounts.AsNoTracking().SingleAsync(a => a.ConnectionId == w.ConnectionId)).ExternalAccountId));
+        await JiraKit.ImportAsync(w, "DIS");
+        Assert.Equal(project, await JiraKit.ProjectIdAsync(w, "DIS"));
+        Assert.Equal(1, await db.Projects.CountAsync(p => p.WorkspaceId == w.WorkspaceId));
+        Assert.Single(await JiraKit.IssuesAsync(w, project));
+    }
+
+    [Fact]
+    public async Task A_site_that_now_answers_with_another_cloud_id_gets_a_new_connection_instead_of_the_disconnected_one()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        Assert.Equal(HttpStatusCode.NoContent, (await w.Admin.SendAsync(HttpMethod.Delete, w.Base)).StatusCode);
+        var recreated = new FakeSite(api.Jira, w.Site.Subdomain); // the same address, a site made anew (another cloud id, other ids inside)
+        var account = api.Jira.Account("Recreated", w.Admin.Email, recreated);
+
+        Assert.Equal("ok", JiraKit.ResultOf(await JiraKit.ApproveAsync(w.Admin, api.Jira, account, await JiraKit.StartAsync(w.Admin, recreated.Subdomain))));
+
         Assert.Equal(2, await CountConnectionsAsync(w.WorkspaceId));
+        Assert.Equal(ConnectionStatuses.Disconnected, (await JiraKit.ConnectionAsync(w)).Status);
     }
 
     [Fact]

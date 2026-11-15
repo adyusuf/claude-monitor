@@ -11,7 +11,12 @@ import { useCodeGate } from "./useCodeGate";
  * gate of a grant), turning it off cancels the open ones. The owner also reads the asks sent here: the question and the answer are text another
  * Claude wrote, shown as plain text and never as markup.
  */
-export function MachineAsks({ agentId, view, owned, onChanged }: { agentId: string; view: MachineView; owned: boolean; onChanged: () => void }) {
+export function MachineAsks({ agentId, view, owned, version = 0, onChanged }: {
+  agentId: string; view: MachineView; owned: boolean;
+  /** Goes up on every live re-read of the page: asks have no event of their own, so the list is read again then. */
+  version?: number;
+  onChanged: () => void;
+}) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const gate = useCodeGate("reauth_required", "machines.asks.enableHint");
@@ -25,7 +30,7 @@ export function MachineAsks({ agentId, view, owned, onChanged }: { agentId: stri
     api.agentAsks(agentId).then(setAsks).catch((e: unknown) => setError(errorText(e)));
     // errorText changes identity every render; the machine and its state are what matter
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId, owned, accepting]);
+  }, [agentId, owned, accepting, version]);
 
   const set = async (accept: boolean) => {
     setDone(false);

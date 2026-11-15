@@ -80,12 +80,12 @@ describe("pull requests and commits", () => {
   it("sends no title when none was typed", async () => {
     const calls = serve({ "POST /issues/i1/code-links": { status: 201, body: codeLink() } });
     await open();
-    await userEvent.type(await screen.findByLabelText("Address (https)"), "http://git.example.org/pr/1");
+    await userEvent.type(await screen.findByLabelText("Address (https)"), "https://git.example.org/pr/1");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    await waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toEqual({ kind: "pr", url: "http://git.example.org/pr/1", title: null }));
+    await waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toEqual({ kind: "pr", url: "https://git.example.org/pr/1", title: null }));
   });
 
-  it.each(["javascript:alert(1)", "https://user:secret@git.example.org/pr/1", "not an address", "ftp://git.example.org/x"])(
+  it.each(["javascript:alert(1)", "https://user:secret@git.example.org/pr/1", "not an address", "ftp://git.example.org/x", "http://git.example.org/pr/1"])(
     "refuses %s before asking the API", async (address) => {
       const calls = serve();
       await open();

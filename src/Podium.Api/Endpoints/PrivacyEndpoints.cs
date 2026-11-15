@@ -33,6 +33,9 @@ public static class PrivacyEndpoints
         var userId = http.User.UserId();
         var ct = http.RequestAborted;
         var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, ct);
+        // Recorded before the first byte, so an export cut off midway still leaves its trace. No detail: the row names nothing it held.
+        Audit.Add(db, http, clock, AuditActions.DataExported, userId: userId);
+        await db.SaveChangesAsync(ct);
         http.Response.ContentType = "application/json";
         http.Response.Headers.ContentDisposition = $"attachment; filename=\"podium-export-{clock.GetUtcNow():yyyy-MM-dd}.json\"";
         // Written into the response's pipe (never a synchronous write) and flushed per chunk, so an export of any size
@@ -53,53 +56,9 @@ public static class PrivacyEndpoints
                                     where a.UserId == userId
                                     select new { AgentId = a.Id, m.Hostname, m.Os, m.Arch, a.Version, a.Status, a.EnrolledAt, a.RevokedAt })
             .ToListAsync(ct));
-        Write(w, "commandsSent", await db.SessionCommands.AsNoTracking().Where(c => c.CreatedBy == userId)
-            .Select(c => new { c.Id, c.SessionId, c.Kind, c.Body, c.Status, c.CreatedAt }).ToListAsync(ct));
-        Write(w, "auditTrail", await db.AuditEvents.AsNoTracking().Where(a => a.ActorUserId == userId).OrderBy(a => a.Id)
-            .Select(a => new { a.Action, a.WorkspaceId, a.TargetType, a.TargetId, a.At }).ToListAsync(ct));
-
-        w.WriteStartArray("sessions");
-        var sessions = await (from s in db.HarnessSessions.AsNoTracking()
-                              join a in db.Agents.AsNoTracking() on s.AgentId equals a.Id
-                              where a.UserId == userId
-                              orderby s.StartedAt
-                              select s).ToListAsync(ct);
-        foreach (var s in sessions)
-        {
-            w.WriteStartObject();
-            w.WriteString("id", s.Id);
-            w.WriteString("workspaceId", s.WorkspaceId);
-            w.WriteString("title", s.Title);
-            w.WriteString("model", s.Model);
-            w.WriteString("status", s.Status);
-            w.WriteString("startedAt", s.StartedAt);
-            Write(w, "tasks", await db.SessionTasks.AsNoTracking().Where(t => t.SessionId == s.Id)
-                .Select(t => new { t.Subject, t.Status, t.UpdatedAt }).ToListAsync(ct));
-            Write(w, "usage", await db.SessionUsage.AsNoTracking().Where(u => u.SessionId == s.Id)
-                .Select(u => new { u.Model, u.InputTokens, u.OutputTokens, u.CacheReadTokens, u.CacheWriteTokens, u.CostUsd }).ToListAsync(ct));
-            w.WriteStartArray("events");
-            long after = 0;
-            while (true)
-            {
-                var chunk = await db.SessionEvents.AsNoTracking().Where(e => e.SessionId == s.Id && e.Id > after)
-                    .OrderBy(e => e.Id).Take(500).ToListAsync(ct);
-                if (chunk.Count == 0) break;
-                foreach (var e in chunk)
-                {
-                    JsonSerializer.Serialize(w, new { e.Kind, e.OccurredAt, e.Truncated, Payload = e.Payload.RootElement }, Json);
-                    e.Payload.Dispose();
-                }
-
-                after = chunk[^1].Id;
-                await w.FlushAsync(ct);
-                await body.FlushAsync(ct);
-            }
-
-            w.WriteEndArray();
-            w.WriteEndObject();
-        }
-
-        w.WriteEndArray();
+        await PrivacyExportPaging.WriteCommandsAsync(w, body, db, userId, ct);
+        await PrivacyExportPaging.WriteAuditTrailAsync(w, body, db, userId, ct);
+        await PrivacyExportPaging.WriteSessionsAsync(w, body, db, userId, ct);
         await PrivacyRemoteData.ExportAsync(w, body, db, userId, ct);
         w.WriteEndObject();
         await w.FlushAsync(ct);
@@ -220,7 +179,7 @@ public static class PrivacyEndpoints
         }
 
         foreach (var m in memberships) m.RemovedAt = now;
-        await db.Workspaces.Where(w => solo.Contains(w.Id)).ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, "archived"), ct);
+        await db.Workspaces.Where(w => solo.Contains(w.Id)).ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, WorkspaceStatuses.Archived), ct);
 
         user.Email = null;
         user.EmailNormalized = null;

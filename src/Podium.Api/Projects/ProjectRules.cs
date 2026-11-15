@@ -15,7 +15,9 @@ internal static class ProjectRules
     public const int ListMax = 30;
     public const int LineMax = 300;
     public const int StakeholdersMax = 50;
-    public const decimal BudgetMax = 9_999_999_999_999m;
+    /// <summary>The largest amount the <c>numeric(14,2)</c> column holds.</summary>
+    public const decimal BudgetMax = 999_999_999_999.99m;
+    public const int BudgetDecimals = 2;
 
     /// <summary>Checks a project definition; the first failure is the answer, null means it is valid.</summary>
     public static IResult? Check(ProjectInput i)
@@ -23,13 +25,14 @@ internal static class ProjectRules
         if (!Http.IsName(i.Name, NameMax)) return Http.Invalid("name", "invalid_name");
         if (TooLong(i.Purpose, TextMax)) return Http.Invalid("purpose", "too_long");
         if (TooLong(i.Sponsor, ShortMax)) return Http.Invalid("sponsor", "too_long");
-        if (i.Stakeholders is { } s && (s.Count > StakeholdersMax || s.Any(x => !Http.IsName(x.Name, NameMax) || TooLong(x.Role, NameMax))))
+        if (i.Stakeholders is { } s && (s.Count > StakeholdersMax || s.Any(x => x is null || !Http.IsName(x.Name, NameMax) || TooLong(x.Role, NameMax))))
         {
             return Http.Invalid("stakeholders", "invalid_list");
         }
 
         if ((i.BudgetAmount is null) != string.IsNullOrWhiteSpace(i.BudgetCurrency)) return Http.Invalid("budget", "amount_and_currency");
         if (i.BudgetAmount is < 0 or > BudgetMax) return Http.Invalid("budgetAmount", "out_of_range");
+        if (i.BudgetAmount is { } amount && decimal.Round(amount, BudgetDecimals) != amount) return Http.Invalid("budgetAmount", "too_many_decimals");
         if (i.BudgetCurrency is { } c && !(c.Length == 3 && c.All(ch => ch is >= 'A' and <= 'Z'))) return Http.Invalid("budgetCurrency", "invalid_currency");
         if (i.StartDate is { } start && i.EndDate is { } end && end < start) return Http.Invalid("endDate", "before_start");
         if (i.ItemTypes is { } t && (t.Count == 0 || t.Distinct().Count() != t.Count || t.Any(x => !WorkItemTypes.All.Contains(x)))) return Http.Invalid("itemTypes", "invalid_list");
@@ -46,8 +49,8 @@ internal static class ProjectRules
         if (!Http.IsName(i.Name, NameMax)) return Http.Invalid("name", "invalid_name");
         if (TooLong(i.Description, TextMax)) return Http.Invalid("description", "too_long");
         if (i.Kind is { } k && !ApplicationKinds.All.Contains(k)) return Http.Invalid("kind", "invalid_value");
-        if (!string.IsNullOrWhiteSpace(i.RepoUrl) && !RepoLink(i.RepoUrl.Trim())) return Http.Invalid("repoUrl", "invalid_url");
-        if (i.Environments is { } e && (e.Count > EnvironmentNames.All.Count || e.Any(x => x.Name is null || !EnvironmentNames.All.Contains(x.Name)
+        if (!string.IsNullOrWhiteSpace(i.RepoUrl) && RepoLink(i.RepoUrl.Trim()) is null) return Http.Invalid("repoUrl", "invalid_url");
+        if (i.Environments is { } e && (e.Count > EnvironmentNames.All.Count || e.Any(x => x is null || x.Name is null || !EnvironmentNames.All.Contains(x.Name)
             || (!string.IsNullOrWhiteSpace(x.Url) && !WebLink(x.Url.Trim())))
             || e.Select(x => x.Name).Distinct().Count() != e.Count))
         {
@@ -60,7 +63,7 @@ internal static class ProjectRules
         }
 
         if (i.VersioningScheme is { } v && !VersioningSchemes.All.Contains(v)) return Http.Invalid("versioningScheme", "invalid_value");
-        if (i.NonFunctionalTargets is { } n && (n.Count > 20 || n.Any(x => x.Kind is null || !TargetKinds.All.Contains(x.Kind) || !Http.IsName(x.Target, LineMax))))
+        if (i.NonFunctionalTargets is { } n && (n.Count > 20 || n.Any(x => x is null || x.Kind is null || !TargetKinds.All.Contains(x.Kind) || !Http.IsName(x.Target, LineMax))))
         {
             return Http.Invalid("nonFunctionalTargets", "invalid_list");
         }
@@ -83,18 +86,39 @@ internal static class ProjectRules
     private static bool Lines(List<string>? lines) =>
         lines is null || (lines.Count <= ListMax && lines.All(l => !string.IsNullOrWhiteSpace(l) && l.Trim().Length <= LineMax));
 
-    /// <summary>An https, ssh or git address, or the scp form git@host:path; no password in it (a stored link is shown to the whole workspace).</summary>
-    internal static bool RepoLink(string value)
+    /// <summary>
+    /// The address to store for an https, ssh or git address, or the scp form git@host:path; null when it is none of them. A stored link is shown to the
+    /// whole workspace, so no password is kept and a user name only on ssh: on https the user information is cut off (Bitbucket's own clone link
+    /// carries one, and a token goes there), on git it is refused.
+    /// </summary>
+    internal static string? RepoLink(string value)
     {
-        if (value.Length > UrlMax || value.Any(char.IsControl)) return false;
+        if (value.Length > UrlMax || value.Any(char.IsControl)) return null;
         if (System.Text.RegularExpressions.Regex.IsMatch(value, @"^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[A-Za-z0-9._/~-]+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(50)))
         {
-            return true;
+            return value;
         }
 
-        return Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "ssh" or "git" && !string.IsNullOrEmpty(uri.Host)
-            && !uri.UserInfo.Contains(':', StringComparison.Ordinal);
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "ssh" or "git") || string.IsNullOrEmpty(uri.Host)) return null;
+        if (uri.UserInfo.Length == 0) return value;
+        if (uri.Scheme == "ssh") return uri.UserInfo.Contains(':', StringComparison.Ordinal) ? null : value;
+        return uri.Scheme == "https" ? WithoutUserInfo(value, uri) : null;
     }
+
+    /// <summary>The https address <paramref name="value"/> without what stands before the last @ of its authority; null if the result is not the same host.</summary>
+    private static string? WithoutUserInfo(string value, Uri uri)
+    {
+        var start = value.IndexOf("://", StringComparison.Ordinal) + 3;
+        var end = value.IndexOfAny(['/', '\\', '?', '#'], start);
+        if (end < 0) end = value.Length;
+        var at = value.LastIndexOf('@', end - 1, end - start);
+        if (at < 0) return null;
+        var stripped = "https://" + value[(at + 1)..];
+        return Uri.TryCreate(stripped, UriKind.Absolute, out var clean) && clean.UserInfo.Length == 0 && clean.Host == uri.Host ? stripped : null;
+    }
+
+    /// <summary>The repository address as stored: trimmed, and an https address without user information; null when blank.</summary>
+    public static string? CleanRepoLink(string? value) => Clean(value) is { } link ? RepoLink(link) ?? link : null;
 
     /// <summary>An http or https address with no user information.</summary>
     internal static bool WebLink(string value) =>

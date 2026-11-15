@@ -107,14 +107,19 @@ public sealed class GrantService(PodiumDb db, ApiConfig config, TimeProvider clo
         if (RemoteChecks.TemplateProblem(template, cwd, grant.MaxTimeoutSeconds, target.Os, false) is { } bad) return bad;
         if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, target.Agent, req?.Code) is { } refused) return refused;
 
-        var changed = await db.MachineGrants
-            .Where(g => g.Id == id && g.Status == GrantStatuses.Requested && g.ExpiresAt > now && g.OwnerUserId == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Active).SetProperty(g => g.DecidedAt, now)
-                .SetProperty(g => g.DecidedBy, userId), ct);
-        if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
-        Audit.Add(db, http, clock, AuditActions.GrantApproved, grant.WorkspaceId, userId, targetType: "grant", targetId: id,
-            detail: new { hash = grant.TemplateHash, target = grant.TargetAgentId });
-        await db.SaveChangesAsync(ct);
+        // The change and its audit row commit together, or neither does (with the used code's step, which the gate tracked).
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            var changed = await db.MachineGrants
+                .Where(g => g.Id == id && g.Status == GrantStatuses.Requested && g.ExpiresAt > now && g.OwnerUserId == userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Active).SetProperty(g => g.DecidedAt, now)
+                    .SetProperty(g => g.DecidedBy, userId), ct);
+            if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
+            Audit.Add(db, http, clock, AuditActions.GrantApproved, grant.WorkspaceId, userId, targetType: "grant", targetId: id,
+                detail: new { hash = grant.TemplateHash, target = grant.TargetAgentId });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         grant.Status = GrantStatuses.Active;
         Changed(grant);
         return Results.NoContent();
@@ -127,13 +132,18 @@ public sealed class GrantService(PodiumDb db, ApiConfig config, TimeProvider clo
         var now = clock.GetUtcNow();
         var grant = await OwnedAsync(id, userId, ct);
         if (grant is null) return Http.NotFound();
-        var changed = await db.MachineGrants.Where(g => g.Id == id && g.Status == GrantStatuses.Requested && g.OwnerUserId == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Denied).SetProperty(g => g.DecidedAt, now)
-                .SetProperty(g => g.DecidedBy, userId), ct);
-        if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
-        Audit.Add(db, http, clock, AuditActions.GrantDenied, grant.WorkspaceId, userId, targetType: "grant", targetId: id,
-            detail: new { hash = grant.TemplateHash, target = grant.TargetAgentId });
-        await db.SaveChangesAsync(ct);
+        // The change and its audit row commit together, or neither does.
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            var changed = await db.MachineGrants.Where(g => g.Id == id && g.Status == GrantStatuses.Requested && g.OwnerUserId == userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Denied).SetProperty(g => g.DecidedAt, now)
+                    .SetProperty(g => g.DecidedBy, userId), ct);
+            if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
+            Audit.Add(db, http, clock, AuditActions.GrantDenied, grant.WorkspaceId, userId, targetType: "grant", targetId: id,
+                detail: new { hash = grant.TemplateHash, target = grant.TargetAgentId });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         grant.Status = GrantStatuses.Denied;
         Changed(grant);
         return Results.NoContent();
@@ -148,14 +158,19 @@ public sealed class GrantService(PodiumDb db, ApiConfig config, TimeProvider clo
         var grant = await db.MachineGrants.AsNoTracking()
             .FirstOrDefaultAsync(g => g.Id == id && (g.OwnerUserId == userId || g.GranteeUserId == userId), ct);
         if (grant is null || await Access.MemberAsync(db, userId, grant.WorkspaceId, Roles.Member, ct) is null) return Http.NotFound();
-        var changed = await db.MachineGrants
-            .Where(g => g.Id == id && (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested))
-            .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Revoked).SetProperty(g => g.RevokedAt, now)
-                .SetProperty(g => g.RevokedBy, userId), ct);
-        if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
-        Audit.Add(db, http, clock, AuditActions.GrantRevoked, grant.WorkspaceId, userId, targetType: "grant", targetId: id,
-            detail: new { hash = grant.TemplateHash, target = grant.TargetAgentId });
-        await db.SaveChangesAsync(ct);
+        // The change and its audit row commit together, or neither does.
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            var changed = await db.MachineGrants
+                .Where(g => g.Id == id && (g.Status == GrantStatuses.Active || g.Status == GrantStatuses.Requested))
+                .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, GrantStatuses.Revoked).SetProperty(g => g.RevokedAt, now)
+                    .SetProperty(g => g.RevokedBy, userId), ct);
+            if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
+            Audit.Add(db, http, clock, AuditActions.GrantRevoked, grant.WorkspaceId, userId, targetType: "grant", targetId: id,
+                detail: new { hash = grant.TemplateHash, target = grant.TargetAgentId });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         grant.Status = GrantStatuses.Revoked;
         Changed(grant);
         await CancelByGrantAsync(db, broker, id, now, ct);

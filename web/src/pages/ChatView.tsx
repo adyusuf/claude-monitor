@@ -2,9 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ReactNode } from "react";
 import { api } from "../api/endpoints";
 import type { CommandRow } from "../api/types";
-import { Button, Card, Spinner } from "../components/ui";
+import { Button, Card, Notice, Spinner } from "../components/ui";
 import { config } from "../config";
-import { useI18n } from "../i18n";
+import { useErrorText, useI18n } from "../i18n";
 import { groupToolRuns, isRun } from "../lib/toolRuns";
 import { buildChat, type ChatItem } from "../lib/transcript";
 import { useNow } from "../lib/useNow";
@@ -42,8 +42,9 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
   commands?: CommandRow[]; canCancel?: boolean; onCancel?: (id: string) => void;
 }) {
   const { t } = useI18n();
+  const errorText = useErrorText();
   const now = useNow(config.clockTickMs);
-  const { held, next, loaded, loadingOlder, older } = useEventFeed(sessionId, version, { kind: config.chatKinds, pageSize: config.chatPageSize, refreshSize: config.chatRefreshSize });
+  const { held, next, loaded, loadingOlder, older, error } = useEventFeed(sessionId, version, { kind: config.chatKinds, pageSize: config.chatPageSize, refreshSize: config.chatRefreshSize });
   const [unseen, setUnseen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
@@ -106,10 +107,11 @@ export function ChatCard({ sessionId, version, footer, canReply = false, onRepli
   return (
     <FoldProvider>
       <Card title={t("session.events")} className="chat-card">
+        {error ? <Notice kind="error">{errorText(error)}</Notice> : null}
         {!loaded ? <Spinner /> : (
           <div className="chat-scroll" ref={box} onScroll={onScroll} tabIndex={0} aria-label={t("chat.label")}>
             {next ? <div className="more"><Button variant="ghost" busy={loadingOlder} onClick={() => void readOlder()}>{t("session.olderEvents")}</Button></div> : null}
-            {entries.length === 0 ? <p className="muted">{t("session.noEvents")}</p> : (
+            {entries.length === 0 ? (error ? null : <p className="muted">{t("session.noEvents")}</p>) : (
               <ol className="chat">
                 {entries.map((e) => isRun(e)
                   ? <ToolRunLine key={e.key} run={e} />

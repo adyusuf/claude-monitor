@@ -7,11 +7,11 @@ export interface LiveMessage { event: string; sessionId?: string; id?: string; s
 /** The events the page itself makes up when the stream was away or the tab came back: whatever the page shows may have changed. */
 export const isCatchUp = (m: LiveMessage): boolean => m.event === "reconnected" || m.event === "resume";
 
-const EVENTS = ["session", "command", "permission", "run", "alert", "grant", "job", "machine", "action"] as const;
+const EVENTS = ["session", "command", "permission", "run", "alert", "grant", "job", "schedule", "approval_rule", "machine", "action"] as const;
 
 /**
  * The workspace's live stream (server-sent events). Calls onMessage for every change; the page re-reads what it
- * shows, so a missed message costs nothing but a moment of staleness. Reconnects after a drop.
+ * shows, so a missed message costs nothing but a moment of staleness. Reconnects after a drop, waiting longer after each failure in a row (up to config.liveReconnectMaxMs).
  *
  * A stream can also go quiet without the browser noticing (a laptop that slept, a network that changed, a proxy that holds the
  * connection open and delivers nothing): the server pings every 20 s, so a stream that has said nothing for config.liveStaleMs is
@@ -32,12 +32,14 @@ export function useLive(workspaceId: string | undefined, onMessage: (m: LiveMess
     let closed = false;
     let heard = Date.now();
     let everReady = false;
+    let failures = 0;
     const open = () => {
       heard = Date.now();
       const stream = new EventSource(streamUrl(workspaceId));
       source = stream;
       stream.addEventListener("ready", () => {
         heard = Date.now();
+        failures = 0;
         setConnected(true);
         if (everReady) handler.current({ event: "reconnected" });
         everReady = true;
@@ -48,17 +50,21 @@ export function useLive(workspaceId: string | undefined, onMessage: (m: LiveMess
       for (const name of EVENTS) {
         stream.addEventListener(name, (e) => {
           heard = Date.now();
+          let payload: object = {};
           try {
-            handler.current({ event: name, ...(JSON.parse((e as MessageEvent).data) as object) });
+            payload = JSON.parse((e as MessageEvent).data) as object;
           } catch {
-            handler.current({ event: name });
+            // a payload that is not JSON still tells the page that something of this kind changed
           }
+          handler.current({ event: name, ...payload });
         });
       }
       stream.onerror = () => {
         setConnected(false);
         stream.close();
-        if (!closed) retry = setTimeout(open, config.liveReconnectMs);
+        if (closed) return;
+        retry = setTimeout(open, Math.min(config.liveReconnectMs * 2 ** failures, config.liveReconnectMaxMs));
+        failures++;
       };
     };
     const reopen = () => {

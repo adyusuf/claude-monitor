@@ -10,6 +10,7 @@ public sealed record ImportSprintsRequest(List<string>? SprintIds);
 
 public sealed record PersonView(Guid Id, string DisplayName, string? Email, Guid? UserId, string? UserName, bool Invited, bool Active);
 
-public sealed record PersonInput(string? Email, Guid? UserId);
+/// <summary>An admin's correction of a person: the e-mail, the member it stands for, or <c>Unlink</c> to undo that link (F-068).</summary>
+public sealed record PersonInput(string? Email, Guid? UserId, bool? Unlink = null);
 
 public sealed record SyncRunView(Guid Id, string Kind, string Status, int Created, int Updated, int Archived, int People, string? Error, DateTimeOffset StartedAt, DateTimeOffset? EndedAt);

@@ -139,8 +139,7 @@ public sealed class ScheduleService(PodiumDb db, ApiConfig config, TimeProvider 
         return await Access.MemberAsync(db, userId, schedule.WorkspaceId, minimum, ct) is not null ? schedule : null;
     }
 
-    private void Changed(JobSchedule schedule) => broker.Publish(Broker.Workspace(schedule.WorkspaceId),
-        new StreamMessage("schedule", new { id = schedule.Id, targetAgentId = schedule.TargetAgentId }));
+    private void Changed(JobSchedule schedule) => JobSchedules.Changed(broker, schedule);
 }
 
 public static class ScheduleQueries

@@ -13,6 +13,7 @@ public sealed class LimitedFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("AIPOD_AUTH_RATE_PER_MINUTE", "3");
+        builder.UseSetting("AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE", "5");
     }
 }
 
@@ -57,5 +58,30 @@ public sealed class RateLimitTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.TooManyRequests, (await http.PostAsJsonAsync("/api/device/approve", new { userCode = code })).StatusCode);
         Assert.Equal(HttpStatusCode.TooManyRequests, (await http.PostAsJsonAsync("/api/device/deny", new { userCode = code })).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync("/api/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_agent_refresh_shares_the_auth_budget_and_the_device_poll_has_its_own()
+    {
+        Assert.NotNull(api); // the shared fixture has set the database and the other variables this API reads
+        await using var limited = new LimitedFactory();
+        var http = limited.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+        // The refresh answers 401 to a made-up token until the auth budget (3) is spent, then 429: it carries the policy.
+        var refresh = new List<HttpStatusCode>();
+        for (var i = 0; i < 4; i++)
+        {
+            refresh.Add((await http.PostAsJsonAsync("/api/agent/token/refresh", new { refreshToken = "made-up" })).StatusCode);
+        }
+
+        Assert.Equal([HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.TooManyRequests], refresh);
+
+        // The poll has its own looser budget (5): it still answers with the spent auth budget behind it, then 429 after its own.
+        var poll = new List<HttpStatusCode>();
+        for (var i = 0; i < 6; i++)
+        {
+            poll.Add((await http.PostAsJsonAsync("/api/device/token", new { deviceCode = "made-up" })).StatusCode);
+        }
+
+        Assert.Equal([.. Enumerable.Repeat(HttpStatusCode.BadRequest, 5), HttpStatusCode.TooManyRequests], poll);
     }
 }

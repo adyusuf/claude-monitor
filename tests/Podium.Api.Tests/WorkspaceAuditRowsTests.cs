@@ -37,6 +37,20 @@ public sealed class WorkspaceAuditRowsTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task Renaming_a_workspace_writes_a_workspace_renamed_row_with_before_and_after()
+    {
+        var owner = await api.NewClient().SignedUpAsync("aud-rename");
+        var before = (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}")).GetProperty("name").GetString();
+        (await owner.SendAsync(HttpMethod.Patch, $"/api/workspaces/{owner.WorkspaceId}", new { name = "Renamed Team" })).EnsureSuccessStatusCode();
+
+        var row = await RowAsync(owner, owner.WorkspaceId, AuditActions.WorkspaceRenamed);
+
+        var detail = row.GetProperty("detail");
+        Assert.Equal((owner.Id, before, "Renamed Team"),
+            (row.GetProperty("actorUserId").GetGuid(), detail.GetProperty("before").GetString(), detail.GetProperty("after").GetString()));
+    }
+
+    [Fact]
     public async Task Inviting_writes_an_invitation_created_row_with_the_invited_role()
     {
         var owner = await api.NewClient().SignedUpAsync("aud-inv-owner");
@@ -91,6 +105,19 @@ public sealed class WorkspaceAuditRowsTests(ApiFactory api)
         Assert.Equal((owner.Id, "user", member.Id.ToString(), "member", "admin"),
             (row.GetProperty("actorUserId").GetGuid(), row.GetProperty("targetType").GetString(), row.GetProperty("targetId").GetString(),
                 detail.GetProperty("before").GetString(), detail.GetProperty("after").GetString()));
+    }
+
+    [Fact]
+    public async Task Setting_the_role_a_member_already_has_writes_no_role_changed_row()
+    {
+        var owner = await api.NewClient().SignedUpAsync("aud-same-owner");
+        var member = await RemoteKit.MemberAsync(api, owner, "aud-same-member");
+
+        var response = await owner.SendAsync(HttpMethod.Patch, $"/api/workspaces/{owner.WorkspaceId}/members/{member.Id}", new { role = "member" });
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
+        var page = await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/audit?limit=100");
+        Assert.DoesNotContain(page.GetProperty("items").EnumerateArray(), a => a.GetProperty("action").GetString() == AuditActions.RoleChanged);
     }
 
     [Fact]

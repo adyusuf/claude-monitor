@@ -29,7 +29,7 @@ public static class WorkspaceEndpoints
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("/workspaces").RequireAuthorization(Schemes.Session);
-        g.MapPost("/", Create);
+        g.MapPost("/", Create).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         g.MapGet("/{id:guid}", Get);
         g.MapPatch("/{id:guid}", Rename);
         g.MapPut("/{id:guid}/settings", PutSettings);
@@ -57,13 +57,16 @@ public static class WorkspaceEndpoints
         return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, View(s)));
     }
 
-    private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db)
+    private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db, TimeProvider clock)
     {
-        if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
+        var userId = http.User.UserId();
+        if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         if (!Http.IsName(req.Name)) return Http.Invalid("name", "invalid_name");
         var workspace = await db.Workspaces.FirstAsync(w => w.Id == id, http.RequestAborted);
+        var before = workspace.Name;
         workspace.Name = req.Name!.Trim();
         workspace.NameSearch = SearchText.Normalize(workspace.Name);
+        Audit.Add(db, http, clock, AuditActions.WorkspaceRenamed, id, userId, detail: new { before, after = workspace.Name });
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
     }
@@ -139,11 +142,19 @@ public static class WorkspaceEndpoints
             return Http.Invalid("role", "last_owner");
         }
 
+        // The role they already hold: nothing changes, so nothing is written to the audit log.
+        if (target.Role == req.Role) return Results.NoContent();
         var before = target.Role;
         target.Role = req.Role;
         Audit.Add(db, http, clock, AuditActions.RoleChanged, id, actor.UserId, targetType: "user", targetId: userId,
             detail: new { before, after = req.Role });
         await db.SaveChangesAsync(http.RequestAborted);
+        // The connector of a connection must stay an admin: below that its connections need a new sign-in (as on removal).
+        if (Roles.Rank(req.Role) < Roles.Rank(Roles.Admin))
+        {
+            await Integrations.IntegrationMembers.ForDemotedMemberAsync(db, id, userId, clock.GetUtcNow(), http.RequestAborted);
+        }
+
         await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
@@ -173,9 +184,13 @@ public static class WorkspaceEndpoints
         target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
+        // Their project roles go with them, so an invitation back starts from the workspace role alone.
+        await db.ProjectMembers.Where(m => m.UserId == userId && db.Projects.Any(p => p.Id == m.ProjectId && p.WorkspaceId == id))
+            .ExecuteDeleteAsync(http.RequestAborted);
         await db.SaveChangesAsync(http.RequestAborted);
         var notices = new List<Action>();
         await RemoteCleanup.ForMemberAsync(db, broker, id, userId, self, now, http.RequestAborted, notices, agents);
+        await Integrations.IntegrationMembers.ForRemovedMemberAsync(db, id, userId, now, http.RequestAborted);
         await tx.CommitAsync(http.RequestAborted);
         notices.ForEach(n => n());
         foreach (var agentId in agents) broker.Publish(Broker.Agent(agentId), new StreamMessage(AgentStreamEvents.Revoked, new { }));

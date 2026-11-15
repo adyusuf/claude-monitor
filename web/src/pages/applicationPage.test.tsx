@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ME, mockApi, renderAt } from "../test/helpers";
-import { application, component, release, workspaceMembers } from "../test/projects-fixtures";
+import { application, component, project, release, workspaceMembers } from "../test/projects-fixtures";
 import { ApplicationPage } from "./ApplicationPage";
 
 const route = [
@@ -13,6 +13,7 @@ const route = [
 const serve = (over: Parameters<typeof mockApi>[0] = {}) => mockApi({
   "GET /me": { body: ME },
   "GET /applications/a1": { body: application() },
+  "GET /projects/p1": { body: project() },
   "GET /workspaces/w1/members": { body: workspaceMembers },
   "GET /applications/a1/components": { body: [component(), component({ id: "c2", name: "Payments", kind: "module" })] },
   "GET /applications/a1/releases": { body: [release(), release({ id: "r2", name: "0.9.0", plannedDate: null, status: "released" })] },
@@ -64,6 +65,14 @@ describe("the application page: definition", () => {
     expect(await screen.findByText("Cart")).toBeInTheDocument();
     for (const name of ["Edit", "Archive", "Rename", "Add", "Cancel release"]) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     expect(screen.getByText("1.0.0")).toBeInTheDocument();
+  });
+
+  it("hides every button, Restore included, when the application's project is archived", async () => {
+    serve({ "GET /projects/p1": { body: project({ status: "archived" }) }, "GET /applications/a1": { body: application({ status: "archived" }) } });
+    open("/w/w1/projects/p1/applications/a1?edit=1");
+    expect(await screen.findByText("Cart")).toBeInTheDocument();
+    for (const name of ["Edit", "Archive", "Restore", "Rename", "Add", "Cancel release"]) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Start a sprint" })).not.toBeInTheDocument();
   });
 
   it("edits the application and saves it with PUT", async () => {
@@ -142,8 +151,18 @@ describe("the application page: components and modules", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ name: "Basket", kind: "module" }));
     const other = screen.getByText("Payments").closest("li")!;
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.click(within(other).getByRole("button", { name: "Archive" }));
+    expect(confirm).toHaveBeenCalledWith("Archive component \"Payments\"? A component cannot be restored once archived.");
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/components/c2")).toBe(true));
+  });
+
+  it("archives a component only after the person confirms", async () => {
+    const calls = serve({ "DELETE /components/c2": { status: 204 } });
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    open();
+    await userEvent.click(within((await screen.findByText("Payments")).closest("li")!).getByRole("button", { name: "Archive" }));
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
   });
 
   it("cancels a rename, refuses an empty name before asking, and shows the API's refusal", async () => {
@@ -187,12 +206,25 @@ describe("the application page: release calendar", () => {
     expect(within(released).queryByRole("button", { name: "Cancel release" })).not.toBeInTheDocument();
   });
 
+  it("offers only the states the API takes: never cancelled for a new release, only released for one that went out", async () => {
+    serve();
+    open();
+    await screen.findByText("1.0.0");
+    const states = (label: string) => within(screen.getByLabelText(label)).getAllByRole("option").map((o) => (o as HTMLOptionElement).value);
+    expect(states("Release state new release")).toEqual(["planned", "released"]);
+    await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Edit" }));
+    expect(states("Release state 1.0.0")).toEqual(["planned", "released", "cancelled"]);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(within(screen.getByText("0.9.0").closest("li")!).getByRole("button", { name: "Edit" }));
+    expect(states("Release state 0.9.0")).toEqual(["released"]);
+  });
+
   it("adds, edits and cancels a release", async () => {
     const calls = serve({ "POST /applications/a1/releases": { status: 201, body: release() }, "PUT /releases/r1": { status: 204 }, "DELETE /releases/r1": { status: 204 } });
     open();
     await screen.findByText("1.0.0");
     await userEvent.type(screen.getByLabelText("Release name new release"), "2.0.0");
-    await userEvent.type(screen.getByLabelText("Planned date new release"), "2026-06-01");
+    await userEvent.type(screen.getByLabelText("Planned date new release"), "01/06/2026");
     await userEvent.selectOptions(screen.getByLabelText("Release state new release"), "planned");
     const add = screen.getAllByRole("button", { name: "Add" }).at(-1)!;
     await userEvent.click(add);
@@ -206,8 +238,30 @@ describe("the application page: release calendar", () => {
     await userEvent.selectOptions(screen.getByLabelText("Release state 1.0.0"), "released");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ name: "1.0.1", plannedDate: null, status: "released" }));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Cancel release" }));
+    expect(confirm).toHaveBeenCalledWith("Cancel release \"1.0.0\"? A cancelled release cannot be edited or brought back.");
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/releases/r1")).toBe(true));
+  });
+
+  it("refuses a planned date that is not a real dd/mm/yyyy day before asking", async () => {
+    const calls = serve({ "POST /applications/a1/releases": { status: 201, body: release() } });
+    open();
+    await screen.findByText("1.0.0");
+    await userEvent.type(screen.getByLabelText("Release name new release"), "3.0.0");
+    await userEvent.type(screen.getByLabelText("Planned date new release"), "31/02/2026");
+    await userEvent.click(screen.getAllByRole("button", { name: "Add" }).at(-1)!);
+    expect(await screen.findByText("Enter a real date as dd/mm/yyyy.")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("cancels a release only after the person confirms", async () => {
+    const calls = serve({ "DELETE /releases/r1": { status: 204 } });
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    open();
+    await screen.findByText("1.0.0");
+    await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Cancel release" }));
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
   });
 
   it("refuses an empty name before asking, cancels an edit and shows the API's refusal", async () => {
@@ -221,6 +275,7 @@ describe("the application page: release calendar", () => {
     await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByLabelText("Release name 1.0.0")).not.toBeInTheDocument();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Cancel release" }));
     expect(await screen.findByText("A release that went out cannot be cancelled.")).toBeInTheDocument();
   });

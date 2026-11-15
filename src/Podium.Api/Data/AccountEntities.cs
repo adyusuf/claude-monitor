@@ -27,6 +27,7 @@ public static class TokenPurposes
 public static class WorkspaceStatuses
 {
     public const string Active = "active";
+    public const string Archived = "archived";
 }
 
 public static class Roles

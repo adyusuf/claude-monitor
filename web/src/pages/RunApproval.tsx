@@ -11,6 +11,27 @@ import { RunFacts } from "./RunFacts";
 import { useCodeGate } from "./useCodeGate";
 
 /**
+ * The signature for an approval, or null. A machine that requires signatures gets one from whatever key this browser holds (the API refuses a key it
+ * does not know, and says so). Any other machine gets one only from a key the API still lists as live: a key retired from another browser, or never
+ * registered, would make the API refuse an approval that needs no signature at all. A failure is reported to the console and never blocks that approval.
+ */
+async function proofFor(run: WebRunView, hash: string): Promise<{ keyId: string; signature: string } | null> {
+  try {
+    const key = await approvalKeys.current();
+    if (!key) return null;
+    if (!run.approvalsRequired) {
+      const listed = await api.approvalKeys();
+      if (!listed.some((k) => k.fingerprint === key.fingerprint && k.retiredAt === null)) return null;
+    }
+
+    return await approvalKeys.sign(runPayload(run, hash));
+  } catch (e) {
+    console.warn("run approval: this browser's key could not sign", e);
+    return null;
+  }
+}
+
+/**
  * The owner's approval of one run (ADR-0005): the whole command, where it runs, who asked and why, and a countdown.
  * A shell run or an interpreter gets a red notice and an Allow button that waits a few seconds after the card appears.
  * There is no "allow all". Allow sends the run's hash; the API refuses it if the run changed. A shell run asks for a
@@ -42,13 +63,7 @@ export function RunApproval({ run, ws, onChanged }: { run: WebRunView; ws: strin
     setSignProblem(null);
     // A signed approval (ADR-0010 §4): this browser's key signs the exact run, and with it the run's repository when it names one (payload v2,
     // ADR-0020 §4); a machine that requires it refuses an approval without one.
-    let proof: { keyId: string; signature: string } | null = null;
-    try {
-      proof = await approvalKeys.sign(runPayload(run, hash));
-    } catch {
-      proof = null;
-    }
-
+    const proof = await proofFor(run, hash);
     if (run.approvalsRequired && !proof) return setSignProblem(t("approvals.needKey"));
     if (await gate.attempt((code) => api.approveRun(run.id, hash, code, proof ?? undefined))) onChanged();
   };

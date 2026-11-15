@@ -93,7 +93,7 @@ export function BacklogPage() {
       ) : (
         <ul className="plain issue-list">
           {list.rows.map((issue, i) => (
-            <BacklogRow key={issue.id} ws={ws} issue={issue} unit={project.estimationUnit} canWrite={canWrite} canMove={scope !== "archived"}
+            <BacklogRow key={issue.id} ws={ws} issue={issue} unit={project.estimationUnit} canWrite={canWrite} canMove={scope !== "archived"} moving={list.moving}
               first={i === 0} last={i === list.rows!.length - 1} onMove={(d) => void list.move(i, d)}
               onArchive={() => archive(issue.id, issue.number)} onRestore={() => void list.restore(issue)} />
           ))}

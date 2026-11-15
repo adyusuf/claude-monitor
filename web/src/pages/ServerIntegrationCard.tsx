@@ -10,9 +10,9 @@ import { changedValues, initialDraft, type Draft } from "../lib/serverSettings";
 import { ServerSettingField } from "./ServerSettingField";
 import { useCodeGate } from "./useCodeGate";
 
-/** The codes this page words for itself: the app-wide texts of the same codes speak of picking from a list. */
-const OWN_CODES = ["invalid_setting", "invalid_value"] as const;
-const KNOWN_NOTES = ["integration_key_missing"] as const;
+/** The codes this page words for itself: the app-wide texts of the same codes speak of picking from a list (tls_required exists only here). */
+const OWN_CODES = ["invalid_setting", "invalid_value", "tls_required"] as const;
+const KNOWN_NOTES = ["integration_key_missing", "jira_connections_exist"] as const;
 
 /** The name, status and note texts of an integration; whatever this web does not know is shown as it is. */
 export function useIntegrationTexts() {

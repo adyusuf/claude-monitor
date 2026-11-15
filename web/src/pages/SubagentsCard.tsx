@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { SubagentRow } from "../api/types";
+import { Icon } from "../components/icons";
 import { Card } from "../components/ui";
 import { useI18n } from "../i18n";
 import { dateTimeSeconds, duration } from "../lib/format";
@@ -22,7 +23,7 @@ export function SubagentsCard({ rows }: { rows: SubagentRow[] }) {
             const ran = runtimeMs(r, now);
             return (
               <li key={r.id} className={isRunning(r) ? "subagent subagent-running" : "subagent"}>
-                <strong>{r.agentType}</strong> <span className="muted">{isRunning(r) ? `… ${t("session.subagentRunning")}` : "✓"}</span>
+                <strong>{r.agentType}</strong> <span className="muted">{isRunning(r) ? `… ${t("session.subagentRunning")}` : <Icon name="check" />}</span>
                 {r.description ? <div className="muted small">{r.description}</div> : null}
                 <dl className="subagent-times muted small">
                   <dt>{t("session.subagentStarted")}</dt><dd>{dateTimeSeconds(r.startedAt)}</dd>

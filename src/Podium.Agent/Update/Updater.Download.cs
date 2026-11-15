@@ -30,29 +30,37 @@ public sealed partial class Updater
         using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct))
         {
             timeout.CancelAfter(config.UpdateDownloadTimeout);
-            using var response = await downloads.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-            if (response.StatusCode != HttpStatusCode.OK) return new(UpdateCodes.Failed, $"the download answered {(int)response.StatusCode}");
-            if (response.RequestMessage?.RequestUri != url) return new(UpdateCodes.BadUrl, "the download was redirected");
-            if (response.Content.Headers.ContentLength > config.UpdateDownloadMax) return new(UpdateCodes.TooLarge, "the download is larger than allowed");
-            using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            long total = 0;
-            await using (var input = await response.Content.ReadAsStreamAsync(timeout.Token))
-            await using (var output = new FileStream(zip, FileMode.Create, FileAccess.Write, FileShare.None))
+            try
             {
-                var buffer = new byte[81920];
-                int read;
-                while ((read = await input.ReadAsync(buffer, timeout.Token)) > 0)
+                using var response = await downloads.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                if (response.StatusCode != HttpStatusCode.OK) return new(UpdateCodes.Failed, $"the download answered {(int)response.StatusCode}");
+                if (response.RequestMessage?.RequestUri != url) return new(UpdateCodes.BadUrl, "the download was redirected");
+                if (response.Content.Headers.ContentLength > config.UpdateDownloadMax) return new(UpdateCodes.TooLarge, "the download is larger than allowed");
+                using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                long total = 0;
+                await using (var input = await response.Content.ReadAsStreamAsync(timeout.Token))
+                await using (var output = new FileStream(zip, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    total += read;
-                    if (total > config.UpdateDownloadMax) return new(UpdateCodes.TooLarge, "the download is larger than allowed");
-                    sha.AppendData(buffer, 0, read);
-                    await output.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
+                    var buffer = new byte[81920];
+                    int read;
+                    while ((read = await input.ReadAsync(buffer, timeout.Token)) > 0)
+                    {
+                        total += read;
+                        if (total > config.UpdateDownloadMax) return new(UpdateCodes.TooLarge, "the download is larger than allowed");
+                        sha.AppendData(buffer, 0, read);
+                        await output.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
+                    }
+                }
+
+                if (!string.Equals(Convert.ToHexStringLower(sha.GetHashAndReset()), offer.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new(UpdateCodes.HashMismatch, "the download's SHA-256 is not the signed one");
                 }
             }
-
-            if (!string.Equals(Convert.ToHexStringLower(sha.GetHashAndReset()), offer.Sha256, StringComparison.OrdinalIgnoreCase))
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
             {
-                return new(UpdateCodes.HashMismatch, "the download's SHA-256 is not the signed one");
+                // the download's own deadline fired, not the caller: a refusal like any other, recorded by ApplyAsync
+                return new(UpdateCodes.Failed, $"the download did not finish within {config.UpdateDownloadTimeout.TotalMinutes:0.##} min");
             }
         }
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Podium.Agent.Config;
 using Podium.Agent.Daemon;
 using Podium.Agent.Net;
 using Podium.Agent.Storage;
@@ -27,6 +28,23 @@ public sealed class RemoteVerbsTests : IDisposable
         Assert.Equal(1, await RunAsync("machines"));
         Assert.Contains("aipod login --server", stderr.ToString(), StringComparison.Ordinal);
         Assert.Equal(0, woke);
+    }
+
+    [Theory]
+    [InlineData("tr", "bağlı değil")]
+    [InlineData("de", "nicht verbunden")]
+    public async Task The_lines_for_the_person_come_in_the_persons_language(string language, string expected)
+    {
+        using var scope = Strings.Scope(language);
+        connected = false;
+        Assert.Equal(1, await RunAsync("machines"));
+        Assert.Contains(expected, stderr.ToString(), StringComparison.Ordinal);
+
+        connected = true;
+        stderr.GetStringBuilder().Clear();
+        Assert.Equal(2, await RunAsync("result"));
+        Assert.DoesNotContain("usage:", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("aipod result", stderr.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

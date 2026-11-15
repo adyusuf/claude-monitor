@@ -92,7 +92,14 @@ public sealed partial class LocalStore
         return taken;
     }
 
+    /// <summary>A hook took a command but could not hand it over (its print failed, or its read ran out of time): it goes back to the queue, so it is not lost and the web is not told it was applied. Only a command still taken goes back.</summary>
+    public void RequeueTakenCommand(string id) =>
+        Exec("UPDATE commands SET state = 'queued', taken_at = NULL, transport = NULL WHERE id = $i AND state = 'taken'", ("$i", id));
+
     public void MarkCommandReported(string id) => Exec("UPDATE commands SET state = 'reported' WHERE id = $i", ("$i", id));
+
+    /// <summary>A command the API settled before it was taken (cancelled, expired): no hook or push takes it any more. One already taken stays.</summary>
+    public void DropQueuedCommand(string id) => Exec("UPDATE commands SET state = 'dropped' WHERE id = $i AND state = 'queued'", ("$i", id));
 
     // ---- permission requests ------------------------------------------------------------------------------------
 
@@ -105,6 +112,9 @@ public sealed partial class LocalStore
             """, ("$l", p.LocalId), ("$h", p.Harness), ("$s", p.Session), ("$t", p.ToolName), ("$in", p.ToolInput),
             ("$w", p.WaitSeconds), ("$c", Iso(p.CreatedAt)));
     }
+
+    /// <summary>Permission requests made before the retention are deleted with their tool input (captured content); their wait ended long before. Returns how many.</summary>
+    public int ForgetPermissions(DateTimeOffset before) => Exec("DELETE FROM permissions WHERE created_at < $t", ("$t", Iso(before)));
 
     public PermissionAsk? Permission(string localId) => Permissions("local_id = $x", ("$x", localId)).FirstOrDefault();
 

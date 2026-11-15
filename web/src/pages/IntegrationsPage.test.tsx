@@ -1,6 +1,6 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { useLocation } from "react-router";
 import { renderAt } from "../test/helpers";
 import { connection, findSite, integrationsView, serveIntegrations as serve } from "../test/integrations-fixtures";
@@ -32,13 +32,29 @@ describe("the integrations page: what it shows", () => {
     expect(screen.getByRole("button", { name: "Connect Jira" })).toBeInTheDocument();
   });
 
-  it("shows the unavailable notice and neither the connect form nor any connection when Jira is not set up", async () => {
-    serve({ "GET /workspaces/w1/integrations": { body: integrationsView([connection()], { available: false }) } });
+  it("with Jira not set up shows the notice and still lists the connections, read-only, with disconnect as the way out", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const calls = serve({
+      "GET /workspaces/w1/integrations": { body: integrationsView([connection()], { available: false }) },
+      "DELETE /integrations/c1": { status: 204 },
+    });
     open();
     expect(await screen.findByText(/Jira is not set up on this server yet/)).toBeInTheDocument();
+    expect(await site("acme.atlassian.net")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Jira address")).not.toBeInTheDocument();
-    expect(screen.queryByText("acme.atlassian.net")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check now" })).not.toBeInTheDocument(); // a check cannot reach Jira now
+    await userEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "DELETE").map((c) => c.path)).toEqual(["/integrations/c1"]));
+    vi.restoreAllMocks();
+  });
+
+  it("with Jira not set up and no connection shows only the notice", async () => {
+    serve({ "GET /workspaces/w1/integrations": { body: integrationsView([], { available: false }) } });
+    open();
+    expect(await screen.findByText(/Jira is not set up on this server yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("No Jira site is connected yet.")).not.toBeInTheDocument();
   });
 
   it("shows one row per connection, each with its own links", async () => {
@@ -80,6 +96,14 @@ describe("the integrations page: what it shows", () => {
     expect((await openDrawer("Settings")).queryByRole("checkbox", { name: /Invite Jira people/ })).not.toBeInTheDocument();
     await closeDrawer();
     expect((await openDrawer("Spaces")).getByRole("button", { name: "Show Jira spaces" })).toBeInTheDocument(); // reading is allowed
+  });
+
+  it.each([["member", true], ["viewer", false]] as const)("offers a %s the link-my-account button: %s (the API refuses a viewer)", async (role, offered) => {
+    serve({ "GET /me": { body: meAs(role) }, "GET /workspaces/w1/integrations": { body: integrationsView([connection({ myAccountLinked: false, myAccountStatus: null })]) } });
+    open();
+    await site("acme.atlassian.net");
+    const drawer = await openDrawer("Settings");
+    expect(drawer.queryByRole("button", { name: "Link my account" }) !== null).toBe(offered);
   });
 
   it("treats a workspace the person has no role in as no admin (fail closed)", async () => {

@@ -194,10 +194,9 @@ public sealed class RunTrackingMacTests : IDisposable
         else Assert.True(ExecHarness.IsAlive(pid), "the tracker ran although it was turned off");
     }
 
-    [Fact]
+    [MacOsFact]
     public async Task The_process_table_reports_the_pid_the_parent_and_the_start_time_of_real_processes()
     {
-        if (!OperatingSystem.IsMacOS()) return;
         var table = new LibProcTable();
         var self = Environment.ProcessId;
         var me = table.Find(self);

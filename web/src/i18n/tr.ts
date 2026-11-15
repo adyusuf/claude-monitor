@@ -7,7 +7,7 @@ import { trIntegrations } from "./tr.integrations";
 import { trViews } from "./tr.views";
 import { trServerSettings } from "./tr.serverSettings";
 import { trTwoStep } from "./tr.twoStep";
-import { trApprovalRules } from "./tr.approvalRules";
+import { trApprovalRules, trApprovalRulesErrors } from "./tr.approvalRules";
 import { trDashboard } from "./tr.dashboard";
 import { trInstallOptions } from "./tr.installOptions";
 import { trRemote } from "./tr.remote";
@@ -18,8 +18,9 @@ export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
     dashboard: "Pano", projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", approvals: "Onaylar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
-    account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
+    account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", signOutFailed: "Çıkış tamamlanamadı, oturumunuz hâlâ açık. Tekrar deneyin.", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
+    workspace: "Çalışma alanı", menu: "Menü",
     themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
   },
   auth: {
@@ -36,9 +37,10 @@ export const tr: Dictionary = {
   },
   errors: {
     ...trAccessErrors,
-    jira_changed: "Siz baktıktan sonra Jira'da değişti. Yenileyip tekrar deneyin.", jira_transition_unavailable: "Jira'da bu durumdan şuna geçiş yok.", jira_no_board: "Jira alanında sprint açılacak bir board yok.", mirrored_scope: "Bir issue ile sprint ya ikisi de Jira'dan ya ikisi de Podium'dan olmalı.", mirrored_type_locked: "Jira'dan gelen issue'nun türü Jira'da tutulur.", mirrored_no_archive: "Jira'dan gelen bir issue burada arşivlenemez. Bunun yerine iptal edin.", mirrored_field_locked: "Jira projesinin adı ve amacı Jira'da tutulur.", mirrored_detached: "Bu Jira'dan alınmıştı ve bağlantı yok. Siteyi yeniden bağlayın.", assignee_not_in_jira: "Podium bu kişinin Jira hesabını bilmiyor. Entegrasyonlar sayfasında bağlayın.",
+    ...trApprovalRulesErrors,
+    jira_changed: "Siz baktıktan sonra Jira'da değişti. Yenileyip tekrar deneyin.", jira_transition_unavailable: "Jira'da bu durumdan şuna geçiş yok.", jira_no_board: "Jira alanında sprint açılacak bir board yok.", mirrored_scope: "Bir issue ile sprint ya ikisi de Jira'dan ya ikisi de Podium'dan olmalı.", mirrored_type_locked: "Jira'dan gelen issue'nun türü Jira'da tutulur.", mirrored_no_archive: "Jira'dan gelen bir issue burada arşivlenemez. Bunun yerine iptal edin.", mirrored_field_locked: "Jira projesinin adı ve amacı Jira'da tutulur.", mirrored_dates_kept: "Jira'dan gelen bir sprintin tarihleri burada silinemez. Değiştirin ya da Jira'da temizleyin.", mirrored_detached: "Bu Jira'dan alınmıştı ve bağlantı yok. Siteyi yeniden bağlayın.", assignee_not_in_jira: "Podium bu kişinin Jira hesabını bilmiyor. Entegrasyonlar sayfasında bağlayın.",
     invalid_site: "Jira alt alan adınızı girin; acme.atlassian.net için acme.", integration_unavailable: "Jira bu sunucuda kurulu değil.",
-    reauthorize: "Bağlantı için Atlassian'da yeniden oturum açılmalı.", jira_account_required: "Önce kendi Atlassian hesabınızı bağlayın.",
+    reauthorize: "Bağlantı için Atlassian'da yeniden oturum açılmalı.", jira_account_required: "Önce kendi Atlassian hesabınızı bağlayın.", already_linked: "Bu üye bu sitenin başka bir kişisine zaten bağlı. Önce oradaki bağlantıyı kaldırın.",
     tracker_unauthorized: "Atlassian oturum açmayı reddetti. Yeniden bağlanın.", tracker_forbidden: "Jira bu hesaba buna izin vermiyor.",
     tracker_not_found: "Jira'da bu yok.", tracker_rate_limited: "Jira yavaşlamanızı istiyor. Bir dakika sonra deneyin.",
     tracker_unavailable: "Jira'ya şu anda ulaşılamıyor.", internal_error: "Kontrol sunucuda başarısız oldu. Yeniden denenecek.", tracker_rejected: "Jira bunu kabul etmedi.", tracker_changed: "Jira'da değişti. Yeniden bakın.",
@@ -53,10 +55,10 @@ export const tr: Dictionary = {
     sign_in_first: "Önce giriş yapın, sonra sağlayıcıyı bağlayın.", provider_in_use: "Bu sağlayıcı hesabı başka bir kullanıcıya bağlı.",
     account_disabled: "Bu hesap devre dışı.", not_a_member: "O çalışma alanının üyesi değilsiniz.",
     invalid_code: "Bu kod geçersiz ya da süresi dolmuş.", last_owner: "Bir çalışma alanında en az bir sahip olmalı.",
-    invalid_answers: "Bu yanıt soruyla uyuşmuyor.",
+    invalid_answers: "Bu yanıt soruyla uyuşmuyor.", invalid_decision: "İzin ver ya da reddet seçin.", invalid_duration: "Yanıtın ne kadar hatırlanacağını listeden seçin.",
     session_ended: "Oturum sona erdi.", session_not_ended: "Yalnızca biten bir oturum listeden kaldırılabilir.", invalid_body: "Gönderilecek mesajı yazın.", too_long: "Bu çok uzun.",
-    out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
-    forbidden: "Bunu yapma izniniz yok.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
+    too_many_decimals: "En fazla iki ondalık basamak kullanın.", out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", invalid_mode: "Listeden bir mod seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
+    forbidden: "Bunu yapma izniniz yok.", csrf: "Sunucu bu değişikliği, bu sitenin kendi sayfasından gelmediği için reddetti. Sayfayı yenileyip tekrar deneyin.", owner_only: "Bunu yalnızca makinenin sahibi yapabilir.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
     account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
@@ -67,6 +69,7 @@ export const tr: Dictionary = {
     target_cannot_run: "Bu makine şu an bunu çalıştıramaz (düzeyi kapalı ya da bağlantısı kopuk).", target_busy: "Bu makine başka çalıştırmalarla meşgul.",
     bad_template: "Bu komut şablonu bu makine için geçerli değil: program tam yol olmalı ve bazı programlara hiçbir zaman izin verilemez.",
     grant_conflict: "Bu şablon için bir izin zaten var.", invalid_reason: "Bu gerekçe çok uzun.", not_member: "Bu kişi çalışma alanının üyesi değil.",
+    already_member: "Bu kişi zaten bu rolde ya da daha yüksek bir rolde üye.", invitation_pending: "Bu adrese açık bir davet zaten var. Yenisini göndermek için onu iptal edin.",
     invalid_machine_role: "Listelerden bir ortam ve bir işlev seçin.",
     totp_required: "Bu makine canlı ya da veritabanı: burada buna izin vermek için iki adımlı giriş gerekir.",
     approval_required: "Bu makine yalnızca sabitlenmiş bir anahtarın imzaladığını çalıştırır. Hesap sayfanızda bir anahtar üretin ve yeniden izin verin.",
@@ -100,13 +103,13 @@ export const tr: Dictionary = {
     invalid_plugin: "Eklenti ad@pazaryeri biçiminde yazılır; yalnızca harf, rakam, nokta, alt çizgi ve tire kullanılır.", invalid_setting: "Listelerden bir ayar ve bir değer seçin.", action_busy: "Ajan bu türden başka bir değişiklikle meşgul. Bitmesini bekleyin.",
     name_taken: "Bu ad burada zaten kullanılıyor. Başka bir ad seçin.", invalid_list: "Listeyi kontrol edin: bir girdi boş, çok uzun, tekrarlı ya da geçersiz, ya da çok fazla girdi var.",
     amount_and_currency: "Bütçe tutarını ve para birimini birlikte verin ya da ikisini de boş bırakın.", invalid_currency: "Üç büyük harf kullanın, örneğin TRY.",
-    before_start: "Bitiş tarihi başlangıç tarihinden önce olamaz.", invalid_value: "Listeden bir değer seçin.", invalid_url: "Bu adrese burada izin verilmiyor. Depo için https, ssh ya da git, ortam için http ya da https adresi kullanın; parola olmasın.",
+    before_start: "Bitiş tarihi başlangıç tarihinden önce olamaz.", invalid_date: "Geçerli bir tarihi gg/aa/yyyy olarak girin.", invalid_value: "Listeden bir değer seçin.", invalid_url: "Bu adrese burada izin verilmiyor. Depo için https, ssh ya da git, ortam için http ya da https adresi kullanın; parola olmasın, kullanıcı adı yalnızca ssh adresinde olsun.",
     limit_reached: "Buraya sığabilecek en çok sayıya ulaşıldı.", archived: "Bu arşivlendi. Önce geri yükleyin.",
     invalid_parent: "Üst iş, bu projenin bir epic'i olmalı.", invalid_application: "Bu projenin bir uygulamasını seçin.", invalid_component: "Seçilen uygulamanın bir bileşenini seçin.", invalid_release: "Seçilen uygulamanın bir sürümünü seçin.", bug_only: "Hata ayrıntılarını yalnızca bir hata taşıyabilir.", invalid_issue: "Bu projeden başka bir iş seçin.", self_link: "Bir iş kendisine bağlanamaz.", cycle: "Bu bağlantı, işlerin birbirini döngü içinde engellemesine yol açar.", duplicate_link: "Bu iki iş zaten bağlı.",
     released: "Yayımlanmış bir sürüm iptal edilemez.", cancelled: "İptal edilmiş bir sürüm değiştirilemez.",
-    sprint_active: "Bu kapsamda başka bir sprint zaten aktif. Önce onu kapatın.", dates_required: "Sprinti başlatmadan önce başlangıç ve bitiş tarihlerini girin.",
+    sprint_active: "Bu kapsamda başka bir sprint zaten aktif. Önce onu kapatın.", dates_required: "Sprinti başlatmadan önce başlangıç ve bitiş tarihlerini girin.", active_dates_required: "Aktif bir sprintin başlangıç ve bitiş tarihleri silinemez.",
     invalid_sprint: "Aynı kapsamdan planlanmış bir sprint seçin.", wrong_scope: "Bu sprint bir uygulamaya ait: yalnızca o uygulamanın işlerini alır.",
-    closed: "Bu sprint kapandı.", not_planned: "Yalnızca planlanmış bir sprint silinebilir.",
+    closed: "Bu sprint kapandı.", not_planned: "Yalnızca planlanmış bir sprint silinebilir.", not_active: "Bu sprint artık aktif değil. Sayfayı yenileyin.",
     invalid_run: "Bu çalışma alanından bir çalıştırma seçin.",
     invalid_auto_mode: "Otomatik mod on_message ya da off olmalı.",
     invalid_auto_project: "Bu makinenin bildirdiği ve Claude Code’un güvendiği bir proje seçin.",
@@ -205,6 +208,7 @@ export const tr: Dictionary = {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
     approve: "Bu makineyi bağla", deny: "Bu ben değilim", approved: "Tamam. Makine bağlandı; bu sayfayı kapatabilirsiniz.",
     denied: "İstek reddedildi.", details: "{host} · {os} {arch} · ajan {version}",
+    noWorkspace: "Henüz hiçbir çalışma alanına katkıda bulunamıyorsunuz. Önce bir çalışma alanı oluşturun, sonra bu sayfaya dönün.", createWorkspace: "Çalışma alanı oluştur",
   },
   members: {
     title: "Üyeler", invite: "Davet et", inviteEmail: "Davet edilecek e-posta", role: "Rol", invited: "Davet gönderildi.",
@@ -268,7 +272,7 @@ export const tr: Dictionary = {
     status: "Durum", allMachines: "Tüm makineler", machine: "Makine", command: "Komut", requestedBy: "İsteyen", when: "Ne zaman", decidedBy: "Karar veren",
     byGrant: "bir izin", byJob: "bir iş", undecided: "henüz yok", details: "Ayrıntılar", detailsOf: "Çalıştırma ayrıntıları", empty: "Bu çalışma alanında henüz hiçbir şey çalışmadı.",
   },
-  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
+  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı", copyFailed: "Kopyalanamadı. Seçip elle kopyalayın." },
   remote: trRemote,
   approvals: {
     title: "Onay anahtarları", intro: "Bu tarayıcıda üretilen bir anahtar, izin verdiğiniz çalıştırmaları imzalar. Yöneticisi anahtarı sabitlemiş ve imzalı onayı açmış bir makine, bu anahtarla imzalanmamış hiçbir şeyi çalıştırmaz; ele geçirilmiş bir sunucu bile sizin adınıza çalıştırma başlatamaz. Özel yarı bu tarayıcıdan hiç çıkmaz.",
@@ -282,10 +286,10 @@ export const tr: Dictionary = {
     enabledHint: "Bir sahibin onaylı bir işi, canlı ya da veritabanı olmayan bir makinede kendi kendine tekrar tekrar çalıştırmasına izin verir. Varsayılan kapalı; kapatmak tüm tikleri durdurur.",
     every: "her {n} dakikada", daily: "her gün {time} UTC", next: "Sonraki çalıştırma", last: "Son çalıştırma", failures: "Üst üste başarısız", why: "Neden durdu",
     status: { active: "Kendi kendine çalışıyor", paused: "Duraklatıldı", ended: "Bitti" },
-    reason: { owner: "Sahibi durdurdu", failures: "Üst üste üç çalıştırma başarısız oldu", strict: "Makine canlı ya da veritabanı oldu", exec_level: "Makine artık komutlara izin vermiyor", job_retired: "İş emekli edildi", disabled: "Zamanlamalar kapatıldı", target_gone: "Makine ya da sahibi yok" },
+    reason: { owner: "Sahibi durdurdu", failures: "Üst üste üç çalıştırma başarısız oldu", strict: "Makine canlı ya da veritabanı oldu", exec_level: "Makine artık komutlara izin vermiyor", job_retired: "İş emekli edildi", disabled: "Zamanlamalar kapatıldı", target_gone: "Makine ya da sahibi yok", approvals: "Makine artık imzalı onay istiyor" },
     pause: "Duraklat", resume: "Yeniden başlat", end: "Bitir", create: "Zamanlamayı başlat", job: "İş", kind: "Tekrar", kindInterval: "Birkaç dakikada bir", kindDaily: "Günde bir", minutes: "Çalıştırmalar arası dakika (15 ile 10080)", timeUtc: "Günün saati (UTC, SS:DD)",
     newHint: "Bir zamanlama onaylı bir işi kendi kendine çalıştırır. Üst üste üç başarısız çalıştırmadan sonra durur, kendi son çalıştırmasıyla çakışmaz ve burada istediğiniz an durdurabilirsiniz.",
     noJobs: "Bir zamanlama için komutunda yer tutucu olmayan etkin bir iş gerekir.",
   },
-  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" },
+  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" }, pageError: { title: "Bu sayfa gösterilemedi", hint: "Sayfadaki bir şey yüklenemedi. Sayfayı yenileyin ya da menüden başka bir sayfa seçin.", reload: "Sayfayı yenile" },
 };

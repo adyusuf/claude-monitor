@@ -125,6 +125,27 @@ public sealed class CommandReplyTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_newer_command_finds_its_reply_when_more_messages_than_the_scan_limit_follow_an_older_one()
+    {
+        var s = await NewSessionAsync();
+        var older = await AppliedAsync(s, "the older prompt");
+        var t0 = api.Clock.GetUtcNow();
+        // More assistant messages than one scan reads (ReplyScanMax, 500) between the two commands, in two batches (a batch holds 500).
+        var chatter = Enumerable.Range(1, 501).Select(i => Line(s.External, Text($"message {i}"), t0.AddSeconds(i))).ToArray();
+        // The messages are dated in the past of the server's clock: a message dated beyond the allowed clock skew counts as now (F-130).
+        api.Clock.Advance(TimeSpan.FromSeconds(510));
+        await SendAsync(s, chatter[..250]);
+        await SendAsync(s, chatter[250..]);
+
+        api.Clock.Advance(TimeSpan.FromMinutes(20));
+        var newer = await AppliedAsync(s, "the newer prompt");
+        await SendAsync(s, Line(s.External, Text("answers the newer prompt"), api.Clock.GetUtcNow().AddSeconds(5)));
+
+        Assert.Equal("answers the newer prompt", (await CommandAsync(s, newer)).GetProperty("replyText").GetString());
+        Assert.Equal("message 1", (await CommandAsync(s, older)).GetProperty("replyText").GetString());
+    }
+
+    [Fact]
     public async Task A_reply_in_another_session_is_not_this_sessions_reply()
     {
         var s = await NewSessionAsync();

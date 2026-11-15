@@ -9,7 +9,10 @@ export const trServerSettings: Dictionary["serverSettings"] = {
   names: { smtp: "E-posta (SMTP)", github: "GitHub ile giriş", google: "Google ile giriş", jira: "Jira" },
   status: { ready: "Hazır", incomplete: "Eksik", off: "Kapalı" },
   statusLabel: "Durum: {status}",
-  notes: { integration_key_missing: "Sunucuda entegrasyon anahtarı eksik: bu anahtar tanımlanana kadar Jira jetonlarını saklayamaz." },
+  notes: {
+    integration_key_missing: "Sunucuda entegrasyon anahtarı eksik: bu anahtar tanımlanana kadar Jira jetonlarını saklayamaz.",
+    jira_connections_exist: "Çalışma alanları bu Jira uygulamasıyla bağlı. Atlassian'ın reddettiği bir istemci kimliği veya sırrı, burada düzeltilene kadar tüm bağlantıları durdurur.",
+  },
   fields: {
     host: "Sunucu", port: "Port", user: "Kullanıcı adı", password: "Parola", from: "Gönderen adresi", tls: "STARTTLS kullan",
     client_id: "İstemci kimliği", client_secret: "İstemci gizli anahtarı",
@@ -27,5 +30,6 @@ export const trServerSettings: Dictionary["serverSettings"] = {
   errors: {
     invalid_setting: "Bu entegrasyonda böyle bir ayar yok.",
     invalid_value: "Bu değer bu ayar için geçerli değil.",
+    tls_required: "Kullanıcı adı ya da parola, e-posta sunucusu bu makinede değilse yalnızca STARTTLS açıkken gönderilir. STARTTLS'i açın ya da onları kaldırın.",
   },
 };

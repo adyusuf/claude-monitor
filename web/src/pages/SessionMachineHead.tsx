@@ -61,19 +61,21 @@ function ClaudeDialog({ view, agentVersion, onClose, onChanged }: { view: Machin
 
 /**
  * The head of a machine's card on the sessions page: online or not, whose it is, whether Claude is installed and running, and for its owner the
- * button that starts or stops Claude there. A machine the page does not know (disconnected) shows only its name.
+ * button that starts or stops Claude there. A machine the page does not know (disconnected) shows only its name. `complete` is false while more
+ * sessions are still to be loaded, so the count is then a floor ("3+").
  */
-export function SessionMachineHead({ ws, hostname, view, owned, agentVersion, count, onChanged }: {
-  ws: string; hostname: string; view: MachineView | undefined; owned: boolean; agentVersion: string | null; count: number; onChanged: () => void;
+export function SessionMachineHead({ ws, hostname, view, owned, agentVersion, count, complete, onChanged }: {
+  ws: string; hostname: string; view: MachineView | undefined; owned: boolean; agentVersion: string | null; count: number; complete: boolean; onChanged: () => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const shown = complete ? count : `${count}+`;
   return (
     <header className="session-machine-head">
       <h2 className="session-machine-name">
         {view ? <OnlineDot online={view.online} /> : null}
         <Icon name="machines" /> {view ? <Link to={`/w/${ws}/machines/${view.agentId}`}>{hostname}</Link> : hostname}
-        <span className="badge" title={t("sessions.count", { n: count })}>{count}</span>
+        <span className="badge" title={t("sessions.count", { n: shown })}>{shown}</span>
       </h2>
       {view ? (
         <div className="session-machine-facts">

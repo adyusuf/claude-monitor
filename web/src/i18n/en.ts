@@ -6,7 +6,7 @@ import { enIntegrations } from "./en.integrations";
 import { enViews } from "./en.views";
 import { enServerSettings } from "./en.serverSettings";
 import { enTwoStep } from "./en.twoStep";
-import { enApprovalRules } from "./en.approvalRules";
+import { enApprovalRules, enApprovalRulesErrors } from "./en.approvalRules";
 import { enDashboard } from "./en.dashboard";
 import { enInstallOptions } from "./en.installOptions";
 import { enRemote } from "./en.remote";
@@ -17,8 +17,9 @@ export const en = {
   app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
     dashboard: "Dashboard", projects: "Projects", sessions: "Sessions", machines: "Machines", runs: "Runs", approvals: "Approvals", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
-    account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
+    account: "Account", download: "Get the agent", signOut: "Sign out", signOutFailed: "Signing out did not complete, so you are still signed in. Try again.", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
+    workspace: "Workspace", menu: "Menu",
     themeSystem: "System", themeLight: "Light", themeDark: "Dark",
   },
   auth: {
@@ -35,9 +36,10 @@ export const en = {
   },
   errors: {
     ...enAccessErrors,
-    jira_changed: "It changed in Jira since you last looked. Reload and try again.", jira_transition_unavailable: "Jira has no step from this status to that one.", jira_no_board: "The Jira space has no board to make a sprint on.", mirrored_scope: "An issue and a sprint must both come from Jira, or both from Podium.", mirrored_type_locked: "The type of an issue from Jira is kept in Jira.", mirrored_no_archive: "An issue from Jira cannot be archived here. Cancel it instead.", mirrored_field_locked: "The name and purpose of a Jira project are kept in Jira.", mirrored_detached: "This was imported from Jira and the connection is gone. Connect the site again.", assignee_not_in_jira: "That person has no Jira account Podium knows. Link them in the Integrations page.",
+    ...enApprovalRulesErrors,
+    jira_changed: "It changed in Jira since you last looked. Reload and try again.", jira_transition_unavailable: "Jira has no step from this status to that one.", jira_no_board: "The Jira space has no board to make a sprint on.", mirrored_scope: "An issue and a sprint must both come from Jira, or both from Podium.", mirrored_type_locked: "The type of an issue from Jira is kept in Jira.", mirrored_no_archive: "An issue from Jira cannot be archived here. Cancel it instead.", mirrored_field_locked: "The name and purpose of a Jira project are kept in Jira.", mirrored_dates_kept: "A sprint from Jira keeps its dates. Change them, or clear them in Jira.", mirrored_detached: "This was imported from Jira and the connection is gone. Connect the site again.", assignee_not_in_jira: "That person has no Jira account Podium knows. Link them in the Integrations page.",
     invalid_site: "Enter your Jira sub-domain, such as acme for acme.atlassian.net.", integration_unavailable: "Jira is not set up on this server.",
-    reauthorize: "The connection needs a new sign-in at Atlassian.", jira_account_required: "Link your own Atlassian account first.",
+    reauthorize: "The connection needs a new sign-in at Atlassian.", jira_account_required: "Link your own Atlassian account first.", already_linked: "That member is already linked to another person of this site. Unlink them there first.",
     tracker_unauthorized: "Atlassian refused the sign-in. Connect again.", tracker_forbidden: "Jira does not allow that for this account.",
     tracker_not_found: "Jira does not have that.", tracker_rate_limited: "Jira asks to slow down. Try again in a minute.",
     tracker_unavailable: "Jira cannot be reached right now.", internal_error: "The check failed on the server. It is tried again.", tracker_rejected: "Jira did not accept that.", tracker_changed: "It changed in Jira. Look at it again.",
@@ -52,10 +54,10 @@ export const en = {
     sign_in_first: "Sign in first, then link the provider.", provider_in_use: "That provider account is linked to another user.",
     account_disabled: "This account is disabled.", not_a_member: "You are not a member of that workspace.",
     invalid_code: "That code is not valid or has expired.", last_owner: "A workspace needs at least one owner.",
-    invalid_answers: "That answer does not match the question.",
+    invalid_answers: "That answer does not match the question.", invalid_decision: "Pick allow or deny.", invalid_duration: "Pick how long the answer is remembered from the list.",
     session_ended: "The session has ended.", session_not_ended: "Only an ended session can be removed from the list.", invalid_body: "Write the message to send.", too_long: "That is too long.",
-    out_of_range: "That value is out of range.", invalid_role: "Pick a role.", unauthorized: "Your session has ended. Sign in again.",
-    forbidden: "You are not allowed to do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
+    too_many_decimals: "Use at most two decimals.", out_of_range: "That value is out of range.", invalid_role: "Pick a role.", invalid_mode: "Pick a mode from the list.", unauthorized: "Your session has ended. Sign in again.",
+    forbidden: "You are not allowed to do that.", csrf: "The server refused this change because it did not come from this site's own page. Reload the page and try again.", owner_only: "Only the machine's owner can do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
     request_failed: "The request failed.", network: "The server cannot be reached.",
     account_locked: "Too many wrong attempts on this account. Try again in 15 minutes.",
@@ -66,6 +68,7 @@ export const en = {
     target_cannot_run: "This machine cannot run that now (its level is off, or it is disconnected).", target_busy: "This machine is busy with other runs.",
     bad_template: "That command template is not valid for this machine: the program must be a full path, and some programs can never be granted.",
     grant_conflict: "A grant for that template already exists.", invalid_reason: "That reason is too long.", not_member: "That person is not a member of this workspace.",
+    already_member: "That person is already a member with this role or a higher one.", invitation_pending: "That address already has an open invitation. Revoke it to send a new one.",
     invalid_machine_role: "Pick an environment and a function from the lists.",
     totp_required: "This machine is production or a database: you need two-step sign-in to allow this here.",
     approval_required: "This machine only runs what a pinned key signed. Make a key on your account page and allow again.",
@@ -99,13 +102,13 @@ export const en = {
     invalid_plugin: "A plugin is written name@marketplace, with letters, digits, dot, underscore and dash only.", invalid_setting: "Pick a setting and a value from the lists.", action_busy: "The agent is still busy with another change of this kind. Wait for it to finish.",
     name_taken: "That name is already used here. Pick another.", invalid_list: "Check the list: an entry is empty, too long, repeated or not allowed, or there are too many.",
     amount_and_currency: "Give the budget amount and its currency together, or neither.", invalid_currency: "Use three capital letters, such as EUR.",
-    before_start: "The end date cannot be before the start date.", invalid_value: "Pick a value from the list.", invalid_url: "That address is not allowed here. Use an https, ssh or git address for the repository and an http or https address for an environment, without a password.",
+    before_start: "The end date cannot be before the start date.", invalid_date: "Enter a real date as dd/mm/yyyy.", invalid_value: "Pick a value from the list.", invalid_url: "That address is not allowed here. Use an https, ssh or git address for the repository and an http or https address for an environment, without a password and with a user name only in an ssh address.",
     limit_reached: "The most that fits here has been reached.", archived: "This is archived. Restore it first.",
     invalid_parent: "The parent must be an epic of this project.", invalid_application: "Pick an application of this project.", invalid_component: "Pick a component of the chosen application.", invalid_release: "Pick a release of the chosen application.", bug_only: "Only a bug carries the bug details.", invalid_issue: "Pick another issue of this project.", self_link: "An issue cannot be linked to itself.", cycle: "That link would make the issues block each other in a loop.", duplicate_link: "These two issues are already linked.",
     released: "A release that went out cannot be cancelled.", cancelled: "A cancelled release cannot be changed.",
-    sprint_active: "Another sprint of this scope is already active. Close it first.", dates_required: "Set the start and end dates before starting the sprint.",
+    sprint_active: "Another sprint of this scope is already active. Close it first.", dates_required: "Set the start and end dates before starting the sprint.", active_dates_required: "An active sprint keeps its start and end dates.",
     invalid_sprint: "Pick a planned sprint of the same scope.", wrong_scope: "This sprint belongs to an application: it takes only that application's issues.",
-    closed: "This sprint is closed.", not_planned: "Only a planned sprint can be deleted.",
+    closed: "This sprint is closed.", not_planned: "Only a planned sprint can be deleted.", not_active: "This sprint is no longer active. Reload the page.",
     invalid_run: "Pick a run of this workspace.",
     invalid_auto_mode: "The automatic mode is on_message or off.",
     invalid_auto_project: "Pick a project this machine has reported and Claude Code trusts.",
@@ -204,6 +207,7 @@ export const en = {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
     approve: "Connect this machine", deny: "This is not me", approved: "Done. The machine is connected; you can close this page.",
     denied: "The request was refused.", details: "{host} · {os} {arch} · agent {version}",
+    noWorkspace: "You may not contribute to any workspace yet. Create a workspace first, then come back to this page.", createWorkspace: "Create a workspace",
   },
   members: {
     title: "Members", invite: "Invite", inviteEmail: "E-mail to invite", role: "Role", invited: "Invitation sent.",
@@ -267,7 +271,7 @@ export const en = {
     status: "Status", allMachines: "All machines", machine: "Machine", command: "Command", requestedBy: "Requested by", when: "When", decidedBy: "Decided by",
     byGrant: "a grant", byJob: "a job", undecided: "not yet", details: "Details", detailsOf: "Run details", empty: "Nothing has run in this workspace yet.",
   },
-  common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
+  common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied", copyFailed: "It could not be copied. Select it and copy it by hand." },
   remote: enRemote,
   approvals: {
     title: "Approval keys", intro: "A key made in this browser signs the runs you allow. A machine whose admin pinned the key and switched on signed approvals runs nothing that was not signed with it, so even a compromised server cannot start a run in your name. The private half never leaves this browser.",
@@ -281,12 +285,12 @@ export const en = {
     enabledHint: "Lets an owner run an approved job again and again by itself, on a machine that is not production or a database. Off by default; switching it off stops every tick.",
     every: "every {n} minutes", daily: "every day at {time} UTC", next: "Next run", last: "Last run", failures: "Failed in a row", why: "Why it stopped",
     status: { active: "Running by itself", paused: "Paused", ended: "Ended" },
-    reason: { owner: "The owner stopped it", failures: "Three runs in a row failed", strict: "The machine became production or a database", exec_level: "The machine no longer allows commands", job_retired: "The job was retired", disabled: "Schedules were switched off", target_gone: "The machine or its owner is gone" },
+    reason: { owner: "The owner stopped it", failures: "Three runs in a row failed", strict: "The machine became production or a database", exec_level: "The machine no longer allows commands", job_retired: "The job was retired", disabled: "Schedules were switched off", target_gone: "The machine or its owner is gone", approvals: "The machine now requires signed approvals" },
     pause: "Pause", resume: "Start again", end: "End", create: "Start the schedule", job: "Job", kind: "Repeats", kindInterval: "Every some minutes", kindDaily: "Once a day", minutes: "Minutes between runs (15 to 10080)", timeUtc: "Time of day (UTC, HH:MM)",
     newHint: "A schedule runs an approved job by itself. It stops after three failed runs in a row, never overlaps its own last run, and you can stop it here at any time.",
     noJobs: "A schedule needs an active job without a placeholder in its command.",
   },
-  notFound: { title: "Page not found", home: "Go to projects" },
+  notFound: { title: "Page not found", home: "Go to projects" }, pageError: { title: "This page could not be shown", hint: "Something on it failed to load. Reload the page, or pick another one from the menu.", reload: "Reload the page" },
 };
 
 export type Dictionary = typeof en;

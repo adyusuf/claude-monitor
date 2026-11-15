@@ -104,9 +104,50 @@ public sealed class IntegrationReconcilerTests(ApiFactory api)
         Assert.Equal("tracker_unavailable", (await JiraKit.ConnectionAsync(broken)).LastError);
         Assert.Null((await JiraKit.ConnectionAsync(broken)).LastPassAt);
         Assert.Equal(api.Clock.GetUtcNow(), (await JiraKit.ConnectionAsync(fine)).LastPassAt);
-        // The one that failed is due again at the next look, and recovers.
+        // The one that failed is due again after the pass interval, and recovers.
+        api.Clock.Advance(api.Services.GetRequiredService<ApiConfig>().IntegrationPassEvery + TimeSpan.FromSeconds(1));
         await Reconciler().RunOnceAsync(CancellationToken.None);
         Assert.Null((await JiraKit.ConnectionAsync(broken)).LastError);
+    }
+
+    [Fact]
+    public async Task A_connection_whose_pass_failed_is_not_passed_again_before_the_pass_interval()
+    {
+        var broken = await JiraKit.ConnectedAsync(api, site => site.Space("BKO"));
+        await JiraKit.ImportAsync(broken, "BKO");
+        await OnlyAsync(broken);
+        api.Jira.Fail(broken.Site, "/rest/api/3/project/BKO", HttpStatusCode.ServiceUnavailable, times: 10);
+
+        await Reconciler().RunOnceAsync(CancellationToken.None);
+        await Reconciler().RunOnceAsync(CancellationToken.None);
+        await Reconciler().RunOnceAsync(CancellationToken.None);
+
+        // ADR-0015 §6: every 10 minutes, also when the last pass failed; each extra look would add a run and call Jira again.
+        Assert.Equal(1, await PassesAsync(broken));
+        Assert.Null((await JiraKit.ConnectionAsync(broken)).LastPassAt); // the next good pass still reads from the last good one
+        api.Clock.Advance(api.Services.GetRequiredService<ApiConfig>().IntegrationPassEvery + TimeSpan.FromSeconds(1));
+        await Reconciler().RunOnceAsync(CancellationToken.None);
+        Assert.Equal(2, await PassesAsync(broken));
+    }
+
+    [Fact]
+    public async Task Runs_older_than_the_keep_are_removed_and_newer_ones_are_kept()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        await OnlyAsync(w);
+        var now = api.Clock.GetUtcNow();
+        await using (var db = api.Db())
+        {
+            db.IntegrationSyncRuns.AddRange(
+                new IntegrationSyncRun { ConnectionId = w.ConnectionId, Kind = SyncKinds.Import, Status = SyncStatuses.Ok, Error = "old", StartedAt = now - Integrations.Reconciler.RunKeep - TimeSpan.FromMinutes(1) },
+                new IntegrationSyncRun { ConnectionId = w.ConnectionId, Kind = SyncKinds.Import, Status = SyncStatuses.Ok, Error = "fresh", StartedAt = now - Integrations.Reconciler.RunKeep + TimeSpan.FromMinutes(1) });
+            await db.SaveChangesAsync();
+        }
+
+        await Reconciler().RunOnceAsync(CancellationToken.None);
+
+        await using var after = api.Db();
+        Assert.Equal(["fresh"], await after.IntegrationSyncRuns.Where(r => r.ConnectionId == w.ConnectionId && r.Kind == SyncKinds.Import && r.Error != null).Select(r => r.Error).ToListAsync());
     }
 
     [Fact]

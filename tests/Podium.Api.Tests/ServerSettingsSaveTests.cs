@@ -86,10 +86,28 @@ public sealed class ServerSettingsSaveTests(ApiFactory api) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_audit_row_tells_a_removed_field_from_a_changed_one()
+    {
+        var admin = await ServerAdminKit.AdminAsync(api, "ss-audit-rm");
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { password = Password, user = "audited-user-name" })).EnsureSuccessStatusCode();
+
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { password = "", user = "another-user-name" })).EnsureSuccessStatusCode();
+
+        await using var db = api.Db();
+        var audits = await db.AuditEvents.AsNoTracking().Where(a => a.ActorUserId == admin.Id && a.Action == AuditActions.ServerSettingsChanged).OrderBy(a => a.Id).ToListAsync();
+        Assert.Equal(2, audits.Count);
+        Assert.Equal(Array.Empty<string>(), audits[0].Detail!.RootElement.GetProperty("removed").EnumerateArray().Select(f => f.GetString()));
+        var second = audits[1].Detail!.RootElement;
+        Assert.Equal(["password", "user"], second.GetProperty("fields").EnumerateArray().Select(f => f.GetString()));
+        Assert.Equal(["password"], second.GetProperty("removed").EnumerateArray().Select(f => f.GetString()));
+        Assert.DoesNotContain("another-user-name", second.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task An_empty_value_removes_the_saved_one_and_a_field_left_out_stays_as_it_is()
     {
         var admin = await ServerAdminKit.AdminAsync(api, "ss-clear");
-        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "mailer", password = Password, host = "mail.example.net" })).EnsureSuccessStatusCode();
+        (await ServerAdminKit.PutAsync(admin, "smtp", new { user = "mailer", password = Password, host = "mail.example.net", tls = "true" })).EnsureSuccessStatusCode();
 
         var cleared = await ServerAdminKit.PutAsync(admin, "smtp", new { user = "" });
 

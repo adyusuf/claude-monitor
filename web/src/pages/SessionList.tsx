@@ -63,8 +63,8 @@ function SessionItem({ ws, s, now, mine, onChanged }: { ws: string; s: SessionRo
       </Link>
       {mine && ((s.startedFromWeb && s.webSessionRef && !ended) || ended) ? (
         <div className="session-actions">
-          {mine && s.startedFromWeb && s.webSessionRef && !ended ? <Button variant="ghost" busy={busy} disabled={stopSent} onClick={stop}>{t("sessions.stop")}</Button> : null}
-          {mine && ended ? <Button variant="ghost" busy={busy} onClick={hide}>{t("sessions.hide")}</Button> : null}
+          {s.startedFromWeb && s.webSessionRef && !ended ? <Button variant="ghost" busy={busy} disabled={stopSent} onClick={stop}>{t("sessions.stop")}</Button> : null}
+          {ended ? <Button variant="ghost" busy={busy} onClick={hide}>{t("sessions.hide")}</Button> : null}
         </div>
       ) : null}
       {stopSent && !ended ? <Notice>{t("sessions.stopSent")}</Notice> : null}
@@ -118,7 +118,8 @@ export function SessionList({ ws, rows, machines, agents, userId, now, complete,
                   onMouseEnter={() => freeze(machine)} onMouseLeave={() => release(machine.key)}
                   onFocus={() => freeze(machine)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) release(machine.key); }}>
                   <SessionMachineHead ws={ws} hostname={machine.hostname} view={view}
-                    owned={agent !== undefined && agent.userId === userId} agentVersion={agent?.version ?? null} count={machine.count} onChanged={onChanged} />
+                    owned={agent !== undefined && agent.userId === userId} agentVersion={agent?.version ?? null} count={machine.count} complete={complete}
+                    onChanged={onChanged} />
                   {machine.repos.length === 0 ? <p className="muted small session-none">{complete ? t("sessions.noneOnMachine") : t("sessions.noneLoaded")}</p> : null}
                   {machine.repos.map((group) => (
                     <div key={group.repo ?? ""} className="session-branch">

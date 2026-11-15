@@ -1,10 +1,11 @@
 import type { MachineView, ToolInfo } from "../api/types";
 import { useI18n } from "../i18n";
+import { STRICT_ENVIRONMENT, STRICT_FUNCTION } from "../lib/machineLimits";
 import { ENVIRONMENT_ORDER, environmentsOf, FUNCTION_ORDER, functionsOf, normalize } from "../lib/roles";
 import { Icon } from "../components/icons";
 
 /** True for a production or database machine (ADR-0008 §2): the badge turns red and scripts will need a code. */
-export const isStrict = (m: MachineView): boolean => m.effectiveEnvironment === "production" || m.effectiveFunction === "database";
+export const isStrict = (m: MachineView): boolean => m.effectiveEnvironment === STRICT_ENVIRONMENT || m.effectiveFunction === STRICT_FUNCTION;
 
 /** The values of a set with the effective one added when a claim made it stricter than anything set, loosest first. */
 function withEffective<T extends string>(values: T[], effective: T | null | undefined, order: readonly T[]): T[] {
