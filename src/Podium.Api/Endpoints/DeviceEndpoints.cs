@@ -15,8 +15,8 @@ public static class DeviceEndpoints
 {
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapPost("/device/code", Code).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
-        api.MapPost("/device/token", Token);
+        api.MapPost("/device/code", Code).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
+        api.MapPost("/device/token", Token).AllowAnonymous();
         var web = api.MapGroup("/device").RequireAuthorization(Schemes.Session).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         web.MapGet("/lookup/{userCode}", Lookup);
         web.MapPost("/approve", Approve);

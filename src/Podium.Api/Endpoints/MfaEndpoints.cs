@@ -31,7 +31,7 @@ public static class MfaEndpoints
         me.MapPost("/setup", Setup);
         me.MapPost("/enable", Enable);
         me.MapPost("/disable", Disable).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
-        api.MapPost("/auth/mfa", SignIn).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+        api.MapPost("/auth/mfa", SignIn).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
     }
 
     /// <summary>For a user with MFA on: the pending token the second step needs (single use, minutes long).</summary>
@@ -66,7 +66,10 @@ public static class MfaEndpoints
         };
     }
 
-    /// <summary>True when the code is the current TOTP (not replayed) or an unused recovery code, which is then spent.</summary>
+    /// <summary>
+    /// True when the code is the current TOTP (not replayed) or an unused recovery code, which is then spent. Both are spent with a
+    /// compare-and-set, so of two requests with the same code only one passes.
+    /// </summary>
     public static async Task<bool> CheckAsync(PodiumDb db, ApiConfig config, User user, string? code, DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
@@ -76,15 +79,19 @@ public static class MfaEndpoints
         var step = Totp.Verify(SecretBox.Open(config.MfaKey, user.TotpSecret), code, now, user.TotpLastStep);
         if (step is not null)
         {
+            var claimed = await db.Users.Where(u => u.Id == user.Id && (u.TotpLastStep == null || u.TotpLastStep < step))
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.TotpLastStep, step), ct);
+            if (claimed == 0) return false;
             user.TotpLastStep = step;
             return true;
         }
 
         var hash = Secrets.Hash(RecoveryNormal(code));
-        var recovery = await db.UserRecoveryCodes.FirstOrDefaultAsync(r => r.UserId == user.Id && r.CodeHash == hash && r.UsedAt == null, ct);
+        var recovery = await db.UserRecoveryCodes.AsNoTracking()
+            .Where(r => r.UserId == user.Id && r.CodeHash == hash && r.UsedAt == null).Select(r => (Guid?)r.Id).FirstOrDefaultAsync(ct);
         if (recovery is null) return false;
-        recovery.UsedAt = now;
-        return true;
+        return await db.UserRecoveryCodes.Where(r => r.Id == recovery && r.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.UsedAt, now), ct) == 1;
     }
 
     /// <summary>The audit detail's step of a wrong code asked outside sign-in (sign-in's second step writes "mfa").</summary>
@@ -223,6 +230,10 @@ public static class MfaEndpoints
             return Http.Invalid("code", "invalid_code");
         }
 
+        // Compare-and-set: of two requests with the same pending token (each with a good code), only one opens a session.
+        var spent = await db.UserTokens.Where(t => t.Id == pending.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), http.RequestAborted);
+        if (spent == 0) return Http.Invalid("token", "invalid_token");
         pending.UsedAt = now;
         user.FailedSignIns = 0;
         EndCookie(http, config);

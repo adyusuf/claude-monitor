@@ -12,5 +12,5 @@ public static class DownloadsRedirect
 {
     public static void Map(IEndpointRouteBuilder routes, string downloadsUrl) =>
         routes.MapGet($"/{ApiConfig.DownloadsFolder}/{{file}}", (string file) =>
-            UpdateUrls.IsPlainFile(file) ? Results.Redirect($"{downloadsUrl}/{file}") : Results.NotFound());
+            UpdateUrls.IsPlainFile(file) ? Results.Redirect($"{downloadsUrl}/{file}") : Results.NotFound()).AllowAnonymous();
 }
