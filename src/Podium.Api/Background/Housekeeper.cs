@@ -40,22 +40,19 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
         ArgumentNullException.ThrowIfNull(clock);
         var db = services.GetRequiredService<PodiumDb>();
         await Chores.RunAsync(db, ct,
-            () => RunOnceAsync(db, clock.GetUtcNow(), ct),
+            () => RunOnceAsync(db, clock.GetUtcNow(), ct, services.GetRequiredService<Broker>()),
             () => RemoteHousekeeping.RunOnceAsync(db, services.GetRequiredService<ApiConfig>(), services.GetRequiredService<Broker>(), clock.GetUtcNow(), ct));
     }
 
     /// <summary>Each chore runs even when one before it fails (<see cref="Chores"/>).</summary>
-    public static async Task RunOnceAsync(PodiumDb db, DateTimeOffset now, CancellationToken ct)
+    public static async Task RunOnceAsync(PodiumDb db, DateTimeOffset now, CancellationToken ct, Broker? broker = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         // An approval rule holds a command the session ran: a week after it ended (revoked or expired) it is gone (ADR-0019).
         var ruleCutoff = now - ApprovalRuleLimits.KeepEnded;
         await Chores.RunAsync(db, ct,
-            () => db.SessionCommands
-                .Where(c => (c.Status == CommandStatuses.Queued || c.Status == CommandStatuses.Delivered) && c.ExpiresAt <= now)
-                .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommandStatuses.Expired), ct),
-            () => db.PermissionRequests.Where(p => p.Status == PermissionStatuses.Open && p.ExpiresAt <= now)
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Expired), ct),
+            () => SessionExpiry.CommandsAsync(db, now, broker, ct),
+            () => SessionExpiry.PermissionsAsync(db, now, broker, ct),
             () => db.ApprovalRules.Where(r => (r.RevokedAt != null && r.RevokedAt <= ruleCutoff) || (r.ExpiresAt != null && r.ExpiresAt <= ruleCutoff))
                 .ExecuteDeleteAsync(ct),
             () => db.DeviceAuthorizations

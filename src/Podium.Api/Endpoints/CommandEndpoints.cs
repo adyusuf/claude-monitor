@@ -5,6 +5,7 @@ using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Security;
 using Podium.Api.Streaming;
+using Podium.Api.Text;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -59,7 +60,8 @@ public static class CommandEndpoints
         if (await Access.SessionAsync(db, userId, id, http.RequestAborted) is not { } found) return Http.NotFound();
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
         if (!CommandKinds.All.Contains(req.Kind ?? "")) return Http.Invalid("kind", "invalid_kind");
-        if (req.Kind == CommandKinds.Prompt && (string.IsNullOrWhiteSpace(req.Body) || req.Body.Length > BodyMax))
+        // A NUL or half a surrogate pair cannot be stored: refused here, not a 500 from the database.
+        if (req.Kind == CommandKinds.Prompt && (string.IsNullOrWhiteSpace(req.Body) || req.Body.Length > BodyMax || !StorableText.Plain(req.Body)))
         {
             return Http.Invalid("body", "invalid_body");
         }
@@ -133,6 +135,7 @@ public static class CommandEndpoints
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
         if (!PermissionDecisions.All.Contains(req.Decision ?? "")) return Http.Invalid("decision", "invalid_decision");
         if (req.Reason is { Length: > ReasonMax }) return Http.Invalid("reason", "too_long");
+        if (!StorableText.Plain(req.Reason)) return Http.Invalid("reason", "invalid_reason");
         if (req.Answers is not null && !AnswersFit(request, req.Decision!, req.Answers)) return Http.Invalid("answers", "invalid_answers");
         var remember = req.Remember ?? ApprovalDurations.Once;
         if (!ApprovalDurations.All.Contains(remember)) return Http.Invalid("remember", "invalid_duration");

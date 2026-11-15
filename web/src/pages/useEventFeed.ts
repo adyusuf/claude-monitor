@@ -21,6 +21,7 @@ export function useEventFeed(sessionId: string, version: number, opts: { kind?: 
   const [next, setNext] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [error, setError] = useState<unknown>(null); // the last read that failed (cleared by the next that works); what is held stays
   const newest = useRef<number | null>(null);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function useEventFeed(sessionId: string, version: number, opts: { kind?: 
     } else {
       setHeld((h) => mergeEvents(h, fetched));
     }
+    setError(null);
     setLoaded(true);
   }, [sessionId, kind, pageSize, refreshSize]);
 
@@ -52,14 +54,18 @@ export function useEventFeed(sessionId: string, version: number, opts: { kind?: 
     setHeld([]);
     setNext(null);
     setLoaded(false);
-    refresh(true).catch(() => setLoaded(true));
+    setError(null);
+    refresh(true).catch((e: unknown) => {
+      setError(e);
+      setLoaded(true);
+    });
   }, [refresh]);
 
   const seen = useRef(version);
   useEffect(() => {
     if (seen.current === version) return;
     seen.current = version;
-    refresh(false).catch(() => undefined);
+    refresh(false).catch(setError);
   }, [version, refresh]);
 
   /** Reads the page before what is held; `beforeAdd` runs just before it is put on top (the chat notes its scroll height there). */
@@ -71,10 +77,13 @@ export function useEventFeed(sessionId: string, version: number, opts: { kind?: 
       beforeAdd?.();
       setHeld((h) => mergeEvents(h, page.items));
       setNext(page.next);
+      setError(null);
+    } catch (e) {
+      setError(e);
     } finally {
       setLoadingOlder(false);
     }
   }, [next, loadingOlder, sessionId, kind, pageSize]);
 
-  return { held, next, loaded, loadingOlder, older };
+  return { held, next, loaded, loadingOlder, older, error };
 }

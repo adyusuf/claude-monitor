@@ -63,8 +63,8 @@ function SessionItem({ ws, s, now, mine, onChanged }: { ws: string; s: SessionRo
       </Link>
       {mine && ((s.startedFromWeb && s.webSessionRef && !ended) || ended) ? (
         <div className="session-actions">
-          {mine && s.startedFromWeb && s.webSessionRef && !ended ? <Button variant="ghost" busy={busy} disabled={stopSent} onClick={stop}>{t("sessions.stop")}</Button> : null}
-          {mine && ended ? <Button variant="ghost" busy={busy} onClick={hide}>{t("sessions.hide")}</Button> : null}
+          {s.startedFromWeb && s.webSessionRef && !ended ? <Button variant="ghost" busy={busy} disabled={stopSent} onClick={stop}>{t("sessions.stop")}</Button> : null}
+          {ended ? <Button variant="ghost" busy={busy} onClick={hide}>{t("sessions.hide")}</Button> : null}
         </div>
       ) : null}
       {stopSent && !ended ? <Notice>{t("sessions.stopSent")}</Notice> : null}

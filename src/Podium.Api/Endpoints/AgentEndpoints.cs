@@ -228,9 +228,9 @@ public static class AgentEndpoints
                 targetId: request.Id, detail: new { rule = rule.Id, request.ToolName });
             answer = new PermissionAnswerMessage(request.Id, session.ExternalId, PermissionDecisions.Allow, null);
         }
-        else
+        else if (session.Status != SessionStatuses.Ended)
         {
-            session.Status = SessionStatuses.Waiting;
+            session.Status = SessionStatuses.Waiting; // an ended session stays ended, as in the event projector
         }
 
         await db.SaveChangesAsync(http.RequestAborted);

@@ -54,12 +54,15 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
         var sessions = new Dictionary<(string, string), HarnessSession>();
         var stored = 0;
         long bytes = 0;
-        foreach (var e in batch.Events)
+        foreach (var captured in batch.Events)
         {
-            if (!Valid(e, harnesses))
+            if (!Valid(captured, harnesses))
             {
                 continue;
             }
+
+            // The agent's clock may run ahead: an event dated beyond the allowed skew counts as now, so one such event cannot pin the session at the top of the list.
+            var e = captured.OccurredAt > now + config.ClockSkewMax ? captured with { OccurredAt = now } : captured;
 
             // A NUL or half a surrogate pair anywhere in it would fail the whole batch in PostgreSQL: the event is skipped instead.
             var raw = e.Payload.GetRawText();
