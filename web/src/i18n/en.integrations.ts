@@ -10,6 +10,7 @@ export const enIntegrations = {
   result: {
     ok: "Done.", denied: "Atlassian did not give access, nothing was connected.", invalid_state: "That sign-in has expired. Start again.",
     site_not_found: "Your Atlassian login cannot reach that Jira address. Check the address, or sign in with the right account.",
+    account_in_use: "That Atlassian account is already linked by someone else on this connection. Sign in with your own account.",
   },
   status: { active: "Connected", reauthorize: "Sign in again", disconnected: "Disconnected" },
   connectedBy: "Connected by {name}", projects: "Projects imported: {n}",

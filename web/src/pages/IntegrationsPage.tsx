@@ -64,7 +64,7 @@ export function IntegrationsPage() {
   );
 }
 
-const KNOWN_RESULTS = ["denied", "invalid_state", "site_not_found"] as const;
+const KNOWN_RESULTS = ["denied", "invalid_state", "site_not_found", "account_in_use"] as const;
 
 function resultText(code: string, t: ReturnType<typeof useI18n>["t"], tx: ReturnType<typeof useI18n>["tx"]): string {
   const known = KNOWN_RESULTS.find((k) => k === code);

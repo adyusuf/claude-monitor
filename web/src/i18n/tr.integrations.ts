@@ -12,6 +12,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   result: {
     ok: "Tamam.", denied: "Atlassian erişim vermedi, hiçbir şey bağlanmadı.", invalid_state: "Bu oturum açma süresi doldu. Yeniden başlayın.",
     site_not_found: "Atlassian girişiniz bu Jira adresine ulaşamıyor. Adresi kontrol edin ya da doğru hesapla girin.",
+    account_in_use: "Bu Atlassian hesabı bu bağlantıda başka biri tarafından zaten bağlandı. Kendi hesabınızla giriş yapın.",
   },
   status: { active: "Bağlı", reauthorize: "Yeniden oturum açın", disconnected: "Bağlantı kesildi" },
   connectedBy: "{name} bağladı", projects: "İçe alınan proje: {n}",

@@ -12,6 +12,7 @@ export const deIntegrations: Dictionary["integrations"] = {
   result: {
     ok: "Erledigt.", denied: "Atlassian hat den Zugriff nicht gewährt, es wurde nichts verbunden.", invalid_state: "Diese Anmeldung ist abgelaufen. Beginnen Sie neu.",
     site_not_found: "Ihr Atlassian-Login erreicht diese Jira-Adresse nicht. Prüfen Sie die Adresse oder melden Sie sich mit dem richtigen Konto an.",
+    account_in_use: "Dieses Atlassian-Konto ist auf dieser Verbindung bereits von jemand anderem verknüpft. Melden Sie sich mit Ihrem eigenen Konto an.",
   },
   status: { active: "Verbunden", reauthorize: "Erneut anmelden", disconnected: "Getrennt" },
   connectedBy: "Verbunden von {name}", projects: "Importierte Projekte: {n}",
