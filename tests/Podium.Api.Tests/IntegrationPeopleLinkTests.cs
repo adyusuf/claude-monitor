@@ -92,6 +92,21 @@ public sealed class IntegrationPeopleLinkTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_person_whose_e_mail_an_admin_typed_is_linked_on_the_next_pass_after_that_person_accepted_the_invitation()
+    {
+        var (w, hidden, _) = await WorldAsync();
+        var invitee = await api.NewClient().SignedUpAsync("lnk-typed");
+        Assert.Equal(HttpStatusCode.NoContent, (await PutAsync(w, hidden, new { email = "  " + invitee.Email.ToUpperInvariant() + " " })).StatusCode);
+        (await w.Admin.PostAsync($"/api/workspaces/{w.WorkspaceId}/invitations", new { email = invitee.Email, role = "viewer" })).EnsureSuccessStatusCode();
+        (await invitee.PostAsync("/api/invitations/accept", new { token = api.Mail.TokenFor(invitee.Email) })).EnsureSuccessStatusCode();
+        Assert.Null(await UserOfAsync(hidden)); // Jira still shows no e-mail for this person
+
+        await JiraKit.PassAsync(w);
+
+        Assert.Equal(invitee.Id, await UserOfAsync(hidden));
+    }
+
+    [Fact]
     public async Task The_tool_account_of_a_member_with_two_person_rows_from_before_is_always_the_first_seen()
     {
         var (w, hidden, other) = await WorldAsync();
