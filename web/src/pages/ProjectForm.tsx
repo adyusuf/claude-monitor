@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { DayField } from "../components/DayInput";
 import { Button, Field, Notice } from "../components/ui";
 import type { ProjectInput } from "../api/typesProjects";
 import type { Member } from "../api/types";
@@ -71,8 +72,8 @@ export function ProjectForm({ initial, members, canChangeOwner, submitLabel, mir
           onChange={(e) => change({ budgetAmount: e.target.value })} />
         <Field label={t("projects.budgetCurrency")} value={draft.budgetCurrency} maxLength={3} placeholder="EUR" hint={t("projects.currencyHint")} error={err("budgetCurrency")}
           onChange={(e) => change({ budgetCurrency: e.target.value.toUpperCase() })} />
-        <Field label={t("projects.startDate")} type="date" value={draft.startDate} error={err("startDate")} onChange={(e) => change({ startDate: e.target.value })} />
-        <Field label={t("projects.endDate")} type="date" value={draft.endDate} error={err("endDate")} onChange={(e) => change({ endDate: e.target.value })} />
+        <DayField label={t("projects.startDate")} value={draft.startDate} error={err("startDate")} onChange={(startDate) => change({ startDate })} />
+        <DayField label={t("projects.endDate")} value={draft.endDate} error={err("endDate")} onChange={(endDate) => change({ endDate })} />
       </div>
       <ProjectSettingsFields draft={draft} errors={errors} onChange={change} />
       <div className="row-actions">

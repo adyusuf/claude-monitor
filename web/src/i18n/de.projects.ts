@@ -33,6 +33,7 @@ export const deProjects: Dictionary["projects"] = {
   target: { performance: "Leistung", accessibility: "Barrierefreiheit", sla: "Verfügbarkeit (SLA)", security: "Sicherheit", other: "Sonstiges" },
   components: "Komponenten und Module", noComponents: "Noch keine Komponenten oder Module.", componentName: "Name", componentKind: "Art",
   archiveComponentConfirm: "Komponente „{name}“ archivieren? Eine archivierte Komponente lässt sich nicht wiederherstellen.",
+  dayFormat: "TT/MM/JJJJ",
   newComponentName: "Name der neuen Komponente", newComponentKind: "Art der neuen Komponente", addComponent: "Hinzufügen", rename: "Umbenennen",
   componentKinds: { component: "Komponente", module: "Modul" },
   releases: "Release-Kalender", noReleases: "Keine Releases geplant.", releaseName: "Name des Releases", plannedDate: "Geplantes Datum",

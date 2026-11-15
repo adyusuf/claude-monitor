@@ -224,7 +224,7 @@ describe("the application page: release calendar", () => {
     open();
     await screen.findByText("1.0.0");
     await userEvent.type(screen.getByLabelText("Release name new release"), "2.0.0");
-    await userEvent.type(screen.getByLabelText("Planned date new release"), "2026-06-01");
+    await userEvent.type(screen.getByLabelText("Planned date new release"), "01/06/2026");
     await userEvent.selectOptions(screen.getByLabelText("Release state new release"), "planned");
     const add = screen.getAllByRole("button", { name: "Add" }).at(-1)!;
     await userEvent.click(add);
@@ -242,6 +242,17 @@ describe("the application page: release calendar", () => {
     await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Cancel release" }));
     expect(confirm).toHaveBeenCalledWith("Cancel release \"1.0.0\"? A cancelled release cannot be edited or brought back.");
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/releases/r1")).toBe(true));
+  });
+
+  it("refuses a planned date that is not a real dd/mm/yyyy day before asking", async () => {
+    const calls = serve({ "POST /applications/a1/releases": { status: 201, body: release() } });
+    open();
+    await screen.findByText("1.0.0");
+    await userEvent.type(screen.getByLabelText("Release name new release"), "3.0.0");
+    await userEvent.type(screen.getByLabelText("Planned date new release"), "31/02/2026");
+    await userEvent.click(screen.getAllByRole("button", { name: "Add" }).at(-1)!);
+    expect(await screen.findByText("Enter a real date as dd/mm/yyyy.")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
   it("cancels a release only after the person confirms", async () => {

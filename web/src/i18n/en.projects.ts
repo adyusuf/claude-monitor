@@ -31,6 +31,7 @@ export const enProjects = {
   target: { performance: "Performance", accessibility: "Accessibility", sla: "Availability (SLA)", security: "Security", other: "Other" },
   components: "Components and modules", noComponents: "No components or modules yet.", componentName: "Name", componentKind: "Kind",
   archiveComponentConfirm: "Archive component \"{name}\"? A component cannot be restored once archived.",
+  dayFormat: "dd/mm/yyyy",
   newComponentName: "New component name", newComponentKind: "New component kind", addComponent: "Add", rename: "Rename",
   componentKinds: { component: "Component", module: "Module" },
   releases: "Release calendar", noReleases: "No releases planned.", releaseName: "Release name", plannedDate: "Planned date",

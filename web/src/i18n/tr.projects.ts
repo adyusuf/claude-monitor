@@ -33,6 +33,7 @@ export const trProjects: Dictionary["projects"] = {
   target: { performance: "Performans", accessibility: "Erişilebilirlik", sla: "Kullanılabilirlik (SLA)", security: "Güvenlik", other: "Diğer" },
   components: "Bileşenler ve modüller", noComponents: "Henüz bileşen ya da modül yok.", componentName: "Ad", componentKind: "Tür",
   archiveComponentConfirm: "\"{name}\" bileşeni arşivlensin mi? Arşivlenen bileşen geri yüklenemez.",
+  dayFormat: "gg/aa/yyyy",
   newComponentName: "Yeni bileşen adı", newComponentKind: "Yeni bileşen türü", addComponent: "Ekle", rename: "Yeniden adlandır",
   componentKinds: { component: "Bileşen", module: "Modül" },
   releases: "Sürüm takvimi", noReleases: "Planlanmış sürüm yok.", releaseName: "Sürüm adı", plannedDate: "Planlanan tarih",
