@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -33,7 +34,7 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
             {
                 taken += Follow(t);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or FormatException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or FormatException or DbException)
             {
                 log.Write($"transcript of session {t.Session} not read: {e.GetType().Name}"); // never its path or content
             }
@@ -65,26 +66,35 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
                     continue;
                 }
 
+                var lineStart = offset;
                 offset = stream.Position;
                 var line = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
                 buffer.SetLength(0);
                 var bytes = lineBytes;
                 lineBytes = 0;
-                if (bytes > config.TranscriptLineMax)
+                try
                 {
-                    // Only its first part was kept, which cannot be parsed: a marker says that a line was there and how big it was.
-                    recorder.Record(EventKinds.Transcript, t.Session, Oversized(line, bytes), project, clock.GetUtcNow(), cut: true);
-                    taken++;
+                    if (bytes > config.TranscriptLineMax)
+                    {
+                        // Only its first part was kept, which cannot be parsed: a marker says that a line was there and how big it was.
+                        recorder.Record(EventKinds.Transcript, t.Session, Oversized(line, bytes), project, clock.GetUtcNow(), cut: true);
+                        taken++;
+                    }
+                    else if (Take(t, line, project, recorder))
+                    {
+                        taken++;
+                    }
                 }
-                else if (Take(t, line, project, recorder))
+                catch (DbException)
                 {
-                    taken++;
+                    offset = lineStart; // a busy or locked database is not the line's fault: it is read again at the next pass, not lost
+                    throw;
                 }
             }
         }
         finally
         {
-            // A partial last line is read again next time; the lines taken before a failure are not, nor the line that failed.
+            // A partial last line is read again next time; the lines taken before a failure are not, nor a line that failed to parse; a line whose write failed is.
             store.TranscriptRead(t.Session, offset);
         }
 
