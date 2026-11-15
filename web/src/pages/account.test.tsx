@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Layout } from "../components/Layout";
 import { en } from "../i18n/en";
 import { ME, mockApi, renderAt } from "../test/helpers";
@@ -22,6 +22,29 @@ describe("the frame", () => {
     await userEvent.click(screen.getByRole("button", { name: "Çıkış" }));
     expect(await screen.findByText("login page")).toBeInTheDocument();
     expect(calls.some((c) => c.path === "/auth/logout")).toBe(true);
+  });
+
+  it("keeps the user signed in and says so when the sign-out fails, and signs out on a retry that works", async () => {
+    let tries = 0;
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockApi({ "GET /me": { body: ME }, "POST /auth/logout": () => (++tries === 1 ? { status: 503 } : { status: 204 }) });
+    renderAt("/w/w1/x", [{ path: "/w/:ws/*", element: <Layout /> }, { path: "/login", element: <div>login page</div> }]);
+    await userEvent.click(await screen.findByRole("button", { name: en.nav.signOut }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(en.nav.signOutFailed);
+    expect(screen.queryByText("login page")).not.toBeInTheDocument();
+    expect(screen.getByText(ME.displayName)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Sessions/ })).toBeInTheDocument();
+    expect(logged).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: en.nav.signOut }));
+    expect(await screen.findByText("login page")).toBeInTheDocument();
+    expect(tries).toBe(2);
+  });
+
+  it("goes to sign-in when the sign-out answers that the session is already over", async () => {
+    mockApi({ "GET /me": { body: ME }, "POST /auth/logout": { status: 401 } });
+    renderAt("/w/w1/x", [{ path: "/w/:ws/*", element: <Layout /> }, { path: "/login", element: <div>login page</div> }]);
+    await userEvent.click(await screen.findByRole("button", { name: en.nav.signOut }));
+    expect(await screen.findByText("login page")).toBeInTheDocument();
   });
 });
 

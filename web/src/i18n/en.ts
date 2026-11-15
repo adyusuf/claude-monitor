@@ -17,7 +17,7 @@ export const en = {
   app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
     dashboard: "Dashboard", projects: "Projects", sessions: "Sessions", machines: "Machines", runs: "Runs", approvals: "Approvals", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
-    account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
+    account: "Account", download: "Get the agent", signOut: "Sign out", signOutFailed: "Signing out did not complete, so you are still signed in. Try again.", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
     themeSystem: "System", themeLight: "Light", themeDark: "Dark",
   },
@@ -55,7 +55,7 @@ export const en = {
     invalid_answers: "That answer does not match the question.", invalid_decision: "Pick allow or deny.", invalid_duration: "Pick how long the answer is remembered from the list.", rule_not_allowed: "Only an allow can be remembered.",
     session_ended: "The session has ended.", session_not_ended: "Only an ended session can be removed from the list.", invalid_body: "Write the message to send.", too_long: "That is too long.",
     out_of_range: "That value is out of range.", invalid_role: "Pick a role.", invalid_mode: "Pick a mode from the list.", unauthorized: "Your session has ended. Sign in again.",
-    forbidden: "You are not allowed to do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
+    forbidden: "You are not allowed to do that.", csrf: "The server refused this change because it did not come from this site's own page. Reload the page and try again.", owner_only: "Only the machine's owner can do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
     request_failed: "The request failed.", network: "The server cannot be reached.",
     account_locked: "Too many wrong attempts on this account. Try again in 15 minutes.",
@@ -267,7 +267,7 @@ export const en = {
     status: "Status", allMachines: "All machines", machine: "Machine", command: "Command", requestedBy: "Requested by", when: "When", decidedBy: "Decided by",
     byGrant: "a grant", byJob: "a job", undecided: "not yet", details: "Details", detailsOf: "Run details", empty: "Nothing has run in this workspace yet.",
   },
-  common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied" },
+  common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied", copyFailed: "It could not be copied. Select it and copy it by hand." },
   remote: enRemote,
   approvals: {
     title: "Approval keys", intro: "A key made in this browser signs the runs you allow. A machine whose admin pinned the key and switched on signed approvals runs nothing that was not signed with it, so even a compromised server cannot start a run in your name. The private half never leaves this browser.",
@@ -286,7 +286,7 @@ export const en = {
     newHint: "A schedule runs an approved job by itself. It stops after three failed runs in a row, never overlaps its own last run, and you can stop it here at any time.",
     noJobs: "A schedule needs an active job without a placeholder in its command.",
   },
-  notFound: { title: "Page not found", home: "Go to projects" },
+  notFound: { title: "Page not found", home: "Go to projects" }, pageError: { title: "This page could not be shown", hint: "Something on it failed to load. Reload the page, or pick another one from the menu.", reload: "Reload the page" },
 };
 
 export type Dictionary = typeof en;

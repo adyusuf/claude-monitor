@@ -18,7 +18,7 @@ export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
     dashboard: "Pano", projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", approvals: "Onaylar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
-    account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
+    account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", signOutFailed: "Çıkış tamamlanamadı, oturumunuz hâlâ açık. Tekrar deneyin.", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
     themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
   },
@@ -56,7 +56,7 @@ export const tr: Dictionary = {
     invalid_answers: "Bu yanıt soruyla uyuşmuyor.", invalid_decision: "İzin ver ya da reddet seçin.", invalid_duration: "Yanıtın ne kadar hatırlanacağını listeden seçin.", rule_not_allowed: "Yalnızca bir izin hatırlanabilir.",
     session_ended: "Oturum sona erdi.", session_not_ended: "Yalnızca biten bir oturum listeden kaldırılabilir.", invalid_body: "Gönderilecek mesajı yazın.", too_long: "Bu çok uzun.",
     out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", invalid_mode: "Listeden bir mod seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
-    forbidden: "Bunu yapma izniniz yok.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
+    forbidden: "Bunu yapma izniniz yok.", csrf: "Sunucu bu değişikliği, bu sitenin kendi sayfasından gelmediği için reddetti. Sayfayı yenileyip tekrar deneyin.", owner_only: "Bunu yalnızca makinenin sahibi yapabilir.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
     account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
@@ -268,7 +268,7 @@ export const tr: Dictionary = {
     status: "Durum", allMachines: "Tüm makineler", machine: "Makine", command: "Komut", requestedBy: "İsteyen", when: "Ne zaman", decidedBy: "Karar veren",
     byGrant: "bir izin", byJob: "bir iş", undecided: "henüz yok", details: "Ayrıntılar", detailsOf: "Çalıştırma ayrıntıları", empty: "Bu çalışma alanında henüz hiçbir şey çalışmadı.",
   },
-  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı" },
+  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı", copyFailed: "Kopyalanamadı. Seçip elle kopyalayın." },
   remote: trRemote,
   approvals: {
     title: "Onay anahtarları", intro: "Bu tarayıcıda üretilen bir anahtar, izin verdiğiniz çalıştırmaları imzalar. Yöneticisi anahtarı sabitlemiş ve imzalı onayı açmış bir makine, bu anahtarla imzalanmamış hiçbir şeyi çalıştırmaz; ele geçirilmiş bir sunucu bile sizin adınıza çalıştırma başlatamaz. Özel yarı bu tarayıcıdan hiç çıkmaz.",
@@ -287,5 +287,5 @@ export const tr: Dictionary = {
     newHint: "Bir zamanlama onaylı bir işi kendi kendine çalıştırır. Üst üste üç başarısız çalıştırmadan sonra durur, kendi son çalıştırmasıyla çakışmaz ve burada istediğiniz an durdurabilirsiniz.",
     noJobs: "Bir zamanlama için komutunda yer tutucu olmayan etkin bir iş gerekir.",
   },
-  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" },
+  notFound: { title: "Sayfa bulunamadı", home: "Projelere git" }, pageError: { title: "Bu sayfa gösterilemedi", hint: "Sayfadaki bir şey yüklenemedi. Sayfayı yenileyin ya da menüden başka bir sayfa seçin.", reload: "Sayfayı yenile" },
 };

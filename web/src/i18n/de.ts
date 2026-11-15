@@ -18,7 +18,7 @@ export const de: Dictionary = {
   app: { name: "Podium", tagline: "Verfolgen Sie Ihre KI-Programmiersitzungen live." },
   nav: {
     dashboard: "Übersicht", projects: "Projekte", sessions: "Sitzungen", machines: "Maschinen", runs: "Ausführungen", approvals: "Freigaben", members: "Mitglieder", integrations: "Integrationen", settings: "Arbeitsbereich-Einstellungen", serverSettings: "Server-Einstellungen",
-    account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", newWorkspace: "Neuer Arbeitsbereich",
+    account: "Konto", download: "Agent herunterladen", signOut: "Abmelden", signOutFailed: "Die Abmeldung wurde nicht abgeschlossen, Sie sind noch angemeldet. Versuchen Sie es erneut.", newWorkspace: "Neuer Arbeitsbereich",
     theme: "Design", language: "Sprache",
     themeSystem: "System", themeLight: "Hell", themeDark: "Dunkel",
   },
@@ -56,7 +56,7 @@ export const de: Dictionary = {
     invalid_answers: "Diese Antwort passt nicht zur Frage.", invalid_decision: "Wählen Sie Erlauben oder Ablehnen.", invalid_duration: "Wählen Sie aus der Liste, wie lange die Antwort gilt.", rule_not_allowed: "Nur ein Erlauben kann gemerkt werden.",
     session_ended: "Die Sitzung ist beendet.", session_not_ended: "Nur eine beendete Sitzung kann aus der Liste entfernt werden.", invalid_body: "Schreiben Sie die Nachricht, die gesendet werden soll.", too_long: "Das ist zu lang.",
     out_of_range: "Dieser Wert liegt außerhalb des zulässigen Bereichs.", invalid_role: "Wählen Sie eine Rolle.", invalid_mode: "Wählen Sie einen Modus aus der Liste.", unauthorized: "Ihre Sitzung ist beendet. Melden Sie sich erneut an.",
-    forbidden: "Das dürfen Sie nicht.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
+    forbidden: "Das dürfen Sie nicht.", csrf: "Der Server hat diese Änderung abgelehnt, weil sie nicht von einer Seite dieser Website kam. Laden Sie die Seite neu und versuchen Sie es erneut.", owner_only: "Das kann nur der Eigentümer der Maschine.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
     too_many_requests: "Zu viele Versuche. Warten Sie eine Minute.", server_error: "Auf dem Server ist etwas schiefgegangen.",
     request_failed: "Die Anfrage ist fehlgeschlagen.", network: "Der Server ist nicht erreichbar.",
     account_locked: "Zu viele falsche Versuche bei diesem Konto. Versuchen Sie es in 15 Minuten erneut.",
@@ -268,7 +268,7 @@ export const de: Dictionary = {
     status: "Status", allMachines: "Alle Maschinen", machine: "Maschine", command: "Befehl", requestedBy: "Angefordert von", when: "Wann", decidedBy: "Entschieden von",
     byGrant: "eine Freigabe", byJob: "ein Auftrag", undecided: "noch nicht", details: "Details", detailsOf: "Details der Ausführung", empty: "In diesem Arbeitsbereich wurde noch nichts ausgeführt.",
   },
-  common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert" },
+  common: { loading: "Wird geladen…", retry: "Erneut versuchen", save: "Speichern", cancel: "Abbrechen", close: "Schließen", yes: "Ja", no: "Nein", copy: "Kopieren", copied: "Kopiert", copyFailed: "Das konnte nicht kopiert werden. Markieren Sie es und kopieren Sie es von Hand." },
   remote: deRemote,
   approvals: {
     title: "Freigabeschlüssel", intro: "Ein in diesem Browser erzeugter Schlüssel signiert die Ausführungen, die Sie erlauben. Eine Maschine, deren Administrator den Schlüssel angeheftet und signierte Freigaben eingeschaltet hat, führt nichts aus, was nicht damit signiert wurde; so kann selbst ein kompromittierter Server in Ihrem Namen keine Ausführung starten. Die private Hälfte verlässt diesen Browser nie.",
@@ -287,5 +287,5 @@ export const de: Dictionary = {
     newHint: "Ein Zeitplan führt einen freigegebenen Auftrag von selbst aus. Er stoppt nach drei fehlgeschlagenen Ausführungen hintereinander, überschneidet sich nie mit seiner letzten Ausführung, und Sie können ihn hier jederzeit stoppen.",
     noJobs: "Ein Zeitplan braucht einen aktiven Auftrag ohne Platzhalter im Befehl.",
   },
-  notFound: { title: "Seite nicht gefunden", home: "Zu den Sitzungen" },
+  notFound: { title: "Seite nicht gefunden", home: "Zu den Sitzungen" }, pageError: { title: "Diese Seite konnte nicht angezeigt werden", hint: "Etwas auf ihr ließ sich nicht laden. Laden Sie die Seite neu oder wählen Sie eine andere im Menü.", reload: "Seite neu laden" },
 };
