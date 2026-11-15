@@ -54,7 +54,7 @@ export const en = {
     invalid_code: "That code is not valid or has expired.", last_owner: "A workspace needs at least one owner.",
     invalid_answers: "That answer does not match the question.",
     session_ended: "The session has ended.", session_not_ended: "Only an ended session can be removed from the list.", invalid_body: "Write the message to send.", too_long: "That is too long.",
-    out_of_range: "That value is out of range.", invalid_role: "Pick a role.", unauthorized: "Your session has ended. Sign in again.",
+    too_many_decimals: "Use at most two decimals.", out_of_range: "That value is out of range.", invalid_role: "Pick a role.", unauthorized: "Your session has ended. Sign in again.",
     forbidden: "You are not allowed to do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",
     too_many_requests: "Too many attempts. Wait a minute.", server_error: "Something went wrong on the server.",
     request_failed: "The request failed.", network: "The server cannot be reached.",

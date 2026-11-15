@@ -55,7 +55,7 @@ export const de: Dictionary = {
     invalid_code: "Dieser Code ist ungültig oder abgelaufen.", last_owner: "Ein Arbeitsbereich braucht mindestens einen Eigentümer.",
     invalid_answers: "Diese Antwort passt nicht zur Frage.",
     session_ended: "Die Sitzung ist beendet.", session_not_ended: "Nur eine beendete Sitzung kann aus der Liste entfernt werden.", invalid_body: "Schreiben Sie die Nachricht, die gesendet werden soll.", too_long: "Das ist zu lang.",
-    out_of_range: "Dieser Wert liegt außerhalb des zulässigen Bereichs.", invalid_role: "Wählen Sie eine Rolle.", unauthorized: "Ihre Sitzung ist beendet. Melden Sie sich erneut an.",
+    too_many_decimals: "Verwenden Sie höchstens zwei Nachkommastellen.", out_of_range: "Dieser Wert liegt außerhalb des zulässigen Bereichs.", invalid_role: "Wählen Sie eine Rolle.", unauthorized: "Ihre Sitzung ist beendet. Melden Sie sich erneut an.",
     forbidden: "Das dürfen Sie nicht.", not_found: "Nicht gefunden.", conflict: "Das hat sich inzwischen geändert. Laden Sie neu und versuchen Sie es erneut.",
     too_many_requests: "Zu viele Versuche. Warten Sie eine Minute.", server_error: "Auf dem Server ist etwas schiefgegangen.",
     request_failed: "Die Anfrage ist fehlgeschlagen.", network: "Der Server ist nicht erreichbar.",

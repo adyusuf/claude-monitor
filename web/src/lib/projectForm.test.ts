@@ -42,6 +42,14 @@ describe("the project form", () => {
     expect(checkProject({ ...ok, sprintLengthDays: "1.5" }).sprintLengthDays).toBe("out_of_range");
     expect(checkProject({ ...ok, stakeholders: Array.from({ length: 51 }, () => ({ name: "a", role: "" })) }).stakeholders).toBe("invalid_list");
   });
+
+  it("takes a budget up to the column's limit with at most two decimals, as the API does", () => {
+    const ok = { ...emptyProjectDraft("u1"), name: "n", budgetCurrency: "EUR" };
+    expect(checkProject({ ...ok, budgetAmount: "999999999999.99" })).toEqual({});
+    expect(checkProject({ ...ok, budgetAmount: "1000000000000" }).budgetAmount).toBe("out_of_range");
+    expect(checkProject({ ...ok, budgetAmount: "10.005" }).budgetAmount).toBe("too_many_decimals");
+    expect(checkProject({ ...ok, budgetAmount: "10.5" })).toEqual({});
+  });
 });
 
 describe("the application form", () => {

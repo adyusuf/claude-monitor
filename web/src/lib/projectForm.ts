@@ -69,6 +69,7 @@ export function checkProject(d: ProjectDraft): FieldErrors {
     || input.stakeholders.some((s) => !s.name || s.name.length > limit.nameMax || (s.role?.length ?? 0) > limit.nameMax)) errors.stakeholders = "invalid_list";
   if ((input.budgetAmount === null) !== (input.budgetCurrency === null)) errors.budget = "amount_and_currency";
   else if (input.budgetAmount !== null && !(input.budgetAmount >= 0 && input.budgetAmount <= limit.budgetMax)) errors.budgetAmount = "out_of_range";
+  else if (input.budgetAmount !== null && (d.budgetAmount.trim().split(".")[1]?.length ?? 0) > limit.budgetDecimals) errors.budgetAmount = "too_many_decimals";
   else if (input.budgetCurrency !== null && !/^[A-Z]{3}$/.test(input.budgetCurrency)) errors.budgetCurrency = "invalid_currency";
   if (input.startDate && input.endDate && input.endDate < input.startDate) errors.endDate = "before_start";
   if (input.itemTypes.length === 0) errors.itemTypes = "invalid_list";
