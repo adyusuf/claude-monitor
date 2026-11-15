@@ -95,12 +95,27 @@ describe("the standing approvals table", () => {
     expect(within(card(en.approvalRules.rules)).getByRole("columnheader", { name: en.approvalRules.lastUsed })).toBeInTheDocument();
   });
 
-  it("drops a rule from the list when its time runs out, without a reload (F-164)", async () => {
+  it("keeps a rule whose time ran out on this device's clock, marked, with Revoke, until a read of the server drops it (F-164, Q-5)", async () => {
+    // The server decides when a rule ends: a device clock that runs fast must not hide a rule that still answers on the machine. Before Q-5 the
+    // list dropped the row at the tick; that locked the browser clock as the authority and left the rule with no Revoke.
+    let data: Data = { ...empty, rules: [rule({ expiresAt: new Date(Date.now() - 5 * 60_000).toISOString() })] };
+    serve(() => data);
+    renderAt("/w/w1/approvals", route);
+    const row = (await screen.findByText("npm test")).closest("tr") as HTMLElement;
+    expect(within(row).getByText(en.approvalRules.endedOnDevice)).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: en.approvalRules.revoke })).toBeInTheDocument();
+    data = empty; // the server's answer: the rule is gone
+    act(() => FakeEventSource.last!.emit("approval_rule", { id: "ru1" }));
+    expect(await screen.findByText(en.approvalRules.noRules)).toBeInTheDocument();
+  });
+
+  it("marks a rule at the tick when its time runs out on this device's clock, without hiding it (F-164, Q-5)", async () => {
     serve(() => ({ ...empty, rules: [rule({ expiresAt: new Date(Date.now() + 1200).toISOString() })] }));
     renderAt("/w/w1/approvals", route);
-    expect(await screen.findByText("npm test")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText("npm test")).toBeNull(), { timeout: 4000 });
-    expect(screen.getByText(en.approvalRules.noRules)).toBeInTheDocument();
+    const row = (await screen.findByText("npm test")).closest("tr") as HTMLElement;
+    expect(within(row).queryByText(en.approvalRules.endedOnDevice)).toBeNull();
+    await waitFor(() => expect(within(row).getByText(en.approvalRules.endedOnDevice)).toBeInTheDocument(), { timeout: 4000 });
+    expect(within(row).getByRole("button", { name: en.approvalRules.revoke })).toBeInTheDocument();
   });
 
   it("asks before revoking and revokes nothing when the person declines", async () => {

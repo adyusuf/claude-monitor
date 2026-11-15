@@ -68,6 +68,29 @@ describe("a slow answer for text the person has since changed", () => {
   });
 });
 
+describe("a live reload that was already scheduled when the filter changed", () => {
+  it("does not run with the old filter and show its rows under the new one", async () => {
+    const asked: string[] = [];
+    serve((url) => {
+      const status = url.searchParams.get("status") ?? "";
+      asked.push(status);
+      return json({ items: [row({ id: status || "all", title: status ? "Ended row" : "Row of all" })], next: null });
+    });
+    renderAt("/w/w1/sessions", route);
+    await openMachine("laptop-1");
+    expect(await screen.findByText("Row of all")).toBeInTheDocument();
+
+    act(() => FakeEventSource.last?.emit("session", { sessionId: "s1" })); // the reload is due in config.liveDebounceMs
+    await userEvent.click(screen.getByRole("button", { name: "Ended" })); // the new filter reads at once
+    const reads = asked.length;
+    await act(() => new Promise((resolve) => setTimeout(resolve, 700))); // past the debounce
+
+    await waitFor(() => expect(screen.getByText("Ended row")).toBeInTheDocument());
+    expect(screen.queryByText("Row of all")).toBeNull();
+    expect(asked.slice(reads - 1)).not.toContain(""); // no read with the old filter after the click
+  });
+});
+
 describe("loading the next page when the server fails", () => {
   it("keeps the sessions already shown and shows the error, and the person can try again", async () => {
     mockApi({

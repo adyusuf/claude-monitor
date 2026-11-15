@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Podium.Agent.Daemon;
 using Podium.Agent.Storage;
 using Podium.Contracts;
@@ -63,5 +64,35 @@ public sealed class TranscriptTailerIsolationTests : IDisposable
         var lines = Queued().Select(e => e.Payload.TryGetProperty("n", out var n) ? n.GetInt32() : 0).ToList();
         Assert.Equal([1, 0, 3], lines); // each line once, in order; the bad one as it was
         Assert.Equal(0, tailer.RunOnce());
+    }
+
+    private void OnOutbox(string sql)
+    {
+        using var other = new SqliteConnection($"Data Source={home.Config.DatabasePath};Pooling=False");
+        other.Open();
+        using var cmd = other.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    [Fact]
+    public void A_database_error_on_one_line_does_not_stop_the_others_and_that_line_is_read_again()
+    {
+        // The write of the line with "n":2 fails as a busy or locked database does (a SqliteException, a DbException); the other transcript is not affected.
+        Track("a-failing", "{\"type\":\"user\",\"n\":1}\n{\"type\":\"user\",\"n\":2}\n{\"type\":\"user\",\"n\":3}\n");
+        Track("b-fine", "{\"type\":\"user\",\"n\":10}\n");
+        OnOutbox("CREATE TRIGGER fail_two BEFORE INSERT ON outbox WHEN NEW.payload LIKE '%\"n\":2%' BEGIN SELECT RAISE(ABORT, 'database is locked'); END");
+        var tailer = new TranscriptTailer(home.Config, store, clock, new AgentLog(home.Config, clock));
+
+        tailer.RunOnce(); // n=1 and n=10 are taken; n=2 failed, n=3 waits behind it
+        Assert.Equal(2, store.OutboxCount());
+        Assert.Contains("transcript of session a-failing not read: SqliteException", File.ReadAllText(home.Config.LogPath), StringComparison.Ordinal);
+
+        OnOutbox("DROP TRIGGER fail_two");
+        Assert.Equal(2, tailer.RunOnce()); // n=2 (not lost) and n=3
+        Assert.Equal(0, tailer.RunOnce());
+
+        var all = Queued().Select(e => e.Payload.GetProperty("n").GetInt32()).Order().ToList();
+        Assert.Equal([1, 2, 3, 10], all); // each line once
     }
 }

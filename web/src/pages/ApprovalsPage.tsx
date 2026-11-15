@@ -11,7 +11,7 @@ import { useNow } from "../lib/useNow";
 import { ApprovalItem } from "./ApprovalItem";
 
 /** A standing approval: its machine, tool and command, how long it lasts, how often it answered and when last; Revoke ends it. */
-function RuleRow({ rule, onRevoked }: { rule: ApprovalRuleRow; onRevoked: () => void }) {
+function RuleRow({ rule, endedOnDevice, onRevoked }: { rule: ApprovalRuleRow; endedOnDevice: boolean; onRevoked: () => void }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [busy, setBusy] = useState(false);
@@ -35,7 +35,10 @@ function RuleRow({ rule, onRevoked }: { rule: ApprovalRuleRow; onRevoked: () => 
       <td>{rule.toolName}</td>
       <td>{rule.command !== null ? <code className="rule-command">{rule.command}</code> : <span className="muted">{t("approvalRules.anyInput")}</span>}</td>
       <td>{t(`approvalRules.duration.${rule.duration}`)}</td>
-      <td>{rule.expiresAt ? dateTime(rule.expiresAt) : <span className="muted">{t("approvalRules.never")}</span>}</td>
+      <td>
+        {rule.expiresAt ? dateTime(rule.expiresAt) : <span className="muted">{t("approvalRules.never")}</span>}
+        {endedOnDevice ? <> <span className="muted small">{t("approvalRules.endedOnDevice")}</span></> : null}
+      </td>
       <td className="num">{rule.useCount}</td>
       <td>{rule.lastUsedAt ? dateTime(rule.lastUsedAt) : <span className="muted">{t("approvalRules.neverUsed")}</span>}</td>
       <td>
@@ -59,8 +62,6 @@ export function ApprovalsPage() {
   const [recent, setRecent] = useState<ApprovalRequestRow[]>([]);
   const [error, setError] = useState<unknown>(null);
   const now = useNow(config.countdownTickMs);
-  // A rule whose time has run out stops answering at once: the list does not wait for the next read to drop it.
-  const liveRules = rules.filter((r) => r.expiresAt === null || Date.parse(r.expiresAt) > now);
   const load = useCallback(async () => {
     try {
       const [w, r, a] = await Promise.all([api.workspacePermissions(ws), api.approvalRules(ws), api.workspacePermissions(ws, "answered")]);
@@ -92,14 +93,14 @@ export function ApprovalsPage() {
           : waiting.map((r) => <ApprovalItem key={r.id} ws={ws} row={r} onDone={() => void load()} />)}
       </Card>
       <Card title={t("approvalRules.rules")}>
-        {liveRules.length === 0 ? <p className="muted">{t("approvalRules.noRules")}</p> : (
+        {rules.length === 0 ? <p className="muted">{t("approvalRules.noRules")}</p> : (
           <div className="table-scroll">
             <table className="table table-rows">
               <thead><tr>
                 <th>{t("approvalRules.machine")}</th><th>{t("approvalRules.tool")}</th><th>{t("approvalRules.command")}</th>
                 <th>{t("approvalRules.remember")}</th><th>{t("approvalRules.ends")}</th><th className="num">{t("approvalRules.uses")}</th><th>{t("approvalRules.lastUsed")}</th><th />
               </tr></thead>
-              <tbody>{liveRules.map((r) => <RuleRow key={r.id} rule={r} onRevoked={() => void load()} />)}</tbody>
+              <tbody>{rules.map((r) => <RuleRow key={r.id} rule={r} endedOnDevice={r.expiresAt !== null && Date.parse(r.expiresAt) <= now} onRevoked={() => void load()} />)}</tbody>
             </table>
           </div>
         )}

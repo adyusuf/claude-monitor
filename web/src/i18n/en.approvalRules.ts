@@ -15,6 +15,7 @@ export const enApprovalRules = {
   questionOnSession: "A question: answer it on the session page.", openSession: "Open the session",
   allow: "Allow", deny: "Deny", reason: "Reason (optional)",
   ends: "Ends", never: "until revoked", uses: "Used", lastUsed: "Last used", neverUsed: "never", revoke: "Revoke", revokeConfirm: "Revoke this standing approval? The next request asks again.",
+  endedOnDevice: "time passed on this device",
   answeredBy: "Answered by", byRule: "a standing approval", decision: { allow: "Allowed", deny: "Denied" }, when: "When",
   anyInput: "any input",
   moreLine: "+1 more line", moreLines: "+{n} more lines",
@@ -24,5 +25,4 @@ export const enApprovalRules = {
 export const enApprovalRulesErrors = {
   rule_limit: "You already have the most standing approvals you can have (200). Revoke one on the approvals page, or allow just this once.",
   rule_not_allowed: "This request cannot have a standing approval now (the machine may have become production or a database). Allow it just this once.",
-  invalid_decision: "Pick Allow or Deny.", invalid_duration: "Pick how long the allow stands from the list.",
 };
