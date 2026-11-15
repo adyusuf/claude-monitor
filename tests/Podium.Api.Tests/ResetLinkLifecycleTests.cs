@@ -45,7 +45,11 @@ public sealed class ResetLinkLifecycleTests(ApiFactory api)
             var now = api.Clock.GetUtcNow();
             db.UserTokens.Add(new UserToken
             {
-                UserId = user.Id, Purpose = TokenPurposes.ResetPassword, TokenHash = Secrets.Hash(other), CreatedAt = now, ExpiresAt = now + TimeSpan.FromHours(24),
+                UserId = user.Id,
+                Purpose = TokenPurposes.ResetPassword,
+                TokenHash = Secrets.Hash(other),
+                CreatedAt = now,
+                ExpiresAt = now + TimeSpan.FromHours(24),
             });
             await db.SaveChangesAsync();
         }
