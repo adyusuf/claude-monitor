@@ -96,7 +96,7 @@ public static class SprintEndpoints
         return Results.NoContent();
     }
 
-    /// <summary>A planned sprint is archived and its issues go back to the backlog.</summary>
+    /// <summary>A planned sprint is archived and its issues go back to the backlog, where work in flight becomes "ready" (as Remove and Close do).</summary>
     private static async Task<IResult> Delete(Guid id, HttpContext http, PodiumDb db, TimeProvider clock, SprintWrites writes)
     {
         var userId = http.User.UserId();
@@ -107,7 +107,11 @@ public static class SprintEndpoints
         if (await writes.DeleteAsync(userId, sprint, http.RequestAborted) is { } refused) return refused;
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         var now = clock.GetUtcNow();
-        await db.Issues.Where(i => i.SprintId == id).ExecuteUpdateAsync(s => s.SetProperty(i => i.SprintId, (Guid?)null).SetProperty(i => i.UpdatedAt, now), http.RequestAborted);
+        foreach (var issue in await db.Issues.Where(i => i.SprintId == id).ToListAsync(http.RequestAborted))
+        {
+            SprintIssueEndpoints.Release(issue, null, userId, now);
+        }
+
         sprint.ArchivedAt = now;
         sprint.UpdatedAt = now;
         sprint.UpdatedBy = userId;
