@@ -166,6 +166,23 @@ describe("the dashboard's reading and live refresh", () => {
     expect(spaced(tile("Open alerts"))).toBe("Open alerts 1");
   });
 
+  // The page makes these two up itself (useLive): the stream's second "ready" is a reconnect, the network coming back is a resume.
+  it.each([
+    ["reconnected", () => { FakeEventSource.last!.emit("ready", {}); FakeEventSource.last!.emit("ready", {}); }],
+    ["resume", () => window.dispatchEvent(new Event("online"))],
+  ])("reads again once for the catch-up event %s", async (_event, trigger) => {
+    const calls = serve(view());
+    renderAt("/w/w1/dashboard", route);
+    await screen.findByRole("heading", { name: "Dashboard" });
+    await act(async () => {});
+    const before = count(calls, "/workspaces/w1/dashboard");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+    act(() => trigger());
+    await act(async () => { await vi.advanceTimersByTimeAsync(config.liveDebounceMs + 1); });
+    vi.useRealTimers();
+    await waitFor(() => expect(count(calls, "/workspaces/w1/dashboard")).toBe(before + 1));
+  });
+
   it("does not read again for an event that is about something else, such as a session", async () => {
     const calls = serve(view());
     renderAt("/w/w1/dashboard", route);
