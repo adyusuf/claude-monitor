@@ -55,7 +55,8 @@ public sealed class ServerSettingsUnsetTests(ApiFactory api) : IAsyncLifetime
         var view = await client.GetJsonAsync("/api/server/integrations");
 
         Assert.False(view.GetProperty("canSave").GetBoolean());
-        Assert.Equal(["integration_key_missing"], ServerAdminKit.IntegrationOf(view, "jira").GetProperty("notes").EnumerateArray().Select(n => n.GetString()));
+        Assert.Equal(["integration_key_missing"], ServerAdminKit.IntegrationOf(view, "jira").GetProperty("notes").EnumerateArray().Select(n => n.GetString())
+            .Where(n => n != "jira_connections_exist")); // that warning depends on what other tests connected in the shared database
         Assert.Equal(HttpStatusCode.NotFound, (await ServerAdminKit.PutAsync(other, "smtp", new { host = "mail.example.net" })).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await ServerAdminKit.PutAsync(client, "slack", new { host = "x" })).StatusCode); // an unknown integration is 404 before the key is looked at
     }
