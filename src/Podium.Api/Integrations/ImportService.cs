@@ -42,6 +42,11 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
                 {
                     outcome = e.Code;
                 }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    await CloseUnexpectedAsync(run);
+                    throw;
+                }
 
                 await FinishRunAsync(run, counts, outcome, ct);
                 results.Add(new SpaceImportResult(key, outcome, counts.Created, counts.Updated));
@@ -69,6 +74,11 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
             catch (TrackerException e)
             {
                 results.AddRange(sprintIds.Select(s => new SprintImportResult(s, e.Code, 0, 0)));
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                await CloseUnexpectedAsync(run);
+                throw;
             }
 
             await FinishRunAsync(run, counts, results.Any(r => r.Outcome != Ok) ? SyncStatuses.Partial : Ok, ct);
@@ -178,6 +188,18 @@ public sealed class ImportService(PodiumDb db, IWorkTracker tracker, Integration
         db.IntegrationSyncRuns.Add(run);
         await db.SaveChangesAsync(ct);
         return run;
+    }
+
+    /// <summary>
+    /// Closes a run that failed for a reason that is not the tracker's (bad data, a bug, a database that went away), the way PassAsync does: on a clean
+    /// tracker, because the failed save may have left the context unusable. The error goes on to the caller, which is logged by the host.
+    /// </summary>
+    private async Task CloseUnexpectedAsync(IntegrationSyncRun run)
+    {
+        db.ChangeTracker.Clear();
+        var ended = clock.GetUtcNow();
+        await db.IntegrationSyncRuns.Where(r => r.Id == run.Id).ExecuteUpdateAsync(s => s
+            .SetProperty(r => r.Status, SyncStatuses.Failed).SetProperty(r => r.Error, SyncService.InternalError).SetProperty(r => r.EndedAt, ended), CancellationToken.None);
     }
 
     private async Task FinishRunAsync(IntegrationSyncRun run, MirrorCounts counts, string outcome, CancellationToken ct)
