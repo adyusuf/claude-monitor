@@ -50,6 +50,29 @@ describe("saving the workspace settings when the server refuses", () => {
   });
 });
 
+describe("saving a new name when the settings after it fail", () => {
+  it("reads the signed-in user again for the new name and does not send the rename a second time", async () => {
+    const calls = mockApi({
+      "GET /me": { body: ME }, "GET /workspaces/w1": { body: info() }, ...audit,
+      "PATCH /workspaces/w1": { status: 204 },
+      "PUT /workspaces/w1/settings": { status: 500 },
+    });
+    page();
+    await userEvent.clear(await screen.findByLabelText(en.workspace.name));
+    await userEvent.type(screen.getByLabelText(en.workspace.name), "Renamed");
+    await save();
+    expect(await screen.findByText(en.errors.server_error)).toBeInTheDocument();
+    const order = calls.map((c) => `${c.method} ${c.path}`);
+    await waitFor(() => expect(calls.map((c) => `${c.method} ${c.path}`).slice(order.indexOf("PATCH /workspaces/w1"))).toContain("GET /me"));
+
+    await save();
+
+    await waitFor(() => expect(calls.filter((c) => c.method === "PUT")).toHaveLength(2));
+    expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(1);
+    expect(screen.queryByText(en.workspace.saved)).toBeNull();
+  });
+});
+
 describe("loading the workspace settings", () => {
   it("shows only the error when the workspace cannot be read", async () => {
     mockApi({ "GET /me": { body: ME }, "GET /workspaces/w1": { status: 403 }, ...audit });

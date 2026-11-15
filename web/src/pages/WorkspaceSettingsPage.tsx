@@ -33,15 +33,22 @@ export function WorkspaceSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws]);
 
+  // Two calls: a name already saved stays saved when the settings after it fail, so the page and the session learn it at once.
   const save = async () => {
+    let renamed = false;
     try {
-      if (form.name !== info?.name) await api.renameWorkspace(ws, form.name);
+      if (form.name !== info?.name) {
+        await api.renameWorkspace(ws, form.name);
+        renamed = true;
+        setInfo((old) => (old ? { ...old, name: form.name } : old));
+      }
       await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes, agentUpdate: form.agentUpdate, claudeUpdate: form.claudeUpdate });
       await refresh();
       setAuditVersion((v) => v + 1);
       setNotice({ kind: "success", text: t("workspace.saved") });
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
+      if (renamed) await refresh();
     }
   };
 
