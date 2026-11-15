@@ -12,6 +12,8 @@ interface Props {
   unit: EstimationUnit;
   canWrite: boolean;
   canMove: boolean;
+  /** A move is on its way: the arrows wait for it. */
+  moving: boolean;
   first: boolean;
   last: boolean;
   onMove: (direction: -1 | 1) => void;
@@ -20,7 +22,7 @@ interface Props {
 }
 
 /** One issue of the backlog: its facts on one line and the actions of the row. The buttons that change things show only to those who may. */
-export function BacklogRow({ ws, issue, unit, canWrite, canMove, first, last, onMove, onArchive, onRestore }: Props) {
+export function BacklogRow({ ws, issue, unit, canWrite, canMove, moving, first, last, onMove, onArchive, onRestore }: Props) {
   const { t } = useI18n();
   const priority = usePriorityText();
   const estimate = useEstimateText();
@@ -46,8 +48,8 @@ export function BacklogRow({ ws, issue, unit, canWrite, canMove, first, last, on
         <Link className="btn btn-ghost" to={`/w/${ws}/projects/${issue.projectId}/issues/${issue.id}`} aria-label={`${t("issues.open")} ${mark}`}>{t("issues.open")}</Link>
         {canWrite && canMove ? (
           <>
-            <Button variant="ghost" disabled={first} aria-label={`${t("issues.moveUp")} ${mark}`} onClick={() => onMove(-1)}>↑</Button>
-            <Button variant="ghost" disabled={last} aria-label={`${t("issues.moveDown")} ${mark}`} onClick={() => onMove(1)}>↓</Button>
+            <Button variant="ghost" disabled={first || moving} aria-label={`${t("issues.moveUp")} ${mark}`} onClick={() => onMove(-1)}>↑</Button>
+            <Button variant="ghost" disabled={last || moving} aria-label={`${t("issues.moveDown")} ${mark}`} onClick={() => onMove(1)}>↓</Button>
           </>
         ) : null}
         {canWrite && !issue.externalKey ? (
