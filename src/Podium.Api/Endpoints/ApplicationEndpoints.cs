@@ -105,6 +105,12 @@ public static class ApplicationEndpoints
         if (found is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        if (status == ManagedStatuses.Active && f.App.Status != ManagedStatuses.Active
+            && await db.Applications.CountAsync(a => a.ProjectId == f.App.ProjectId && a.Status == ManagedStatuses.Active, http.RequestAborted) >= PerProjectMax)
+        {
+            return Http.Invalid("name", "limit_reached");
+        }
+
         f.App.Status = status;
         f.App.UpdatedAt = clock.GetUtcNow();
         f.App.UpdatedBy = userId;
