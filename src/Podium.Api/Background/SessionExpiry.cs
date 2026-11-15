@@ -18,15 +18,13 @@ public static class SessionExpiry
             .Where(c => (c.Status == CommandStatuses.Queued || c.Status == CommandStatuses.Delivered) && c.ExpiresAt <= now)
             .Select(c => new { c.Id, c.SessionId, c.WorkspaceId }).ToListAsync(ct);
         if (due.Count == 0) return;
-        var ids = due.Select(d => d.Id).ToList();
-        // The same condition again: a command answered or cancelled since the read is not touched, and not announced.
-        var expired = await db.SessionCommands
-            .Where(c => ids.Contains(c.Id) && (c.Status == CommandStatuses.Queued || c.Status == CommandStatuses.Delivered) && c.ExpiresAt <= now)
-            .Select(c => c.Id).ToListAsync(ct);
-        await db.SessionCommands.Where(c => expired.Contains(c.Id) && (c.Status == CommandStatuses.Queued || c.Status == CommandStatuses.Delivered))
-            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommandStatuses.Expired), ct);
-        foreach (var d in due.Where(d => expired.Contains(d.Id)))
+        foreach (var d in due)
         {
+            // Each row by compare-and-set with the condition of the read: one answered or cancelled since is not touched, and not announced.
+            var changed = await db.SessionCommands
+                .Where(c => c.Id == d.Id && (c.Status == CommandStatuses.Queued || c.Status == CommandStatuses.Delivered) && c.ExpiresAt <= now)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommandStatuses.Expired), ct);
+            if (changed != 1) continue;
             broker?.Publish(Broker.Workspace(d.WorkspaceId), new StreamMessage("command", new { sessionId = d.SessionId, id = d.Id, status = CommandStatuses.Expired }));
         }
     }
@@ -37,13 +35,11 @@ public static class SessionExpiry
         var due = await db.PermissionRequests.AsNoTracking().Where(p => p.Status == PermissionStatuses.Open && p.ExpiresAt <= now)
             .Select(p => new { p.Id, p.SessionId, p.WorkspaceId }).ToListAsync(ct);
         if (due.Count == 0) return;
-        var ids = due.Select(d => d.Id).ToList();
-        var expired = await db.PermissionRequests.Where(p => ids.Contains(p.Id) && p.Status == PermissionStatuses.Open && p.ExpiresAt <= now)
-            .Select(p => p.Id).ToListAsync(ct);
-        await db.PermissionRequests.Where(p => expired.Contains(p.Id) && p.Status == PermissionStatuses.Open)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Expired), ct);
-        foreach (var d in due.Where(d => expired.Contains(d.Id)))
+        foreach (var d in due)
         {
+            var changed = await db.PermissionRequests.Where(p => p.Id == d.Id && p.Status == PermissionStatuses.Open && p.ExpiresAt <= now)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Expired), ct);
+            if (changed != 1) continue;
             broker?.Publish(Broker.Workspace(d.WorkspaceId), new StreamMessage("permission", new { sessionId = d.SessionId, id = d.Id, status = PermissionStatuses.Expired }));
         }
     }

@@ -1,5 +1,9 @@
 using Podium.Api.Background;
+using Podium.Api.Data;
+using Podium.Api.Streaming;
 using Podium.Api.Tests.Infrastructure;
+using Podium.Contracts;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Podium.Api.Tests;
@@ -42,5 +46,58 @@ public sealed class SessionExpiryStreamTests(ApiFactory api)
 
         var message = await RemoteKit.NextEventAsync(stream, "permission", e => e.GetProperty("id").GetGuid() == request);
         Assert.Equal(("expired", team.SessionId), (message.GetProperty("status").GetString(), message.GetProperty("sessionId").GetGuid()));
+    }
+
+    [Fact]
+    public async Task A_command_cancelled_after_the_expiry_read_is_neither_expired_nor_announced()
+    {
+        var team = await SessionKit.TeamAsync(api);
+        var command = await SessionKit.QueueStopAsync(team);
+        api.Clock.Advance(TimeSpan.FromHours(1));
+        var fault = new CommandFault("UPDATE session_commands");
+        await using var host = HostKit.WithInterceptor(api, fault);
+        var broker = host.Services.GetRequiredService<Broker>();
+        using var stream = broker.Subscribe(Broker.Workspace(team.Admin.WorkspaceId));
+        // The owner cancels between the expiry's reads and its update.
+        fault.Before = () =>
+        {
+            using var other = api.Db();
+            other.SessionCommands.Where(c => c.Id == command).ExecuteUpdate(s => s.SetProperty(c => c.Status, CommandStatuses.Cancelled));
+        };
+
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            await SessionExpiry.CommandsAsync(scope.ServiceProvider.GetRequiredService<PodiumDb>(), api.Clock.GetUtcNow(), broker, CancellationToken.None);
+        }
+
+        await using var db = api.Db();
+        Assert.Equal(CommandStatuses.Cancelled, await db.SessionCommands.Where(c => c.Id == command).Select(c => c.Status).SingleAsync());
+        Assert.False(stream.Reader.TryRead(out var announced), $"announced {announced?.Event}");
+    }
+
+    [Fact]
+    public async Task A_permission_request_answered_after_the_expiry_read_is_neither_expired_nor_announced()
+    {
+        var team = await SessionKit.TeamAsync(api);
+        var request = await SessionKit.AskPermissionAsync(team);
+        api.Clock.Advance(TimeSpan.FromHours(1));
+        var fault = new CommandFault("UPDATE permission_requests");
+        await using var host = HostKit.WithInterceptor(api, fault);
+        var broker = host.Services.GetRequiredService<Broker>();
+        using var stream = broker.Subscribe(Broker.Workspace(team.Admin.WorkspaceId));
+        fault.Before = () =>
+        {
+            using var other = api.Db();
+            other.PermissionRequests.Where(p => p.Id == request).ExecuteUpdate(s => s.SetProperty(p => p.Status, PermissionStatuses.Answered));
+        };
+
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            await SessionExpiry.PermissionsAsync(scope.ServiceProvider.GetRequiredService<PodiumDb>(), api.Clock.GetUtcNow(), broker, CancellationToken.None);
+        }
+
+        await using var db = api.Db();
+        Assert.Equal(PermissionStatuses.Answered, await db.PermissionRequests.Where(p => p.Id == request).Select(p => p.Status).SingleAsync());
+        Assert.False(stream.Reader.TryRead(out var announced), $"announced {announced?.Event}");
     }
 }
