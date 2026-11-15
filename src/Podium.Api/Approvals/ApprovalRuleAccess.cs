@@ -11,8 +11,9 @@ namespace Podium.Api.Approvals;
 /// path inside the session's project access layers (access_scope = inside; an older agent sends none, so no rule), the path has no "." or ".." and
 /// no empty segment (the check is lexical, so /a/x/../secret must not pass as under /a), and, when a live web policy covers the session's repository,
 /// the machine's access report shows that very version applied and the path is under none of the denied folders of the machine OS's section and
-/// under one of its allowed folders (or the policy allows the project's own folder, which the agent's "inside" already judged). Bash and searches
-/// without a path are not affected. Policies and machine OSes are read once per instance, so a page of requests asks the database once for each.
+/// under one of its allowed folders (or the policy allows the project's own folder, or lists no allowed folder at all, which the agent's "inside"
+/// already judged). Bash and searches without a path are not affected. Policies and machine OSes are read once per instance, so a page of requests
+/// asks the database once for each.
 /// </summary>
 public sealed class ApprovalRuleAccess(PodiumDb db)
 {
@@ -29,8 +30,9 @@ public sealed class ApprovalRuleAccess(PodiumDb db)
         var document = AccessPolicyStore.Read(row);
         if (await OsAsync(agent.MachineId, ct) is not { } os || AccessPolicyRules.Section(document, os) is not { } section) return false;
         var lexical = os == OsKinds.Windows ? path.Replace('/', '\\') : path;
+        // As the agent's layer (AccessPolicyMath.Policy): no allowed folder and not the project's own is no folder limit, so its "inside" decides.
         return !AccessPolicyMath.IsUnderAny(lexical, section.DeniedFolders, os)
-            && (document.IncludeProjectFolder || AccessPolicyMath.IsUnderAny(lexical, section.AllowedFolders, os));
+            && (document.IncludeProjectFolder || section.AllowedFolders.Count == 0 || AccessPolicyMath.IsUnderAny(lexical, section.AllowedFolders, os));
     }
 
     /// <summary>
