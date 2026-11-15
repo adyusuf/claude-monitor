@@ -27,6 +27,7 @@ public sealed class InboxPump(Func<AgentConfig> settings, LocalStore store, IInb
         var now = clock.GetUtcNow();
         // A prompt the session never showed goes back to the hooks, also one pushed before push was turned off or moved to the channel.
         store.RequeueStalePushes(now, config.InboxConfirmWait);
+        store.PruneBindings(now - InboxLifetime); // a reused process id must not map a new process to an old session (the MCP asks use it whatever the push transport)
         if (!config.InboxPushEnabled) return 0;
         store.PruneInboxes(now - InboxLifetime);
         var pushed = 0;

@@ -266,6 +266,30 @@ public sealed class InboxPushTests : IDisposable
     }
 
     [Fact]
+    public void A_binding_nobody_refreshes_is_pruned_so_a_reused_pid_does_not_map_to_a_dead_session()
+    {
+        store.BindSession("dead", 4242, Start.AddDays(-40)); // its process id was reused by another program since
+        store.BindSession("live", 5151, Start.AddDays(-2));
+
+        Assert.Equal(1, store.PruneBindings(Start.AddDays(-30)));
+
+        Assert.Null(store.SessionOf(4242));
+        Assert.Equal("live", store.SessionOf(5151));
+    }
+
+    [Fact]
+    public async Task The_daemons_pass_prunes_old_bindings_also_with_the_inbox_push_turned_off()
+    {
+        store.BindSession("dead", 4242, Start - InboxPump.InboxLifetime - TimeSpan.FromMinutes(1));
+        store.BindSession("live", 5151, Start - TimeSpan.FromDays(2));
+
+        await Pump(home.Config with { PushEnabled = false }).PumpAsync(CancellationToken.None);
+
+        Assert.Null(store.SessionOf(4242));
+        Assert.Equal("live", store.SessionOf(5151));
+    }
+
+    [Fact]
     public void A_hook_that_repeats_what_is_known_writes_nothing_until_the_row_is_an_hour_old()
     {
         store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);
