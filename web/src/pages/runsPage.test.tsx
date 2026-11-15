@@ -144,8 +144,9 @@ describe("loading older runs", () => {
     renderAt("/w/w1/runs", route);
     await userEvent.click(await screen.findByRole("button", { name: en.sessions.more }));
     expect(await screen.findByText("/bin/echo older")).toBeInTheDocument();
-    const oldest = first[first.length - 1]!.createdAt;
-    expect(calls.find((c) => c.path.includes("before="))!.path).toBe(`/workspaces/w1/runs?before=${encodeURIComponent(oldest)}&limit=${config.runPageSize}`);
+    const oldest = first[first.length - 1]!;
+    // The cursor is the oldest run's time and id (F-167): runs created at the same moment are not skipped across the page boundary.
+    expect(calls.find((c) => c.path.includes("before="))!.path).toBe(`/workspaces/w1/runs?before=${encodeURIComponent(oldest.createdAt)}&beforeId=${encodeURIComponent(oldest.id)}&limit=${config.runPageSize}`);
     expect(screen.getAllByRole("row")).toHaveLength(config.runPageSize + 2);
     expect(screen.queryByRole("button", { name: en.sessions.more })).toBeNull();
   });

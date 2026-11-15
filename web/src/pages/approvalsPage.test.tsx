@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApprovalRequestRow, ApprovalRuleRow } from "../api/types";
@@ -75,7 +75,7 @@ describe("the standing approvals table", () => {
     serve(() => ({ ...empty, rules: [rule()] }));
     renderAt("/w/w1/approvals", route);
     await screen.findByText("npm test");
-    expect(cellTexts(rowOf("npm test"))).toEqual(["laptop-1 · widgets", "Bash", "npm test", "1 hour", "06/10/2026 09:30", "3"]);
+    expect(cellTexts(rowOf("npm test"))).toEqual(["laptop-1 · widgets", "Bash", "npm test", "1 hour", "06/10/2099 09:30", "3"]);
   });
 
   it("says 'any input' for a rule with no command and 'until revoked' for one that never ends", async () => {
@@ -83,6 +83,24 @@ describe("the standing approvals table", () => {
     renderAt("/w/w1/approvals", route);
     const row = (await screen.findByText(en.approvalRules.anyInput)).closest("tr") as HTMLElement;
     expect(cellTexts(row)).toEqual(["laptop-1", "Write", en.approvalRules.anyInput, "Always", en.approvalRules.never, "3"]);
+  });
+
+  it("shows when a rule last answered, and 'never' for one that has not (F-164)", async () => {
+    serve(() => ({ ...empty, rules: [rule({ lastUsedAt: new Date(2026, 9, 5, 14, 15, 0).toISOString() }), rule({ id: "ru2", command: "make all", lastUsedAt: null })] }));
+    renderAt("/w/w1/approvals", route);
+    await screen.findByText("npm test");
+    const last = (row: HTMLElement) => within(row).getAllByRole("cell")[6]!.textContent;
+    expect(last(rowOf("npm test"))).toBe("05/10/2026 14:15");
+    expect(last(rowOf("make all"))).toBe(en.approvalRules.neverUsed);
+    expect(within(card(en.approvalRules.rules)).getByRole("columnheader", { name: en.approvalRules.lastUsed })).toBeInTheDocument();
+  });
+
+  it("drops a rule from the list when its time runs out, without a reload (F-164)", async () => {
+    serve(() => ({ ...empty, rules: [rule({ expiresAt: new Date(Date.now() + 1200).toISOString() })] }));
+    renderAt("/w/w1/approvals", route);
+    expect(await screen.findByText("npm test")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("npm test")).toBeNull(), { timeout: 4000 });
+    expect(screen.getByText(en.approvalRules.noRules)).toBeInTheDocument();
   });
 
   it("asks before revoking and revokes nothing when the person declines", async () => {
@@ -150,6 +168,16 @@ describe("the approvals page follows the live stream", () => {
     act(() => FakeEventSource.last!.emit("permission", {}));
     expect(await screen.findByText("make all")).toBeInTheDocument();
     expect(reads(calls)).toBe(before + 1);
+  });
+
+  it("reads the lists again on an approval_rule event, so a rule revoked in another tab is gone (F-091, F-164)", async () => {
+    let data: Data = { ...empty, rules: [rule()] };
+    serve(() => data);
+    renderAt("/w/w1/approvals", route);
+    await screen.findByText("npm test");
+    data = empty;
+    act(() => FakeEventSource.last!.emit("approval_rule", { id: "ru1" }));
+    expect(await screen.findByText(en.approvalRules.noRules)).toBeInTheDocument();
   });
 
   it("reads again when the stream comes back, because events may have been missed", async () => {

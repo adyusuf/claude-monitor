@@ -7,8 +7,8 @@ export const request = (over: Partial<ApprovalRequestRow> = {}): ApprovalRequest
   decision: null, answeredAt: null, answeredByName: null, answeredByRule: null, canRemember: true, strict: false, ...over,
 });
 
-/** A standing approval for one command, ending at 09:30 on 06/10/2026 local time. */
+/** A standing approval for one command, ending at 09:30 on 06/10/2099 local time (still live, so the page shows it). */
 export const rule = (over: Partial<ApprovalRuleRow> = {}): ApprovalRuleRow => ({
   id: "ru1", agentId: "a1", hostname: "laptop-1", toolName: "Bash", command: "npm test", duration: "1h", createdAt: new Date(2026, 9, 5, 8, 30, 0).toISOString(),
-  expiresAt: new Date(2026, 9, 6, 9, 30, 0).toISOString(), useCount: 3, lastUsedAt: null, projectName: "widgets", ...over,
+  expiresAt: new Date(2099, 9, 6, 9, 30, 0).toISOString(), useCount: 3, lastUsedAt: null, projectName: "widgets", ...over,
 });

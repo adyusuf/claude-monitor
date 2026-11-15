@@ -66,9 +66,9 @@ public static class RunQueries
     private static bool StrictNow(string? roleEnvironment, string? roleFunction, string? claimedEnvironment, string? claimedFunction) =>
         MachineRoles.IsStrict(MachineRoles.EffectiveEnvironment(roleEnvironment, claimedEnvironment), MachineRoles.EffectiveFunction(roleFunction, claimedFunction));
 
-    /// <summary>Runs of a workspace for the web, newest first, key-paged; optionally one target agent's.</summary>
+    /// <summary>Runs of a workspace for the web, newest first, key-paged by (created time, id) (the id is optional: with the time alone only strictly older runs follow); optionally one target agent's.</summary>
     public static async Task<List<WebRunView>> ForWebAsync(PodiumDb db, ApiConfig config, Guid workspaceId, Guid userId,
-        Guid? targetAgentId, Guid? runId, DateTimeOffset? before, int limit, DateTimeOffset now, CancellationToken ct)
+        Guid? targetAgentId, Guid? runId, DateTimeOffset? before, Guid? beforeId, int limit, DateTimeOffset now, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         var rows = await (from r in db.RemoteRuns.AsNoTracking()
@@ -81,7 +81,8 @@ public static class RunQueries
                           where r.WorkspaceId == workspaceId
                                 && (targetAgentId == null || r.TargetAgentId == targetAgentId)
                                 && (runId == null || r.Id == runId)
-                                && (before == null || r.CreatedAt < before)
+                                && (before == null || r.CreatedAt < before
+                                    || (beforeId != null && r.CreatedAt == before && r.Id.CompareTo(beforeId.Value) < 0)) // (time, id) cursor: ties are not skipped
                           orderby r.CreatedAt descending, r.Id descending
                           select new { r, Target = tm.Hostname, TargetOs = tm.Os, TargetUser = tu.DisplayName, Requester = rm.Hostname, RequesterUser = ru.DisplayName, ta.Interpreters, ta.RoleEnvironment, ta.RoleFunction, ta.ClaimedEnvironment, ta.ClaimedFunction, ta.ApprovalsRequired })
             .Take(limit).ToListAsync(ct);

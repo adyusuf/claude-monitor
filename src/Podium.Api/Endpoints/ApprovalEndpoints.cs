@@ -100,12 +100,15 @@ public static class ApprovalEndpoints
         var rule = await db.ApprovalRules.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId, ct);
         if (rule is null || await Access.MemberAsync(db, userId, rule.WorkspaceId, Roles.Viewer, ct) is null) return Http.NotFound();
         var now = clock.GetUtcNow();
+        // The revoke and its audit row commit together or not at all (F-194).
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var changed = await db.ApprovalRules.Where(r => r.Id == id && r.UserId == userId && r.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, now), ct);
         if (changed != 1) return Http.NotFound();
         Audit.Add(db, http, clock, AuditActions.ApprovalRuleRevoked, rule.WorkspaceId, userId, targetType: "approval_rule", targetId: id,
             detail: new { rule.ToolName, rule.Duration });
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         broker.Publish(Broker.Workspace(rule.WorkspaceId), new StreamMessage("approval_rule", new { id }));
         return Results.NoContent();
     }
