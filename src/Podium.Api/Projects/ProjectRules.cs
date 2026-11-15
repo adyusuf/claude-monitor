@@ -86,7 +86,10 @@ internal static class ProjectRules
     private static bool Lines(List<string>? lines) =>
         lines is null || (lines.Count <= ListMax && lines.All(l => !string.IsNullOrWhiteSpace(l) && l.Trim().Length <= LineMax));
 
-    /// <summary>An https, ssh or git address, or the scp form git@host:path; no password in it (a stored link is shown to the whole workspace).</summary>
+    /// <summary>
+    /// An https, ssh or git address, or the scp form git@host:path; no password in it, and a user name only on ssh (a stored link is shown to the
+    /// whole workspace, and on https or git the user name is where a token goes).
+    /// </summary>
     internal static bool RepoLink(string value)
     {
         if (value.Length > UrlMax || value.Any(char.IsControl)) return false;
@@ -96,7 +99,7 @@ internal static class ProjectRules
         }
 
         return Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "ssh" or "git" && !string.IsNullOrEmpty(uri.Host)
-            && !uri.UserInfo.Contains(':', StringComparison.Ordinal);
+            && !uri.UserInfo.Contains(':', StringComparison.Ordinal) && (uri.Scheme == "ssh" || uri.UserInfo.Length == 0);
     }
 
     /// <summary>An http or https address with no user information.</summary>

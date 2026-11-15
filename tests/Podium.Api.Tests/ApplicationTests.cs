@@ -90,6 +90,8 @@ public sealed class ApplicationTests(ApiFactory api)
     [InlineData("git://git.example.invalid/team/shop.git", true)]
     [InlineData("git@git.example.invalid:team/shop.git", true)]
     [InlineData("https://user:secret@git.example.invalid/team/shop.git", false)] // a password would be shown to the whole workspace
+    [InlineData("https://ghp0token0value@git.example.invalid/team/shop.git", false)] // so would a token given as the user name
+    [InlineData("git://token@git.example.invalid/team/shop.git", false)]
     [InlineData("http://git.example.invalid/team/shop.git", false)]
     [InlineData("javascript:alert(1)", false)]
     [InlineData("file:///etc/passwd", false)]

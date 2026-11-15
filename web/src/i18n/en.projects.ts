@@ -22,7 +22,7 @@ export const enProjects = {
   applications: "Applications", addApplication: "Add an application", noApplications: "This project has no applications yet.",
   noApplicationsHint: "Add the web app, the mobile app or the API this project builds.", backToProject: "Project",
   appName: "Application name", description: "Description", kind: "Kind", repoUrl: "Repository address",
-  repoHint: "An https, ssh or git address, without a password.", environments: "Environments", envUrl: "Address of",
+  repoHint: "An https, ssh or git address, without a password; only an ssh address may name a user.", environments: "Environments", envUrl: "Address of",
   techStack: "Technology stack", techName: "Technology", addTech: "Add", versioning: "Versioning scheme", techOwner: "Technical owner",
   targets: "Non-functional targets", targetKind: "Target kind", targetText: "Target", addTarget: "Add a target",
   kinds: { web: "Web", mobile: "Mobile", api: "API", other: "Other" },

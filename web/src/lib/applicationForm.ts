@@ -46,12 +46,13 @@ const parse = (value: string): URL | null => {
   }
 };
 
-/** A repository link is https, ssh or git (or the scp form git@host:path) with no password; the API's rule, in short. */
+/** A repository link is https, ssh or git (or the scp form git@host:path) with no password, and only ssh may name a user; the API's rule, in short. */
 const repoLinkOk = (value: string): boolean => {
   if (value.length > limit.urlMax) return false;
   if (/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[A-Za-z0-9._/~-]+$/.test(value)) return true;
   const url = parse(value);
-  return url !== null && ["https:", "ssh:", "git:"].includes(url.protocol) && url.hostname !== "" && url.password === "";
+  return url !== null && ["https:", "ssh:", "git:"].includes(url.protocol) && url.hostname !== "" && url.password === ""
+    && (url.protocol === "ssh:" || url.username === "");
 };
 
 /** An environment address is http or https with no user information. */
