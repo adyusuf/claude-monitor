@@ -30,6 +30,13 @@ public static class IntegrationConnect
                 && c.Status != ConnectionStatuses.Disconnected, ct);
             if (connection is null || await Access.MemberAsync(db, state.UserId, state.WorkspaceId, Roles.Member, ct) is null) return "invalid_state";
             if (connection.CloudId != site.Id) return SiteNotFound;
+            // The connector's account reads for everybody: their own new sign-in repairs a connection their refused refresh left needing one.
+            if (connection.ConnectorUserId == state.UserId && connection.Status == ConnectionStatuses.Reauthorize)
+            {
+                connection.Status = ConnectionStatuses.Active;
+                connection.LastError = null;
+                connection.UpdatedAt = now;
+            }
         }
         else
         {
