@@ -72,7 +72,8 @@ export function IssuePage() {
   if (!current) return error ? <div className="page"><Notice kind="error">{error}</Notice></div> : <Spinner />;
   const { view, project, members, applications } = current;
   const { issue } = view;
-  const canWrite = view.canEdit && project.access.canEditApplications;
+  // An archived project is read-only until it is restored (the API refuses every change below it).
+  const canWrite = view.canEdit && project.access.canEditApplications && project.status === "active";
   const writable = canWrite && !issue.archived;
   const mirrored = issue.externalKey !== null;
   const archive = () => {

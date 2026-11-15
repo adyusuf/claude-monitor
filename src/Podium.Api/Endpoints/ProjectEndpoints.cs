@@ -152,6 +152,7 @@ public static class ProjectEndpoints
         var grant = await ProjectAccess.OfAsync(db, actor, id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
         if (!grant.CanEdit) return Results.Forbid();
+        if (grant.Archived) return ProjectGrant.ReadOnly;
         if (req.Role is null || !ProjectRoles.All.Contains(req.Role)) return Http.Invalid("role", "invalid_role");
         if (await Access.MemberAsync(db, userId, grant.Project.WorkspaceId, Roles.Viewer, http.RequestAborted) is null) return Http.Invalid("userId", "not_a_member");
 
@@ -171,6 +172,7 @@ public static class ProjectEndpoints
         var grant = await ProjectAccess.OfAsync(db, actor, id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
         if (!grant.CanEdit) return Results.Forbid();
+        if (grant.Archived) return ProjectGrant.ReadOnly;
         var row = await db.ProjectMembers.FirstOrDefaultAsync(m => m.ProjectId == id && m.UserId == userId, http.RequestAborted);
         if (row is null) return Http.NotFound();
         db.ProjectMembers.Remove(row);

@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ME, mockApi, renderAt } from "../test/helpers";
-import { application, component, release, workspaceMembers } from "../test/projects-fixtures";
+import { application, component, project, release, workspaceMembers } from "../test/projects-fixtures";
 import { ApplicationPage } from "./ApplicationPage";
 
 describe("the application page: Cancel in the edit form", () => {
@@ -10,6 +10,7 @@ describe("the application page: Cancel in the edit form", () => {
     const calls = mockApi({
       "GET /me": { body: ME },
       "GET /applications/a1": { body: application() },
+      "GET /projects/p1": { body: project() },
       "GET /workspaces/w1/members": { body: workspaceMembers },
       "GET /applications/a1/components": { body: [component()] },
       "GET /applications/a1/releases": { body: [release()] },

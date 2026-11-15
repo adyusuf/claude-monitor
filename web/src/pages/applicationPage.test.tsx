@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ME, mockApi, renderAt } from "../test/helpers";
-import { application, component, release, workspaceMembers } from "../test/projects-fixtures";
+import { application, component, project, release, workspaceMembers } from "../test/projects-fixtures";
 import { ApplicationPage } from "./ApplicationPage";
 
 const route = [
@@ -13,6 +13,7 @@ const route = [
 const serve = (over: Parameters<typeof mockApi>[0] = {}) => mockApi({
   "GET /me": { body: ME },
   "GET /applications/a1": { body: application() },
+  "GET /projects/p1": { body: project() },
   "GET /workspaces/w1/members": { body: workspaceMembers },
   "GET /applications/a1/components": { body: [component(), component({ id: "c2", name: "Payments", kind: "module" })] },
   "GET /applications/a1/releases": { body: [release(), release({ id: "r2", name: "0.9.0", plannedDate: null, status: "released" })] },
@@ -64,6 +65,14 @@ describe("the application page: definition", () => {
     expect(await screen.findByText("Cart")).toBeInTheDocument();
     for (const name of ["Edit", "Archive", "Rename", "Add", "Cancel release"]) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     expect(screen.getByText("1.0.0")).toBeInTheDocument();
+  });
+
+  it("hides every button, Restore included, when the application's project is archived", async () => {
+    serve({ "GET /projects/p1": { body: project({ status: "archived" }) }, "GET /applications/a1": { body: application({ status: "archived" }) } });
+    open("/w/w1/projects/p1/applications/a1?edit=1");
+    expect(await screen.findByText("Cart")).toBeInTheDocument();
+    for (const name of ["Edit", "Archive", "Restore", "Rename", "Add", "Cancel release"]) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Start a sprint" })).not.toBeInTheDocument();
   });
 
   it("edits the application and saves it with PUT", async () => {
