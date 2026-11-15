@@ -96,13 +96,18 @@ public sealed class JobService(PodiumDb db, ApiConfig config, TimeProvider clock
         if (target is null) return RemoteChecks.Conflict(RemoteErrors.TargetCannotRun);
         if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, target, req?.Code) is { } refused) return refused;
 
-        var changed = await db.MachineJobs.Where(j => j.Id == id && j.Status == JobStatuses.Proposed && j.OwnerUserId == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Active).SetProperty(j => j.DecidedAt, now)
-                .SetProperty(j => j.DecidedBy, userId), ct);
-        if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
-        Audit.Add(db, http, clock, AuditActions.JobApproved, job.WorkspaceId, userId, targetType: "job", targetId: id,
-            detail: new { target = job.TargetAgentId });
-        await db.SaveChangesAsync(ct);
+        // The change and its audit row commit together, or neither does (with the used code's step, which the gate tracked).
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            var changed = await db.MachineJobs.Where(j => j.Id == id && j.Status == JobStatuses.Proposed && j.OwnerUserId == userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Active).SetProperty(j => j.DecidedAt, now)
+                    .SetProperty(j => j.DecidedBy, userId), ct);
+            if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
+            Audit.Add(db, http, clock, AuditActions.JobApproved, job.WorkspaceId, userId, targetType: "job", targetId: id,
+                detail: new { target = job.TargetAgentId });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         job.Status = JobStatuses.Active;
         Changed(job);
         return Results.NoContent();
@@ -115,13 +120,18 @@ public sealed class JobService(PodiumDb db, ApiConfig config, TimeProvider clock
         var now = clock.GetUtcNow();
         var job = await OwnedAsync(id, userId, ct);
         if (job is null) return Http.NotFound();
-        var changed = await db.MachineJobs.Where(j => j.Id == id && j.Status == JobStatuses.Proposed && j.OwnerUserId == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Denied).SetProperty(j => j.DecidedAt, now)
-                .SetProperty(j => j.DecidedBy, userId), ct);
-        if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
-        Audit.Add(db, http, clock, AuditActions.JobDenied, job.WorkspaceId, userId, targetType: "job", targetId: id,
-            detail: new { target = job.TargetAgentId });
-        await db.SaveChangesAsync(ct);
+        // The change and its audit row commit together, or neither does.
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            var changed = await db.MachineJobs.Where(j => j.Id == id && j.Status == JobStatuses.Proposed && j.OwnerUserId == userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Denied).SetProperty(j => j.DecidedAt, now)
+                    .SetProperty(j => j.DecidedBy, userId), ct);
+            if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
+            Audit.Add(db, http, clock, AuditActions.JobDenied, job.WorkspaceId, userId, targetType: "job", targetId: id,
+                detail: new { target = job.TargetAgentId });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         job.Status = JobStatuses.Denied;
         Changed(job);
         return Results.NoContent();
@@ -135,13 +145,18 @@ public sealed class JobService(PodiumDb db, ApiConfig config, TimeProvider clock
         var now = clock.GetUtcNow();
         var job = await OwnedAsync(id, userId, ct);
         if (job is null) return Http.NotFound();
-        var changed = await db.MachineJobs
-            .Where(j => j.Id == id && j.OwnerUserId == userId && (j.Status == JobStatuses.Active || j.Status == JobStatuses.Proposed))
-            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Retired).SetProperty(j => j.RetiredAt, now), ct);
-        if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
-        Audit.Add(db, http, clock, AuditActions.JobRetired, job.WorkspaceId, userId, targetType: "job", targetId: id,
-            detail: new { target = job.TargetAgentId });
-        await db.SaveChangesAsync(ct);
+        // The change and its audit row commit together, or neither does.
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            var changed = await db.MachineJobs
+                .Where(j => j.Id == id && j.OwnerUserId == userId && (j.Status == JobStatuses.Active || j.Status == JobStatuses.Proposed))
+                .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, JobStatuses.Retired).SetProperty(j => j.RetiredAt, now), ct);
+            if (changed != 1) return RemoteChecks.Conflict(RemoteErrors.NotPending);
+            Audit.Add(db, http, clock, AuditActions.JobRetired, job.WorkspaceId, userId, targetType: "job", targetId: id,
+                detail: new { target = job.TargetAgentId });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
         job.Status = JobStatuses.Retired;
         Changed(job);
         await CancelByJobAsync(db, broker, id, now, ct);
