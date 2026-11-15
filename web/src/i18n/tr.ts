@@ -282,7 +282,7 @@ export const tr: Dictionary = {
     enabledHint: "Bir sahibin onaylı bir işi, canlı ya da veritabanı olmayan bir makinede kendi kendine tekrar tekrar çalıştırmasına izin verir. Varsayılan kapalı; kapatmak tüm tikleri durdurur.",
     every: "her {n} dakikada", daily: "her gün {time} UTC", next: "Sonraki çalıştırma", last: "Son çalıştırma", failures: "Üst üste başarısız", why: "Neden durdu",
     status: { active: "Kendi kendine çalışıyor", paused: "Duraklatıldı", ended: "Bitti" },
-    reason: { owner: "Sahibi durdurdu", failures: "Üst üste üç çalıştırma başarısız oldu", strict: "Makine canlı ya da veritabanı oldu", exec_level: "Makine artık komutlara izin vermiyor", job_retired: "İş emekli edildi", disabled: "Zamanlamalar kapatıldı", target_gone: "Makine ya da sahibi yok" },
+    reason: { owner: "Sahibi durdurdu", failures: "Üst üste üç çalıştırma başarısız oldu", strict: "Makine canlı ya da veritabanı oldu", exec_level: "Makine artık komutlara izin vermiyor", job_retired: "İş emekli edildi", disabled: "Zamanlamalar kapatıldı", target_gone: "Makine ya da sahibi yok", approvals: "Makine artık imzalı onay istiyor" },
     pause: "Duraklat", resume: "Yeniden başlat", end: "Bitir", create: "Zamanlamayı başlat", job: "İş", kind: "Tekrar", kindInterval: "Birkaç dakikada bir", kindDaily: "Günde bir", minutes: "Çalıştırmalar arası dakika (15 ile 10080)", timeUtc: "Günün saati (UTC, SS:DD)",
     newHint: "Bir zamanlama onaylı bir işi kendi kendine çalıştırır. Üst üste üç başarısız çalıştırmadan sonra durur, kendi son çalıştırmasıyla çakışmaz ve burada istediğiniz an durdurabilirsiniz.",
     noJobs: "Bir zamanlama için komutunda yer tutucu olmayan etkin bir iş gerekir.",

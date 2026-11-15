@@ -1,8 +1,10 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { ScheduleView, WebJobView } from "../api/types";
+import { SCHEDULE_REASONS, type ScheduleView, type WebJobView } from "../api/types";
+import { de } from "../i18n/de";
 import { en } from "../i18n/en";
+import { tr } from "../i18n/tr";
 import { mockApi } from "../test/helpers";
 import { renderPlain } from "../test/remote-fixtures";
 import { clock, minutesOf, ScheduleList } from "./ScheduleList";
@@ -65,9 +67,15 @@ describe("the schedules of a machine", () => {
   });
 
   it("shows why a schedule stopped in words for each reason the API can give", () => {
-    const reasons = Object.keys(en.schedules.reason);
-    show(reasons.map((r, i) => schedule({ id: `s${i}`, status: "paused", pauseReason: r, nextRunAt: null, jobName: `J${i}` })));
-    for (const text of Object.values(en.schedules.reason)) expect(screen.getByText(text)).toBeInTheDocument();
+    show(SCHEDULE_REASONS.map((r, i) => schedule({ id: `s${i}`, status: "paused", pauseReason: r, nextRunAt: null, jobName: `J${i}` })));
+    for (const r of SCHEDULE_REASONS) expect(screen.getByText(en.schedules.reason[r])).toBeInTheDocument();
+  });
+
+  it("has a text for each reason the API can give in every language", () => {
+    for (const lang of [en, tr, de]) {
+      const texts: Record<string, string> = lang.schedules.reason;
+      for (const r of SCHEDULE_REASONS) expect(texts[r], r).toEqual(expect.any(String));
+    }
   });
 });
 
