@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
@@ -48,5 +49,23 @@ public sealed class AgentMoveTests(ApiFactory api)
             var detail = (await MovedRowAsync(reader, workspace, team.TargetId)).GetProperty("detail");
             Assert.Equal((team.WorkspaceId, team.Owner.WorkspaceId), (detail.GetProperty("from").GetGuid(), detail.GetProperty("to").GetGuid()));
         }
+    }
+
+    [Fact]
+    public async Task Moving_an_agent_clears_the_tags_the_note_and_the_listening_services()
+    {
+        var team = await RemoteKit.TeamAsync(api);
+        (await team.Admin.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/tags", new { tags = new Dictionary<string, string> { ["env"] = "lab" } })).EnsureSuccessStatusCode();
+        (await team.Admin.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/note", new { note = "restart the queue first" })).EnsureSuccessStatusCode();
+        (await team.Owner.SendAsync(HttpMethod.Put, $"/api/agents/{team.TargetId}/services", new { share = true })).EnsureSuccessStatusCode();
+        var profile = new AgentProfile(ExecLevels.Argv, false, null, null, 2, Services: [new ServiceInfo(5432, "tcp", "postgres")]);
+        (await team.Target.Http.PutAsJsonAsync("/api/agent/profile", profile, TestUser.Json)).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await MoveAsync(team.Owner, team.TargetId, team.Owner.WorkspaceId)).StatusCode);
+
+        await using var db = api.Db();
+        var row = await db.Agents.AsNoTracking().SingleAsync(a => a.Id == team.TargetId);
+        Assert.Equal((null, null, null, null), (row.Tags, row.TagsSetBy, row.AdminNote, row.AdminNoteSetBy));
+        Assert.Equal((false, null, null), (row.ShareServices, row.Services, row.ServicesAt));
     }
 }

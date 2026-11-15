@@ -130,6 +130,16 @@ public static class MachineEndpoints
         agent.ClaudeInventoryAt = null;
         agent.AccessReport = null; // the access report names the machine's ceiling paths (ADR-0020 §4); the next profile sends it again
         agent.AccessReportAt = null;
+        // The tags and the note are what the old workspace's admins typed (ADR-0008 §3a′): the new one starts without them.
+        agent.Tags = null;
+        agent.TagsSetAt = null;
+        agent.TagsSetBy = null;
+        agent.AdminNote = null;
+        agent.AdminNoteSetAt = null;
+        agent.AdminNoteSetBy = null;
+        agent.ShareServices = false; // and the owner's opt-in for reporting listening services, with what it reported
+        agent.Services = null;
+        agent.ServicesAt = null;
         // Both workspaces' admins see it: the one it left and the one it joined.
         Audit.Add(db, http, clock, AuditActions.AgentMoved, from, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
         Audit.Add(db, http, clock, AuditActions.AgentMoved, target, userId, targetType: "agent", targetId: id, detail: new { from, to = target });
