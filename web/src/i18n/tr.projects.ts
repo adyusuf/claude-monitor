@@ -24,7 +24,7 @@ export const trProjects: Dictionary["projects"] = {
   applications: "Uygulamalar", addApplication: "Uygulama ekle", noApplications: "Bu projede henüz uygulama yok.",
   noApplicationsHint: "Projenin geliştirdiği web uygulamasını, mobil uygulamayı ya da API'yi ekleyin.", backToProject: "Proje",
   appName: "Uygulama adı", description: "Açıklama", kind: "Tür", repoUrl: "Depo adresi",
-  repoHint: "Parolasız bir https, ssh ya da git adresi; kullanıcı adı yalnızca ssh adresinde olabilir.", environments: "Ortamlar", envUrl: "Adresi:",
+  repoHint: "Bir https, ssh ya da git adresi; https adresindeki kullanıcı bilgisi saklanmaz, kullanıcı adı yalnızca ssh adresinde olabilir.", environments: "Ortamlar", envUrl: "Adresi:",
   techStack: "Teknoloji yığını", techName: "Teknoloji", addTech: "Ekle", versioning: "Sürümleme şeması", techOwner: "Teknik sahip",
   targets: "İşlevsel olmayan hedefler", targetKind: "Hedef türü", targetText: "Hedef", addTarget: "Hedef ekle",
   kinds: { web: "Web", mobile: "Mobil", api: "API", other: "Diğer" },

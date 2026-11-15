@@ -89,9 +89,8 @@ public sealed class ApplicationTests(ApiFactory api)
     [InlineData("ssh://git@git.example.invalid/team/shop.git", true)]
     [InlineData("git://git.example.invalid/team/shop.git", true)]
     [InlineData("git@git.example.invalid:team/shop.git", true)]
-    [InlineData("https://user:secret@git.example.invalid/team/shop.git", false)] // a password would be shown to the whole workspace
-    [InlineData("https://ghp0token0value@git.example.invalid/team/shop.git", false)] // so would a token given as the user name
     [InlineData("git://token@git.example.invalid/team/shop.git", false)]
+    [InlineData("ssh://user:secret@git.example.invalid/team/shop.git", false)]
     [InlineData("http://git.example.invalid/team/shop.git", false)]
     [InlineData("javascript:alert(1)", false)]
     [InlineData("file:///etc/passwd", false)]
@@ -106,6 +105,28 @@ public sealed class ApplicationTests(ApiFactory api)
 
         if (valid) Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         else Assert.Equal(("repoUrl", "invalid_url"), await ProjectKit.ProblemAsync(response));
+    }
+
+    [Theory]
+    [InlineData("https://user@bitbucket.example.invalid/ws/repo.git", "https://bitbucket.example.invalid/ws/repo.git")] // the host's own clone link
+    [InlineData("https://user:secret@git.example.invalid/team/shop.git", "https://git.example.invalid/team/shop.git")] // a password would be shown to the whole workspace
+    [InlineData("https://ghp0token0value@git.example.invalid/team/shop.git", "https://git.example.invalid/team/shop.git")] // so would a token given as the user name
+    [InlineData("https://user@git.example.invalid:8443/team/shop.git?a=b@c", "https://git.example.invalid:8443/team/shop.git?a=b@c")]
+    [InlineData("ssh://git@git.example.invalid/team/shop.git", "ssh://git@git.example.invalid/team/shop.git")]
+    public async Task User_information_on_an_https_repository_link_is_cut_off_when_it_is_saved(string url, string stored)
+    {
+        var (owner, _, _, _, project) = await SetUpAsync();
+        var body = JsonSerializer.SerializeToElement(ProjectKit.Application("Linked"), TestUser.Json).EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value);
+        body["repoUrl"] = url;
+
+        var created = await owner.PostAsync($"/api/projects/{project}/applications", body);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Equal(stored, (await owner.GetJsonAsync($"/api/applications/{id}")).GetProperty("repoUrl").GetString());
+        body["name"] = "Linked again";
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.SendAsync(HttpMethod.Put, $"/api/applications/{id}", body)).StatusCode);
+        Assert.Equal(stored, (await owner.GetJsonAsync($"/api/applications/{id}")).GetProperty("repoUrl").GetString());
     }
 
     [Theory]

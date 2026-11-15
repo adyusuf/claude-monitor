@@ -49,7 +49,7 @@ internal static class ProjectRules
         if (!Http.IsName(i.Name, NameMax)) return Http.Invalid("name", "invalid_name");
         if (TooLong(i.Description, TextMax)) return Http.Invalid("description", "too_long");
         if (i.Kind is { } k && !ApplicationKinds.All.Contains(k)) return Http.Invalid("kind", "invalid_value");
-        if (!string.IsNullOrWhiteSpace(i.RepoUrl) && !RepoLink(i.RepoUrl.Trim())) return Http.Invalid("repoUrl", "invalid_url");
+        if (!string.IsNullOrWhiteSpace(i.RepoUrl) && RepoLink(i.RepoUrl.Trim()) is null) return Http.Invalid("repoUrl", "invalid_url");
         if (i.Environments is { } e && (e.Count > EnvironmentNames.All.Count || e.Any(x => x is null || x.Name is null || !EnvironmentNames.All.Contains(x.Name)
             || (!string.IsNullOrWhiteSpace(x.Url) && !WebLink(x.Url.Trim())))
             || e.Select(x => x.Name).Distinct().Count() != e.Count))
@@ -87,20 +87,38 @@ internal static class ProjectRules
         lines is null || (lines.Count <= ListMax && lines.All(l => !string.IsNullOrWhiteSpace(l) && l.Trim().Length <= LineMax));
 
     /// <summary>
-    /// An https, ssh or git address, or the scp form git@host:path; no password in it, and a user name only on ssh (a stored link is shown to the
-    /// whole workspace, and on https or git the user name is where a token goes).
+    /// The address to store for an https, ssh or git address, or the scp form git@host:path; null when it is none of them. A stored link is shown to the
+    /// whole workspace, so no password is kept and a user name only on ssh: on https the user information is cut off (Bitbucket's own clone link
+    /// carries one, and a token goes there), on git it is refused.
     /// </summary>
-    internal static bool RepoLink(string value)
+    internal static string? RepoLink(string value)
     {
-        if (value.Length > UrlMax || value.Any(char.IsControl)) return false;
+        if (value.Length > UrlMax || value.Any(char.IsControl)) return null;
         if (System.Text.RegularExpressions.Regex.IsMatch(value, @"^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[A-Za-z0-9._/~-]+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(50)))
         {
-            return true;
+            return value;
         }
 
-        return Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "ssh" or "git" && !string.IsNullOrEmpty(uri.Host)
-            && !uri.UserInfo.Contains(':', StringComparison.Ordinal) && (uri.Scheme == "ssh" || uri.UserInfo.Length == 0);
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "ssh" or "git") || string.IsNullOrEmpty(uri.Host)) return null;
+        if (uri.UserInfo.Length == 0) return value;
+        if (uri.Scheme == "ssh") return uri.UserInfo.Contains(':', StringComparison.Ordinal) ? null : value;
+        return uri.Scheme == "https" ? WithoutUserInfo(value, uri) : null;
     }
+
+    /// <summary>The https address <paramref name="value"/> without what stands before the last @ of its authority; null if the result is not the same host.</summary>
+    private static string? WithoutUserInfo(string value, Uri uri)
+    {
+        var start = value.IndexOf("://", StringComparison.Ordinal) + 3;
+        var end = value.IndexOfAny(['/', '\\', '?', '#'], start);
+        if (end < 0) end = value.Length;
+        var at = value.LastIndexOf('@', end - 1, end - start);
+        if (at < 0) return null;
+        var stripped = "https://" + value[(at + 1)..];
+        return Uri.TryCreate(stripped, UriKind.Absolute, out var clean) && clean.UserInfo.Length == 0 && clean.Host == uri.Host ? stripped : null;
+    }
+
+    /// <summary>The repository address as stored: trimmed, and an https address without user information; null when blank.</summary>
+    public static string? CleanRepoLink(string? value) => Clean(value) is { } link ? RepoLink(link) ?? link : null;
 
     /// <summary>An http or https address with no user information.</summary>
     internal static bool WebLink(string value) =>

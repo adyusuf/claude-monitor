@@ -65,10 +65,11 @@ describe("the application form", () => {
   it("checks the repository and environment addresses like the API does", () => {
     const ok = { ...emptyApplicationDraft(), name: "a" };
     expect(checkApplication(ok)).toEqual({});
-    for (const url of ["https://git.example.org/x", "ssh://git@git.example.org/x", "git://git.example.org/x", "git@git.example.org:team/x.git"]) {
+    for (const url of ["https://git.example.org/x", "ssh://git@git.example.org/x", "git://git.example.org/x", "git@git.example.org:team/x.git",
+      "https://user@bitbucket.example.org/ws/repo.git", "https://u:p@git.example.org/x"]) {
       expect(checkApplication({ ...ok, repoUrl: url })).toEqual({});
     }
-    for (const url of ["ftp://git.example.org/x", "https://u:p@git.example.org/x", "https://token@git.example.org/x", "git://token@git.example.org/x", "not a url", `https://git.example.org/${"x".repeat(500)}`]) {
+    for (const url of ["ftp://git.example.org/x", "ssh://u:p@git.example.org/x", "git://token@git.example.org/x", "not a url", `https://git.example.org/${"x".repeat(500)}`]) {
       expect(checkApplication({ ...ok, repoUrl: url }).repoUrl).toBe("invalid_url");
     }
     expect(checkApplication({ ...ok, environments: [{ name: "dev", url: "https://dev.example.org" }, { name: "test", url: "" }] })).toEqual({});

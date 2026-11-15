@@ -92,4 +92,38 @@ public sealed class SprintRaceTests(ApiFactory api)
             if (row.Status == SprintStatuses.Active) (await SprintKit.CloseAsync(t.Owner, sprint)).EnsureSuccessStatusCode();
         }
     }
+
+    [Fact]
+    public async Task A_sprint_whose_dates_are_cleared_while_it_starts_is_never_left_active_without_dates()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        for (var round = 0; round < Rounds; round++)
+        {
+            var sprint = await SprintKit.SprintAsync(t.Owner, t.Project);
+
+            await Task.WhenAll(SprintKit.StartAsync(t.Owner, sprint), t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{sprint}", new { goal = "Ship it" }));
+
+            await using var db = api.Db();
+            var row = await db.Sprints.AsNoTracking().SingleAsync(s => s.Id == sprint);
+            Assert.False(row.Status == SprintStatuses.Active && (row.StartDate is null || row.EndDate is null), $"round {round}: active without dates");
+        }
+    }
+
+    [Fact]
+    public async Task A_sprint_updated_while_it_closes_is_never_rewritten_after_it_closed()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        for (var round = 0; round < Rounds; round++)
+        {
+            var sprint = await SprintKit.SprintAsync(t.Owner, t.Project);
+            (await SprintKit.StartAsync(t.Owner, sprint)).EnsureSuccessStatusCode();
+
+            await Task.WhenAll(SprintKit.CloseAsync(t.Owner, sprint), t.Owner.SendAsync(HttpMethod.Put, $"/api/sprints/{sprint}", new { goal = $"Late {round}", startDate = "2026-11-02", endDate = "2026-11-13" }));
+
+            await using var db = api.Db();
+            var row = await db.Sprints.AsNoTracking().SingleAsync(s => s.Id == sprint);
+            Assert.Equal(SprintStatuses.Closed, row.Status);
+            Assert.Equal(row.ClosedAt, row.UpdatedAt);
+        }
+    }
 }

@@ -299,7 +299,7 @@ describe("the project page: applications", () => {
     const calls = serve();
     open();
     await userEvent.click(await screen.findByRole("button", { name: "Add an application" }));
-    await userEvent.type(await screen.findByLabelText("Repository address"), "https://user:secret@git.example.org/x");
+    await userEvent.type(await screen.findByLabelText("Repository address"), "git://token@git.example.org/x");
     await userEvent.click(screen.getByLabelText("Development"));
     await userEvent.type(screen.getByLabelText("Address of Development"), "ftp://dev.example.org");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));

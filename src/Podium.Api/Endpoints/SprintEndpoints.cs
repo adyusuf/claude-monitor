@@ -86,6 +86,8 @@ public static class SprintEndpoints
         if (await ProjectAccess.SprintAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         var sprint = f.Sprint;
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (!await LockAsync(db, sprint, http.RequestAborted)) return Http.NotFound();
         if (sprint.Status == SprintStatuses.Closed) return Http.Invalid("status", "closed");
         // Starting needs both dates; a running sprint keeps them (a cleared date would also mean "unchanged" toward a tool).
         if (sprint.Status == SprintStatuses.Active && (req.StartDate is null || req.EndDate is null)) return Http.Invalid(req.StartDate is null ? "startDate" : "endDate", "active_dates_required");
@@ -98,6 +100,7 @@ public static class SprintEndpoints
         SetTeam(db, id, current, req.TeamUserIds, now);
         Audit.Add(db, http, clock, AuditActions.SprintUpdated, sprint.WorkspaceId, userId, targetType: "sprint", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
