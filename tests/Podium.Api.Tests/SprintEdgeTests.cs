@@ -56,4 +56,38 @@ public sealed class SprintEdgeTests(ApiFactory api)
         Assert.Equal(("teamUserIds", "not_a_member"), await ProjectKit.ProblemAsync(await Put(sprint, new { teamUserIds = new[] { t.Owner.Id, t.Reviewer.Id } })));
         Assert.Equal(1, (await SprintKit.ViewAsync(t.Owner, sprint)).GetProperty("team").GetArrayLength());
     }
+
+    [Fact]
+    public async Task Restoring_an_unfinished_issue_of_a_closed_sprint_brings_it_back_to_the_backlog_and_a_finished_one_stays()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var sprint = await SprintKit.SprintAsync(t.Owner, t.Project);
+        var flight = await IssueKit.IssueAsync(t.Owner, t.Project, "In flight", "story", new { status = "in_progress" });
+        var done = await IssueKit.IssueAsync(t.Owner, t.Project, "Finished", "story", new { status = "done" });
+        (await SprintKit.AddAsync(t.Owner, sprint, flight, done)).EnsureSuccessStatusCode();
+        (await SprintKit.StartAsync(t.Owner, sprint)).EnsureSuccessStatusCode();
+        foreach (var id in new[] { flight, done }) (await t.Owner.SendAsync(HttpMethod.Delete, $"/api/issues/{id}")).EnsureSuccessStatusCode();
+        (await SprintKit.CloseAsync(t.Owner, sprint)).EnsureSuccessStatusCode();
+
+        foreach (var id in new[] { flight, done }) Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.PostAsync($"/api/issues/{id}/restore")).StatusCode);
+
+        Assert.Equal((null, "ready"), (await SprintKit.IssueSprintAsync(t.Owner, flight), await SprintKit.IssueStatusAsync(t.Owner, flight)));
+        Assert.Equal((sprint, "done"), (await SprintKit.IssueSprintAsync(t.Owner, done), await SprintKit.IssueStatusAsync(t.Owner, done)));
+        Assert.Equal(["In flight"], await IssueKit.TitlesAsync(t.Owner, $"/api/projects/{t.Project}/issues?scope=backlog"));
+    }
+
+    [Fact]
+    public async Task Restoring_an_issue_of_an_open_sprint_keeps_it_there()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var sprint = await SprintKit.SprintAsync(t.Owner, t.Project);
+        var flight = await IssueKit.IssueAsync(t.Owner, t.Project, "In flight", "story", new { status = "in_progress" });
+        (await SprintKit.AddAsync(t.Owner, sprint, flight)).EnsureSuccessStatusCode();
+        (await SprintKit.StartAsync(t.Owner, sprint)).EnsureSuccessStatusCode();
+        (await t.Owner.SendAsync(HttpMethod.Delete, $"/api/issues/{flight}")).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.PostAsync($"/api/issues/{flight}/restore")).StatusCode);
+
+        Assert.Equal((sprint, "in_progress"), (await SprintKit.IssueSprintAsync(t.Owner, flight), await SprintKit.IssueStatusAsync(t.Owner, flight)));
+    }
 }
