@@ -42,6 +42,21 @@ public sealed class IdentityFileModeTests : IDisposable
     }
 
     [Fact]
+    public void A_save_keeps_agent_json_owner_only_when_it_creates_and_when_it_replaces_the_file()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var identity = Identity.Load(home.Config);
+
+        (identity with { Server = "https://aipod.invalid" }).Save(home.Config);
+        Assert.Equal(OwnerOnlyFile, File.GetUnixFileMode(home.Config.IdentityPath));
+
+        File.Delete(home.Config.IdentityPath);
+        identity.Save(home.Config);
+        Assert.Equal(OwnerOnlyFile, File.GetUnixFileMode(home.Config.IdentityPath));
+        Assert.Equal(identity.MachineKey, Identity.Load(home.Config).MachineKey);
+    }
+
+    [Fact]
     public void The_database_and_the_log_live_in_a_home_no_one_else_can_enter()
     {
         if (OperatingSystem.IsWindows()) return;
