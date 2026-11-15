@@ -21,7 +21,7 @@ export interface ConnectionView {
 
 export interface IntegrationsView {
   available: boolean;
-  providers: string[];
+  trackerProviders: string[];
   connections: ConnectionView[];
 }
 

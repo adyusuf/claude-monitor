@@ -5,8 +5,8 @@ import { Button, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime } from "../lib/format";
 
-/** The rest of one connection, in its drawer: whether it needs a new sign-in, live updates, the last problem, the person's own Atlassian account and the invite switch. */
-export function IntegrationSettings({ connection: c, admin, onChange }: { connection: ConnectionView; admin: boolean; onChange: () => void }) {
+/** The rest of one connection, in its drawer: whether it needs a new sign-in, live updates, the last problem, the person's own Atlassian account (linked by a member, not a viewer) and the invite switch. */
+export function IntegrationSettings({ connection: c, admin, canLink, onChange }: { connection: ConnectionView; admin: boolean; canLink: boolean; onChange: () => void }) {
   const { t, tx } = useI18n();
   const errorText = useErrorText();
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function IntegrationSettings({ connection: c, admin, onChange }: { connec
       </p>
       <p>
         <strong>{t("integrations.myAccount")}:</strong> {accountText}{" "}
-        <Button variant="ghost" onClick={() => void link()}>{c.myAccountLinked ? t("integrations.relink") : t("integrations.linkAccount")}</Button>
+        {canLink ? <Button variant="ghost" onClick={() => void link()}>{c.myAccountLinked ? t("integrations.relink") : t("integrations.linkAccount")}</Button> : null}
       </p>
       {admin ? (
         <label className="check">

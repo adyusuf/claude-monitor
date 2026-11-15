@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.TestHost;
 using Podium.Api.Data;
+using Podium.Api.Integrations;
 using Podium.Api.Mail;
 using Podium.Api.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -152,5 +153,34 @@ public sealed class IntegrationInviteTests(ApiFactory api)
         Assert.Equal(1, MailsTo(address));
         Assert.Equal(2, (await InvitationsAsync(w)).Count);
         Assert.Single(await InvitationsAsync(w), i => i.RevokedAt is null);
+    }
+
+    /// <summary>A mail server that refuses some addresses for good and sends to the rest.</summary>
+    private sealed class PickyMailer(FakeMailer inner, HashSet<string> refused) : IMailer
+    {
+        public Task SendAsync(MailMessageData message, CancellationToken ct) =>
+            refused.Contains(message.To) ? throw new InvalidOperationException("the address is refused") : inner.SendAsync(message, ct);
+    }
+
+    [Fact]
+    public async Task Fifty_addresses_that_always_fail_do_not_keep_a_person_seen_later_from_being_invited()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        (await SwitchAsync(w, true)).EnsureSuccessStatusCode();
+        var space = w.Site.Space("STV");
+        var bad = Enumerable.Range(0, PeopleMirror.InviteCap).Select(n => Emails.New($"inv-stv{n}")).ToList();
+        for (var n = 0; n < bad.Count; n++) space.People.Add(new FakePerson($"p-stv{n}", $"Bad {n}", bad[n]));
+        var mailer = new PickyMailer(api.Mail, [.. bad]);
+        await using var host = api.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<IMailer>(mailer)));
+        var admin = JiraKit.ClientOf(api, host);
+        (await admin.PostAsync("/api/auth/login", new { email = w.Admin.Email, password = TestUser.Password })).EnsureSuccessStatusCode();
+        (await admin.PostAsync($"{w.Base}/spaces/import", new { keys = new[] { "STV" } })).EnsureSuccessStatusCode(); // every one of the fifty fails
+
+        api.Clock.Advance(TimeSpan.FromMinutes(5));
+        var late = Emails.New("inv-stv-late");
+        space.People.Add(new FakePerson("p-stv-late", "Late Person", late));
+        (await admin.PostAsync($"{w.Base}/sync")).EnsureSuccessStatusCode();
+
+        Assert.Equal(1, MailsTo(late)); // the ones that failed before go behind the one never tried
     }
 }

@@ -82,6 +82,48 @@ public sealed class IntegrationWebhookTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task The_same_delivery_arriving_at_once_is_answered_200_by_every_call_and_counted_once()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+
+        var answers = await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => WebhookKit.DeliverAsync(api, w.ConnectionId, WebhookKit.IssueEvent("ABC-1"), "same-delivery")));
+
+        Assert.All(answers, a => Assert.Equal(HttpStatusCode.OK, a.StatusCode));
+        Assert.Equal(1, await ReceiptsAsync(w));
+        Assert.Equal("ABC-1", (await WebhookKit.NextAsync(api, w.ConnectionId)).Ref);
+        await AssertNothingQueuedBeforeAsync(w, "ABC-2"); // only one read was queued for the twelve calls
+    }
+
+    [Fact]
+    public async Task A_duplicate_that_commits_between_the_check_and_the_write_is_answered_200_and_queues_nothing()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        var fault = new CommandFault("INSERT INTO integration_webhook_receipts");
+        await using var host = HostKit.WithInterceptor(api, fault);
+        // The first call has found no receipt and is about to write its own: the same delivery's other call commits its receipt now.
+        fault.Before = () =>
+        {
+            using var db = api.Db();
+            db.IntegrationWebhookReceipts.Add(new IntegrationWebhookReceipt { ConnectionId = w.ConnectionId, DeliveryId = "raced", ReceivedAt = api.Clock.GetUtcNow() });
+            db.SaveChanges();
+        };
+        using var client = host.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/integrations/jira/webhook/{w.ConnectionId}")
+        {
+            Content = new StringContent(WebhookKit.IssueEvent("ABC-1"), System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation("Authorization", WebhookKit.Token(api));
+        request.Headers.Add("X-Atlassian-Webhook-Identifier", "raced");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(fault.Before); // the other call did commit inside this one
+        Assert.Equal(1, await ReceiptsAsync(w));
+        await AssertNothingQueuedBeforeAsync(w, "ABC-2"); // the call that lost the race queued no read
+    }
+
+    [Fact]
     public async Task A_delivery_without_an_identifier_is_known_by_its_body()
     {
         var w = await JiraKit.ConnectedAsync(api);

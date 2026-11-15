@@ -74,7 +74,10 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
         if (!connection.AutoInvite) return 0;
         var now = clock.GetUtcNow();
         var candidates = await db.IntegrationPeople.Where(p => p.ConnectionId == connection.Id && p.Active && p.UserId == null && p.InvitedAt == null && p.EmailNormalized != null)
-            .OrderBy(p => p.FirstSeenAt).Take(InviteCap).ToListAsync(ct);
+            // The fewest earlier invitations first (every failed send leaves one): addresses that always fail sink behind those never tried, so they cannot
+            // use up the cap of every run and starve the rest.
+            .OrderBy(p => db.WorkspaceInvitations.Count(i => i.WorkspaceId == connection.WorkspaceId && i.EmailNormalized == p.EmailNormalized))
+            .ThenBy(p => p.FirstSeenAt).Take(InviteCap).ToListAsync(ct);
         if (candidates.Count == 0) return 0;
         var inviter = await db.Users.AsNoTracking().FirstAsync(u => u.Id == connection.ConnectorUserId, ct);
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == connection.WorkspaceId, ct);

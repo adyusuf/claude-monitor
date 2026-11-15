@@ -98,6 +98,14 @@ describe("the integrations page: what it shows", () => {
     expect((await openDrawer("Spaces")).getByRole("button", { name: "Show Jira spaces" })).toBeInTheDocument(); // reading is allowed
   });
 
+  it.each([["member", true], ["viewer", false]] as const)("offers a %s the link-my-account button: %s (the API refuses a viewer)", async (role, offered) => {
+    serve({ "GET /me": { body: meAs(role) }, "GET /workspaces/w1/integrations": { body: integrationsView([connection({ myAccountLinked: false, myAccountStatus: null })]) } });
+    open();
+    await site("acme.atlassian.net");
+    const drawer = await openDrawer("Settings");
+    expect(drawer.queryByRole("button", { name: "Link my account" }) !== null).toBe(offered);
+  });
+
   it("treats a workspace the person has no role in as no admin (fail closed)", async () => {
     serve({ "GET /workspaces/w3/integrations": { body: integrationsView() } });
     renderAt("/w/w3/integrations", route);

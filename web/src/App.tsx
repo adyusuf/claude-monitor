@@ -1,4 +1,4 @@
-import { Link, Navigate, Route, Routes } from "react-router";
+import { Link, Navigate, Route, Routes, useSearchParams } from "react-router";
 import { RequireAuth, useSession } from "./auth/session";
 import { Layout } from "./components/Layout";
 import { Empty } from "./components/ui";
@@ -28,7 +28,11 @@ import { NewWorkspacePage, WorkspaceSettingsPage } from "./pages/WorkspaceSettin
 
 function Home() {
   const { me } = useSession();
+  const [params] = useSearchParams();
   const first = me?.workspaces[0];
+  // A sign-in round trip that could not name its workspace (an expired or foreign state) lands here with a result code: the integrations page shows it.
+  const result = params.get("result");
+  if (first && result) return <Navigate to={`/w/${first.id}/integrations?result=${encodeURIComponent(result)}`} replace />;
   return first ? <Navigate to={`/w/${first.id}/projects`} replace /> : <Navigate to="/workspaces/new" replace />;
 }
 

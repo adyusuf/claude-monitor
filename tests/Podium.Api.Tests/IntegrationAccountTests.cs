@@ -41,6 +41,23 @@ public sealed class IntegrationAccountTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task An_atlassian_account_that_another_member_already_linked_cannot_be_linked_by_a_second_member()
+    {
+        var w = await JiraKit.ConnectedAsync(api);
+        var member = await RemoteKit.MemberAsync(api, w.Admin, "ic-twice-member");
+
+        // The member signs in at Atlassian as the connector's account: their Jira writes would be attributed to the connector's Jira user.
+        var result = JiraKit.ResultOf(await JiraKit.ApproveAsync(member, api.Jira, w.Account, await Account(member, w)));
+
+        Assert.Equal("account_in_use", result);
+        await using var db = api.Db();
+        var accounts = await db.IntegrationAccounts.AsNoTracking().Where(a => a.ConnectionId == w.ConnectionId).ToListAsync();
+        Assert.Equal(w.Admin.Id, Assert.Single(accounts).UserId);
+        // The person who holds the link can still sign in again with it.
+        Assert.Equal("ok", JiraKit.ResultOf(await JiraKit.ApproveAsync(w.Admin, api.Jira, w.Account, await Account(w.Admin, w))));
+    }
+
+    [Fact]
     public async Task The_connector_signing_in_again_with_their_own_account_repairs_a_connection_whose_refresh_was_refused_and_a_member_does_not()
     {
         var w = await JiraKit.ConnectedAsync(api);

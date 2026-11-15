@@ -20,9 +20,10 @@ describe("the recent checks of a connection", () => {
     expect(await screen.findByText("Nothing has run yet.")).toBeInTheDocument();
   });
 
-  it("shows the empty text when they cannot be loaded", async () => {
-    serve({ "GET /integrations/c1/runs": { status: 500 } });
+  it("shows the problem, not the empty text, when they cannot be loaded", async () => {
+    serve({ "GET /integrations/c1/runs": { status: 403, body: { title: "forbidden" } } });
     open();
-    expect(await screen.findByText("Nothing has run yet.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing has run yet.")).not.toBeInTheDocument();
   });
 });

@@ -139,6 +139,30 @@ public sealed class IntegrationSyncTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_sprint_event_for_an_archived_project_changes_nothing_in_it()
+    {
+        var s = await JiraSprintKit.ImportedAsync(api);
+        await JiraKit.ImportSprintsAsync(s.World, "SPR", s.Active.Id);
+        await using (var db = api.Db())
+        {
+            await db.Projects.Where(p => p.Id == s.Project).ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, ManagedStatuses.Archived));
+        }
+
+        var original = s.Active.Name;
+        s.Active.Name = "Renamed in Jira after the project was archived";
+        s.Working.SprintId = s.Future.Id;
+        api.Jira.Touch(s.Working);
+        var before = (await JiraKit.IssueAsync(s.World, "SPR-5")).SprintId;
+        using var scope = api.Services.CreateScope();
+
+        await scope.ServiceProvider.GetRequiredService<SyncService>().SyncSprintAsync(await JiraKit.ConnectionAsync(s.World), s.Active.IdText, CancellationToken.None);
+
+        Assert.DoesNotContain(await JiraKit.SprintsAsync(s.World, s.Project), x => x.Name == s.Active.Name);
+        Assert.Contains(await JiraKit.SprintsAsync(s.World, s.Project), x => x.Name == original);
+        Assert.Equal(before, (await JiraKit.IssueAsync(s.World, "SPR-5")).SprintId);
+    }
+
+    [Fact]
     public async Task The_worker_goes_on_after_a_request_it_cannot_serve()
     {
         var gone = await JiraKit.ConnectedAsync(api);

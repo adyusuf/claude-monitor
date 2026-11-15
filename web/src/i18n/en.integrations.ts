@@ -10,6 +10,7 @@ export const enIntegrations = {
   result: {
     ok: "Done.", denied: "Atlassian did not give access, nothing was connected.", invalid_state: "That sign-in has expired. Start again.",
     site_not_found: "Your Atlassian login cannot reach that Jira address. Check the address, or sign in with the right account.",
+    account_in_use: "That Atlassian account is already linked by someone else on this connection. Sign in with your own account.",
   },
   status: { active: "Connected", reauthorize: "Sign in again", disconnected: "Disconnected" },
   connectedBy: "Connected by {name}", projects: "Projects imported: {n}",
@@ -22,7 +23,7 @@ export const enIntegrations = {
   syncNow: "Check now", syncing: "Checking…", disconnect: "Disconnect", disconnectConfirm: "Disconnect {site}? What was imported stays, but stops updating.",
   spacesTitle: "Spaces", spacesHint: "Choose the Jira spaces to bring in as projects, with their backlog, epics and people.",
   loadSpaces: "Show Jira spaces", noSpaces: "This account sees no spaces.", imported: "Imported", importSelected: "Import selected ({n})",
-  openProject: "Open project", sprintsOf: "Sprints…", selectSpace: "Select {name}",
+  openProject: "Open project", sprintsOf: "Sprints…", selectSpace: "Select {name}", spacesLimit: "At most {n} spaces can be imported at once.",
   importResult: "{key}: {created} new, {updated} updated", importProblem: "{key}: {error}",
   sprintsTitle: "Sprints of {name}", sprintsHint: "Choose sprints to import with their issues. New Jira sprints appear here; they are only imported when you choose them.",
   noSprints: "This space has no sprints (or no board).", importSprints: "Import selected sprints ({n})",

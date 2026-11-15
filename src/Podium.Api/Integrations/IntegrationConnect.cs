@@ -10,6 +10,7 @@ public static class IntegrationConnect
 {
     public const string Ok = "ok";
     public const string SiteNotFound = "site_not_found";
+    public const string AccountInUse = "account_in_use";
 
     public static async Task<string> CompleteAsync(PodiumDb db, ApiConfig config, TimeProvider clock, JiraOAuth oauth, IntegrationOAuthState state,
         string code, HttpContext http)
@@ -69,6 +70,8 @@ public static class IntegrationConnect
             connection.UpdatedAt = now;
         }
 
+        // One Atlassian account stands for one person of a connection, or their Jira writes would be attributed to someone else's Jira user.
+        if (await db.IntegrationAccounts.AnyAsync(a => a.ConnectionId == connection.Id && a.ExternalAccountId == accountId && a.UserId != state.UserId, ct)) return AccountInUse;
         var account = await db.IntegrationAccounts.FirstOrDefaultAsync(a => a.ConnectionId == connection.Id && a.UserId == state.UserId, ct);
         if (account is null)
         {
