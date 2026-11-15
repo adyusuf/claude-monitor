@@ -210,7 +210,7 @@ public sealed class ApprovalRuleAccessTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task A_cleared_policy_is_no_limit_so_the_agents_inside_mark_decides_again()
+    public async Task A_cleared_policy_does_not_limit_what_may_be_remembered_so_the_agents_inside_mark_decides_again()
     {
         var w = await ApprovalRuleKit.WorldAsync(api);
         await PolicyAsync(w, NoRules, applied: false, cleared: true);
