@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessPolicyView } from "../api/typesAccess";
 import { en } from "../i18n/en";
-import { approvalKeys } from "../lib/approvalKey";
+import { policyHash, policyPayload } from "../lib/accessPolicyHash";
+import { approvalKeys, SIGNING } from "../lib/approvalKey";
 import { defaultView, policyDocument, policyView, REPO } from "../test/access-fixtures";
 import { mockApi } from "../test/helpers";
 import { renderPlain } from "../test/remote-fixtures";
@@ -25,6 +26,10 @@ function open(view: AccessPolicyView = policyView()) {
 }
 const save = () => userEvent.click(screen.getByRole("button", { name: en.access.save }));
 const key = (name: string) => screen.getByRole("checkbox", { name });
+const bytes = (base64: string) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+const verifies = async (publicKey: string, signature: string, payload: string) =>
+  crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, await crypto.subtle.importKey("spki", bytes(publicKey), SIGNING, true, ["verify"]),
+    bytes(signature), new TextEncoder().encode(payload));
 
 describe("the access policy form: repositories", () => {
   it("lists the candidates and the keys already in the policy, sorted, with the policy's own ticked", () => {
@@ -82,6 +87,10 @@ describe("the access policy form: saving", () => {
     const body = calls.find(saved)!.body as { keyId: string; signature: string };
     expect(body.keyId).toBe(stored.fingerprint);
     expect(body.signature).toMatch(/^[A-Za-z0-9+/]{86}==$/); // a 64-byte signature in base64
+    // It signs the next version (3 + 1) of exactly the document sent, for this workspace and project, and nothing else.
+    const hash = await policyHash(policyDocument());
+    expect(await verifies(stored.publicKey, body.signature, policyPayload("w1", "p1", 4, hash))).toBe(true);
+    expect(await verifies(stored.publicKey, body.signature, policyPayload("w1", "p1", 3, hash))).toBe(false);
   });
 
   it("sends nothing and says so when the browser's key cannot sign", async () => {
