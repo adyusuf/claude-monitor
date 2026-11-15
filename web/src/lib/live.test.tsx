@@ -45,7 +45,7 @@ describe("useLive reconnect back-off", () => {
 
   it("waits longer after every failure, up to a ceiling", () => {
     renderHook(() => useLive("w1", vi.fn()));
-    let waits = config.liveReconnectMs;
+    let waits: number = config.liveReconnectMs;
     for (let i = 0; i < 8; i++) {
       const stream = drop();
       act(() => vi.advanceTimersByTime(waits - 1));
