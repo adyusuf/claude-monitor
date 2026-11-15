@@ -160,6 +160,22 @@ describe("the Claude card on the machine page", () => {
     expect(calls.find((c) => c.method === "PUT" && c.path === "/agents/a1/claude")!.body).toEqual({ accept: true, autoMode: "on_message" });
   });
 
+  it("keeps a refused automatic-start change and offers a button to send it again with the code, instead of turning Claude control off", async () => {
+    let n = 0;
+    const calls = api({ "PUT /agents/a1/claude": () => (n++ === 0 ? { status: 403, body: { title: "reauth_required" } } : { body: {} }) }, dev);
+    open();
+    await openTab(en.views.machine.control);
+    await userEvent.selectOptions(await screen.findByLabelText(en.machines.claudeControl.auto), "on_message");
+    await userEvent.type(await screen.findByLabelText(en.remote.codeLabel), "123456");
+
+    await userEvent.click(await screen.findByRole("button", { name: en.machines.claudeControl.retryAuto }));
+
+    expect(await screen.findByText(en.machines.claudeControl.done.auto)).toBeInTheDocument();
+    const puts = calls.filter((c) => c.method === "PUT" && c.path === "/agents/a1/claude");
+    expect(puts.map((c) => c.body)).toEqual([{ accept: true, autoMode: "on_message" }, { accept: true, code: "123456", autoMode: "on_message" }]);
+    expect(screen.queryByRole("button", { name: en.machines.claudeControl.retryAuto })).toBeNull();
+  });
+
   it("shows the mode the machine says it has and turns it off with off", async () => {
     const calls = api({ "PUT /agents/a1/claude": { body: {} } }, { ...dev, claudeAutoMode: "on_message" });
     open();

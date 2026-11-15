@@ -81,6 +81,7 @@ export const deMachines: Dictionary["machines"] = {
     auto: "Automatischer Start",
     autoModes: { off: "Aus", on_message: "Wenn eine Frage eintrifft und keine Sitzung frei ist", always: "In einem Projekt immer eine Sitzung laufen lassen" },
     autoProject: "Projekt für die Sitzung",
+    retryAuto: "Automatischen Start anwenden",
     autoHint: "Standardmäßig aus. Fragt eine andere Maschine diese zu einem Projekt und ist hier keine Claude-Sitzung frei, startet diese Maschine eine Hintergrundsitzung in diesem Projekt; „immer eine laufen lassen“ startet auch eine, wenn im gewählten Projekt keine läuft, und erneut, wenn sie endet. Die Sitzungen laufen im Modus manual (jeder riskante Schritt wartet auf eine Person). Höchstens {n} pro Stunde für die Maschine, nie eine zweite für ein Projekt, das schon eine hat. Jede Sitzung nutzt das Claude-Konto und den Tarif des Maschineneigentümers. Zum Einschalten oder Erhöhen ist eine aktuelle Anmeldung nötig.",
     firstPromptHint: "Wird der neuen Sitzung als Nachricht aus dem Web gesendet und so gekennzeichnet: Die Sitzung behandelt sie als Text zum Lesen, nicht als Befehl, und fragt an der Maschine nach, bevor etwas Nebenwirkungen hat. Leer lassen, um eine leerlaufende Sitzung zu starten. Sie wird nur bis zur Übernahme durch den Agent aufbewahrt und nie ins Audit-Protokoll geschrieben.",
     modes: { manual: "Vor riskanten Schritten fragen (manual)", plan: "Nur planen", acceptEdits: "Dateiänderungen akzeptieren" },

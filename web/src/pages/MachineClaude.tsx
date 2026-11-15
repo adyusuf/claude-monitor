@@ -42,6 +42,7 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   const [project, setProject] = useState("");
   const [mode, setMode] = useState<ClaudePermissionMode>("manual");
   const [prompt, setPrompt] = useState("");
+  const [pendingAuto, setPendingAuto] = useState<{ mode: ClaudeAutoMode; project?: string } | null>(null); // an automatic-start change the API asked a code for: the code field retries this one
   const accepting = view.acceptsClaudeControl === true;
   const autoMode: ClaudeAutoMode = view.claudeAutoMode ?? "off";
   const allowed = view.roleEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.roleEnvironment) && view.effectiveEnvironment != null && ALLOWED_ENVIRONMENTS.includes(view.effectiveEnvironment);
@@ -70,6 +71,7 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
 
   const set = async (accept: boolean) => {
     setDone(null);
+    setPendingAuto(null);
     if (await enable.attempt((code) => api.setAgentClaude(agentId, accept, code).then(() => undefined))) {
       setDone("saved");
       onChanged();
@@ -77,7 +79,9 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
   };
   const setAuto = async (mode: ClaudeAutoMode, autoProject?: string) => {
     setDone(null);
+    setPendingAuto({ mode, project: autoProject });
     if (await enable.attempt((code) => api.setAgentClaude(agentId, true, code, mode, autoProject).then(() => undefined))) {
+      setPendingAuto(null);
       setDone("auto");
       onChanged();
     }
@@ -113,6 +117,11 @@ export function MachineClaude({ agentId, view, owned, projects, agentVersion, ve
       <p>{accepting ? t("machines.claudeControl.on") : t("machines.claudeControl.off")}</p>
       {enable.field}
       {enable.error ? <Notice kind="error">{enable.error}</Notice> : null}
+      {pendingAuto && enable.field ? (
+        <div className="row-actions">
+          <Button variant="primary" busy={enable.busy} disabled={!enable.ready} onClick={() => void setAuto(pendingAuto.mode, pendingAuto.project)}>{t("machines.claudeControl.retryAuto")}</Button>
+        </div>
+      ) : null}
       <div className="row-actions">
         <Button variant={accepting ? "subtle" : "primary"} busy={enable.busy} onClick={() => void set(!accepting)}>
           {accepting ? t("machines.claudeControl.turnOff") : t("machines.claudeControl.turnOn")}
