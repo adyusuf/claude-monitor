@@ -26,7 +26,8 @@ public sealed class Recorder(AgentConfig config, LocalStore store)
     // Read once per recorder (one hook run, one transcript in one tailer pass): agent.json is read for the tag.
     private (bool Mask, int Max)? switches;
 
-    public void Record(string kind, string session, JsonNode payload, ProjectInfo? project, DateTimeOffset now)
+    /// <summary>Records one thing; <paramref name="cut"/> marks a payload that is already a marker for something cut before it got here.</summary>
+    public void Record(string kind, string session, JsonNode payload, ProjectInfo? project, DateTimeOffset now, bool cut = false)
     {
         ArgumentNullException.ThrowIfNull(payload);
         var (mask, max) = switches ??= (WorkspaceSettings.Get(config, store, MaskSecretsKey) != "false",
@@ -34,8 +35,8 @@ public sealed class Recorder(AgentConfig config, LocalStore store)
         var node = mask ? Masker.Mask(payload.DeepClone())! : payload;
         var json = node.ToJsonString();
         var bytes = Encoding.UTF8.GetByteCount(json);
-        var truncated = bytes > max;
-        if (truncated)
+        var truncated = cut || bytes > max;
+        if (bytes > max)
         {
             json = new JsonObject
             {

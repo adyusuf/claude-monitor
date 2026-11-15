@@ -51,6 +51,7 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         var recorder = new Recorder(config, store);
         var buffer = new MemoryStream();
         var taken = 0;
+        long lineBytes = 0;
         int b;
         try
         {
@@ -58,6 +59,7 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
             {
                 if (b != '\n')
                 {
+                    lineBytes++;
                     if (buffer.Length < config.TranscriptLineMax) buffer.WriteByte((byte)b);
                     continue;
                 }
@@ -65,7 +67,18 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
                 offset = stream.Position;
                 var line = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
                 buffer.SetLength(0);
-                if (Take(t, line, project, recorder)) taken++;
+                var bytes = lineBytes;
+                lineBytes = 0;
+                if (bytes > config.TranscriptLineMax)
+                {
+                    // Only its first part was kept, which cannot be parsed: a marker says that a line was there and how big it was.
+                    recorder.Record(EventKinds.Transcript, t.Session, Oversized(line, bytes), project, clock.GetUtcNow(), cut: true);
+                    taken++;
+                }
+                else if (Take(t, line, project, recorder))
+                {
+                    taken++;
+                }
             }
         }
         finally
@@ -107,6 +120,14 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         }
 
         return true;
+    }
+
+    /// <summary>A line over the limit: its size and a preview cut on a character boundary.</summary>
+    private static JsonObject Oversized(string kept, long bytes)
+    {
+        var n = Math.Min(kept.Length, Recorder.PreviewChars);
+        if (n < kept.Length && char.IsHighSurrogate(kept[n - 1])) n--;
+        return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = kept[..n] };
     }
 
     /// <summary>Claude's usage block, with the cache writes split by lifetime (they are priced differently).</summary>
