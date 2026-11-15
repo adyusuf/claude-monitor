@@ -100,11 +100,18 @@ public sealed class IntegrationPassFailureTests(ApiFactory api)
         Assert.Contains(bad.ConnectionId.ToString(), line.Text, StringComparison.Ordinal);
         Assert.Contains(nameof(CryptographicException), line.Text, StringComparison.Ordinal);
 
-        // The next look tries the failing connection again, and leaves the one that is up to date alone.
+        // The next look leaves both alone: the failing one, too, waits for the pass interval (ADR-0015 §6).
+        await reconciler.RunOnceAsync(CancellationToken.None);
+
+        Assert.Single(await RunsAsync(bad));
+        Assert.Single(await RunsAsync(good));
+        Assert.Single(log.Entries);
+
+        // After the interval the failing connection is tried again.
+        api.Clock.Advance(api.Services.GetRequiredService<ApiConfig>().IntegrationPassEvery + TimeSpan.FromSeconds(1));
         await reconciler.RunOnceAsync(CancellationToken.None);
 
         Assert.Equal([SyncStatuses.Failed, SyncStatuses.Failed], (await RunsAsync(bad)).Select(r => r.Status));
-        Assert.Single(await RunsAsync(good));
         Assert.Equal(2, log.Entries.Count);
     }
 
