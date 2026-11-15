@@ -115,4 +115,14 @@ describe("members: the invitation drawer", () => {
     await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(en.errors.conflict)).toBeInTheDocument());
     expect(within(screen.getByRole("dialog")).getByLabelText(en.members.inviteEmail)).toHaveValue("new+member@gmail.com");
   });
+
+  it.each([["already_member"], ["invitation_pending"]] as const)("names a refused duplicate invitation (%s) inside the drawer", async (code) => {
+    mockApi({ ...base(), "POST /workspaces/w1/invitations": { status: 409, body: { title: code } } });
+    renderAt("/w/w1/members", route);
+    await screen.findByText("Diğer Kişi");
+    const drawer = await openInvite();
+    await userEvent.type(within(drawer).getByLabelText(en.members.inviteEmail), "new+member@gmail.com");
+    await userEvent.click(within(drawer).getByRole("button", { name: en.members.invite }));
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(en.errors[code])).toBeInTheDocument());
+  });
 });

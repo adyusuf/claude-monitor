@@ -67,6 +67,7 @@ export const de: Dictionary = {
     target_cannot_run: "Diese Maschine kann das jetzt nicht ausführen (ihre Stufe ist aus, oder sie ist getrennt).", target_busy: "Diese Maschine ist mit anderen Ausführungen beschäftigt.",
     bad_template: "Diese Befehlsvorlage ist für diese Maschine nicht gültig: Das Programm muss ein vollständiger Pfad sein, und manche Programme können nie freigegeben werden.",
     grant_conflict: "Für diese Vorlage gibt es schon eine Freigabe.", invalid_reason: "Diese Begründung ist zu lang.", not_member: "Diese Person ist kein Mitglied dieses Arbeitsbereichs.",
+    already_member: "Diese Person ist schon Mitglied mit dieser oder einer höheren Rolle.", invitation_pending: "Für diese Adresse gibt es schon eine offene Einladung. Widerrufen Sie sie, um eine neue zu senden.",
     invalid_machine_role: "Wählen Sie eine Umgebung und eine Funktion aus den Listen.",
     totp_required: "Diese Maschine ist ein Produktions- oder Datenbankrechner: Dafür brauchen Sie die Anmeldung in zwei Schritten.",
     approval_required: "Diese Maschine führt nur aus, was ein angehefteter Schlüssel signiert hat. Erzeugen Sie auf Ihrer Kontoseite einen Schlüssel und geben Sie erneut frei.",

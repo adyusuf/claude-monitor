@@ -67,6 +67,7 @@ export const tr: Dictionary = {
     target_cannot_run: "Bu makine şu an bunu çalıştıramaz (düzeyi kapalı ya da bağlantısı kopuk).", target_busy: "Bu makine başka çalıştırmalarla meşgul.",
     bad_template: "Bu komut şablonu bu makine için geçerli değil: program tam yol olmalı ve bazı programlara hiçbir zaman izin verilemez.",
     grant_conflict: "Bu şablon için bir izin zaten var.", invalid_reason: "Bu gerekçe çok uzun.", not_member: "Bu kişi çalışma alanının üyesi değil.",
+    already_member: "Bu kişi zaten bu rolde ya da daha yüksek bir rolde üye.", invitation_pending: "Bu adrese açık bir davet zaten var. Yenisini göndermek için onu iptal edin.",
     invalid_machine_role: "Listelerden bir ortam ve bir işlev seçin.",
     totp_required: "Bu makine canlı ya da veritabanı: burada buna izin vermek için iki adımlı giriş gerekir.",
     approval_required: "Bu makine yalnızca sabitlenmiş bir anahtarın imzaladığını çalıştırır. Hesap sayfanızda bir anahtar üretin ve yeniden izin verin.",

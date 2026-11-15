@@ -13,10 +13,15 @@ public sealed record InvitationResponse(Guid Id, string Email, string Role, Date
 /// <summary>E-mail invitations. Accepting needs the invited address on a signed-in, verified account.</summary>
 public static class InvitationEndpoints
 {
+    /// <summary>409 title: the address is an active member already at the invited rank or above (the invitation could change nothing).</summary>
+    public const string AlreadyMember = "already_member";
+    /// <summary>409 title: the address has an open invitation to this workspace (revoke it to send a new one).</summary>
+    public const string InvitationPending = "invitation_pending";
+
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("").RequireAuthorization(Schemes.Session);
-        g.MapPost("/workspaces/{id:guid}/invitations", Invite);
+        g.MapPost("/workspaces/{id:guid}/invitations", Invite).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         g.MapGet("/workspaces/{id:guid}/invitations", List);
         g.MapDelete("/workspaces/{id:guid}/invitations/{invitationId:guid}", Revoke);
         g.MapPost("/invitations/accept", Accept);
@@ -34,11 +39,26 @@ public static class InvitationEndpoints
         if (Roles.Rank(role) > Roles.Rank(actor.Role)) return Results.Forbid();
 
         var now = clock.GetUtcNow();
+        var normalized = SearchText.Email(req.Email!);
+        var memberRole = await db.WorkspaceMembers.AsNoTracking().Where(m => m.WorkspaceId == id && m.RemovedAt == null)
+            .Join(db.Users.Where(u => u.EmailNormalized == normalized), m => m.UserId, u => u.Id, (m, _) => m.Role)
+            .FirstOrDefaultAsync(http.RequestAborted);
+        if (memberRole is not null && Roles.Rank(memberRole) >= Roles.Rank(role))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: AlreadyMember);
+        }
+
+        if (await db.WorkspaceInvitations.AnyAsync(i => i.WorkspaceId == id && i.EmailNormalized == normalized && i.AcceptedAt == null
+                && i.RevokedAt == null && i.ExpiresAt > now, http.RequestAborted))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: InvitationPending);
+        }
+
         var token = Secrets.NewToken();
         var invitation = new WorkspaceInvitation
         {
             WorkspaceId = id,
-            EmailNormalized = SearchText.Email(req.Email!),
+            EmailNormalized = normalized,
             Role = role,
             TokenHash = Secrets.Hash(token),
             InvitedBy = userId,

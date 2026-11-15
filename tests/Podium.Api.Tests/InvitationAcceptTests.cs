@@ -60,8 +60,26 @@ public sealed class InvitationAcceptTests(ApiFactory api)
         var owner = await api.NewClient().SignedUpAsync("acc-down-owner");
         var invitee = await api.NewClient().SignedUpAsync("acc-down-invitee");
         (await invitee.PostAsync("/api/invitations/accept", new { token = await InviteAsync(owner, invitee, "admin") })).EnsureSuccessStatusCode();
+        // The invite endpoint now refuses a lower role for a member (F-048): the open lower invitation is one made before they joined
+        // higher (a Jira people invitation, say), written here directly.
+        var lower = Secrets.NewToken();
+        await using (var db = api.Db())
+        {
+            var now = api.Clock.GetUtcNow();
+            db.WorkspaceInvitations.Add(new Podium.Api.Data.WorkspaceInvitation
+            {
+                WorkspaceId = owner.WorkspaceId,
+                EmailNormalized = Podium.Api.Text.SearchText.Email(invitee.Email),
+                Role = "viewer",
+                TokenHash = Secrets.Hash(lower),
+                InvitedBy = owner.Id,
+                CreatedAt = now,
+                ExpiresAt = now + TimeSpan.FromDays(7),
+            });
+            await db.SaveChangesAsync();
+        }
 
-        var response = await invitee.PostAsync("/api/invitations/accept", new { token = await InviteAsync(owner, invitee, "viewer") });
+        var response = await invitee.PostAsync("/api/invitations/accept", new { token = lower });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("admin", await RoleOfAsync(owner, owner.WorkspaceId, invitee.Id));
