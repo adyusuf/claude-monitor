@@ -86,7 +86,7 @@ export function ApplicationReleases({ applicationId, canEdit }: { applicationId:
                   {canEdit ? (
                     <span className="row-actions">
                       <Button variant="ghost" onClick={() => setEditing({ id: r.id, draft: { name: r.name, plannedDate: r.plannedDate ?? "", status: r.status } })}>{t("projects.edit")}</Button>
-                      {r.status === "released" ? null : <Button variant="ghost" onClick={() => void act(() => api.cancelRelease(r.id))}>{t("projects.cancelRelease")}</Button>}
+                      {r.status === "released" ? null : <Button variant="ghost" onClick={() => { if (window.confirm(t("projects.cancelReleaseConfirm", { name: r.name }))) void act(() => api.cancelRelease(r.id)); }}>{t("projects.cancelRelease")}</Button>}
                     </span>
                   ) : null}
                 </>

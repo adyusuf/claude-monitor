@@ -32,9 +32,11 @@ export const deProjects: Dictionary["projects"] = {
   versions: { semver: "Semantisch (1.2.3)", calver: "Kalender (2026.10)", none: "Keine" },
   target: { performance: "Leistung", accessibility: "Barrierefreiheit", sla: "Verfügbarkeit (SLA)", security: "Sicherheit", other: "Sonstiges" },
   components: "Komponenten und Module", noComponents: "Noch keine Komponenten oder Module.", componentName: "Name", componentKind: "Art",
+  archiveComponentConfirm: "Komponente „{name}“ archivieren? Eine archivierte Komponente lässt sich nicht wiederherstellen.",
   newComponentName: "Name der neuen Komponente", newComponentKind: "Art der neuen Komponente", addComponent: "Hinzufügen", rename: "Umbenennen",
   componentKinds: { component: "Komponente", module: "Modul" },
   releases: "Release-Kalender", noReleases: "Keine Releases geplant.", releaseName: "Name des Releases", plannedDate: "Geplantes Datum",
   releaseStatus: "Release-Status", newRelease: "neues Release", addRelease: "Hinzufügen", cancelRelease: "Release abbrechen",
+  cancelReleaseConfirm: "Release „{name}“ abbrechen? Ein abgebrochenes Release lässt sich weder bearbeiten noch zurückholen.",
   release: { planned: "Geplant", released: "Veröffentlicht", cancelled: "Abgebrochen" },
 };

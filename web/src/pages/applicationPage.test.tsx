@@ -151,8 +151,18 @@ describe("the application page: components and modules", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ name: "Basket", kind: "module" }));
     const other = screen.getByText("Payments").closest("li")!;
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.click(within(other).getByRole("button", { name: "Archive" }));
+    expect(confirm).toHaveBeenCalledWith("Archive component \"Payments\"? A component cannot be restored once archived.");
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/components/c2")).toBe(true));
+  });
+
+  it("archives a component only after the person confirms", async () => {
+    const calls = serve({ "DELETE /components/c2": { status: 204 } });
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    open();
+    await userEvent.click(within((await screen.findByText("Payments")).closest("li")!).getByRole("button", { name: "Archive" }));
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
   });
 
   it("cancels a rename, refuses an empty name before asking, and shows the API's refusal", async () => {
@@ -228,8 +238,19 @@ describe("the application page: release calendar", () => {
     await userEvent.selectOptions(screen.getByLabelText("Release state 1.0.0"), "released");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ name: "1.0.1", plannedDate: null, status: "released" }));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Cancel release" }));
+    expect(confirm).toHaveBeenCalledWith("Cancel release \"1.0.0\"? A cancelled release cannot be edited or brought back.");
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.path === "/releases/r1")).toBe(true));
+  });
+
+  it("cancels a release only after the person confirms", async () => {
+    const calls = serve({ "DELETE /releases/r1": { status: 204 } });
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    open();
+    await screen.findByText("1.0.0");
+    await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Cancel release" }));
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
   });
 
   it("refuses an empty name before asking, cancels an edit and shows the API's refusal", async () => {
@@ -243,6 +264,7 @@ describe("the application page: release calendar", () => {
     await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByLabelText("Release name 1.0.0")).not.toBeInTheDocument();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.click(within(screen.getByText("1.0.0").closest("li")!).getByRole("button", { name: "Cancel release" }));
     expect(await screen.findByText("A release that went out cannot be cancelled.")).toBeInTheDocument();
   });
