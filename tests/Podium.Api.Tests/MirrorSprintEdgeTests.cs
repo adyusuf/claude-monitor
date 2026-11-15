@@ -47,4 +47,18 @@ public sealed class MirrorSprintEdgeTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.NoContent, (await EditAsync(s.W.Member, await s.IdAsync("Plan B"), new { goal = "No dates in Jira either" })).StatusCode);
     }
 
+    [Fact]
+    public async Task A_close_whose_move_reached_jira_but_whose_close_was_refused_is_brought_in_line_by_the_next_pass()
+    {
+        var s = await JiraWriteSprintKit.OpenAsync(api);
+        var now = await s.IdAsync("Now");
+        s.W.Site.Refuse(HttpMethod.Post, Route(s.Now), HttpStatusCode.BadRequest);
+
+        await JiraWriteKit.AssertRefusedAsync(await SprintKit.CloseAsync(s.W.Member, now), HttpStatusCode.BadRequest, "tracker_rejected");
+
+        Assert.Equal((null, null, "active"), (s.W.Site.Find("WRT-6")!.SprintId, s.W.Site.Find("WRT-7")!.SprintId, s.Now.State)); // Jira: moved, not closed
+        Assert.Equal((now, now, "active"), (await s.SprintOfAsync("WRT-6"), await s.SprintOfAsync("WRT-7"), await SprintKit.StatusAsync(s.W.Member, now))); // here: unchanged
+        await JiraKit.PassAsync(s.W.World);
+        Assert.Equal((null, null, now, "active"), (await s.SprintOfAsync("WRT-6"), await s.SprintOfAsync("WRT-7"), await s.SprintOfAsync("WRT-8"), await SprintKit.StatusAsync(s.W.Member, now)));
+    }
 }

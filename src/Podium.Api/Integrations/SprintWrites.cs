@@ -53,7 +53,11 @@ public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gat
             : RunAsync(user, sprint, (ctx, id) => writer.StartIterationAsync(ctx, id, first, last, ct), ct);
     }
 
-    /// <summary>Closing moves the unfinished issues first (to another mirrored sprint or the backlog), then closes.</summary>
+    /// <summary>
+    /// Closing moves the unfinished issues first (to another mirrored sprint or the backlog), then closes. The two calls are not atomic: when the
+    /// move reaches the tool and the close is refused, the tool keeps the move while nothing changes here; the next sync pass brings the issues
+    /// here in line with the tool, and the close can be tried again (MirrorSprintEdgeTests).
+    /// </summary>
     public async Task<IResult?> CloseAsync(Guid user, Sprint sprint, IReadOnlyList<Issue> unfinished, Sprint? moveTo, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(sprint);
