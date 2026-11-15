@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { Member } from "../api/types";
@@ -16,7 +16,8 @@ import { IssueRuns } from "./IssueRuns";
 import { IssueTestCases } from "./IssueTestCases";
 import { StatusBadge } from "./IssueBits";
 
-interface Loaded { view: IssueView; project: ProjectView; members: Member[]; applications: ApplicationSummary[] }
+/** What was read for one issue id; another id (a link to another issue reuses this page) shows nothing of it. */
+interface Loaded { id: string; view: IssueView; project: ProjectView; members: Member[]; applications: ApplicationSummary[] }
 
 /** One issue: its fields (and a form to change them), what it blocks and is blocked by, its test cases and its pull requests and commits. */
 export function IssuePage() {
@@ -27,15 +28,19 @@ export function IssuePage() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const editing = params.get("edit") === "1";
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
+    const mine = ++latest.current;
     try {
       const [view, project, members, apps] = await Promise.all([
         api.issue(id), api.project(projectId), api.members(ws), api.applications(projectId, { status: "all" }),
       ]);
-      setLoaded({ view, project, members, applications: apps.items });
+      if (mine !== latest.current) return;
+      setLoaded({ id, view, project, members, applications: apps.items });
+      setError(null);
     } catch (e) {
-      setError(errorText(e));
+      if (mine === latest.current) setError(errorText(e));
     }
     // errorText is a fresh function each render; loading again for it would loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,8 +68,9 @@ export function IssuePage() {
     await load();
   };
 
-  if (!loaded) return error ? <div className="page"><Notice kind="error">{error}</Notice></div> : <Spinner />;
-  const { view, project, members, applications } = loaded;
+  const current = loaded?.id === id ? loaded : null;
+  if (!current) return error ? <div className="page"><Notice kind="error">{error}</Notice></div> : <Spinner />;
+  const { view, project, members, applications } = current;
   const { issue } = view;
   const canWrite = view.canEdit && project.access.canEditApplications;
   const writable = canWrite && !issue.archived;
