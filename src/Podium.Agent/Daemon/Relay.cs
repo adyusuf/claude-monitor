@@ -125,8 +125,8 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         // cannot leave one pass's values under the other's tag.
         List<(string Key, string Value)> entries =
         [
-            ("settings.mask_secrets", s.MaskSecrets ? "true" : "false"),
-            ("settings.event_max_bytes", s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
+            (Capture.Recorder.MaskSecretsKey, s.MaskSecrets ? "true" : "false"),
+            (Capture.Recorder.EventMaxBytesKey, s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
             (UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate)),
             .. MachineMonitor.Entries(s),
             (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
