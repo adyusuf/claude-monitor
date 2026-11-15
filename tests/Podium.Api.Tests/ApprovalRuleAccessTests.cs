@@ -18,10 +18,11 @@ public sealed class ApprovalRuleAccessTests(ApiFactory api)
     private static object ReadOf(string path) => new { file_path = path };
 
     /// <summary>A live policy for the default project, written as the web would have saved it, and (when asked) reported by the machine as applied.</summary>
-    private async Task PolicyAsync(RuleWorld w, AccessOsRules mac, bool includeProjectFolder = false, bool applied = true, bool cleared = false, int version = 1, int reported = 1)
+    private async Task PolicyAsync(RuleWorld w, AccessOsRules mac, bool includeProjectFolder = false, bool applied = true, bool cleared = false, int version = 1, int reported = 1,
+        AccessOsRules? linux = null, AccessOsRules? windows = null)
     {
         var projectId = (await ProjectKit.CreateProjectAsync(w.Owner, "Policy project")).GetProperty("id").GetGuid();
-        var document = new AccessPolicyDocument(AccessPolicyRules.Format, [ApprovalRuleKit.Project], includeProjectFolder, NoRules, mac, NoRules, false, cleared);
+        var document = new AccessPolicyDocument(AccessPolicyRules.Format, [ApprovalRuleKit.Project], includeProjectFolder, linux ?? NoRules, mac, windows ?? NoRules, false, cleared);
         var now = api.Clock.GetUtcNow();
         await using var db = api.Db();
         var row = new ProjectAccessPolicy
@@ -182,6 +183,30 @@ public sealed class ApprovalRuleAccessTests(ApiFactory api)
 
         Assert.Equal(HttpStatusCode.NoContent, allowed.StatusCode);
         await RemoteKit.AssertProblemAsync(denied, HttpStatusCode.Conflict, CommandEndpoints.RuleOutsideAccess);
+    }
+
+    [Theory]
+    [InlineData(OsKinds.Windows, @"C:\Work\Shop\a.txt", true)]
+    [InlineData(OsKinds.Windows, "c:/work/shop/a.txt", true)]
+    [InlineData(OsKinds.Windows, @"C:\Work\Shopping\a.txt", false)]
+    [InlineData(OsKinds.Windows, "c:/work/shop/SECRET/key.txt", false)]
+    [InlineData(OsKinds.Linux, "/work/shop/a.txt", true)]
+    [InlineData(OsKinds.Linux, "/Work/Shop/a.txt", false)]
+    [InlineData(OsKinds.Linux, "/work/shop/SECRET/key.txt", true)]
+    public async Task The_section_of_the_machines_os_decides_with_that_os_separators_and_case_rule(string os, string path, bool remembered)
+    {
+        var w = await ApprovalRuleKit.WorldAsync(api);
+        await PolicyAsync(w, NoRules, linux: new AccessOsRules(["/work/shop"], ["/work/shop/secret"], []),
+            windows: new AccessOsRules([@"C:\Work\Shop"], [@"C:\Work\Shop\secret"], []));
+        await using (var db = api.Db())
+        {
+            var machineId = await db.Agents.Where(a => a.Id == w.AgentId).Select(a => a.MachineId).SingleAsync();
+            await db.Machines.Where(m => m.Id == machineId).ExecuteUpdateAsync(s => s.SetProperty(m => m.Os, os));
+        }
+
+        var response = await RememberReadAsync(w, path);
+
+        Assert.Equal(remembered ? HttpStatusCode.NoContent : HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]
