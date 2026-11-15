@@ -43,8 +43,10 @@ public sealed partial class EventProjector(PodiumDb db, ApiConfig config)
                 await TaskToolAsync(s, p, e.OccurredAt, ct);
                 break;
             case "hook:PermissionRequest":
-            case "hook:Notification":
                 SetStatus(s, SessionStatuses.Waiting);
+                break;
+            case "hook:Notification":
+                Notification(s, Str(p, "notification_type"));
                 break;
             case "hook:Stop":
                 SetStatus(s, SessionStatuses.Idle);
@@ -64,6 +66,34 @@ public sealed partial class EventProjector(PodiumDb db, ApiConfig config)
                 break;
             case EventKinds.Usage:
                 await UsageAsync(s, p, e.OccurredAt, ct);
+                break;
+            default:
+                break;
+        }
+    }
+
+    /// <summary>Claude Code's kinds of notification (the hook payload's <c>notification_type</c>).</summary>
+    private static class NotificationTypes
+    {
+        public const string PermissionPrompt = "permission_prompt";
+        public const string ElicitationDialog = "elicitation_dialog";
+        public const string IdlePrompt = "idle_prompt";
+    }
+
+    /// <summary>
+    /// A notice that needs the user (a permission prompt, a question from a tool) makes the session wait; "waiting for your input" after a
+    /// finished turn makes it idle. Another kind (a sign-in that worked, one not known yet) changes nothing. An older Claude Code sends no kind:
+    /// every notice then still means "needs you".
+    /// </summary>
+    private static void Notification(HarnessSession s, string? type)
+    {
+        switch (type)
+        {
+            case null or NotificationTypes.PermissionPrompt or NotificationTypes.ElicitationDialog:
+                SetStatus(s, SessionStatuses.Waiting);
+                break;
+            case NotificationTypes.IdlePrompt:
+                SetStatus(s, SessionStatuses.Idle);
                 break;
             default:
                 break;

@@ -19,8 +19,8 @@ public enum IngestOutcome
 
 /// <summary>
 /// Stores one batch from an agent in one transaction: the batch number first (a number already stored means a retry,
-/// and nothing else is written), then each event and its projections. An event that is not valid is skipped and
-/// counted, never guessed at; an event larger than the workspace's limit is stored as a truncation marker.
+/// and nothing else is written), then each event and its projections. An event that is not valid (or holds text PostgreSQL cannot store) is
+/// skipped and counted, never guessed at; an event larger than the workspace's limit is stored as a truncation marker.
 /// </summary>
 public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, TimeProvider clock)
 {
@@ -61,8 +61,14 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
                 continue;
             }
 
-            var session = await SessionAsync(sessions, agentId, workspaceId, e, ct);
+            // A NUL or half a surrogate pair anywhere in it would fail the whole batch in PostgreSQL: the event is skipped instead.
             var raw = e.Payload.GetRawText();
+            if (!StorableText.Json(raw))
+            {
+                continue;
+            }
+
+            var session = await SessionAsync(sessions, agentId, workspaceId, e, ct);
             var size = Encoding.UTF8.GetByteCount(raw);
             bytes += size;
             var truncated = e.Truncated || size > settings.EventMaxBytes;
@@ -99,7 +105,9 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
         && e.Kind is { Length: > 0 and <= KindMax }
         && e.SessionExternalId is { Length: > 0 and <= ExternalIdMax }
         && e.Payload.ValueKind == JsonValueKind.Object
-        && (e.ProjectKey is null || e.ProjectKey.Length <= ProjectKeyMax);
+        && (e.ProjectKey is null || e.ProjectKey.Length <= ProjectKeyMax)
+        && StorableText.Plain(e.Kind) && StorableText.Plain(e.SessionExternalId) && StorableText.Plain(e.ProjectKey)
+        && StorableText.Plain(e.ProjectName) && StorableText.Plain(e.GitBranch);
 
     private static JsonDocument Marker(string raw, int size) =>
         JsonSerializer.SerializeToDocument(new { truncated = true, bytes = size, preview = raw[..Math.Min(raw.Length, PreviewChars)] });

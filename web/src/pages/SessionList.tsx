@@ -118,7 +118,8 @@ export function SessionList({ ws, rows, machines, agents, userId, now, complete,
                   onMouseEnter={() => freeze(machine)} onMouseLeave={() => release(machine.key)}
                   onFocus={() => freeze(machine)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) release(machine.key); }}>
                   <SessionMachineHead ws={ws} hostname={machine.hostname} view={view}
-                    owned={agent !== undefined && agent.userId === userId} agentVersion={agent?.version ?? null} count={machine.count} onChanged={onChanged} />
+                    owned={agent !== undefined && agent.userId === userId} agentVersion={agent?.version ?? null} count={machine.count} complete={complete}
+                    onChanged={onChanged} />
                   {machine.repos.length === 0 ? <p className="muted small session-none">{complete ? t("sessions.noneOnMachine") : t("sessions.noneLoaded")}</p> : null}
                   {machine.repos.map((group) => (
                     <div key={group.repo ?? ""} className="session-branch">

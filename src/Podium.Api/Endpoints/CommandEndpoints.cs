@@ -91,18 +91,22 @@ public static class CommandEndpoints
     private static async Task<IResult> Cancel(Guid id, HttpContext http, PodiumDb db, TimeProvider clock, Broker broker)
     {
         var userId = http.User.UserId();
-        var command = await db.SessionCommands.FirstOrDefaultAsync(c => c.Id == id, http.RequestAborted);
+        var command = await db.SessionCommands.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, http.RequestAborted);
         if (command is null || await Access.SessionAsync(db, userId, command.SessionId, http.RequestAborted) is not { } found)
         {
             return Http.NotFound();
         }
 
         if (!await Access.OwnsSessionAsync(db, userId, found.Session, http.RequestAborted)) return Results.Forbid();
-        if (command.Status != CommandStatuses.Queued) return Results.Conflict();
-        command.Status = CommandStatuses.Cancelled;
+        // Compare-and-set: only a command still queued is cancelled, so the agent's "delivered" report and this cancel cannot both win.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var cancelled = await db.SessionCommands.Where(c => c.Id == id && c.Status == CommandStatuses.Queued)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommandStatuses.Cancelled), http.RequestAborted);
+        if (cancelled == 0) return Results.Conflict();
         Audit.Add(db, http, clock, AuditActions.CommandCancelled, command.WorkspaceId, userId, targetType: "command", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
-        broker.Publish(Broker.Workspace(command.WorkspaceId), new StreamMessage("command", new { sessionId = command.SessionId, id, status = command.Status }));
+        await tx.CommitAsync(http.RequestAborted);
+        broker.Publish(Broker.Workspace(command.WorkspaceId), new StreamMessage("command", new { sessionId = command.SessionId, id, status = CommandStatuses.Cancelled }));
         return Results.NoContent();
     }
 
@@ -159,6 +163,10 @@ public static class CommandEndpoints
             await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
             try
             {
+                // Compare-and-set: of two answers that passed the check above together, only the one that still finds the request open is saved.
+                var claimed = await db.PermissionRequests.Where(p => p.Id == id && p.Status == PermissionStatuses.Open && p.ExpiresAt > now)
+                    .ExecuteUpdateAsync(p => p.SetProperty(x => x.Status, PermissionStatuses.Answered), http.RequestAborted);
+                if (claimed == 0) return Results.Conflict();
                 if (ask is not null && existing is { } ruleId && await ApprovalRuleCreation.StandLongerAsync(db, ruleId, ask, http.RequestAborted))
                 {
                     ApprovalRuleCreation.AuditRule(db, http, clock, ask, ruleId);

@@ -20,34 +20,43 @@ public static class CommandReplies
     /// <summary>The events' time is the agent's clock and AppliedAt the API's: a minute of look-back covers any skew.</summary>
     private static readonly TimeSpan Skew = TimeSpan.FromMinutes(1);
 
-    private sealed record Candidate(long Id, DateTimeOffset OccurredAt, string? LineAt, string Text);
+    private sealed record Candidate(Guid CommandId, long Id, DateTimeOffset OccurredAt, string? LineAt, string Text);
 
     public static async Task<IReadOnlyDictionary<Guid, CommandReply>> FindAsync(PodiumDb db, Guid sessionId,
         IReadOnlyCollection<CommandRow> commands, ApiConfig config, CancellationToken ct)
     {
         var asked = commands.Where(c => c.Kind == CommandKinds.Prompt && c.Status == CommandStatuses.Applied && c.AppliedAt is not null).ToList();
         if (asked.Count == 0) return new Dictionary<Guid, CommandReply>();
-        var since = asked.Min(c => c.AppliedAt!.Value).ToUniversalTime() - Skew;
+        var ids = asked.Select(c => c.Id).ToArray();
+        var since = asked.Select(c => c.AppliedAt!.Value.ToUniversalTime() - Skew).ToArray();
+        // Each command reads its own window from the moment it was applied, so the replies of newer commands are never pushed past the limit
+        // by the messages after an older one; the windows together read no more than ReplyScanMax messages.
+        var window = Math.Max(1, config.ReplyScanMax / asked.Count);
         var preview = config.ReplyPreviewChars + 1; // one more than shown tells whether there is more
         var kind = EventKinds.Transcript;
 
         // Only the first text block's start leaves the database; the rest of an event stays where it is.
         var found = await db.Database.SqlQuery<Candidate>($"""
-            SELECT e.id AS "Id", e.occurred_at AS "OccurredAt", e.payload->>'timestamp' AS "LineAt", left(t.text, {preview}) AS "Text"
-            FROM session_events e
+            SELECT c.id AS "CommandId", x.id AS "Id", x.occurred_at AS "OccurredAt", x.line_at AS "LineAt", x.text AS "Text"
+            FROM unnest({ids}::uuid[], {since}::timestamptz[]) AS c(id, since)
             CROSS JOIN LATERAL (
-                SELECT jsonb_path_query_first(e.payload, '$.message.content[*] ? (@.type == "text").text') #>> ARRAY[]::text[] AS text
-            ) t
-            WHERE e.session_id = {sessionId} AND e.kind = {kind} AND e.occurred_at >= {since}
-              AND e.payload->>'type' = 'assistant' AND btrim(coalesce(t.text, '')) <> ''
-            ORDER BY e.occurred_at, e.id
-            LIMIT {config.ReplyScanMax}
+                SELECT e.id, e.occurred_at, e.payload->>'timestamp' AS line_at, left(t.text, {preview}) AS text
+                FROM session_events e
+                CROSS JOIN LATERAL (
+                    SELECT jsonb_path_query_first(e.payload, '$.message.content[*] ? (@.type == "text").text') #>> ARRAY[]::text[] AS text
+                ) t
+                WHERE e.session_id = {sessionId} AND e.kind = {kind} AND e.occurred_at >= c.since
+                  AND e.payload->>'type' = 'assistant' AND btrim(coalesce(t.text, '')) <> ''
+                ORDER BY e.occurred_at, e.id
+                LIMIT {window}
+            ) x
             """).ToListAsync(ct);
 
         var replies = new Dictionary<Guid, CommandReply>();
         foreach (var command in asked)
         {
-            var reply = found.FirstOrDefault(c => WrittenAt(c) > command.AppliedAt!.Value);
+            var reply = found.Where(c => c.CommandId == command.Id).OrderBy(c => c.OccurredAt).ThenBy(c => c.Id)
+                .FirstOrDefault(c => WrittenAt(c) > command.AppliedAt!.Value);
             if (reply is not null) replies[command.Id] = Shorten(reply, config.ReplyPreviewChars);
         }
 

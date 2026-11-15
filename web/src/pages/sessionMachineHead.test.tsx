@@ -35,8 +35,9 @@ describe("whether Claude Code is on a machine and running there", () => {
 });
 
 describe("the head of a machine's card on the sessions page", () => {
-  const head = (view: MachineView | undefined, over: { owned?: boolean; count?: number } = {}) => renderPlain(
-    <SessionMachineHead ws="w1" hostname="laptop-1" view={view} owned={over.owned ?? false} agentVersion="0.6.0" count={over.count ?? 4} onChanged={() => undefined} />,
+  const head = (view: MachineView | undefined, over: { owned?: boolean; count?: number; complete?: boolean } = {}) => renderPlain(
+    <SessionMachineHead ws="w1" hostname="laptop-1" view={view} owned={over.owned ?? false} agentVersion="0.6.0" count={over.count ?? 4} complete={over.complete ?? true}
+      onChanged={() => undefined} />,
   );
 
   it("shows only the name and says the machine is no longer connected when the page does not know it", () => {
@@ -53,6 +54,11 @@ describe("the head of a machine's card on the sessions page", () => {
     expect(screen.getByText("4")).toHaveAttribute("title", "4 session(s)");
     expect(screen.getByText("Diğer Kişi")).toBeInTheDocument();
     expect(screen.getByText("Can be started from the web")).toBeInTheDocument();
+  });
+
+  it("shows the session count as a floor with a plus while more sessions are still to be loaded", () => {
+    head(machine({ agentId: "a1", claudeKind: "native" }), { count: 4, complete: false });
+    expect(screen.getByText("4+")).toHaveAttribute("title", "4+ session(s)");
   });
 
   it("leaves out the web-start badge when the machine does not accept it", () => {

@@ -64,6 +64,24 @@ public sealed class IngestTests(ApiFactory api)
         Assert.Equal("Renamed by user", row.GetProperty("title").GetString());
     }
 
+    [Theory]
+    [InlineData(null, "waiting")] // an older Claude Code sends no kind: every notice still means "needs you"
+    [InlineData("permission_prompt", "waiting")]
+    [InlineData("elicitation_dialog", "waiting")]
+    [InlineData("idle_prompt", "idle")]
+    [InlineData("auth_success", "idle")]
+    [InlineData("a_kind_not_known_yet", "idle")]
+    public async Task Only_a_notification_that_asks_for_the_user_makes_a_finished_turn_wait(string? type, string expected)
+    {
+        var user = await api.NewClient().SignedUpAsync("notify");
+        var agent = await user.ConnectAgentAsync();
+        var s = "sess-" + Guid.NewGuid();
+        await agent.SendAsync(TestAgent.Hook(s, "PreToolUse", new { tool_name = "Bash" }, T(0)), TestAgent.Hook(s, "Stop", new { }, T(1)));
+        object notice = type is null ? new { message = "Claude is waiting for your input" } : new { message = "Claude is waiting for your input", notification_type = type };
+        await agent.SendAsync(TestAgent.Hook(s, "Notification", notice, T(2)));
+        Assert.Equal(expected, (await SessionOf(user)).GetProperty("status").GetString());
+    }
+
     [Fact]
     public async Task Task_tools_todo_lists_subagents_and_usage_become_projections()
     {

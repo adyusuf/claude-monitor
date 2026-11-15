@@ -161,10 +161,14 @@ public static class SessionEndpoints
         return Results.Ok(new Page<EventRow>(rows.Take(take).ToList(), next));
     }
 
-    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker)
+    /// <summary>The workspace's live stream: opened by a member only, and ended at a ping once the reader is no longer a member or signed in.</summary>
+    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker, ApiConfig config, TimeProvider clock)
     {
-        if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        return Sse.Stream(broker.Subscribe(Broker.Workspace(id)), [new StreamMessage("ready", new { workspaceId = id })], http.RequestAborted);
+        var userId = http.User.UserId();
+        if (await Access.MemberAsync(db, userId, id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
+        var login = http.User.LoginSessionId();
+        return Sse.Stream(broker.Subscribe(Broker.Workspace(id)), [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
+            http.RequestAborted, ct => Access.StillReadsAsync(db, clock, userId, login, id, ct));
     }
 }
 

@@ -110,7 +110,7 @@ public static class AgentEndpoints
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
-    private static async Task<IResult> Stream(HttpContext http, PodiumDb db, Broker broker, TimeProvider clock)
+    private static async Task<IResult> Stream(HttpContext http, PodiumDb db, Broker broker, TimeProvider clock, ApiConfig config)
     {
         var agentId = http.User.AgentId();
         var subscription = broker.Subscribe(Broker.Agent(agentId));
@@ -131,7 +131,7 @@ public static class AgentEndpoints
             .Concat(runs.Select(r => new StreamMessage(AgentStreamEvents.Run, r)))
             .Concat(asks.Select(a => new StreamMessage(AgentStreamEvents.Ask, a)))
             .Concat(actions.Select(a => new StreamMessage(AgentStreamEvents.Action, a)));
-        return Sse.Stream(subscription, first, http.RequestAborted);
+        return Sse.Stream(subscription, first, config.StreamPingEvery, http.RequestAborted);
     }
 
     private static async Task<IResult> CommandStatus(Guid id, CommandStatusUpdate req, HttpContext http, PodiumDb db,
@@ -147,6 +147,7 @@ public static class AgentEndpoints
         }
 
         var now = clock.GetUtcNow();
+        var was = command.Status;
         command.Status = req.Status!;
         command.Result = req.Result is { Length: > 500 } r ? r[..500] : req.Result;
         if (req.Status == CommandStatuses.Delivered)
@@ -162,7 +163,13 @@ public static class AgentEndpoints
             // An unknown value is dropped, not refused: a newer agent may name a way this API does not know yet.
             if (req.Status == CommandStatuses.Applied && req.Transport is { } transport && CommandTransports.All.Contains(transport)) command.Transport = transport;
         }
+        // Compare-and-set on the status read above: a cancel (or another report) that changed it since wins, and this report is a 409.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        var moved = await db.SessionCommands.Where(c => c.Id == id && c.Status == was)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, command.Status), http.RequestAborted);
+        if (moved == 0) return Results.Conflict();
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(command.WorkspaceId),
             new StreamMessage("command", new { sessionId = command.SessionId, id, status = command.Status }));
         return Results.NoContent();
