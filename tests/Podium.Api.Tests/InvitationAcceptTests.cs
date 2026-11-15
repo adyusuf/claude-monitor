@@ -86,4 +86,38 @@ public sealed class InvitationAcceptTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.NotFound, (await invitee.Http.GetAsync($"/api/workspaces/{owner.WorkspaceId}")).StatusCode);
         Assert.Equal(1, (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/invitations")).GetArrayLength());
     }
+
+    [Fact]
+    public async Task A_removed_member_rejoins_through_an_unused_invitation_with_its_role()
+    {
+        var owner = await api.NewClient().SignedUpAsync("acc-rejoin-owner");
+        var invitee = await api.NewClient().SignedUpAsync("acc-rejoin-invitee");
+        (await invitee.PostAsync("/api/invitations/accept", new { token = await InviteAsync(owner, invitee, "admin") })).EnsureSuccessStatusCode();
+        (await owner.SendAsync(HttpMethod.Delete, $"/api/workspaces/{owner.WorkspaceId}/members/{invitee.Id}")).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NotFound, (await invitee.Http.GetAsync($"/api/workspaces/{owner.WorkspaceId}")).StatusCode);
+
+        // A lower role than the one held before the removal: a removed member takes the invitation's role, never the old one.
+        var response = await invitee.PostAsync("/api/invitations/accept", new { token = await InviteAsync(owner, invitee, "viewer") });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await invitee.Http.GetAsync($"/api/workspaces/{owner.WorkspaceId}")).StatusCode);
+        Assert.Equal("viewer", await RoleOfAsync(owner, owner.WorkspaceId, invitee.Id));
+        await using var db = api.Db();
+        var member = await db.WorkspaceMembers.AsNoTracking().SingleAsync(m => m.WorkspaceId == owner.WorkspaceId && m.UserId == invitee.Id);
+        Assert.Null(member.RemovedAt);
+    }
+
+    [Fact]
+    public async Task Accept_without_a_session_is_401_and_the_invitation_stays_open()
+    {
+        var owner = await api.NewClient().SignedUpAsync("acc-anon-owner");
+        var invitee = await api.NewClient().SignedUpAsync("acc-anon-invitee");
+        var token = await InviteAsync(owner, invitee, "member");
+
+        var response = await api.NewClient().PostAsync("/api/invitations/accept", new { token });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(1, (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/invitations")).GetArrayLength());
+        (await invitee.PostAsync("/api/invitations/accept", new { token })).EnsureSuccessStatusCode();
+    }
 }
