@@ -63,4 +63,28 @@ public sealed class IntegrationMemberRemovalTests(ApiFactory api)
         var import = await owner.PostAsync($"{world.Base}/spaces/import", new { keys = new[] { "IMR" } });
         Assert.Equal("reauthorize", (await import.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray().Single().GetProperty("outcome").GetString());
     }
+
+    [Fact]
+    public async Task Demoting_the_connector_below_admin_makes_the_connection_need_a_new_sign_in_and_a_demotion_to_admin_does_not()
+    {
+        var owner = await api.NewClient().SignedUpAsync("imr-demote-owner");
+        var connector = await RemoteKit.MemberAsync(api, owner, "imr-demote-connector", "admin");
+        var site = api.Jira.Site();
+        site.Space("IMD").People.Add(new FakePerson("p-demote", "Connector Person", connector.Email));
+        var account = api.Jira.Account("Connector", connector.Email, site);
+        Assert.Equal("ok", JiraKit.ResultOf(await JiraKit.ApproveAsync(connector, api.Jira, account, await JiraKit.StartAsync(connector, site.Subdomain, owner.WorkspaceId))));
+        var id = (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/integrations")).GetProperty("connections")[0].GetProperty("id").GetGuid();
+        var world = new JiraWorld(api, owner, site, account, id);
+        var url = $"/api/workspaces/{owner.WorkspaceId}/members/{connector.Id}";
+
+        (await owner.SendAsync(HttpMethod.Patch, url, new { role = "owner" })).EnsureSuccessStatusCode();
+        (await owner.SendAsync(HttpMethod.Patch, url, new { role = "admin" })).EnsureSuccessStatusCode();
+        Assert.Equal(ConnectionStatuses.Active, (await JiraKit.ConnectionAsync(world)).Status);
+
+        (await owner.SendAsync(HttpMethod.Patch, url, new { role = "viewer" })).EnsureSuccessStatusCode();
+
+        Assert.Equal(ConnectionStatuses.Reauthorize, (await JiraKit.ConnectionAsync(world)).Status);
+        await using var db = api.Db();
+        Assert.Equal([connector.Id], await db.IntegrationAccounts.Where(a => a.ConnectionId == id).Select(a => a.UserId).ToListAsync());
+    }
 }
