@@ -48,6 +48,14 @@ describe("the approval keys card", () => {
     expect(screen.getByText(en.approvals.notRegistered, { exact: false })).toBeInTheDocument();
   });
 
+  it("never puts shell syntax from a key's name into the command to paste (F-166)", async () => {
+    mockApi({ "GET /me/approval-keys": { body: [] } });
+    const key = await approvalKeys.generate("a$(touch /tmp/x)`id`; b' \\ c\"d");
+    renderPlain(<ApprovalKeysCard />);
+    const shown = await screen.findByText(/^aipod approvers add /);
+    expect(shown.textContent).toBe(`aipod approvers add ${key.publicKey} --name "a touch tmp x id b c d"`);
+  });
+
   it("lists the registered keys, marks this browser's as registered and retires one", async () => {
     const key = await approvalKeys.generate("This one");
     const calls = mockApi({
