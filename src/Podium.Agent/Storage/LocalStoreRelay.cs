@@ -94,6 +94,9 @@ public sealed partial class LocalStore
 
     public void MarkCommandReported(string id) => Exec("UPDATE commands SET state = 'reported' WHERE id = $i", ("$i", id));
 
+    /// <summary>A command the API settled before it was taken (cancelled, expired): no hook or push takes it any more. One already taken stays.</summary>
+    public void DropQueuedCommand(string id) => Exec("UPDATE commands SET state = 'dropped' WHERE id = $i AND state = 'queued'", ("$i", id));
+
     // ---- permission requests ------------------------------------------------------------------------------------
 
     public void AddPermission(PermissionAsk p)

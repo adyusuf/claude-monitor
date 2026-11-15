@@ -231,7 +231,8 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 store.Set(PushStatus.StreamCommandKey, c.Id.ToString());
                 store.Set(PushStatus.StreamCommandAtKey, Now());
                 if (store.SaveCommand(new LocalCommand(c.Id.ToString(), c.SessionExternalId, c.Kind, c.Body, c.ExpiresAt))) store.Bump(PushStatus.InCountKey);
-                await api.CommandStatusAsync(c.Id.ToString(), CommandStatuses.Delivered, null, ct);
+                // The API refuses "delivered" for a command cancelled (or expired) in the meantime: it is then not handed to the session.
+                if (!await api.CommandStatusAsync(c.Id.ToString(), CommandStatuses.Delivered, null, ct)) store.DropQueuedCommand(c.Id.ToString());
                 return true;
             case AgentStreamEvents.PermissionAnswer:
                 var a = data.Deserialize<PermissionAnswerMessage>(ApiClient.Json)!;

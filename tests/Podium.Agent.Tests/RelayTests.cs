@@ -191,6 +191,19 @@ public sealed class RelayTests : IDisposable
         Assert.Empty(store.TakenCommands());
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict)]
+    [InlineData(HttpStatusCode.NotFound)]
+    public async Task A_command_the_api_settled_before_its_delivery_report_is_not_handed_to_the_session(HttpStatusCode refused)
+    {
+        fake.On("POST /api/agent/commands/*", refused, "{}");
+        var command = new AgentCommandMessage(Guid.NewGuid(), Guid.NewGuid(), "s1", CommandKinds.Prompt, "cancelled meanwhile", clock.GetUtcNow().AddMinutes(5));
+        Assert.True(await relay.OnStreamAsync(AgentStreamEvents.Command, JsonSerializer.SerializeToElement(command, ApiClient.Json), CancellationToken.None));
+        Assert.Null(store.TakeCommand("s1", CommandKinds.Prompt, clock.GetUtcNow()));
+        Assert.Empty(store.TakePromptsForPush("s1", CommandKinds.Prompt, clock.GetUtcNow()));
+        Assert.Equal(0, store.WaitingCommands(clock.GetUtcNow()).Count);
+    }
+
     [Fact]
     public async Task The_stream_is_read_as_server_sent_events()
     {
