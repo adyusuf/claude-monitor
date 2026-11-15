@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using Podium.Agent.Capture;
@@ -122,12 +123,69 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         return true;
     }
 
-    /// <summary>A line over the limit: its size and a preview cut on a character boundary.</summary>
+    /// <summary>How many times the JSON escapes of a kept fragment are undone: content nested in content (a tool result that holds a transcript) is escaped once per level.</summary>
+    private const int UnescapeLevels = 3;
+
+    /// <summary>A line over the limit: its size and a preview cut on a character boundary. The kept part is raw JSONL text, whose escaped quotes (\"api_key\": \"...\") hide a secret from the masker: the escapes are undone before it is masked.</summary>
     private static JsonObject Oversized(string kept, long bytes)
     {
-        var n = Math.Min(kept.Length, Recorder.PreviewChars);
-        if (n < kept.Length && char.IsHighSurrogate(kept[n - 1])) n--;
-        return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = kept[..n] };
+        var text = kept;
+        for (var level = 0; level < UnescapeLevels && text.Contains('\\', StringComparison.Ordinal); level++) text = UnescapeJson(text);
+        var n = Math.Min(text.Length, Recorder.PreviewChars);
+        if (n < text.Length && char.IsHighSurrogate(text[n - 1])) n--;
+        return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = text[..n] };
+    }
+
+    /// <summary>Undoes one level of JSON string escapes in a fragment that may end in the middle of one; a backslash that starts no known escape stays as it is.</summary>
+    internal static string UnescapeJson(string fragment)
+    {
+        var sb = new StringBuilder(fragment.Length);
+        for (var i = 0; i < fragment.Length; i++)
+        {
+            if (fragment[i] != '\\' || i + 1 >= fragment.Length)
+            {
+                sb.Append(fragment[i]);
+                continue;
+            }
+
+            var next = fragment[i + 1];
+            switch (next)
+            {
+                case '"' or '\\' or '/':
+                    sb.Append(next);
+                    i++;
+                    break;
+                case 'n':
+                    sb.Append('\n');
+                    i++;
+                    break;
+                case 't':
+                    sb.Append('\t');
+                    i++;
+                    break;
+                case 'r':
+                    sb.Append('\r');
+                    i++;
+                    break;
+                case 'b':
+                    sb.Append('\b');
+                    i++;
+                    break;
+                case 'f':
+                    sb.Append('\f');
+                    i++;
+                    break;
+                case 'u' when i + 5 < fragment.Length && ushort.TryParse(fragment.AsSpan(i + 2, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var code):
+                    sb.Append((char)code);
+                    i += 5;
+                    break;
+                default:
+                    sb.Append('\\');
+                    break;
+            }
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>Claude's usage block, with the cache writes split by lifetime (they are priced differently).</summary>
