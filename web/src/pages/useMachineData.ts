@@ -24,6 +24,10 @@ export interface MachineData {
   hasMoreGrants: boolean;
   hasMoreJobs: boolean;
   error: unknown;
+  /** A failed read of the metrics (they refresh on their own); gone with the next metrics read that succeeds. */
+  metricsError: unknown;
+  /** A failed read of an older page of runs, grants or jobs; gone with the next page that is read, or a full read. */
+  moreError: unknown;
   /** Reads everything again (a live message, or a decision just made). */
   reload: () => Promise<void>;
   moreRuns: () => Promise<void>;
@@ -59,6 +63,8 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const [hasMoreGrants, setHasMoreGrants] = useState(false);
   const [hasMoreJobs, setHasMoreJobs] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [metricsError, setMetricsError] = useState<unknown>(null);
+  const [moreError, setMoreError] = useState<unknown>(null);
   const latestReload = useRef(0);
   const pagedOlder = useRef(false);
   const pagedGrants = useRef(false);
@@ -95,6 +101,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       if (!pagedJobs.current) setHasMoreJobs(jobRows.length >= config.remotePageSize);
       if (scheduleRows !== undefined) setSchedules(scheduleRows);
       setError(partial);
+      setMoreError(null);
     } catch (e) {
       if (mine === latestReload.current) setError(e);
     } finally {
@@ -105,8 +112,9 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const loadMetrics = useCallback(async () => {
     try {
       setMetrics(await api.metrics(agentId, config.metricsMinutes));
+      setMetricsError(null);
     } catch (e) {
-      setError(e);
+      setMetricsError(e);
     }
   }, [agentId]);
 
@@ -118,8 +126,9 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       pagedOlder.current = true;
       setRuns((previous) => [...previous, ...page.filter((r) => !previous.some((p) => p.id === r.id))]);
       setHasMoreRuns(page.length >= config.runPageSize);
+      setMoreError(null);
     } catch (e) {
-      setError(e);
+      setMoreError(e);
     }
   }, [ws, agentId, runs]);
 
@@ -131,8 +140,9 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       pagedGrants.current = true;
       setGrants((previous) => [...previous, ...page.filter((g) => !previous.some((p) => p.id === g.id))]);
       setHasMoreGrants(page.length >= config.remotePageSize);
+      setMoreError(null);
     } catch (e) {
-      setError(e);
+      setMoreError(e);
     }
   }, [agentId, grants]);
 
@@ -144,8 +154,9 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       pagedJobs.current = true;
       setJobs((previous) => [...previous, ...page.filter((j) => !previous.some((p) => p.id === j.id))]);
       setHasMoreJobs(page.length >= config.remotePageSize);
+      setMoreError(null);
     } catch (e) {
-      setError(e);
+      setMoreError(e);
     }
   }, [agentId, jobs]);
 
@@ -159,5 +170,5 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     return () => clearInterval(timer);
   }, [loadMetrics]);
 
-  return { machine, detail, loaded, owned, agentVersion, metrics, alerts, runs, grants, jobs, schedules, hasMoreRuns, hasMoreGrants, hasMoreJobs, error, reload, moreRuns, moreGrants, moreJobs };
+  return { machine, detail, loaded, owned, agentVersion, metrics, alerts, runs, grants, jobs, schedules, hasMoreRuns, hasMoreGrants, hasMoreJobs, error, metricsError, moreError, reload, moreRuns, moreGrants, moreJobs };
 }
