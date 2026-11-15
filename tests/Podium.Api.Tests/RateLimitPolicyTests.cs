@@ -15,11 +15,17 @@ public sealed class RateLimitPolicyTests(ApiFactory api)
     private const int Budget = 3; // LimitedFactory allows 3 auth requests per minute
 
     [Theory]
+    [InlineData("POST", "/api/auth/register")]
+    [InlineData("POST", "/api/auth/verify-email")]
     [InlineData("POST", "/api/auth/login")]
+    [InlineData("POST", "/api/auth/password/forgot")]
+    [InlineData("POST", "/api/auth/password/reset")]
     [InlineData("POST", "/api/auth/mfa")]
     [InlineData("GET", "/api/auth/external/github")]
     [InlineData("POST", "/api/device/code")]
     [InlineData("GET", "/api/device/lookup/BCDF-GHJK")]
+    [InlineData("POST", "/api/device/approve")]
+    [InlineData("POST", "/api/device/deny")]
     [InlineData("POST", "/api/agent/token/refresh")]
     [InlineData("POST", "/api/me/delete")]
     [InlineData("POST", "/api/me/mfa/disable")]
