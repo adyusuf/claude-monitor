@@ -17,7 +17,7 @@ export const en = {
   app: { name: "Podium", tagline: "Follow your AI coding sessions, live." },
   nav: {
     dashboard: "Dashboard", projects: "Projects", sessions: "Sessions", machines: "Machines", runs: "Runs", approvals: "Approvals", members: "Members", integrations: "Integrations", settings: "Workspace settings", serverSettings: "Server settings",
-    account: "Account", download: "Get the agent", signOut: "Sign out", newWorkspace: "New workspace",
+    account: "Account", download: "Get the agent", signOut: "Sign out", signOutFailed: "Signing out did not complete, so you are still signed in. Try again.", newWorkspace: "New workspace",
     theme: "Theme", language: "Language",
     themeSystem: "System", themeLight: "Light", themeDark: "Dark",
   },

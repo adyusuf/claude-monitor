@@ -18,7 +18,7 @@ export const tr: Dictionary = {
   app: { name: "Podium", tagline: "Yapay zekâ kodlama oturumlarınızı canlı izleyin." },
   nav: {
     dashboard: "Pano", projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", approvals: "Onaylar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
-    account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", newWorkspace: "Yeni çalışma alanı",
+    account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", signOutFailed: "Çıkış tamamlanamadı, oturumunuz hâlâ açık. Tekrar deneyin.", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
     themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
   },

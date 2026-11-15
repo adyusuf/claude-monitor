@@ -33,12 +33,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Signed out here only once the server has ended the session (or says it is already over): a failed sign-out keeps `me` and throws, so
+  // the frame tells the person instead of showing them signed out while the cookie still works.
   const signOut = useCallback(async () => {
     try {
       await api.logout();
-    } finally {
-      setMe(null);
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 401) throw e;
     }
+    setMe(null);
   }, []);
 
   useEffect(() => {
