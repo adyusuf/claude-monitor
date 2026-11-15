@@ -39,13 +39,28 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
 
     public void HeartbeatFailed(string errorType) => store.Set(HeartbeatErrorKey, errorType);
 
+    // The batch size the API takes: halved each time it refuses a batch as too large (its MaxBatchEvents is below ours), for this daemon's life.
+    private int batchEvents = config.BatchEvents;
+
     /// <summary>Sends batches until the outbox is empty. Returns the number of events the API acknowledged.</summary>
     public async Task<int> UploadAsync(CancellationToken ct)
     {
         var sent = 0;
-        while (store.NextBatch(config.BatchEvents, config.BatchBytes) is { } batch)
+        while (store.NextBatch(batchEvents, config.BatchBytes) is { } batch)
         {
-            var ack = await api.SendBatchAsync(new EventBatch(batch.Seq, batch.Rows.Select(r => r.Event).ToList()), ct);
+            BatchAck ack;
+            try
+            {
+                ack = await api.SendBatchAsync(new EventBatch(batch.Seq, batch.Rows.Select(r => r.Event).ToList()), ct);
+            }
+            catch (ApiException e) when (e.Status == System.Net.HttpStatusCode.RequestEntityTooLarge && batch.Rows.Count > 1)
+            {
+                // Refused before anything was stored under its number: the same number goes up again with the first half only.
+                batchEvents = Math.Max(1, batch.Rows.Count / 2);
+                store.ShrinkBatch(batch.Seq, batchEvents);
+                continue;
+            }
+
             store.Acknowledge(batch.Seq);
             sent += ack.Duplicate ? 0 : batch.Rows.Count;
             UploadOutcome(null);
