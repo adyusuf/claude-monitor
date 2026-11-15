@@ -43,6 +43,11 @@ public static class IntegrationConnect
             if (await Access.MemberAsync(db, state.UserId, state.WorkspaceId, Roles.Admin, ct) is null) return "invalid_state";
             connection = await db.IntegrationConnections.FirstOrDefaultAsync(c => c.WorkspaceId == state.WorkspaceId && c.Provider == TrackerProviders.Jira
                 && c.SiteHost == state.SiteHost && c.Status != ConnectionStatuses.Disconnected, ct);
+            // A site connected again after a disconnect gets its last connection back: the projects and issues imported then are linked to
+            // it, so importing a space again finds them. Only for the same site (cloud id): a site made anew at the address starts afresh.
+            connection ??= await db.IntegrationConnections.Where(c => c.WorkspaceId == state.WorkspaceId && c.Provider == TrackerProviders.Jira
+                && c.SiteHost == state.SiteHost && c.Status == ConnectionStatuses.Disconnected && c.CloudId == site.Id)
+                .OrderByDescending(c => c.UpdatedAt).ThenByDescending(c => c.CreatedAt).FirstOrDefaultAsync(ct);
             if (connection is null)
             {
                 connection = new IntegrationConnection
