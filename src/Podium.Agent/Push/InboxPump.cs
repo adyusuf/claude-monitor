@@ -24,9 +24,10 @@ public sealed class InboxPump(Func<AgentConfig> settings, LocalStore store, IInb
     public async Task<int> PumpAsync(CancellationToken ct)
     {
         var config = settings();
-        if (!config.InboxPushEnabled) return 0;
         var now = clock.GetUtcNow();
-        store.RequeueStalePushes(now, config.InboxConfirmWait); // a prompt the session never showed goes back to the hooks
+        // A prompt the session never showed goes back to the hooks, also one pushed before push was turned off or moved to the channel.
+        store.RequeueStalePushes(now, config.InboxConfirmWait);
+        if (!config.InboxPushEnabled) return 0;
         store.PruneInboxes(now - InboxLifetime);
         var pushed = 0;
         foreach (var inbox in store.Inboxes())

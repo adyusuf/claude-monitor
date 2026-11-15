@@ -156,7 +156,7 @@ public sealed class PushWireTests : IDisposable
             """{"type":"user","message":{"content":"<channel source=\"podium\" message_id=\"c-2\">\n<<<podium-message id=c-2\ny\npodium-message>>>\n</channel>"}}""",
         ]);
         store.TrackTranscript(new TranscriptCursor("s-1", HarnessKinds.ClaudeCode, transcript, 0, null, null, null), Start);
-        new TranscriptTailer(home.Config, store, new ManualClock(Start)).RunOnce();
+        new TranscriptTailer(home.Config, store, new ManualClock(Start), new AgentLog(home.Config, TimeProvider.System)).RunOnce();
         Assert.Equal(["c-2"], store.TakenCommands().Select(t => t.Id));
         Assert.Equal("c-1", Assert.Single(store.UnconfirmedPushes()).Id);
     }

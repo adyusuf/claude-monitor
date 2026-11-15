@@ -20,9 +20,14 @@ public static partial class Masker
         ("slack_token", SlackToken()),
         ("google_key", GoogleKey()),
         ("jwt", Jwt()),
+        ("bearer_token", BearerToken()),
+        ("url_credential", UrlCredential()),
         ("connection_password", ConnectionPassword()),
         ("assigned_secret", AssignedSecret()),
     ];
+
+    /// <summary>What a non-empty string under a secret-named key (SecretKey) becomes, whatever its shape.</summary>
+    public const string SecretFieldMark = "[masked:secret_field]";
 
     public static JsonNode? Mask(JsonNode? node) => node switch
     {
@@ -37,8 +42,8 @@ public static partial class Masker
         ArgumentNullException.ThrowIfNull(text);
         foreach (var (kind, pattern) in Rules)
         {
-            text = pattern.Replace(text, m => m.Groups["secret"].Success
-                ? m.Value.Replace(m.Groups["secret"].Value, $"[masked:{kind}]", StringComparison.Ordinal)
+            text = pattern.Replace(text, m => m.Groups["secret"] is { Success: true } g
+                ? string.Concat(m.Value.AsSpan(0, g.Index - m.Index), $"[masked:{kind}]", m.Value.AsSpan(g.Index - m.Index + g.Length))
                 : $"[masked:{kind}]");
         }
 
@@ -49,7 +54,10 @@ public static partial class Masker
     {
         foreach (var key in o.Select(p => p.Key).ToList())
         {
-            o[key] = Mask(o[key]?.DeepClone());
+            // The value alone may hold no keyword ({"password":"hunter2"}); its key says what it is.
+            o[key] = SecretKey().IsMatch(key) && o[key] is JsonValue v && v.TryGetValue<string>(out var s) && s.Length > 0
+                ? JsonValue.Create(SecretFieldMark)
+                : Mask(o[key]?.DeepClone());
         }
 
         return o;
@@ -89,9 +97,22 @@ public static partial class Masker
     [GeneratedRegex(@"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}")]
     private static partial Regex Jwt();
 
-    [GeneratedRegex(@"(?i)\b(password|pwd)\s*=\s*(?<secret>(?!\[masked:)[^;""'\s]{4,})")]
+    // A JSON key that ends with a secret name (password, DB_PASSWORD, API_KEY, client_secret, Token); token_type or max_tokens do not.
+    [GeneratedRegex(@"(?i)(password|passwd|pwd|secret|token|api[_\-]?key|access[_\-]?key|secret[_\-]?key)$")]
+    private static partial Regex SecretKey();
+
+    // An opaque token after the Bearer scheme; it must hold a digit or a symbol, so "Bearer authentication" in prose stays.
+    [GeneratedRegex(@"(?i)\bBearer\s+(?<secret>(?=[A-Za-z0-9\-._~+/]*[0-9\-._~+/])[A-Za-z0-9\-._~+/]{16,}=*)")]
+    private static partial Regex BearerToken();
+
+    // The password of scheme://user:password@host. Anchored on "://" (no scan of long words for a scheme name).
+    [GeneratedRegex(@"://[^\s/:@]+:(?<secret>(?!\[masked:)[^\s/@]+)@")]
+    private static partial Regex UrlCredential();
+
+    // No word boundary before the keyword: a prefixed name (DB_PASSWORD, dbPassword) must match too, and "_" is a word character.
+    [GeneratedRegex(@"(?i)(password|pwd)\s*=\s*(?<secret>(?!\[masked:)[^;""'\s]{4,})")]
     private static partial Regex ConnectionPassword();
 
-    [GeneratedRegex(@"(?i)\b(secret|token|api[_\-]?key|passwd|password|client[_\-]?secret|access[_\-]?key)[""']?\s*[:=]\s*[""']?(?<secret>(?!\[masked:)[^\s""',;]{8,})")]
+    [GeneratedRegex(@"(?i)(secret|token|api[_\-]?key|passwd|password|client[_\-]?secret|access[_\-]?key|secret[_\-]?key)[""']?\s*[:=]\s*[""']?(?<secret>(?!\[masked:)[^\s""',;]{8,})")]
     private static partial Regex AssignedSecret();
 }

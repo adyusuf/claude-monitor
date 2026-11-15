@@ -11,9 +11,10 @@ namespace Podium.Agent.Daemon;
 /// <summary>
 /// Follows the transcript (JSONL) of every session a hook mentioned in the last day: each new complete line becomes a
 /// "transcript" event, and each assistant message's token usage a "usage" event, once per message id (a message is
-/// written in several lines that repeat its usage).
+/// written in several lines that repeat its usage). One transcript that cannot be read, or one line that cannot be taken,
+/// never stops the other transcripts: the failure is logged by type name and that transcript goes on at the next pass.
 /// </summary>
-public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeProvider clock)
+public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeProvider clock, AgentLog log)
 {
     public static readonly TimeSpan ActiveWindow = TimeSpan.FromDays(1);
 
@@ -27,7 +28,14 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         pending = [.. store.UnconfirmedPushes().Select(p => p.Id), .. store.UnconfirmedAsks().Select(a => a.Id)];
         foreach (var t in store.Transcripts(clock.GetUtcNow() - ActiveWindow))
         {
-            taken += Follow(t);
+            try
+            {
+                taken += Follow(t);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or FormatException)
+            {
+                log.Write($"transcript of session {t.Session} not read: {e.GetType().Name}"); // never its path or content
+            }
         }
 
         return taken;
@@ -43,22 +51,42 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         var recorder = new Recorder(config, store);
         var buffer = new MemoryStream();
         var taken = 0;
+        long lineBytes = 0;
         int b;
-        while ((b = stream.ReadByte()) != -1)
+        try
         {
-            if (b != '\n')
+            while ((b = stream.ReadByte()) != -1)
             {
-                if (buffer.Length < config.TranscriptLineMax) buffer.WriteByte((byte)b);
-                continue;
-            }
+                if (b != '\n')
+                {
+                    lineBytes++;
+                    if (buffer.Length < config.TranscriptLineMax) buffer.WriteByte((byte)b);
+                    continue;
+                }
 
-            offset = stream.Position;
-            var line = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
-            buffer.SetLength(0);
-            if (Take(t, line, project, recorder)) taken++;
+                offset = stream.Position;
+                var line = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+                buffer.SetLength(0);
+                var bytes = lineBytes;
+                lineBytes = 0;
+                if (bytes > config.TranscriptLineMax)
+                {
+                    // Only its first part was kept, which cannot be parsed: a marker says that a line was there and how big it was.
+                    recorder.Record(EventKinds.Transcript, t.Session, Oversized(line, bytes), project, clock.GetUtcNow(), cut: true);
+                    taken++;
+                }
+                else if (Take(t, line, project, recorder))
+                {
+                    taken++;
+                }
+            }
+        }
+        finally
+        {
+            // A partial last line is read again next time; the lines taken before a failure are not, nor the line that failed.
+            store.TranscriptRead(t.Session, offset);
         }
 
-        store.TranscriptRead(t.Session, offset); // a partial last line is read again next time
         return taken;
     }
 
@@ -92,6 +120,14 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         }
 
         return true;
+    }
+
+    /// <summary>A line over the limit: its size and a preview cut on a character boundary.</summary>
+    private static JsonObject Oversized(string kept, long bytes)
+    {
+        var n = Math.Min(kept.Length, Recorder.PreviewChars);
+        if (n < kept.Length && char.IsHighSurrogate(kept[n - 1])) n--;
+        return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = kept[..n] };
     }
 
     /// <summary>Claude's usage block, with the cache writes split by lifetime (they are priced differently).</summary>

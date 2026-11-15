@@ -21,7 +21,8 @@ public static class WorkspaceSettings
     public static readonly IReadOnlyList<string> Switches =
         [ClaudeUpdate.ClaudePolicy.WorkspaceKey, Update.UpdatePolicy.WorkspaceKey, MachineMonitor.RemoteRunsKey, ClaudeAutoStart.ModeKey, ClaudeAutoStart.ProjectKey, WorkspaceKey,
             Access.AccessPolicySync.StampKey, Access.AccessPolicySync.EnforceKey, Access.AccessPolicySync.WorkspaceKey,
-            Exec.ExecLevelChanges.SequenceKey, Exec.ExecLevelChanges.StateKey, Exec.ExecLevelChanges.LevelKey];
+            Exec.ExecLevelChanges.SequenceKey, Exec.ExecLevelChanges.StateKey, Exec.ExecLevelChanges.LevelKey,
+            Capture.Recorder.MaskSecretsKey, Capture.Recorder.EventMaxBytesKey];
 
     public static void Tag(LocalStore store, Guid workspaceId)
     {

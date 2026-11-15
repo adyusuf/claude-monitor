@@ -106,6 +106,9 @@ public sealed partial class LocalStore
             ("$w", p.WaitSeconds), ("$c", Iso(p.CreatedAt)));
     }
 
+    /// <summary>Permission requests made before the retention are deleted with their tool input (captured content); their wait ended long before. Returns how many.</summary>
+    public int ForgetPermissions(DateTimeOffset before) => Exec("DELETE FROM permissions WHERE created_at < $t", ("$t", Iso(before)));
+
     public PermissionAsk? Permission(string localId) => Permissions("local_id = $x", ("$x", localId)).FirstOrDefault();
 
     public List<PermissionAsk> PermissionsIn(string state) => Permissions("state = $x", ("$x", state));
