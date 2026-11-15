@@ -53,7 +53,9 @@ public static class ExternalAuthEndpoints
 
         var email = external.Principal!.FindFirstValue(ClaimTypes.Email);
         var verified = external.Principal.FindFirstValue(ExternalProviders.EmailVerifiedClaim) == "true";
-        var name = external.Principal.FindFirstValue(ClaimTypes.Name) ?? email ?? provider;
+        // The name the provider gives passes the rule a typed one does; one that fails it (blank, too long, a control character) is replaced by the address.
+        var suppliedName = external.Principal.FindFirstValue(ClaimTypes.Name);
+        var name = Http.IsName(suppliedName) ? suppliedName! : email ?? provider;
         var existing = await db.UserLogins.FirstOrDefaultAsync(
             l => l.Provider == provider && l.ProviderSubject == subject, http.RequestAborted);
         var now = clock.GetUtcNow();
