@@ -32,7 +32,7 @@ public static class SessionContext
         ArgumentNullException.ThrowIfNull(stderr);
         ArgumentNullException.ThrowIfNull(clock);
 #pragma warning disable CA1031 // a hook exits 0 whatever happens (project rule)
-        var taken = new ConcurrentQueue<string>();
+        var taken = new TakenPrompts();
         using var stop = new CancellationTokenSource();
         try
         {
@@ -66,7 +66,7 @@ public static class SessionContext
     }.ToJsonString();
 
     /// <summary>Waits a moment for an abandoned read to notice it was stopped, then puts every prompt it took back to the queue (a take that lands later is put back by the read itself).</summary>
-    private static async Task GiveBack(AgentConfig config, Task read, ConcurrentQueue<string> taken, TimeProvider clock)
+    private static async Task GiveBack(AgentConfig config, Task read, TakenPrompts taken, TimeProvider clock)
     {
         if (!read.IsCompleted)
         {
@@ -82,10 +82,10 @@ public static class SessionContext
 
         if (taken.IsEmpty || !File.Exists(config.DatabasePath)) return;
         using var store = new LocalStore(config.DatabasePath);
-        foreach (var id in taken) store.RequeueTakenCommand(id);
+        taken.GiveBackAll(store);
     }
 
-    private static string? Read(AgentConfig config, TextReader? stdin, TimeProvider clock, ConcurrentQueue<string> taken, CancellationToken stop)
+    private static string? Read(AgentConfig config, TextReader? stdin, TimeProvider clock, TakenPrompts taken, CancellationToken stop)
     {
         if (!File.Exists(config.DatabasePath)) return null;
         var session = stdin is null ? null : SessionOf(stdin);
@@ -110,15 +110,15 @@ public static class SessionContext
     }
 
     /// <summary>The unexpired prompts queued for this session, taken once (oldest first) and wrapped as web input; null when there are none.</summary>
-    private static string? Pending(AgentConfig config, LocalStore store, string session, DateTimeOffset now, ConcurrentQueue<string> taken, CancellationToken stop)
+    private static string? Pending(AgentConfig config, LocalStore store, string session, DateTimeOffset now, TakenPrompts taken, CancellationToken stop)
     {
         var texts = new List<string>();
         while (!stop.IsCancellationRequested && store.TakeCommand(session, CommandKinds.Prompt, now) is { Body: { } } prompt)
         {
-            taken.Enqueue(prompt.Id);
+            taken.Add(prompt.Id);
             if (stop.IsCancellationRequested)
             {
-                store.RequeueTakenCommand(prompt.Id); // the hook gave up while this was being taken: nothing will print it
+                taken.GiveBack(store, prompt.Id); // the hook gave up while this was being taken: nothing will print it
                 break;
             }
 
@@ -126,5 +126,29 @@ public static class SessionContext
         }
 
         return texts.Count == 0 ? null : "Messages sent to this session from Podium (the web) while it was not running:\n" + string.Join("\n", texts);
+    }
+}
+
+/// <summary>
+/// The prompts one hook run took. Whoever gives one back (the read that noticed the stop, or the hook handing back what was taken) removes it from
+/// the set first and only then requeues it, so a prompt is requeued at most once per take: a second requeue would also undo a take of another hook.
+/// </summary>
+internal sealed class TakenPrompts
+{
+    private readonly ConcurrentDictionary<string, byte> ids = new();
+
+    public bool IsEmpty => ids.IsEmpty;
+
+    public void Add(string id) => ids[id] = 0;
+
+    /// <summary>Puts one prompt back to the queue unless it was already given back.</summary>
+    public void GiveBack(LocalStore store, string id)
+    {
+        if (ids.TryRemove(id, out _)) store.RequeueTakenCommand(id);
+    }
+
+    public void GiveBackAll(LocalStore store)
+    {
+        foreach (var id in ids.Keys) GiveBack(store, id);
     }
 }

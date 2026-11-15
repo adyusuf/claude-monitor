@@ -263,4 +263,36 @@ public sealed class SessionContextTests : IDisposable
 
         Assert.Equal("line1\nline2 \"q\" \\ \t", (string?)parsed["hookSpecificOutput"]!["additionalContext"]);
     }
+
+    [Fact]
+    public void A_prompt_the_read_gave_back_is_not_requeued_again_over_another_hooks_take()
+    {
+        // The read requeues X after the stop; another hook (or the inbox push) takes X; the hook's hand-back must not requeue X a second time.
+        Queue("cmd-1", "s-1", "body");
+        using var store = new LocalStore(home.Config.DatabasePath);
+        var taken = new Capture.TakenPrompts();
+        taken.Add(store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow)!.Id);
+        taken.GiveBack(store, "cmd-1"); // the read's requeue
+        Assert.Equal("cmd-1", store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow)!.Id); // another hook took it
+
+        taken.GiveBackAll(store); // the hook handing back what it took
+
+        Assert.Equal("cmd-1", store.TakenCommands().Single().Id); // still taken by the other hook
+        Assert.Null(store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow)); // not delivered twice
+    }
+
+    [Fact]
+    public void Prompts_taken_and_not_given_back_are_requeued_by_the_hand_back_once()
+    {
+        Queue("cmd-1", "s-1", "one");
+        using var store = new LocalStore(home.Config.DatabasePath);
+        var taken = new Capture.TakenPrompts();
+        taken.Add(store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow)!.Id);
+
+        taken.GiveBackAll(store);
+        taken.GiveBackAll(store); // a second hand-back changes nothing
+
+        Assert.Empty(store.TakenCommands());
+        Assert.Equal("cmd-1", store.TakeCommand("s-1", "prompt", DateTimeOffset.UtcNow)!.Id);
+    }
 }
