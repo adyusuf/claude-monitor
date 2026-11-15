@@ -73,11 +73,13 @@ public sealed record ClaudeControlOutcome(bool Succeeded, string Text, string? S
 /// The only text of the owner's that is ever given to `claude` is the optional first prompt (P2): wrapped as a message from the web, never logged; the rest of the
 /// arguments are a fixed shape of keys and enums. A folder Claude Code's own record shows as not trusted is refused before `claude` is asked.
 /// </summary>
+#pragma warning disable CA1001 // startGate is a SemaphoreSlim whose wait handle is never asked for: it owns no operating-system resource to release
 public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, TimeProvider clock, Func<ClaudeInstall>? locate = null)
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(30);
     private const string NotTrusted = "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt, then try again";
     private readonly Lock gate = new();
+    private readonly SemaphoreSlim startGate = new(1, 1);
     private readonly Func<ClaudeInstall> locator = locate ?? (() => ClaudeLocator.Locate(config));
 
     [GeneratedRegex(@"backgrounded\s*·\s*(?<id>[0-9a-f]{8})", RegexOptions.CultureInvariant)]
@@ -100,12 +102,27 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
         if (FolderOf(projectKey) is not { } folder) return new(false, "this machine knows no such project (it appears once a session works in it, or its folder is listed with `aipod config projects add`)");
         if (!Directory.Exists(folder)) return new(false, "the project's folder is gone from this machine");
         if (ClaudeTrust.IsTrusted(config, folder) == false) return new(false, NotTrusted); // Claude Code's own record says so: do not even ask it
+
+        // One start at a time from the cap check to the record: two starts racing for the last slot would both pass the check.
+        await startGate.WaitAsync(ct);
+        try
+        {
+            return await StartCheckedAsync(claude.Path, folder, projectKey, mode, firstPrompt, actionId, reason, ct);
+        }
+        finally
+        {
+            startGate.Release();
+        }
+    }
+
+    private async Task<ClaudeControlOutcome> StartCheckedAsync(string claudePath, string folder, string projectKey, string mode, string? firstPrompt, Guid actionId, string? reason, CancellationToken ct)
+    {
         if (Running().Count >= config.ClaudeWorkersMax) return new(false, $"{config.ClaudeWorkersMax} sessions started from the web are already running here: stop one first");
 
         List<string> args = ["--bg", "--name", NameFor(projectKey), "--permission-mode", mode];
         // The first prompt is the only text of the owner's that ever reaches `claude`: wrapped and labelled as coming from the web, defused and cut, and last on the line.
         if (firstPrompt is not null) args.Add(ChannelEnvelopes.BuildFirstPrompt(actionId, firstPrompt, config.ClaudeFirstPromptMax, clock.GetUtcNow()));
-        var run = await RunClaudeAsync(claude.Path, args, folder, ct);
+        var run = await RunClaudeAsync(claudePath, args, folder, ct);
         if (run is null) return new(false, "claude could not be started");
         if (run.ExitCode != 0)
         {
@@ -117,7 +134,7 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
 
         if (Backgrounded().Match(run.Output) is not { Success: true } match) return new(false, $"claude --bg did not say which session it started: {FirstLine(run.Output)}");
         var id = match.Groups["id"].Value;
-        Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow(), null, reason)).ToList());
+        lock (gate) Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow(), null, reason)).ToList()); // the same lock as stop and reconcile: no record of theirs is overwritten
         return new(true, $"started session {id} in the background ({mode} mode{(firstPrompt is null ? "" : ", with a first prompt")}); it appears in the session list", id);
     }
 
@@ -237,3 +254,4 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
         }
     }
 }
+#pragma warning restore CA1001
