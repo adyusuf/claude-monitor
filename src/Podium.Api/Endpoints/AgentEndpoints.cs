@@ -210,10 +210,15 @@ public static class AgentEndpoints
         };
         db.PermissionRequests.Add(request);
 
+        // The rule's use is counted in the same transaction as the request it answers (F-162).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         // An approval rule answers at once, but only to an agent that reads the answer in this response (ADR-0019 §7, §8).
         var agent = req.InlineAnswer ? await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted) : null;
         var rule = agent is null ? null
             : await ApprovalRules.MatchAsync(db, agent, request.RepoId, req.ToolName, req.ToolInput, request.AccessScope, now, http.RequestAborted);
+        // The use is a conditional write on a rule still live (as a grant's is), so a rule revoked or ended a moment ago allows nothing and
+        // requests at the same moment all count; a request it does not allow waits for the owner like any other.
+        if (rule is not null && !await ApprovalRules.CountUseAsync(db, rule.Id, now, http.RequestAborted)) rule = null;
         PermissionAnswerMessage? answer = null;
         if (rule is not null)
         {
@@ -222,8 +227,6 @@ public static class AgentEndpoints
             request.AnsweredBy = rule.UserId;
             request.AnsweredAt = now;
             request.AnsweredByRule = rule.Id;
-            rule.UseCount++;
-            rule.LastUsedAt = now;
             Audit.Add(db, http, clock, AuditActions.PermissionAutoAllowed, session.WorkspaceId, rule.UserId, targetType: "permission_request",
                 targetId: request.Id, detail: new { rule = rule.Id, request.ToolName });
             answer = new PermissionAnswerMessage(request.Id, session.ExternalId, PermissionDecisions.Allow, null);
@@ -234,6 +237,7 @@ public static class AgentEndpoints
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         broker.Publish(Broker.Workspace(session.WorkspaceId),
             new StreamMessage("permission", new { sessionId = session.Id, id = request.Id, status = request.Status }));
         return Results.Ok(new PermissionRequestCreated(request.Id, request.ExpiresAt, answer));
