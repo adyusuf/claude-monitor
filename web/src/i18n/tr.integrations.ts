@@ -7,6 +7,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   unavailable: "Jira bu sunucuda henüz kurulu değil. Önce bakımcı bir Atlassian uygulaması kaydeder (SETUP'a bakın).",
   connectTitle: "Jira'yı bağla", subdomain: "Jira adresi", subdomainHint: "Jira alt alan adınız; acme.atlassian.net için \"acme\".",
   twoStepCode: "Kimlik doğrulayıcı uygulamanızdaki kod", connect: "Atlassian ile bağlan",
+  reauthSignIn: "Bir site bağlamak için yakın zamanda oturum açmış olmanız gerekir. Oturumu kapatın, yeniden açın ve 10 dakika içinde bağlayın.",
   connectHint: "Atlassian'da oturum açar ve Podium'un Jira'nızı okumasına ve yazmasına izin verirsiniz. Atlassian parolanız Podium'a ulaşmaz.",
   result: {
     ok: "Tamam.", denied: "Atlassian erişim vermedi, hiçbir şey bağlanmadı.", invalid_state: "Bu oturum açma süresi doldu. Yeniden başlayın.",
@@ -30,7 +31,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   sprintState: { planned: "Planlandı", active: "Aktif", closed: "Kapandı" }, selectSprint: "{name} seç",
   sprintImported: "Sprint içe alındı: {name}", close: "Kapat",
   peopleTitle: "Jira'daki kişiler", peopleHint: "E-postası görünen ve çalışma alanında olmayan kişi, davetler açıksa izleyici olarak davet edilir.",
-  noEmail: "e-posta yok", invited: "davet edildi", linked: "üye: {name}", inactive: "pasif", setEmail: "E-posta gir", linkMember: "Bir üyeye bağla",
+  noEmail: "e-posta yok", invited: "davet edildi", linked: "üye: {name}", inactive: "pasif", setEmail: "E-posta gir", linkMember: "Bir üyeye bağla", unlinkMember: "{name} bağlantısını kaldır",
   email: "E-posta", save: "Kaydet",
   runsTitle: "Son kontroller", noRuns: "Henüz bir şey çalışmadı.",
   runKind: { import: "İçe alma", webhook: "Jira'dan güncelleme", pass: "Kontrol" }, runStatus: { running: "Çalışıyor", ok: "Bitti", partial: "Kısmen bitti", failed: "Başarısız" },

@@ -27,6 +27,18 @@ public sealed class ServerSettingsAccessTests(ApiFactory api) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_jira_card_warns_that_workspaces_are_connected_with_the_app_while_a_connection_exists()
+    {
+        await JiraKit.ConnectedAsync(api, tag: "ss-jira-connected");
+        var admin = await ServerAdminKit.AdminAsync(api, "ss-jira-warn");
+
+        var view = await (await ServerAdminKit.GetAsync(admin)).Content.ReadFromJsonAsync<JsonElement>();
+
+        var jira = ServerAdminKit.IntegrationOf(view, "jira");
+        Assert.Contains("jira_connections_exist", jira.GetProperty("notes").EnumerateArray().Select(n => n.GetString()));
+    }
+
+    [Fact]
     public async Task Everyone_outside_the_admin_workspaces_owners_and_admins_gets_404_on_all_three_calls_and_nothing_happens()
     {
         var member = await ServerAdminKit.AdminAsync(api, "ss-member", Roles.Member);
@@ -109,7 +121,8 @@ public sealed class ServerSettingsAccessTests(ApiFactory api) : IAsyncLifetime
         Assert.Equal(ApiFactory.Origin + "/api/auth/callback/github", ServerAdminKit.IntegrationOf(view, "github").GetProperty("callbackUrl").GetString());
         Assert.Equal(ApiFactory.Origin + "/api/auth/callback/google", ServerAdminKit.IntegrationOf(view, "google").GetProperty("callbackUrl").GetString());
         Assert.Equal(ApiFactory.Origin + "/api/integrations/jira/callback", ServerAdminKit.IntegrationOf(view, "jira").GetProperty("callbackUrl").GetString());
-        Assert.Empty(ServerAdminKit.IntegrationOf(view, "jira").GetProperty("notes").EnumerateArray());
+        // The connections warning depends on what other tests connected in the shared database; every other note must be absent.
+        Assert.DoesNotContain(ServerAdminKit.IntegrationOf(view, "jira").GetProperty("notes").EnumerateArray().Select(n => n.GetString()), n => n != "jira_connections_exist");
         // The test environment gives the sign-in apps and Jira through the environment: source "server", and a secret's value is never sent.
         var id = ServerAdminKit.FieldOf(view, "github", "client_id");
         Assert.Equal(("server", "gh-id", "AIPOD_GITHUB_CLIENT_ID", false), (id.GetProperty("source").GetString(), id.GetProperty("value").GetString(),

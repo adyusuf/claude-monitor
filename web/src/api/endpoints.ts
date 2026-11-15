@@ -204,7 +204,7 @@ export const api = {
   importSprints: (id: string, key: string, sprintIds: string[]) =>
     request<SprintImportResult[]>("POST", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints/import`, { sprintIds }),
   integrationPeople: (id: string) => request<PersonView[]>("GET", `/integrations/${id}/people`),
-  setIntegrationPerson: (personId: string, input: { email?: string; userId?: string }) => request<void>("PUT", `/integrations/people/${personId}`, input),
+  setIntegrationPerson: (personId: string, input: { email?: string; userId?: string; unlink?: boolean }) => request<void>("PUT", `/integrations/people/${personId}`, input),
   syncIntegration: (id: string) => request<SyncRunView>("POST", `/integrations/${id}/sync`),
   integrationRuns: (id: string) => request<SyncRunView[]>("GET", `/integrations/${id}/runs`),
 

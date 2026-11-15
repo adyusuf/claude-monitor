@@ -7,6 +7,7 @@ export const deIntegrations: Dictionary["integrations"] = {
   unavailable: "Jira ist auf diesem Server noch nicht eingerichtet. Zuerst registriert die Betreuung eine Atlassian-App (siehe SETUP).",
   connectTitle: "Jira verbinden", subdomain: "Jira-Adresse", subdomainHint: "Ihre Jira-Subdomain, etwa \"acme\" für acme.atlassian.net.",
   twoStepCode: "Code aus Ihrer Authenticator-App", connect: "Mit Atlassian verbinden",
+  reauthSignIn: "Zum Verbinden einer Site ist eine aktuelle Anmeldung nötig. Melden Sie sich ab, wieder an und verbinden Sie innerhalb von 10 Minuten.",
   connectHint: "Sie melden sich bei Atlassian an und erlauben Podium, Ihr Jira zu lesen und zu schreiben. Ihr Atlassian-Passwort erreicht Podium nie.",
   result: {
     ok: "Erledigt.", denied: "Atlassian hat den Zugriff nicht gewährt, es wurde nichts verbunden.", invalid_state: "Diese Anmeldung ist abgelaufen. Beginnen Sie neu.",
@@ -30,7 +31,7 @@ export const deIntegrations: Dictionary["integrations"] = {
   sprintState: { planned: "Geplant", active: "Aktiv", closed: "Abgeschlossen" }, selectSprint: "{name} auswählen",
   sprintImported: "Sprint importiert: {name}", close: "Schließen",
   peopleTitle: "Personen aus Jira", peopleHint: "Eine Person mit sichtbarer E-Mail-Adresse, die nicht im Arbeitsbereich ist, wird bei aktiven Einladungen als Betrachter eingeladen.",
-  noEmail: "keine E-Mail", invited: "eingeladen", linked: "Mitglied: {name}", inactive: "inaktiv", setEmail: "E-Mail setzen", linkMember: "Mit Mitglied verknüpfen",
+  noEmail: "keine E-Mail", invited: "eingeladen", linked: "Mitglied: {name}", inactive: "inaktiv", setEmail: "E-Mail setzen", linkMember: "Mit Mitglied verknüpfen", unlinkMember: "Verknüpfung mit {name} lösen",
   email: "E-Mail", save: "Speichern",
   runsTitle: "Letzte Prüfungen", noRuns: "Noch nichts gelaufen.",
   runKind: { import: "Import", webhook: "Update aus Jira", pass: "Prüfung" }, runStatus: { running: "Läuft", ok: "Fertig", partial: "Teilweise fertig", failed: "Fehlgeschlagen" },

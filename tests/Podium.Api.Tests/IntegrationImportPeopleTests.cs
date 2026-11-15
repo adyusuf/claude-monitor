@@ -92,6 +92,27 @@ public sealed class IntegrationImportPeopleTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task An_automatic_link_by_e_mail_and_the_leads_manager_role_are_audited_with_the_members_id()
+    {
+        var c = await CrowdAsync("PPA");
+        c.Space.Lead = c.ByMail;
+
+        await JiraKit.ImportAsync(c.World, "PPA");
+
+        await using var db = api.Db();
+        var people = await db.IntegrationPeople.AsNoTracking().Where(p => p.ConnectionId == c.World.ConnectionId).ToDictionaryAsync(p => p.ExternalAccountId, p => p.Id);
+        var links = await db.AuditEvents.AsNoTracking().Where(a => a.WorkspaceId == c.World.WorkspaceId && a.Action == "integration.person_linked").ToListAsync();
+        Assert.Equal(new[] { people["acc-member"].ToString(), people["acc-viewer"].ToString() }.Order(StringComparer.Ordinal), links.Select(a => a.TargetId).Order(StringComparer.Ordinal));
+        var memberLink = links.Single(a => a.TargetId == people["acc-member"].ToString());
+        Assert.Equal((c.World.Admin.Id, c.Member.Id, true), (memberLink.ActorUserId, memberLink.Detail!.RootElement.GetProperty("userId").GetGuid(),
+            memberLink.Detail.RootElement.GetProperty("automatic").GetBoolean()));
+        var project = await JiraKit.ProjectIdAsync(c.World, "PPA");
+        var grant = await db.AuditEvents.AsNoTracking().SingleAsync(a => a.WorkspaceId == c.World.WorkspaceId && a.Action == "project.member_changed" && a.TargetId == project.ToString());
+        Assert.Equal((c.Member.Id, ProjectRoles.Manager, "jira_lead"), (grant.Detail!.RootElement.GetProperty("userId").GetGuid(),
+            grant.Detail.RootElement.GetProperty("role").GetString(), grant.Detail.RootElement.GetProperty("source").GetString()));
+    }
+
+    [Fact]
     public async Task A_project_lead_who_is_a_member_becomes_a_project_manager_and_nobody_else_does()
     {
         var c = await CrowdAsync();

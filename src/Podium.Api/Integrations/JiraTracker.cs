@@ -132,7 +132,7 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
         return await SearchAsync(ctx, $"project in ({keys}) AND updated >= \"{from}\" ORDER BY updated ASC", fields, null, ct);
     }
 
-    public async Task<IReadOnlySet<string>> ListItemIdsAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
+    public async Task<IReadOnlySet<string>?> ListItemIdsAsync(TrackerContext ctx, string containerKey, CancellationToken ct)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
         string? token = null;
@@ -150,10 +150,10 @@ public sealed class JiraTracker(JiraApi api) : IWorkTracker
             }
 
             token = JiraParse.Str(doc.RootElement, "nextPageToken");
-            if (token is null) break;
+            if (token is null) return ids;
         }
 
-        return ids;
+        return null; // the cap was reached with pages left: not the whole list
     }
 
     public async Task<IReadOnlyList<ExternalPerson>> ListPeopleAsync(TrackerContext ctx, string containerKey, CancellationToken ct)

@@ -57,5 +57,6 @@ public sealed class MirrorGate(PodiumDb db, IntegrationTokens tokens)
     /// <summary>The tool's account id for a Podium user: their own linked account first, else the person row matched to them.</summary>
     public async Task<string?> AccountOfAsync(Guid connectionId, Guid userId, CancellationToken ct) =>
         await db.IntegrationAccounts.AsNoTracking().Where(a => a.ConnectionId == connectionId && a.UserId == userId).Select(a => a.ExternalAccountId).FirstOrDefaultAsync(ct)
-        ?? await db.IntegrationPeople.AsNoTracking().Where(p => p.ConnectionId == connectionId && p.UserId == userId).Select(p => p.ExternalAccountId).FirstOrDefaultAsync(ct);
+        ?? await db.IntegrationPeople.AsNoTracking().Where(p => p.ConnectionId == connectionId && p.UserId == userId)
+            .OrderBy(p => p.FirstSeenAt).ThenBy(p => p.Id).Select(p => p.ExternalAccountId).FirstOrDefaultAsync(ct); // the same row every time, should two be linked
 }

@@ -26,10 +26,13 @@ public static class ServerSettingsViews
 {
     public const string NoteIntegrationKey = "integration_key_missing";
 
-    public static ServerIntegrationsView Of(IntegrationSettings settings, ApiConfig config) =>
-        new(settings.CanSave, [.. IntegrationIds.All.Select(id => Integration(settings, config, id))]);
+    /// <summary>Workspaces are connected with the Jira app: a new client id or secret that Atlassian refuses stops every one of them.</summary>
+    public const string NoteJiraConnections = "jira_connections_exist";
 
-    private static IntegrationSettingsView Integration(IntegrationSettings settings, ApiConfig config, string id)
+    public static ServerIntegrationsView Of(IntegrationSettings settings, ApiConfig config, int jiraConnections = 0) =>
+        new(settings.CanSave, [.. IntegrationIds.All.Select(id => Integration(settings, config, id, jiraConnections))]);
+
+    private static IntegrationSettingsView Integration(IntegrationSettings settings, ApiConfig config, string id, int jiraConnections)
     {
         var snapshot = settings.Current;
         var fields = IntegrationCatalog.Of(id).Select(f =>
@@ -47,6 +50,8 @@ public static class ServerSettingsViews
         var status = given == 0 && id != IntegrationIds.Smtp ? IntegrationStatuses.Off
             : missing || notes.Count > 0 ? IntegrationStatuses.Incomplete
             : IntegrationStatuses.Ready;
+        // A warning only: it does not make the integration incomplete.
+        if (id == IntegrationIds.Jira && jiraConnections > 0) notes.Add(NoteJiraConnections);
         return new IntegrationSettingsView(id, status, CallbackUrl(config, id), notes, fields);
     }
 

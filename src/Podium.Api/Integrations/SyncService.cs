@@ -146,7 +146,9 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
             var gone = state.SprintLinks.Where(l => iterations.All(i => i.Id != l.Key)).Select(l => l.Value).ToList();
             foreach (var g in gone) sprints.Archive(state, g);
             foreach (var item in ImportService.EpicsFirst(epics.Concat(changed))) issues.Upsert(state, item, persons, connection.SiteHost, counts);
-            counts.Archived += issues.ArchiveMissing(state, alive.ToHashSet(StringComparer.Ordinal));
+            // An empty or cut listing is no proof that the issues are gone (the connector may have lost the permission to see them, F-066):
+            // nothing is archived on it.
+            if (alive is { Count: > 0 }) counts.Archived += issues.ArchiveMissing(state, alive.ToHashSet(StringComparer.Ordinal));
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         }
