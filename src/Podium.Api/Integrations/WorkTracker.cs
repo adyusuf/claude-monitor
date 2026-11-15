@@ -83,8 +83,11 @@ public interface IWorkTracker
     Task<IReadOnlyList<ExternalItem>> ListChangedAsync(TrackerContext ctx, IReadOnlyList<string> containerKeys, DateTimeOffset since,
         CancellationToken ct);
 
-    /// <summary>The tool's ids of every issue of the containers that still exist (to find the ones that were deleted).</summary>
-    Task<IReadOnlySet<string>> ListItemIdsAsync(TrackerContext ctx, string containerKey, CancellationToken ct);
+    /// <summary>
+    /// The tool's ids of every issue of the containers that still exist (to find the ones that were deleted); null when the listing was cut
+    /// short (a page cap), because a partial list is no proof that the rest is gone.
+    /// </summary>
+    Task<IReadOnlySet<string>?> ListItemIdsAsync(TrackerContext ctx, string containerKey, CancellationToken ct);
 
     Task<IReadOnlyList<ExternalPerson>> ListPeopleAsync(TrackerContext ctx, string containerKey, CancellationToken ct);
 }

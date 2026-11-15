@@ -81,6 +81,20 @@ public sealed class IntegrationPassTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_space_whose_listing_comes_back_empty_archives_none_of_its_issues()
+    {
+        // As when the connector no longer sees the issues (lost permission) or the search answers empty: an empty list is no proof that
+        // every issue was deleted (F-066).
+        var s = await JiraSprintKit.ImportedAsync(api);
+        foreach (var issue in s.Space.Issues) issue.Deleted = true;
+
+        var run = await JiraKit.PassAsync(s.World);
+
+        Assert.Equal((0, "ok"), (Count(run, "archived"), run.GetProperty("status").GetString()));
+        Assert.All(await JiraKit.IssuesAsync(s.World, s.Project), i => Assert.Null(i.ArchivedAt));
+    }
+
+    [Fact]
     public async Task A_sprint_that_disappeared_is_archived_and_its_issues_go_back_to_the_backlog_and_a_new_sprint_is_not_imported()
     {
         var s = await JiraSprintKit.ImportedAsync(api);
