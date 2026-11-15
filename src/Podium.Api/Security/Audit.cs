@@ -17,6 +17,7 @@ public static class AuditActions
     public const string PasswordReset = "user.password_reset";
     public const string ProviderLinked = "user.provider_linked";
     public const string AccountDeleted = "user.account_deleted";
+    public const string DataExported = "user.data_exported";
     public const string WorkspaceCreated = "workspace.created";
     public const string WorkspaceRenamed = "workspace.renamed";
     public const string InvitationCreated = "workspace.invitation_created";

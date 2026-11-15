@@ -161,6 +161,21 @@ describe("api client", () => {
     expect((await code("/e")).code).toBe("request_failed");
     expect((await code("/zzz")).code).toBe("not_found");
   });
+
+  it("ignores a framework title that is not a code and keeps a code with digits", async () => {
+    // The body the API's exception handler writes on a real 500 (ServerErrorBodyTests reads it from the API).
+    const framework = { type: "https://tools.ietf.org/html/rfc9110#section-15.6.1", title: "An error occurred while processing your request.", status: 500 };
+    mockApi({
+      "POST /a": { status: 500, body: framework },
+      "POST /b": { status: 409, body: { title: "Conflict" } },
+      "POST /c": { status: 400, body: { title: "policy_sha256" } },
+    });
+    const code = async (p: string) => (await request("POST", p).catch((e: ApiError) => e)) as ApiError;
+    const a = await code("/a");
+    expect([a.status, a.code, a.data.title]).toEqual([500, "server_error", framework.title]);
+    expect((await code("/b")).code).toBe("conflict");
+    expect((await code("/c")).code).toBe("policy_sha256");
+  });
 });
 
 describe("live", () => {

@@ -33,6 +33,9 @@ public static class PrivacyEndpoints
         var userId = http.User.UserId();
         var ct = http.RequestAborted;
         var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, ct);
+        // Recorded before the first byte, so an export cut off midway still leaves its trace. No detail: the row names nothing it held.
+        Audit.Add(db, http, clock, AuditActions.DataExported, userId: userId);
+        await db.SaveChangesAsync(ct);
         http.Response.ContentType = "application/json";
         http.Response.Headers.ContentDisposition = $"attachment; filename=\"podium-export-{clock.GetUtcNow():yyyy-MM-dd}.json\"";
         // Written into the response's pipe (never a synchronous write) and flushed per chunk, so an export of any size
