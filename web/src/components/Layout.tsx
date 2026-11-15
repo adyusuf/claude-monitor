@@ -67,7 +67,7 @@ export function Layout() {
         </div>
         {current ? (
           <label className="switcher">
-            <span className="sr-only">Workspace</span>
+            <span className="sr-only">{t("nav.workspace")}</span>
             <select value={current.id} onChange={(e) => e.target.value === "new" ? navigate("/workspaces/new") : navigate(`/w/${e.target.value}/projects`)}>
               {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               <option value="new">+ {t("nav.newWorkspace")}</option>
@@ -128,7 +128,7 @@ export function Layout() {
       </aside>
       <div className="main-col">
         <div className="topbar">
-          <button type="button" className="menu-toggle" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
+          <button type="button" className="menu-toggle" aria-label={t("nav.menu")} onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
           <span className="topbar-name">{t("app.name")}</span>
         </div>
         <div className="main">

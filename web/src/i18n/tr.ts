@@ -20,6 +20,7 @@ export const tr: Dictionary = {
     dashboard: "Pano", projects: "Projeler", sessions: "Oturumlar", machines: "Makineler", runs: "Çalıştırmalar", approvals: "Onaylar", members: "Üyeler", integrations: "Entegrasyonlar", settings: "Çalışma alanı ayarları", serverSettings: "Sunucu ayarları",
     account: "Hesap", download: "Ajanı edinin", signOut: "Çıkış", signOutFailed: "Çıkış tamamlanamadı, oturumunuz hâlâ açık. Tekrar deneyin.", newWorkspace: "Yeni çalışma alanı",
     theme: "Tema", language: "Dil",
+    workspace: "Çalışma alanı", menu: "Menü",
     themeSystem: "Sistem", themeLight: "Açık", themeDark: "Koyu",
   },
   auth: {

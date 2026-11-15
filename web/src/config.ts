@@ -30,6 +30,8 @@ export const config = {
   /** The longest typed answer to a question (the API takes the same). */
   answerMax: 500,
   liveReconnectMs: 3_000,
+  /** A stream that keeps failing is retried after 3 s, 6 s, 12 s ... never later than this. */
+  liveReconnectMaxMs: 60_000,
   liveDebounceMs: 400,
   /** The server pings a live stream every 20 s: one that has said nothing for this long is dropped and opened again, checked this often. */
   liveStaleMs: 70_000,

@@ -223,7 +223,7 @@ public static class PrivacyEndpoints
         }
 
         foreach (var m in memberships) m.RemovedAt = now;
-        await db.Workspaces.Where(w => solo.Contains(w.Id)).ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, "archived"), ct);
+        await db.Workspaces.Where(w => solo.Contains(w.Id)).ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, WorkspaceStatuses.Archived), ct);
 
         user.Email = null;
         user.EmailNormalized = null;
