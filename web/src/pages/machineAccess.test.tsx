@@ -118,4 +118,20 @@ describe("a project policy on a machine", () => {
     expect(within(li).getByRole("list", { name: "Applications" })).toHaveTextContent("/usr/bin/git");
     expect(within(li).getByText("ab12")).toBeInTheDocument();
   });
+
+  it("says the project's own folder comes on top of the listed folders when the machine's own limit lists no folder", () => {
+    show(access({
+      ceiling: { allowedFolders: [], deniedFolders: [], applications: [], shell: true },
+      policies: [policy({ includeProjectFolder: true })],
+    }));
+    expect(within(row("Widgets")).getByText("Plus the project's own folder.")).toBeInTheDocument();
+  });
+
+  it("does not promise the project's own folder when the machine's own limit allows only some folders", () => {
+    show(access({
+      ceiling: { allowedFolders: ["/srv"], deniedFolders: [], applications: [], shell: true },
+      policies: [policy({ includeProjectFolder: true })],
+    }));
+    expect(within(row("Widgets")).queryByText("Plus the project's own folder.")).toBeNull();
+  });
 });

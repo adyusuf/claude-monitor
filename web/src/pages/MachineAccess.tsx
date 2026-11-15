@@ -17,7 +17,7 @@ export function AccessStateBadge({ state }: { state: string | null }) {
 }
 
 /** One project's policy on this machine: the web's version, the one applied here and in which state, and the effective lists for the machine's OS. */
-function PolicyRow({ ws, policy }: { ws: string; policy: MachineAccessPolicyView }) {
+function PolicyRow({ ws, policy, ceilingLimits }: { ws: string; policy: MachineAccessPolicyView; ceilingLimits: boolean }) {
   const { t } = useI18n();
   const behind = policy.appliedVersion !== null && policy.appliedVersion < policy.webVersion;
   return (
@@ -32,7 +32,8 @@ function PolicyRow({ ws, policy }: { ws: string; policy: MachineAccessPolicyView
         {policy.isSigned ? <span className="badge ok">{t("access.signed")}</span> : <span className="badge warn">{t("access.unsigned")}</span>}
         {policy.shell ? <span className="badge status-failed">{t("access.shellOn")}</span> : null}
       </div>
-      <AccessLists allowed={policy.allowedFolders} denied={policy.deniedFolders} applications={policy.applications} projectFolder={policy.includeProjectFolder} />
+      <AccessLists allowed={policy.allowedFolders} denied={policy.deniedFolders} applications={policy.applications} projectFolder={policy.includeProjectFolder}
+        ceilingLimits={ceilingLimits} />
     </li>
   );
 }
@@ -60,7 +61,7 @@ export function MachineAccess({ ws, access }: { ws: string; access: MachineAcces
       <section className="stack-tight" aria-label={t("access.policies")}>
         <h3 className="subhead">{t("access.policies")}</h3>
         {access.policies.length === 0 ? <p className="muted">{t("access.noPolicies")}</p> : (
-          <ul className="plain">{access.policies.map((p) => <PolicyRow key={p.projectId} ws={ws} policy={p} />)}</ul>
+          <ul className="plain">{access.policies.map((p) => <PolicyRow key={p.projectId} ws={ws} policy={p} ceilingLimits={(access.ceiling?.allowedFolders.length ?? 0) > 0} />)}</ul>
         )}
       </section>
     </div>

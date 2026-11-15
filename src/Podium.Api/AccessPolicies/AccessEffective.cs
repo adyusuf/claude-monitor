@@ -53,12 +53,19 @@ public static class AccessEffective
             .Union(ceiling.Where(c => AccessPolicyMath.IsUnderAny(c, policy, os)), StringComparer.Ordinal).Order(StringComparer.Ordinal)];
     }
 
-    /// <summary>The applications both allow: an empty list on either side is no limit there; otherwise the policy's entries the ceiling also lists.</summary>
+    /// <summary>
+    /// The applications both allow: an empty list on either side is no limit there; otherwise the policy's entries the ceiling also lists. The agent checks
+    /// each layer on its own and a layer that pins an executable by SHA-256 refuses any other file, so entries that pin different hashes are not listed, and
+    /// an entry only one side pins is listed with that hash.
+    /// </summary>
     public static IReadOnlyList<AccessApp> Applications(IReadOnlyList<AccessApp> policy, IReadOnlyList<AccessApp> ceiling, string os)
     {
         if (ceiling.Count == 0) return policy;
         if (policy.Count == 0) return ceiling;
         // The same path as the OS compares it: each is "under" the other only when they are equal.
-        return [.. policy.Where(p => ceiling.Any(c => AccessPolicyMath.IsUnder(c.Path, p.Path, os) && AccessPolicyMath.IsUnder(p.Path, c.Path, os)))];
+        return [.. policy.SelectMany(p => ceiling
+            .Where(c => AccessPolicyMath.IsUnder(c.Path, p.Path, os) && AccessPolicyMath.IsUnder(p.Path, c.Path, os)
+                && (p.Sha256 is null || c.Sha256 is null || string.Equals(p.Sha256, c.Sha256, StringComparison.Ordinal)))
+            .Select(c => new AccessApp(p.Path, p.Sha256 ?? c.Sha256))).Distinct()];
     }
 }
