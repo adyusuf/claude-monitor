@@ -4,6 +4,7 @@ using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Integrations;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Podium.Api.Endpoints;
 
@@ -31,7 +32,14 @@ public static class IntegrationWebhookEndpoints
         var delivery = http.Request.Headers[DeliveryHeader].ToString() is { Length: > 0 and <= 100 } header ? header : Convert.ToHexStringLower(SHA256.HashData(body));
         if (await db.IntegrationWebhookReceipts.AnyAsync(r => r.ConnectionId == id && r.DeliveryId == delivery, ct)) return Results.Ok();
         db.IntegrationWebhookReceipts.Add(new IntegrationWebhookReceipt { ConnectionId = id, DeliveryId = delivery, ReceivedAt = clock.GetUtcNow() });
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            return Results.Ok(); // the same delivery arrived at once and the other call wrote its receipt first: it queues the read, this one does not
+        }
 
         if (Parse(body, id) is { } request) inbox.Enqueue(request);
         return Results.Ok();
