@@ -7,7 +7,7 @@ import { trIntegrations } from "./tr.integrations";
 import { trViews } from "./tr.views";
 import { trServerSettings } from "./tr.serverSettings";
 import { trTwoStep } from "./tr.twoStep";
-import { trApprovalRules } from "./tr.approvalRules";
+import { trApprovalRules, trApprovalRulesErrors } from "./tr.approvalRules";
 import { trDashboard } from "./tr.dashboard";
 import { trInstallOptions } from "./tr.installOptions";
 import { trRemote } from "./tr.remote";

@@ -1,7 +1,7 @@
 import type { Dictionary } from "./en";
 import { deMachines } from "./de.machines";
 import { deTwoStep } from "./de.twoStep";
-import { deApprovalRules } from "./de.approvalRules";
+import { deApprovalRules, deApprovalRulesErrors } from "./de.approvalRules";
 import { deDashboard } from "./de.dashboard";
 import { deInstallOptions } from "./de.installOptions";
 import { deRemote } from "./de.remote";

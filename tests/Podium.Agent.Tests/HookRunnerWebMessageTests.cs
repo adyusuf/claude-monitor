@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Podium.Agent.Capture;
 using Podium.Agent.Push;
 using Podium.Agent.Storage;
 using Podium.Contracts;
@@ -47,6 +48,23 @@ public sealed partial class HookRunnerTests
         var reason = output["reason"]!.GetValue<string>();
         Assert.StartsWith(ChannelEnvelopes.InboxNotice, reason, StringComparison.Ordinal);
         AssertDefusedAndCapped(reason, "h1");
+    }
+
+    [Fact]
+    public async Task A_hostile_deny_reason_from_the_web_is_labelled_wrapped_defused_and_capped()
+    {
+        LogIn(fresh: true);
+        using var daemon = new LocalStore(home.Config.DatabasePath);
+        var running = Run(clock, "PermissionRequest", new { session_id = "s1", tool_name = "Bash", tool_input = new { command = "git push" } },
+            c => c with { PushContentMax = SmallCap });
+        var asked = await WaitFor(() => daemon.PermissionsIn(PermissionStates.New).SingleOrDefault());
+        daemon.PermissionSent(asked.LocalId, "remote-h");
+        daemon.PermissionAnswered("remote-h", PermissionDecisions.Deny, Hostile);
+        var decision = JsonNode.Parse((await running)!)!["hookSpecificOutput"]!["decision"]!;
+        Assert.Equal("deny", decision["behavior"]!.GetValue<string>());
+        var message = decision["message"]!.GetValue<string>();
+        Assert.StartsWith(HookRunner.DeniedFromTheWeb + "\n" + ChannelEnvelopes.InboxNotice, message, StringComparison.Ordinal);
+        AssertDefusedAndCapped(message, asked.LocalId);
     }
 
     [Fact]

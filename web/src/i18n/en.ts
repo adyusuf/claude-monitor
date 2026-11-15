@@ -6,7 +6,7 @@ import { enIntegrations } from "./en.integrations";
 import { enViews } from "./en.views";
 import { enServerSettings } from "./en.serverSettings";
 import { enTwoStep } from "./en.twoStep";
-import { enApprovalRules } from "./en.approvalRules";
+import { enApprovalRules, enApprovalRulesErrors } from "./en.approvalRules";
 import { enDashboard } from "./en.dashboard";
 import { enInstallOptions } from "./en.installOptions";
 import { enRemote } from "./en.remote";

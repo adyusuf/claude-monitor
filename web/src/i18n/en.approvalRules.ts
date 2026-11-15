@@ -6,7 +6,7 @@ export const enApprovalRules = {
   waiting: "Waiting", noneWaiting: "Nothing is waiting for you.",
   rules: "Standing approvals", noRules: "You have no standing approvals.",
   recent: "Recently answered", noRecent: "Nothing was answered lately.",
-  session: "Session", machine: "Machine", tool: "Tool", command: "Command", input: "Input", expires: "Waits until", untitled: "Untitled session",
+  session: "Session", machine: "Machine", tool: "Tool", command: "Command", input: "Input", expires: "Waits until", expired: "Time is up: this request is now asked on the machine.", untitled: "Untitled session",
   remember: "Allow for", duration: { once: "This time only", "5m": "5 minutes", "10m": "10 minutes", "30m": "30 minutes", "1h": "1 hour", always: "Always" },
   rememberHint: "The same tool on this machine, in this project, is then allowed by itself until the time ends: for Bash only this exact command, for a file only this file.",
   rememberHintAlways: "Always lasts until you revoke it on the approvals page, or until it goes unused for as long as the workspace keeps its sessions, and asks for your code.",
@@ -18,4 +18,11 @@ export const enApprovalRules = {
   answeredBy: "Answered by", byRule: "a standing approval", decision: { allow: "Allowed", deny: "Denied" }, when: "When",
   anyInput: "any input",
   moreLine: "+1 more line", moreLines: "+{n} more lines",
+};
+
+/** The codes of the permission answer and the standing approvals (ADR-0019), as `errors.<code>`; en.ts spreads it into `errors`. */
+export const enApprovalRulesErrors = {
+  rule_limit: "You already have the most standing approvals you can have (200). Revoke one on the approvals page, or allow just this once.",
+  rule_not_allowed: "This request cannot have a standing approval now (the machine may have become production or a database). Allow it just this once.",
+  invalid_decision: "Pick Allow or Deny.", invalid_duration: "Pick how long the allow stands from the list.",
 };

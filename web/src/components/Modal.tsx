@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import { Icon } from "./icons";
 
@@ -8,14 +8,16 @@ const open: object[] = [];
 const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
 
 /**
- * A dialog over the page: a title, a close button, Escape and a click on the backdrop close it. Focus moves into it when it opens and goes back
- * to where it was when it closes; the page behind does not scroll while it is open. `side` slides it in from the right edge, full height.
+ * A dialog over the page: a title, a close button, Escape and a click on the backdrop close it. Focus moves into it when it opens (unless a field
+ * inside took it itself) and goes back to where it was before it opened when it closes; the page behind does not scroll while it is open. `side` slides it in from the right edge, full height.
  */
 export function Modal({ title, onClose, children, side }: { title: ReactNode; onClose: () => void; children: ReactNode; side?: boolean }) {
   const { t } = useI18n();
   const titleId = useId();
   const box = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
+  // Who had focus before the dialog: read on the first render, before a child's autoFocus (which runs before this component's effect) moves it.
+  const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
   useEffect(() => {
     close.current = onClose;
   });
@@ -23,8 +25,7 @@ export function Modal({ title, onClose, children, side }: { title: ReactNode; on
   useEffect(() => {
     const me = {};
     open.push(me);
-    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    box.current?.focus();
+    if (!box.current?.contains(document.activeElement)) box.current?.focus(); // a field that took focus itself keeps it
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
@@ -50,9 +51,9 @@ export function Modal({ title, onClose, children, side }: { title: ReactNode; on
       document.removeEventListener("keydown", onKey);
       open.splice(open.indexOf(me), 1);
       document.body.style.overflow = overflow;
-      before?.focus();
+      opener?.focus();
     };
-  }, []);
+  }, [opener]);
 
   return (
     <div className={side ? "modal-backdrop side" : "modal-backdrop"} onMouseDown={(e) => {

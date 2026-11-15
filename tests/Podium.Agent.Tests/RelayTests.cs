@@ -8,7 +8,7 @@ using Podium.Contracts;
 
 namespace Podium.Agent.Tests;
 
-public sealed class RelayTests : IDisposable
+public sealed partial class RelayTests : IDisposable
 {
     private readonly TempHome home = new();
     private readonly ManualClock clock = new(DateTimeOffset.UtcNow);

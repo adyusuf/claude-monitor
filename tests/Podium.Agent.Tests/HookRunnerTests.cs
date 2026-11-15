@@ -158,7 +158,9 @@ public sealed partial class HookRunnerTests : IDisposable
         var output = JsonNode.Parse((await running)!)!["hookSpecificOutput"]!;
         Assert.Equal("PermissionRequest", output["hookEventName"]!.GetValue<string>());
         Assert.Equal("deny", output["decision"]!["behavior"]!.GetValue<string>());
-        Assert.Equal("not on Friday", output["decision"]!["message"]!.GetValue<string>());
+        var message = output["decision"]!["message"]!.GetValue<string>(); // the owner's reason is web text: labelled and wrapped (F-242)
+        Assert.StartsWith(HookRunner.DeniedFromTheWeb, message, StringComparison.Ordinal);
+        AssertWrapped(message, asked.LocalId, "not on Friday");
     }
 
     [Fact]
