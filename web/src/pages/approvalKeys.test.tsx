@@ -96,13 +96,16 @@ describe("the approval keys card", () => {
   });
 });
 
+const live = (key: { name: string; fingerprint: string; publicKey: string }, retiredAt: string | null = null) =>
+  ({ id: "k1", name: key.name, fingerprint: key.fingerprint, publicKey: key.publicKey, createdAt: new Date().toISOString(), retiredAt });
+
 describe("allowing a run signs it with this browser's key", () => {
   const verify = async (publicKey: string, signature: string, payload: string) =>
     crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, await crypto.subtle.importKey("spki", bytes(publicKey), SIGNING, true, ["verify"]), bytes(signature), new TextEncoder().encode(payload));
 
   it("sends the key's id and a signature over this exact run, its target, its hash and its expiry", async () => {
     const key = await approvalKeys.generate("k");
-    const calls = mockApi({ "POST /runs/r1/approve": { status: 204 } });
+    const calls = mockApi({ "POST /runs/r1/approve": { status: 204 }, "GET /me/approval-keys": { body: [live(key)] } });
     const card = run({ hash: "h".repeat(64) });
     renderPlain(<RunApproval run={card} ws="w1" onChanged={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: en.remote.allow }));
@@ -121,6 +124,42 @@ describe("allowing a run signs it with this browser's key", () => {
     const body = calls.find((c) => c.path === "/runs/r1/approve")!.body as Record<string, unknown>;
     expect(body.signature).toBeUndefined();
     expect(body.keyId).toBeUndefined();
+  });
+
+  it("sends no signature when this browser's key is not registered or was retired elsewhere, for a machine that does not require one (F-165)", async () => {
+    const key = await approvalKeys.generate("stale");
+    for (const listed of [[], [live(key, new Date().toISOString())]]) {
+      const calls = mockApi({ "POST /runs/r1/approve": { status: 204 }, "GET /me/approval-keys": { body: listed } });
+      const { unmount } = renderPlain(<RunApproval run={run({ hash: "h".repeat(64) })} ws="w1" onChanged={vi.fn()} />);
+      await userEvent.click(screen.getByRole("button", { name: en.remote.allow }));
+      await waitFor(() => expect(calls.some((c) => c.path === "/runs/r1/approve")).toBe(true));
+      const body = calls.find((c) => c.path === "/runs/r1/approve")!.body as Record<string, unknown>;
+      expect(body.signature).toBeUndefined();
+      expect(body.keyId).toBeUndefined();
+      unmount();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("still signs with the held key for a machine that requires signatures, and the API decides (F-165)", async () => {
+    const key = await approvalKeys.generate("req");
+    const calls = mockApi({ "POST /runs/r1/approve": { status: 204 }, "GET /me/approval-keys": { body: [] } });
+    renderPlain(<RunApproval run={run({ hash: "h".repeat(64), approvalsRequired: true })} ws="w1" onChanged={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: en.remote.allow }));
+    await waitFor(() => expect(calls.some((c) => c.path === "/runs/r1/approve")).toBe(true));
+    expect((calls.find((c) => c.path === "/runs/r1/approve")!.body as { keyId: string }).keyId).toBe(key.fingerprint);
+  });
+
+  it("reports a signing error instead of hiding it, and for a machine that does not require signatures goes on unsigned (F-165)", async () => {
+    const key = await approvalKeys.generate("broken");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(approvalKeys, "sign").mockRejectedValue(new Error("no subtle crypto"));
+    const calls = mockApi({ "POST /runs/r1/approve": { status: 204 }, "GET /me/approval-keys": { body: [live(key)] } });
+    renderPlain(<RunApproval run={run({ hash: "h".repeat(64) })} ws="w1" onChanged={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: en.remote.allow }));
+    await waitFor(() => expect(calls.some((c) => c.path === "/runs/r1/approve")).toBe(true));
+    expect((calls.find((c) => c.path === "/runs/r1/approve")!.body as Record<string, unknown>).signature).toBeUndefined();
+    expect(warn).toHaveBeenCalled();
   });
 
   it("says a key is needed and sends nothing when the machine requires signatures and this browser has none", async () => {
