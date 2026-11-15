@@ -61,4 +61,21 @@ public sealed class InvitationInviterTests(ApiFactory api)
         await using var db = api.Db();
         Assert.Equal("admin", await db.WorkspaceMembers.Where(m => m.WorkspaceId == owner.WorkspaceId && m.UserId == invitee.Id).Select(m => m.Role).SingleAsync());
     }
+
+    [Fact]
+    public async Task An_invitation_into_an_archived_workspace_cannot_be_accepted_and_stays_open()
+    {
+        var (owner, _, invitee, token) = await InvitedByAdminAsync("inv-archived", "member");
+        await using (var db = api.Db())
+        {
+            await db.Workspaces.Where(w => w.Id == owner.WorkspaceId)
+                .ExecuteUpdateAsync(s => s.SetProperty(w => w.Status, "archived"));
+        }
+
+        await AssertRefusedAsync(owner, invitee, token);
+
+        await using var check = api.Db();
+        var hash = Podium.Api.Security.Secrets.Hash(token);
+        Assert.Null(await check.WorkspaceInvitations.Where(i => i.TokenHash == hash).Select(i => i.AcceptedAt).SingleAsync());
+    }
 }

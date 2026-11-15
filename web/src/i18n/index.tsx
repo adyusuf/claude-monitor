@@ -78,6 +78,17 @@ export function useI18n(): I18n {
   return ctx;
 }
 
+/** For a code that arrives in the address (`?error=`): its message when the dictionary has one, otherwise nothing (never the raw key). */
+export function useKnownErrorText() {
+  const { tx } = useI18n();
+  return (code: string | null) => {
+    if (!code) return null;
+    const key = `errors.${code}`;
+    const text = tx(key);
+    return text === key ? null : text;
+  };
+}
+
 /** The translated message of an error: an API code when it has one, otherwise a network failure. */
 export function useErrorText() {
   const { tx } = useI18n();

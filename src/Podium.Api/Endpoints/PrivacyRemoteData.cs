@@ -108,6 +108,9 @@ public static class PrivacyRemoteData
             .Select(a => new { a.Id, a.RequesterAgentId, a.TargetAgentId, a.Question, a.Status, a.Answer, a.AnswerTruncated, a.Error, a.CreatedAt, a.DeliveredAt, a.AnsweredAt }).ToListAsync(ct));
         PrivacyEndpoints.Write(w, "agentActions", await db.AgentActions.AsNoTracking().Where(a => a.RequestedBy == userId).OrderBy(a => a.CreatedAt)
             .Select(a => new { a.Id, a.AgentId, a.Kind, a.Status, a.Result, a.CreatedAt, a.FinishedAt }).ToListAsync(ct));
+        // The public halves of the user's approval keys, with the name they typed for each (retired ones too).
+        PrivacyEndpoints.Write(w, "approvalKeys", await db.ApprovalKeys.AsNoTracking().Where(k => k.UserId == userId).OrderBy(k => k.CreatedAt).ThenBy(k => k.Id)
+            .Select(k => new { k.Id, k.Name, k.Fingerprint, k.PublicKey, k.CreatedAt, k.RetiredAt }).ToListAsync(ct));
         PrivacyEndpoints.Write(w, "machineProjects", await db.MachineProjects.AsNoTracking().Where(p => agentIds.Contains(p.AgentId)).OrderBy(p => p.AgentId).ThenBy(p => p.ProjectKey)
             .Select(p => new { p.AgentId, p.ProjectKey, p.Name, p.Branch, p.HeadSha, p.Tag, p.LastSeenAt, p.Source }).ToListAsync(ct));
         w.WriteStartArray("metrics");
@@ -200,6 +203,8 @@ public static class PrivacyRemoteData
             .SetProperty(a => a.AccessReport, (string?)null).SetProperty(a => a.AccessReportAt, (DateTimeOffset?)null), ct);
         await db.MachineMetrics.Where(m => agentIds.Contains(m.AgentId)).ExecuteDeleteAsync(ct);
         await db.MachineAlerts.Where(a => agentIds.Contains(a.AgentId)).ExecuteDeleteAsync(ct);
+        // The key names are text the person typed: the rows go (nothing else points at them; a policy keeps only the fingerprint it was signed under).
+        await db.ApprovalKeys.Where(k => k.UserId == userId).ExecuteDeleteAsync(ct);
     }
 
     private static void WriteTime(Utf8JsonWriter w, string name, DateTimeOffset? value)

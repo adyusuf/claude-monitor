@@ -101,7 +101,7 @@ public static class Startup
     {
         if (config.TrustProxy) app.UseForwardedHeaders();
         app.UseExceptionHandler();
-        app.Use(SecurityHeaders);
+        app.Use((http, next) => SecurityHeaders(http, next, config.SecureCookies));
         app.Use((http, next) => Csrf(http, next, config));
         var files = config.WebRoot is { Length: > 0 } root && Directory.Exists(root)
             ? new PhysicalFileProvider(Path.GetFullPath(root))
@@ -236,9 +236,11 @@ public static class Startup
         if (ctx.File.Name.EndsWith(".html", StringComparison.Ordinal)) ctx.Context.Response.Headers.CacheControl = "no-cache";
     }
 
-    private static Task SecurityHeaders(HttpContext http, Func<Task> next)
+    public static Task SecurityHeaders(HttpContext http, Func<Task> next, bool https)
     {
         var h = http.Response.Headers;
+        // Only when the public origin is https (production requires it): a development http origin must not pin its host to https.
+        if (https) h.StrictTransportSecurity = "max-age=31536000";
         h.XContentTypeOptions = "nosniff";
         h.XFrameOptions = "DENY";
         h["Referrer-Policy"] = "same-origin";

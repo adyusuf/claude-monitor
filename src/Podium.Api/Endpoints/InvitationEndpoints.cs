@@ -128,6 +128,12 @@ public static class InvitationEndpoints
             return Http.Invalid("token", "invalid_token");
         }
 
+        // An archived workspace takes no new member (/me hides it): refused, and the invitation stays unspent.
+        if (!await db.Workspaces.AsNoTracking().AnyAsync(w => w.Id == invitation.WorkspaceId && w.Status == WorkspaceStatuses.Active, http.RequestAborted))
+        {
+            return Http.Invalid("token", "invalid_token");
+        }
+
         var member = await db.WorkspaceMembers.FirstOrDefaultAsync(
             m => m.WorkspaceId == invitation.WorkspaceId && m.UserId == userId, http.RequestAborted);
 

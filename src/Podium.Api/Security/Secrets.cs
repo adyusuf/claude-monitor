@@ -66,8 +66,17 @@ public static class Secrets
         return Hasher.VerifyHashedPassword(user, hash, password ?? "") != PasswordVerificationResult.Failed;
     }
 
-    /// <summary>A stable, non-reversible tag for an IP address in the audit log (no raw address is stored).</summary>
-    public static string? IpTag(System.Net.IPAddress? ip) => ip is null ? null : Hash("ip:" + ip)[..16];
+    /// <summary>
+    /// A stable tag for an IP address in the audit log (no raw address is stored): an HMAC under a key derived from the server's secret, so the
+    /// small IPv4 space cannot be enumerated into the address without that secret.
+    /// </summary>
+    public static string? IpTag(System.Net.IPAddress? ip, byte[] serverKey)
+    {
+        ArgumentNullException.ThrowIfNull(serverKey);
+        if (ip is null) return null;
+        var key = HMACSHA256.HashData(serverKey, Encoding.UTF8.GetBytes("podium audit ip tag v1"));
+        return Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(ip.ToString())))[..16];
+    }
 
     private static string Base64Url(byte[] bytes) =>
         Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
