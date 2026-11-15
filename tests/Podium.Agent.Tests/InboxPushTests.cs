@@ -130,6 +130,25 @@ public sealed class InboxPushTests : IDisposable
         Assert.Equal("c-2", store.TakeCommand("s-2", CommandKinds.Prompt, Start)!.Id);
     }
 
+    [Theory]
+    [InlineData(false, PushTransports.Inbox)]
+    [InlineData(true, PushTransports.Channel)]
+    public async Task Turning_push_off_requeues_a_pushed_unconfirmed_prompt_for_the_hook(bool pushEnabled, string transportAfter)
+    {
+        store.SaveInbox("s-1", "/tmp/cc-socks/1.sock", Token, Start);
+        Queue("c-1", "s-1");
+        Assert.Equal(1, await Pump().PumpAsync(CancellationToken.None)); // pushed, never seen in the transcript
+        Assert.Null(store.TakeCommand("s-1", CommandKinds.Prompt, Start)); // a hook does not take a pushed prompt
+
+        clock.Advance(home.Config.InboxConfirmWait);
+        // Push switched off (or moved to the channel) while the prompt waited for its confirmation.
+        Assert.Equal(0, await Pump(home.Config with { PushEnabled = pushEnabled, PushTransport = transportAfter }).PumpAsync(CancellationToken.None));
+
+        Assert.Empty(store.UnconfirmedPushes());
+        Assert.Equal("c-1", store.TakeCommand("s-1", CommandKinds.Prompt, clock.GetUtcNow())!.Id);
+        Assert.Single(transport.Sent); // requeued for the hooks, not written to the socket again
+    }
+
     [Fact]
     public async Task Push_off_or_through_the_channel_writes_nothing()
     {
