@@ -161,6 +161,7 @@ describe("the grant form", () => {
   it.each([
     ["time limit of 0", en.remote.maxTimeout, "0"], ["time limit above the maximum", en.remote.maxTimeout, String(config.grantTimeoutMax + 1)],
     ["0 days", en.remote.days, "0"], ["days above the maximum", en.remote.days, String(config.grantDaysMax + 1)],
+    ["fractional time limit", en.remote.maxTimeout, "30.5"], ["fractional days", en.remote.days, "1.5"],
   ])("refuses a %s as out of range", async (_name, label, value) => {
     const calls = mockApi({});
     const { template, cwd } = form();

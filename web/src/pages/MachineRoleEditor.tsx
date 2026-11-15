@@ -4,11 +4,12 @@ import type { MachineEnvironment, MachineFunction, MachineView } from "../api/ty
 import { Icon } from "../components/icons";
 import { Button, Notice } from "../components/ui";
 import { useI18n } from "../i18n";
+import { STRICT_ENVIRONMENT, STRICT_FUNCTION } from "../lib/machineLimits";
 import { ENVIRONMENT_ORDER, environmentsOf, FUNCTION_ORDER, functionsOf, normalize, strictest } from "../lib/roles";
 import { isStrict, RoleBadge } from "./MachineBadges";
 import { useCodeGate } from "./useCodeGate";
 
-const STRICT: readonly string[] = ["production", "database"];
+const STRICT: readonly string[] = [STRICT_ENVIRONMENT, STRICT_FUNCTION];
 
 /**
  * One set of the role as chips: each value is a chip with an edit (it turns into a list to pick another value) and a remove; a list below adds a

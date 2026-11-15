@@ -68,6 +68,49 @@ public sealed class TestRunTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task Starting_the_test_again_while_one_is_open_returns_that_run_and_a_finished_one_does_not_block_a_new_start()
+    {
+        var team = await RemoteKit.TeamAsync(api);
+        await SendProfileAsync(team, Fact(argv: Command), Fact("blog", argv: Command));
+
+        var first = (await (await Start(team.Owner, team)).Content.ReadFromJsonAsync<RunCreated>(TestUser.Json))!;
+        var again = (await (await Start(team.Owner, team)).Content.ReadFromJsonAsync<RunCreated>(TestUser.Json))!;
+        var other = (await (await Start(team.Owner, team, "blog")).Content.ReadFromJsonAsync<RunCreated>(TestUser.Json))!;
+
+        Assert.Equal(first.Id, again.Id);
+        Assert.NotEqual(first.Id, other.Id);
+        await using (var db = api.Db())
+        {
+            Assert.Equal(2, await db.RemoteRuns.AsNoTracking().CountAsync(r => r.TargetAgentId == team.TargetId && r.Kind == RunKinds.Test));
+            await db.RemoteRuns.Where(r => r.Id == first.Id).ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatuses.Succeeded));
+        }
+
+        var next = (await (await Start(team.Owner, team)).Content.ReadFromJsonAsync<RunCreated>(TestUser.Json))!;
+
+        Assert.NotEqual(first.Id, next.Id);
+    }
+
+    [Fact]
+    public async Task Parallel_starts_of_the_test_create_one_run()
+    {
+        var team = await RemoteKit.TeamAsync(api);
+        await SendProfileAsync(team, Fact(argv: Command));
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => Start(team.Owner, team)));
+
+        var ids = new HashSet<Guid>();
+        foreach (var response in responses)
+        {
+            response.EnsureSuccessStatusCode();
+            ids.Add((await response.Content.ReadFromJsonAsync<RunCreated>(TestUser.Json))!.Id);
+        }
+
+        Assert.Single(ids);
+        await using var db = api.Db();
+        Assert.Equal(1, await db.RemoteRuns.AsNoTracking().CountAsync(r => r.TargetAgentId == team.TargetId && r.Kind == RunKinds.Test));
+    }
+
+    [Fact]
     public async Task Only_the_machines_owner_may_start_it()
     {
         var team = await RemoteKit.TeamAsync(api);
