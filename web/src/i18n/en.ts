@@ -206,6 +206,7 @@ export const en = {
     title: "Connect a machine", code: "Code shown by the agent", lookup: "Continue", workspace: "Report to workspace",
     approve: "Connect this machine", deny: "This is not me", approved: "Done. The machine is connected; you can close this page.",
     denied: "The request was refused.", details: "{host} · {os} {arch} · agent {version}",
+    noWorkspace: "You may not contribute to any workspace yet. Create a workspace first, then come back to this page.", createWorkspace: "Create a workspace",
   },
   members: {
     title: "Members", invite: "Invite", inviteEmail: "E-mail to invite", role: "Role", invited: "Invitation sent.",

@@ -207,6 +207,7 @@ export const de: Dictionary = {
     title: "Eine Maschine verbinden", code: "Vom Agent angezeigter Code", lookup: "Weiter", workspace: "An Arbeitsbereich melden",
     approve: "Diese Maschine verbinden", deny: "Das bin nicht ich", approved: "Fertig. Die Maschine ist verbunden; Sie können diese Seite schließen.",
     denied: "Die Anfrage wurde abgelehnt.", details: "{host} · {os} {arch} · Agent {version}",
+    noWorkspace: "Sie dürfen noch in keinem Arbeitsbereich mitarbeiten. Erstellen Sie zuerst einen Arbeitsbereich und kehren Sie dann zu dieser Seite zurück.", createWorkspace: "Arbeitsbereich erstellen",
   },
   members: {
     title: "Mitglieder", invite: "Einladen", inviteEmail: "E-Mail-Adresse zum Einladen", role: "Rolle", invited: "Einladung gesendet.",

@@ -207,6 +207,7 @@ export const tr: Dictionary = {
     title: "Makine bağla", code: "Ajanın gösterdiği kod", lookup: "Devam", workspace: "Raporlayacağı çalışma alanı",
     approve: "Bu makineyi bağla", deny: "Bu ben değilim", approved: "Tamam. Makine bağlandı; bu sayfayı kapatabilirsiniz.",
     denied: "İstek reddedildi.", details: "{host} · {os} {arch} · ajan {version}",
+    noWorkspace: "Henüz hiçbir çalışma alanına katkıda bulunamıyorsunuz. Önce bir çalışma alanı oluşturun, sonra bu sayfaya dönün.", createWorkspace: "Çalışma alanı oluştur",
   },
   members: {
     title: "Üyeler", invite: "Davet et", inviteEmail: "Davet edilecek e-posta", role: "Rol", invited: "Davet gönderildi.",
