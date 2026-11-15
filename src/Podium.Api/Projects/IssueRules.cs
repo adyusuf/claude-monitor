@@ -94,6 +94,13 @@ internal static class IssueRules
             return Http.Invalid("applicationId", "invalid_application");
         }
 
+        // An application's sprint holds only that application's issues (adding checks it too): the issue keeps it until it leaves the sprint.
+        if (issue.SprintId is { } sprint
+            && await db.Sprints.AnyAsync(s => s.Id == sprint && s.ApplicationId != null && s.ApplicationId != issue.ApplicationId, ct))
+        {
+            return Http.Invalid("applicationId", "wrong_scope");
+        }
+
         if (issue.ComponentId is { } component
             && !await db.ApplicationComponents.AnyAsync(c => c.Id == component && c.ApplicationId == issue.ApplicationId && c.Status == ManagedStatuses.Active, ct))
         {

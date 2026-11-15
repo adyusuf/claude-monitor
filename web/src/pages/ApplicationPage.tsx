@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { Member } from "../api/types";
-import type { ApplicationInput, ApplicationView } from "../api/typesProjects";
+import type { ApplicationInput, ApplicationView, ProjectView } from "../api/typesProjects";
 import { Button, Card, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { draftOfApplication } from "../lib/applicationForm";
@@ -18,21 +18,23 @@ export function ApplicationPage() {
   const errorText = useErrorText();
   const [params, setParams] = useSearchParams();
   const [app, setApp] = useState<ApplicationView | null>(null);
+  const [project, setProject] = useState<ProjectView | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState<string | null>(null);
   const editing = params.get("edit") === "1";
 
   const load = useCallback(async () => {
     try {
-      const [view, people] = await Promise.all([api.application(id), api.members(ws)]);
+      const [view, people, owner] = await Promise.all([api.application(id), api.members(ws), api.project(projectId)]);
       setApp(view);
       setMembers(people);
+      setProject(owner);
     } catch (e) {
       setError(errorText(e));
     }
     // errorText is a fresh function each render; loading again for it would loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, ws]);
+  }, [id, ws, projectId]);
 
   useEffect(() => {
     void load();
@@ -60,9 +62,11 @@ export function ApplicationPage() {
     if (app && window.confirm(t("projects.archiveConfirm", { name: app.name }))) void act(() => api.archiveApplication(id));
   };
 
-  if (!app) return error ? <div className="page"><Notice kind="error">{error}</Notice></div> : <Spinner />;
+  if (!app || !project) return error ? <div className="page"><Notice kind="error">{error}</Notice></div> : <Spinner />;
   const archived = app.status === "archived";
-  const canEdit = app.canEdit && !archived;
+  // An archived project is read-only until it is restored (the API refuses every change below it), restoring the application included.
+  const mayChange = app.canEdit && project.status === "active";
+  const canEdit = mayChange && !archived;
   return (
     <div className="page">
       <Link className="back" to={`/w/${ws}/projects/${projectId}`}>← {t("projects.backToProject")}</Link>
@@ -81,7 +85,7 @@ export function ApplicationPage() {
         <Notice>
           <span className="spread">
             <span>{t("projects.applicationArchivedBanner")}</span>
-            {app.canEdit ? <Button variant="ghost" onClick={() => void act(() => api.restoreApplication(id))}>{t("projects.restore")}</Button> : null}
+            {mayChange ? <Button variant="ghost" onClick={() => void act(() => api.restoreApplication(id))}>{t("projects.restore")}</Button> : null}
           </span>
         </Notice>
       ) : null}

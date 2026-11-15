@@ -14,7 +14,7 @@ function row(issue: IssueSummary, canWrite = true) {
   const actions = { onMove: vi.fn(), onArchive: vi.fn(), onRestore: vi.fn() };
   render(
     <I18nProvider initial="en">
-      <MemoryRouter><ul><BacklogRow ws="w1" issue={issue} unit="hours" canWrite={canWrite} canMove={canWrite} first={false} last={false} {...actions} /></ul></MemoryRouter>
+      <MemoryRouter><ul><BacklogRow ws="w1" issue={issue} unit="hours" canWrite={canWrite} canMove={canWrite} moving={false} first={false} last={false} {...actions} /></ul></MemoryRouter>
     </I18nProvider>,
   );
   return actions;

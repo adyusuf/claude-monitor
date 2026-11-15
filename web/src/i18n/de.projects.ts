@@ -24,7 +24,7 @@ export const deProjects: Dictionary["projects"] = {
   applications: "Anwendungen", addApplication: "Anwendung hinzufügen", noApplications: "Dieses Projekt hat noch keine Anwendungen.",
   noApplicationsHint: "Fügen Sie die Web-App, die mobile App oder die API hinzu, die dieses Projekt baut.", backToProject: "Projekt",
   appName: "Name der Anwendung", description: "Beschreibung", kind: "Art", repoUrl: "Repository-Adresse",
-  repoHint: "Eine https-, ssh- oder git-Adresse, ohne Passwort.", environments: "Umgebungen", envUrl: "Adresse von",
+  repoHint: "Eine https-, ssh- oder git-Adresse, ohne Passwort; nur eine ssh-Adresse darf einen Benutzer nennen.", environments: "Umgebungen", envUrl: "Adresse von",
   techStack: "Technologie-Stack", techName: "Technologie", addTech: "Hinzufügen", versioning: "Versionierungsschema", techOwner: "Technischer Eigentümer",
   targets: "Nichtfunktionale Ziele", targetKind: "Art des Ziels", targetText: "Ziel", addTarget: "Ziel hinzufügen",
   kinds: { web: "Web", mobile: "Mobil", api: "API", other: "Sonstiges" },

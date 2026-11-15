@@ -41,6 +41,7 @@ public static class IssueRunEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.Issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.RunId is not { } runId || !await db.RemoteRuns.AnyAsync(r => r.Id == runId && r.WorkspaceId == f.Issue.WorkspaceId, http.RequestAborted))
         {
@@ -60,6 +61,7 @@ public static class IssueRunEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         var link = await db.IssueRuns.FirstOrDefaultAsync(l => l.IssueId == id && l.RunId == runId, http.RequestAborted);
         if (link is null) return Http.NotFound();
         db.IssueRuns.Remove(link);

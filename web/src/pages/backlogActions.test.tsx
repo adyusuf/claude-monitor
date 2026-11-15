@@ -54,6 +54,24 @@ describe("the backlog: moving, archiving and restoring", () => {
     expect(rows()).toEqual(["Pay with a card", "Refund an order", "Print a receipt"]);
   });
 
+  it("sends one move for a second click while the first is pending and leaves the order as the server has it", async () => {
+    const calls = serve({ "PUT /issues/i1/position": { status: 204 } });
+    const served = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    let answer = () => {};
+    const pending = new Promise<void>((resolve) => { answer = resolve; });
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      if (init?.method === "PUT") await pending;
+      return served(input, init);
+    });
+    open();
+    const down = await screen.findByRole("button", { name: "Move down #1" });
+    await userEvent.click(down);
+    await userEvent.click(down);
+    answer();
+    await waitFor(() => expect(rows()).toEqual(["Refund an order", "Pay with a card", "Print a receipt"]));
+    expect(calls.filter((c) => c.path === "/issues/i1/position")).toHaveLength(1);
+  });
+
   it("archives after a confirmation and takes the row out", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
     const calls = serve({ "DELETE /issues/i2": { status: 204 } });

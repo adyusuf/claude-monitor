@@ -42,6 +42,14 @@ describe("the project form", () => {
     expect(checkProject({ ...ok, sprintLengthDays: "1.5" }).sprintLengthDays).toBe("out_of_range");
     expect(checkProject({ ...ok, stakeholders: Array.from({ length: 51 }, () => ({ name: "a", role: "" })) }).stakeholders).toBe("invalid_list");
   });
+
+  it("takes a budget up to the column's limit with at most two decimals, as the API does", () => {
+    const ok = { ...emptyProjectDraft("u1"), name: "n", budgetCurrency: "EUR" };
+    expect(checkProject({ ...ok, budgetAmount: "999999999999.99" })).toEqual({});
+    expect(checkProject({ ...ok, budgetAmount: "1000000000000" }).budgetAmount).toBe("out_of_range");
+    expect(checkProject({ ...ok, budgetAmount: "10.005" }).budgetAmount).toBe("too_many_decimals");
+    expect(checkProject({ ...ok, budgetAmount: "10.5" })).toEqual({});
+  });
 });
 
 describe("the application form", () => {
@@ -59,7 +67,7 @@ describe("the application form", () => {
     for (const url of ["https://git.example.org/x", "ssh://git@git.example.org/x", "git://git.example.org/x", "git@git.example.org:team/x.git"]) {
       expect(checkApplication({ ...ok, repoUrl: url })).toEqual({});
     }
-    for (const url of ["ftp://git.example.org/x", "https://u:p@git.example.org/x", "not a url", `https://git.example.org/${"x".repeat(500)}`]) {
+    for (const url of ["ftp://git.example.org/x", "https://u:p@git.example.org/x", "https://token@git.example.org/x", "git://token@git.example.org/x", "not a url", `https://git.example.org/${"x".repeat(500)}`]) {
       expect(checkApplication({ ...ok, repoUrl: url }).repoUrl).toBe("invalid_url");
     }
     expect(checkApplication({ ...ok, environments: [{ name: "dev", url: "https://dev.example.org" }, { name: "test", url: "" }] })).toEqual({});

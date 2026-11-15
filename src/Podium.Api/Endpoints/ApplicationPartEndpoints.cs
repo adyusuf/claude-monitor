@@ -41,6 +41,7 @@ public static class ApplicationPartEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.ApplicationAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.App.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (Invalid(req) is { } invalid) return invalid;
         if (await db.ApplicationComponents.CountAsync(c => c.ApplicationId == id && c.Status == ManagedStatuses.Active, http.RequestAborted) >= ComponentsMax)
@@ -62,6 +63,7 @@ public static class ApplicationPartEndpoints
         var row = await db.ApplicationComponents.FirstOrDefaultAsync(c => c.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.ApplicationAsync(db, userId, row.ApplicationId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (row.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (Invalid(req) is { } invalid) return invalid;
         Fill(row, req);
@@ -76,6 +78,7 @@ public static class ApplicationPartEndpoints
         var row = await db.ApplicationComponents.FirstOrDefaultAsync(c => c.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.ApplicationAsync(db, userId, row.ApplicationId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         row.Status = ManagedStatuses.Archived;
         Audit.Add(db, http, clock, AuditActions.ComponentChanged, row.WorkspaceId, userId, targetType: "application", targetId: row.ApplicationId);
         await db.SaveChangesAsync(http.RequestAborted);
@@ -95,8 +98,10 @@ public static class ApplicationPartEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.ApplicationAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.App.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (Invalid(req) is { } invalid) return invalid;
+        if (req.Status == ReleaseStatuses.Cancelled) return Http.Invalid("status", "invalid_value"); // a release is cancelled after it was planned, never born so
         if (await db.ApplicationReleases.CountAsync(r => r.ApplicationId == id && r.Status != ReleaseStatuses.Cancelled, http.RequestAborted) >= ReleasesMax)
         {
             return Http.Invalid("name", "limit_reached");
@@ -116,21 +121,24 @@ public static class ApplicationPartEndpoints
         var row = await db.ApplicationReleases.FirstOrDefaultAsync(r => r.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.ApplicationAsync(db, userId, row.ApplicationId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (row.Status == ReleaseStatuses.Cancelled) return Http.Invalid("status", "cancelled");
         if (Invalid(req) is { } invalid) return invalid;
+        if (row.Status == ReleaseStatuses.Released && (req.Status ?? row.Status) != ReleaseStatuses.Released) return Http.Invalid("status", "released");
         Fill(row, req);
         Audit.Add(db, http, clock, AuditActions.ReleaseChanged, row.WorkspaceId, userId, targetType: "application", targetId: row.ApplicationId);
         if (await ProjectEndpoints.SaveUniqueAsync(db, http.RequestAborted) is { } taken) return taken;
         return Results.NoContent();
     }
 
-    /// <summary>A planned release is cancelled; one that went out is history and stays.</summary>
+    /// <summary>A planned release is cancelled; one that went out is history and stays (PUT keeps it released too).</summary>
     private static async Task<IResult> CancelRelease(Guid id, HttpContext http, PodiumDb db, TimeProvider clock)
     {
         var userId = http.User.UserId();
         var row = await db.ApplicationReleases.FirstOrDefaultAsync(r => r.Id == id, http.RequestAborted);
         if (row is null || await ProjectAccess.ApplicationAsync(db, userId, row.ApplicationId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (row.Status == ReleaseStatuses.Released) return Http.Invalid("status", "released");
         row.Status = ReleaseStatuses.Cancelled;
         Audit.Add(db, http, clock, AuditActions.ReleaseChanged, row.WorkspaceId, userId, targetType: "application", targetId: row.ApplicationId);

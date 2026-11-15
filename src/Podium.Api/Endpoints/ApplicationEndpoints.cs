@@ -82,6 +82,7 @@ public static class ApplicationEndpoints
         var found = await ProjectAccess.ApplicationAsync(db, userId, id, http.RequestAborted);
         if (found is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         if (f.App.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (ProjectRules.Check(req) is { } invalid) return invalid;
         if (await TechOwnerInvalidAsync(db, req, f.App.WorkspaceId, http.RequestAborted)) return Http.Invalid("techOwnerUserId", "not_a_member");
@@ -103,6 +104,7 @@ public static class ApplicationEndpoints
         var found = await ProjectAccess.ApplicationAsync(db, userId, id, http.RequestAborted);
         if (found is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         f.App.Status = status;
         f.App.UpdatedAt = clock.GetUtcNow();
         f.App.UpdatedBy = userId;

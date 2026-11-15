@@ -14,6 +14,10 @@ export const TARGET_KINDS: TargetKind[] = ["performance", "accessibility", "sla"
 export const COMPONENT_KINDS: ComponentKind[] = ["component", "module"];
 export const RELEASE_STATUSES: ReleaseStatus[] = ["planned", "released", "cancelled"];
 
+/** The states a release may be given, as the API allows: a new one is planned or already out, a planned one may also be cancelled, one that went out stays released. */
+export const releaseStatusesFrom = (current: ReleaseStatus | null): ReleaseStatus[] =>
+  current === null ? RELEASE_STATUSES.filter((s) => s !== "cancelled") : current === "released" ? ["released"] : RELEASE_STATUSES;
+
 export const projectLimits = {
   nameMax: 100,
   purposeMax: 2000,
@@ -23,7 +27,8 @@ export const projectLimits = {
   lineMax: 300,
   sprintMin: 1,
   sprintMax: 42,
-  budgetMax: 9_999_999_999_999,
+  budgetMax: 999_999_999_999.99,
+  budgetDecimals: 2,
   techStackMax: 30,
   techNameMax: 60,
   targetsMax: 20,

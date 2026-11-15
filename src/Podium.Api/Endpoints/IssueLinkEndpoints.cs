@@ -22,6 +22,7 @@ public static class IssueLinkEndpoints
         var userId = http.User.UserId();
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         var issue = f.Issue;
         if (issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
         if (req.Kind is null || !IssueLinkKinds.All.Contains(req.Kind)) return Http.Invalid("kind", "invalid_value");
@@ -63,6 +64,7 @@ public static class IssueLinkEndpoints
         var link = await db.IssueLinks.FirstOrDefaultAsync(l => l.Id == id, http.RequestAborted);
         if (link is null || await ProjectAccess.IssueAsync(db, userId, link.BlockerIssueId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
+        if (f.Grant.Archived) return ProjectGrant.ReadOnly;
         db.IssueLinks.Remove(link);
         Audit.Add(db, http, clock, AuditActions.IssueLinkChanged, link.WorkspaceId, userId, targetType: "issue", targetId: link.BlockerIssueId);
         await db.SaveChangesAsync(http.RequestAborted);

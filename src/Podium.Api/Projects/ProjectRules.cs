@@ -15,7 +15,9 @@ internal static class ProjectRules
     public const int ListMax = 30;
     public const int LineMax = 300;
     public const int StakeholdersMax = 50;
-    public const decimal BudgetMax = 9_999_999_999_999m;
+    /// <summary>The largest amount the <c>numeric(14,2)</c> column holds.</summary>
+    public const decimal BudgetMax = 999_999_999_999.99m;
+    public const int BudgetDecimals = 2;
 
     /// <summary>Checks a project definition; the first failure is the answer, null means it is valid.</summary>
     public static IResult? Check(ProjectInput i)
@@ -30,6 +32,7 @@ internal static class ProjectRules
 
         if ((i.BudgetAmount is null) != string.IsNullOrWhiteSpace(i.BudgetCurrency)) return Http.Invalid("budget", "amount_and_currency");
         if (i.BudgetAmount is < 0 or > BudgetMax) return Http.Invalid("budgetAmount", "out_of_range");
+        if (i.BudgetAmount is { } amount && decimal.Round(amount, BudgetDecimals) != amount) return Http.Invalid("budgetAmount", "too_many_decimals");
         if (i.BudgetCurrency is { } c && !(c.Length == 3 && c.All(ch => ch is >= 'A' and <= 'Z'))) return Http.Invalid("budgetCurrency", "invalid_currency");
         if (i.StartDate is { } start && i.EndDate is { } end && end < start) return Http.Invalid("endDate", "before_start");
         if (i.ItemTypes is { } t && (t.Count == 0 || t.Distinct().Count() != t.Count || t.Any(x => !WorkItemTypes.All.Contains(x)))) return Http.Invalid("itemTypes", "invalid_list");
@@ -83,7 +86,10 @@ internal static class ProjectRules
     private static bool Lines(List<string>? lines) =>
         lines is null || (lines.Count <= ListMax && lines.All(l => !string.IsNullOrWhiteSpace(l) && l.Trim().Length <= LineMax));
 
-    /// <summary>An https, ssh or git address, or the scp form git@host:path; no password in it (a stored link is shown to the whole workspace).</summary>
+    /// <summary>
+    /// An https, ssh or git address, or the scp form git@host:path; no password in it, and a user name only on ssh (a stored link is shown to the
+    /// whole workspace, and on https or git the user name is where a token goes).
+    /// </summary>
     internal static bool RepoLink(string value)
     {
         if (value.Length > UrlMax || value.Any(char.IsControl)) return false;
@@ -93,7 +99,7 @@ internal static class ProjectRules
         }
 
         return Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "ssh" or "git" && !string.IsNullOrEmpty(uri.Host)
-            && !uri.UserInfo.Contains(':', StringComparison.Ordinal);
+            && !uri.UserInfo.Contains(':', StringComparison.Ordinal) && (uri.Scheme == "ssh" || uri.UserInfo.Length == 0);
     }
 
     /// <summary>An http or https address with no user information.</summary>
