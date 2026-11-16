@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CursorPage } from "../api/types";
-import { appendNew, nextByCursor } from "./listPages";
+import { appendNew, nextByCursor, readUpTo } from "./listPages";
 
 type Row = { id: string };
 const rows = (...ids: string[]): Row[] => ids.map((id) => ({ id }));
@@ -45,5 +45,27 @@ describe("nextByCursor", () => {
   it("lets a failed read throw to the page, which shows its error", async () => {
     const read = vi.fn(async () => Promise.reject(new Error("server_error")));
     await expect(nextByCursor(read, { truncated: true, cursor: null }, rows("a"), key)).rejects.toThrow("server_error");
+  });
+});
+
+describe("readUpTo", () => {
+  const list = (ids: string[], truncated: boolean) => ({ items: rows(...ids), truncated });
+
+  it("reads only the first page when nothing more was shown", async () => {
+    const read = vi.fn(async () => list(["a"], true));
+    expect(await readUpTo(read, 0, key)).toEqual(list(["a"], true));
+    expect(read.mock.calls).toEqual([[]]);
+  });
+
+  it("reads on with skip until as many rows as were shown are read again", async () => {
+    const read = vi.fn(async (skip?: number) => (skip === undefined ? list(["a"], true) : skip === 1 ? list(["b"], true) : list(["c"], false)));
+    expect(await readUpTo(read, 3, key)).toEqual(list(["a", "b", "c"], false));
+    expect(read.mock.calls).toEqual([[], [1], [2]]);
+  });
+
+  it("stops at a page that brings no new row", async () => {
+    const read = vi.fn(async (skip?: number) => (skip === undefined ? list(["a"], true) : list(["a"], true)));
+    expect((await readUpTo(read, 5, key)).items.map(key)).toEqual(["a"]);
+    expect(read).toHaveBeenCalledTimes(2);
   });
 });

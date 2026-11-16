@@ -2,6 +2,7 @@
 export const enMachines = {
   title: "Machines", empty: "No machine is connected yet.", connect: "Connect a machine", revoke: "Disconnect",
   revokeConfirm: "Disconnect this machine? Its agent stops reporting.", revoked: "Disconnected", lastSeen: "Last seen",
+  truncated: "Only the first {n} machines are shown; the workspace has more.",
   version: "Agent", user: "User", moveTo: "Move to workspace", enrolled: "Connected",
   updateAvailable: "Update available: {version}",
   updateHint: "Run \"aipod update\" on the machine, or let it update itself (aipod config auto-update on, if the workspace allows it).",

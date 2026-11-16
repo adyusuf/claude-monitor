@@ -103,6 +103,9 @@ export const api = {
   revokeAgent: (agentId: string) => request<void>("POST", `/agents/${agentId}/revoke`),
   moveAgent: (agentId: string, workspaceId: string) => request<void>("PATCH", `/agents/${agentId}`, { workspaceId }),
   machines: (id: string) => request<MachineView[]>("GET", `/workspaces/${id}/machines`),
+  /** The agents and the machines of the machines page, from the first or after the `skip` already shown, and whether the API cut them (F-024). */
+  agentList: (id: string, skip?: number) => requestList<AgentRow>(`/workspaces/${id}/agents${q({ skip })}`),
+  machineList: (id: string, skip?: number) => requestList<MachineView>(`/workspaces/${id}/machines${q({ skip })}`),
   agentRole: (agentId: string) => request<AgentRoleView>("GET", `/agents/${agentId}/role`),
   setAgentRole: (agentId: string, input: AgentRoleInput) => request<AgentRoleView>("PUT", `/agents/${agentId}/role`, input),
   machineDetail: (agentId: string) => request<MachineDetail>("GET", `/agents/${agentId}/detail`),

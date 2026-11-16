@@ -7,6 +7,24 @@ export function appendNew<T>(shown: T[], more: T[], key: (row: T) => string): T[
   return [...shown, ...more.filter((row) => !seen.has(key(row)))];
 }
 
+/** A list read and whether the API cut it (the X-Truncated header). */
+export interface ListRead<T> { items: T[]; truncated: boolean }
+
+/**
+ * A skip-paged list read again as far as it was shown: the first page, then the next ones while the API says it cut the list and fewer
+ * than `shown` rows are read, so a refresh does not take away the rows "Load more" added. A page with no new row ends the reading.
+ */
+export async function readUpTo<T>(read: (skip?: number) => Promise<ListRead<T>>, shown: number, key: (row: T) => string): Promise<ListRead<T>> {
+  let list = await read();
+  while (list.truncated && list.items.length < shown) {
+    const page = await read(list.items.length);
+    const items = appendNew(list.items, page.items, key);
+    if (items.length === list.items.length) return { items, truncated: page.truncated };
+    list = { items, truncated: page.truncated };
+  }
+  return list;
+}
+
 /** Where a cursor-paged list stands: whether rows are left, and the cursor to read them from (null: from the start). */
 export interface CursorState { truncated: boolean; cursor: string | null }
 
