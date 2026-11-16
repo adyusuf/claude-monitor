@@ -30,13 +30,14 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
             .ToDictionaryAsync(p => p.ExternalAccountId, ct);
         var now = clock.GetUtcNow();
         // The addresses Jira shows, and those an admin typed for people Jira shows none for (kept on the row): a person invited by a typed
-        // address is linked once they accept (F-069).
-        var emails = wanted.Where(p => p.Email is not null).Select(p => SearchText.Email(p.Email!))
-            .Concat(known.Values.Where(r => r.UserId is null && r.EmailNormalized is not null).Select(r => r.EmailNormalized!)).Distinct().ToList();
+        // address is linked once they accept (F-069). Matched by the identity key, never the search form: a look-alike address (an accent,
+        // a dotless i) is another mailbox and must not link to the member (F-180).
+        var emails = wanted.Select(p => EmailIdentity.Key(p.Email))
+            .Concat(known.Values.Where(r => r.UserId is null).Select(r => EmailIdentity.Key(r.Email))).OfType<string>().Distinct().ToList();
         var members = await (from u in db.Users.AsNoTracking()
                              join m in db.WorkspaceMembers.AsNoTracking() on u.Id equals m.UserId
-                             where m.WorkspaceId == connection.WorkspaceId && m.RemovedAt == null && u.EmailNormalized != null && emails.Contains(u.EmailNormalized)
-                             select new { u.Id, Email = u.EmailNormalized! }).ToDictionaryAsync(x => x.Email, x => x.Id, ct);
+                             where m.WorkspaceId == connection.WorkspaceId && m.RemovedAt == null && u.EmailKey != null && emails.Contains(u.EmailKey)
+                             select new { u.Id, Key = u.EmailKey! }).ToDictionaryAsync(x => x.Key, x => x.Id, ct);
         // A member stands for one person of a connection: one already linked (by hand or earlier) gets no second person by e-mail.
         var linked = (await db.IntegrationPeople.Where(p => p.ConnectionId == connection.Id && p.UserId != null).Select(p => p.UserId!.Value).ToListAsync(ct)).ToHashSet();
         var automatic = new List<IntegrationPerson>();
@@ -59,7 +60,7 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
                 row.EmailNormalized = SearchText.Email(p.Email);
             }
 
-            if (row.UserId is null && row.EmailNormalized is { } normalized && members.TryGetValue(normalized, out var user) && linked.Add(user))
+            if (row.UserId is null && EmailIdentity.Key(row.Email) is { } key && members.TryGetValue(key, out var user) && linked.Add(user))
             {
                 row.UserId = user;
                 automatic.Add(row);
