@@ -40,16 +40,20 @@ public static class InvitationEndpoints
 
         var now = clock.GetUtcNow();
         var normalized = SearchText.Email(req.Email!);
+        var key = EmailIdentity.Key(req.Email);
         var memberRole = await db.WorkspaceMembers.AsNoTracking().Where(m => m.WorkspaceId == id && m.RemovedAt == null)
-            .Join(db.Users.Where(u => u.EmailNormalized == normalized), m => m.UserId, u => u.Id, (m, _) => m.Role)
+            .Join(db.Users.Where(u => u.EmailKey == key), m => m.UserId, u => u.Id, (m, _) => m.Role)
             .FirstOrDefaultAsync(http.RequestAborted);
         if (memberRole is not null && Roles.Rank(memberRole) >= Roles.Rank(role))
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: AlreadyMember);
         }
 
-        if (await db.WorkspaceInvitations.AnyAsync(i => i.WorkspaceId == id && i.EmailNormalized == normalized && i.AcceptedAt == null
-                && i.RevokedAt == null && i.ExpiresAt > now, http.RequestAborted))
+        // Folding finds every candidate; the identity key decides (F-180). An invitation from before the typed address was kept counts as the same.
+        var pending = await db.WorkspaceInvitations.AsNoTracking().Where(i => i.WorkspaceId == id && i.EmailNormalized == normalized
+                && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now)
+            .Select(i => i.Email).ToListAsync(http.RequestAborted);
+        if (pending.Any(e => e is null || EmailIdentity.Key(e) == key))
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: InvitationPending);
         }
@@ -59,6 +63,7 @@ public static class InvitationEndpoints
         {
             WorkspaceId = id,
             EmailNormalized = normalized,
+            Email = req.Email!.Trim(),
             Role = role,
             TokenHash = Secrets.Hash(token),
             InvitedBy = userId,
@@ -72,7 +77,7 @@ public static class InvitationEndpoints
 
         var inviter = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, http.RequestAborted);
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
-        var inviteeLanguage = await db.Users.AsNoTracking().Where(u => u.EmailNormalized == invitation.EmailNormalized).Select(u => u.Language).FirstOrDefaultAsync(http.RequestAborted);
+        var inviteeLanguage = await db.Users.AsNoTracking().Where(u => u.EmailKey == key).Select(u => u.Language).FirstOrDefaultAsync(http.RequestAborted);
         await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, inviteeLanguage), "invite", req.Email!.Trim(),
             Http.Link(config, "/invitations/accept", token), inviter.DisplayName, workspace.Name), http.RequestAborted);
         return Results.Created($"/api/workspaces/{id}/invitations/{invitation.Id}", new { invitation.Id });
@@ -103,6 +108,13 @@ public static class InvitationEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// Whether the invitation was sent to the user's address: by the identity key (F-180), so a look-alike address is another person; an
+    /// invitation from before the typed address was kept has only the folded form to compare.
+    /// </summary>
+    private static bool Addressed(User user, WorkspaceInvitation invitation) =>
+        invitation.Email is null ? user.EmailNormalized == invitation.EmailNormalized : user.EmailKey == EmailIdentity.Key(invitation.Email);
+
     private static async Task<IResult> Accept(TokenRequest req, HttpContext http, PodiumDb db, TimeProvider clock)
     {
         if (string.IsNullOrEmpty(req.Token)) return Http.Invalid("token", "invalid_token");
@@ -114,7 +126,7 @@ public static class InvitationEndpoints
 
         var userId = http.User.UserId();
         var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, http.RequestAborted);
-        if (user.EmailVerifiedAt is null || user.EmailNormalized != invitation.EmailNormalized)
+        if (user.EmailVerifiedAt is null || !Addressed(user, invitation))
         {
             return Http.Invalid("token", "invitation_other_address");
         }

@@ -1,6 +1,7 @@
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Mail;
+using Podium.Api.Projects;
 using Podium.Api.Security;
 using Podium.Api.Text;
 using Microsoft.EntityFrameworkCore;
@@ -36,8 +37,8 @@ public static class AuthEndpoints
         if (!Secrets.PasswordAcceptable(req.Password)) return Http.Invalid("password", "weak_password");
         if (!Http.IsName(req.DisplayName)) return Http.Invalid("displayName", "invalid_name");
 
-        var normalized = SearchText.Email(req.Email!);
-        if (await db.Users.AnyAsync(u => u.EmailNormalized == normalized, http.RequestAborted))
+        var key = EmailIdentity.Key(req.Email);
+        if (await db.Users.AnyAsync(u => u.EmailKey == key, http.RequestAborted))
         {
             Secrets.HashPassword(new User(), req.Password!); // the hash a new account costs, so timing does not tell a registered address apart
             return Results.Accepted();
@@ -49,7 +50,17 @@ public static class AuthEndpoints
         user.Language = MailTemplates.Language(http); // the language they registered in: later mails to them follow it
         var token = AddUserToken(db, user.Id, TokenPurposes.VerifyEmail, now, config.EmailTokenLifetime);
         Audit.Add(db, http, clock, AuditActions.Register, userId: user.Id);
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e))
+        {
+            // The same address won a race, or an account holds a look-alike of it while email_normalized is still unique (F-180):
+            // the answer a registered address gets, and nothing was saved.
+            return Results.Accepted();
+        }
+
         SendOffRequest(mailer, MailTemplates.Build(MailTemplates.Language(http), "verify", user.Email!,
             Http.Link(config, "/verify-email", token)), logs);
         return Results.Accepted();
@@ -70,8 +81,7 @@ public static class AuthEndpoints
 
     private static async Task<IResult> Login(LoginRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
     {
-        var normalized = SearchText.Email(req.Email ?? "");
-        var user = await db.Users.FirstOrDefaultAsync(u => u.EmailNormalized == normalized, http.RequestAborted);
+        var user = await FindAsync(db, req.Email, http.RequestAborted);
         var now = clock.GetUtcNow();
         // One verification on every path (unknown address, no password, locked) so timing tells nothing apart.
         var passwordOk = Secrets.VerifyPasswordOrDummy(user, req.Password);
@@ -110,6 +120,13 @@ public static class AuthEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// The account of an address by its identity key (F-180: trimmed and lower-cased, never accent-folded, so a look-alike address is another
+    /// account); null for no address, so a blank one never meets a deleted account (whose key is NULL).
+    /// </summary>
+    private static async Task<User?> FindAsync(PodiumDb db, string? email, CancellationToken ct) =>
+        EmailIdentity.Key(email) is { } key ? await db.Users.FirstOrDefaultAsync(u => u.EmailKey == key, ct) : null;
+
     /// <summary>Counts a failed attempt; returns true when this one locked the account.</summary>
     public static bool RecordFailure(User user, ApiConfig config, DateTimeOffset now)
     {
@@ -145,9 +162,8 @@ public static class AuthEndpoints
     private static async Task<IResult> Forgot(ForgotRequest req, HttpContext http, PodiumDb db, ApiConfig config,
         TimeProvider clock, IMailer mailer, ILoggerFactory logs)
     {
-        var normalized = SearchText.Email(req.Email ?? "");
-        var user = await db.Users.FirstOrDefaultAsync(
-            u => u.EmailNormalized == normalized && u.Status == UserStatuses.Active, http.RequestAborted);
+        var user = await FindAsync(db, req.Email, http.RequestAborted);
+        if (user?.Status != UserStatuses.Active) user = null;
         var since = clock.GetUtcNow() - config.ResetMailEvery;
         // One mail per address per window, whatever the number of callers or their addresses: the link already mailed keeps working.
         if (user?.Email is not null && !await db.UserTokens.AnyAsync(

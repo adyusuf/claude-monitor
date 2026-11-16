@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Podium.Api.Config;
 using Podium.Api.Data;
+using Podium.Api.Projects;
 using Podium.Api.Security;
 using Podium.Api.Text;
 using Microsoft.AspNetCore.Authentication;
@@ -95,8 +96,8 @@ public static class ExternalAuthEndpoints
         }
 
         if (email is null || !verified) return Back(config, "/login?error=provider_email_unverified");
-        var normalized = SearchText.Email(email);
-        if (await db.Users.AnyAsync(u => u.EmailNormalized == normalized, http.RequestAborted))
+        var key = EmailIdentity.Key(email);
+        if (await db.Users.AnyAsync(u => u.EmailKey == key, http.RequestAborted))
         {
             return Back(config, "/login?error=link_required&provider=" + provider);
         }
@@ -104,7 +105,16 @@ public static class ExternalAuthEndpoints
         var created = Accounts.NewUser(db, now, email, name, verified: true);
         AddLogin(db, created.Id, provider, subject, email, now);
         Audit.Add(db, http, clock, AuditActions.Register, userId: created.Id, detail: new { provider });
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e))
+        {
+            // Another account holds a look-alike of the address while email_normalized is still unique (F-180), or the same sign-up won a race.
+            return Back(config, "/login?error=link_required&provider=" + provider);
+        }
+
         await Http.IssueLoginAsync(http, db, config, clock, created);
         return Back(config, target);
     }
