@@ -10,7 +10,7 @@ namespace Podium.Agent.Capture;
 
 /// <summary>
 /// Puts one captured thing in the outbox: masked for secrets unless the workspace switched that off (unknown means
-/// on), and capped at the workspace's event size, beyond which a marker with a preview is kept instead. Both switches are
+/// on), and cleaned of what the API's database cannot store (NUL, half a surrogate pair), and capped at the workspace's event size, beyond which a marker with a preview is kept instead. Both switches are
 /// read through the workspace tag (WorkspaceSettings): one read for another workspace counts as unread, so masking is on.
 /// </summary>
 public sealed class Recorder(AgentConfig config, LocalStore store)
@@ -32,7 +32,8 @@ public sealed class Recorder(AgentConfig config, LocalStore store)
         ArgumentNullException.ThrowIfNull(payload);
         var (mask, max) = switches ??= (WorkspaceSettings.Get(config, store, MaskSecretsKey) != "false",
             int.TryParse(WorkspaceSettings.Get(config, store, EventMaxBytesKey), out var m) ? m : config.EventMaxBytesDefault);
-        var node = mask ? Masker.Mask(payload.DeepClone())! : payload;
+        var cleaned = SafeText.Clean(payload)!; // a copy: what the API's database cannot store (NUL, a lone surrogate) is replaced before it is queued
+        var node = mask ? Masker.Mask(cleaned)! : cleaned;
         var json = node.ToJsonString();
         var bytes = Encoding.UTF8.GetByteCount(json);
         var truncated = cut || bytes > max;
@@ -42,8 +43,8 @@ public sealed class Recorder(AgentConfig config, LocalStore store)
             {
                 ["truncated"] = true,
                 ["bytes"] = bytes,
-                ["hook_event_name"] = payload["hook_event_name"]?.DeepClone(),
-                ["tool_name"] = payload["tool_name"]?.DeepClone(),
+                ["hook_event_name"] = cleaned["hook_event_name"]?.DeepClone(),
+                ["tool_name"] = cleaned["tool_name"]?.DeepClone(),
                 ["preview"] = json[..Math.Min(json.Length, PreviewChars)],
             }.ToJsonString();
         }
