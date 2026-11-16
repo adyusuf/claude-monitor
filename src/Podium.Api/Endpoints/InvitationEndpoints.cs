@@ -59,6 +59,7 @@ public static class InvitationEndpoints
         {
             WorkspaceId = id,
             EmailNormalized = normalized,
+            Email = req.Email!.Trim(),
             Role = role,
             TokenHash = Secrets.Hash(token),
             InvitedBy = userId,
@@ -85,7 +86,7 @@ public static class InvitationEndpoints
         var open = await db.WorkspaceInvitations.AsNoTracking()
             .Where(i => i.WorkspaceId == id && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now)
             .OrderByDescending(i => i.CreatedAt)
-            .Select(i => new InvitationResponse(i.Id, i.EmailNormalized, i.Role, i.CreatedAt, i.ExpiresAt))
+            .Select(i => new InvitationResponse(i.Id, i.Email ?? i.EmailNormalized, i.Role, i.CreatedAt, i.ExpiresAt))
             .ToListAsync(http.RequestAborted);
         return Results.Ok(open);
     }
