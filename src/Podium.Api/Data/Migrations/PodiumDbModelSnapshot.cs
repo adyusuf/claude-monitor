@@ -4059,7 +4059,7 @@ namespace Podium.Api.Data.Migrations
                     b.HasIndex("ApplicationId")
                         .IsUnique()
                         .HasDatabaseName("ux_sprints_active_application")
-                        .HasFilter("status = 'active' AND application_id IS NOT NULL AND source_connection_id IS NULL");
+                        .HasFilter("status = 'active' AND application_id IS NOT NULL AND source_connection_id IS NULL AND archived_at IS NULL");
 
                     b.HasIndex("CreatedBy")
                         .HasDatabaseName("ix_sprints_created_by");
@@ -4067,7 +4067,7 @@ namespace Podium.Api.Data.Migrations
                     b.HasIndex("ProjectId")
                         .IsUnique()
                         .HasDatabaseName("ux_sprints_active_project")
-                        .HasFilter("status = 'active' AND application_id IS NULL AND source_connection_id IS NULL");
+                        .HasFilter("status = 'active' AND application_id IS NULL AND source_connection_id IS NULL AND archived_at IS NULL");
 
                     b.HasIndex("ReleaseId")
                         .HasDatabaseName("ix_sprints_release_id");
