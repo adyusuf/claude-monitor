@@ -33,7 +33,7 @@ public static class ExecLevelSigning
 
 /// <summary>
 /// The owner asks for a level (web -> API). Sequence must be the machine's current sequence + 1 (compare-and-set). KeyId and Signature are required
-/// when the change raises the level; Code is the re-authentication (a fresh two-step code on a production or database machine).
+/// when the change raises the level; Code is the re-authentication (a raise on a production or database machine needs a fresh two-step code; a lowering needs only a recent sign-in).
 /// </summary>
 public sealed record ExecLevelChange(string Level, long Sequence, DateTimeOffset NotAfter, string? KeyId = null, string? Signature = null, string? Code = null);
 
