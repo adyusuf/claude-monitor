@@ -160,12 +160,21 @@ public static class ProjectEndpoints
         var project = grant.Project;
         if (project.SourceConnectionId is not { } connectionId) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.NotMirrored);
         if (await MirrorGate.StillMirroredAsync(db, connectionId, http.RequestAborted)) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.StillConnected);
+        // The sprints that mirror the connection are cut loose with the project, in one step with the project lock the sprint writes take: otherwise
+        // they stay refused as detached for good. The count goes into the audit.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
+        var sprints = await db.Sprints.Where(s => s.ProjectId == id && s.SourceConnectionId != null).ToListAsync(http.RequestAborted);
+        var sprintIds = sprints.Select(s => s.Id).ToList();
+        foreach (var sprint in sprints) sprint.SourceConnectionId = null;
         project.SourceConnectionId = null;
         project.UpdatedAt = clock.GetUtcNow();
         project.UpdatedBy = userId;
-        db.IntegrationLinks.RemoveRange(await db.IntegrationLinks.Where(l => l.Kind == LinkKinds.Project && l.LocalId == id).ToListAsync(http.RequestAborted));
-        Audit.Add(db, http, clock, AuditActions.ProjectDetached, project.WorkspaceId, userId, targetType: "project", targetId: id, detail: new { connectionId });
+        db.IntegrationLinks.RemoveRange(await db.IntegrationLinks
+            .Where(l => (l.Kind == LinkKinds.Project && l.LocalId == id) || (l.Kind == LinkKinds.Sprint && sprintIds.Contains(l.LocalId))).ToListAsync(http.RequestAborted));
+        Audit.Add(db, http, clock, AuditActions.ProjectDetached, project.WorkspaceId, userId, targetType: "project", targetId: id, detail: new { connectionId, sprints = sprints.Count });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
