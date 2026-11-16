@@ -129,7 +129,7 @@ public static class IssueEndpoints
         if (await ProjectAccess.IssueAsync(db, userId, id, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         if (f.Grant.Archived) return ProjectGrant.ReadOnly;
-        if (f.Issue.ExternalKey is not null) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.NoArchive);
+        if (f.Issue.ExternalKey is not null && await MirrorGate.StillMirroredAsync(db, f.Grant.Project.SourceConnectionId, http.RequestAborted)) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.NoArchive);
         var now = clock.GetUtcNow();
         f.Issue.ArchivedAt = archive ? now : null;
         f.Issue.UpdatedAt = now;

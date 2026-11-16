@@ -37,6 +37,7 @@ export const en = {
   errors: {
     ...enAccessErrors,
     ...enApprovalRulesErrors,
+    mirrored_connected: "The Jira connection is still active. Disconnect it first, then detach the project.", not_mirrored: "This project is not linked to Jira.",
     jira_partly_applied: "Jira took the new status, but not the other changes, so nothing else was saved here. Reload and apply the other changes again.",
     jira_changed: "It changed in Jira since you last looked. Reload and try again.", jira_transition_unavailable: "Jira has no step from this status to that one.", jira_no_board: "The Jira space has no board to make a sprint on.", mirrored_scope: "An issue and a sprint must both come from Jira, or both from Podium.", mirrored_type_locked: "The type of an issue from Jira is kept in Jira.", mirrored_no_archive: "An issue from Jira cannot be archived here. Cancel it instead.", mirrored_field_locked: "The name and purpose of a Jira project are kept in Jira.", mirrored_dates_kept: "A sprint from Jira keeps its dates. Change them, or clear them in Jira.", mirrored_detached: "This was imported from Jira and the connection is gone. Connect the site again.", assignee_not_in_jira: "That person has no Jira account Podium knows. Link them in the Integrations page.",
     invalid_site: "Enter your Jira sub-domain, such as acme for acme.atlassian.net.", integration_unavailable: "Jira is not set up on this server.",

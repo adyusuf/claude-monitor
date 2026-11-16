@@ -7,6 +7,7 @@ export const trProjects: Dictionary["projects"] = {
   empty: "Henüz proje yok.", emptyHint: "Bir proje, geliştirdiğiniz uygulamaları ve ileride bunların iş listesini ve sprintlerini bir arada tutar.",
   noMatch: "Aramayla eşleşen proje yok.",
   archiveConfirm: "\"{name}\" arşivlensin mi? Arşivlenmişler arasında kalır ve geri yüklenebilir.",
+  detach: "Jira bağlantısını kes", detachConfirm: "\"{name}\" Jira ile kalıcı olarak ayrılsın mı? Bağlantı zaten kopmuş durumda; sonrasında proje içe aktarılmış olarak işaretlenmez ve Jira'ya yeniden bağlanamaz.",
   archivedBanner: "Bu proje arşivlendi: geri yüklenene kadar yalnızca okunabilir.",
   applicationArchivedBanner: "Bu uygulama arşivlendi: geri yüklenene kadar yalnızca okunabilir.",
   ownerIs: "Sahibi: {name}", applicationCount: "Uygulama sayısı: {n}", sprintDays: "{n} gün", removeRow: "Kaldır",

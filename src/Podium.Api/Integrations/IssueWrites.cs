@@ -12,7 +12,7 @@ public sealed record IssueFacts(string Type, string Title, string? Description, 
 
 /// <summary>
 /// Writes a Podium change of a mirrored issue to the tool first (ADR-0015 §7). Each method answers null when the local change may go on (also when
-/// the issue is not mirrored or only Podium-only fields changed), or the refusal to send back. The tool's new change value is stored on the
+/// the issue is not mirrored, its connection is disconnected, or only Podium-only fields changed), or the refusal to send back. The tool's new change value is stored on the
 /// link, so the echo of our own write is recognised. Nothing here saves; the endpoint's save carries it.
 /// </summary>
 public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate, TimeProvider clock, ILogger<IssueWrites> log)
@@ -23,6 +23,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         ArgumentNullException.ThrowIfNull(before);
         ArgumentNullException.ThrowIfNull(after);
         if (after.ExternalKey is null || project.SourceConnectionId is not { } connectionId) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         if (before.Type != after.Type) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.TypeLocked);
         var (change, unmapped) = await DiffAsync(connectionId, project, before, after, ct);
         if (unmapped is not null) return unmapped;
@@ -85,6 +86,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(issue);
         if (issue.ExternalKey is null || project.SourceConnectionId is not { } connectionId || issue.Status == newStatus) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         var (open, refusal) = await gate.OpenAsync(connectionId, user, ct);
         if (open is null) return refusal;
         var link = await gate.LinkOfAsync(LinkKinds.Issue, issue.Id, ct);
@@ -108,6 +110,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(issue);
         if (project.SourceConnectionId is not { } connectionId) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         var (open, refusal) = await gate.OpenAsync(connectionId, user, ct);
         if (open is null) return refusal;
         var space = await gate.ProjectKeyAsync(project.Id, ct);
@@ -148,6 +151,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(issue);
         if (issue.ExternalKey is null || project.SourceConnectionId is not { } connectionId) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         if (after is not null && after.ExternalKey is null) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         var (open, refusal) = await gate.OpenAsync(connectionId, user, ct);
         if (open is null) return refusal;

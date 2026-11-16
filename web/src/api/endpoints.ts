@@ -138,6 +138,7 @@ export const api = {
   updateProject: (id: string, input: ProjectInput) => request<void>("PUT", `/projects/${id}`, input),
   archiveProject: (id: string) => request<void>("DELETE", `/projects/${id}`),
   restoreProject: (id: string) => request<void>("POST", `/projects/${id}/restore`),
+  detachProject: (id: string) => request<void>("POST", `/projects/${id}/detach`),
   projectMembers: (id: string) => request<ProjectMemberView[]>("GET", `/projects/${id}/members`),
   putProjectMember: (id: string, userId: string, role: ProjectRole) => request<void>("PUT", `/projects/${id}/members/${userId}`, { role }),
   removeProjectMember: (id: string, userId: string) => request<void>("DELETE", `/projects/${id}/members/${userId}`),

@@ -10,10 +10,10 @@ const route = [{ path: "/w/:ws/projects/:projectId/issues/:id", element: <IssueP
 const mirror = { externalKey: "SHOP-12", externalUrl: "https://acme.atlassian.net/browse/SHOP-12" };
 const epics = [issueSummary({ id: "e1", number: 9, title: "Payments epic", type: "epic" })];
 
-const serve = (issue: Parameters<typeof issueView>[1] = {}) => mockApi({
+const serve = (issue: Parameters<typeof issueView>[1] = {}, mirrorActive = issue.externalKey != null) => mockApi({
   "GET /me": { body: ME },
   "GET /issues/i1": { body: issueView({}, issue) },
-  "GET /projects/p1": { body: project() },
+  "GET /projects/p1": { body: project({ sourceConnectionId: mirrorActive ? "c1" : null, mirrorActive }) },
   "GET /workspaces/w1/members": { body: workspaceMembers },
   "GET /projects/p1/applications": { body: { items: [appSummary()], next: null } },
   "GET /projects/p1/issues": { body: { items: epics, next: null } },
@@ -35,6 +35,14 @@ describe("the issue page of a mirrored issue", () => {
     expect(screen.getByRole("link", { name: "SHOP-12 ↗" })).toHaveAttribute("href", mirror.externalUrl);
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the key and offers Archive again once the connection is gone", async () => {
+    serve(mirror, false);
+    open();
+    await screen.findByRole("heading", { level: 1, name: /#1 Pay with a card/ });
+    expect(screen.getByRole("link", { name: "SHOP-12 ↗" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
   it("shows no badge and keeps the Archive button for an issue made in Podium", async () => {
@@ -66,6 +74,12 @@ describe("the issue form of a mirrored issue", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
     expect(calls.find((c) => c.method === "PUT")?.body).toMatchObject({ title: "Pay by card", type: "story" });
+  });
+
+  it("leaves the Type select open for an imported issue whose connection is gone", async () => {
+    serve(mirror, false);
+    open("?edit=1");
+    expect(await screen.findByLabelText("Type")).toBeEnabled();
   });
 
   it("leaves the Type select open for an issue made in Podium", async () => {

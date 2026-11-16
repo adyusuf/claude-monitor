@@ -23,7 +23,7 @@ public sealed record ProjectView(Guid Id, Guid WorkspaceId, string Name, string?
     IReadOnlyList<Stakeholder> Stakeholders, decimal? BudgetAmount, string? BudgetCurrency, DateOnly? StartDate, DateOnly? EndDate,
     IReadOnlyList<string> ItemTypes, string PriorityScale, string EstimationUnit, int SprintLengthDays,
     IReadOnlyList<string> DefinitionOfReady, IReadOnlyList<string> DefinitionOfDone, string Status, DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt, ProjectAccessView Access, Guid? SourceConnectionId = null);
+    DateTimeOffset UpdatedAt, ProjectAccessView Access, Guid? SourceConnectionId = null, bool MirrorActive = false);
 
 public sealed record ProjectMemberView(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset AddedAt);
 
@@ -58,10 +58,10 @@ internal static class ProjectViews
     public static ProjectSummary Summary(ManagedProject p, string? ownerName, int applications) =>
         new(p.Id, p.Name, p.Purpose, p.OwnerUserId, ownerName, p.StartDate, p.EndDate, p.Status, applications, p.CreatedAt, p.SourceConnectionId);
 
-    public static ProjectView View(ManagedProject p, string? ownerName, ProjectAccessView access) =>
+    public static ProjectView View(ManagedProject p, string? ownerName, ProjectAccessView access, bool mirrorActive = false) =>
         new(p.Id, p.WorkspaceId, p.Name, p.Purpose, p.OwnerUserId, ownerName, p.Sponsor, ProjectJson.Unpack<Stakeholder>(p.Stakeholders),
             p.BudgetAmount, p.BudgetCurrency, p.StartDate, p.EndDate, p.ItemTypes, p.PriorityScale, p.EstimationUnit, p.SprintLengthDays,
-            p.DefinitionOfReady, p.DefinitionOfDone, p.Status, p.CreatedAt, p.UpdatedAt, access, p.SourceConnectionId);
+            p.DefinitionOfReady, p.DefinitionOfDone, p.Status, p.CreatedAt, p.UpdatedAt, access, p.SourceConnectionId, mirrorActive);
 
     public static ApplicationSummary Summary(ManagedApplication a) =>
         new(a.Id, a.ProjectId, a.Name, a.Description, a.Kind, a.TechStack, a.Status, a.CreatedAt);

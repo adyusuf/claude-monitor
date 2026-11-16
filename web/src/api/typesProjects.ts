@@ -76,6 +76,8 @@ export interface ProjectView {
   updatedAt: string;
   access: ProjectAccess;
   sourceConnectionId: string | null;
+  /** True while the project's connection is not disconnected: its name and purpose are then the tool's. False for a project made here and for an imported one whose connection is gone. */
+  mirrorActive: boolean;
 }
 
 export interface ProjectMemberView { userId: string; displayName: string; email: string | null; role: ProjectRole; addedAt: string }

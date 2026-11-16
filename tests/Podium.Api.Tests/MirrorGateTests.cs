@@ -36,7 +36,7 @@ public sealed class MirrorGateTests(ApiFactory api)
     public void No_failure_is_needed_to_ask_and_nothing_is_asked_of_nothing() => Assert.Throws<ArgumentNullException>(() => MirrorGate.Refusal(null!));
 
     [Fact]
-    public async Task A_disconnected_connection_refuses_every_write_as_detached_and_changes_nothing()
+    public async Task A_disconnected_connection_refuses_the_sprint_writes_as_detached_and_changes_nothing()
     {
         var s = await JiraWriteSprintKit.OpenAsync(api);
         var issue = await s.W.IdAsync("WRT-2");
@@ -46,9 +46,6 @@ public sealed class MirrorGateTests(ApiFactory api)
 
         var answers = new[]
         {
-            await JiraWriteKit.EditAsync(s.W.Member, issue, new { title = "Detached" }),
-            await s.W.Member.SendAsync(HttpMethod.Put, $"/api/issues/{issue}/status", new { status = "done" }),
-            await s.W.Member.PostAsync($"/api/projects/{s.W.Project}/issues", new { title = "New" }),
             await s.W.Member.PostAsync($"/api/projects/{s.W.Project}/sprints", new { name = "New" }),
             await SprintKit.AddAsync(s.W.Member, await s.IdAsync("Plan B"), issue),
             await SprintKit.CloseAsync(s.W.Member, now),
@@ -57,9 +54,26 @@ public sealed class MirrorGateTests(ApiFactory api)
 
         foreach (var answer in answers) await JiraWriteKit.AssertRefusedAsync(answer, HttpStatusCode.Conflict, "mirrored_detached");
         Assert.Equal(calls, s.W.Jira.Calls(s.W.Site).Count);
-        Assert.Equal(("Story one", "active"), ((await s.W.RowAsync("WRT-2")).Title, await SprintKit.StatusAsync(s.W.Member, now)));
-        Assert.Equal(s.W.World.ConnectionId, (await s.W.World.Admin.GetJsonAsync($"/api/projects/{s.W.Project}")).GetProperty("sourceConnectionId").GetGuid()); // detached, not forgotten
-        Assert.Equal(HttpStatusCode.NoContent, (await JiraWriteKit.EditAsync(s.W.Member, issue, new { technicalDesign = "Podium keeps this" })).StatusCode);
+        Assert.Equal("active", await SprintKit.StatusAsync(s.W.Member, now));
+        Assert.Equal(s.W.World.ConnectionId, (await s.W.World.Admin.GetJsonAsync($"/api/projects/{s.W.Project}")).GetProperty("sourceConnectionId").GetGuid()); // disconnected, not detached: the source stays until Detach
+    }
+
+    [Fact]
+    public async Task A_disconnected_connection_no_longer_gates_the_issue_writes_they_are_podiums_and_make_no_call_to_jira()
+    {
+        // F-106 and F-262: this test used to expect every issue write to be refused as mirrored_detached; the lock now applies only while the connection is not disconnected.
+        var w = await JiraWriteKit.OpenAsync(api);
+        var issue = await w.IdAsync("WRT-2");
+        (await w.World.Admin.SendAsync(HttpMethod.Delete, $"/api/integrations/{w.World.ConnectionId}")).EnsureSuccessStatusCode();
+        var calls = w.Jira.Calls(w.Site).Count;
+
+        Assert.Equal(HttpStatusCode.NoContent, (await JiraWriteKit.EditAsync(w.Member, issue, new { title = "Detached" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await w.Member.SendAsync(HttpMethod.Put, $"/api/issues/{issue}/status", new { status = "done" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await w.Member.PostAsync($"/api/projects/{w.Project}/issues", new { title = "New" })).StatusCode);
+
+        Assert.Equal(calls, w.Jira.Calls(w.Site).Count);
+        var row = await w.RowAsync("WRT-2");
+        Assert.Equal(("Detached", "done"), (row.Title, row.Status));
     }
 
     [Fact]
