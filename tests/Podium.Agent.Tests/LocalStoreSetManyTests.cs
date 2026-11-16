@@ -56,12 +56,12 @@ public sealed class LocalStoreSetManyTests : IDisposable
     {
         var workspace = Guid.NewGuid();
         Assert.Equal([(MachineMonitor.RemoteRunsKey, "false"), (MachineMonitor.ShareServicesKey, "false"), (MachineMonitor.ShareInventoryKey, "false"),
-            (AccessPolicySync.StampKey, ""), (AccessPolicySync.EnforceKey, "false"), (AccessPolicySync.WorkspaceKey, workspace.ToString("D"))],
+            (MachineMonitor.ClaudeControlKey, "unknown"), (AccessPolicySync.StampKey, ""), (AccessPolicySync.EnforceKey, "false"), (AccessPolicySync.WorkspaceKey, workspace.ToString("D"))],
             MachineMonitor.Entries(new AgentSettings(true, 1000, workspace)));
         Assert.Equal([(MachineMonitor.RemoteRunsKey, "true"), (MachineMonitor.ShareServicesKey, "true"), (MachineMonitor.ShareInventoryKey, "true"),
-            (AccessPolicySync.StampKey, "stamp"), (AccessPolicySync.EnforceKey, "true"), (AccessPolicySync.WorkspaceKey, workspace.ToString("D")),
+            (MachineMonitor.ClaudeControlKey, "true"), (AccessPolicySync.StampKey, "stamp"), (AccessPolicySync.EnforceKey, "true"), (AccessPolicySync.WorkspaceKey, workspace.ToString("D")),
             (MachineMonitor.ThresholdsKey, "80,81,82,83")],
             MachineMonitor.Entries(new AgentSettings(true, 1000, workspace, RemoteRuns: true, Alerts: new AlertThresholds(80, 81, 82, 83), ShareServices: true, ShareInventory: true,
-                AccessPolicyStamp: "stamp", EnforceAccessPolicies: true)));
+                AccessPolicyStamp: "stamp", EnforceAccessPolicies: true, ClaudeControl: true)));
     }
 }

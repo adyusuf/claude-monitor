@@ -106,7 +106,7 @@ public static class AgentEndpoints
         var stamp = await AccessPolicyDelivery.StampAsync(db, workspaceId, http.RequestAborted);
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
             new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, mine?.ShareServices ?? false, auto, auto == ClaudeAutoModes.Always ? mine!.ClaudeAutoProject : null,
-            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies, ExecLevelChanges.Read<ExecLevelRequest>(mine?.ExecLevelRequest)));
+            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies, ExecLevelChanges.Read<ExecLevelRequest>(mine?.ExecLevelRequest), mine?.AcceptsClaudeControl ?? false));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
