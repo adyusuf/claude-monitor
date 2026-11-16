@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { Invitation, Member } from "../api/types";
@@ -101,5 +101,49 @@ describe("Load more on the open invitations the API cut (F-060)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
     expect(await screen.findByText("Something went wrong on the server.")).toBeInTheDocument();
     expect(screen.getByText("first+test@gmail.com")).toBeInTheDocument();
+  });
+});
+
+describe("a change keeps the rows Load more added (F-060)", () => {
+  /** Ada and Bea come plain and cut; the cursor pages are Ada, Bea (k1) then Cem (last). */
+  const pagedMembers = (call: { path: string }) => {
+    if (call.path.includes("cursor=k1")) return { body: { items: [member("u3", "Cem")], nextCursor: null } };
+    if (call.path.includes("limit=")) return { body: { items: [member("u1", "Ada"), member("u2", "Bea")], nextCursor: "k1" } };
+    return { body: [member("u1", "Ada"), member("u2", "Bea")], headers: cut };
+  };
+
+  it("still shows a member added by Load more after their own role change", async () => {
+    const calls = mockApi({
+      "GET /me": { body: ME }, "GET /workspaces/w1/members": pagedMembers, "GET /workspaces/w1/invitations": { body: [] },
+      "PATCH /workspaces/w1/members/u3": { status: 204 },
+    });
+    renderAt("/w/w1/members", route);
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    const row = (await screen.findByText("Cem")).closest("tr")!;
+    await userEvent.selectOptions(within(row as HTMLElement).getByRole("combobox"), "admin");
+    await screen.findByText("Cem");
+    expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(1);
+    await new Promise((r) => setTimeout(r, 50)); // the reload after the change has answered
+    expect(screen.getByText("Cem")).toBeInTheDocument();
+    expect(screen.getAllByText("Bea")).toHaveLength(1);
+    expect(more()).not.toBeInTheDocument();
+  });
+
+  it("still shows an invitation added by Load more after another one is revoked", async () => {
+    mockApi({
+      "GET /me": { body: ME }, "GET /workspaces/w1/members": { body: [member("u1", "Ada")] },
+      "GET /workspaces/w1/invitations": (call) => (call.path.includes("limit=")
+        ? { body: { items: [invitation("i1", "first+test@gmail.com"), invitation("i2", "second+test@gmail.com")], nextCursor: null } }
+        : { body: [invitation("i1", "first+test@gmail.com")], headers: cut }),
+      "DELETE /workspaces/w1/invitations/i1": { status: 204 },
+    });
+    renderAt("/w/w1/members", route);
+    await userEvent.click(await screen.findByRole("tab", { name: /Invitations/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await screen.findByText("second+test@gmail.com");
+    const row = screen.getByText("first+test@gmail.com").closest("tr")!;
+    await userEvent.click(within(row as HTMLElement).getByRole("button", { name: "Cancel" }));
+    await new Promise((r) => setTimeout(r, 50)); // the reload after the revoke has answered
+    expect(screen.getByText("second+test@gmail.com")).toBeInTheDocument();
   });
 });

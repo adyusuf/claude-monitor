@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/endpoints";
 import type { PersonView } from "../api/typesIntegrations";
 import type { Member } from "../api/types";
 import { MoreRows } from "../components/MoreRows";
 import { Button, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
-import { appendNew } from "../lib/listPages";
+import { appendNew, readUpTo, type ListRead } from "../lib/listPages";
 
 /** The people of the tool (admins): who is a member, who was invited, who has no visible e-mail. An admin can type an e-mail or link a person to a member. */
 export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
@@ -17,12 +17,19 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
   const [email, setEmail] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // How many people are shown: a reload after a save reads as far again, so a person Load more added stays.
+  const shown = useRef(0);
+
+  const show = (list: ListRead<PersonView>) => {
+    shown.current = list.items.length;
+    setPeople(list.items);
+    setTruncated(list.truncated);
+  };
 
   const load = useCallback(async () => {
     try {
-      const [list, all] = await Promise.all([api.integrationPeople(id), api.members(ws)]);
-      setPeople(list.items);
-      setTruncated(list.truncated);
+      const [list, all] = await Promise.all([readUpTo((skip) => api.integrationPeople(id, skip), shown.current, (p) => p.id), api.members(ws)]);
+      show(list);
       setMembers(all);
     } catch (e) {
       setError(errorText(e));
@@ -32,6 +39,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
   }, [id, ws]);
 
   useEffect(() => {
+    shown.current = 0; // another connection starts at its first page
     void load();
   }, [load]);
 
@@ -41,8 +49,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
     setLoadingMore(true);
     try {
       const list = await api.integrationPeople(id, people.length);
-      setPeople(appendNew(people, list.items, (p) => p.id));
-      setTruncated(list.truncated);
+      show({ items: appendNew(people, list.items, (p) => p.id), truncated: list.truncated });
     } catch (e) {
       setError(errorText(e));
     } finally {

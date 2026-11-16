@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { Invitation, Member, Role } from "../api/types";
@@ -9,7 +9,7 @@ import { Tabs } from "../components/Tabs";
 import { Button, Card, Field, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { date } from "../lib/format";
-import { nextByCursor, type CursorState } from "../lib/listPages";
+import { nextByCursor, readByCursorUpTo, type CursorState } from "../lib/listPages";
 
 const ROLES: Role[] = ["owner", "admin", "member", "viewer"];
 
@@ -31,6 +31,8 @@ export function MembersPage() {
   const [invitationsLeft, setInvitationsLeft] = useState<CursorState>(WHOLE);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingInvitations, setLoadingInvitations] = useState(false);
+  // How many of each are shown: a reload after a change reads as far again, so a row Load more added stays.
+  const shown = useRef({ members: 0, invitations: 0 });
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [inviting, setInviting] = useState(false);
@@ -38,16 +40,25 @@ export function MembersPage() {
   const myRole = me?.workspaces.find((w) => w.id === ws)?.role;
   const admin = myRole === "owner" || myRole === "admin";
 
+  const showMembers = (rows: Member[], left: CursorState) => {
+    shown.current.members = rows.length;
+    setMembers(rows);
+    setMembersLeft(left);
+  };
+  const showInvitations = (rows: Invitation[], left: CursorState) => {
+    shown.current.invitations = rows.length;
+    setInvitations(rows);
+    setInvitationsLeft(left);
+  };
+
   const load = useCallback(async () => {
     try {
       // The first rows come as the plain list, which says when the API cut it (X-Truncated, F-060); "Load more" reads the rest by cursor.
-      const list = await api.memberList(ws);
-      setMembers(list.items);
-      setMembersLeft({ truncated: list.truncated, cursor: null });
+      const list = await readByCursorUpTo(await api.memberList(ws), (cursor) => api.memberPage(ws, cursor), shown.current.members, (m) => m.userId);
+      showMembers(list.rows, list.state);
       if (admin) {
-        const open = await api.invitationList(ws);
-        setInvitations(open.items);
-        setInvitationsLeft({ truncated: open.truncated, cursor: null });
+        const open = await readByCursorUpTo(await api.invitationList(ws), (cursor) => api.invitationPage(ws, cursor), shown.current.invitations, (i) => i.id);
+        showInvitations(open.rows, open.state);
       }
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
@@ -55,6 +66,7 @@ export function MembersPage() {
   }, [ws, admin, errorText]);
 
   useEffect(() => {
+    shown.current = { members: 0, invitations: 0 }; // another workspace starts at its first page
     void load();
     // errorText is a fresh function each render; loading again for it would loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,8 +77,7 @@ export function MembersPage() {
     setLoadingMembers(true);
     try {
       const next = await nextByCursor((cursor) => api.memberPage(ws, cursor), membersLeft, members, (m) => m.userId);
-      setMembers(next.rows);
-      setMembersLeft(next.state);
+      showMembers(next.rows, next.state);
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
     } finally {
@@ -78,8 +89,7 @@ export function MembersPage() {
     setLoadingInvitations(true);
     try {
       const next = await nextByCursor((cursor) => api.invitationPage(ws, cursor), invitationsLeft, invitations, (i) => i.id);
-      setInvitations(next.rows);
-      setInvitationsLeft(next.state);
+      showInvitations(next.rows, next.state);
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
     } finally {
