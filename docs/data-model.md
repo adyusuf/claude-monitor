@@ -87,7 +87,11 @@ The remote-work tables (ADR-0005, ADR-0010): [data-model-remote.md](data-model-r
 - **Idempotency** sits in `agent_batches`, not in the event table: a unique key on a partitioned table must
   include the partition key, so it cannot catch a retried batch that lands in another month.
 - **Retention:** every few hours a job writes each workspace-day older than `retention_days` (UTC, by `received_at`)
-  to one zipped JSON array, records it in `event_archives`, and deletes those rows in the same transaction.
+  to one zipped JSON array, records it in `event_archives`, and deletes those rows in the same transaction. The housekeeping
+  loop deletes an archive file with its `event_archives` row once the row's `created_at` is older than `retention_days`, sets
+  `session_commands.body` to NULL and `permission_requests.tool_input` to `{}` past `retention_days` (by `created_at`; never a
+  command still `queued` or `delivered`, never an `open` request; the rows stay), in batches; the API shows such content as
+  removed (`contentRemoved`) at once (F-119).
 
 | Table | Columns | Keys and indexes |
 |---|---|---|

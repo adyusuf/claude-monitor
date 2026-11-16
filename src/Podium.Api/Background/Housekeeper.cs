@@ -7,8 +7,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.Background;
 
 /// <summary>
-/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens and device codes, and keep the
-/// monthly partitions of session_events created ahead of need (the default partition catches anything else).
+/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens and device codes, keep the
+/// monthly partitions of session_events created ahead of need (the default partition catches anything else), and blank captured content past retention
+/// (<see cref="ContentRetention"/>).
 /// </summary>
 public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock, ILogger<Housekeeper> log) : BackgroundService
 {
@@ -67,7 +68,9 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
             () => db.AgentTokens.Where(t => t.ExpiresAt <= credentialCutoff || (t.RevokedAt != null && t.RevokedAt <= credentialCutoff))
                 .ExecuteDeleteAsync(ct),
             () => db.DeviceAuthorizations.Where(d => d.ExpiresAt <= credentialCutoff).ExecuteDeleteAsync(ct),
-            () => EnsurePartitionsAsync(db, now, ct));
+            () => EnsurePartitionsAsync(db, now, ct),
+            // Prompt texts, permission inputs and archive files past the workspace's retention (F-119).
+            () => ContentRetention.RunOnceAsync(db, now, ct));
     }
 
     /// <summary>session_events_yYYYYmMM for this month and the next ones. Idempotent.</summary>

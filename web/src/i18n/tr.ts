@@ -146,6 +146,7 @@ export const tr: Dictionary = {
     send: "Gönder", stop: "Oturumu durdur", stopConfirm: "Bu oturum bir sonraki adımında durdurulsun mu?", sent: "Gönderildi.",
     onlyOwner: "Bu oturuma yalnızca onu çalıştıran makinenin sahibi komut gönderebilir.",
     history: "Webden gönderilenler", cancel: "İptal", noCommands: "Henüz bir şey gönderilmedi.",
+    removedAfterRetention: "Çalışma alanının saklama süresi dolduğu için kaldırıldı.",
     permissions: "İzin bekleyenler", noPermissions: "İzin bekleyen bir şey yok.", allow: "İzin ver", deny: "Reddet",
     reason: "Gerekçe (isteğe bağlı)", answered: "Yanıtlandı", expired: "Süresi doldu", expires: "Bitiş",
     expiresIn: "{time} sonra sona erer",

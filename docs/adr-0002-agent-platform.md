@@ -101,7 +101,9 @@ the central database hold users' code and anything their tools printed, **secret
 - content is never written to an application log (only ids and sizes);
 - every workspace has a **retention period** (default 90 days). Past it, events are written **one file per
   workspace per day as a zipped JSON array** and then removed from the database; the archive's path, size, count
-  and SHA-256 are recorded (`event_archives`). Decided by the maintainer on 03/10/2026.
+  and SHA-256 are recorded (`event_archives`). Decided by the maintainer on 03/10/2026. An archive file is deleted with its row
+  once the row is older than the retention period too, and a web prompt's text (`session_commands.body`) and a permission request's
+  tool input (`permission_requests.tool_input`) are blanked past the retention period; the rows stay (F-119, maintainer, 16/11/2026).
 
 ### Accounts and sign-in
 

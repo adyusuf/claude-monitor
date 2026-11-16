@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Podium.Api.Approvals;
+using Podium.Api.Background;
 using Podium.Api.Remote;
 using Podium.Api.Config;
 using Podium.Api.Data;
@@ -15,9 +16,10 @@ namespace Podium.Api.Endpoints;
 public sealed record CommandRequest(string? Kind, string? Body);
 public sealed record CommandRow(Guid Id, string Kind, string? Body, string Status, Guid CreatedBy, DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt, DateTimeOffset? DeliveredAt, DateTimeOffset? AppliedAt, string? Result,
-    long? ReplyEventId = null, string? ReplyText = null, bool ReplyMore = false, string? Transport = null);
+    long? ReplyEventId = null, string? ReplyText = null, bool ReplyMore = false, string? Transport = null, bool ContentRemoved = false);
+/// <param name="ContentRemoved">The tool input was removed after the workspace's retention (F-119): <c>ToolInput</c> is then <c>{}</c>.</param>
 public sealed record PermissionRow(Guid Id, string ToolName, System.Text.Json.JsonDocument ToolInput, string Status,
-    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, string? Decision, string? Reason, DateTimeOffset? AnsweredAt);
+    DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, string? Decision, string? Reason, DateTimeOffset? AnsweredAt, bool ContentRemoved = false);
 /// <param name="Remember">How long the allow stands for the same tool on the same machine (<see cref="ApprovalDurations"/>; ADR-0019); null is once.</param>
 /// <param name="Code">The two-step code an <c>always</c> rule may need (re-authentication).</param>
 public sealed record AnswerRequest(string? Decision, string? Reason, Dictionary<string, string>? Answers = null, string? Remember = null, string? Code = null);
@@ -43,12 +45,17 @@ public static class CommandEndpoints
         g.MapPost("/permission-requests/{id:guid}/answer", Answer);
     }
 
-    private static async Task<IResult> ListCommands(Guid id, HttpContext http, PodiumDb db, ApiConfig config)
+    private static async Task<IResult> ListCommands(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
     {
-        if (await Access.SessionAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
-        var rows = await db.SessionCommands.AsNoTracking().Where(c => c.SessionId == id).OrderByDescending(c => c.CreatedAt).Take(50)
-            .Select(c => new CommandRow(c.Id, c.Kind, c.Body, c.Status, c.CreatedBy, c.CreatedAt, c.ExpiresAt, c.DeliveredAt, c.AppliedAt, c.Result, null, null, false, c.Transport))
-            .ToListAsync(http.RequestAborted);
+        if (await Access.SessionAsync(db, http.User.UserId(), id, http.RequestAborted) is not { } found) return Http.NotFound();
+        var cutoff = await RetentionCutoffAsync(db, found.Session.WorkspaceId, clock, http.RequestAborted);
+        // A prompt past retention reads as removed at once, also in the minute before the housekeeper blanks it (ContentRetention, F-119); a pending one never.
+        var rows = (await db.SessionCommands.AsNoTracking().Where(c => c.SessionId == id).OrderByDescending(c => c.CreatedAt).Take(50)
+            .Select(c => new CommandRow(c.Id, c.Kind, c.Body, c.Status, c.CreatedBy, c.CreatedAt, c.ExpiresAt, c.DeliveredAt, c.AppliedAt, c.Result, null, null, false, c.Transport, false))
+            .ToListAsync(http.RequestAborted))
+            .Select(c => c.Kind == CommandKinds.Prompt && c.Status is not (CommandStatuses.Queued or CommandStatuses.Delivered) && c.CreatedAt < cutoff
+                ? c with { Body = null, ContentRemoved = true }
+                : c).ToList();
         var replies = await CommandReplies.FindAsync(db, id, rows, config, http.RequestAborted);
         return Results.Ok(rows.Select(c => replies.TryGetValue(c.Id, out var r) ? c with { ReplyEventId = r.EventId, ReplyText = r.Text, ReplyMore = r.More } : c));
     }
@@ -112,15 +119,26 @@ public static class CommandEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> ListPermissions(Guid id, string? status, HttpContext http, PodiumDb db)
+    private static async Task<IResult> ListPermissions(Guid id, string? status, HttpContext http, PodiumDb db, TimeProvider clock)
     {
-        if (await Access.SessionAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
+        if (await Access.SessionAsync(db, http.User.UserId(), id, http.RequestAborted) is not { } found) return Http.NotFound();
+        var cutoff = await RetentionCutoffAsync(db, found.Session.WorkspaceId, clock, http.RequestAborted);
         var query = db.PermissionRequests.AsNoTracking().Where(p => p.SessionId == id);
         if (status is { Length: > 0 }) query = query.Where(p => p.Status == status);
         var rows = await query.OrderByDescending(p => p.CreatedAt).Take(50)
-            .Select(p => new PermissionRow(p.Id, p.ToolName, p.ToolInput, p.Status, p.CreatedAt, p.ExpiresAt, p.Decision, p.Reason, p.AnsweredAt))
+            .Select(p => new PermissionRow(p.Id, p.ToolName, p.ToolInput, p.Status, p.CreatedAt, p.ExpiresAt, p.Decision, p.Reason, p.AnsweredAt, false))
             .ToListAsync(http.RequestAborted);
-        return Results.Ok(rows);
+        // An input past retention reads as removed at once (ContentRetention, F-119); an open request never.
+        return Results.Ok(rows.Select(p => p.Status != PermissionStatuses.Open && p.CreatedAt < cutoff
+            ? p with { ToolInput = JsonDocument.Parse(ContentRetention.BlankInput), ContentRemoved = true }
+            : p).ToList());
+    }
+
+    /// <summary>Content created before this moment is past the workspace's retention (<see cref="ContentRetention"/>).</summary>
+    internal static async Task<DateTimeOffset> RetentionCutoffAsync(PodiumDb db, Guid workspaceId, TimeProvider clock, CancellationToken ct)
+    {
+        var days = await db.WorkspaceSettings.AsNoTracking().Where(s => s.WorkspaceId == workspaceId).Select(s => s.RetentionDays).FirstAsync(ct);
+        return clock.GetUtcNow().AddDays(-days);
     }
 
     private static async Task<IResult> Answer(Guid id, AnswerRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, Broker broker)
