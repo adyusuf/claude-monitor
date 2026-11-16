@@ -1,5 +1,6 @@
 using Podium.Api.Data;
 using Podium.Api.Projects;
+using Podium.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Integrations;
@@ -17,7 +18,8 @@ public sealed record IssueFacts(string Type, string Title, string? Description, 
 /// </summary>
 public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate, TimeProvider clock, ILogger<IssueWrites> log)
 {
-    public async Task<IResult?> UpdateAsync(Guid user, ManagedProject project, IssueFacts before, Issue after, CancellationToken ct)
+    /// <summary>An edit of the issue; <paramref name="http"/> tags the audit row of a partly applied write with the request's address.</summary>
+    public async Task<IResult?> UpdateAsync(Guid user, ManagedProject project, IssueFacts before, Issue after, HttpContext? http, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(before);
@@ -47,7 +49,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         }
         catch (TrackerException e) when (transitioned)
         {
-            return await PartlyAppliedAsync(open.Ctx, user, after, link, e, ct);
+            return await PartlyAppliedAsync(open.Ctx, user, after, link, e, http, ct);
         }
         catch (TrackerException e)
         {
@@ -61,7 +63,8 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
     /// The transition went through and the field update after it did not: Jira has the new status, so the row takes that status too (and the link the
     /// tool's new change value, or the retry would be refused as changed in Jira), but none of the other fields. The answer says the change was applied only in part.
     /// </summary>
-    private async Task<IResult> PartlyAppliedAsync(TrackerContext ctx, Guid user, Issue after, IntegrationLink? link, TrackerException failure, CancellationToken ct)
+    private async Task<IResult> PartlyAppliedAsync(TrackerContext ctx, Guid user, Issue after, IntegrationLink? link, TrackerException failure, HttpContext? http,
+        CancellationToken ct)
     {
         log.LogWarning("The status of issue {Issue} changed in the tool but the field update failed: {Code}", after.Id, failure.Code);
         string? stamp = null;
@@ -77,6 +80,12 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         var now = clock.GetUtcNow();
         await db.Issues.Where(i => i.Id == after.Id).ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, after.Status).SetProperty(i => i.UpdatedAt, now).SetProperty(i => i.UpdatedBy, user), ct);
         if (link is not null && stamp is not null) await db.IntegrationLinks.Where(l => l.Id == link.Id).ExecuteUpdateAsync(s => s.SetProperty(l => l.ExternalUpdated, stamp), ct);
+        // The status changed here, so it is audited (S-3): the status and the failure code, no text. The issue the endpoint filled is let go
+        // first, so this save stores the audit row and none of the fields the tool did not take.
+        db.Entry(after).State = EntityState.Detached;
+        Audit.Add(db, http, clock, AuditActions.IssueUpdated, after.WorkspaceId, user, targetType: "issue", targetId: after.Id,
+            detail: new { partlyApplied = true, status = after.Status, code = failure.Code });
+        await db.SaveChangesAsync(ct);
         return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.PartlyApplied);
     }
 
