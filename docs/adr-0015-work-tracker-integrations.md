@@ -78,7 +78,7 @@ A refresh token rotates on every use; the new one is stored in the same transact
    delivery is answered 429, recorded and queued nowhere, and the pass reads what it named). The handler reads only *which* issue key or sprint id changed and queues "read it again" in memory (`SyncQueue`); the
    worker fetches the record with the connector's token and applies it. A lost queue (restart) costs nothing: pass 2 finds it.
 2. **Reconciliation** every 10 minutes per active connection (and once at start): issues of imported spaces with `updated >= last pass − 5 minutes`, the sprints of imported sprints' boards, the space list
-   (a vanished space is archived), the people of imported spaces. It is the only update path on a machine that Jira cannot reach (development) and the net under pass 1.
+   (a vanished space, like a vanished issue, is archived on the second pass in a row that misses it, F-066; an empty or cut issue listing archives nothing), the people of imported spaces. It is the only update path on a machine that Jira cannot reach (development) and the net under pass 1.
 3. **Webhook upkeep:** the pass registers the webhook when the first space is imported (two registrations: issue events filtered by `project in (...)`, and sprint events), re-registers when the
    set of spaces changes, and extends it every 10 days (30-day expiry). A site that refuses webhooks keeps working on pass 2 alone; the page shows "webhook: off".
 4. **Echo:** a write Podium made (Part 2) records the Jira `updated` value it got back; the webhook or pass that reads the same value changes nothing.
