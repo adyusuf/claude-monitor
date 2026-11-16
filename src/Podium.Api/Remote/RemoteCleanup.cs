@@ -19,6 +19,11 @@ public static class RemoteCleanup
         List<Action>? after = null) =>
         ForAsync(db, broker, null, null, [agentId], actor, now, after, ct);
 
+    /// <summary>Several agents' remote work as one cascade (one lock order for all of them).</summary>
+    public static Task ForAgentsAsync(PodiumDb db, Broker broker, IReadOnlyCollection<Guid> agentIds, Guid? actor, DateTimeOffset now,
+        CancellationToken ct, List<Action>? after = null) =>
+        ForAsync(db, broker, null, null, agentIds, actor, now, after, ct);
+
     /// <summary>
     /// A removed member's remote work and that of the agents they had in the workspace (<paramref name="agentIds"/>), as one
     /// cascade: a cascade per agent would lock one agent's rows before the next agent's jobs, against the global order.
