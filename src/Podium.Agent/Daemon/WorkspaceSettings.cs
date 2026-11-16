@@ -22,7 +22,7 @@ public static class WorkspaceSettings
         [ClaudeUpdate.ClaudePolicy.WorkspaceKey, Update.UpdatePolicy.WorkspaceKey, MachineMonitor.RemoteRunsKey, ClaudeAutoStart.ModeKey, ClaudeAutoStart.ProjectKey, WorkspaceKey,
             Access.AccessPolicySync.StampKey, Access.AccessPolicySync.EnforceKey, Access.AccessPolicySync.WorkspaceKey,
             Exec.ExecLevelChanges.SequenceKey, Exec.ExecLevelChanges.StateKey, Exec.ExecLevelChanges.LevelKey,
-            Capture.Recorder.MaskSecretsKey, Capture.Recorder.EventMaxBytesKey];
+            Capture.Recorder.MaskSecretsKey, Capture.Recorder.EventMaxBytesKey, Relay.BatchMaxEventsKey];
 
     public static void Tag(LocalStore store, Guid workspaceId)
     {

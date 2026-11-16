@@ -65,6 +65,7 @@ public sealed partial class LocalStore : IDisposable
         AddColumnIfMissing("exec_runs", "run_pid_start", "TEXT");
         AddColumnIfMissing("exec_runs", "run_deadline", "TEXT");
         CreateAccessTables();
+        CreateQuarantineTable();
     }
 
     /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>
