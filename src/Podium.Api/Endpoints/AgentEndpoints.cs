@@ -96,7 +96,7 @@ public static class AgentEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Settings(HttpContext http, PodiumDb db)
+    private static async Task<IResult> Settings(HttpContext http, PodiumDb db, ApiConfig config)
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
@@ -106,7 +106,7 @@ public static class AgentEndpoints
         var stamp = await AccessPolicyDelivery.StampAsync(db, workspaceId, http.RequestAborted);
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
             new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, mine?.ShareServices ?? false, auto, auto == ClaudeAutoModes.Always ? mine!.ClaudeAutoProject : null,
-            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies, ExecLevelChanges.Read<ExecLevelRequest>(mine?.ExecLevelRequest)));
+            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies, ExecLevelChanges.Read<ExecLevelRequest>(mine?.ExecLevelRequest), config.MaxBatchEvents));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>

@@ -100,9 +100,10 @@ public sealed record CommandStatusUpdate(string Status, string? Result, DateTime
 /// <summary>What the agent must know of its workspace's settings before it captures anything. AgentUpdate is the most the workspace lets an agent do about updating itself; ClaudeUpdate whether it may update Claude Code on the machine (ADR-0006).</summary>
 /// <param name="AccessPolicyStamp">Changes whenever the access policies for this agent's repositories change, so it fetches them again (ADR-0020 §4).</param>
 /// <param name="EnforceAccessPolicies">The workspace switch: a run whose repository has no policy, or that names none, gets the default.</param>
+/// <param name="MaxBatchEvents">The most events the server takes in one batch; an agent sends no more. 0 (an older server, which sends none) means unknown: the agent keeps its own size.</param>
 public sealed record AgentSettings(bool MaskSecrets, int EventMaxBytes, Guid WorkspaceId, string AgentUpdate = UpdateModes.Off,
     bool RemoteRuns = false, AlertThresholds? Alerts = null, bool ClaudeUpdate = false, bool ShareServices = false, string? ClaudeAutoMode = null, string? ClaudeAutoProject = null,
-    bool ShareInventory = false, string? AccessPolicyStamp = null, bool EnforceAccessPolicies = false, ExecLevelRequest? ExecLevelRequest = null);
+    bool ShareInventory = false, string? AccessPolicyStamp = null, bool EnforceAccessPolicies = false, ExecLevelRequest? ExecLevelRequest = null, int MaxBatchEvents = 0);
 
 public static class AgentStreamEvents
 {

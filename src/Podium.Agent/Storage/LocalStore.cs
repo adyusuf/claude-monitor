@@ -62,6 +62,7 @@ public sealed partial class LocalStore : IDisposable
         AddColumnIfMissing("exec_runs", "refused_by", "TEXT"); // a database made before an access layer's refusal was reported (ADR-0020 §4)
         AddColumnIfMissing("exec_runs", "access_version", "INTEGER");
         CreateAccessTables();
+        CreateQuarantineTable();
     }
 
     /// <summary>Additive schema change for an existing database; a hook and the daemon may start together, so a lost race is fine.</summary>

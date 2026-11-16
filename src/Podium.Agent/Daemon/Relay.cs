@@ -15,7 +15,7 @@ namespace Podium.Agent.Daemon;
 /// requests to the API, report commands the hooks applied, keep the workspace's settings, and take what arrives on
 /// the agent's stream.
 /// </summary>
-public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock)
+public sealed partial class Relay(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock)
 {
     /// <summary>Executes runs sent to this agent (ADR-0005); null where the relay only uploads.</summary>
     public RunRelay? Runs { get; init; }
@@ -38,36 +38,6 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
     }
 
     public void HeartbeatFailed(string errorType) => store.Set(HeartbeatErrorKey, errorType);
-
-    // The batch size the API takes: halved each time it refuses a batch as too large (its MaxBatchEvents is below ours), for this daemon's life.
-    private int batchEvents = config.BatchEvents;
-
-    /// <summary>Sends batches until the outbox is empty. Returns the number of events the API acknowledged.</summary>
-    public async Task<int> UploadAsync(CancellationToken ct)
-    {
-        var sent = 0;
-        while (store.NextBatch(batchEvents, config.BatchBytes) is { } batch)
-        {
-            BatchAck ack;
-            try
-            {
-                ack = await api.SendBatchAsync(new EventBatch(batch.Seq, batch.Rows.Select(r => r.Event).ToList()), ct);
-            }
-            catch (ApiException e) when (e.Status == System.Net.HttpStatusCode.RequestEntityTooLarge && batch.Rows.Count > 1)
-            {
-                // Refused before anything was stored under its number: the same number goes up again with the first half only.
-                batchEvents = Math.Max(1, batch.Rows.Count / 2);
-                store.ShrinkBatch(batch.Seq, batchEvents);
-                continue;
-            }
-
-            store.Acknowledge(batch.Seq);
-            sent += ack.Duplicate ? 0 : batch.Rows.Count;
-            UploadOutcome(null);
-        }
-
-        return sent;
-    }
 
     /// <summary>New permission requests go to the API; ones past their wait are given up (Claude asks locally).</summary>
     public async Task PermissionsAsync(CancellationToken ct)
@@ -142,6 +112,7 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         [
             (Capture.Recorder.MaskSecretsKey, s.MaskSecrets ? "true" : "false"),
             (Capture.Recorder.EventMaxBytesKey, s.EventMaxBytes.ToString(CultureInfo.InvariantCulture)),
+            (BatchMaxEventsKey, s.MaxBatchEvents.ToString(CultureInfo.InvariantCulture)),
             (UpdatePolicy.WorkspaceKey, UpdateModes.Normalize(s.AgentUpdate)),
             .. MachineMonitor.Entries(s),
             (ClaudeUpdate.ClaudePolicy.WorkspaceKey, s.ClaudeUpdate ? "true" : "false"),
@@ -218,20 +189,6 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
         store.Set(PushStatus.StreamStateAtKey, Now());
         store.Set(PushStatus.StreamFailuresKey, failures.ToString(CultureInfo.InvariantCulture));
         store.Set(PushStatus.StreamErrorKey, error ?? "");
-    }
-
-    /// <summary>Records the outcome of an upload pass: its time, or the failure's type name.</summary>
-    public void UploadOutcome(string? error)
-    {
-        if (error is null)
-        {
-            store.Set(PushStatus.UploadAtKey, Now());
-            store.Set(PushStatus.UploadErrorKey, "");
-            return;
-        }
-
-        store.Set(PushStatus.UploadErrorKey, error);
-        store.Set(PushStatus.UploadErrorAtKey, Now());
     }
 
     private string Now() => clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
