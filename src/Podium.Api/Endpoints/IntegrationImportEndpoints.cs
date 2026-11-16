@@ -149,7 +149,17 @@ public static class IntegrationImportEndpoints
                 detail: new { userId = person.UserId, previousUserId = previousUser, emailChanged });
         }
 
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e, PeopleMirror.PersonUserIndex))
+        {
+            // The member was linked to another person of the connection meanwhile (another admin, or a pass matching by e-mail): the same
+            // answer as the check above gives.
+            return Http.Invalid("userId", AlreadyLinked);
+        }
+
         return Results.NoContent();
     }
 
