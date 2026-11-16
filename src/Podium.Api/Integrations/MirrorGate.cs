@@ -14,6 +14,7 @@ public sealed class MirrorGate(PodiumDb db, IntegrationTokens tokens)
 {
     public const string AccountRequired = "jira_account_required";
     public const string Changed = "jira_changed";
+    public const string PartlyApplied = "jira_partly_applied";
     public const string TransitionUnavailable = "jira_transition_unavailable";
     public const string NoBoard = "jira_no_board";
     public const string Scope = "mirrored_scope";

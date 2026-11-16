@@ -101,7 +101,7 @@ describe("i18n", () => {
     "csrf", "account_locked", "conflict", "email_not_verified", "invalid_credentials", "mfa_required", "reauth_required", "reauthorize",
     "sole_owner", "owner_only", "action_busy", "claude_start_pending", "no_test_command", "approval_invalid", "approval_required",
     "exec_level_invalid", "exec_level_changed", "access_policy_changed", "bad_template", "totp_required", "settings_conflict",
-    "jira_account_required", "jira_changed", "jira_no_board", "jira_transition_unavailable", "mirrored_no_archive", "mirrored_scope",
+    "jira_account_required", "jira_changed", "jira_partly_applied", "jira_no_board", "jira_transition_unavailable", "mirrored_no_archive", "mirrored_scope",
     "mirrored_type_locked", "mirrored_field_locked", "tracker_changed", "tracker_unavailable", "tracker_forbidden", "tracker_rejected",
     "tracker_not_found", "tracker_rate_limited", "stale_update",
   ];
