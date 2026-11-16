@@ -44,7 +44,19 @@ Claude's own tools (Read, Edit, Bash in a session) stay under Claude Code's own 
 
 The web shows each machine's effective policy (web policy ∩ ceiling, the state of each policy on the machine and whether it is signed) read-only on the machine page; the ceiling's paths only to the machine's owner and admins. A machine admin changes the ceiling with `aipod config access show | allow <folder> | deny <folder> | app <exe> [--sha256 <hex>] | remove <path> | clear`, never by editing a file.
 
+**Amendment, 16/11/2026 (F-300): an argv run that names no working directory is not folder-checked.** The check above judges a working directory the run
+names (and the placeholder paths of a grant). A per-call argv run with no `cwd` has nothing to judge: its `Cwd` stays empty, the API's `Evaluate` and the
+agent's guard skip the folder rule, and the process starts in the agent's own folder (the run account's home or work folder); an explicit `cwd` there is
+judged as above (and a folder under the home is refused). A free argument path of an argv run (not a typed grant placeholder) is not judged either: an
+argument is the executable's own business, and the folder rules cover what the run account may reach only through the working directory and the grant's
+placeholders. The decision (maintainer, 16/11/2026) is to document this limit, not to judge a default folder; the OS account stays the hard limit (section 5),
+and enforcement of a default folder remains open. Pinned by `AccessPolicyMathTests` and `ExecGuardPathTests`.
+
 Decisions confirmed by the maintainer on 09/11/2026: the workspace switch (rule 4), the project page with an explicit repository list (rule 1), and signing the repository with the run (rule 6).
+**The repository key leaves out the port (maintainer, 16/11/2026: kept as intended).** `RepoKeys.NormalizeRemote` keeps the lower-cased host, the path without `.git` and no credentials, and drops the port and the scheme: `ssh://git@git.example.invalid:2222/team/shop.git` and `https://git.example.invalid:8443/team/shop` are one key, `git:git.example.invalid/team/shop`. So two services on one host that serve the same path on different ports share one repository, hence one policy. That is the intended trade: the same repository reached over ssh and over https (different ports) must be held to one policy, and a clone URL differs from an application's URL in exactly this way. Two different repositories that collide on host and path are not told apart; give them different paths. Pinned by `RepoKeysPortTests`.
+
+**A policy taken back is not "no limit" (maintainer, 16/11/2026: kept as it is).** Clearing a policy (a tombstone, `cleared`) leaves the repository's keys with it. The web answers "no policy covers this repository" (`GET .../access-policies/by-key` is 404 and the session line shows none), but the API still delivers the tombstone to the workspace's machines and each agent reports it as `default` and applies the default layer to that repository even while *enforce access policies* is off: the project's own folder, argv runs only, no shell and no script. Only a repository no policy ever covered gets the ceiling alone with the switch off. Pinned by `AccessClearedPolicyTests` on the API (by-key 404 beside the delivered tombstone) and on the agent (default layer with the switch off, ceiling alone for a repository never covered).
+
 ## 5. Not covered
 
 - Blocking Claude's own tools in a session (rule above).

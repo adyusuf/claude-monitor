@@ -185,5 +185,24 @@ public sealed partial class LocalStore
     public bool FirstSight(string session, string messageId) =>
         Exec("INSERT OR IGNORE INTO usage_seen (session, message_id) VALUES ($s, $m)", ("$s", session), ("$m", messageId)) == 1;
 
+    /// <summary>Transcripts no hook has mentioned since <paramref name="before"/>: the session, and where its file was.</summary>
+    public List<(string Session, string Path)> TranscriptsIdleSince(DateTimeOffset before)
+    {
+        var list = new List<(string, string)>();
+        using var cmd = Command("SELECT session, path FROM transcripts WHERE updated_at < $t", null, ("$t", Iso(before)));
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) list.Add((r.GetString(0), r.GetString(1)));
+        return list;
+    }
+
+    /// <summary>Forgets a session's transcript row (path and offset) and the message ids its usage was counted by, together: neither is wanted once its file is gone.</summary>
+    public void ForgetTranscript(string session)
+    {
+        using var tx = db.BeginTransaction();
+        Exec("DELETE FROM usage_seen WHERE session = $s", tx, ("$s", session));
+        Exec("DELETE FROM transcripts WHERE session = $s", tx, ("$s", session));
+        tx.Commit();
+    }
+
     internal SqliteConnection Connection => db;
 }

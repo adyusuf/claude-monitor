@@ -53,6 +53,11 @@ export const config = {
   runPageSize: 50,
   /** A machine's grants and jobs come in pages of this many, newest first (they are never deleted, only ended). */
   remotePageSize: 50,
+  /**
+   * How long an action queued for a machine (a stop, a restart) waits to be taken before the API expires it: the API's
+   * `AgentActionKinds.QueueTtl` (Podium.Contracts/ActionProtocol.cs, 10 minutes). The sessions list's Stop can be pressed again after it.
+   */
+  agentActionQueueMs: 10 * 60_000,
   /** The nav badge of runs waiting for the user re-reads this often. */
   pendingPollMs: 30_000,
   // How often the approval band reads the requests waiting on the viewer's sessions (ADR-0019).

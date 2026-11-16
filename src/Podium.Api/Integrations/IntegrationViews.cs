@@ -27,6 +27,9 @@ public sealed record ConnectResponse(string AuthorizeUrl);
 
 public sealed record ConnectionSettings(bool AutoInvite);
 
+/// <summary>The body of <c>POST /integrations/{id}/disconnect</c>: the two-step code when the sign-in is not recent (F-081).</summary>
+public sealed record DisconnectRequest(string? Code);
+
 public static class IntegrationViews
 {
     public static ConnectionView Of(IntegrationConnection c, string connectorName, Guid me, IntegrationAccount? mine, int projects) => new(

@@ -1,4 +1,4 @@
-import { request } from "./client";
+import { request, requestList } from "./client";
 import type {
   ExecLevelChangeInput, ExecLevelView, AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
@@ -40,20 +40,27 @@ export const api = {
   /** Without a token the API takes the provider sign-in's pending token from its own cookie. */
   mfaSignIn: (token: string | undefined, code: string) => request<void>("POST", "/auth/mfa", { token, code }),
   mfaSetup: () => request<{ secret: string; uri: string }>("POST", "/me/mfa/setup"),
-  mfaEnable: (code: string) => request<{ recoveryCodes: string[] }>("POST", "/me/mfa/enable", { code }),
+  /** The account password goes with the first code (F-028); an account without one sends none and needs a fresh sign-in. */
+  mfaEnable: (code: string, password?: string) => request<{ recoveryCodes: string[] }>("POST", "/me/mfa/enable", { code, password }),
   mfaDisable: (code: string) => request<void>("POST", "/me/mfa/disable", { code }),
+  /** Needs a sign-in from the last few minutes (reauth_required) and is refused for the last way in (last_sign_in_method; F-181). */
+  unlinkProvider: (provider: string) => request<void>("DELETE", `/me/providers/${provider}`),
   forgot: (email: string) => request<void>("POST", "/auth/password/forgot", { email }),
   reset: (token: string, password: string) => request<void>("POST", "/auth/password/reset", { token, password }),
 
   createWorkspace: (name: string) => request<{ id: string }>("POST", "/workspaces", { name }),
   workspace: (id: string) => request<WorkspaceInfo>("GET", `/workspaces/${id}`),
   renameWorkspace: (id: string, name: string) => request<void>("PATCH", `/workspaces/${id}`, { name }),
-  saveSettings: (id: string, settings: Partial<Settings>) => request<void>("PUT", `/workspaces/${id}/settings`, settings),
+  /** The code is the two-step code a recent sign-in may be replaced by (lowering the retention, turning masking off). */
+  saveSettings: (id: string, settings: Partial<Settings>, opts: { code?: string; expectedUpdatedAt?: string } = {}) =>
+    request<void>("PUT", `/workspaces/${id}/settings`, { ...settings, updatedAt: undefined, code: opts.code, expectedUpdatedAt: opts.expectedUpdatedAt }),
   members: (id: string) => request<Member[]>("GET", `/workspaces/${id}/members`),
   changeRole: (id: string, userId: string, role: Role) => request<void>("PATCH", `/workspaces/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => request<void>("DELETE", `/workspaces/${id}/members/${userId}`),
   invitations: (id: string) => request<Invitation[]>("GET", `/workspaces/${id}/invitations`),
-  invite: (id: string, email: string, role: Role) => request<{ id: string }>("POST", `/workspaces/${id}/invitations`, { email, role }),
+  /** `mailSent` is false when the invitation is saved but its mail could not go out; an older server leaves it out (read as sent). */
+  invite: (id: string, email: string, role: Role) => request<{ id: string; mailSent?: boolean }>("POST", `/workspaces/${id}/invitations`, { email, role }),
+  resendInvitation: (id: string, invitationId: string) => request<{ mailSent: boolean }>("POST", `/workspaces/${id}/invitations/${invitationId}/resend`),
   revokeInvitation: (id: string, invitationId: string) => request<void>("DELETE", `/workspaces/${id}/invitations/${invitationId}`),
   acceptInvitation: (token: string) => request<{ workspaceId: string }>("POST", "/invitations/accept", { token }),
   audit: (id: string, before?: string | null) => request<Page<AuditRow>>("GET", `/workspaces/${id}/audit${q({ before })}`),
@@ -69,10 +76,13 @@ export const api = {
   sendCommand: (id: string, kind: "prompt" | "stop", body?: string) => request<{ id: string }>("POST", `/sessions/${id}/commands`, { kind, body }),
   cancelCommand: (commandId: string) => request<void>("POST", `/commands/${commandId}/cancel`),
   permissions: (id: string, status?: string) => request<PermissionRow[]>("GET", `/sessions/${id}/permission-requests${q({ status })}`),
-  /** `answers` (question text -> the option chosen) is only for the question tool's request, with an allow. */
+  /**
+   * `answers` (question text -> the options chosen, only offered labels) and `other` (question text -> the text typed instead) are only for the
+   * question tool's request, with an allow; the API refuses a chosen answer that is not an offered option (Q-2).
+   */
   answer: (permissionId: string, decision: "allow" | "deny", reason?: string, answers?: Record<string, string>,
-    opts?: { remember?: ApprovalDuration; code?: string }) =>
-    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason, answers, remember: opts?.remember, code: opts?.code }),
+    opts?: { remember?: ApprovalDuration; code?: string; other?: Record<string, string> }) =>
+    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason, answers, remember: opts?.remember, code: opts?.code, other: opts?.other }),
   /** The requests on the viewer's own sessions: open ones oldest first, or with "answered" the latest answers (ADR-0019). */
   workspacePermissions: (id: string, status?: "answered") =>
     request<ApprovalRequestRow[]>("GET", `/workspaces/${id}/permission-requests${q({ status })}`),
@@ -115,12 +125,12 @@ export const api = {
   retireApprovalKey: (id: string) => request<void>("POST", `/me/approval-keys/${id}/retire`),
   denyRun: (runId: string, reason?: string) => request<void>("POST", `/runs/${runId}/deny`, { reason }),
   cancelRun: (runId: string) => request<void>("POST", `/runs/${runId}/cancel`),
-  grants: (agentId: string, page: { before?: string | null; limit?: number } = {}) => request<WebGrantView[]>("GET", `/agents/${agentId}/grants${q(page)}`),
+  grants: (agentId: string, page: { before?: string | null; beforeId?: string | null; limit?: number } = {}) => request<WebGrantView[]>("GET", `/agents/${agentId}/grants${q(page)}`),
   createGrant: (agentId: string, input: GrantInput) => request<WebGrantView>("POST", `/agents/${agentId}/grants`, input),
   approveGrant: (grantId: string, code?: string) => request<void>("POST", `/grants/${grantId}/approve`, { code }),
   denyGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/deny`),
   revokeGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/revoke`),
-  jobs: (agentId: string, page: { before?: string | null; limit?: number } = {}) => request<WebJobView[]>("GET", `/agents/${agentId}/jobs${q(page)}`),
+  jobs: (agentId: string, page: { before?: string | null; beforeId?: string | null; limit?: number; status?: string } = {}) => request<WebJobView[]>("GET", `/agents/${agentId}/jobs${q(page)}`),
   approveJob: (jobId: string, code?: string) => request<void>("POST", `/jobs/${jobId}/approve`, { code }),
   denyJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/deny`),
   retireJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/retire`),
@@ -130,7 +140,8 @@ export const api = {
   resumeSchedule: (id: string, code?: string) => request<void>("POST", `/schedules/${id}/resume`, { code }),
   endSchedule: (id: string) => request<void>("POST", `/schedules/${id}/end`),
   remoteSettings: (id: string) => request<RemoteSettings>("GET", `/workspaces/${id}/remote-settings`),
-  saveRemoteSettings: (id: string, settings: RemoteSettings) => request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, settings),
+  saveRemoteSettings: (id: string, settings: RemoteSettings, expectedUpdatedAt?: string) =>
+    request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, { ...settings, updatedAt: undefined, expectedUpdatedAt }),
   projects: (ws: string, opts: { q?: string; status?: string; cursor?: string | null; limit?: number }) =>
     request<Page<ProjectSummary>>("GET", `/workspaces/${ws}/projects${q(opts)}`),
   createProject: (ws: string, input: ProjectInput) => request<ProjectView>("POST", `/workspaces/${ws}/projects`, input),
@@ -138,6 +149,7 @@ export const api = {
   updateProject: (id: string, input: ProjectInput) => request<void>("PUT", `/projects/${id}`, input),
   archiveProject: (id: string) => request<void>("DELETE", `/projects/${id}`),
   restoreProject: (id: string) => request<void>("POST", `/projects/${id}/restore`),
+  detachProject: (id: string) => request<void>("POST", `/projects/${id}/detach`),
   projectMembers: (id: string) => request<ProjectMemberView[]>("GET", `/projects/${id}/members`),
   putProjectMember: (id: string, userId: string, role: ProjectRole) => request<void>("PUT", `/projects/${id}/members/${userId}`, { role }),
   removeProjectMember: (id: string, userId: string) => request<void>("DELETE", `/projects/${id}/members/${userId}`),
@@ -197,13 +209,14 @@ export const api = {
     request<{ authorizeUrl: string }>("POST", `/workspaces/${ws}/integrations/jira/connect`, { subdomain, code }),
   linkMyAccount: (id: string) => request<{ authorizeUrl: string }>("POST", `/integrations/${id}/account/connect`),
   setIntegration: (id: string, autoInvite: boolean) => request<void>("PUT", `/integrations/${id}`, { autoInvite }),
-  disconnectIntegration: (id: string) => request<void>("DELETE", `/integrations/${id}`),
-  integrationSpaces: (id: string) => request<SpaceView[]>("GET", `/integrations/${id}/spaces`),
+  /** Disconnecting needs a recent sign-in or a two-step code (F-081): the code goes in the body of the POST address. */
+  disconnectIntegration: (id: string, code?: string) => request<void>("POST", `/integrations/${id}/disconnect`, { code }),
+  integrationSpaces: (id: string) => requestList<SpaceView>(`/integrations/${id}/spaces`),
   importSpaces: (id: string, keys: string[]) => request<SpaceImportResult[]>("POST", `/integrations/${id}/spaces/import`, { keys }),
   integrationSprints: (id: string, key: string) => request<SprintChoice[]>("GET", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints`),
   importSprints: (id: string, key: string, sprintIds: string[]) =>
     request<SprintImportResult[]>("POST", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints/import`, { sprintIds }),
-  integrationPeople: (id: string) => request<PersonView[]>("GET", `/integrations/${id}/people`),
+  integrationPeople: (id: string) => requestList<PersonView>(`/integrations/${id}/people`),
   setIntegrationPerson: (personId: string, input: { email?: string; userId?: string; unlink?: boolean }) => request<void>("PUT", `/integrations/people/${personId}`, input),
   syncIntegration: (id: string) => request<SyncRunView>("POST", `/integrations/${id}/sync`),
   integrationRuns: (id: string) => request<SyncRunView[]>("GET", `/integrations/${id}/runs`),

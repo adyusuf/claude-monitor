@@ -1,5 +1,6 @@
 using Podium.Api.Data;
 using Podium.Api.Projects;
+using Podium.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Integrations;
@@ -12,17 +13,19 @@ public sealed record IssueFacts(string Type, string Title, string? Description, 
 
 /// <summary>
 /// Writes a Podium change of a mirrored issue to the tool first (ADR-0015 §7). Each method answers null when the local change may go on (also when
-/// the issue is not mirrored or only Podium-only fields changed), or the refusal to send back. The tool's new change value is stored on the
+/// the issue is not mirrored, its connection is disconnected, or only Podium-only fields changed), or the refusal to send back. The tool's new change value is stored on the
 /// link, so the echo of our own write is recognised. Nothing here saves; the endpoint's save carries it.
 /// </summary>
-public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate, TimeProvider clock)
+public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate, TimeProvider clock, ILogger<IssueWrites> log)
 {
-    public async Task<IResult?> UpdateAsync(Guid user, ManagedProject project, IssueFacts before, Issue after, CancellationToken ct)
+    /// <summary>An edit of the issue; <paramref name="http"/> tags the audit row of a partly applied write with the request's address.</summary>
+    public async Task<IResult?> UpdateAsync(Guid user, ManagedProject project, IssueFacts before, Issue after, HttpContext? http, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(before);
         ArgumentNullException.ThrowIfNull(after);
         if (after.ExternalKey is null || project.SourceConnectionId is not { } connectionId) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         if (before.Type != after.Type) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.TypeLocked);
         var (change, unmapped) = await DiffAsync(connectionId, project, before, after, ct);
         if (unmapped is not null) return unmapped;
@@ -31,6 +34,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         var (open, refusal) = await gate.OpenAsync(connectionId, user, ct);
         if (open is null) return refusal;
         var link = await gate.LinkOfAsync(LinkKinds.Issue, after.Id, ct);
+        var transitioned = false;
         try
         {
             if (link?.ExternalUpdated is { } known && await writer.ItemStampAsync(open.Ctx, after.ExternalKey, ct) != known) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Changed);
@@ -39,8 +43,13 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
                 return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.TransitionUnavailable);
             }
 
+            transitioned = statusChanged;
             await writer.UpdateItemAsync(open.Ctx, after.ExternalKey, change, ct);
             if (link is not null) link.ExternalUpdated = await writer.ItemStampAsync(open.Ctx, after.ExternalKey, ct);
+        }
+        catch (TrackerException e) when (transitioned)
+        {
+            return await PartlyAppliedAsync(open.Ctx, user, after, link, e, http, ct);
         }
         catch (TrackerException e)
         {
@@ -50,12 +59,43 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         return null;
     }
 
+    /// <summary>
+    /// The transition went through and the field update after it did not: Jira has the new status, so the row takes that status too (and the link the
+    /// tool's new change value, or the retry would be refused as changed in Jira), but none of the other fields. The answer says the change was applied only in part.
+    /// </summary>
+    private async Task<IResult> PartlyAppliedAsync(TrackerContext ctx, Guid user, Issue after, IntegrationLink? link, TrackerException failure, HttpContext? http,
+        CancellationToken ct)
+    {
+        log.LogWarning("The status of issue {Issue} changed in the tool but the field update failed: {Code}", after.Id, failure.Code);
+        string? stamp = null;
+        try
+        {
+            stamp = await writer.ItemStampAsync(ctx, after.ExternalKey!, ct);
+        }
+        catch (TrackerException e)
+        {
+            log.LogWarning("The change value of issue {Issue} could not be read after a partly applied write: {Code}", after.Id, e.Code);
+        }
+
+        var now = clock.GetUtcNow();
+        await db.Issues.Where(i => i.Id == after.Id).ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, after.Status).SetProperty(i => i.UpdatedAt, now).SetProperty(i => i.UpdatedBy, user), ct);
+        if (link is not null && stamp is not null) await db.IntegrationLinks.Where(l => l.Id == link.Id).ExecuteUpdateAsync(s => s.SetProperty(l => l.ExternalUpdated, stamp), ct);
+        // The status changed here, so it is audited (S-3): the status and the failure code, no text. The issue the endpoint filled is let go
+        // first, so this save stores the audit row and none of the fields the tool did not take.
+        db.Entry(after).State = EntityState.Detached;
+        Audit.Add(db, http, clock, AuditActions.IssueUpdated, after.WorkspaceId, user, targetType: "issue", targetId: after.Id,
+            detail: new { partlyApplied = true, status = after.Status, code = failure.Code });
+        await db.SaveChangesAsync(ct);
+        return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.PartlyApplied);
+    }
+
     /// <summary>A quick status change (the sprint page).</summary>
     public async Task<IResult?> StatusAsync(Guid user, ManagedProject project, Issue issue, string newStatus, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(issue);
         if (issue.ExternalKey is null || project.SourceConnectionId is not { } connectionId || issue.Status == newStatus) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         var (open, refusal) = await gate.OpenAsync(connectionId, user, ct);
         if (open is null) return refusal;
         var link = await gate.LinkOfAsync(LinkKinds.Issue, issue.Id, ct);
@@ -79,6 +119,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(issue);
         if (project.SourceConnectionId is not { } connectionId) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         var (open, refusal) = await gate.OpenAsync(connectionId, user, ct);
         if (open is null) return refusal;
         var space = await gate.ProjectKeyAsync(project.Id, ct);
@@ -119,6 +160,7 @@ public sealed class IssueWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(issue);
         if (issue.ExternalKey is null || project.SourceConnectionId is not { } connectionId) return null;
+        if (!await MirrorGate.StillMirroredAsync(db, connectionId, ct)) return null;
         if (after is not null && after.ExternalKey is null) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         var (open, refusal) = await gate.OpenAsync(connectionId, user, ct);
         if (open is null) return refusal;

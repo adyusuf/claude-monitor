@@ -17,6 +17,9 @@ namespace Podium.Api.Remote;
 /// </summary>
 public sealed class AskReports(PodiumDb db, ApiConfig config, TimeProvider clock, Broker broker)
 {
+    /// <summary>The web event that tells the people allowed to read an ask that it exists or changed: its requester and its target's owner, never the rest of the workspace.</summary>
+    public const string WorkspaceEvent = "ask";
+
     private static readonly string[] Open = [AskStatuses.Queued, AskStatuses.Delivered];
 
     /// <summary>The target's agent: received (it holds the ask), delivered (to a session), no idle session, or not accepting.</summary>
@@ -124,6 +127,7 @@ public sealed class AskReports(PodiumDb db, ApiConfig config, TimeProvider clock
             {
                 broker.Publish(Broker.Agent(ask.RequesterAgentId), new StreamMessage(AgentStreamEvents.AskUpdate, new AskUpdateMessage(ask.Id, AskStatuses.Cancelled)));
                 broker.Publish(Broker.Agent(ask.TargetAgentId), new StreamMessage(AgentStreamEvents.AskCancel, new AskCancelMessage(ask.Id)));
+                PublishToWeb(broker, ask);
             }
 
             if (after is null) Notify();
@@ -135,8 +139,21 @@ public sealed class AskReports(PodiumDb db, ApiConfig config, TimeProvider clock
     public static Task CancelOpenForAgentAsync(PodiumDb db, Broker broker, Guid agentId, DateTimeOffset now, CancellationToken ct, List<Action>? after = null) =>
         CancelOpenAsync(db, broker, now, a => a.RequesterAgentId == agentId || a.TargetAgentId == agentId, ct, after);
 
-    private void Updated(MachineAsk ask) =>
+    private void Updated(MachineAsk ask)
+    {
         broker.Publish(Broker.Agent(ask.RequesterAgentId), new StreamMessage(AgentStreamEvents.AskUpdate, new AskUpdateMessage(ask.Id, ask.Status)));
+        PublishToWeb(broker, ask);
+    }
+
+    /// <summary>Tells the web pages of the users who may read this ask (the visibility of <see cref="AskQueries"/>: requester and target user), with ids only, never the question or the answer.</summary>
+    public static void PublishToWeb(Broker broker, MachineAsk ask)
+    {
+        ArgumentNullException.ThrowIfNull(broker);
+        ArgumentNullException.ThrowIfNull(ask);
+        var message = new StreamMessage(WorkspaceEvent, new { id = ask.Id, targetAgentId = ask.TargetAgentId, status = ask.Status });
+        broker.Publish(Broker.WorkspaceMember(ask.WorkspaceId, ask.TargetUserId), message);
+        if (ask.RequesterUserId != ask.TargetUserId) broker.Publish(Broker.WorkspaceMember(ask.WorkspaceId, ask.RequesterUserId), message);
+    }
 
     /// <summary>A short code for an error the target reported: lowercase letters, digits and underscore, at most 50.</summary>
     private static string Code(string value) =>

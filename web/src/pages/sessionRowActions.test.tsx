@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionRow } from "../api/types";
+import { config } from "../config";
 import { FakeEventSource, ME, mockApi, openMachine, renderAt } from "../test/helpers";
 import { SessionsPage } from "./SessionsPage";
 
@@ -92,6 +93,33 @@ describe("stopping a session the web started", () => {
     expect(await screen.findByText(/^Stop sent\./)).toBeInTheDocument();
     expect(calls.find((c) => c.method === "POST")).toMatchObject({ path: "/agents/a1/actions", body: { kind: "claude_stop", sessionRef: "ref-1" } });
     expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
+  });
+
+  describe("after the action queue's lifetime", () => {
+    beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+    afterEach(() => vi.useRealTimers());
+
+    it("stays off until the action queue's lifetime has passed, then can be pressed again and the notice goes", async () => {
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      const calls = mockApi({
+        "GET /me": { body: ME },
+        "GET /workspaces/w1/sessions": { body: { items: [running()], next: null } },
+        "POST /agents/a1/actions": { status: 201, body: { id: "act1" } },
+      });
+      await open();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.click(await screen.findByRole("button", { name: "Stop" }));
+      expect(await screen.findByText(/^Stop sent\./)).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(config.agentActionQueueMs - 1_000));
+      expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
+      expect(screen.queryByText(/^Stop sent\./)).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Stop" }));
+      await waitFor(() => expect(calls.filter((c) => c.method === "POST")).toHaveLength(2));
+    });
   });
 
   it("sends nothing when the person declines the confirmation", async () => {

@@ -19,7 +19,8 @@ export interface Me {
 }
 
 export type AgentUpdateMode = "off" | "check" | "on";
-export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate?: boolean; enforceAccessPolicies?: boolean }
+/** `updatedAt` is when the settings were last saved: sent back as `expectedUpdatedAt` so a save after someone else's is refused (an older server leaves it out). */
+export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate?: boolean; enforceAccessPolicies?: boolean; updatedAt?: string }
 export interface WorkspaceInfo { id: string; name: string; role: Role; settings: Settings }
 export interface Member { userId: string; displayName: string; email: string | null; role: Role; joinedAt: string }
 export interface Invitation { id: string; email: string; role: Role; createdAt: string; expiresAt: string }
@@ -84,6 +85,8 @@ export interface CommandRow {
   /** The start of that message; replyMore says the message goes on. */
   replyText?: string | null;
   replyMore?: boolean;
+  /** The prompt's text was removed after the workspace's retention (body is then null); absent on an older API. */
+  contentRemoved?: boolean;
 }
 export interface PermissionRow {
   id: string;
@@ -95,6 +98,8 @@ export interface PermissionRow {
   decision: "allow" | "deny" | null;
   reason: string | null;
   answeredAt: string | null;
+  /** The tool input was removed after the workspace's retention (toolInput is then {}); absent on an older API. */
+  contentRemoved?: boolean;
 }
 
 /** How many of something are in one state. */
@@ -134,6 +139,8 @@ export interface ApprovalRequestRow {
   /** Whether an allow may stand for a while (not on a strict machine, not a question or a plan, not a too long command). */
   canRemember: boolean;
   strict: boolean;
+  /** The tool input was removed after the workspace's retention (toolInput is then {}); absent on an older API. */
+  contentRemoved?: boolean;
 }
 
 /** One of the viewer's standing approvals. */

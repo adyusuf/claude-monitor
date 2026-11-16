@@ -1,4 +1,4 @@
-"""scripts/install/aipod-install.sh: the installer and the removal script of the old agent, hermetically.
+"""scripts/install/aipod-install.sh (assembled from sh/*.part): the installer and the removal script of the old agent, hermetically.
 
 A private HOME, a download folder read through file://, and stubs for `claude` and `security` that keep their state in files: no real keychain,
 Claude Code configuration, agent or server is touched, and no process outside the test's own folder is ever signalled.
@@ -17,10 +17,13 @@ import unittest
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPT = os.path.normpath(os.path.join(HERE, '..', 'install', 'aipod-install.sh'))
 _spec = importlib.util.spec_from_file_location('plugin_support', os.path.join(HERE, 'plugin_support.py'))
 support = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(support)
+_install_spec = importlib.util.spec_from_file_location('install_support', os.path.join(HERE, 'install_support.py'))
+install_support = importlib.util.module_from_spec(_install_spec)
+_install_spec.loader.exec_module(install_support)
+SCRIPT = install_support.assembled(install_support.SH)  # the file the download host serves, joined from the step files (F-332)
 OS, ARCH, FILE = support.OS, support.ARCH, support.FILE
 SERVER = 'https://aipod.example.net'
 

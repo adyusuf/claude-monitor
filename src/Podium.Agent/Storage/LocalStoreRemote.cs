@@ -10,9 +10,14 @@ public sealed record RemoteRequest(string LocalId, string Kind, string Method, s
 public sealed record FollowedRun(string RunId, string Status, string? View, int NextSeq, bool Done, DateTimeOffset UpdatedAt);
 
 /// <summary>A run this agent was sent to execute, written before it starts so a replay never starts it twice.</summary>
-/// <remarks>RefusedBy and AccessVersion: the access layer that refused the run, when Error is an access code (ADR-0020 §4).</remarks>
+/// <remarks>
+/// RefusedBy and AccessVersion: the access layer that refused the run, when Error is an access code (ADR-0020 §4).
+/// Pid, PidStart and Deadline: the run's lead process, when it started and when its timeout ends, kept so an agent that restarted can pick the run up (F-323);
+/// all null for a run that cannot outlive the agent, and for rows written before they were kept.
+/// </remarks>
 public sealed record ExecRun(string RunId, string State, string? FinalStatus, int? ExitCode, string? Error, bool Truncated,
-    string? ResolvedExe, bool Reported, string? RefusedBy = null, int? AccessVersion = null);
+    string? ResolvedExe, bool Reported, string? RefusedBy = null, int? AccessVersion = null, int? Pid = null, DateTimeOffset? PidStart = null,
+    DateTimeOffset? Deadline = null);
 
 public sealed record StoredChunk(string RunId, int Seq, string Stream, string Body, bool Gap);
 
@@ -152,6 +157,11 @@ public sealed partial class LocalStore
             """, ("$id", runId), ("$s", status), ("$x", exitCode), ("$e", error), ("$tr", truncated ? 1 : 0), ("$r", resolvedExe), ("$rb", refusedBy),
             ("$av", accessVersion));
 
+    /// <summary>Keeps the started run's process id, that process's own start time (it tells the process from a recycled id) and the end of its timeout.</summary>
+    public void ExecStarted(string runId, int pid, DateTimeOffset pidStart, DateTimeOffset deadline) =>
+        Exec("UPDATE exec_runs SET run_pid = $p, run_pid_start = $s, run_deadline = $d WHERE run_id = $id AND state = 'running'",
+            ("$id", runId), ("$p", pid), ("$s", Iso(pidStart)), ("$d", Iso(deadline)));
+
     public ExecRun? ExecRunOf(string runId) => ExecRuns("WHERE run_id = $id", ("$id", runId)).FirstOrDefault();
 
     public List<ExecRun> ExecRunsIn(string state) => ExecRuns("WHERE state = $s", ("$s", state));
@@ -181,14 +191,15 @@ public sealed partial class LocalStore
 
     private List<ExecRun> ExecRuns(string where, params (string Name, object? Value)[] args)
     {
-        using var cmd = Command($"SELECT run_id, state, final_status, exit_code, error, truncated, resolved_exe, reported, refused_by, access_version FROM exec_runs {where}", null, args);
+        using var cmd = Command($"SELECT run_id, state, final_status, exit_code, error, truncated, resolved_exe, reported, refused_by, access_version, run_pid, run_pid_start, run_deadline FROM exec_runs {where}", null, args);
         using var r = cmd.ExecuteReader();
         var list = new List<ExecRun>();
         while (r.Read())
         {
             list.Add(new ExecRun(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.IsDBNull(3) ? null : r.GetInt32(3),
                 r.IsDBNull(4) ? null : r.GetString(4), r.GetInt32(5) == 1, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7) == 1,
-                r.IsDBNull(8) ? null : r.GetString(8), r.IsDBNull(9) ? null : r.GetInt32(9)));
+                r.IsDBNull(8) ? null : r.GetString(8), r.IsDBNull(9) ? null : r.GetInt32(9), r.IsDBNull(10) ? null : r.GetInt32(10),
+                r.IsDBNull(11) ? null : Parse(r.GetString(11)), r.IsDBNull(12) ? null : Parse(r.GetString(12))));
         }
 
         return list;

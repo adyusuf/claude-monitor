@@ -79,7 +79,7 @@ public sealed class AccessEnforcementTests(ApiFactory api)
 
     [Theory]
     [InlineData("""{"enforceAccessPolicies":false}""")]
-    [InlineData("""{"retentionDays":30}""")]
+    [InlineData("""{"retentionDays":120}""")] // raised: lowering it needs re-authentication since F-219 (WorkspaceSettingsReauthTests)
     public async Task A_save_that_leaves_the_switch_as_it_is_needs_no_re_authentication_and_writes_no_enforcement_row(string body)
     {
         var owner = await api.NewClient().SignedUpAsync("enf-same");

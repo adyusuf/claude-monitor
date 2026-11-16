@@ -1,0 +1,23 @@
+    # ------------------------------------------------------------ installing the build
+    if (-not $installed -or (Newer $version $installed)) {
+        Say "Installing aipod $version"
+        if ($DryRun) { Say "  [dry run] $($best.file) would be downloaded, checked and put at $NewBin" }
+        else {
+            $zip = Join-Path $tmp $best.file
+            Get-Remote "$From/$($best.file)" $zip
+            if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $best.sha256.ToLowerInvariant()) { Die "refused: $($best.file) does not match the SHA-256 in the manifest" }
+            Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $tmp 'x') -Force
+            if (-not (Test-Path -LiteralPath (Join-Path $tmp 'x\aipod.exe'))) { Die 'the download holds no aipod.exe' }
+            New-Item -ItemType Directory -Force -Path (Split-Path $NewBin) | Out-Null
+            if (Test-Path -LiteralPath $NewBin) { Remove-Item -LiteralPath "$NewBin.old" -Force -ErrorAction SilentlyContinue; Move-Item -LiteralPath $NewBin -Destination "$NewBin.old" -Force } # a running program can be renamed, not overwritten
+            Move-Item -LiteralPath (Join-Path $tmp 'x\aipod.exe') -Destination $NewBin -Force
+            Say "  installed $NewBin"
+            foreach ($extra in 'aipodw.exe') { if (Test-Path -LiteralPath (Join-Path $tmp "x\$extra")) { Move-Item -LiteralPath (Join-Path $tmp "x\$extra") -Destination (Join-Path (Split-Path $NewBin) $extra) -Force } }
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            if (($userPath -split ';') -notcontains (Split-Path $NewBin)) {
+                [Environment]::SetEnvironmentVariable('Path', "$userPath;$(Split-Path $NewBin)".TrimStart(';'), 'User')
+                Say "  added $(Split-Path $NewBin) to your PATH (a new terminal sees it)"
+            }
+        }
+    }
+

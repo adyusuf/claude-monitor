@@ -59,23 +59,26 @@ public sealed class IntegrationPassTests(ApiFactory api)
     [Fact]
     public async Task An_issue_deleted_in_jira_is_archived_once_and_a_space_that_vanished_archives_its_project()
     {
+        // F-066: both are archived on the second pass in a row that misses them, not on the first.
         var s = await JiraSprintKit.ImportedAsync(api);
         s.Loose.Deleted = true;
 
         var first = await JiraKit.PassAsync(s.World);
         var second = await JiraKit.PassAsync(s.World);
+        var third = await JiraKit.PassAsync(s.World);
 
         var loose = await JiraKit.IssueAsync(s.World, "SPR-7");
         Assert.NotNull(loose.ArchivedAt);
         Assert.Null((await JiraKit.IssueAsync(s.World, "SPR-1")).ArchivedAt);
-        Assert.Equal((1, 0), (Count(first, "archived"), Count(second, "archived")));
+        Assert.Equal((0, 1, 0), (Count(first, "archived"), Count(second, "archived"), Count(third, "archived")));
         s.Space.Deleted = true;
 
+        var missed = await JiraKit.PassAsync(s.World);
         var gone = await JiraKit.PassAsync(s.World);
 
         await using var db = api.Db();
         Assert.Equal(ManagedStatuses.Archived, (await db.Projects.AsNoTracking().SingleAsync(p => p.Id == s.Project)).Status);
-        Assert.Equal((1, "ok"), (Count(gone, "archived"), gone.GetProperty("status").GetString()));
+        Assert.Equal((0, 1, "ok"), (Count(missed, "archived"), Count(gone, "archived"), gone.GetProperty("status").GetString()));
         Assert.Equal(7, await db.Issues.CountAsync(i => i.ProjectId == s.Project)); // nothing is deleted
         Assert.Equal(0, Count(await JiraKit.PassAsync(s.World), "archived")); // and an archived project is left alone
     }

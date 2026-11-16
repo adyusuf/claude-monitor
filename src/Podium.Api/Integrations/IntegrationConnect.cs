@@ -1,5 +1,6 @@
 using Podium.Api.Config;
 using Podium.Api.Data;
+using Podium.Api.Projects;
 using Podium.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +12,9 @@ public static class IntegrationConnect
     public const string Ok = "ok";
     public const string SiteNotFound = "site_not_found";
     public const string AccountInUse = "account_in_use";
+
+    /// <summary>The unique index on (connection, Atlassian account) of <c>integration_accounts</c> (F-080, F-337).</summary>
+    public const string AccountIndex = "ux_integration_accounts_account";
 
     public static async Task<string> CompleteAsync(PodiumDb db, ApiConfig config, TimeProvider clock, JiraOAuth oauth, IntegrationOAuthState state,
         string code, HttpContext http)
@@ -88,7 +92,16 @@ public static class IntegrationConnect
         account.UpdatedAt = now;
         Audit.Add(db, http, clock, state.Purpose == OAuthPurposes.Account ? AuditActions.IntegrationAccountLinked : AuditActions.IntegrationConnected,
             state.WorkspaceId, state.UserId, targetType: "integration", targetId: connection.Id);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e, AccountIndex))
+        {
+            // A second person linked the same account at the same moment and saved first (the check above passed for both, F-337).
+            return AccountInUse;
+        }
+
         return Ok;
     }
 }

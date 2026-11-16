@@ -5,6 +5,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Projects;
 
+/// <summary>What an issue held before an edit: a value the form sends back unchanged is not checked again, so one that went stale does not block every edit (F-102).</summary>
+internal sealed record IssueStored(string Type, string? Priority, string? Estimate, Guid? AssigneeUserId, Guid? ParentId, Guid? ApplicationId, Guid? ComponentId, Guid? ReleaseId)
+{
+    public static IssueStored Of(Issue i) => new(i.Type, i.Priority, i.Estimate, i.AssigneeUserId, i.ParentId, i.ApplicationId, i.ComponentId, i.ReleaseId);
+}
+
 /// <summary>Validation of what a person types into an issue, against the project's own settings (ADR-0011 §4). Errors are i18n keys.</summary>
 internal static class IssueRules
 {
@@ -27,13 +33,13 @@ internal static class IssueRules
         _ => [],
     };
 
-    /// <summary>Checks everything that needs no database read; the first failure is the answer, null means valid.</summary>
-    public static IResult? Check(IssueInput i, ManagedProject project)
+    /// <summary>Checks everything that needs no database read; the first failure is the answer, null means valid. A type, priority or estimate equal to the stored one (<paramref name="stored"/>) is not checked again.</summary>
+    public static IResult? Check(IssueInput i, ManagedProject project, IssueStored? stored = null)
     {
         if (!Http.IsName(i.Title, TitleMax)) return Http.Invalid("title", "invalid_name");
-        if (i.Type is { } t && (!WorkItemTypes.All.Contains(t) || !project.ItemTypes.Contains(t))) return Http.Invalid("type", "invalid_value");
-        if (i.Priority is { Length: > 0 } p && !Priorities(project.PriorityScale).Contains(p)) return Http.Invalid("priority", "invalid_value");
-        if (i.Estimate is { Length: > 0 } e && Estimate(e, project.EstimationUnit) is null) return Http.Invalid("estimate", "invalid_value");
+        if (i.Type is { } t && t != stored?.Type && (!WorkItemTypes.All.Contains(t) || !project.ItemTypes.Contains(t))) return Http.Invalid("type", "invalid_value");
+        if (i.Priority is { Length: > 0 } p && p != stored?.Priority && !Priorities(project.PriorityScale).Contains(p)) return Http.Invalid("priority", "invalid_value");
+        if (i.Estimate is { Length: > 0 } e && e.Trim() != stored?.Estimate && Estimate(e, project.EstimationUnit) is null) return Http.Invalid("estimate", "invalid_value");
         if (i.Status is { } s && !IssueStatuses.All.Contains(s)) return Http.Invalid("status", "invalid_value");
         if (TooLong(i.Description, TextMax)) return Http.Invalid("description", "too_long");
         if (TooLong(i.TechnicalDesign, TextMax)) return Http.Invalid("technicalDesign", "too_long");
@@ -77,37 +83,41 @@ internal static class IssueRules
         return number.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The relational rules: every named person, issue, application, component and release must exist in this project and be usable.</summary>
-    public static async Task<IResult?> CheckReferencesAsync(PodiumDb db, ManagedProject project, Issue issue, string type, CancellationToken ct)
+    /// <summary>
+    /// The relational rules: every named person, issue, application, component and release must exist in this project and be usable. On an edit only
+    /// what differs from <paramref name="stored"/> is checked; the component and the release are also checked again when the application changes.
+    /// </summary>
+    public static async Task<IResult?> CheckReferencesAsync(PodiumDb db, ManagedProject project, Issue issue, string type, CancellationToken ct, IssueStored? stored = null)
     {
-        if (issue.AssigneeUserId is { } who && !await ProjectRules.IsWorkerAsync(db, who, project.WorkspaceId, ct)) return Http.Invalid("assigneeUserId", "not_a_member");
-        if (issue.ParentId is { } parent)
+        var applicationMoved = issue.ApplicationId != stored?.ApplicationId || stored is null;
+        if (issue.AssigneeUserId is { } who && (stored is null || who != stored.AssigneeUserId) && !await ProjectRules.IsWorkerAsync(db, who, project.WorkspaceId, ct)) return Http.Invalid("assigneeUserId", "not_a_member");
+        if (issue.ParentId is { } parent && (stored is null || parent != stored.ParentId || type != stored.Type))
         {
             var ok = type != WorkItemTypes.Epic && parent != issue.Id
                 && await db.Issues.AnyAsync(x => x.Id == parent && x.ProjectId == project.Id && x.Type == WorkItemTypes.Epic && x.ArchivedAt == null, ct);
             if (!ok) return Http.Invalid("parentId", "invalid_parent");
         }
 
-        if (issue.ApplicationId is { } app
+        if (issue.ApplicationId is { } app && applicationMoved
             && !await db.Applications.AnyAsync(a => a.Id == app && a.ProjectId == project.Id && a.Status == ManagedStatuses.Active, ct))
         {
             return Http.Invalid("applicationId", "invalid_application");
         }
 
         // An application's sprint holds only that application's issues (adding checks it too): the issue keeps it until it leaves the sprint.
-        if (issue.SprintId is { } sprint
+        if (applicationMoved && issue.SprintId is { } sprint
             && await db.Sprints.AnyAsync(s => s.Id == sprint && s.ApplicationId != null && s.ApplicationId != issue.ApplicationId, ct))
         {
             return Http.Invalid("applicationId", "wrong_scope");
         }
 
-        if (issue.ComponentId is { } component
+        if (issue.ComponentId is { } component && (applicationMoved || component != stored?.ComponentId)
             && !await db.ApplicationComponents.AnyAsync(c => c.Id == component && c.ApplicationId == issue.ApplicationId && c.Status == ManagedStatuses.Active, ct))
         {
             return Http.Invalid("componentId", "invalid_component");
         }
 
-        if (issue.ReleaseId is { } release
+        if (issue.ReleaseId is { } release && (applicationMoved || release != stored?.ReleaseId)
             && !await db.ApplicationReleases.AnyAsync(r => r.Id == release && r.ApplicationId == issue.ApplicationId && r.Status != ReleaseStatuses.Cancelled, ct))
         {
             return Http.Invalid("releaseId", "invalid_release");

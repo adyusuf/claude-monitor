@@ -1,11 +1,14 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Tests.Infrastructure;
 using Podium.Contracts;
 
 namespace Podium.Api.Tests;
 
-/// <summary>The agents list is ordered by status, host name and newest enrolment, and holds at most 500 rows (MachineEndpoints.List).</summary>
+/// <summary>The agents list is ordered by status, host name and newest enrolment, holds at most 500 rows and leaves out agents revoked
+/// longer ago than <see cref="ApiConfig.RevokedAgentsListedFor"/> (MachineEndpoints.List).</summary>
 [Collection(ApiGroup.Name)]
 public sealed class AgentListOrderTests(ApiFactory api)
 {
@@ -22,7 +25,7 @@ public sealed class AgentListOrderTests(ApiFactory api)
         LastSeenAt = at,
     };
 
-    private static Agent NewAgent(Machine machine, Guid userId, string status, DateTimeOffset enrolledAt) => new()
+    private static Agent NewAgent(Machine machine, Guid userId, string status, DateTimeOffset enrolledAt, DateTimeOffset? revokedAt = null) => new()
     {
         MachineId = machine.Id,
         UserId = userId,
@@ -30,6 +33,7 @@ public sealed class AgentListOrderTests(ApiFactory api)
         Version = "0.3.0",
         Status = status,
         EnrolledAt = enrolledAt,
+        RevokedAt = revokedAt,
     };
 
     private async Task SeedAsync(IEnumerable<Machine> machines, IEnumerable<Agent> agents)
@@ -91,5 +95,26 @@ public sealed class AgentListOrderTests(ApiFactory api)
 
         Assert.Equal(Cap, rows.Count);
         Assert.All(rows, r => Assert.Equal(AgentStatuses.Active, r.GetProperty("status").GetString()));
+    }
+
+    [Fact]
+    public async Task Revoked_agents_older_than_the_window_are_left_out_and_newer_ones_stay()
+    {
+        var user = await api.NewClient().SignedUpAsync("al-window");
+        var now = api.Clock.GetUtcNow();
+        var window = api.Services.GetRequiredService<ApiConfig>().RevokedAgentsListedFor;
+        Assert.Equal(TimeSpan.FromDays(30), window); // F-024: the default N
+        var machine = NewMachine(user.WorkspaceId, "host", now);
+        var activeOld = NewAgent(machine, user.Id, AgentStatuses.Active, now - window - TimeSpan.FromDays(10));
+        var atTheEdge = NewAgent(machine, user.Id, AgentStatuses.Revoked, now - window - TimeSpan.FromDays(1), now - window);
+        var justOver = NewAgent(machine, user.Id, AgentStatuses.Revoked, now - window - TimeSpan.FromDays(1), now - window - TimeSpan.FromSeconds(1));
+        var recent = NewAgent(machine, user.Id, AgentStatuses.Revoked, now - TimeSpan.FromDays(2), now - TimeSpan.FromDays(1));
+        await SeedAsync([machine], [activeOld, atTheEdge, justOver, recent]);
+
+        var ids = (await AgentsAsync(user)).Select(a => a.GetProperty("id").GetGuid()).ToList();
+
+        Assert.Equal([activeOld.Id, recent.Id, atTheEdge.Id], ids);
+        await using var db = api.Db();
+        Assert.NotNull(await db.Agents.FindAsync(justOver.Id)); // left out of the list, never deleted
     }
 }

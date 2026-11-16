@@ -39,9 +39,12 @@ public static class GrantQueries
         return rows.Select(View).ToList();
     }
 
-    /// <summary>The grants of one target for the web, newest first, key-paged. The owner sees every grant; anyone else only theirs as grantee.</summary>
+    /// <summary>
+    /// The grants of one target for the web, newest first, key-paged by (created time, id) as the run list is (F-341; the id is optional: with the
+    /// time alone only strictly older grants follow). The owner sees every grant; anyone else only theirs as grantee.
+    /// </summary>
     public static async Task<List<WebGrantView>> ForWebAsync(PodiumDb db, Guid targetAgentId, Guid userId, bool ownerSeesAll,
-        Guid? grantId, DateTimeOffset? before, int limit, DateTimeOffset now, CancellationToken ct)
+        Guid? grantId, DateTimeOffset? before, int limit, DateTimeOffset now, CancellationToken ct, Guid? beforeId = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         var rows = await (from g in db.MachineGrants.AsNoTracking()
@@ -49,7 +52,8 @@ public static class GrantQueries
                           where g.TargetAgentId == targetAgentId
                                 && (ownerSeesAll || g.GranteeUserId == userId)
                                 && (grantId == null || g.Id == grantId)
-                                && (before == null || g.CreatedAt < before)
+                                && (before == null || g.CreatedAt < before
+                                    || (beforeId != null && g.CreatedAt == before && g.Id.CompareTo(beforeId.Value) < 0)) // (time, id) cursor: ties are not skipped
                           orderby g.CreatedAt descending, g.Id descending
                           select new
                           {

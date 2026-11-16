@@ -14,6 +14,7 @@ public sealed class MirrorGate(PodiumDb db, IntegrationTokens tokens)
 {
     public const string AccountRequired = "jira_account_required";
     public const string Changed = "jira_changed";
+    public const string PartlyApplied = "jira_partly_applied";
     public const string TransitionUnavailable = "jira_transition_unavailable";
     public const string NoBoard = "jira_no_board";
     public const string Scope = "mirrored_scope";
@@ -21,6 +22,8 @@ public sealed class MirrorGate(PodiumDb db, IntegrationTokens tokens)
     public const string NoArchive = "mirrored_no_archive";
     public const string FieldLocked = "mirrored_field_locked";
     public const string DatesKept = "mirrored_dates_kept";
+    public const string StillConnected = "mirrored_connected";
+    public const string NotMirrored = "not_mirrored";
 
     public async Task<(WriteGate? Gate, IResult? Refusal)> OpenAsync(Guid connectionId, Guid userId, CancellationToken ct)
     {
@@ -30,6 +33,13 @@ public sealed class MirrorGate(PodiumDb db, IntegrationTokens tokens)
         var ctx = await tokens.ContextForAsync(connection, userId, ct);
         return ctx is null ? (null, Problem(StatusCodes.Status409Conflict, AccountRequired)) : (new WriteGate(connection, ctx), null);
     }
+
+    /// <summary>
+    /// True while the mirror lock and the write-through apply to a project: it has a source and that connection is not disconnected (F-106, F-262).
+    /// A connection that only needs a new sign-in still counts, because it comes back; a disconnected one never does, so what was imported is Podium's.
+    /// </summary>
+    public static async Task<bool> StillMirroredAsync(PodiumDb db, Guid? connectionId, CancellationToken ct) =>
+        connectionId is { } id && await db.IntegrationConnections.AsNoTracking().AnyAsync(c => c.Id == id && c.Status != ConnectionStatuses.Disconnected, ct);
 
     public static IResult Problem(int status, string title) => Results.Problem(statusCode: status, title: title);
 

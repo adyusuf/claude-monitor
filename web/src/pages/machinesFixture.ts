@@ -11,8 +11,8 @@ export const agent = (over: Partial<AgentRow> = {}): AgentRow => ({
 export const text = (c: Element) => (c.textContent ?? "").replace(/\s+/g, " ").trim();
 export const count = (calls: Call[], path: string) => calls.filter((c) => c.path.split("?")[0] === path).length;
 
-/** The page reads once before the signed-in user is known and once after; wait for both so a count is a baseline. */
+/** The page reads once, after the signed-in user is known (F-097); wait for that read so a count is a baseline. */
 export const settle = async (calls: Call[]) => {
-  await waitFor(() => expect(calls.filter((c) => c.path.startsWith("/workspaces/w1/runs") && !c.path.includes("before=")).length).toBeGreaterThanOrEqual(2));
+  await waitFor(() => expect(calls.filter((c) => c.path.startsWith("/workspaces/w1/runs") && !c.path.includes("before=")).length).toBeGreaterThanOrEqual(1));
   await act(async () => {});
 };

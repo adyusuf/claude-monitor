@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------- finding an older agent
+
+old_binaries() {
+  for f in "$old_home/bin/cm-agent" "$new_home/bin/cm-agent" "$claude_dir"/plugins/data/monitor-agent-*/bin/cm-agent "$claude_dir"/plugins/data/aipod-*/bin/cm-agent; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+}
+old_plugin_ids() { have_claude && claude plugin list --json 2> /dev/null | sed -n 's/.*"id": *"\(monitor-agent@[^"]*\)".*/\1/p'; }
+old_marketplaces() {
+  have_claude || return 0
+  claude plugin marketplace list --json 2> /dev/null | sed -n 's/^ *"name": *"\(monitor-agent-[a-z]*\)".*/\1/p'
+}
+# Only daemons run from one of the old binaries found here: never another user's, never a copy somewhere else.
+old_daemon_pids() {
+  old_binaries | while IFS= read -r f; do
+    # shellcheck disable=SC2009  # pgrep -f cannot match a path with spaces reliably
+    ps -axo pid=,command= 2> /dev/null | grep -F -- "$f daemon" | grep -v -E '^ *[0-9]+ +(grep|awk) ' | awk '{print $1}'
+  done
+}
+old_autostart() {
+  for f in "$HOME/Library/LaunchAgents/com.claudemonitor.agent.user.plist" "$HOME/.config/systemd/user/claude-monitor-agent.service"; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+}
+old_boot_service() {
+  for f in /Library/LaunchDaemons/com.claudemonitor.agent.plist /etc/systemd/system/cm-agent.service; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+}
+old_binary_version() {
+  first="$(old_binaries | head -n 1)"
+  [ -n "$first" ] && "$first" version 2> /dev/null | head -n 1 | tr -d '\r '
+}
+found_old() { [ -n "$(old_binaries)$(old_plugin_ids)$(old_marketplaces)$(old_autostart)$(old_daemon_pids)" ]; }
+list_old() {
+  old_binaries | sed 's/^/  binary: /'
+  old_plugin_ids | sed 's/^/  Claude Code plugin: /'
+  old_marketplaces | sed 's/^/  marketplace: /'
+  old_autostart | sed 's/^/  autostart: /'
+  old_daemon_pids | sed 's/^/  running daemon, pid /'
+}
+

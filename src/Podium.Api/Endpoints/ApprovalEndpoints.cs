@@ -10,7 +10,7 @@ namespace Podium.Api.Endpoints;
 /// <summary>A permission request on one of the caller's sessions, with where it comes from (ADR-0019 §11-13).</summary>
 public sealed record ApprovalRequestRow(Guid Id, Guid SessionId, string? SessionTitle, string? ProjectName, Guid AgentId, string Hostname,
     string ToolName, System.Text.Json.JsonDocument ToolInput, string Status, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt,
-    string? Decision, DateTimeOffset? AnsweredAt, string? AnsweredByName, Guid? AnsweredByRule, bool CanRemember, bool Strict);
+    string? Decision, DateTimeOffset? AnsweredAt, string? AnsweredByName, Guid? AnsweredByRule, bool CanRemember, bool Strict, bool ContentRemoved = false);
 
 /// <summary>One of the caller's approval rules.</summary>
 public sealed record ApprovalRuleRow(Guid Id, Guid AgentId, string Hostname, string ToolName, string? Command, string Duration,
@@ -33,7 +33,7 @@ public static class ApprovalEndpoints
     }
 
     /// <summary>Open requests (oldest first) and, with <c>status=answered</c>, the latest answered ones; only on the caller's sessions.</summary>
-    private static async Task<IResult> Requests(Guid id, string? status, HttpContext http, PodiumDb db, TimeProvider clock)
+    private static async Task<IResult> Requests(Guid id, string? status, HttpContext http, PodiumDb db, TimeProvider clock, ILoggerFactory logs)
     {
         var userId = http.User.UserId();
         var ct = http.RequestAborted;
@@ -54,18 +54,22 @@ public static class ApprovalEndpoints
         var repos = await db.Repos.AsNoTracking().Where(r => repoIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.DisplayName, ct);
         var userIds = rows.Where(r => r.p.AnsweredBy != null).Select(r => r.p.AnsweredBy!.Value).Distinct().ToList();
         var names = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
-        var access = new ApprovalRuleAccess(db);
+        var cutoff = await CommandEndpoints.RetentionCutoffAsync(db, id, clock, ct);
+        var access = new ApprovalRuleAccess(db, logs.CreateLogger<ApprovalRuleAccess>());
         var result = new List<ApprovalRequestRow>(rows.Count);
         foreach (var r in rows)
         {
             var strict = ApprovalRules.Strict(r.a);
-            var input = r.p.ToolInput.RootElement;
+            // An answered input past retention reads as removed at once (ContentRetention, F-119); an open request never.
+            var removed = r.p.Status != PermissionStatuses.Open && r.p.CreatedAt < cutoff;
+            var toolInput = removed ? System.Text.Json.JsonDocument.Parse(Background.ContentRetention.BlankInput) : r.p.ToolInput;
+            var input = toolInput.RootElement;
             // The same checks the answer makes (ApprovalRuleCreation.RememberAsync), the access tie included (ADR-0020 §4).
             var canRemember = !strict && ApprovalRules.ScopeOf(r.p.ToolName, input) is not null
                 && await access.AllowsAsync(r.a, r.p.RepoId, r.p.ToolName, input, r.p.AccessScope, ct);
             result.Add(new ApprovalRequestRow(r.p.Id, r.p.SessionId, r.Title, r.RepoId is { } rid ? repos.GetValueOrDefault(rid) : null, r.a.Id, r.Hostname,
-                r.p.ToolName, r.p.ToolInput, r.p.Status, r.p.CreatedAt, r.p.ExpiresAt, r.p.Decision, r.p.AnsweredAt,
-                r.p.AnsweredBy is { } by ? names.GetValueOrDefault(by) : null, r.p.AnsweredByRule, canRemember, strict));
+                r.p.ToolName, toolInput, r.p.Status, r.p.CreatedAt, r.p.ExpiresAt, r.p.Decision, r.p.AnsweredAt,
+                r.p.AnsweredBy is { } by ? names.GetValueOrDefault(by) : null, r.p.AnsweredByRule, canRemember, strict, removed));
         }
 
         return Results.Ok(result);

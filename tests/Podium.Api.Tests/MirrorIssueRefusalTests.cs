@@ -82,16 +82,16 @@ public sealed class MirrorIssueRefusalTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task A_refusal_after_the_status_step_still_leaves_the_podium_row_as_it_was()
+    public async Task A_refusal_after_the_status_step_leaves_the_fields_but_follows_the_status_jira_took_and_says_so()
     {
         var w = await JiraWriteKit.OpenAsync(api);
         w.Site.Refuse(HttpMethod.Put, Issue, HttpStatusCode.Forbidden);
 
         var response = await JiraWriteKit.EditAsync(w.Member, await w.IdAsync("WRT-2"), new { title = "Half", status = "in_progress" });
 
-        await JiraWriteKit.AssertRefusedAsync(response, HttpStatusCode.Forbidden, "tracker_forbidden");
+        await JiraWriteKit.AssertRefusedAsync(response, HttpStatusCode.Conflict, "jira_partly_applied");
         var row = await w.RowAsync("WRT-2");
-        Assert.Equal(("Story one", "backlog"), (row.Title, row.Status)); // the next webhook or pass brings the step Jira did take
+        Assert.Equal(("Story one", "in_progress"), (row.Title, row.Status)); // F-263: the step Jira did take is kept here at once, not left for the next pass
     }
 
     [Fact]

@@ -10,7 +10,7 @@ const RUN_ACCOUNT_NAME = /^[A-Za-z_][A-Za-z0-9_-]{0,31}$/;
 const RESERVED = ["root", "wheel", "admin", "sudo", "daemon", "nobody", "system", "aipod", "_aipod"];
 export const runAccountNameOk = (name: string): boolean => RUN_ACCOUNT_NAME.test(name) && !RESERVED.includes(name.toLowerCase());
 
-/** Where the installer puts the agent, per system (scripts/install/aipod-install.sh and .ps1; an AP_AGENT_HOME override moves it): sudo needs this full path. */
+/** Where the installer puts the agent, per system (the installers `aipod-install.sh` and `.ps1`, assembled by scripts/install/assemble.sh from scripts/install/sh/*.part and ps1/*.part; an AP_AGENT_HOME override moves it): sudo needs this full path. */
 const AGENT_PATH = {
   linux: "~/.aipod/bin/aipod",
   macos: "\"$HOME/Library/Application Support/aipod/bin/aipod\"",

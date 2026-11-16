@@ -24,7 +24,7 @@ public static class MachineMetricsEndpoints
         return Results.Ok(await MachineQueries.MachinesAsync(db, config, id, clock.GetUtcNow(), http.RequestAborted));
     }
 
-    private static async Task<IResult> Detail(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
+    private static async Task<IResult> Detail(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, ILoggerFactory logs)
     {
         var ws = await db.Agents.AsNoTracking().Where(a => a.Id == id).Select(a => (Guid?)a.WorkspaceId).FirstOrDefaultAsync(http.RequestAborted);
         var userId = http.User.UserId();
@@ -34,7 +34,8 @@ public static class MachineMetricsEndpoints
         }
 
         var admin = await Access.MemberAsync(db, userId, workspaceId, Roles.Admin, http.RequestAborted) is not null;
-        return await MachineDetails.GetAsync(db, config, workspaceId, id, userId, admin, clock.GetUtcNow(), http.RequestAborted) is { } detail
+        return await MachineDetails.GetAsync(db, config, workspaceId, id, userId, admin, clock.GetUtcNow(), http.RequestAborted,
+                logs.CreateLogger(typeof(MachineDetails))) is { } detail
             ? Results.Ok(detail)
             : Http.NotFound();
     }

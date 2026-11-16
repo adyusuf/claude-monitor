@@ -71,6 +71,8 @@ run is recorded on the merge commit as `Gate-Waived: <gates> (neden: <reason>)`.
 `scripts/waived-gates.sh <source> <target>` (the waived gates between two refs, exit 1 when any). Details:
 [docs/release.md](docs/release.md#promotion). Third-party actions are pinned to a commit SHA and gitleaks is
 checksum-verified. To change a version, change it there and in the Prerequisites table above.
+The same workflow has a second job, `agent-windows` (`windows-latest`): it builds and runs `tests/Podium.Agent.Tests`, the only place the
+agent's Windows runtime (Job Object, DPAPI, Credential Manager, ACL reader) is exercised; it needs no secret and starts with the workflow.
 
 A gate run collects coverage while the unit tests run and the coverage step judges those files, so no test runs twice
 (`scripts/merge-gate.conf`, `tests/coverage.props`, `web/vite.config.ts`); `bash scripts/coverage.sh` on its own still runs
@@ -119,7 +121,7 @@ not there yet); the transcript is read later, so nothing of it is lost. **Uninst
 unknown shape it falls back to the data directory and the settings alone). The local plugin (`aipod install`, `aipod-local`) reports
 every event a second time if it stays enabled next to this one: `/aipod:connect` removes it, and the bootstrap says so while it is there.
 
-`scripts/install/aipod-install.sh` (macOS, Linux) and `aipod-install.ps1` (Windows) do all of this in one run, replace an older `cm-agent` install while keeping its settings and login, and are published beside the zips (README, "Install aipod").
+`aipod-install.sh` (macOS, Linux) and `aipod-install.ps1` (Windows) do all of this in one run (their source is the step files in `scripts/install/sh` and `scripts/install/ps1`; `scripts/install/assemble.sh <folder>` joins them into the two files that are served), replace an older `cm-agent` install while keeping its settings and login, and are published beside the zips (README, "Install aipod").
 
 The plugin is called `aipod` (ADR-0016): `claude plugin marketplace add <site>/downloads/aipod-marketplace.json`, `claude plugin install aipod@aipod-releases`, then `/aipod:connect` (the skills are `/aipod:connect|status|disconnect`).
 
@@ -444,10 +446,19 @@ release, backups, restore drill, rollback) is [docs/deploy-windows.md](docs/depl
 The agent and the tray speak the operating system's language when it is English, Turkish or German, and English otherwise. `AP_LANG=en|tr|de` overrides
 that for one run or one machine (for example `AP_LANG=de aipod status`); it is read by the agent and the tray only, never by the API (ADR-0014, Part A).
 
+`AIPOD_INVITE_RATE_PER_MINUTE` (default 60) is how many workspace invitations (send and resend) and workspace creations one client IP may make per
+minute. It is a budget of its own, apart from `AIPOD_AUTH_RATE_PER_MINUTE` (sign-in, sign-up, reset), so inviting a team does not use up the sign-in
+budget of everyone behind the same address. A missing, non-numeric or non-positive value means the default.
+
 `AIPOD_ADMIN_WORKSPACE` names the one workspace whose owners and admins manage the server-wide integration settings on Settings → Integrations
 (ADR-0017): SMTP, GitHub and Google sign-in and the Jira app. Set it to the workspace id; empty means nobody can open the page. A value saved on the
 page is kept in the database (secrets sealed with `AIPOD_INTEGRATION_KEY`); a value in this file always wins and cannot be changed on the page.
 SMTP host, port and sender stay required in this file outside development.
+
+`AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE` (default 120) is how many device-code polls (`/api/device/token`) one client IP may send per minute. An agent
+polls every few seconds while it waits for approval, so a fleet behind one address shares this budget: raise it when many machines are connected
+at once from behind one NAT or proxy. A missing, non-numeric or non-positive value means the default. `AIPOD_AUTH_RATE_PER_MINUTE` (default 20) is the
+separate budget for sign-in, sign-up, reset, device-code and token-refresh requests.
 
 ## Secret and token inventory
 

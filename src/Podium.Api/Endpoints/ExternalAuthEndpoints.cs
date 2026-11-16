@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Podium.Api.Config;
 using Podium.Api.Data;
+using Podium.Api.Projects;
 using Podium.Api.Security;
 using Podium.Api.Text;
 using Microsoft.AspNetCore.Authentication;
@@ -18,10 +19,49 @@ public static class ExternalAuthEndpoints
     public const string ModeSignIn = "signin";
     public const string ModeLink = "link";
 
+    /// <summary>The settings page's error after a link whose sign-in was not fresh (F-181).</summary>
+    public const string LinkReauthRequired = "link_reauth_required";
+
+    /// <summary>409 title: unlinking would leave the account no way to sign in (no password and no other provider).</summary>
+    public const string LastSignInMethod = "last_sign_in_method";
+
     public static void Map(RouteGroupBuilder api)
     {
         api.MapGet("/auth/external/{provider}", Start).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
         api.MapGet("/auth/external/{provider}/done", Done).AllowAnonymous();
+        api.MapDelete("/me/providers/{provider}", Unlink).RequireAuthorization(Schemes.Session).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+    }
+
+    /// <summary>
+    /// Removes a linked provider from the signed-in account (F-181). Needs a fresh sign-in, like linking; refused when it is the last way in
+    /// (no password and no other provider). Judged under a lock on the user's row, so two unlinks at once cannot each leave the other as the
+    /// way that stays.
+    /// </summary>
+    private static async Task<IResult> Unlink(string provider, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
+    {
+        if (!Providers.All.Contains(provider)) return Http.NotFound();
+        var userId = http.User.UserId();
+        var ct = http.RequestAborted;
+        if (!await PrivacyEndpoints.RecentSignInAsync(http, db, config, clock))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: Remote.RemoteChecks.ReauthRequired);
+        }
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM users WHERE id = {userId} FOR UPDATE", ct);
+        var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, ct);
+        var providers = await db.UserLogins.Where(l => l.UserId == userId).Select(l => l.Provider).ToListAsync(ct);
+        if (!providers.Contains(provider)) return Http.NotFound();
+        if (user.PasswordHash is null && providers.All(p => p == provider))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: LastSignInMethod);
+        }
+
+        await db.UserLogins.Where(l => l.UserId == userId && l.Provider == provider).ExecuteDeleteAsync(ct);
+        Audit.Add(db, http, clock, AuditActions.ProviderUnlinked, userId: userId, detail: new { provider });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return Results.NoContent();
     }
 
     private static IResult Start(string provider, string? mode, string? next, IntegrationSettings settings)
@@ -66,6 +106,10 @@ public static class ExternalAuthEndpoints
             var session = await http.AuthenticateAsync(Schemes.Session);
             if (!session.Succeeded) return Back(config, "/login?error=sign_in_first");
             var userId = session.Principal!.UserId();
+            // A session cookie alone links nothing (F-181): a stolen one would attach its own way in. The session is this request's user from
+            // here, so the fresh sign-in check reads it.
+            http.User = session.Principal;
+            if (!await PrivacyEndpoints.RecentSignInAsync(http, db, config, clock)) return Back(config, "/settings?error=" + LinkReauthRequired);
             if (existing is not null)
             {
                 return Back(config, existing.UserId == userId ? "/settings?linked=" + provider : "/settings?error=provider_in_use");
@@ -95,8 +139,8 @@ public static class ExternalAuthEndpoints
         }
 
         if (email is null || !verified) return Back(config, "/login?error=provider_email_unverified");
-        var normalized = SearchText.Email(email);
-        if (await db.Users.AnyAsync(u => u.EmailNormalized == normalized, http.RequestAborted))
+        var key = EmailIdentity.Key(email);
+        if (await db.Users.AnyAsync(u => u.EmailKey == key, http.RequestAborted))
         {
             return Back(config, "/login?error=link_required&provider=" + provider);
         }
@@ -104,7 +148,16 @@ public static class ExternalAuthEndpoints
         var created = Accounts.NewUser(db, now, email, name, verified: true);
         AddLogin(db, created.Id, provider, subject, email, now);
         Audit.Add(db, http, clock, AuditActions.Register, userId: created.Id, detail: new { provider });
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e))
+        {
+            // Another account holds a look-alike of the address while email_normalized is still unique (F-180), or the same sign-up won a race.
+            return Back(config, "/login?error=link_required&provider=" + provider);
+        }
+
         await Http.IssueLoginAsync(http, db, config, clock, created);
         return Back(config, target);
     }

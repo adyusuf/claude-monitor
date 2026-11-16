@@ -94,6 +94,32 @@ public sealed class SprintRaceTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_sprint_left_active_and_archived_by_a_lost_race_no_longer_holds_the_slot_so_another_sprint_of_the_project_can_start()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var stuck = await SprintKit.SprintAsync(t.Owner, t.Project);
+        (await SprintKit.StartAsync(t.Owner, stuck)).EnsureSuccessStatusCode();
+        await using (var db = api.Db())
+        {
+            // The state a start that raced a delete used to leave behind (F-004).
+            await db.Sprints.Where(s => s.Id == stuck).ExecuteUpdateAsync(s => s.SetProperty(x => x.ArchivedAt, DateTimeOffset.UtcNow));
+        }
+
+        var next = await SprintKit.SprintAsync(t.Owner, t.Project);
+        var started = await SprintKit.StartAsync(t.Owner, next);
+
+        Assert.Equal(HttpStatusCode.NoContent, started.StatusCode);
+        Assert.Equal("active", await SprintKit.StatusAsync(t.Owner, next));
+        var third = await SprintKit.SprintAsync(t.Owner, t.Project);
+        Assert.Equal(("status", "sprint_active"), await ProjectKit.ProblemAsync(await SprintKit.StartAsync(t.Owner, third)));
+
+        // The stuck row is only here for this test: the shared database must not keep an archived active sprint (the rollback of the index
+        // migration refuses to run past one).
+        await using var cleanup = api.Db();
+        await cleanup.Sprints.Where(s => s.Id == stuck).ExecuteDeleteAsync();
+    }
+
+    [Fact]
     public async Task A_sprint_whose_dates_are_cleared_while_it_starts_is_never_left_active_without_dates()
     {
         var t = await IssueKit.TeamAsync(api);

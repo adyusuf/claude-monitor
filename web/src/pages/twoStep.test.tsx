@@ -41,10 +41,11 @@ describe("the authenticator guide page", () => {
     expect(screen.getByRole("link", { name: en.account.mfaOpen })).toHaveAttribute("href", SETUP.uri);
 
     await userEvent.type(screen.getByLabelText(en.auth.mfaCode), "123456");
+    await userEvent.type(screen.getByLabelText(en.account.mfaPassword), "my password!!");
     await userEvent.click(screen.getByRole("button", { name: en.account.mfaEnable }));
     expect(await screen.findByText("aaaa-1111")).toBeInTheDocument();
     expect(screen.getByText("bbbb-2222")).toBeInTheDocument();
-    expect(calls.find((c) => c.path === "/me/mfa/enable")!.body).toEqual({ code: "123456" });
+    expect(calls.find((c) => c.path === "/me/mfa/enable")!.body).toEqual({ code: "123456", password: "my password!!" });
   });
 
   it("says it is on, and offers no setup, once two-step sign-in is on", async () => {

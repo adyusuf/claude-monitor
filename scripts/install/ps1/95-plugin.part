@@ -1,0 +1,28 @@
+    # ------------------------------------------------------------ the Claude Code plugin
+    if (-not $NoPlugin) {
+        if (-not (Have-Claude)) {
+            Say "Claude Code (the 'claude' command) was not found. When it is installed, run:"
+            Say "  claude plugin marketplace add $From/aipod-marketplace.json"
+            Say "  claude plugin install aipod@aipod-releases$(if ($Server) { " --config server=$Server" })"
+        }
+        else {
+            Say 'Setting up the Claude Code plugin'
+            $markets = @(); try { $markets = @((claude plugin marketplace list --json 2>$null | ConvertFrom-Json) | ForEach-Object name) } catch { $markets = @() }
+            if ($markets -contains 'aipod-releases') { Act 'claude plugin marketplace update aipod-releases' { Run-Native 'claude' @('plugin', 'marketplace', 'update', 'aipod-releases') } | Out-Null }
+            elseif (-not (Act "claude plugin marketplace add $From/aipod-marketplace.json" { Run-Native 'claude' @('plugin', 'marketplace', 'add', "$From/aipod-marketplace.json") })) {
+                Warn "  could not add the marketplace $From/aipod-marketplace.json"
+            }
+            $plugins = @(); try { $plugins = @((claude plugin list --json 2>$null | ConvertFrom-Json) | ForEach-Object id) } catch { $plugins = @() }
+            if ($plugins -contains 'aipod@aipod-releases') {
+                if (Act 'claude plugin update aipod@aipod-releases' { Run-Native 'claude' @('plugin', 'update', 'aipod@aipod-releases') }) { Did '  the aipod plugin is up to date' }
+            }
+            else {
+                # The server option lets the plugin download its own copy of the agent; without it the plugin finds the server in agent.json.
+                $ok = $false
+                if ($Server) { $ok = Act "claude plugin install aipod@aipod-releases --config server=$Server" { Run-Native 'claude' @('plugin', 'install', 'aipod@aipod-releases', '--config', "server=$Server") } }
+                if (-not $ok) { $ok = Act 'claude plugin install aipod@aipod-releases' { Run-Native 'claude' @('plugin', 'install', 'aipod@aipod-releases') } }
+                if ($ok) { Did '  installed the aipod plugin' } else { Warn '  the plugin was not installed; run: claude plugin install aipod@aipod-releases' }
+            }
+        }
+    }
+

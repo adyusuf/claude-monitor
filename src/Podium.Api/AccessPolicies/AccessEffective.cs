@@ -14,11 +14,12 @@ public static class AccessEffective
 {
     private static readonly AccessOsRules Empty = new([], [], []);
 
-    public static async Task<MachineAccessView> ViewAsync(PodiumDb db, Agent agent, string os, bool privileged, CancellationToken ct)
+    public static async Task<MachineAccessView> ViewAsync(PodiumDb db, Agent agent, string os, bool privileged, CancellationToken ct,
+        ILogger? log = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(agent);
-        var report = AccessReports.Read(agent.AccessReport);
+        var report = AccessReports.Read(agent.AccessReport, log, agent.Id);
         var ceiling = privileged ? report?.Ceiling : null;
         var enforced = await db.WorkspaceSettings.AsNoTracking().Where(s => s.WorkspaceId == agent.WorkspaceId).Select(s => s.EnforceAccessPolicies)
             .FirstOrDefaultAsync(ct);

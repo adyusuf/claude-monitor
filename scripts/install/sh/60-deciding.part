@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------- deciding
+
+old_present=0
+installed=""
+[ -x "$new_bin" ] && installed="$("$new_bin" version 2> /dev/null | head -n 1 | tr -d '\r ')"
+if found_old; then
+  old_present=1
+  say "An older agent is installed:"
+  list_old
+  ov="$(old_binary_version)"
+  confirm "Remove the old agent${ov:+ (cm-agent $ov)} and install aipod $version? Your settings and login are kept." n \
+    || { say "Nothing was changed. The old agent stays; run this again when you are ready."; exit 0; }
+elif [ -n "$installed" ]; then
+  if newer "$version" "$installed"; then
+    confirm "aipod $installed is installed; update to $version?" y || { say "Nothing was changed."; exit 0; }
+  else
+    say "aipod $installed is installed and is the newest build."
+  fi
+fi
+
+fresh=0
+[ -f "$new_home/agent.json" ] || [ -f "$old_home/agent.json" ] || fresh=1
+carry_over
+if [ "$old_present" = 1 ]; then remove_old; fi
+

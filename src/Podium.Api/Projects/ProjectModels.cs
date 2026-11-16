@@ -4,13 +4,15 @@ namespace Podium.Api.Projects;
 
 // The wire shapes of managed projects and applications (ADR-0011). A PUT replaces the whole definition: an optional text, a date, the
 // budget and a list that is missing are cleared; the four settings with a default (item types, priority scale, estimation unit and
-// sprint length) keep their current value when missing.
+// sprint length) keep their current value when missing. A PUT that carries expectedUpdatedAt (the updatedAt the form was loaded with) is
+// refused with 409 stale_update when the project changed since; one that omits it is last-write-wins, as before.
 
 public sealed record Stakeholder(string? Name, string? Role);
 
 public sealed record ProjectInput(string? Name, string? Purpose, Guid? OwnerUserId, string? Sponsor, List<Stakeholder>? Stakeholders,
     decimal? BudgetAmount, string? BudgetCurrency, DateOnly? StartDate, DateOnly? EndDate, List<string>? ItemTypes, string? PriorityScale,
-    string? EstimationUnit, int? SprintLengthDays, List<string>? DefinitionOfReady, List<string>? DefinitionOfDone);
+    string? EstimationUnit, int? SprintLengthDays, List<string>? DefinitionOfReady, List<string>? DefinitionOfDone,
+    DateTimeOffset? ExpectedUpdatedAt = null);
 
 public sealed record ProjectAccessView(bool CanEdit, bool CanArchive, bool CanEditApplications);
 
@@ -21,7 +23,7 @@ public sealed record ProjectView(Guid Id, Guid WorkspaceId, string Name, string?
     IReadOnlyList<Stakeholder> Stakeholders, decimal? BudgetAmount, string? BudgetCurrency, DateOnly? StartDate, DateOnly? EndDate,
     IReadOnlyList<string> ItemTypes, string PriorityScale, string EstimationUnit, int SprintLengthDays,
     IReadOnlyList<string> DefinitionOfReady, IReadOnlyList<string> DefinitionOfDone, string Status, DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt, ProjectAccessView Access, Guid? SourceConnectionId = null);
+    DateTimeOffset UpdatedAt, ProjectAccessView Access, Guid? SourceConnectionId = null, bool MirrorActive = false);
 
 public sealed record ProjectMemberView(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset AddedAt);
 
@@ -56,10 +58,10 @@ internal static class ProjectViews
     public static ProjectSummary Summary(ManagedProject p, string? ownerName, int applications) =>
         new(p.Id, p.Name, p.Purpose, p.OwnerUserId, ownerName, p.StartDate, p.EndDate, p.Status, applications, p.CreatedAt, p.SourceConnectionId);
 
-    public static ProjectView View(ManagedProject p, string? ownerName, ProjectAccessView access) =>
+    public static ProjectView View(ManagedProject p, string? ownerName, ProjectAccessView access, bool mirrorActive = false) =>
         new(p.Id, p.WorkspaceId, p.Name, p.Purpose, p.OwnerUserId, ownerName, p.Sponsor, ProjectJson.Unpack<Stakeholder>(p.Stakeholders),
             p.BudgetAmount, p.BudgetCurrency, p.StartDate, p.EndDate, p.ItemTypes, p.PriorityScale, p.EstimationUnit, p.SprintLengthDays,
-            p.DefinitionOfReady, p.DefinitionOfDone, p.Status, p.CreatedAt, p.UpdatedAt, access, p.SourceConnectionId);
+            p.DefinitionOfReady, p.DefinitionOfDone, p.Status, p.CreatedAt, p.UpdatedAt, access, p.SourceConnectionId, mirrorActive);
 
     public static ApplicationSummary Summary(ManagedApplication a) =>
         new(a.Id, a.ProjectId, a.Name, a.Description, a.Kind, a.TechStack, a.Status, a.CreatedAt);
