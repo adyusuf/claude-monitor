@@ -7,6 +7,7 @@ using Podium.Api.Streaming;
 using Podium.Api.Text;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Podium.Api.Ingest;
 
@@ -15,6 +16,9 @@ public enum IngestOutcome
     Stored,
     Duplicate,
     TooLarge,
+
+    /// <summary>PostgreSQL refused the batch's content as data (F-240) although each event passed the checks: nothing of it was stored.</summary>
+    Unstorable,
 }
 
 /// <summary>
@@ -23,8 +27,14 @@ public enum IngestOutcome
 /// skipped and counted, never guessed at; an event larger than the workspace's limit is stored as a truncation marker. An event of a session
 /// recorded in another workspace than the agent's current one (the agent was moved since, F-244) is skipped too: nothing is written across workspaces.
 /// </summary>
-public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, TimeProvider clock)
+public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, TimeProvider clock, ILogger<BatchIngestor> log)
 {
+    /// <summary>The problem title of a batch PostgreSQL refused as data (422).</summary>
+    public const string Unstorable = "batch_unstorable";
+
+    /// <summary>SQLSTATE class 22, "data exception": the content itself cannot be stored (a NUL, a bad byte sequence, a value out of range).</summary>
+    private const string DataExceptionClass = "22";
+
     public const int KindMax = 100;
     public const int ExternalIdMax = 200;
     public const int ProjectKeyMax = 300;
@@ -94,7 +104,19 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
             stored++;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException pg && pg.SqlState.StartsWith(DataExceptionClass, StringComparison.Ordinal))
+        {
+            // What the per-event checks let through and PostgreSQL still refuses fails the whole batch: it is answered as the client's, not a 500.
+            // The transaction is rolled back with the batch number, so a fixed agent can send it again. Only the code is logged: a data error's text can quote the content.
+            log.LogWarning("batch {BatchSeq} of agent {AgentId} refused by the database as data ({SqlState})", batch.BatchSeq, agentId, pg.SqlState);
+            await tx.RollbackAsync(ct);
+            return (IngestOutcome.Unstorable, 0);
+        }
+
         await db.AgentBatches.Where(b => b.AgentId == agentId && b.BatchSeq == batch.BatchSeq)
             .ExecuteUpdateAsync(s => s.SetProperty(b => b.Bytes, bytes).SetProperty(b => b.EventCount, stored), ct);
         await tx.CommitAsync(ct);
