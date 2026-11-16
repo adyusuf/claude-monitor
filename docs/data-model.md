@@ -177,7 +177,7 @@ An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a li
   is free again once its holder is archived. A `project_members` row, an `issue_links` row, a test case and a code link are removed outright (they are links, not records).
 - **Rights** are computed in the API (`ProjectAccess`) from the workspace role and the project role; the workspace membership check comes
   first, so a person who left the workspace loses every project at once. A workspace `viewer` never changes anything.
-- **Caps stand in for paging** on the small lists: 100 active applications per project, 200 components and 200 releases per application, 50 links, 100 test cases and 50 code links per issue.
+- **Caps stand in for paging** on the small lists: 100 active applications per project, 200 components, 200 planned releases and 1000 released ones per application, 50 links, 100 test cases and 50 code links per issue.
 - **Issue numbers and positions** are given under a row lock on the project (`SELECT … FOR UPDATE`), so parallel creates get distinct numbers; a move writes the middle of its neighbours and spaces the whole project again when the gap is gone.
 - **Audit** rows (`project.*`, `application.*`) name a row by id and carry no typed text. Account export and deletion for these tables are
   not decided yet (ADR-0011 §5): the rows keep the deleted user's id and hold no personal fields of their own.
