@@ -40,7 +40,8 @@ export const api = {
   /** Without a token the API takes the provider sign-in's pending token from its own cookie. */
   mfaSignIn: (token: string | undefined, code: string) => request<void>("POST", "/auth/mfa", { token, code }),
   mfaSetup: () => request<{ secret: string; uri: string }>("POST", "/me/mfa/setup"),
-  mfaEnable: (code: string) => request<{ recoveryCodes: string[] }>("POST", "/me/mfa/enable", { code }),
+  /** The account password goes with the first code (F-028); an account without one sends none and needs a fresh sign-in. */
+  mfaEnable: (code: string, password?: string) => request<{ recoveryCodes: string[] }>("POST", "/me/mfa/enable", { code, password }),
   mfaDisable: (code: string) => request<void>("POST", "/me/mfa/disable", { code }),
   forgot: (email: string) => request<void>("POST", "/auth/password/forgot", { email }),
   reset: (token: string, password: string) => request<void>("POST", "/auth/password/reset", { token, password }),

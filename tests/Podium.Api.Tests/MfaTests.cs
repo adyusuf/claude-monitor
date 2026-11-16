@@ -76,8 +76,8 @@ public sealed class MfaTests(ApiFactory api)
         var setup = await (await user.PostAsync("/api/me/mfa/setup")).Content.ReadFromJsonAsync<JsonElement>();
         var secret = FromBase32(setup.GetProperty("secret").GetString()!);
         Assert.StartsWith("otpauth://totp/", setup.GetProperty("uri").GetString(), StringComparison.Ordinal);
-        Assert.Equal(HttpStatusCode.BadRequest, (await user.PostAsync("/api/me/mfa/enable", new { code = "000000" })).StatusCode);
-        var enabled = await user.PostAsync("/api/me/mfa/enable", new { code = Now(secret, -1) });
+        Assert.Equal(HttpStatusCode.BadRequest, (await user.PostAsync("/api/me/mfa/enable", new { code = "000000", password = TestUser.Password })).StatusCode);
+        var enabled = await user.PostAsync("/api/me/mfa/enable", new { code = Now(secret, -1), password = TestUser.Password });
         var recovery = (await enabled.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("recoveryCodes").EnumerateArray().Select(c => c.GetString()!).ToList();
         Assert.Equal(10, recovery.Count);
         Assert.True((await user.GetJsonAsync("/api/me")).GetProperty("mfaEnabled").GetBoolean());

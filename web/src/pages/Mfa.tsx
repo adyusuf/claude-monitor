@@ -66,14 +66,17 @@ export function MfaCard({ guide = true, titled = true }: { guide?: boolean; titl
   const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(null);
   const [recovery, setRecovery] = useState<string[] | null>(null);
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
-  const run = async (work: () => Promise<void>) => {
+  /** `known` words an API code for this form where the shared text would speak of another one. */
+  const run = async (work: () => Promise<void>, known: Record<string, string> = {}) => {
     setNotice(null);
     try {
       await work();
     } catch (err) {
-      setNotice({ kind: "error", text: errorText(err) });
+      const code = (err as { code?: string } | null)?.code;
+      setNotice({ kind: "error", text: (code ? known[code] : undefined) ?? errorText(err) });
     }
   };
 
@@ -104,11 +107,12 @@ export function MfaCard({ guide = true, titled = true }: { guide?: boolean; titl
         <form className="stack" onSubmit={(e) => {
           e.preventDefault();
           void run(async () => {
-            const result = await api.mfaEnable(code);
+            const result = await api.mfaEnable(code, me?.hasPassword ? password : undefined);
             setRecovery(result.recoveryCodes);
             setCode("");
+            setPassword("");
             await refresh();
-          });
+          }, { reauth_required: t("account.mfaFreshSignIn") });
         }}>
           <p>{t("twoStep.scan")}</p>
           <QrCode text={setup.uri} label={t("twoStep.qrLabel")} />
@@ -116,6 +120,9 @@ export function MfaCard({ guide = true, titled = true }: { guide?: boolean; titl
           <CopyText text={setup.secret} />
           <a href={setup.uri}>{t("account.mfaOpen")}</a>
           <Field label={t("auth.mfaCode")} value={code} inputMode="numeric" autoComplete="one-time-code" onChange={(e) => setCode(e.target.value)} />
+          {me?.hasPassword
+            ? <Field label={t("account.mfaPassword")} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            : <p className="muted">{t("account.mfaFreshSignIn")}</p>}
           <div><Button type="submit">{t("account.mfaEnable")}</Button></div>
         </form>
       ) : (

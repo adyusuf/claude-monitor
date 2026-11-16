@@ -63,6 +63,7 @@ export const tr: Dictionary = {
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
     account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
     reauth_required: "Parolası olmayan bir hesabı silmek için yeniden oturum açın: çıkış yapın, GitHub ya da Google ile girin ve hesabı birkaç dakika içinde silin.",
+    password_required: "İki adımlı girişi açmak için parolanızı girin.",
     confirm_required: "Onay kelimesini tam olarak yazın.", sole_owner: "Paylaşılan bir çalışma alanının tek sahibisiniz: önce başka birini sahip yapın.",
     mfa_required: "Bu kabuk komutu için doğrulama uygulamasındaki kod gerekli.", run_mismatch: "Çalıştırma, gösterildiğinden sonra değişti. Yenileyip tekrar bakın.",
     not_pending: "Bu istek zaten yanıtlandı ya da süresi doldu.", remote_runs_disabled: "Bu çalışma alanında uzaktan çalışma kapalı.",
@@ -245,6 +246,7 @@ export const tr: Dictionary = {
 
     mfaOpen: "Doğrulama uygulamasında aç", mfaEnable: "Aç", mfaRecovery: "Kurtarma kodları. Güvenli bir yerde saklayın: her biri uygulama olmadan bir kez giriş yapar. Yalnızca şimdi gösteriliyor.",
     mfaDisable: "Kapat", mfaDisabled: "İki adımlı giriş kapalı.",
+    mfaPassword: "Hesap parolanız", mfaFreshSignIn: "Hesabınızın parolası yok; bunu açmak için son birkaç dakika içinde giriş yapmış olmanız gerekir: çıkış yapın, GitHub ya da Google ile girin ve hemen ardından açın.",
     deleteConfirm: "Onaylamak için {word} yazın", deleteButton: "Hesabımı sil", deleted: "Hesabınız silindi.",
   },
   invitation: { accepting: "Çalışma alanına katılınıyor…", accepted: "Çalışma alanına katıldınız." },

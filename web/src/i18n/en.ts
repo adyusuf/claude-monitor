@@ -62,6 +62,7 @@ export const en = {
     request_failed: "The request failed.", network: "The server cannot be reached.",
     account_locked: "Too many wrong attempts on this account. Try again in 15 minutes.",
     reauth_required: "To delete an account without a password, sign in again: sign out, sign in with GitHub or Google, and delete the account within a few minutes.",
+    password_required: "Enter your password to turn two-step sign-in on.",
     confirm_required: "Type the confirmation word exactly.", sole_owner: "You are the only owner of a shared workspace: make someone else owner first.",
     mfa_required: "This shell command needs the code from your authenticator app.", run_mismatch: "The run changed since it was shown. Reload and look at it again.",
     not_pending: "This request has already been answered or has expired.", remote_runs_disabled: "Remote work is switched off in this workspace.",
@@ -244,6 +245,7 @@ export const en = {
 
     mfaOpen: "Open in authenticator", mfaEnable: "Turn on", mfaRecovery: "Recovery codes. Keep them somewhere safe: each signs in once without the app. They are shown only now.",
     mfaDisable: "Turn off", mfaDisabled: "Two-step sign-in is off.",
+    mfaPassword: "Your account password", mfaFreshSignIn: "Your account has no password, so turning this on needs a sign-in from the last few minutes: sign out, sign in with GitHub or Google, and turn it on right after.",
     deleteConfirm: "Type {word} to confirm", deleteButton: "Delete my account", deleted: "Your account is deleted.",
   },
   invitation: { accepting: "Joining the workspace…", accepted: "You joined the workspace." },
