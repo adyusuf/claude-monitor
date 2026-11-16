@@ -61,6 +61,9 @@ public sealed partial class LocalStore : IDisposable
         AddColumnIfMissing("session_inboxes", "permission_mode", "TEXT"); // a database made before the mode of a session was kept (ADR-0008 §3f)
         AddColumnIfMissing("exec_runs", "refused_by", "TEXT"); // a database made before an access layer's refusal was reported (ADR-0020 §4)
         AddColumnIfMissing("exec_runs", "access_version", "INTEGER");
+        AddColumnIfMissing("exec_runs", "run_pid", "INTEGER"); // a database made before a run's process id was kept for a restarted agent (F-323); NULL = not adoptable
+        AddColumnIfMissing("exec_runs", "run_pid_start", "TEXT");
+        AddColumnIfMissing("exec_runs", "run_deadline", "TEXT");
         CreateAccessTables();
     }
 
