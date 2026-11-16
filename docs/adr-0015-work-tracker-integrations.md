@@ -74,7 +74,8 @@ A refresh token rotates on every use; the new one is stored in the same transact
 ## 6. Keeping up to date
 
 1. **Webhook** `POST /api/integrations/jira/webhook/{connectionId}`: no session; the JWT is verified with the client secret (constant time, `exp` checked), the body is capped at 256 KiB, the
-   delivery id is recorded once, and the answer is 200 at once. The handler reads only *which* issue key or sprint id changed and queues "read it again" in memory (`SyncQueue`); the
+   delivery id is recorded once, and the answer is 200 at once (a token without `exp` is accepted, F-075, so a connection may leave at most 3000 new receipts an hour; past that a
+   delivery is answered 429, recorded and queued nowhere, and the pass reads what it named). The handler reads only *which* issue key or sprint id changed and queues "read it again" in memory (`SyncQueue`); the
    worker fetches the record with the connector's token and applies it. A lost queue (restart) costs nothing: pass 2 finds it.
 2. **Reconciliation** every 10 minutes per active connection (and once at start): issues of imported spaces with `updated >= last pass − 5 minutes`, the sprints of imported sprints' boards, the space list
    (a vanished space is archived), the people of imported spaces. It is the only update path on a machine that Jira cannot reach (development) and the net under pass 1.
