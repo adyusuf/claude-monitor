@@ -4427,6 +4427,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Email")
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
                     b.Property<string>("EmailNormalized")
                         .IsRequired()
                         .HasColumnType("text")
