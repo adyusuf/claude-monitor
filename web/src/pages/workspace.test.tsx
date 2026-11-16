@@ -167,6 +167,7 @@ describe("members", () => {
 
 describe("workspace settings and account", () => {
   it("saves the name and capture settings and shows the audit log", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true); // lowering the retention and turning masking off are confirmed first (F-219)
     const calls = mockApi({
       "GET /me": { body: ME },
       "GET /workspaces/w1": { body: { id: "w1", name: "Team", role: "owner", settings: { maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144 } } },

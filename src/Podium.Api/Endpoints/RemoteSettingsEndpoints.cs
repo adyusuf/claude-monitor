@@ -7,10 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.Endpoints;
 
 public sealed record RemoteSettings(bool RemoteRunsEnabled, int AlertCpuPct, int AlertMemoryPct, int AlertDiskPct, int AlertSustainSeconds,
-    long ScriptOutputMaxBytes = 8 * 1024 * 1024, bool RemoteSchedulesEnabled = false);
+    long ScriptOutputMaxBytes = 8 * 1024 * 1024, bool RemoteSchedulesEnabled = false, DateTimeOffset? UpdatedAt = null);
 
 public sealed record RemoteSettingsRequest(bool? RemoteRunsEnabled, int? AlertCpuPct, int? AlertMemoryPct, int? AlertDiskPct,
-    int? AlertSustainSeconds, long? ScriptOutputMaxBytes = null, bool? RemoteSchedulesEnabled = null);
+    int? AlertSustainSeconds, long? ScriptOutputMaxBytes = null, bool? RemoteSchedulesEnabled = null, DateTimeOffset? ExpectedUpdatedAt = null);
 
 /// <summary>
 /// The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; an admin changes. Turning the
@@ -32,7 +32,7 @@ public static class RemoteSettingsEndpoints
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        return Results.Ok(View(s));
+        return Results.Ok(View(s) with { UpdatedAt = s.UpdatedAt });
     }
 
     private static async Task<IResult> Put(Guid id, RemoteSettingsRequest req, HttpContext http, PodiumDb db, TimeProvider clock,
@@ -47,7 +47,11 @@ public static class RemoteSettingsEndpoints
 
         if (req.AlertSustainSeconds is < SustainMin or > SustainMax) return Http.Invalid("alertSustainSeconds", "out_of_range");
         if (req.ScriptOutputMaxBytes is { } cap && (cap < config.ScriptOutputFloor || cap > config.ScriptOutputCeiling)) return Http.Invalid("scriptOutputMaxBytes", "out_of_range");
+        // The row is locked before it is read: a save from a card loaded before another save is refused, and two saves of one card cannot both pass.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await WorkspaceSettingsRules.LockAsync(db, id, http.RequestAborted);
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
+        if (WorkspaceSettingsRules.IsStale(s.UpdatedAt, req.ExpectedUpdatedAt)) return WorkspaceSettingsRules.Stale();
         var before = View(s);
         var turnedOff = s.RemoteRunsEnabled && req.RemoteRunsEnabled == false;
         s.RemoteRunsEnabled = req.RemoteRunsEnabled ?? s.RemoteRunsEnabled;
@@ -61,12 +65,13 @@ public static class RemoteSettingsEndpoints
         s.UpdatedBy = userId;
         Audit.Add(db, http, clock, AuditActions.RemoteSettingsChanged, id, userId, detail: new { before, after = View(s) });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         if (turnedOff)
         {
             await RunDecisions.CancelOpenAsync(db, broker, clock.GetUtcNow(), id, null, null, http.RequestAborted);
             await AskReports.CancelOpenAsync(db, broker, clock.GetUtcNow(), a => a.WorkspaceId == id, http.RequestAborted);
         }
-        return Results.Ok(View(s));
+        return Results.Ok(View(s) with { UpdatedAt = s.UpdatedAt });
     }
 
     private static RemoteSettings View(WorkspaceSettings s) =>

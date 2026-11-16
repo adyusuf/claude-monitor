@@ -188,13 +188,33 @@ public static class SessionEndpoints
         return Results.Ok(new Page<EventRow>(rows.Take(take).ToList(), next));
     }
 
-    /// <summary>The workspace's live stream: opened by a member only, and ended at a ping once the reader is no longer a member or signed in.</summary>
-    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker, ApiConfig config, TimeProvider clock)
+    /// <summary>
+    /// The workspace's live stream: opened by a member only, at most <see cref="StreamLimiter.MaxPerMember"/> at once per member (429 beyond),
+    /// and ended at a ping once the reader is no longer a member or signed in.
+    /// </summary>
+    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker, StreamLimiter limiter, ApiConfig config, TimeProvider clock)
     {
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
+        if (limiter.TryOpen(userId) is not { } lease)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: StreamLimiter.TooManyStreams);
+        }
+
+        // The place goes back when the stream ends, and also when the response ends without the stream having started.
+        http.Response.OnCompleted(() =>
+        {
+            lease.Dispose();
+            return Task.CompletedTask;
+        });
+        var inner = broker.Subscribe([Broker.Workspace(id), Broker.WorkspaceMember(id, userId)]);
+        var subscription = new Subscription(inner.Reader, () =>
+        {
+            inner.Dispose();
+            lease.Dispose();
+        });
         var login = http.User.LoginSessionId();
-        return Sse.Stream(broker.Subscribe([Broker.Workspace(id), Broker.WorkspaceMember(id, userId)]), [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
+        return Sse.Stream(subscription, [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
             http.RequestAborted, ct => Access.StillReadsAsync(db, clock, userId, login, id, ct));
     }
 }

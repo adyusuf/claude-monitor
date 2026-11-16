@@ -51,12 +51,16 @@ export const api = {
   createWorkspace: (name: string) => request<{ id: string }>("POST", "/workspaces", { name }),
   workspace: (id: string) => request<WorkspaceInfo>("GET", `/workspaces/${id}`),
   renameWorkspace: (id: string, name: string) => request<void>("PATCH", `/workspaces/${id}`, { name }),
-  saveSettings: (id: string, settings: Partial<Settings>) => request<void>("PUT", `/workspaces/${id}/settings`, settings),
+  /** The code is the two-step code a recent sign-in may be replaced by (lowering the retention, turning masking off). */
+  saveSettings: (id: string, settings: Partial<Settings>, opts: { code?: string; expectedUpdatedAt?: string } = {}) =>
+    request<void>("PUT", `/workspaces/${id}/settings`, { ...settings, updatedAt: undefined, code: opts.code, expectedUpdatedAt: opts.expectedUpdatedAt }),
   members: (id: string) => request<Member[]>("GET", `/workspaces/${id}/members`),
   changeRole: (id: string, userId: string, role: Role) => request<void>("PATCH", `/workspaces/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => request<void>("DELETE", `/workspaces/${id}/members/${userId}`),
   invitations: (id: string) => request<Invitation[]>("GET", `/workspaces/${id}/invitations`),
-  invite: (id: string, email: string, role: Role) => request<{ id: string }>("POST", `/workspaces/${id}/invitations`, { email, role }),
+  /** `mailSent` is false when the invitation is saved but its mail could not go out; an older server leaves it out (read as sent). */
+  invite: (id: string, email: string, role: Role) => request<{ id: string; mailSent?: boolean }>("POST", `/workspaces/${id}/invitations`, { email, role }),
+  resendInvitation: (id: string, invitationId: string) => request<{ mailSent: boolean }>("POST", `/workspaces/${id}/invitations/${invitationId}/resend`),
   revokeInvitation: (id: string, invitationId: string) => request<void>("DELETE", `/workspaces/${id}/invitations/${invitationId}`),
   acceptInvitation: (token: string) => request<{ workspaceId: string }>("POST", "/invitations/accept", { token }),
   audit: (id: string, before?: string | null) => request<Page<AuditRow>>("GET", `/workspaces/${id}/audit${q({ before })}`),
@@ -136,7 +140,8 @@ export const api = {
   resumeSchedule: (id: string, code?: string) => request<void>("POST", `/schedules/${id}/resume`, { code }),
   endSchedule: (id: string) => request<void>("POST", `/schedules/${id}/end`),
   remoteSettings: (id: string) => request<RemoteSettings>("GET", `/workspaces/${id}/remote-settings`),
-  saveRemoteSettings: (id: string, settings: RemoteSettings) => request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, settings),
+  saveRemoteSettings: (id: string, settings: RemoteSettings, expectedUpdatedAt?: string) =>
+    request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, { ...settings, updatedAt: undefined, expectedUpdatedAt }),
   projects: (ws: string, opts: { q?: string; status?: string; cursor?: string | null; limit?: number }) =>
     request<Page<ProjectSummary>>("GET", `/workspaces/${ws}/projects${q(opts)}`),
   createProject: (ws: string, input: ProjectInput) => request<ProjectView>("POST", `/workspaces/${ws}/projects`, input),

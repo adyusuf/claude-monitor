@@ -19,7 +19,8 @@ export interface Me {
 }
 
 export type AgentUpdateMode = "off" | "check" | "on";
-export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate?: boolean; enforceAccessPolicies?: boolean }
+/** `updatedAt` is when the settings were last saved: sent back as `expectedUpdatedAt` so a save after someone else's is refused (an older server leaves it out). */
+export interface Settings { maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate?: boolean; enforceAccessPolicies?: boolean; updatedAt?: string }
 export interface WorkspaceInfo { id: string; name: string; role: Role; settings: Settings }
 export interface Member { userId: string; displayName: string; email: string | null; role: Role; joinedAt: string }
 export interface Invitation { id: string; email: string; role: Role; createdAt: string; expiresAt: string }
