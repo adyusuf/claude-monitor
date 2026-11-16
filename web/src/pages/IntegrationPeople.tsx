@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/endpoints";
 import type { PersonView } from "../api/typesIntegrations";
 import type { Member } from "../api/types";
+import { MoreRows } from "../components/MoreRows";
 import { Button, Notice } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
+import { appendNew } from "../lib/listPages";
 
 /** The people of the tool (admins): who is a member, who was invited, who has no visible e-mail. An admin can type an e-mail or link a person to a member. */
 export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
@@ -14,6 +16,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [email, setEmail] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -31,6 +34,21 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** The people after those shown (the API cut the list at its maximum, F-077), added once each. */
+  const loadMore = async () => {
+    if (!people) return;
+    setLoadingMore(true);
+    try {
+      const list = await api.integrationPeople(id, people.length);
+      setPeople(appendNew(people, list.items, (p) => p.id));
+      setTruncated(list.truncated);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const save = async (person: PersonView, input: { email?: string; userId?: string; unlink?: boolean }) => {
     try {
@@ -69,7 +87,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
           </li>
         ))}
       </ul>
-      {truncated ? <p className="muted">{t("integrations.peopleTruncated", { n: people.length })}</p> : null}
+      {truncated ? <MoreRows note={t("integrations.peopleTruncated", { n: people.length })} busy={loadingMore} onMore={() => void loadMore()} /> : null}
     </div>
   );
 }

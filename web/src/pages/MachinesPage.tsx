@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/endpoints";
 import { ApiError } from "../api/client";
 import type { AgentRow, DeviceLookup, MachineView } from "../api/types";
 import { useSession } from "../auth/session";
+import { MoreRows } from "../components/MoreRows";
 import { Button, Card, Empty, Field, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { dateTime, percent } from "../lib/format";
+import { appendNew, readUpTo, type ListRead } from "../lib/listPages";
 import { debounce, isCatchUp, useLive } from "../lib/live";
 import { ClaudeBadge, RoleBadge, TagChips } from "./MachineBadges";
 import { ExecBadge, maxDiskPct, memoryPct, OnlineDot, ServiceBadge } from "./MachineBits";
@@ -43,6 +45,8 @@ function MachineRow({ ws, agent: a, view: v, canRevoke, onRevoke }: {
   );
 }
 
+const NONE: ListRead<MachineView> = { items: [], truncated: false };
+
 /** The workspace's connected machines; a user disconnects their own, an admin anyone's. */
 export function MachinesPage() {
   const { ws = "" } = useParams();
@@ -52,32 +56,71 @@ export function MachinesPage() {
   const [rows, setRows] = useState<AgentRow[] | null>(null);
   const [views, setViews] = useState<Map<string, MachineView>>(new Map());
   const [error, setError] = useState<unknown>(null);
+  // Whether the API cut the agents or the machines (X-Truncated, F-024), and how many of each are shown, so a live refresh keeps them.
+  const [agentsCut, setAgentsCut] = useState(false);
+  const [machinesCut, setMachinesCut] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const shown = useRef({ agents: 0, machines: 0 });
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
+
+  const show = (agents: ListRead<AgentRow>, machines: ListRead<MachineView>) => {
+    shown.current = { agents: agents.items.length, machines: machines.items.length };
+    setRows(agents.items);
+    setViews(new Map(machines.items.map((m) => [m.agentId, m])));
+    setAgentsCut(agents.truncated);
+    setMachinesCut(machines.truncated);
+  };
 
   // An API without remote work answers 404 to the machines list: the page then shows the plain list, as before.
   const load = useCallback(async () => {
     try {
       const [agents, machines] = await Promise.all([
-        api.agents(ws),
-        api.machines(ws).catch((e: unknown) => {
-          if (e instanceof ApiError && e.status === 404) return [];
+        readUpTo((skip) => api.agentList(ws, skip), shown.current.agents, (a) => a.id),
+        readUpTo((skip) => api.machineList(ws, skip), shown.current.machines, (m) => m.agentId).catch((e: unknown) => {
+          if (e instanceof ApiError && e.status === 404) return NONE;
           throw e;
         }),
       ]);
-      setRows(agents);
-      setViews(new Map(machines.map((m) => [m.agentId, m])));
+      show(agents, machines);
       setError(null);
     } catch (e) {
       setError(e);
     }
   }, [ws]);
   useEffect(() => {
+    shown.current = { agents: 0, machines: 0 }; // another workspace starts at its first page
     void load();
   }, [load]);
-  const reload = useMemo(() => debounce(() => void load()), [load]);
+  // A live message reads the list again through an effect, so the read (which keeps the rows shown) never runs from a render.
+  const [tick, setTick] = useState(0);
+  const reload = useMemo(() => debounce(() => setTick((n) => n + 1)), []);
+  useEffect(() => {
+    if (tick > 0) void load();
+    // only a new tick reads again; a new workspace is read by the effect above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
   useLive(ws, (m) => {
     if (m.event === "alert" || m.event === "run" || m.event === "session" || m.event === "machine" || isCatchUp(m)) reload();
   });
+
+  /** The agents and machines after those shown, each list only while the API says it cut it; a row is added once. */
+  const loadMore = async () => {
+    if (!rows) return;
+    setLoadingMore(true);
+    try {
+      const machines = [...views.values()];
+      const [agentPage, machinePage] = await Promise.all([
+        agentsCut ? api.agentList(ws, rows.length) : { items: [], truncated: false },
+        machinesCut ? api.machineList(ws, machines.length) : NONE,
+      ]);
+      show({ items: appendNew(rows, agentPage.items, (a) => a.id), truncated: agentPage.truncated },
+        { items: appendNew(machines, machinePage.items, (m) => m.agentId), truncated: machinePage.truncated });
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const revoke = async (id: string) => {
     if (!window.confirm(t("machines.revokeConfirm"))) return;
@@ -117,6 +160,7 @@ export function MachinesPage() {
               </tbody>
             </table>
           </div>
+          {agentsCut || machinesCut ? <MoreRows note={t("machines.truncated", { n: rows.length })} busy={loadingMore} onMore={() => void loadMore()} /> : null}
         </Card>
       )}
     </div>

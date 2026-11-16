@@ -26,6 +26,8 @@ export interface Member { userId: string; displayName: string; email: string | n
 export interface Invitation { id: string; email: string; role: Role; createdAt: string; expiresAt: string }
 
 export interface Page<T> { items: T[]; next: string | null }
+/** A page of the members or invitations read with a limit or a cursor (F-060): `nextCursor` is null on the last one. */
+export interface CursorPage<T> { items: T[]; nextCursor: string | null }
 
 export interface SessionRow {
   id: string;
