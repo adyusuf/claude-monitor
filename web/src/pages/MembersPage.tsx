@@ -11,6 +11,8 @@ import { date } from "../lib/format";
 
 const ROLES: Role[] = ["owner", "admin", "member", "viewer"];
 
+type NoticeState = { kind: "error" | "success"; text: string };
+
 /** Members and invitations as two tabs. Everyone sees the members; admins see the invitations, invite (from a drawer), change roles and remove. */
 export function MembersPage() {
   const { ws = "" } = useParams();
@@ -23,7 +25,7 @@ export function MembersPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [inviting, setInviting] = useState(false);
-  const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
   const myRole = me?.workspaces.find((w) => w.id === ws)?.role;
   const admin = myRole === "owner" || myRole === "admin";
 
@@ -42,26 +44,35 @@ export function MembersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws, admin]);
 
-  /** Runs one change and reloads; false when the server refused it (the reason is shown). */
-  const act = async (work: () => Promise<unknown>, success?: string) => {
+  /** Runs one change and reloads; false when the server refused it (the reason is shown). The notice may depend on what the call answered. */
+  const act = async (work: () => Promise<unknown>, success?: string | (() => NoticeState)) => {
     try {
       await work();
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
       return false;
     }
-    if (success) setNotice({ kind: "success", text: success });
+    if (success) setNotice(typeof success === "string" ? { kind: "success", text: success } : success());
     await load();
     return true;
   };
 
+  // An invitation that is saved but whose mail could not go out says so; the open invitations carry the button to send it again.
   const invite = (e: FormEvent) => {
     e.preventDefault();
+    let mailSent = true;
     void act(async () => {
-      await api.invite(ws, email, role);
+      mailSent = (await api.invite(ws, email, role)).mailSent !== false;
       setEmail("");
       setInviting(false);
-    }, t("members.invited"));
+    }, () => (mailSent ? { kind: "success", text: t("members.invited") } : { kind: "error", text: t("members.mailNotSent") }));
+  };
+
+  const resend = (invitationId: string) => {
+    let mailSent = true;
+    void act(async () => {
+      mailSent = (await api.resendInvitation(ws, invitationId)).mailSent;
+    }, () => (mailSent ? { kind: "success", text: t("members.resent") } : { kind: "error", text: t("members.mailNotSent") }));
   };
 
   const leave = async (userId: string) => {
@@ -135,6 +146,8 @@ export function MembersPage() {
                         <td>{t(`roles.${i.role}`)}</td>
                         <td className="muted small">{date(i.expiresAt)}</td>
                         <td className="right">
+                          <button type="button" className="link" onClick={() => resend(i.id)}>{t("members.resend")}</button>
+                          {" "}
                           <button type="button" className="link" onClick={() => void act(() => api.revokeInvitation(ws, i.id))}>{t("session.cancel")}</button>
                         </td>
                       </tr>

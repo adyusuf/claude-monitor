@@ -53,7 +53,9 @@ export const api = {
   changeRole: (id: string, userId: string, role: Role) => request<void>("PATCH", `/workspaces/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => request<void>("DELETE", `/workspaces/${id}/members/${userId}`),
   invitations: (id: string) => request<Invitation[]>("GET", `/workspaces/${id}/invitations`),
-  invite: (id: string, email: string, role: Role) => request<{ id: string }>("POST", `/workspaces/${id}/invitations`, { email, role }),
+  /** `mailSent` is false when the invitation is saved but its mail could not go out; an older server leaves it out (read as sent). */
+  invite: (id: string, email: string, role: Role) => request<{ id: string; mailSent?: boolean }>("POST", `/workspaces/${id}/invitations`, { email, role }),
+  resendInvitation: (id: string, invitationId: string) => request<{ mailSent: boolean }>("POST", `/workspaces/${id}/invitations/${invitationId}/resend`),
   revokeInvitation: (id: string, invitationId: string) => request<void>("DELETE", `/workspaces/${id}/invitations/${invitationId}`),
   acceptInvitation: (token: string) => request<{ workspaceId: string }>("POST", "/invitations/accept", { token }),
   audit: (id: string, before?: string | null) => request<Page<AuditRow>>("GET", `/workspaces/${id}/audit${q({ before })}`),

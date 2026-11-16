@@ -214,6 +214,7 @@ export const tr: Dictionary = {
     title: "Üyeler", invite: "Davet et", inviteEmail: "Davet edilecek e-posta", role: "Rol", invited: "Davet gönderildi.",
     pending: "Açık davetler", noPending: "Açık davet yok.", remove: "Çıkar", leave: "Çalışma alanından ayrıl",
     removeConfirm: "Bu üye çalışma alanından çıkarılsın mı?", leaveConfirm: "Bu çalışma alanından ayrılınsın mı?",
+    mailNotSent: "Davet kaydedildi ama e-postası gönderilemedi. Açık davetlerden yeniden gönderin.", resend: "Yeniden gönder", resent: "Davet yeniden gönderildi.",
   },
   roles: { owner: "Sahip", admin: "Yönetici", member: "Üye", viewer: "İzleyici" },
   workspace: {

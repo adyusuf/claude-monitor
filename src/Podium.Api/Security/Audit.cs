@@ -24,6 +24,7 @@ public static class AuditActions
     public const string InvitationCreated = "workspace.invitation_created";
     public const string InvitationAccepted = "workspace.invitation_accepted";
     public const string InvitationRevoked = "workspace.invitation_revoked";
+    public const string InvitationResent = "workspace.invitation_resent";
     public const string RoleChanged = "workspace.role_changed";
     public const string MemberRemoved = "workspace.member_removed";
     public const string SettingsChanged = "workspace.settings_changed";

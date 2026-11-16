@@ -30,6 +30,7 @@ public sealed class RateLimitPolicyTests(ApiFactory api)
     [InlineData("POST", "/api/me/delete")]
     [InlineData("POST", "/api/me/mfa/disable")]
     [InlineData("POST", "/api/workspaces/0190a1b2-0000-7000-8000-000000000001/invitations")]
+    [InlineData("POST", "/api/workspaces/0190a1b2-0000-7000-8000-000000000001/invitations/0190a1b2-0000-7000-8000-000000000002/resend")]
     [InlineData("POST", "/api/workspaces")]
     public async Task An_endpoint_with_the_auth_policy_answers_429_once_the_budget_is_spent(string method, string url)
     {

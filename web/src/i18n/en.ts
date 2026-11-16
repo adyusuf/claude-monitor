@@ -213,6 +213,7 @@ export const en = {
     title: "Members", invite: "Invite", inviteEmail: "E-mail to invite", role: "Role", invited: "Invitation sent.",
     pending: "Open invitations", noPending: "No open invitations.", remove: "Remove", leave: "Leave workspace",
     removeConfirm: "Remove this member from the workspace?", leaveConfirm: "Leave this workspace?",
+    mailNotSent: "The invitation is saved, but its mail could not be sent. Send it again from the open invitations.", resend: "Send again", resent: "The invitation was sent again.",
   },
   roles: { owner: "Owner", admin: "Admin", member: "Member", viewer: "Viewer" },
   workspace: {

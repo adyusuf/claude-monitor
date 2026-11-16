@@ -26,12 +26,13 @@ public static class InvitationEndpoints
         var g = api.MapGroup("").RequireAuthorization(Schemes.Session);
         g.MapPost("/workspaces/{id:guid}/invitations", Invite).RequireRateLimiting(RateLimitPolicy);
         g.MapGet("/workspaces/{id:guid}/invitations", List);
+        g.MapPost("/workspaces/{id:guid}/invitations/{invitationId:guid}/resend", Resend).RequireRateLimiting(RateLimitPolicy);
         g.MapDelete("/workspaces/{id:guid}/invitations/{invitationId:guid}", Revoke);
         g.MapPost("/invitations/accept", Accept);
     }
 
     private static async Task<IResult> Invite(Guid id, InviteRequest req, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock, IMailer mailer)
+        TimeProvider clock, IMailer mailer, ILoggerFactory logs)
     {
         var userId = http.User.UserId();
         var actor = await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted);
@@ -74,12 +75,30 @@ public static class InvitationEndpoints
             detail: new { role });
         await db.SaveChangesAsync(http.RequestAborted);
 
-        var inviter = await db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, http.RequestAborted);
-        var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
-        var inviteeLanguage = await db.Users.AsNoTracking().Where(u => u.EmailNormalized == invitation.EmailNormalized).Select(u => u.Language).FirstOrDefaultAsync(http.RequestAborted);
-        await mailer.SendAsync(MailTemplates.Build(MailTemplates.Language(http, inviteeLanguage), "invite", req.Email!.Trim(),
-            Http.Link(config, "/invitations/accept", token), inviter.DisplayName, workspace.Name), http.RequestAborted);
-        return Results.Created($"/api/workspaces/{id}/invitations/{invitation.Id}", new { invitation.Id });
+        // Saved above: a mail server that is down leaves the invitation pending and says so, and an admin can send it again.
+        var mailSent = await InvitationMail.TrySendAsync(http, db, config, mailer, logs, invitation, token, userId);
+        return Results.Created($"/api/workspaces/{id}/invitations/{invitation.Id}", new { invitation.Id, mailSent });
+    }
+
+    /// <summary>Sends a pending invitation again with a new link (the old one stops working); says whether the mail went.</summary>
+    private static async Task<IResult> Resend(Guid id, Guid invitationId, HttpContext http, PodiumDb db, ApiConfig config,
+        TimeProvider clock, IMailer mailer, ILoggerFactory logs)
+    {
+        var userId = http.User.UserId();
+        if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
+        var now = clock.GetUtcNow();
+        var token = Secrets.NewToken();
+        var hash = Secrets.Hash(token);
+        // Compare-and-set on the still-open invitation: one that was accepted, revoked or has expired since cannot be given a new link.
+        var renewed = await db.WorkspaceInvitations
+            .Where(i => i.Id == invitationId && i.WorkspaceId == id && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.TokenHash, hash), http.RequestAborted);
+        if (renewed != 1) return Http.NotFound();
+
+        var invitation = await db.WorkspaceInvitations.AsNoTracking().FirstAsync(i => i.Id == invitationId, http.RequestAborted);
+        Audit.Add(db, http, clock, AuditActions.InvitationResent, id, userId, targetType: "invitation", targetId: invitationId);
+        await db.SaveChangesAsync(http.RequestAborted);
+        return Results.Ok(new { mailSent = await InvitationMail.TrySendAsync(http, db, config, mailer, logs, invitation, token, userId) });
     }
 
     private static async Task<IResult> List(Guid id, HttpContext http, PodiumDb db, TimeProvider clock)
