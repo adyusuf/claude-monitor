@@ -31,7 +31,7 @@ import { useMachineData } from "./useMachineData";
 import { Icon } from "../components/icons";
 
 /** The live events that change what this page shows. */
-const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "schedule", "machine", "action"];
+const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "schedule", "ask", "machine", "action"];
 
 /** One machine in tabs: overview, control, work (projects, runs, jobs, schedules), monitoring (load, alerts) and access (grants). The runs waiting for the owner stay above the tabs. */
 export function MachinePage() {
