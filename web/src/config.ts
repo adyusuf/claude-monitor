@@ -4,6 +4,8 @@ export const config = {
   apiBase: "/api",
   csrfHeader: "X-CSRF",
   pageSize: 25,
+  /** The most rows the API gives one limit-and-cursor page (its PageSizeMax): "Load more" of the members and invitations asks for this many. */
+  cursorPageMax: 100,
   eventPageSize: 50,
   /** The chat reads the newest transcript lines first, then this many more each time the reader scrolls up. */
   /** What the conversation reads: the transcript, and the hooks that say Claude wants the user or a subagent came and went. */

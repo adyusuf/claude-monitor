@@ -199,6 +199,7 @@ export const de: Dictionary = {
     pending: "Offene Einladungen", noPending: "Keine offenen Einladungen.", remove: "Entfernen", leave: "Arbeitsbereich verlassen",
     removeConfirm: "Dieses Mitglied aus dem Arbeitsbereich entfernen?", leaveConfirm: "Diesen Arbeitsbereich verlassen?",
     mailNotSent: "Die Einladung ist gespeichert, aber ihre E-Mail konnte nicht gesendet werden. Senden Sie sie unter den offenen Einladungen erneut.", resend: "Erneut senden", resent: "Die Einladung wurde erneut gesendet.",
+    truncated: "Nur die ersten {n} Mitglieder werden angezeigt; der Arbeitsbereich hat mehr.", invitationsTruncated: "Nur die ersten {n} offenen Einladungen werden angezeigt; es gibt mehr.",
   },
   roles: { owner: "Eigentümer", admin: "Administrator", member: "Mitglied", viewer: "Betrachter" },
   workspace: {

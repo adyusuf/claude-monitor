@@ -198,6 +198,7 @@ export const en = {
     pending: "Open invitations", noPending: "No open invitations.", remove: "Remove", leave: "Leave workspace",
     removeConfirm: "Remove this member from the workspace?", leaveConfirm: "Leave this workspace?",
     mailNotSent: "The invitation is saved, but its mail could not be sent. Send it again from the open invitations.", resend: "Send again", resent: "The invitation was sent again.",
+    truncated: "Only the first {n} members are shown; the workspace has more.", invitationsTruncated: "Only the first {n} open invitations are shown; there are more.",
   },
   roles: { owner: "Owner", admin: "Admin", member: "Member", viewer: "Viewer" },
   workspace: {

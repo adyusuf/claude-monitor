@@ -1,6 +1,7 @@
+import { config } from "../config";
 import { request, requestList } from "./client";
 import type {
-  ExecLevelChangeInput, ExecLevelView, AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  ExecLevelChangeInput, ExecLevelView, AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, CursorPage, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
@@ -55,9 +56,17 @@ export const api = {
   saveSettings: (id: string, settings: Partial<Settings>, opts: { code?: string; expectedUpdatedAt?: string } = {}) =>
     request<void>("PUT", `/workspaces/${id}/settings`, { ...settings, updatedAt: undefined, code: opts.code, expectedUpdatedAt: opts.expectedUpdatedAt }),
   members: (id: string) => request<Member[]>("GET", `/workspaces/${id}/members`),
+  /** The first members and whether the API cut the list (X-Truncated, F-060); the next ones come from memberPage. */
+  memberList: (id: string) => requestList<Member>(`/workspaces/${id}/members`),
+  memberPage: (id: string, cursor: string | null) =>
+    request<CursorPage<Member>>("GET", `/workspaces/${id}/members${q({ limit: config.cursorPageMax, cursor })}`),
   changeRole: (id: string, userId: string, role: Role) => request<void>("PATCH", `/workspaces/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => request<void>("DELETE", `/workspaces/${id}/members/${userId}`),
   invitations: (id: string) => request<Invitation[]>("GET", `/workspaces/${id}/invitations`),
+  /** The first open invitations and whether the API cut the list (X-Truncated, F-060); the next ones come from invitationPage. */
+  invitationList: (id: string) => requestList<Invitation>(`/workspaces/${id}/invitations`),
+  invitationPage: (id: string, cursor: string | null) =>
+    request<CursorPage<Invitation>>("GET", `/workspaces/${id}/invitations${q({ limit: config.cursorPageMax, cursor })}`),
   /** `mailSent` is false when the invitation is saved but its mail could not go out; an older server leaves it out (read as sent). */
   invite: (id: string, email: string, role: Role) => request<{ id: string; mailSent?: boolean }>("POST", `/workspaces/${id}/invitations`, { email, role }),
   resendInvitation: (id: string, invitationId: string) => request<{ mailSent: boolean }>("POST", `/workspaces/${id}/invitations/${invitationId}/resend`),
