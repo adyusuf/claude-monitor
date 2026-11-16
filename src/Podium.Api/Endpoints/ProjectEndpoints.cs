@@ -184,13 +184,15 @@ public static class ProjectEndpoints
     {
         var grant = await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
+        // Admins and owners of the workspace see each address; everyone else gets null in its place (F-225, as the workspace member list).
+        var seesEmail = Roles.Rank(grant.Member.Role) >= Roles.Rank(Roles.Admin);
         // Only people still in the workspace: a removed member is no longer listed, with or without a project row.
         var rows = await (from m in db.ProjectMembers.AsNoTracking()
                           join u in db.Users.AsNoTracking() on m.UserId equals u.Id
                           join w in db.WorkspaceMembers.AsNoTracking() on new { m.UserId, grant.Project.WorkspaceId } equals new { w.UserId, w.WorkspaceId }
                           where m.ProjectId == id && w.RemovedAt == null
                           orderby u.DisplayName
-                          select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
+                          select new ProjectMemberView(u.Id, u.DisplayName, seesEmail ? u.Email : null, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
         return Results.Ok(rows);
     }
 
