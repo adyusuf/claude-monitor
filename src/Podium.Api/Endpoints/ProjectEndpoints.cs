@@ -105,6 +105,8 @@ public static class ProjectEndpoints
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
         await db.Entry(project).ReloadAsync(http.RequestAborted);
+        // An archive that committed while this request waited for the lock is seen here (F-104).
+        if (project.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (ProjectRules.IsStale(req.ExpectedUpdatedAt, project.UpdatedAt)) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ProjectRules.StaleUpdate);
         // A mirrored project's name and purpose are the tool's while its connection lives (ADR-0015 §7); everything else about it is Podium's to edit.
         if (project.SourceConnectionId is not null && (req.Name?.Trim() != project.Name || ProjectRules.Clean(req.Purpose) != project.Purpose)
@@ -160,12 +162,21 @@ public static class ProjectEndpoints
         var project = grant.Project;
         if (project.SourceConnectionId is not { } connectionId) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.NotMirrored);
         if (await MirrorGate.StillMirroredAsync(db, connectionId, http.RequestAborted)) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.StillConnected);
+        // The sprints that mirror the connection are cut loose with the project, in one step with the project lock the sprint writes take: otherwise
+        // they stay refused as detached for good. The count goes into the audit.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
+        var sprints = await db.Sprints.Where(s => s.ProjectId == id && s.SourceConnectionId != null).ToListAsync(http.RequestAborted);
+        var sprintIds = sprints.Select(s => s.Id).ToList();
+        foreach (var sprint in sprints) sprint.SourceConnectionId = null;
         project.SourceConnectionId = null;
         project.UpdatedAt = clock.GetUtcNow();
         project.UpdatedBy = userId;
-        db.IntegrationLinks.RemoveRange(await db.IntegrationLinks.Where(l => l.Kind == LinkKinds.Project && l.LocalId == id).ToListAsync(http.RequestAborted));
-        Audit.Add(db, http, clock, AuditActions.ProjectDetached, project.WorkspaceId, userId, targetType: "project", targetId: id, detail: new { connectionId });
+        db.IntegrationLinks.RemoveRange(await db.IntegrationLinks
+            .Where(l => (l.Kind == LinkKinds.Project && l.LocalId == id) || (l.Kind == LinkKinds.Sprint && sprintIds.Contains(l.LocalId))).ToListAsync(http.RequestAborted));
+        Audit.Add(db, http, clock, AuditActions.ProjectDetached, project.WorkspaceId, userId, targetType: "project", targetId: id, detail: new { connectionId, sprints = sprints.Count });
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
@@ -173,13 +184,15 @@ public static class ProjectEndpoints
     {
         var grant = await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
+        // Admins and owners of the workspace see each address; everyone else gets null in its place (F-225, as the workspace member list).
+        var seesEmail = Roles.Rank(grant.Member.Role) >= Roles.Rank(Roles.Admin);
         // Only people still in the workspace: a removed member is no longer listed, with or without a project row.
         var rows = await (from m in db.ProjectMembers.AsNoTracking()
                           join u in db.Users.AsNoTracking() on m.UserId equals u.Id
                           join w in db.WorkspaceMembers.AsNoTracking() on new { m.UserId, grant.Project.WorkspaceId } equals new { w.UserId, w.WorkspaceId }
                           where m.ProjectId == id && w.RemovedAt == null
                           orderby u.DisplayName
-                          select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
+                          select new ProjectMemberView(u.Id, u.DisplayName, seesEmail ? u.Email : null, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
         return Results.Ok(rows);
     }
 

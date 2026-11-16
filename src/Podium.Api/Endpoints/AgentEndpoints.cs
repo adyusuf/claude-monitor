@@ -210,7 +210,7 @@ public static class AgentEndpoints
 
         if (!PermissionRequestKeys.Valid(req.ClientKey)) return Http.Invalid("clientKey", RunRules.BadClientKey);
         // The same ask sent again after a lost response (F-188) gets the request it made, never a second open one.
-        if (await PermissionRequestKeys.FindAsync(db, agentId, req.ClientKey, session.ExternalId, req.InlineAnswer, http.RequestAborted) is { } again) return Results.Ok(again);
+        if (await PermissionRequestKeys.FindAsync(db, agentId, req.ClientKey, req.InlineAnswer, http.RequestAborted) is { } again) return Results.Ok(again);
         var now = clock.GetUtcNow();
         var wait = Math.Clamp(req.WaitSeconds, 1, config.PermissionWaitMaxSeconds);
         var request = new PermissionRequest
@@ -266,7 +266,7 @@ public static class AgentEndpoints
             // and the rule use it counted are rolled back.
             await tx.RollbackAsync(http.RequestAborted);
             db.ChangeTracker.Clear();
-            return Results.Ok(await PermissionRequestKeys.FindAsync(db, agentId, req.ClientKey, session.ExternalId, req.InlineAnswer, http.RequestAborted));
+            return Results.Ok(await PermissionRequestKeys.FindAsync(db, agentId, req.ClientKey, req.InlineAnswer, http.RequestAborted));
         }
 
         broker.Publish(Broker.Workspace(session.WorkspaceId),

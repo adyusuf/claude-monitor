@@ -10,11 +10,11 @@ import { BacklogRow } from "./BacklogRow";
 const mirror = { externalKey: "SHOP-12", externalUrl: "https://acme.atlassian.net/browse/SHOP-12" };
 
 /** One backlog row, with spies for the three things it can ask for. */
-function row(issue: IssueSummary, canWrite = true) {
+function row(issue: IssueSummary, canWrite = true, mirrorActive = issue.externalKey !== null) {
   const actions = { onMove: vi.fn(), onArchive: vi.fn(), onRestore: vi.fn() };
   render(
     <I18nProvider initial="en">
-      <MemoryRouter><ul><BacklogRow ws="w1" issue={issue} unit="hours" canWrite={canWrite} canMove={canWrite} moving={false} first={false} last={false} {...actions} /></ul></MemoryRouter>
+      <MemoryRouter><ul><BacklogRow ws="w1" issue={issue} unit="hours" canWrite={canWrite} canMove={canWrite} mirrorActive={mirrorActive} moving={false} first={false} last={false} {...actions} /></ul></MemoryRouter>
     </I18nProvider>,
   );
   return actions;
@@ -44,6 +44,27 @@ describe("a backlog row of a mirrored issue", () => {
     row(issueSummary({ externalKey: "SHOP-12", externalUrl: "javascript:alert(1)" }));
     expect(screen.getByText("SHOP-12")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /SHOP-12/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("a backlog row of a mirrored issue whose connection is gone", () => {
+  it("shows the Archive button, which asks to archive, as the API allows it after a disconnect or a detach", async () => {
+    const actions = row(issueSummary(mirror), true, false);
+    expect(screen.getByRole("link", { name: "SHOP-12 ↗" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Archive #1" }));
+    expect(actions.onArchive).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the Restore button when archived, which asks to restore", async () => {
+    const actions = row(issueSummary({ ...mirror, archived: true }), true, false);
+    expect(screen.queryByRole("button", { name: /Archive/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Restore #1" }));
+    expect(actions.onRestore).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows neither button to a person who may not write", () => {
+    row(issueSummary(mirror), false, false);
+    expect(screen.queryByRole("button", { name: /Archive|Restore/ })).not.toBeInTheDocument();
   });
 });
 

@@ -137,7 +137,8 @@ public static class IntegrationImportEndpoints
 
     private static IResult PagingRefused(int? skip) => Http.Invalid(skip is < 0 ? "skip" : "take", InvalidPaging);
 
-    private static void MarkTruncated(HttpContext http, bool truncated)
+    /// <summary>Says on the response (<see cref="TruncatedHeader"/>) that a list was cut; the member and invitation lists use it too (F-060).</summary>
+    internal static void MarkTruncated(HttpContext http, bool truncated)
     {
         if (truncated) http.Response.Headers[TruncatedHeader] = "true";
     }

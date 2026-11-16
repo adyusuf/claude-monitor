@@ -23,6 +23,8 @@ export function WorkspaceSettingsPage() {
   const [form, setForm] = useState<{ name: string; maskSecrets: boolean; retentionDays: number; eventMaxBytes: number; agentUpdate: AgentUpdateMode; claudeUpdate: boolean }>(
     { name: "", maskSecrets: true, retentionDays: 90, eventMaxBytes: 262144, agentUpdate: "off", claudeUpdate: false });
   const [auditVersion, setAuditVersion] = useState(0);
+  // Both forms write the workspace's settings row: after this page saved, the remote card reads again so the time it sends is the new one.
+  const [remoteVersion, setRemoteVersion] = useState(0);
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const gate = useCodeGate("reauth_required", "workspace.codeHint");
 
@@ -66,6 +68,7 @@ export function WorkspaceSettingsPage() {
     setNotice(null);
     if (await gate.attempt(run)) {
       setAuditVersion((v) => v + 1);
+      setRemoteVersion((v) => v + 1);
       setNotice({ kind: "success", text: t("workspace.saved") });
     }
   };
@@ -143,7 +146,7 @@ export function WorkspaceSettingsPage() {
           id: "remote", label: t("remote.settingsTitle"),
           content: (
             <SettingsSection title={t("remote.settingsTitle")} hint={t("remote.settingsHint")}>
-              <RemoteSettingsCard ws={ws} canEdit={canEdit} titled={false} onSaved={reloadInfo} />
+              <RemoteSettingsCard key={remoteVersion} ws={ws} canEdit={canEdit} titled={false} onSaved={reloadInfo} />
             </SettingsSection>
           ),
         },
@@ -154,6 +157,7 @@ export function WorkspaceSettingsPage() {
               <AccessEnforcementCard ws={ws} enforce={info.settings.enforceAccessPolicies ?? false} canEdit={canEdit}
                 onChanged={() => {
                   setAuditVersion((v) => v + 1);
+      setRemoteVersion((v) => v + 1);
                   reloadInfo();
                 }} />
             </SettingsSection>

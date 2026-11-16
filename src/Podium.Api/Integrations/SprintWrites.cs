@@ -108,7 +108,15 @@ public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gat
         ArgumentNullException.ThrowIfNull(sprint);
         ArgumentNullException.ThrowIfNull(issues);
         var mirroredIssues = issues.Count(i => i.ExternalKey is not null);
-        if (sprint.SourceConnectionId is null) return mirroredIssues == 0 ? null : MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
+        if (sprint.SourceConnectionId is null)
+        {
+            // A local sprint takes no mirrored issue while its project is still mirrored; once the connection is gone or the project detached the
+            // issues keep their tool key but are Podium's (the rule follows the mirror, not the key).
+            var projectMirrored = mirroredIssues > 0
+                && await MirrorGate.StillMirroredAsync(db, await db.Projects.AsNoTracking().Where(p => p.Id == sprint.ProjectId).Select(p => p.SourceConnectionId).FirstOrDefaultAsync(ct), ct);
+            return projectMirrored ? MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope) : null;
+        }
+
         if (mirroredIssues != issues.Count) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.Scope);
         var keys = issues.Select(i => i.ExternalKey!).ToList();
         return await RunAsync(user, sprint, async (ctx, id) =>

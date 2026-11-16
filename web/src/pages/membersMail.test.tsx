@@ -55,4 +55,13 @@ describe("members: the invitation mail (F-047)", () => {
     await userEvent.click(screen.getByRole("button", { name: en.members.resend }));
     expect(await screen.findByText(en.members.mailNotSent)).toBeInTheDocument();
   });
+
+  it("names an invitation that cannot be sent again because its exact address was not kept", async () => {
+    mockApi({ ...base, "POST /workspaces/w1/invitations/i1/resend": { status: 409, body: { title: "invitation_address_unknown" } } });
+    renderAt("/w/w1/members", route);
+    await screen.findByText("Owner Person");
+    await openTab(/Invitations/);
+    await userEvent.click(screen.getByRole("button", { name: en.members.resend }));
+    expect(await screen.findByText(en.errors.invitation_address_unknown)).toBeInTheDocument();
+  });
 });

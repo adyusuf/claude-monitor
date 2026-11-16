@@ -126,12 +126,16 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
         foreach (var person in candidates)
         {
             var normalized = person.EmailNormalized!;
-            if (await HasOpenInvitationAsync(connection.WorkspaceId, normalized, now, ct)) continue;
+            // The address as the tool shows it is the mailbox (F-180): the row keeps it, the mail goes to it, and "already invited" is judged by its key.
+            var typed = person.Email!.Trim();
+            var key = EmailIdentity.Key(typed);
+            if (await HasOpenInvitationAsync(connection.WorkspaceId, normalized, key, now, ct)) continue;
             var token = Secrets.NewToken();
             var invitation = new WorkspaceInvitation
             {
                 WorkspaceId = connection.WorkspaceId,
                 EmailNormalized = normalized,
+                Email = typed,
                 Role = Roles.Viewer,
                 TokenHash = Secrets.Hash(token),
                 InvitedBy = connection.ConnectorUserId,
@@ -141,10 +145,10 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
             db.WorkspaceInvitations.Add(invitation);
             Audit.Add(db, null, clock, AuditActions.IntegrationInvited, connection.WorkspaceId, connection.ConnectorUserId, targetType: "invitation", targetId: invitation.Id);
             await db.SaveChangesAsync(ct);
-            var language = await db.Users.AsNoTracking().Where(u => u.EmailNormalized == normalized).Select(u => u.Language).FirstOrDefaultAsync(ct);
+            var language = await db.Users.AsNoTracking().Where(u => u.EmailKey == key).Select(u => u.Language).FirstOrDefaultAsync(ct);
             try
             {
-                await mailer.SendAsync(MailTemplates.Build(language is not null && MailTemplates.Languages.Contains(language) ? language : "en", "invite", person.Email!.Trim(),
+                await mailer.SendAsync(MailTemplates.Build(language is not null && MailTemplates.Languages.Contains(language) ? language : "en", "invite", typed,
                     Http.Link(config, "/invitations/accept", token), inviter.DisplayName, workspace.Name), ct);
                 person.InvitedAt = now;
                 sent++;
@@ -169,6 +173,11 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
         return sent;
     }
 
-    private Task<bool> HasOpenInvitationAsync(Guid workspaceId, string normalized, DateTimeOffset now, CancellationToken ct) =>
-        db.WorkspaceInvitations.AnyAsync(i => i.WorkspaceId == workspaceId && i.EmailNormalized == normalized && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now, ct);
+    /// <summary>Folding finds the candidates, the identity key decides (as the admin invite does); a row from before the typed address counts as the same.</summary>
+    private async Task<bool> HasOpenInvitationAsync(Guid workspaceId, string normalized, string? key, DateTimeOffset now, CancellationToken ct)
+    {
+        var open = await db.WorkspaceInvitations.AsNoTracking().Where(i => i.WorkspaceId == workspaceId && i.EmailNormalized == normalized
+            && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now).Select(i => i.Email).ToListAsync(ct);
+        return open.Any(e => e is null || EmailIdentity.Key(e) == key);
+    }
 }

@@ -42,7 +42,12 @@ public static class WorkspaceMemberList
 
         var page = await rows.OrderBy(r => r.DisplayName).ThenBy(r => r.Id).Take(take + 1).ToListAsync(http.RequestAborted);
         var shown = page.Take(take).Select(r => new MemberResponse(r.Id, r.DisplayName, seesEmail ? r.Email : null, r.Role, r.JoinedAt)).ToList();
-        if (!paged) return Results.Ok(shown);
+        if (!paged)
+        {
+            IntegrationImportEndpoints.MarkTruncated(http, page.Count > take);
+            return Results.Ok(shown);
+        }
+
         return Results.Ok(new CursorPage<MemberResponse>(shown, page.Count > take ? CursorOf(shown[^1]) : null));
     }
 
