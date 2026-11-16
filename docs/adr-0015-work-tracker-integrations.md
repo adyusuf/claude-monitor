@@ -101,7 +101,8 @@ A change in Podium to a mirrored row is sent to Jira with the acting user's own 
 | `POST /api/workspaces/{ws}/integrations/jira/connect { subdomain }` → `{ authorizeUrl }` | workspace admin or owner, recent sign-in |
 | `GET /api/integrations/jira/callback?code&state` | the user who started it (state) → redirects to the web |
 | `POST /api/integrations/{id}/account/connect` → `{ authorizeUrl }` (link my own account) | member of the workspace |
-| `DELETE /api/integrations/{id}` (disconnect: tokens and webhook go; imported rows stay, marked detached) | admin |
+| `DELETE /api/integrations/{id}` (disconnect: tokens and webhook go; imported rows stay, marked detached) | admin, recent sign-in or code window (F-081) |
+| `POST /api/integrations/{id}/disconnect` `{ code }` (the same disconnect, with the two-step code when the sign-in is not recent; the web uses it) | admin, recent sign-in or two-step code (F-081) |
 | `PUT /api/integrations/{id}` `{ autoInvite }` | admin |
 | `GET /api/integrations/{id}/spaces` (live list, with "imported" flags) | any member |
 | `POST /api/integrations/{id}/spaces/import { keys[] }` | admin or owner |

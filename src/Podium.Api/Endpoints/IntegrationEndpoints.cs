@@ -10,6 +10,7 @@ namespace Podium.Api.Endpoints;
 /// <summary>
 /// Work tracker connections (ADR-0015 §8): who connected which site, each person's own Atlassian account, and the sign-in round trip. Reading
 /// needs any workspace role; connecting a site, changing its settings and disconnecting need admin; linking one's own account needs member.
+/// Connecting and disconnecting (which deletes every person's tokens) also need a recent sign-in or a two-step code (F-081).
 /// </summary>
 public static class IntegrationEndpoints
 {
@@ -24,6 +25,7 @@ public static class IntegrationEndpoints
         g.MapGet("/integrations/jira/callback", Callback);
         g.MapPut("/integrations/{id:guid}", Settings);
         g.MapDelete("/integrations/{id:guid}", Disconnect);
+        g.MapPost("/integrations/{id:guid}/disconnect", DisconnectWithCode);
     }
 
     private static async Task<IResult> List(Guid ws, HttpContext http, PodiumDb db, IntegrationSettings settings)
@@ -128,11 +130,19 @@ public static class IntegrationEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Disconnect(Guid id, HttpContext http, PodiumDb db, TimeProvider clock, WebhookManager webhooks)
+    /// <summary>The old address, kept for old clients (#4): it carries no code, so it passes on a recent sign-in or the code window only.</summary>
+    private static Task<IResult> Disconnect(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, WebhookManager webhooks) =>
+        DisconnectAsync(id, null, http, db, config, clock, webhooks);
+
+    private static Task<IResult> DisconnectWithCode(Guid id, DisconnectRequest? req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock,
+        WebhookManager webhooks) => DisconnectAsync(id, req?.Code, http, db, config, clock, webhooks);
+
+    private static async Task<IResult> DisconnectAsync(Guid id, string? code, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, WebhookManager webhooks)
     {
         var me = http.User.UserId();
         var c = await db.IntegrationConnections.FirstOrDefaultAsync(x => x.Id == id && x.Status != ConnectionStatuses.Disconnected, http.RequestAborted);
         if (c is null || await Access.MemberAsync(db, me, c.WorkspaceId, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
+        if (!await RemoteChecks.ReauthAsync(http, db, config, clock, me, code)) return RemoteChecks.ReauthRefused(http);
         await webhooks.TryRemoveAsync(c, http.RequestAborted);
         var now = clock.GetUtcNow();
         c.Status = ConnectionStatuses.Disconnected;

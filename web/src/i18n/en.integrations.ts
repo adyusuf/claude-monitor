@@ -21,6 +21,7 @@ export const enIntegrations = {
   myAccountAgain: "Linked, sign in again", linkAccount: "Link my account", relink: "Sign in again",
   autoInvite: "Invite Jira people to Podium", autoInviteHint: "People with a visible e-mail address get an invitation as a viewer. Off by default.",
   syncNow: "Check now", syncing: "Checking…", disconnect: "Disconnect", disconnectConfirm: "Disconnect {site}? What was imported stays, but stops updating.",
+  disconnectSignIn: "Disconnecting a site needs a recent sign-in. Sign out, sign in again, and disconnect within 10 minutes.",
   spacesTitle: "Spaces", spacesHint: "Choose the Jira spaces to bring in as projects, with their backlog, epics and people.",
   loadSpaces: "Show Jira spaces", noSpaces: "This account sees no spaces.", imported: "Imported", importSelected: "Import selected ({n})",
   openProject: "Open project", sprintsOf: "Sprints…", selectSpace: "Select {name}", spacesLimit: "At most {n} spaces can be imported at once.",

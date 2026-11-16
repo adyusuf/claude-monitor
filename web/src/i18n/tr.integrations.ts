@@ -23,6 +23,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   myAccountAgain: "Bağlı, yeniden oturum açın", linkAccount: "Hesabımı bağla", relink: "Yeniden oturum aç",
   autoInvite: "Jira'daki kişileri Podium'a davet et", autoInviteHint: "E-postası görünen kişilere izleyici olarak davet gider. Varsayılan olarak kapalı.",
   syncNow: "Şimdi kontrol et", syncing: "Kontrol ediliyor…", disconnect: "Bağlantıyı kes", disconnectConfirm: "{site} bağlantısı kesilsin mi? İçe alınanlar kalır ama güncellenmez.",
+  disconnectSignIn: "Bir sitenin bağlantısını kesmek için yakın zamanda oturum açmış olmanız gerekir. Oturumu kapatın, yeniden açın ve 10 dakika içinde bağlantıyı kesin.",
   spacesTitle: "Alanlar", spacesHint: "Proje olarak almak istediğiniz Jira alanlarını seçin; backlog'u, epic'leri ve kişileri de gelir.",
   loadSpaces: "Jira alanlarını göster", noSpaces: "Bu hesap hiç alan görmüyor.", imported: "İçe alındı", importSelected: "Seçilenleri içe al ({n})",
   openProject: "Projeyi aç", sprintsOf: "Sprintler…", spacesLimit: "Bir seferde en fazla {n} alan içe alınabilir.", selectSpace: "{name} seç",

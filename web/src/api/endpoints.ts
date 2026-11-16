@@ -197,7 +197,8 @@ export const api = {
     request<{ authorizeUrl: string }>("POST", `/workspaces/${ws}/integrations/jira/connect`, { subdomain, code }),
   linkMyAccount: (id: string) => request<{ authorizeUrl: string }>("POST", `/integrations/${id}/account/connect`),
   setIntegration: (id: string, autoInvite: boolean) => request<void>("PUT", `/integrations/${id}`, { autoInvite }),
-  disconnectIntegration: (id: string) => request<void>("DELETE", `/integrations/${id}`),
+  /** Disconnecting needs a recent sign-in or a two-step code (F-081): the code goes in the body of the POST address. */
+  disconnectIntegration: (id: string, code?: string) => request<void>("POST", `/integrations/${id}/disconnect`, { code }),
   integrationSpaces: (id: string) => request<SpaceView[]>("GET", `/integrations/${id}/spaces`),
   importSpaces: (id: string, keys: string[]) => request<SpaceImportResult[]>("POST", `/integrations/${id}/spaces/import`, { keys }),
   integrationSprints: (id: string, key: string) => request<SprintChoice[]>("GET", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints`),

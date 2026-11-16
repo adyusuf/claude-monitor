@@ -23,6 +23,7 @@ export const deIntegrations: Dictionary["integrations"] = {
   myAccountAgain: "Verknüpft, erneut anmelden", linkAccount: "Mein Konto verknüpfen", relink: "Erneut anmelden",
   autoInvite: "Jira-Personen zu Podium einladen", autoInviteHint: "Personen mit sichtbarer E-Mail-Adresse werden als Betrachter eingeladen. Standardmäßig aus.",
   syncNow: "Jetzt prüfen", syncing: "Prüfe…", disconnect: "Trennen", disconnectConfirm: "{site} trennen? Das Importierte bleibt, wird aber nicht mehr aktualisiert.",
+  disconnectSignIn: "Zum Trennen einer Site ist eine aktuelle Anmeldung nötig. Melden Sie sich ab, wieder an und trennen Sie innerhalb von 10 Minuten.",
   spacesTitle: "Bereiche", spacesHint: "Wählen Sie die Jira-Bereiche, die als Projekte übernommen werden, mit Backlog, Epics und Personen.",
   loadSpaces: "Jira-Bereiche anzeigen", noSpaces: "Dieses Konto sieht keine Bereiche.", imported: "Importiert", importSelected: "Auswahl importieren ({n})",
   openProject: "Projekt öffnen", sprintsOf: "Sprints…", spacesLimit: "Es können höchstens {n} Bereiche auf einmal importiert werden.", selectSpace: "{name} auswählen",
