@@ -69,6 +69,7 @@ export const en = {
     bad_template: "That command template is not valid for this machine: the program must be a full path, and some programs can never be granted.",
     grant_conflict: "A grant for that template already exists.", invalid_reason: "That reason is too long.", not_member: "That person is not a member of this workspace.",
     already_member: "That person is already a member with this role or a higher one.", invitation_pending: "That address already has an open invitation. Revoke it to send a new one.",
+    member_has_issues: "Issues are still assigned to this person, archived ones included. Reassign them first.",
     invalid_machine_role: "Pick an environment and a function from the lists.",
     totp_required: "This machine is production or a database: you need two-step sign-in to allow this here.",
     approval_required: "This machine only runs what a pinned key signed. Make a key on your account page and allow again.",

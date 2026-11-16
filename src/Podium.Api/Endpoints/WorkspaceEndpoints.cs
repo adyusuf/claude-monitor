@@ -150,6 +150,7 @@ public static class WorkspaceEndpoints
 
         // The role they already hold: nothing changes, so nothing is written to the audit log.
         if (target.Role == req.Role) return Results.NoContent();
+        if (MemberIssueGuard.LowersBelowMember(target.Role, req.Role) && await MemberIssueGuard.RefuseAsync(db, id, userId, http.RequestAborted) is { } assigned) return assigned;
         var before = target.Role;
         target.Role = req.Role;
         Audit.Add(db, http, clock, AuditActions.RoleChanged, id, actor.UserId, targetType: "user", targetId: userId,
@@ -187,6 +188,7 @@ public static class WorkspaceEndpoints
         if (target.Role == Roles.Owner && self != userId && actor.Role != Roles.Owner) return Results.Forbid();
         if (target.Role == Roles.Owner && await LastOwnerAsync(db, id, http.RequestAborted)) return Http.Invalid("userId", "last_owner");
 
+        if (await MemberIssueGuard.RefuseAsync(db, id, userId, http.RequestAborted) is { } assigned) return assigned;
         target.RemovedAt = now;
         Audit.Add(db, http, clock, AuditActions.MemberRemoved, id, self, targetType: "user", targetId: userId);
         var agents = await RevokeAgentsAsync(db, http, clock, id, userId, self, now);
