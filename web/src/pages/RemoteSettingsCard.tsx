@@ -17,7 +17,7 @@ const CAP_MAX = 64;
 const inRange = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
 
 /** The workspace's remote-work switch and alert thresholds (ADR-0005). Any member reads; only an admin changes them. */
-export function RemoteSettingsCard({ ws, canEdit, titled = true }: { ws: string; canEdit: boolean; titled?: boolean }) {
+export function RemoteSettingsCard({ ws, canEdit, titled = true, onSaved }: { ws: string; canEdit: boolean; titled?: boolean; onSaved?: () => void }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [form, setForm] = useState<RemoteSettings | null>(null);
@@ -53,10 +53,12 @@ export function RemoteSettingsCard({ ws, canEdit, titled = true }: { ws: string;
     if (!pctOk || !capOk || !inRange(form.alertSustainSeconds, SUSTAIN_MIN, SUSTAIN_MAX)) return setNotice({ kind: "error", text: t("errors.out_of_range") });
     if (saved?.remoteRunsEnabled && !form.remoteRunsEnabled && !window.confirm(t("remote.disableConfirm"))) return;
     try {
-      const stored = await api.saveRemoteSettings(ws, form);
+      // The time this card read the settings goes with the save: one saved after someone else's is refused (stale_update).
+      const stored = await api.saveRemoteSettings(ws, form, saved?.updatedAt);
       setForm(stored);
       setSaved(stored);
       setNotice({ kind: "success", text: t("workspace.saved") });
+      onSaved?.();
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
     }

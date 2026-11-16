@@ -116,7 +116,7 @@ export const de: Dictionary = {
     invalid_first_prompt: "Die erste Eingabe ist ein Text mit 1 bis 2000 Zeichen.", claude_folder_not_trusted: "Claude Code vertraut diesem Ordner noch nicht: Öffnen Sie Claude dort einmal an der Maschine und bestätigen Sie die Vertrauensfrage.",
     claude_start_pending: "Ein anderer Start auf dieser Maschine wartet noch: Versuchen Sie es erneut, wenn er fertig ist.",
     set_on_server: "Dieser Wert ist auf dem Server selbst gesetzt und lässt sich hier nicht ändern.", integration_key_missing: "Auf dem Server fehlt der Integrationsschlüssel, daher kann dies nicht gespeichert werden.",
-    settings_conflict: "Jemand anderes hat dies im selben Moment gespeichert. Laden Sie die Seite neu und versuchen Sie es erneut.", mail_failed: "Die Test-E-Mail konnte nicht gesendet werden. Prüfen Sie die Einstellungen des Mailservers.", no_email: "Ihr Konto hat keine E-Mail-Adresse, an die die Test-E-Mail gehen kann.",
+    settings_conflict: "Jemand anderes hat dies im selben Moment gespeichert. Laden Sie die Seite neu und versuchen Sie es erneut.", stale_update: "Jemand anderes hat diese Einstellungen geändert, nachdem Sie die Seite geöffnet haben. Laden Sie die Seite neu, um sie zu sehen, und nehmen Sie Ihre Änderung dann erneut vor.", mail_failed: "Die Test-E-Mail konnte nicht gesendet werden. Prüfen Sie die Einstellungen des Mailservers.", no_email: "Ihr Konto hat keine E-Mail-Adresse, an die die Test-E-Mail gehen kann.",
   },
   status: { active: "Arbeitet", idle: "Untätig", waiting: "Braucht Sie", ended: "Beendet" },
   time: { now: "jetzt", s: "s", m: "min", h: "h", d: "T" },

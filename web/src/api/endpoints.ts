@@ -49,8 +49,8 @@ export const api = {
   workspace: (id: string) => request<WorkspaceInfo>("GET", `/workspaces/${id}`),
   renameWorkspace: (id: string, name: string) => request<void>("PATCH", `/workspaces/${id}`, { name }),
   /** The code is the two-step code a recent sign-in may be replaced by (lowering the retention, turning masking off). */
-  saveSettings: (id: string, settings: Partial<Settings>, code?: string) =>
-    request<void>("PUT", `/workspaces/${id}/settings`, code ? { ...settings, code } : settings),
+  saveSettings: (id: string, settings: Partial<Settings>, opts: { code?: string; expectedUpdatedAt?: string } = {}) =>
+    request<void>("PUT", `/workspaces/${id}/settings`, { ...settings, updatedAt: undefined, code: opts.code, expectedUpdatedAt: opts.expectedUpdatedAt }),
   members: (id: string) => request<Member[]>("GET", `/workspaces/${id}/members`),
   changeRole: (id: string, userId: string, role: Role) => request<void>("PATCH", `/workspaces/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => request<void>("DELETE", `/workspaces/${id}/members/${userId}`),
@@ -134,7 +134,8 @@ export const api = {
   resumeSchedule: (id: string, code?: string) => request<void>("POST", `/schedules/${id}/resume`, { code }),
   endSchedule: (id: string) => request<void>("POST", `/schedules/${id}/end`),
   remoteSettings: (id: string) => request<RemoteSettings>("GET", `/workspaces/${id}/remote-settings`),
-  saveRemoteSettings: (id: string, settings: RemoteSettings) => request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, settings),
+  saveRemoteSettings: (id: string, settings: RemoteSettings, expectedUpdatedAt?: string) =>
+    request<RemoteSettings>("PUT", `/workspaces/${id}/remote-settings`, { ...settings, updatedAt: undefined, expectedUpdatedAt }),
   projects: (ws: string, opts: { q?: string; status?: string; cursor?: string | null; limit?: number }) =>
     request<Page<ProjectSummary>>("GET", `/workspaces/${ws}/projects${q(opts)}`),
   createProject: (ws: string, input: ProjectInput) => request<ProjectView>("POST", `/workspaces/${ws}/projects`, input),

@@ -11,12 +11,14 @@ namespace Podium.Api.Endpoints;
 public sealed record NameRequest(string? Name);
 public sealed record WorkspaceResponse(Guid Id, string Name, string Role, SettingsResponse Settings);
 /// <param name="EnforceAccessPolicies">ADR-0020 §4 rule 4: a run whose repository has no access policy, or that names none, gets the default.</param>
+/// <param name="UpdatedAt">When the settings were last saved: a page sends it back as <c>expectedUpdatedAt</c> so a save after someone else's is refused (F-049). Not part of the audit rows.</param>
 public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes, string AgentUpdate = UpdateModes.Off,
-    bool ClaudeUpdate = false, bool EnforceAccessPolicies = false);
+    bool ClaudeUpdate = false, bool EnforceAccessPolicies = false, DateTimeOffset? UpdatedAt = null);
 
 /// <param name="Code">The two-step code re-authentication may need when EnforceAccessPolicies changes, the retention days are lowered or masking is turned off.</param>
+/// <param name="ExpectedUpdatedAt">The <c>updatedAt</c> the page read; when it no longer matches the save is 409 stale_update. Absent: no check, as before.</param>
 public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes, string? AgentUpdate = null,
-    bool? ClaudeUpdate = null, bool? EnforceAccessPolicies = null, string? Code = null);
+    bool? ClaudeUpdate = null, bool? EnforceAccessPolicies = null, string? Code = null, DateTimeOffset? ExpectedUpdatedAt = null);
 public sealed record MemberResponse(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset JoinedAt);
 public sealed record RoleRequest(string? Role);
 
@@ -54,7 +56,7 @@ public static class WorkspaceEndpoints
         if (member is null) return Http.NotFound();
         var workspace = await db.Workspaces.AsNoTracking().FirstAsync(w => w.Id == id, http.RequestAborted);
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, View(s)));
+        return Results.Ok(new WorkspaceResponse(id, workspace.Name, member.Role, View(s) with { UpdatedAt = s.UpdatedAt }));
     }
 
     private static async Task<IResult> Rename(Guid id, NameRequest req, HttpContext http, PodiumDb db, TimeProvider clock)
@@ -87,13 +89,20 @@ public static class WorkspaceEndpoints
         if (req.AgentUpdate is not null && !UpdateModes.IsValid(req.AgentUpdate)) return Http.Invalid("agentUpdate", "invalid_mode");
 
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
-        var before = View(s);
-        var enforce = req.EnforceAccessPolicies is { } wanted && wanted != s.EnforceAccessPolicies ? wanted : (bool?)null;
-        if ((enforce is not null || WorkspaceSettingsRules.NeedsReauth(s, req)) && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code))
-        {
-            return RemoteChecks.ReauthRefused(http);
-        }
+        bool? Enforce() => req.EnforceAccessPolicies is { } wanted && wanted != s.EnforceAccessPolicies ? wanted : null;
+        bool NeedsReauth() => Enforce() is not null || WorkspaceSettingsRules.NeedsReauth(s, req);
+        var reauthed = NeedsReauth();
+        if (reauthed && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused(http);
 
+        // The row is locked and read again: a save from a page loaded before another one is refused, and what the re-authentication above judged
+        // is judged once more against what is stored now (a concurrent save may have made this one a lowering).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await WorkspaceSettingsRules.LockAsync(db, id, http.RequestAborted);
+        await db.Entry(s).ReloadAsync(http.RequestAborted);
+        if (WorkspaceSettingsRules.IsStale(s.UpdatedAt, req.ExpectedUpdatedAt)) return WorkspaceSettingsRules.Stale();
+        if (!reauthed && NeedsReauth()) return RemoteChecks.ReauthRefused(http);
+        var before = View(s);
+        var enforce = Enforce();
         s.MaskSecrets = req.MaskSecrets ?? s.MaskSecrets;
         s.RetentionDays = req.RetentionDays ?? s.RetentionDays;
         s.EventMaxBytes = req.EventMaxBytes ?? s.EventMaxBytes;
@@ -110,6 +119,7 @@ public static class WorkspaceEndpoints
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 

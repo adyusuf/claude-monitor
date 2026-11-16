@@ -35,6 +35,9 @@ export function WorkspaceSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws]);
 
+  // The workspace is read again after another form saved: its saved time is what the next save of this page must send.
+  const reloadInfo = () => void api.workspace(ws).then(setInfo).catch((e: unknown) => setNotice({ kind: "error", text: errorText(e) }));
+
   // Two calls: a name already saved stays saved when the settings after it fail, so the page and the session learn it at once.
   const run = async (code?: string) => {
     let renamed = false;
@@ -44,8 +47,10 @@ export function WorkspaceSettingsPage() {
         renamed = true;
         setInfo((old) => (old ? { ...old, name: form.name } : old));
       }
-      await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes, agentUpdate: form.agentUpdate, claudeUpdate: form.claudeUpdate }, code);
-      setInfo((old) => (old ? { ...old, settings: { ...old.settings, maskSecrets: form.maskSecrets, retentionDays: form.retentionDays } } : old));
+      // The page sends the time it read the settings: a save after someone else's is refused (stale_update) instead of overwriting it.
+      await api.saveSettings(ws, { maskSecrets: form.maskSecrets, retentionDays: form.retentionDays, eventMaxBytes: form.eventMaxBytes, agentUpdate: form.agentUpdate, claudeUpdate: form.claudeUpdate },
+        { code, expectedUpdatedAt: info?.settings.updatedAt });
+      setInfo(await api.workspace(ws));
       await refresh();
     } catch (e) {
       if (renamed) await refresh();
@@ -138,7 +143,7 @@ export function WorkspaceSettingsPage() {
           id: "remote", label: t("remote.settingsTitle"),
           content: (
             <SettingsSection title={t("remote.settingsTitle")} hint={t("remote.settingsHint")}>
-              <RemoteSettingsCard ws={ws} canEdit={canEdit} titled={false} />
+              <RemoteSettingsCard ws={ws} canEdit={canEdit} titled={false} onSaved={reloadInfo} />
             </SettingsSection>
           ),
         },
@@ -149,7 +154,7 @@ export function WorkspaceSettingsPage() {
               <AccessEnforcementCard ws={ws} enforce={info.settings.enforceAccessPolicies ?? false} canEdit={canEdit}
                 onChanged={() => {
                   setAuditVersion((v) => v + 1);
-                  void api.workspace(ws).then(setInfo).catch((e: unknown) => setNotice({ kind: "error", text: errorText(e) }));
+                  reloadInfo();
                 }} />
             </SettingsSection>
           ),

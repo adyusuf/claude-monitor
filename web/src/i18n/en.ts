@@ -115,7 +115,7 @@ export const en = {
     invalid_first_prompt: "The first prompt is 1 to 2000 characters of text.", claude_folder_not_trusted: "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt.",
     claude_start_pending: "Another start on this machine is still waiting: try again when it has finished.",
     set_on_server: "This value is set on the server itself and cannot be changed here.", integration_key_missing: "The integration key is missing on the server, so this cannot be saved.",
-    settings_conflict: "Someone else saved this at the same moment. Reload the page and try again.", mail_failed: "The test mail could not be sent. Check the mail server settings.", no_email: "Your account has no e-mail address to send the test mail to.",
+    settings_conflict: "Someone else saved this at the same moment. Reload the page and try again.", stale_update: "Someone else changed these settings after you opened this page. Reload the page to see them, then make your change again.", mail_failed: "The test mail could not be sent. Check the mail server settings.", no_email: "Your account has no e-mail address to send the test mail to.",
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", s: "s", m: "m", h: "h", d: "d" },

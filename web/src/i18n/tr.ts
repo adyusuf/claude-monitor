@@ -116,7 +116,7 @@ export const tr: Dictionary = {
     invalid_first_prompt: "İlk istem 1 ile 2000 karakterlik metin olmalı.", claude_folder_not_trusted: "Claude Code bu klasöre henüz güvenmiyor: makinede orada bir kez Claude'u açıp güven sorusunu onaylayın.",
     claude_start_pending: "Bu makinede başka bir başlatma hâlâ bekliyor: bitince yeniden deneyin.",
     set_on_server: "Bu değer sunucunun kendisinde tanımlı ve burada değiştirilemez.", integration_key_missing: "Sunucuda entegrasyon anahtarı eksik, bu yüzden bu kaydedilemez.",
-    settings_conflict: "Başka biri bunu aynı anda kaydetti. Sayfayı yenileyip yeniden deneyin.", mail_failed: "Deneme e-postası gönderilemedi. E-posta sunucusu ayarlarını kontrol edin.", no_email: "Hesabınızda deneme e-postasının gönderileceği bir adres yok.",
+    settings_conflict: "Başka biri bunu aynı anda kaydetti. Sayfayı yenileyip yeniden deneyin.", stale_update: "Siz bu sayfayı açtıktan sonra başka biri bu ayarları değiştirdi. Değişiklikleri görmek için sayfayı yenileyin, sonra değişikliğinizi yeniden yapın.", mail_failed: "Deneme e-postası gönderilemedi. E-posta sunucusu ayarlarını kontrol edin.", no_email: "Hesabınızda deneme e-postasının gönderileceği bir adres yok.",
   },
   status: { active: "Çalışıyor", idle: "Boşta", waiting: "Sizi bekliyor", ended: "Bitti" },
   time: { now: "şimdi", s: "sn", m: "dk", h: "sa", d: "g" },
