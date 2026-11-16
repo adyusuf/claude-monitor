@@ -101,16 +101,29 @@ public static class InvitationEndpoints
         return Results.Ok(new { mailSent = await InvitationMail.TrySendAsync(http, db, config, mailer, logs, invitation, token, userId) });
     }
 
-    private static async Task<IResult> List(Guid id, HttpContext http, PodiumDb db, TimeProvider clock)
+    /// <summary>
+    /// The open invitations, newest first (the id breaks equal times). With neither <paramref name="limit"/> nor <paramref name="cursor"/>
+    /// the answer is the plain array it always was, capped at <see cref="WorkspaceMemberList.ListMax"/>; with either it is a
+    /// <see cref="CursorPage{T}"/> (F-060).
+    /// </summary>
+    private static async Task<IResult> List(Guid id, int? limit, string? cursor, HttpContext http, PodiumDb db, TimeProvider clock, ApiConfig config)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         var now = clock.GetUtcNow();
-        var open = await db.WorkspaceInvitations.AsNoTracking()
-            .Where(i => i.WorkspaceId == id && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now)
-            .OrderByDescending(i => i.CreatedAt)
-            .Select(i => new InvitationResponse(i.Id, i.Email ?? i.EmailNormalized, i.Role, i.CreatedAt, i.ExpiresAt))
-            .ToListAsync(http.RequestAborted);
-        return Results.Ok(open);
+        var paged = limit is not null || cursor is not null;
+        var take = paged ? Http.Limit(limit, config) : WorkspaceMemberList.ListMax;
+        var query = db.WorkspaceInvitations.AsNoTracking()
+            .Where(i => i.WorkspaceId == id && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now);
+        if (Cursor.Parse(cursor) is { } after)
+        {
+            query = query.Where(i => i.CreatedAt < after.At || (i.CreatedAt == after.At && i.Id.CompareTo(after.Id) < 0));
+        }
+
+        var page = await query.OrderByDescending(i => i.CreatedAt).ThenByDescending(i => i.Id).Take(take + 1).ToListAsync(http.RequestAborted);
+        var shown = page.Take(take).ToList();
+        var rows = shown.Select(i => new InvitationResponse(i.Id, i.Email ?? i.EmailNormalized, i.Role, i.CreatedAt, i.ExpiresAt)).ToList();
+        if (!paged) return Results.Ok(rows);
+        return Results.Ok(new CursorPage<InvitationResponse>(rows, page.Count > take ? Cursor.Of(shown[^1].CreatedAt, shown[^1].Id) : null));
     }
 
     private static async Task<IResult> Revoke(Guid id, Guid invitationId, HttpContext http, PodiumDb db, TimeProvider clock)
