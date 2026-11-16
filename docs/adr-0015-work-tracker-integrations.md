@@ -116,6 +116,8 @@ A change in Podium to a mirrored row is sent to Jira with the acting user's own 
 | `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |
 | `POST /api/integrations/jira/webhook/{connectionId}` | the JWT only |
 
+The same `skip` and `X-Truncated: true` serve the machine lists outside this ADR (F-024): `GET /api/workspaces/{id}/agents?skip` and `GET /api/workspaces/{id}/machines?skip` answer at most 500 rows as a bare array, ordered with the agent id as the last tiebreak so pages neither overlap nor miss a row; a negative `skip` is 400 `invalid_paging`, a list of up to 500 rows without `skip` answers as before.
+
 Errors are i18n keys. Audit rows (`integration.*`) name ids and counts, never Jira text or tokens.
 
 ## 8a. Built differently from the plan
