@@ -56,6 +56,8 @@ internal static class PodiumDbModelIntegrations
         b.Entity<IntegrationPerson>(e =>
         {
             e.HasIndex(x => new { x.ConnectionId, x.ExternalAccountId }).IsUnique();
+            // A member stands for one person of a connection (F-068): the check in code, made race-proof.
+            e.HasIndex(x => new { x.ConnectionId, x.UserId }).IsUnique().HasFilter("user_id IS NOT NULL").HasDatabaseName("ux_integration_people_user");
             e.HasIndex(x => x.UserId);
             e.HasIndex(x => x.EmailNormalized);
             e.HasOne<IntegrationConnection>().WithMany().HasForeignKey(x => x.ConnectionId).OnDelete(DeleteBehavior.Restrict);

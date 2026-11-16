@@ -1447,6 +1447,11 @@ namespace Podium.Api.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_integration_people_connection_id_external_account_id");
 
+                    b.HasIndex("ConnectionId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_integration_people_user")
+                        .HasFilter("user_id IS NOT NULL");
+
                     b.ToTable("integration_people");
                 });
 
