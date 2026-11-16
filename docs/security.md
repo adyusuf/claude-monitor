@@ -57,6 +57,12 @@ User codes are formatted "BCDF-GHJK" (8 letters from 20 consonants, 34 bits) wit
 | CodeQL `cs/sensitive-data-transmission` (4.3, below the blocking band) | `Mail/Mailer.cs`: the mail body carries a token | It is the verification, reset or invitation link: sending that token to the account's own mailbox is the design. The token is single-use, expires, and is stored only hashed. |
 | ESLint `react-hooks/set-state-in-effect` (switched off in `web/eslint.config.js`) | pages load from the API in an effect | State is set only after the response arrives (an async callback), React's documented fetch pattern; the rule cannot see the `await`. |
 
+## Known limits
+
+| Limit | What it means | Why it stays |
+|---|---|---|
+| Hash-to-start gap of a pinned executable (ADR-0020 §4 rule 5) | An access layer that lists an application with a SHA-256 is checked by hashing the file at the moment the run is decided (`ExecutableHashes.Of`, read from the file every time, no cache). Between that hash and the moment the operating system starts the process, a person or process that may write the file can swap it, and the swapped file runs. | Hashing the file and starting it are two steps, and the operating system offers no portable way to start exactly the bytes that were hashed (executing an open handle in place is not available the same way on every platform the agent runs on). The window is bounded: only an account that can already write the executable can use it, and the run still obeys every folder, shell and ceiling rule. Decision of 16/11/2026: documented as a known limit, no code change. Pin an executable that sits in a folder only administrators may write. |
+
 ## Reporting a problem
 
 Open an issue that says only that you found one; the details are exchanged privately.
