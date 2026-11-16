@@ -1,7 +1,8 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionRow } from "../api/types";
+import { config } from "../config";
 import { FakeEventSource, ME, mockApi, openMachine, renderAt } from "../test/helpers";
 import { SessionsPage } from "./SessionsPage";
 
@@ -80,14 +81,22 @@ describe("a live reload that was already scheduled when the filter changed", () 
     await openMachine("laptop-1");
     expect(await screen.findByText("Row of all")).toBeInTheDocument();
 
-    act(() => FakeEventSource.last?.emit("session", { sessionId: "s1" })); // the reload is due in config.liveDebounceMs
-    await userEvent.click(screen.getByRole("button", { name: "Ended" })); // the new filter reads at once
-    const reads = asked.length;
-    await act(() => new Promise((resolve) => setTimeout(resolve, 700))); // past the debounce
+    // A fake clock, not a real wait: the debounce is stepped past exactly, so the old reload is due while the test looks.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+    const readsAtClick: number[] = [];
+    try {
+      act(() => FakeEventSource.last?.emit("session", { sessionId: "s1" })); // the reload is due in config.liveDebounceMs
+      fireEvent.click(screen.getByRole("button", { name: "Ended" })); // the new filter reads at once
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      readsAtClick.push(asked.length);
+      await act(async () => { await vi.advanceTimersByTimeAsync(config.liveDebounceMs + 1); }); // past the debounce
+    } finally {
+      vi.useRealTimers();
+    }
 
     await waitFor(() => expect(screen.getByText("Ended row")).toBeInTheDocument());
     expect(screen.queryByText("Row of all")).toBeNull();
-    expect(asked.slice(reads - 1)).not.toContain(""); // no read with the old filter after the click
+    expect(asked.slice((readsAtClick[0] ?? 1) - 1)).not.toContain(""); // no read with the old filter after the click
   });
 });
 
