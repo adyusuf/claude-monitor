@@ -28,7 +28,8 @@ internal static class ApprovalRuleCreation
     {
         var agent = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == request.AgentId, http.RequestAborted);
         if (agent is null || agent.UserId != userId || agent.Status != AgentStatuses.Active || agent.WorkspaceId != request.WorkspaceId || ApprovalRules.Strict(agent)
-            || ApprovalRules.ScopeOf(request.ToolName, request.ToolInput.RootElement) is not { } scope)
+            || ApprovalRules.ScopeOf(request.ToolName, request.ToolInput.RootElement) is not { } scope
+            || !await ApprovalRuleFloor.HoldsAsync(db, userId, request.WorkspaceId, http.RequestAborted)) // a viewer answers once, never remembers (F-163)
         {
             return (Results.Problem(statusCode: StatusCodes.Status409Conflict, title: CommandEndpoints.RuleNotAllowed), null, null);
         }

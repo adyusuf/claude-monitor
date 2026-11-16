@@ -22,7 +22,9 @@ public sealed record PermissionRow(Guid Id, string ToolName, System.Text.Json.Js
     DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, string? Decision, string? Reason, DateTimeOffset? AnsweredAt, bool ContentRemoved = false);
 /// <param name="Remember">How long the allow stands for the same tool on the same machine (<see cref="ApprovalDurations"/>; ADR-0019); null is once.</param>
 /// <param name="Code">The two-step code an <c>always</c> rule may need (re-authentication).</param>
-public sealed record AnswerRequest(string? Decision, string? Reason, Dictionary<string, string>? Answers = null, string? Remember = null, string? Code = null);
+/// <param name="Other">The question tool's typed answers (question text to text; Q-2): <c>Answers</c> holds only offered options, this the "Other" text, which the agent wraps as a message from the web.</param>
+public sealed record AnswerRequest(string? Decision, string? Reason, Dictionary<string, string>? Answers = null, string? Remember = null, string? Code = null,
+    Dictionary<string, string>? Other = null);
 
 /// <summary>
 /// Commands to a session and answers to its permission requests. Anyone in the workspace may READ them; only the
@@ -155,7 +157,8 @@ public static class CommandEndpoints
         if (!PermissionDecisions.All.Contains(req.Decision ?? "")) return Http.Invalid("decision", "invalid_decision");
         if (req.Reason is { Length: > ReasonMax }) return Http.Invalid("reason", "too_long");
         if (!StorableText.Plain(req.Reason)) return Http.Invalid("reason", "invalid_reason");
-        if (req.Answers is not null && !AnswersFit(request, req.Decision!, req.Answers)) return Http.Invalid("answers", "invalid_answers");
+        var (answersError, answers) = QuestionAnswerCheck.Check(request, req.Decision!, req.Answers, req.Other);
+        if (answersError is not null) return Http.Invalid("answers", answersError);
         var remember = req.Remember ?? ApprovalDurations.Once;
         if (!ApprovalDurations.All.Contains(remember)) return Http.Invalid("remember", "invalid_duration");
         if (remember != ApprovalDurations.Once && req.Decision != PermissionDecisions.Allow) return Http.Invalid("remember", RuleNotAllowed);
@@ -174,6 +177,7 @@ public static class CommandEndpoints
 
         var decision = req.Decision!;
         var reason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim();
+        var storedAnswers = answers is null ? null : JsonSerializer.Serialize(answers); // kept so the obsolete poll returns them too (F-196)
         Audit.Add(db, http, clock, AuditActions.PermissionAnswered, request.WorkspaceId, userId, targetType: "permission_request",
             targetId: id, detail: new { Decision = decision, request.ToolName });
         // The answer, a new rule or the change to an existing one, and their audit rows are saved together or not at all: an answer that is
@@ -188,7 +192,8 @@ public static class CommandEndpoints
                 var answered = await db.PermissionRequests
                     .Where(p => p.Id == id && p.Status == PermissionStatuses.Open && p.ExpiresAt > now)
                     .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PermissionStatuses.Answered).SetProperty(p => p.Decision, decision)
-                        .SetProperty(p => p.Reason, reason).SetProperty(p => p.AnsweredBy, userId).SetProperty(p => p.AnsweredAt, now), http.RequestAborted);
+                        .SetProperty(p => p.Reason, reason).SetProperty(p => p.AnsweredBy, userId).SetProperty(p => p.AnsweredAt, now)
+                        .SetProperty(p => p.Answers, storedAnswers), http.RequestAborted);
                 if (answered != 1)
                 {
                     await tx.RollbackAsync(http.RequestAborted);
@@ -223,7 +228,7 @@ public static class CommandEndpoints
         }
 
         broker.Publish(Broker.Agent(request.AgentId), new StreamMessage(AgentStreamEvents.PermissionAnswer,
-            new PermissionAnswerMessage(id, found.Session.ExternalId, decision, reason, req.Answers)));
+            new PermissionAnswerMessage(id, found.Session.ExternalId, decision, reason, answers)));
         broker.Publish(Broker.Workspace(request.WorkspaceId), new StreamMessage("permission", new { sessionId = request.SessionId, id, status = PermissionStatuses.Answered }));
         return Results.NoContent();
     }
@@ -233,25 +238,4 @@ public static class CommandEndpoints
 
     /// <summary>A path tool's path is not inside the project's access (ADR-0020 §4): the request is answered once, never remembered.</summary>
     public const string RuleOutsideAccess = "rule_outside_access";
-
-    /// <summary>
-    /// Answers are chosen options, so they are accepted only for the question tool, only with an allow, only for the
-    /// questions the request really carries, and each as short text: the web can never put other input into a tool call.
-    /// </summary>
-    private static bool AnswersFit(PermissionRequest request, string decision, Dictionary<string, string> answers)
-    {
-        if (request.ToolName != QuestionTools.AskUserQuestion || decision != PermissionDecisions.Allow) return false;
-        if (answers.Count is 0 or > QuestionsMax) return false;
-        var asked = new HashSet<string>();
-        if (request.ToolInput.RootElement.ValueKind == JsonValueKind.Object && request.ToolInput.RootElement.TryGetProperty("questions", out var list)
-            && list.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var q in list.EnumerateArray())
-            {
-                if (q.ValueKind == JsonValueKind.Object && q.TryGetProperty("question", out var text) && text.ValueKind == JsonValueKind.String) asked.Add(text.GetString()!);
-            }
-        }
-
-        return answers.All(a => asked.Contains(a.Key) && !string.IsNullOrWhiteSpace(a.Value) && a.Value.Length <= AnswerMax);
-    }
 }

@@ -32,7 +32,7 @@ function api(over: Parameters<typeof mockApi>[0] = {}) {
 const open = () => renderAt("/w/w1/machines/a1", route);
 
 describe("older grants and jobs of a machine", () => {
-  it("reads grants a page at a time and offers More for the older ones, with before=the oldest shown", async () => {
+  it("reads grants a page at a time and offers More for the older ones, with before and beforeId = the oldest shown (F-341)", async () => {
     const calls = api({
       "GET /agents/a1/grants": (c) => c.path.includes("before=")
         ? { body: [grant({ id: "ancient", granteeName: "Old Grantee", status: "active", createdAt: new Date(2026, 6, 1).toISOString() })] }
@@ -45,7 +45,7 @@ describe("older grants and jobs of a machine", () => {
     expect(await screen.findByText("Old Grantee")).toBeInTheDocument();
     expect(calls.find((c) => c.path.startsWith("/agents/a1/grants"))!.path).toBe(`/agents/a1/grants?limit=${config.remotePageSize}`);
     expect(calls.find((c) => c.path.includes("before="))!.path)
-      .toBe(`/agents/a1/grants?before=${encodeURIComponent(fullGrants[fullGrants.length - 1]!.createdAt)}&limit=${config.remotePageSize}`);
+      .toBe(`/agents/a1/grants?before=${encodeURIComponent(fullGrants[fullGrants.length - 1]!.createdAt)}&beforeId=${fullGrants[fullGrants.length - 1]!.id}&limit=${config.remotePageSize}`);
     expect(screen.queryByRole("button", { name: en.sessions.more })).toBeNull(); // a short page: nothing older
   });
 
@@ -59,7 +59,7 @@ describe("older grants and jobs of a machine", () => {
 
     expect(await screen.findByText("ancient-job")).toBeInTheDocument();
     expect(calls.find((c) => c.path.includes("before="))!.path)
-      .toBe(`/agents/a1/jobs?before=${encodeURIComponent(fullJobs[fullJobs.length - 1]!.createdAt)}&limit=${config.remotePageSize}`);
+      .toBe(`/agents/a1/jobs?before=${encodeURIComponent(fullJobs[fullJobs.length - 1]!.createdAt)}&beforeId=${fullJobs[fullJobs.length - 1]!.id}&limit=${config.remotePageSize}`);
     expect(screen.queryByRole("button", { name: en.sessions.more })).toBeNull();
   });
 

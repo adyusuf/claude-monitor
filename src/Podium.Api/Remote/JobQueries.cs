@@ -64,9 +64,9 @@ public static class JobQueries
         return true;
     }
 
-    /// <summary>The jobs of one target for the web, newest first, key-paged; <paramref name="statuses"/> (null: all) keeps only jobs in those statuses.</summary>
+    /// <summary>The jobs of one target for the web, newest first, key-paged by (created time, id) as the run list is (F-341; the id is optional: with the time alone only strictly older jobs follow); <paramref name="statuses"/> (null: all) keeps only jobs in those statuses.</summary>
     public static async Task<List<WebJobView>> ForWebAsync(PodiumDb db, Guid targetAgentId, Guid userId, Guid? jobId,
-        DateTimeOffset? before, int limit, CancellationToken ct, IReadOnlyList<string>? statuses = null)
+        DateTimeOffset? before, int limit, CancellationToken ct, IReadOnlyList<string>? statuses = null, Guid? beforeId = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         var wanted = statuses?.ToArray();
@@ -74,7 +74,8 @@ public static class JobQueries
                           join u in db.Users.AsNoTracking() on j.ProposedByUserId equals u.Id
                           where j.TargetAgentId == targetAgentId
                                 && (jobId == null || j.Id == jobId)
-                                && (before == null || j.CreatedAt < before)
+                                && (before == null || j.CreatedAt < before
+                                    || (beforeId != null && j.CreatedAt == before && j.Id.CompareTo(beforeId.Value) < 0)) // (time, id) cursor: ties are not skipped
                                 && (wanted == null || wanted.Contains(j.Status))
                           orderby j.CreatedAt descending, j.Id descending
                           select new

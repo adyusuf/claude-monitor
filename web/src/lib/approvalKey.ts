@@ -78,10 +78,15 @@ export function memoryStore(): KeyStore {
 
 const DB = "ap-approval";
 const OBJECT = "keys";
-const SLOT = "current";
+/** The one browser-wide slot of the keys made before F-190: whoever signed in next used it. Read now only to hand a key to its owner. */
+export const LEGACY_SLOT = "current";
+/** Where keys go while nobody is signed in (nothing is signed then; tests that do not sign in use it). */
+export const SIGNED_OUT_SLOT = "signed-out";
+/** Each person's own slot (F-190): another account on the same browser never sees, offers or signs with this key. */
+export const userSlot = (userId: string): string => `user:${userId}`;
 
 /** IndexedDB keeps a CryptoKey as it is (structured clone), which is what lets the private half stay non-extractable. */
-export function indexedDbStore(): KeyStore {
+export function indexedDbStore(slot: string = LEGACY_SLOT): KeyStore {
   const open = () => new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(OBJECT);
@@ -101,9 +106,49 @@ export function indexedDbStore(): KeyStore {
     }
   };
   return {
-    get: async () => ((await run("readonly", (s) => s.get(SLOT))) as StoredKey | undefined) ?? null,
-    put: async (key) => { await run("readwrite", (s) => s.put(key, SLOT)); },
-    clear: async () => { await run("readwrite", (s) => s.delete(SLOT)); },
+    get: async () => ((await run("readonly", (s) => s.get(slot))) as StoredKey | undefined) ?? null,
+    put: async (key) => { await run("readwrite", (s) => s.put(key, slot)); },
+    clear: async () => { await run("readwrite", (s) => s.delete(slot)); },
+  };
+}
+
+/** One page-lived store per slot, for a browser without IndexedDB. */
+export function memoryStores(): (slot: string) => KeyStore {
+  const stores = new Map<string, KeyStore>();
+  return (slot) => {
+    let store = stores.get(slot);
+    if (!store) stores.set(slot, (store = memoryStore()));
+    return store;
+  };
+}
+
+/**
+ * The key store of the person signed in now (F-190): each account has its own slot, so a key made by one person is never read, offered for
+ * registration or used to sign by the next account on the same browser; signed out, the store is an empty slot of its own. A key made before
+ * this (the old browser-wide slot) is handed to the person signed in only when it is one of their live registered keys, else it stays where it is.
+ */
+export function userScopedStore(storeFor: (slot: string) => KeyStore) {
+  let slot = SIGNED_OUT_SLOT;
+  const current = () => storeFor(slot);
+  return {
+    get: () => current().get(),
+    put: (key: StoredKey) => current().put(key),
+    clear: () => current().clear(),
+    /** Who is signed in now; null when nobody is. */
+    useFor(userId: string | null) {
+      slot = userId ? userSlot(userId) : SIGNED_OUT_SLOT;
+    },
+    /** Moves the old browser-wide key to the signed-in person's slot when <code>isLive</code> says it is theirs; true when it moved. */
+    async adoptLegacy(isLive: (fingerprint: string) => Promise<boolean>): Promise<boolean> {
+      const mine = current();
+      if (slot === SIGNED_OUT_SLOT || (await mine.get()) !== null) return false;
+      const legacy = storeFor(LEGACY_SLOT);
+      const old = await legacy.get();
+      if (!old || !(await isLive(old.fingerprint))) return false;
+      await mine.put(old);
+      await legacy.clear();
+      return true;
+    },
   };
 }
 
@@ -115,5 +160,6 @@ const hasIndexedDb = (): boolean => {
   }
 };
 
-/** The key of this browser: in IndexedDB when there is one, else for this page only. */
-export const approvalKeys = createApprovalKeys(hasIndexedDb() ? indexedDbStore() : memoryStore());
+/** The signed-in person's key on this browser (the session sets who that is): in IndexedDB when there is one, else for this page only. */
+export const approvalKeyScope = userScopedStore(hasIndexedDb() ? (slot) => indexedDbStore(slot) : memoryStores());
+export const approvalKeys = createApprovalKeys(approvalKeyScope);

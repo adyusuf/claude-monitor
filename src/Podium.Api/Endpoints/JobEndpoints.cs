@@ -21,7 +21,7 @@ public static class JobEndpoints
         g.MapPost("/jobs/{id:guid}/retire", Retire);
     }
 
-    private static async Task<IResult> List(Guid id, DateTimeOffset? before, int? limit, string? status, HttpContext http, PodiumDb db, ApiConfig config)
+    private static async Task<IResult> List(Guid id, DateTimeOffset? before, int? limit, string? status, HttpContext http, PodiumDb db, ApiConfig config, Guid? beforeId = null)
     {
         var userId = http.User.UserId();
         var agent = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, http.RequestAborted);
@@ -31,7 +31,7 @@ public static class JobEndpoints
         }
 
         if (!JobQueries.TryStatuses(status, out var statuses)) return Http.Invalid("status", "invalid_status");
-        return Results.Ok(await JobQueries.ForWebAsync(db, id, userId, null, before, Http.Limit(limit, config), http.RequestAborted, statuses));
+        return Results.Ok(await JobQueries.ForWebAsync(db, id, userId, null, before, Http.Limit(limit, config), http.RequestAborted, statuses, beforeId));
     }
 
     private static Task<IResult> Approve(Guid id, JobApproval? req, HttpContext http, JobService jobs) => jobs.ApproveAsync(id, req, http);

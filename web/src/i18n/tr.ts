@@ -58,7 +58,7 @@ export const tr: Dictionary = {
     link_reauth_required: "Bir giriş yöntemini bağlamak için son birkaç dakika içinde giriş yapmış olmanız gerekir: çıkış yapın, yeniden girin ve hemen ardından bağlayın.", last_sign_in_method: "Bu hesaba girmenin tek yolu bu. Önce bir parola belirleyin ya da başka bir sağlayıcı bağlayın.",
     account_disabled: "Bu hesap devre dışı.", not_a_member: "O çalışma alanının üyesi değilsiniz.",
     invalid_code: "Bu kod geçersiz ya da süresi dolmuş.", last_owner: "Bir çalışma alanında en az bir sahip olmalı.",
-    invalid_answers: "Bu yanıt soruyla uyuşmuyor.", invalid_decision: "İzin ver ya da reddet seçin.", invalid_duration: "Yanıtın ne kadar hatırlanacağını listeden seçin.",
+    invalid_answers: "Bu yanıt soruyla uyuşmuyor.", invalid_answer: "Bu yanıt sunulan seçeneklerden biri değil.", invalid_decision: "İzin ver ya da reddet seçin.", invalid_duration: "Yanıtın ne kadar hatırlanacağını listeden seçin.",
     session_ended: "Oturum sona erdi.", session_not_ended: "Yalnızca biten bir oturum listeden kaldırılabilir.", invalid_body: "Gönderilecek mesajı yazın.", too_long: "Bu çok uzun.",
     too_many_decimals: "En fazla iki ondalık basamak kullanın.", out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", invalid_mode: "Listeden bir mod seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
     forbidden: "Bunu yapma izniniz yok.", csrf: "Sunucu bu değişikliği, bu sitenin kendi sayfasından gelmediği için reddetti. Sayfayı yenileyip tekrar deneyin.", owner_only: "Bunu yalnızca makinenin sahibi yapabilir.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",

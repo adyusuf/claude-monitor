@@ -54,12 +54,14 @@ public sealed partial class Relay(AgentConfig config, LocalStore store, ApiClien
 
             await UploadAsync(ct); // the session must exist on the API before a request can name it
             using var input = JsonDocument.Parse(p.ToolInput);
-            // InlineAnswer: an approval rule's allow comes back in this answer (ADR-0019); on the stream it could arrive before the id is stored.
+            // InlineAnswer: an approval rule's allow comes back in this answer (ADR-0019); on the stream it could arrive before the id is stored. The local id is
+            // the key: a create sent again after a lost response gets the request it made, not a second one (F-188).
             var created = await api.CreatePermissionAsync(
-                new PermissionRequestCreate(p.Harness, p.Session, p.ToolName, input.RootElement.Clone(), left, InlineAnswer: true, AccessScope: Access.AccessScopes.For(config, store, p.Session, p.ToolName, input.RootElement)), ct);
+                new PermissionRequestCreate(p.Harness, p.Session, p.ToolName, input.RootElement.Clone(), left, InlineAnswer: true, AccessScope: Access.AccessScopes.For(config, store, p.Session, p.ToolName, input.RootElement), ClientKey: p.LocalId), ct);
             if (created is null) continue;
             store.PermissionSent(p.LocalId, created.Id.ToString());
-            if (created.Answer is { } a && a.Id == created.Id) store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason);
+            // A create sent again (F-188) may find its request answered by the owner already: the chosen options come with that answer.
+            if (created.Answer is { } a && a.Id == created.Id) store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason, a.Answers is null ? null : JsonSerializer.Serialize(a.Answers));
         }
     }
 

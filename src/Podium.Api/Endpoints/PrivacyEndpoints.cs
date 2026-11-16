@@ -148,7 +148,8 @@ public static class PrivacyEndpoints
         await db.HarnessSessions.Where(s => sessionIds.Contains(s.Id))
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.Title, (string?)null).SetProperty(x => x.TitleSearch, ""), ct);
         await db.PermissionRequests.Where(p => sessionIds.Contains(p.SessionId))
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.ToolInput, JsonDocument.Parse("{}")).SetProperty(p => p.Reason, (string?)null), ct);
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.ToolInput, JsonDocument.Parse("{}")).SetProperty(p => p.Reason, (string?)null)
+                .SetProperty(p => p.Answers, (string?)null), ct); // the question tool's chosen answers are captured content too (F-196)
         await db.ApprovalRules.Where(r => r.UserId == userId || agentIds.Contains(r.AgentId)).ExecuteDeleteAsync(ct);
         await db.SessionCommands.Where(c => sessionIds.Contains(c.SessionId) || c.CreatedBy == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Body, (string?)null), ct);

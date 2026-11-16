@@ -57,7 +57,7 @@ export const en = {
     link_reauth_required: "Linking a sign-in method needs a sign-in from the last few minutes: sign out, sign in again, and link it right after.", last_sign_in_method: "This is the only way to sign in to this account. Set a password or link another provider first.",
     account_disabled: "This account is disabled.", not_a_member: "You are not a member of that workspace.",
     invalid_code: "That code is not valid or has expired.", last_owner: "A workspace needs at least one owner.",
-    invalid_answers: "That answer does not match the question.", invalid_decision: "Pick allow or deny.", invalid_duration: "Pick how long the answer is remembered from the list.",
+    invalid_answers: "That answer does not match the question.", invalid_answer: "That answer is not one of the options offered.", invalid_decision: "Pick allow or deny.", invalid_duration: "Pick how long the answer is remembered from the list.",
     session_ended: "The session has ended.", session_not_ended: "Only an ended session can be removed from the list.", invalid_body: "Write the message to send.", too_long: "That is too long.",
     too_many_decimals: "Use at most two decimals.", out_of_range: "That value is out of range.", invalid_role: "Pick a role.", invalid_mode: "Pick a mode from the list.", unauthorized: "Your session has ended. Sign in again.",
     forbidden: "You are not allowed to do that.", csrf: "The server refused this change because it did not come from this site's own page. Reload the page and try again.", owner_only: "Only the machine's owner can do that.", not_found: "Not found.", conflict: "That has already changed. Refresh and try again.",

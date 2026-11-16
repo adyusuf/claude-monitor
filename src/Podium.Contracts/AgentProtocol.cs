@@ -74,9 +74,32 @@ public static class DeviceTokenErrors
 /// <summary>A tool call waiting for a person's answer, sent the moment the harness asks.</summary>
 /// <param name="InlineAnswer">True when the agent reads <see cref="PermissionRequestCreated.Answer"/>; only then may an approval rule answer at once (ADR-0019 §8).</param>
 /// <param name="AccessScope">For a path tool, where its path lies against the session's project access layers (<see cref="AccessScopes"/>); null from an older agent.</param>
+/// <param name="ClientKey">The agent's own id for the ask (its local id; F-188): the same key sent again gets the request it made, not a second one. Null from an older agent.</param>
 public sealed record PermissionRequestCreate(
     string HarnessKind, string SessionExternalId, string ToolName, JsonElement ToolInput, int WaitSeconds, bool InlineAnswer = false,
-    string? AccessScope = null);
+    string? AccessScope = null, string? ClientKey = null);
+
+/// <summary>
+/// The size cap of a permission request's tool input (F-189), one definition for the agent (which cuts before it stores and sends) and the API (which
+/// cuts what an older agent sends): an input over it is kept as a marker with a preview, the convention for captured content, so a whole file a
+/// write tool carries never reaches the database or the lists. A cut input offers no answers to choose from.
+/// </summary>
+public static class PermissionToolInputs
+{
+    public const int MaxBytes = 256 * 1024;
+    public const int PreviewChars = 4000;
+
+    /// <summary>The input (a JSON object's text) as it is kept: itself up to the cap, else <c>{"truncated":true,"bytes":n,"preview":"..."}</c>.</summary>
+    public static string Capped(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        var bytes = System.Text.Encoding.UTF8.GetByteCount(json);
+        if (bytes <= MaxBytes) return json;
+        var end = Math.Min(json.Length, PreviewChars);
+        if (end < json.Length && char.IsHighSurrogate(json[end - 1])) end--; // never half a surrogate pair: it cannot be stored
+        return JsonSerializer.Serialize(new { truncated = true, bytes, preview = json[..end] });
+    }
+}
 
 /// <param name="Answer">The answer when an approval rule allowed the request at once (ADR-0019 §7); null when the owner is asked.</param>
 public sealed record PermissionRequestCreated(Guid Id, DateTimeOffset ExpiresAt, PermissionAnswerMessage? Answer = null);

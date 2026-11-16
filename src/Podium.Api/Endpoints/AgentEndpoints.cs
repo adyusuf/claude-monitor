@@ -10,6 +10,7 @@ using Podium.Api.Streaming;
 using Podium.Api.Update;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Podium.Api.Endpoints;
 
@@ -207,6 +208,9 @@ public static class AgentEndpoints
             return Http.Invalid("toolName", "invalid");
         }
 
+        if (!PermissionRequestKeys.Valid(req.ClientKey)) return Http.Invalid("clientKey", RunRules.BadClientKey);
+        // The same ask sent again after a lost response (F-188) gets the request it made, never a second open one.
+        if (await PermissionRequestKeys.FindAsync(db, agentId, req.ClientKey, session.ExternalId, req.InlineAnswer, http.RequestAborted) is { } again) return Results.Ok(again);
         var now = clock.GetUtcNow();
         var wait = Math.Clamp(req.WaitSeconds, 1, config.PermissionWaitMaxSeconds);
         var request = new PermissionRequest
@@ -215,11 +219,12 @@ public static class AgentEndpoints
             SessionId = session.Id,
             AgentId = agentId,
             ToolName = req.ToolName,
-            ToolInput = JsonDocument.Parse(req.ToolInput.GetRawText()),
+            ToolInput = JsonDocument.Parse(PermissionToolInputs.Capped(req.ToolInput.GetRawText())), // an older agent sends it whole (F-189)
             CreatedAt = now,
             ExpiresAt = now.AddSeconds(wait),
             RepoId = session.RepoId,
             AccessScope = AccessScopes.All.Contains(req.AccessScope ?? "") ? req.AccessScope : null, // an unknown value is dropped, so no path rule
+            ClientKey = req.ClientKey,
         };
         db.PermissionRequests.Add(request);
 
@@ -250,8 +255,20 @@ public static class AgentEndpoints
             session.Status = SessionStatuses.Waiting; // an ended session stays ended, as in the event projector
         }
 
-        await db.SaveChangesAsync(http.RequestAborted);
-        await tx.CommitAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+            await tx.CommitAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (req.ClientKey is not null && e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // The same key at the same moment (ix_permission_requests_agent_id_client_key): the other create won; its request is the answer, this one
+            // and the rule use it counted are rolled back.
+            await tx.RollbackAsync(http.RequestAborted);
+            db.ChangeTracker.Clear();
+            return Results.Ok(await PermissionRequestKeys.FindAsync(db, agentId, req.ClientKey, session.ExternalId, req.InlineAnswer, http.RequestAborted));
+        }
+
         broker.Publish(Broker.Workspace(session.WorkspaceId),
             new StreamMessage("permission", new { sessionId = session.Id, id = request.Id, status = request.Status }));
         return Results.Ok(new PermissionRequestCreated(request.Id, request.ExpiresAt, answer));
@@ -259,8 +276,8 @@ public static class AgentEndpoints
 
     /// <summary>
     /// OBSOLETE (F-196): nothing in the product calls this any more, the answer reaches the agent on its stream. It stays, and keeps returning real
-    /// values, for older agents (rule 4); every answer carries <c>Deprecation: true</c>. It does not return an answer's chosen options (they are
-    /// not stored), so a poller can lose them: another reason to read the stream.
+    /// values, for older agents (rule 4); every answer carries <c>Deprecation: true</c>. The answer carries the question tool's chosen options too
+    /// (stored with it since F-196), so a poller loses nothing; an answer from before the column has none.
     /// </summary>
     private static async Task<IResult> GetPermission(Guid id, HttpContext http, PodiumDb db)
     {
@@ -272,7 +289,7 @@ public static class AgentEndpoints
                          select new { p, s.ExternalId }).FirstOrDefaultAsync(http.RequestAborted);
         return row is null
             ? Http.NotFound()
-            : Results.Ok(new { row.p.Status, answer = row.p.Decision is null ? null : new PermissionAnswerMessage(row.p.Id, row.ExternalId, row.p.Decision, row.p.Reason) });
+            : Results.Ok(new { row.p.Status, answer = PermissionRequestKeys.AnswerOf(row.p, row.ExternalId) });
     }
 }
 

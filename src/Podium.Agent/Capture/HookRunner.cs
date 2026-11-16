@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Podium.Agent.Auth;
 using Podium.Agent.Config;
@@ -20,6 +21,9 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
 
     /// <summary>The line before the owner's deny reason: who denied it and where from; the reason itself follows wrapped as a web message.</summary>
     public const string DeniedFromTheWeb = "Denied from Podium (the web) by the session's owner. Their reason follows as a message from the web.";
+
+    /// <summary>The line before an answer the owner typed instead of choosing an option: the text itself follows wrapped as a web message (Q-2).</summary>
+    public const string TypedFromTheWeb = "Typed in Podium (the web) by the session's owner instead of choosing an option; it follows as a message from the web.";
 
     /// <summary>Returns what the hook prints on stdout (null: nothing).</summary>
     public async Task<string?> RunAsync(string hookEvent, string input, CancellationToken ct)
@@ -120,7 +124,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
     {
         if (!CanHearTheWeb()) return null;
         var localId = Guid.NewGuid().ToString("N");
-        var input = Masker.Mask(payload["tool_input"]?.DeepClone() ?? new JsonObject())!.ToJsonString();
+        var input = PermissionToolInputs.Capped(Masker.Mask(payload["tool_input"]?.DeepClone() ?? new JsonObject())!.ToJsonString());
         store.AddPermission(new PermissionAsk(localId, HarnessKinds.ClaudeCode, session, payload["tool_name"]?.GetValue<string>() ?? "unknown",
             input, (int)config.PermissionWait.TotalSeconds, clock.GetUtcNow(), null, null, null, PermissionStates.New));
         var deadline = clock.GetUtcNow() + config.PermissionWait;
@@ -130,7 +134,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
             {
                 var result = new JsonObject { ["behavior"] = decision == PermissionDecisions.Allow ? "allow" : "deny" };
                 if (decision != PermissionDecisions.Allow && answered.Reason is { } why) result["message"] = DenyMessage(localId, session, why);
-                if (decision == PermissionDecisions.Allow && AnsweredInput(payload, answered.Answers) is { } updated) result["updatedInput"] = updated;
+                if (decision == PermissionDecisions.Allow && AnsweredInput(localId, session, payload, answered.Answers) is { } updated) result["updatedInput"] = updated;
                 return new JsonObject
                 {
                     ["hookSpecificOutput"] = new JsonObject { ["hookEventName"] = "PermissionRequest", ["decision"] = result },
@@ -157,13 +161,28 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
     /// <summary>
     /// The question tool's input with the owner's answers added, which is how the harness takes an answer without asking
     /// on the machine. Built from the tool's own input as the hook received it (never from anything the web sent), so
-    /// the web can choose among the options but cannot change the call.
+    /// the web can choose among the options but cannot change the call. Options the question offered go in as they are; anything
+    /// else in an answer was typed in the web, so it goes in labelled and wrapped like the deny reason (Q-2).
     /// </summary>
-    private static JsonObject? AnsweredInput(JsonObject payload, string? answers)
+    private JsonObject? AnsweredInput(string id, string session, JsonObject payload, string? answers)
     {
         if (payload["tool_name"]?.GetValue<string>() != QuestionTools.AskUserQuestion || answers is null) return null;
         if (payload["tool_input"]?.DeepClone() is not JsonObject input || JsonNode.Parse(answers) is not JsonObject chosen) return null;
-        input["answers"] = chosen;
+        var offered = QuestionAnswers.Offered(JsonSerializer.SerializeToElement(input));
+        var now = clock.GetUtcNow();
+        var answered = new JsonObject();
+        foreach (var (question, value) in chosen)
+        {
+            if (value?.GetValueKind() != JsonValueKind.String) continue;
+            var text = value.GetValue<string>();
+            var options = offered.TryGetValue(question, out var q) ? QuestionAnswers.ChosenLength(text, q) : 0;
+            var typed = text[options..];
+            if (typed.StartsWith(QuestionAnswers.Separator, StringComparison.Ordinal)) typed = typed[QuestionAnswers.Separator.Length..];
+            answered[question] = typed.Length == 0 ? text : (options > 0 ? text[..options] + QuestionAnswers.Separator : "") + TypedFromTheWeb + "\n"
+                + Push.ChannelEnvelopes.BuildInbox(new LocalCommand(id, session, CommandKinds.Prompt, typed, now), config.PushContentMax, now);
+        }
+
+        input["answers"] = answered;
         return input;
     }
 
