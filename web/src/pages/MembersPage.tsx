@@ -106,7 +106,7 @@ export function MembersPage() {
                 <tbody>
                   {members.map((m) => (
                     <tr key={m.userId}>
-                      <td><strong>{m.displayName}</strong><div className="muted small">{m.email}</div></td>
+                      <td><strong>{m.displayName}</strong>{m.email ? <div className="muted small">{m.email}</div> : null}</td>
                       <td>
                         {admin && m.userId !== me?.id ? (
                           <select className="input" aria-label={t("members.role")} value={m.role}

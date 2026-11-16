@@ -33,7 +33,7 @@ public static class WorkspaceEndpoints
         g.MapGet("/{id:guid}", Get);
         g.MapPatch("/{id:guid}", Rename);
         g.MapPut("/{id:guid}/settings", PutSettings);
-        g.MapGet("/{id:guid}/members", Members);
+        g.MapGet("/{id:guid}/members", WorkspaceMemberList.ListAsync);
         g.MapPatch("/{id:guid}/members/{userId:guid}", ChangeRole);
         g.MapDelete("/{id:guid}/members/{userId:guid}", Remove);
     }
@@ -104,17 +104,6 @@ public static class WorkspaceEndpoints
 
         await db.SaveChangesAsync(http.RequestAborted);
         return Results.NoContent();
-    }
-
-    private static async Task<IResult> Members(Guid id, HttpContext http, PodiumDb db)
-    {
-        if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        var members = await (from m in db.WorkspaceMembers.AsNoTracking()
-                             join u in db.Users.AsNoTracking() on m.UserId equals u.Id
-                             where m.WorkspaceId == id && m.RemovedAt == null
-                             orderby u.DisplayName
-                             select new MemberResponse(u.Id, u.DisplayName, u.Email, m.Role, m.JoinedAt)).ToListAsync(http.RequestAborted);
-        return Results.Ok(members);
     }
 
     private static async Task<IResult> ChangeRole(Guid id, Guid userId, RoleRequest req, HttpContext http, PodiumDb db,
