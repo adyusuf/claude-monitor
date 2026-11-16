@@ -5,6 +5,7 @@ using Podium.Api.Data;
 using Podium.Api.Tests.Infrastructure;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Podium.Api.Tests;
 
@@ -51,7 +52,7 @@ public sealed class ContentRetentionTests(ApiFactory api)
     private async Task<int> PassAsync(int batch = ContentRetention.Batch)
     {
         await using var db = api.Db();
-        return await ContentRetention.RunOnceAsync(db, api.Clock.GetUtcNow(), CancellationToken.None, batch);
+        return await ContentRetention.RunOnceAsync(db, api.ArchiveDir, NullLogger.Instance, api.Clock.GetUtcNow(), CancellationToken.None, batch);
     }
 
     private async Task<string?> BodyAsync(Guid id)
