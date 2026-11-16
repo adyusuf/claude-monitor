@@ -1,6 +1,7 @@
 using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Mail;
+using Podium.Api.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Endpoints;
