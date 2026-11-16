@@ -111,7 +111,8 @@ where an `in_progress` or `in_review` issue becomes `ready`.
 
 **Issues:** `issues` gains `sprint_id` (an issue is in at most one sprint). The backlog is the issues in no sprint. Issues are added to a
 planned or active sprint from the backlog (many at once) or created new and added; a sprint of an application takes only issues of that
-application. Removing one returns it to the backlog. The sprint page groups its issues by status; a quick status change has its own call.
+application. Removing one returns it to the backlog. The sprint page groups its issues by status; a quick status change has its own call. The status `backlog` is a status like the others inside
+a sprint: an issue keeps the status it had when it was added, and the quick change accepts `backlog` ("in the sprint, not ready yet") without taking it out of the sprint; only a closed sprint refuses the change.
 **Team:** workspace members who can work. **Release:** a release of an application of the project (of that application when the sprint
 has one). Committed and done estimates are summed from the issues (numeric units only; T-shirt sizes are not summed).
 
