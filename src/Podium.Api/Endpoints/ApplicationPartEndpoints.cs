@@ -90,8 +90,11 @@ public static class ApplicationPartEndpoints
     private static async Task<IResult> Releases(Guid id, HttpContext http, PodiumDb db)
     {
         if (await ProjectAccess.ApplicationAsync(db, http.User.UserId(), id, http.RequestAborted) is null) return Http.NotFound();
-        var rows = await db.ApplicationReleases.AsNoTracking().Where(r => r.ApplicationId == id && r.Status != ReleaseStatuses.Cancelled)
-            .OrderBy(r => r.PlannedDate == null).ThenBy(r => r.PlannedDate).ThenBy(r => r.NameSearch).Take(ReleasesMax).ToListAsync(http.RequestAborted);
+        // Releases that went out stay for good and the cap counts only planned ones, so the history can be longer than the cap: show every planned release and the latest ones that went out.
+        var latestOut = db.ApplicationReleases.Where(r => r.ApplicationId == id && r.Status == ReleaseStatuses.Released)
+            .OrderBy(r => r.PlannedDate == null).ThenByDescending(r => r.PlannedDate).ThenBy(r => r.NameSearch).Take(ReleasesMax).Select(r => r.Id);
+        var rows = await db.ApplicationReleases.AsNoTracking().Where(r => r.ApplicationId == id && (r.Status == ReleaseStatuses.Planned || latestOut.Contains(r.Id)))
+            .OrderBy(r => r.PlannedDate == null).ThenBy(r => r.PlannedDate).ThenBy(r => r.NameSearch).ToListAsync(http.RequestAborted);
         return Results.Ok(rows.Select(ProjectViews.View).ToList());
     }
 
@@ -104,7 +107,9 @@ public static class ApplicationPartEndpoints
         if (f.App.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (Invalid(req) is { } invalid) return invalid;
         if (req.Status == ReleaseStatuses.Cancelled) return Http.Invalid("status", "invalid_value"); // a release is cancelled after it was planned, never born so
-        if (await db.ApplicationReleases.CountAsync(r => r.ApplicationId == id && r.Status != ReleaseStatuses.Cancelled, http.RequestAborted) >= ReleasesMax)
+        // Only planned releases fill the calendar: one that went out is history and cannot be deleted, so counting it would end the calendar for good (F-259).
+        if ((req.Status ?? ReleaseStatuses.Planned) == ReleaseStatuses.Planned
+            && await db.ApplicationReleases.CountAsync(r => r.ApplicationId == id && r.Status == ReleaseStatuses.Planned, http.RequestAborted) >= ReleasesMax)
         {
             return Http.Invalid("name", "limit_reached");
         }

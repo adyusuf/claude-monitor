@@ -66,7 +66,7 @@ Text a person types (names, purposes, notes, links) is shown as text only and ne
 | `GET /api/projects/{id}/applications`, `POST` | read / application edit |
 | `GET /api/applications/{id}`, `PUT`, `DELETE` (archive), `POST /restore` | read / application edit |
 | `GET`, `POST /api/applications/{id}/components` and `PUT`, `DELETE /api/components/{id}` | read / application edit |
-| `GET`, `POST /api/applications/{id}/releases` and `PUT`, `DELETE /api/releases/{id}` (a release that went out cannot be cancelled) | read / application edit |
+| `GET`, `POST /api/applications/{id}/releases` and `PUT`, `DELETE /api/releases/{id}` (a release that went out cannot be cancelled; the cap of 200 counts planned releases only, so a long history never blocks the next one) | read / application edit |
 
 Lists are paged by key (newest first). Error codes are i18n keys. Changes write audit rows that name the row by id, never its text.
 
