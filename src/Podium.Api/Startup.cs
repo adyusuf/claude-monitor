@@ -24,6 +24,7 @@ public static class Startup
         services.AddSingleton(config);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Broker>();
+        services.AddSingleton<StreamLimiter>();
         services.AddSingleton(new UpdateCatalog(config));
         if (config.DownloadsUrl is not null) services.AddHostedService<UpdateCatalogRefresher>();
         services.AddDbContext<PodiumDb>(o => o.UseNpgsql(config.DatabaseUrl));
