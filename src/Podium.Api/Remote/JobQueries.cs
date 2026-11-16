@@ -34,16 +34,48 @@ public static class JobQueries
         return rows.Select(View).ToList();
     }
 
-    /// <summary>The jobs of one target for the web, newest first, key-paged.</summary>
+    /// <summary>
+    /// The statuses a list filter names: one status of <see cref="JobStatuses.All"/>, the groups <c>open</c> and <c>finished</c>, or several of them separated
+    /// by commas. False for an unknown name; empty or null is no filter (null statuses).
+    /// </summary>
+    public static bool TryStatuses(string? filter, out IReadOnlyList<string>? statuses)
+    {
+        statuses = null;
+        if (string.IsNullOrWhiteSpace(filter)) return true;
+        var named = new List<string>();
+        foreach (var part in filter.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            switch (part)
+            {
+                case JobStatuses.OpenGroup:
+                    named.AddRange(JobStatuses.Open);
+                    break;
+                case JobStatuses.FinishedGroup:
+                    named.AddRange(JobStatuses.Finished);
+                    break;
+                default:
+                    if (!JobStatuses.All.Contains(part)) return false;
+                    named.Add(part);
+                    break;
+            }
+        }
+
+        statuses = named.Count == 0 ? null : named.Distinct().ToList();
+        return true;
+    }
+
+    /// <summary>The jobs of one target for the web, newest first, key-paged; <paramref name="statuses"/> (null: all) keeps only jobs in those statuses.</summary>
     public static async Task<List<WebJobView>> ForWebAsync(PodiumDb db, Guid targetAgentId, Guid userId, Guid? jobId,
-        DateTimeOffset? before, int limit, CancellationToken ct)
+        DateTimeOffset? before, int limit, CancellationToken ct, IReadOnlyList<string>? statuses = null)
     {
         ArgumentNullException.ThrowIfNull(db);
+        var wanted = statuses?.ToArray();
         var rows = await (from j in db.MachineJobs.AsNoTracking()
                           join u in db.Users.AsNoTracking() on j.ProposedByUserId equals u.Id
                           where j.TargetAgentId == targetAgentId
                                 && (jobId == null || j.Id == jobId)
                                 && (before == null || j.CreatedAt < before)
+                                && (wanted == null || wanted.Contains(j.Status))
                           orderby j.CreatedAt descending, j.Id descending
                           select new
                           {

@@ -194,7 +194,7 @@ public static class SessionEndpoints
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
         var login = http.User.LoginSessionId();
-        return Sse.Stream(broker.Subscribe(Broker.Workspace(id)), [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
+        return Sse.Stream(broker.Subscribe([Broker.Workspace(id), Broker.WorkspaceMember(id, userId)]), [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
             http.RequestAborted, ct => Access.StillReadsAsync(db, clock, userId, login, id, ct));
     }
 }

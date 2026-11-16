@@ -27,6 +27,7 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     public const string RemoteRunsKey = "settings.remote_runs";
     public const string ShareServicesKey = "settings.share_services";
     public const string ShareInventoryKey = "settings.share_inventory";
+    public const string ClaudeControlKey = "settings.claude_control";
     public const int KeepSamples = 60;
     /// <summary>A folder a session worked in is read for its commit and tag for this long after the last visit (ADR-0008 §3a′).</summary>
     public static readonly TimeSpan VisitedFor = TimeSpan.FromDays(30);
@@ -200,7 +201,8 @@ public sealed class MachineMonitor(AgentConfig config, LocalStore store, ApiClie
     {
         ArgumentNullException.ThrowIfNull(settings);
         List<(string Key, string Value)> entries = [(RemoteRunsKey, settings.RemoteRuns ? "true" : "false"), (ShareServicesKey, settings.ShareServices ? "true" : "false"),
-            (ShareInventoryKey, settings.ShareInventory ? "true" : "false"), .. Access.AccessPolicySync.Entries(settings)];
+            (ShareInventoryKey, settings.ShareInventory ? "true" : "false"), (ClaudeControlKey, ClaudeStartGuard.Stored(settings.ClaudeControl)),
+            .. Access.AccessPolicySync.Entries(settings)];
         if (settings.Alerts is { } a)
         {
             entries.Add((ThresholdsKey, string.Join(',', new[] { a.CpuPct, a.MemoryPct, a.DiskPct, a.SustainSeconds }

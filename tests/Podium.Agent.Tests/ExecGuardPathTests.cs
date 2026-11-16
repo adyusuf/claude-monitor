@@ -142,4 +142,19 @@ public sealed class ExecGuardPathTests : IDisposable
         Assert.Equal(ExecErrors.PathInHome, fx.Check(ExecFixture.Argv([ExecFixture.TrustedExe], cwd: fx.Home), Argv).Error);
         Assert.True(fx.Check(ExecFixture.Argv([ExecFixture.TrustedExe], cwd: fx.Root), Argv).Allowed);
     }
+
+    // F-300, a known limit documented in ADR-0020 §4 and docs/security.md: a per-call argv run that names no working directory is not folder-checked.
+    [Fact]
+    public void A_per_call_argv_run_with_no_working_directory_is_not_folder_checked_and_a_free_path_argument_is_not_judged()
+    {
+        if (!ExecFixture.Unix) return;
+        var elsewhere = ExecFixture.Level(ExecLevels.Argv, roots: [fx.Outside]);
+
+        var named = fx.Check(ExecFixture.Argv([ExecFixture.TrustedExe], cwd: fx.Root), elsewhere);
+        var none = fx.Check(ExecFixture.Argv([ExecFixture.TrustedExe, "/etc/passwd"]), elsewhere);
+
+        Assert.Equal(ExecErrors.RootNotAllowed, named.Error);
+        Assert.True(none.Allowed);
+        Assert.Null(none.ResolvedCwd); // the run then starts in the agent's own folder, which no roots list judged
+    }
 }

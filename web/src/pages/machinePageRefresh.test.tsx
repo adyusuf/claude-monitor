@@ -122,4 +122,17 @@ describe("what a live message makes the machine page read again", () => {
 
     expect(count(calls, "/agents/a1/asks")).toBe(base + 1);
   });
+
+  it("reads the owner's asks again after an ask message (the server tells only the people who may read the ask)", async () => {
+    const calls = api({ "GET /agents/a1/detail": { body: detail() } });
+    open();
+    await openTab(en.views.machine.control);
+    await screen.findByText(en.machines.asks.none);
+    await settle(calls);
+    const base = count(calls, "/agents/a1/asks");
+
+    await liveReread("ask");
+
+    expect(count(calls, "/agents/a1/asks")).toBe(base + 1);
+  });
 });
