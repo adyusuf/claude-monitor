@@ -91,4 +91,30 @@ describe("the remote work card saved from a page that is out of date (F-049)", (
     expect(puts[1]?.body).toMatchObject({ expectedUpdatedAt: T0 }); // the card is still on the time it read until the server answers
     await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.path === "/workspaces/w1")).toHaveLength(2));
   });
+
+  it("saves the card right after the page saved without a 409, because the card reads the new time again", async () => {
+    let stamp = T0;
+    const calls = mockApi({
+      "GET /me": { body: ME }, "GET /workspaces/w1": () => ({ body: info(stamp) }), ...audit,
+      "GET /workspaces/w1/remote-settings": () => ({ body: remote(stamp) }),
+      "PUT /workspaces/w1/settings": () => {
+        stamp = T1;
+        return { status: 204 };
+      },
+      "PUT /workspaces/w1/remote-settings": (c) => ((c.body as { expectedUpdatedAt?: string }).expectedUpdatedAt === stamp
+        ? { body: remote(stamp) } : { status: 409, body: { title: "stale_update" } }),
+    });
+    page();
+    await screen.findByLabelText(en.workspace.name);
+    await save();
+    await screen.findByText(en.workspace.saved);
+    await openTab(en.remote.settingsTitle);
+    await screen.findByLabelText(en.remote.alertCpu);
+    await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.path === "/workspaces/w1/remote-settings")).toHaveLength(2));
+    await save();
+
+    await waitFor(() => expect(calls.filter((c) => c.method === "PUT" && c.path === "/workspaces/w1/remote-settings")).toHaveLength(1));
+    expect(screen.queryByText(en.errors.stale_update)).toBeNull();
+    expect(calls.find((c) => c.method === "PUT" && c.path === "/workspaces/w1/remote-settings")?.body).toMatchObject({ expectedUpdatedAt: T1 });
+  });
 });
