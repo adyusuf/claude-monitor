@@ -54,6 +54,9 @@ public sealed class User
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public string? Email { get; set; }
     public string? EmailNormalized { get; set; }
+
+    /// <summary>The e-mail identity key (<see cref="Text.EmailIdentity"/>: trimmed, lower-cased, not folded; F-180). NULL with no address (a deleted account).</summary>
+    public string? EmailKey { get; set; }
     public string DisplayName { get; set; } = "";
     public string DisplayNameSearch { get; set; } = "";
     public string? PasswordHash { get; set; }

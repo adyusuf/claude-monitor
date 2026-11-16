@@ -4170,6 +4170,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("email");
 
+                    b.Property<string>("EmailKey")
+                        .HasColumnType("text")
+                        .HasColumnName("email_key");
+
                     b.Property<string>("EmailNormalized")
                         .HasColumnType("text")
                         .HasColumnName("email_normalized");
@@ -4218,6 +4222,10 @@ namespace Podium.Api.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_users");
+
+                    b.HasIndex("EmailKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_email_key");
 
                     b.HasIndex("EmailNormalized")
                         .IsUnique()

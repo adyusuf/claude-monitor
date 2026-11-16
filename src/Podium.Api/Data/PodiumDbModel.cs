@@ -31,6 +31,7 @@ internal static class PodiumDbModel
         b.Entity<User>(e =>
         {
             e.HasIndex(x => x.EmailNormalized).IsUnique();
+            e.HasIndex(x => x.EmailKey).IsUnique();
             e.Property(x => x.Language).HasMaxLength(2);
             e.ToTable(t =>
             {
