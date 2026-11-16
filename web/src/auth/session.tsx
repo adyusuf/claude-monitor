@@ -4,6 +4,18 @@ import { ApiError, onSessionEnded } from "../api/client";
 import { api } from "../api/endpoints";
 import type { Me } from "../api/types";
 import { Spinner } from "../components/ui";
+import { approvalKeyScope } from "../lib/approvalKey";
+
+/**
+ * The approval key follows the person (F-190): set before the pages see the new person, so none reads the previous account's key. A key made
+ * before keys were kept per person moves to them only when the API lists it as one of their live keys.
+ */
+function keysFor(me: Me | null) {
+  approvalKeyScope.useFor(me?.id ?? null);
+  if (!me) return;
+  approvalKeyScope.adoptLegacy(async (fingerprint) => (await api.approvalKeys()).some((k) => k.fingerprint === fingerprint && k.retiredAt === null))
+    .catch((e: unknown) => console.error(e));
+}
 
 interface Session {
   me: Me | null;
@@ -22,10 +34,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const current = await api.me();
+      keysFor(current);
       setMe(current);
       return current;
     } catch (e) {
       if (!(e instanceof ApiError) || e.status !== 401) console.error(e);
+      keysFor(null);
       setMe(null);
       return null;
     } finally {
@@ -41,6 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (!(e instanceof ApiError) || e.status !== 401) throw e;
     }
+    keysFor(null);
     setMe(null);
   }, []);
 
@@ -49,7 +64,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   // A call that finds the session ended (expired or revoked in another tab) signs out here, so RequireAuth sends to /login with the way back.
-  useEffect(() => onSessionEnded(() => setMe(null)), []);
+  useEffect(() => onSessionEnded(() => {
+    keysFor(null);
+    setMe(null);
+  }), []);
 
   const value = useMemo(() => ({ me, loading, refresh, signOut }), [me, loading, refresh, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
