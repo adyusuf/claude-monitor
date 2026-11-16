@@ -148,6 +148,7 @@ public static class WorkspaceEndpoints
         target.Role = req.Role;
         Audit.Add(db, http, clock, AuditActions.RoleChanged, id, actor.UserId, targetType: "user", targetId: userId,
             detail: new { before, after = req.Role });
+        await Approvals.ApprovalRuleFloor.ForRoleChangeAsync(db, http, clock, id, userId, req.Role, actor.UserId, http.RequestAborted); // below member: rules end (F-163)
         await db.SaveChangesAsync(http.RequestAborted);
         // The connector of a connection must stay an admin: below that its connections need a new sign-in (as on removal).
         if (Roles.Rank(req.Role) < Roles.Rank(Roles.Admin))
