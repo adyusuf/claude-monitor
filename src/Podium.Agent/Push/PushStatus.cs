@@ -48,6 +48,11 @@ public static class PushStatus
             lines.Add(Strings.T(Msg.StUploadFailure, uploadError, Clock(Time(store.Get(UploadErrorAtKey)))));
         }
 
+        if (store.QuarantineCount() is var held and > 0)
+        {
+            lines.Add(Strings.T(Msg.StQuarantined, held)); // F-239: the events moved aside, still held (a count, never their content)
+        }
+
         if (store.Get(Auth.AuthRefusal.ReasonKey) is { Length: > 0 } refused && Auth.Identity.Peek(config)?.Connected != true)
         {
             lines.Add(Strings.T(Msg.StConnection, Auth.AuthRefusal.Describe(refused), Clock(Time(store.Get(Auth.AuthRefusal.AtKey)))));
