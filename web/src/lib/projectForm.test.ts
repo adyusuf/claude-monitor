@@ -16,6 +16,11 @@ describe("the project form", () => {
       stakeholders: [{ name: null, role: null }] })).stakeholders).toEqual([{ name: "", role: "" }]);
   });
 
+  it("sends the version it loaded when it edits a project and none when it creates one", () => {
+    expect(inputOfProject(draftOfProject(project())).expectedUpdatedAt).toBe(project().updatedAt);
+    expect(inputOfProject({ ...emptyProjectDraft("u1"), name: "n" })).not.toHaveProperty("expectedUpdatedAt");
+  });
+
   it("drops blank lines and stakeholder rows, and trims what is kept", () => {
     expect(filled([" a ", "", "  "])).toEqual(["a"]);
     const sent = inputOfProject({ ...emptyProjectDraft("u1"), name: "n", stakeholders: [{ name: " Dana ", role: " " }, { name: "", role: "" }], definitionOfDone: ["", " x "] });

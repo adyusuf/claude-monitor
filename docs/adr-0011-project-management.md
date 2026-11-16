@@ -61,12 +61,12 @@ Text a person types (names, purposes, notes, links) is shown as text only and ne
 | Call | Needs |
 |---|---|
 | `GET /api/workspaces/{ws}/projects`, `POST` | read / member |
-| `GET /api/projects/{id}`, `PUT` (replaces the definition), `DELETE` (archive), `POST /restore` | read / project edit / archive |
+| `GET /api/projects/{id}`, `PUT` (replaces the definition; an optional `expectedUpdatedAt` makes a project that changed since answer 409 `stale_update`, without it the last write wins; a change of item types, priority scale or estimation unit that would leave issues with a value the project no longer offers answers 409 `item_type_in_use`, `priority_scale_in_use` or `estimation_unit_in_use` with the number of issues in `count`), `DELETE` (archive), `POST /restore` | read / project edit / archive |
 | `GET /api/projects/{id}/members`, `PUT /{userId}`, `DELETE /{userId}` | read / project edit |
 | `GET /api/projects/{id}/applications`, `POST` | read / application edit |
 | `GET /api/applications/{id}`, `PUT`, `DELETE` (archive), `POST /restore` | read / application edit |
 | `GET`, `POST /api/applications/{id}/components` and `PUT`, `DELETE /api/components/{id}` | read / application edit |
-| `GET`, `POST /api/applications/{id}/releases` and `PUT`, `DELETE /api/releases/{id}` (a release that went out cannot be cancelled) | read / application edit |
+| `GET`, `POST /api/applications/{id}/releases` and `PUT`, `DELETE /api/releases/{id}` (a release that went out cannot be cancelled; the cap of 200 counts planned releases only, so a long history never blocks the next one) | read / application edit |
 
 Lists are paged by key (newest first). Error codes are i18n keys. Changes write audit rows that name the row by id, never its text.
 

@@ -89,6 +89,7 @@ A change in Podium to a mirrored row is sent to Jira with the acting user's own 
   sprint membership and rank, new issue, sprint name, goal, dates, start and close.
 - *Podium-only fields* (kept locally, never sent): acceptance criteria, technical design, bug fields, test cases, code links, runs, application, component, release, project settings.
 - *Locked on a mirrored row:* the type (Jira needs a "move"), and archiving an issue (Jira's delete cannot be undone: use status `cancelled`).
+- *Locks and write-through end with the connection (F-106, F-262):* they apply while the project's connection is not disconnected (one that only needs a new sign-in still locks, it comes back). After a disconnect the project's name and purpose, and its issues' type, archiving and every field, are Podium's to edit, and a new issue is made here without a call to Jira. The project keeps its source link until `POST /api/projects/{id}/detach` (the project's owner or a workspace admin, audited as `project.detached`, only after the disconnect: 409 `mirrored_connected` before it, 409 `not_mirrored` when there is nothing to detach) clears `SourceConnectionId` and the project's link row, so no sync takes it back. Mirrored sprints keep their own source and stay refused as detached.
 - *Conflict:* the write carries the `updated` Jira had at the last sync; if Jira has a newer one the answer is 409 `jira_changed` and nothing is written.
 - *Rights:* the same as for any issue, plus a linked Atlassian account; Jira's own permissions have the last word and their refusal is passed on as 403 `jira_forbidden`.
 
@@ -101,6 +102,7 @@ A change in Podium to a mirrored row is sent to Jira with the acting user's own 
 | `GET /api/integrations/jira/callback?code&state` | the user who started it (state) → redirects to the web |
 | `POST /api/integrations/{id}/account/connect` → `{ authorizeUrl }` (link my own account) | member of the workspace |
 | `DELETE /api/integrations/{id}` (disconnect: tokens and webhook go; imported rows stay, marked detached) | admin |
+| `POST /api/projects/{id}/detach` (cut an imported project of a disconnected connection loose for good) | project owner or workspace admin |
 | `PUT /api/integrations/{id}` `{ autoInvite }` | admin |
 | `GET /api/integrations/{id}/spaces` (live list, with "imported" flags) | any member |
 | `POST /api/integrations/{id}/spaces/import { keys[] }` | admin or owner |

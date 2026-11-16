@@ -5,6 +5,7 @@ export const enProjects = {
   empty: "There are no projects yet.", emptyHint: "A project holds the applications you build and, later, their backlog and sprints.",
   noMatch: "No project matches the search.",
   archiveConfirm: "Archive \"{name}\"? It stays in the list of archived ones and can be restored.",
+  detach: "Detach from Jira", detachConfirm: "Detach \"{name}\" from Jira for good? The connection is gone already; afterwards the project is no longer marked as imported and cannot be linked to Jira again.",
   archivedBanner: "This project is archived: it is read-only until it is restored.",
   applicationArchivedBanner: "This application is archived: it is read-only until it is restored.",
   ownerIs: "Owner: {name}", applicationCount: "Applications: {n}", sprintDays: "{n} days", removeRow: "Remove",

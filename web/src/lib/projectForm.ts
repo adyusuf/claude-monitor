@@ -20,6 +20,8 @@ export interface ProjectDraft {
   sprintLengthDays: string;
   definitionOfReady: string[];
   definitionOfDone: string[];
+  /** The updatedAt of the project the form was loaded from; empty for a new one. */
+  updatedAt: string;
 }
 
 /** A field name (as the API names it) mapped to an error code under "errors.". */
@@ -28,7 +30,7 @@ export type FieldErrors = Record<string, string>;
 export const emptyProjectDraft = (ownerUserId: string): ProjectDraft => ({
   name: "", purpose: "", ownerUserId, sponsor: "", stakeholders: [], budgetAmount: "", budgetCurrency: "", startDate: "", endDate: "",
   itemTypes: [...ITEM_TYPES], priorityScale: "p0_p3", estimationUnit: "story_points", sprintLengthDays: "14",
-  definitionOfReady: [], definitionOfDone: [],
+  definitionOfReady: [], definitionOfDone: [], updatedAt: "",
 });
 
 export const draftOfProject = (p: ProjectView): ProjectDraft => ({
@@ -38,6 +40,7 @@ export const draftOfProject = (p: ProjectView): ProjectDraft => ({
   startDate: p.startDate ?? "", endDate: p.endDate ?? "", itemTypes: [...p.itemTypes], priorityScale: p.priorityScale,
   estimationUnit: p.estimationUnit, sprintLengthDays: String(p.sprintLengthDays),
   definitionOfReady: [...p.definitionOfReady], definitionOfDone: [...p.definitionOfDone],
+  updatedAt: p.updatedAt,
 });
 
 const text = (value: string): string | null => value.trim() === "" ? null : value.trim();
@@ -55,6 +58,7 @@ export const inputOfProject = (d: ProjectDraft): ProjectInput => ({
   startDate: text(d.startDate), endDate: text(d.endDate), itemTypes: d.itemTypes, priorityScale: d.priorityScale,
   estimationUnit: d.estimationUnit, sprintLengthDays: Number(d.sprintLengthDays),
   definitionOfReady: filled(d.definitionOfReady), definitionOfDone: filled(d.definitionOfDone),
+  ...(d.updatedAt === "" ? {} : { expectedUpdatedAt: d.updatedAt }),
 });
 
 const tooLongLine = (lines: string[]) => filled(lines).length > limit.listMax || filled(lines).some((l) => l.length > limit.lineMax);

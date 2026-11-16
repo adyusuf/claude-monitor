@@ -14,7 +14,7 @@ export const project = (over: Partial<ProjectView> = {}): ProjectView => ({
   stakeholders: [{ name: "Dana", role: "Finance" }], budgetAmount: 1500, budgetCurrency: "EUR", startDate: "2026-01-05", endDate: "2026-12-31",
   itemTypes: ["story", "bug"], priorityScale: "moscow", estimationUnit: "hours", sprintLengthDays: 10, definitionOfReady: ["Has criteria"],
   definitionOfDone: ["Reviewed", "Tested"], status: "active", createdAt: "2026-01-01T10:00:00Z", updatedAt: "2026-01-02T10:00:00Z",
-  access: { canEdit: true, canArchive: true, canEditApplications: true }, sourceConnectionId: null, ...over,
+  access: { canEdit: true, canArchive: true, canEditApplications: true }, sourceConnectionId: null, mirrorActive: false, ...over,
 });
 
 export const appSummary = (over: Partial<ApplicationSummary> = {}): ApplicationSummary => ({

@@ -89,4 +89,24 @@ public sealed class IssueLinkTests(ApiFactory api)
 
         Assert.Equal(("status", "archived"), await ProjectKit.ProblemAsync(await Link(t.Owner, a, b, "blocks")));
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_link_of_an_archived_issue_cannot_be_removed_from_either_end_until_it_is_restored(bool archiveTheBlocker)
+    {
+        var t = await IssueKit.TeamAsync(api);
+        var a = await IssueKit.IssueAsync(t.Owner, t.Project, "A");
+        var b = await IssueKit.IssueAsync(t.Owner, t.Project, "B");
+        (await Link(t.Owner, a, b, "blocks")).EnsureSuccessStatusCode();
+        var linkId = (await IssueKit.ViewAsync(t.Owner, a)).GetProperty("blocks")[0].GetProperty("linkId").GetGuid();
+        var archived = archiveTheBlocker ? a : b;
+        (await t.Owner.SendAsync(HttpMethod.Delete, $"/api/issues/{archived}")).EnsureSuccessStatusCode();
+
+        Assert.Equal(("status", "archived"), await ProjectKit.ProblemAsync(await t.Owner.SendAsync(HttpMethod.Delete, $"/api/issue-links/{linkId}")));
+        Assert.Single((await IssueKit.ViewAsync(t.Owner, a)).GetProperty("blocks").EnumerateArray());
+
+        (await t.Owner.PostAsync($"/api/issues/{archived}/restore", new { })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Delete, $"/api/issue-links/{linkId}")).StatusCode);
+    }
 }

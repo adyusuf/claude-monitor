@@ -75,6 +75,7 @@ public static class AuditActions
     public const string ProjectUpdated = "project.updated";
     public const string ProjectArchived = "project.archived";
     public const string ProjectRestored = "project.restored";
+    public const string ProjectDetached = "project.detached";
     public const string ProjectMemberChanged = "project.member_changed";
     public const string ProjectMemberRemoved = "project.member_removed";
     public const string ApplicationCreated = "application.created";
