@@ -124,6 +124,17 @@ public sealed class AccessPolicyMathTests
         Assert.Equal(new AccessRefusal(AccessErrors.CwdDenied, AccessRefusedBy.Policy, 3), AccessPolicyMath.Evaluate(layers, Argv("/srv/secret/x"), Linux));
     }
 
+    // F-300, a known limit (ADR-0020 §4, docs/security.md): a run that names no working directory has no folder to judge, and free argument paths are not placeholders.
+    [Fact]
+    public void An_argv_run_with_no_working_directory_meets_no_folder_check_and_a_free_argument_is_not_a_path_to_judge()
+    {
+        var layers = new[] { Layer(allowed: ["/srv"], denied: ["/srv/secret"]) };
+
+        Assert.Equal(AccessErrors.CwdNotAllowed, AccessPolicyMath.Evaluate(layers, Argv("/opt"), Linux)?.Code);
+        Assert.Null(AccessPolicyMath.Evaluate(layers, Argv(cwd: null), Linux));
+        Assert.Null(AccessPolicyMath.Evaluate([AccessPolicyMath.Default(["/srv/app"])], Argv(cwd: null), Linux));
+    }
+
     [Fact]
     public void The_first_layer_that_refuses_is_named_so_a_ceiling_refusal_comes_before_a_policy_one()
     {

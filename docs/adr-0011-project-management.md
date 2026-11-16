@@ -61,12 +61,12 @@ Text a person types (names, purposes, notes, links) is shown as text only and ne
 | Call | Needs |
 |---|---|
 | `GET /api/workspaces/{ws}/projects`, `POST` | read / member |
-| `GET /api/projects/{id}`, `PUT` (replaces the definition), `DELETE` (archive), `POST /restore` | read / project edit / archive |
+| `GET /api/projects/{id}`, `PUT` (replaces the definition; an optional `expectedUpdatedAt` makes a project that changed since answer 409 `stale_update`, without it the last write wins; a change of item types, priority scale or estimation unit that would leave issues with a value the project no longer offers answers 409 `item_type_in_use`, `priority_scale_in_use` or `estimation_unit_in_use` with the number of issues in `count`), `DELETE` (archive), `POST /restore` | read / project edit / archive |
 | `GET /api/projects/{id}/members`, `PUT /{userId}`, `DELETE /{userId}` | read / project edit |
 | `GET /api/projects/{id}/applications`, `POST` | read / application edit |
 | `GET /api/applications/{id}`, `PUT`, `DELETE` (archive), `POST /restore` | read / application edit |
 | `GET`, `POST /api/applications/{id}/components` and `PUT`, `DELETE /api/components/{id}` | read / application edit |
-| `GET`, `POST /api/applications/{id}/releases` and `PUT`, `DELETE /api/releases/{id}` (a release that went out cannot be cancelled) | read / application edit |
+| `GET`, `POST /api/applications/{id}/releases` and `PUT`, `DELETE /api/releases/{id}` (a release that went out cannot be cancelled; the cap of 200 counts planned releases only, so a long history never blocks the next one) | read / application edit |
 
 Lists are paged by key (newest first). Error codes are i18n keys. Changes write audit rows that name the row by id, never its text.
 
@@ -111,7 +111,8 @@ where an `in_progress` or `in_review` issue becomes `ready`.
 
 **Issues:** `issues` gains `sprint_id` (an issue is in at most one sprint). The backlog is the issues in no sprint. Issues are added to a
 planned or active sprint from the backlog (many at once) or created new and added; a sprint of an application takes only issues of that
-application. Removing one returns it to the backlog. The sprint page groups its issues by status; a quick status change has its own call.
+application. Removing one returns it to the backlog. The sprint page groups its issues by status; a quick status change has its own call. The status `backlog` is a status like the others inside
+a sprint: an issue keeps the status it had when it was added, and the quick change accepts `backlog` ("in the sprint, not ready yet") without taking it out of the sprint; only a closed sprint refuses the change.
 **Team:** workspace members who can work. **Release:** a release of an application of the project (of that application when the sprint
 has one). Committed and done estimates are summed from the issues (numeric units only; T-shirt sizes are not summed).
 

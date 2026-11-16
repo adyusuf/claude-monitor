@@ -54,6 +54,9 @@ public sealed class User
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public string? Email { get; set; }
     public string? EmailNormalized { get; set; }
+
+    /// <summary>The e-mail identity key (<see cref="Text.EmailIdentity"/>: trimmed, lower-cased, not folded; F-180). NULL with no address (a deleted account).</summary>
+    public string? EmailKey { get; set; }
     public string DisplayName { get; set; } = "";
     public string DisplayNameSearch { get; set; } = "";
     public string? PasswordHash { get; set; }
@@ -142,6 +145,9 @@ public sealed class WorkspaceInvitation
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid WorkspaceId { get; set; }
     public string EmailNormalized { get; set; } = "";
+
+    /// <summary>The address as the inviter typed it (trimmed), for display (F-059); NULL on an invitation from before this column.</summary>
+    public string? Email { get; set; }
     public string Role { get; set; } = Roles.Member;
     public string TokenHash { get; set; } = "";
     public Guid InvitedBy { get; set; }

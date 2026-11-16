@@ -94,6 +94,7 @@ public sealed class AskCreator(PodiumDb db, ApiConfig config, TimeProvider clock
 
         var from = await (from a in db.Agents.AsNoTracking() join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id where a.Id == agentId select m.Hostname).FirstAsync(ct);
         broker.Publish(Broker.Agent(target.Id), new StreamMessage(AgentStreamEvents.Ask, new AskMessage(ask.Id, question, Label(from), ask.ProjectKey, ask.ExpiresAt)));
+        AskReports.PublishToWeb(broker, ask);
         return new AskCreateResult(new AskCreated(ask.Id, ask.Status, ask.ExpiresAt), StatusCodes.Status200OK, null);
     }
 

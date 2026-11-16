@@ -9,7 +9,7 @@ import { dateTime } from "../lib/format";
 import { debounce, isCatchUp, useLive } from "../lib/live";
 import { AlertList } from "./AlertList";
 import { GrantList } from "./GrantList";
-import { JobList } from "./JobList";
+import { JobList, type JobFilter } from "./JobList";
 import { ScheduleList } from "./ScheduleList";
 import { ToolList } from "./MachineBadges";
 import { MachineMetrics } from "./MachineMetrics";
@@ -31,7 +31,7 @@ import { useMachineData } from "./useMachineData";
 import { Icon } from "../components/icons";
 
 /** The live events that change what this page shows. */
-const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "schedule", "machine", "action"];
+const REMOTE_EVENTS: readonly string[] = ["run", "alert", "grant", "job", "schedule", "ask", "machine", "action"];
 
 /** One machine in tabs: overview, control, work (projects, runs, jobs, schedules), monitoring (load, alerts) and access (grants). The runs waiting for the owner stay above the tabs. */
 export function MachinePage() {
@@ -46,7 +46,8 @@ function MachineContent({ ws, agentId }: { ws: string; agentId: string }) {
   const { me } = useSession();
   const [showResolved, setShowResolved] = useState(false);
   const [version, setVersion] = useState(0);
-  const data = useMachineData(ws, agentId, me?.id, showResolved);
+  const [jobFilter, setJobFilter] = useState<JobFilter>("");
+  const data = useMachineData(ws, agentId, me?.id, showResolved, jobFilter);
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
   const isAdmin = role === "owner" || role === "admin";
   const { reload } = data;
@@ -133,8 +134,8 @@ function MachineContent({ ws, agentId }: { ws: string; agentId: string }) {
               <Card title={t("remote.runs")}>
                 <RunList runs={data.runs} ws={ws} version={version} hasMore={data.hasMoreRuns} onMore={() => void data.moreRuns()} onChanged={() => void reload()} />
               </Card>
-              <Card title={t("remote.jobs")}><JobList jobs={data.jobs} hasMore={data.hasMoreJobs} onMore={() => void data.moreJobs()} onChanged={() => void reload()} /></Card>
-              <Card title={t("schedules.title")}><ScheduleList schedules={data.schedules} jobs={data.jobs} canCreate={data.owned} onChanged={() => void reload()} /></Card>
+              <Card title={t("remote.jobs")}><JobList jobs={data.jobs} filter={jobFilter} onFilter={setJobFilter} hasMore={data.hasMoreJobs} onMore={() => void data.moreJobs()} onChanged={() => void reload()} /></Card>
+              <Card title={t("schedules.title")}><ScheduleList schedules={data.schedules} jobs={data.activeJobs} canCreate={data.owned} onChanged={() => void reload()} /></Card>
             </>
           ),
         },

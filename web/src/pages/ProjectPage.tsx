@@ -58,6 +58,10 @@ export function ProjectPage() {
     await load();
   };
 
+  const detach = () => {
+    if (project && window.confirm(t("projects.detachConfirm", { name: project.name }))) void act(() => api.detachProject(id));
+  };
+
   const archive = () => {
     if (project && window.confirm(t("projects.archiveConfirm", { name: project.name }))) void act(() => api.archiveProject(id));
   };
@@ -75,6 +79,7 @@ export function ProjectPage() {
           <Link className="btn btn-ghost" to={`/w/${ws}/projects/${id}/sprints`}>{t("sprints.title")}</Link>
           {access.canEditApplications && !archived ? <Link className="btn btn-ghost" to={`/w/${ws}/projects/${id}/sprints?new=1`}>{t("sprints.startSprint")}</Link> : null}
           {access.canEdit && !archived && !editing ? <Button variant="ghost" onClick={() => setEditing(true)}>{t("projects.edit")}</Button> : null}
+          {access.canArchive && !archived && project.sourceConnectionId !== null && !project.mirrorActive ? <Button variant="ghost" onClick={detach}>{t("projects.detach")}</Button> : null}
           {access.canArchive && !archived ? <Button variant="ghost" onClick={archive}>{t("projects.archive")}</Button> : null}
         </div>
       </header>
@@ -89,7 +94,7 @@ export function ProjectPage() {
       ) : null}
       {editing && access.canEdit && !archived ? (
         <Card title={t("projects.editTitle")}>
-          <ProjectForm initial={draftOfProject(project)} members={members} canChangeOwner={access.canArchive} submitLabel={t("common.save")} mirrored={project.sourceConnectionId !== null}
+          <ProjectForm initial={draftOfProject(project)} members={members} canChangeOwner={access.canArchive} submitLabel={t("common.save")} mirrored={project.mirrorActive}
             onSubmit={save} onCancel={() => setEditing(false)} />
         </Card>
       ) : <ProjectDefinition project={project} />}

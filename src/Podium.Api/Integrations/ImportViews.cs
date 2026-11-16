@@ -1,6 +1,7 @@
 namespace Podium.Api.Integrations;
 
-public sealed record SpaceView(string Key, string Name, string? Description, bool Imported, Guid? ProjectId);
+/// <summary>A space of the site. <c>CanEdit</c> (added later, old clients ignore it): the caller may edit the imported project, as importing its sprints needs (false when not imported). UX only; the import call checks it again.</summary>
+public sealed record SpaceView(string Key, string Name, string? Description, bool Imported, Guid? ProjectId, bool CanEdit = false);
 
 public sealed record SprintChoice(string Id, string Name, string State, string? Goal, DateOnly? Start, DateOnly? End, bool Imported, Guid? SprintId);
 

@@ -149,6 +149,15 @@ public sealed class UnitTests
         Assert.Equal("http://localhost:5173", dev.PublicOrigin);
         Assert.Null(dev.GitHub);
         Assert.False(dev.SecureCookies);
+        Assert.Equal(120, dev.DeviceTokenRequestsPerMinute); // F-215: the poll budget's default
+        foreach (var bad in new[] { "0", "-5", "many" })
+        {
+            var fallback = ApiConfig.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE"] = bad,
+            }).Build(), development: true);
+            Assert.Equal(120, fallback.DeviceTokenRequestsPerMinute);
+        }
 
         var prod = ApiConfig.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -165,6 +174,7 @@ public sealed class UnitTests
             ["AIPOD_BACKGROUND_JOBS"] = "off",
             ["AIPOD_AUTH_RATE_PER_MINUTE"] = "5",
             ["AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE"] = "7",
+            ["AIPOD_INVITE_RATE_PER_MINUTE"] = "9",
             ["AIPOD_MFA_KEY"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         }).Build(), development: false);
         Assert.Equal("https://aipod.invalid", prod.PublicOrigin);
@@ -175,6 +185,7 @@ public sealed class UnitTests
         Assert.False(prod.BackgroundJobs);
         Assert.Equal(5, prod.AuthRequestsPerMinute);
         Assert.Equal(7, prod.DeviceTokenRequestsPerMinute);
+        Assert.Equal(9, prod.InviteRequestsPerMinute);
         Assert.Equal("id", prod.Google!.ClientId);
 
         IConfiguration With(string origin, string mfaKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

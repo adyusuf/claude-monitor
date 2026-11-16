@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { en } from "../i18n/en";
 import { ME, mockApi, renderAt } from "../test/helpers";
 import { AccountPage } from "./AccountPages";
 import { LoginPage } from "./AuthPages";
@@ -90,6 +91,23 @@ describe("turning two-step sign-in on and off", () => {
     await userEvent.click(screen.getByRole("button", { name: "Turn on" }));
     expect(await screen.findByText("aaaaa-bbbbb")).toBeInTheDocument();
     expect(screen.getByText(/They are shown only now/)).toBeInTheDocument();
+  });
+
+  it("asks an account without a password for no password and words a refused stale sign-in for this form", async () => {
+    const calls = mockApi({
+      "GET /me": { body: { ...ME, mfaEnabled: false, hasPassword: false } },
+      "POST /me/mfa/setup": { body: { secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/x?secret=JBSWY3DPEHPK3PXP" } },
+      "POST /me/mfa/enable": { status: 403, body: { title: "reauth_required" } },
+    });
+    renderAt("/account", [{ path: "/account", element: <AccountPage /> }]);
+    await userEvent.click(await screen.findByRole("button", { name: en.account.mfaSetup }));
+    expect(await screen.findByText(en.account.mfaFreshSignIn)).toBeInTheDocument();
+    expect(screen.queryByLabelText(en.account.mfaPassword)).toBeNull();
+    await userEvent.type(screen.getAllByLabelText(/Code from your authenticator app/)[0]!, "123456");
+    await userEvent.click(screen.getByRole("button", { name: en.account.mfaEnable }));
+    expect(await screen.findAllByText(en.account.mfaFreshSignIn)).toHaveLength(2);
+    expect(screen.queryByText(en.errors.reauth_required)).toBeNull();
+    expect(calls.find((c) => c.path === "/me/mfa/enable")!.body).toEqual({ code: "123456" });
   });
 
   it("turns it off with a code and asks for a code before deleting the account", async () => {

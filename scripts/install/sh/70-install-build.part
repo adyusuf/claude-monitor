@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------- installing the build
+
+if [ -z "$installed" ] || newer "$version" "$installed"; then
+  say "Installing aipod $version"
+  if [ "$dry" = 1 ]; then
+    say "  [dry run] $file would be downloaded, checked and put at $new_bin"
+  else
+    curl -fsSL --max-time 300 --max-filesize 262144000 -o "$tmp/$file" "$from/$file" || die "download of $file failed"
+    [ "$(sha256 "$tmp/$file")" = "$sha" ] || die "refused: $file does not match the SHA-256 in the manifest"
+    mkdir -p "$tmp/x"
+    if command -v unzip > /dev/null 2>&1; then
+      unzip -o -q "$tmp/$file" -d "$tmp/x" || die "unzip failed"
+    elif command -v bsdtar > /dev/null 2>&1; then
+      bsdtar -xf "$tmp/$file" -C "$tmp/x" || die "bsdtar failed"
+    else
+      die "unzip (or bsdtar) is needed"
+    fi
+    [ -f "$tmp/x/aipod" ] || die "the download holds no aipod"
+    chmod +x "$tmp/x/aipod"
+    if [ "$os" = macos ] && [ "${AIPOD_INSTALL_UNSIGNED_OK:-}" != 1 ]; then
+      codesign --verify --strict "$tmp/x/aipod" 2> /dev/null || die "refused: the build is not validly code-signed"
+    fi
+    mkdir -p "$new_home/bin" && chmod 700 "$new_home"
+    mv -f "$tmp/x/aipod" "$new_bin" || die "could not put the build at $new_bin"
+    say "  installed $new_bin"
+    case ":$PATH:" in
+      *":$HOME/.local/bin:"*) [ -d "$HOME/.local/bin" ] && ln -sf "$new_bin" "$HOME/.local/bin/aipod" && say "  linked aipod into $HOME/.local/bin" ;;
+      *) say "  to type 'aipod' anywhere, add this folder to PATH: $new_home/bin" ;;
+    esac
+  fi
+fi
+

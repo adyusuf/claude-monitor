@@ -18,7 +18,8 @@ public sealed record ExecLevelPendingView(string Level, long Sequence, DateTimeO
 /// <summary>
 /// The owner's change of a machine's remote-run level from the web (ADR-0021). Owner only, in an active membership; the level and deadline are checked,
 /// the sequence is compare-and-set, a raise carries a signature of one of the owner's registered keys (the machine checks it again against its pinned
-/// keys), and every change is re-authenticated like a grant. Nothing here changes <c>agents.exec_level</c>: only the agent's own report does.
+/// keys), a raise is re-authenticated like a grant (a strict machine needs a fresh code) and a lowering needs only a recent sign-in.
+/// Nothing here changes <c>agents.exec_level</c>: only the agent's own report does.
 /// </summary>
 public static class ExecLevelChanges
 {
@@ -47,7 +48,11 @@ public static class ExecLevelChanges
             if (!await VerifiesAsync(db, userId, req, id, ct)) return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ApprovalErrors.Invalid);
         }
 
-        if (await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, agent, req.Code) is { } refused) return refused;
+        // A raise is gated like a grant approval (a strict machine needs a fresh code); a lowering is the safe direction and needs only the re-authentication
+        // of any other action, a recent sign-in (F-139), so the owner can always switch remote runs off.
+        var gate = signed ? await RemoteChecks.ApprovalGateAsync(http, db, config, clock, userId, agent, req.Code)
+            : await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code) ? null : RemoteChecks.ReauthRefused(http);
+        if (gate is { } refused) return refused;
         var stored = new ExecLevelRequest(req.Level!, req.Sequence, req.NotAfter, signed ? req.KeyId : null, signed ? req.Signature : null);
         var json = JsonSerializer.Serialize(stored, Json);
         // The change and its audit row commit together, or neither does (with the used code's step, which the gate tracked).

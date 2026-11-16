@@ -72,6 +72,8 @@ public static class IssueLinkEndpoints
         if (link is null || await ProjectAccess.IssueAsync(db, userId, link.BlockerIssueId, http.RequestAborted) is not { } f) return Http.NotFound();
         if (!f.Grant.CanEditApplications) return Results.Forbid();
         if (f.Grant.Archived) return ProjectGrant.ReadOnly;
+        // An archived issue is read-only on either end of the link, as it is for adding one.
+        if (f.Issue.ArchivedAt is not null || await db.Issues.AnyAsync(i => i.Id == link.BlockedIssueId && i.ArchivedAt != null, http.RequestAborted)) return Http.Invalid("status", "archived");
         db.IssueLinks.Remove(link);
         Audit.Add(db, http, clock, AuditActions.IssueLinkChanged, link.WorkspaceId, userId, targetType: "issue", targetId: link.BlockerIssueId);
         await db.SaveChangesAsync(http.RequestAborted);

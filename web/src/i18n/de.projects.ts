@@ -7,6 +7,7 @@ export const deProjects: Dictionary["projects"] = {
   empty: "Es gibt noch keine Projekte.", emptyHint: "Ein Projekt enthält die Anwendungen, die Sie bauen, und später deren Backlog und Sprints.",
   noMatch: "Kein Projekt passt zur Suche.",
   archiveConfirm: "„{name}“ archivieren? Es bleibt in der Liste der archivierten und kann wiederhergestellt werden.",
+  detach: "Von Jira lösen", detachConfirm: "\"{name}\" dauerhaft von Jira lösen? Die Verbindung besteht bereits nicht mehr; danach gilt das Projekt nicht mehr als importiert und kann nicht erneut mit Jira verknüpft werden.",
   archivedBanner: "Dieses Projekt ist archiviert: Es ist schreibgeschützt, bis es wiederhergestellt wird.",
   applicationArchivedBanner: "Diese Anwendung ist archiviert: Sie ist schreibgeschützt, bis sie wiederhergestellt wird.",
   ownerIs: "Eigentümer: {name}", applicationCount: "Anwendungen: {n}", sprintDays: "{n} Tage", removeRow: "Entfernen",

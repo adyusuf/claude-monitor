@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------- the Claude Code plugin
+
+if [ "$want_plugin" = 1 ]; then
+  if ! have_claude; then
+    say "Claude Code (the 'claude' command) was not found. When it is installed, run:"
+    say "  claude plugin marketplace add $from/aipod-marketplace.json"
+    say "  claude plugin install aipod@aipod-releases${server:+ --config server=$server}"
+  else
+    say "Setting up the Claude Code plugin"
+    if claude plugin marketplace list --json 2> /dev/null | grep -q '"name": *"aipod-releases"'; then
+      act "claude plugin marketplace update aipod-releases" claude plugin marketplace update aipod-releases
+    else
+      act "claude plugin marketplace add $from/aipod-marketplace.json" claude plugin marketplace add "$from/aipod-marketplace.json" \
+        || warn "  could not add the marketplace $from/aipod-marketplace.json"
+    fi
+    if claude plugin list --json 2> /dev/null | grep -q '"id": *"aipod@aipod-releases"'; then
+      act "claude plugin update aipod@aipod-releases" claude plugin update aipod@aipod-releases && did "  the aipod plugin is up to date"
+    else
+      # The server option lets the plugin download its own copy of the agent; without it the plugin finds the server in agent.json.
+      if [ -n "$server" ]; then
+        act "claude plugin install aipod@aipod-releases --config server=$server" claude plugin install aipod@aipod-releases --config "server=$server" \
+          || act "claude plugin install aipod@aipod-releases" claude plugin install aipod@aipod-releases \
+          || warn "  the plugin was not installed; run: claude plugin install aipod@aipod-releases"
+      else
+        act "claude plugin install aipod@aipod-releases" claude plugin install aipod@aipod-releases \
+          || warn "  the plugin was not installed; run: claude plugin install aipod@aipod-releases"
+      fi
+      did "  installed the aipod plugin"
+    fi
+  fi
+fi
+

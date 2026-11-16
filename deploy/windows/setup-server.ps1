@@ -105,7 +105,7 @@ if ($dbPassword) {
   $env:PGPASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($su))
   try {
     & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE aipod_$Environment LOGIN PASSWORD '$dbPassword';" | Out-Null
-    & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE aipod_$Environment OWNER aipod_$Environment;" | Out-Null
+    & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE aipod_$Environment OWNER aipod_$Environment ENCODING 'UTF8' TEMPLATE template0;" | Out-Null
   } finally { Remove-Item Env:PGPASSWORD }
 } else { Write-Host "   aipod.env already existed: the database is assumed to exist" }
 

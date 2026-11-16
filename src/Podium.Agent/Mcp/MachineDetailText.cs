@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Podium.Agent.Capture;
 using Podium.Contracts;
 
 namespace Podium.Agent.Mcp;
@@ -34,7 +35,7 @@ public static class MachineDetailText
         if (d.Projects.Count > 0) b.AppendLine("projects:");
         foreach (var p in d.Projects.Take(ProjectsShown)) b.AppendLine(Project(p));
         var text = b.ToString().TrimEnd();
-        return text.Length > TotalMax ? text[..TotalMax] + "\n[cut]" : text;
+        return text.Length > TotalMax ? SafeText.Cut(text, TotalMax) + "\n[cut]" : text;
     }
 
     private static string Project(MachineProjectView p)

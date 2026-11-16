@@ -8,6 +8,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(HERE, '..', 'build-agent.sh')
+ASSEMBLE = os.path.join(HERE, '..', 'install', 'assemble.sh')
 TARGETS = {
     'osx-arm64': 'aipod-macos-arm64', 'osx-x64': 'aipod-macos-x64', 'win-x64': 'aipod-windows-x64',
     'win-arm64': 'aipod-windows-arm64', 'linux-x64': 'aipod-linux-x64', 'linux-arm64': 'aipod-linux-arm64',
@@ -44,8 +45,11 @@ class BuildAgentTests(unittest.TestCase):
         write(os.path.join(self.root, 'src', 'Podium.Agent', 'Podium.Agent.csproj'), f'<Project><PropertyGroup><Version>{VERSION}</Version></PropertyGroup></Project>\n')
         for name, label in (('write_plugin_pins.py', 'pins'), ('sign_manifest.py', 'sign'), ('build_plugin_site.py', 'site')):
             write(os.path.join(self.root, 'scripts', name), PYTHON_STUB.replace('{name}', label))
-        write(os.path.join(self.root, 'scripts', 'install', 'aipod-install.sh'), '#!/bin/sh\n')
-        write(os.path.join(self.root, 'scripts', 'install', 'aipod-install.ps1'), '# installer\n')
+        os.makedirs(os.path.join(self.root, 'scripts', 'install'))
+        shutil.copyfile(ASSEMBLE, os.path.join(self.root, 'scripts', 'install', 'assemble.sh'))
+        write(os.path.join(self.root, 'scripts', 'install', 'sh', '00-first.part'), '#!/bin/sh\n')
+        write(os.path.join(self.root, 'scripts', 'install', 'sh', '99-last.part'), 'exit 0\n')
+        write(os.path.join(self.root, 'scripts', 'install', 'ps1', '00-first.part'), '# installer\n')
         subprocess.run(['git', 'init', '-q', self.root], check=True)
         write(os.path.join(self.bin, 'dotnet'), DOTNET, executable=True)
         write(os.path.join(self.bin, 'zip'), ZIP, executable=True)
@@ -90,6 +94,10 @@ class BuildAgentTests(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.out, 'manifest.json')))
         self.assertIn('no AGENT_UPDATE_CHANNEL', result.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.out, 'aipod-install.ps1')))
+        # The installers are served as one file each: the step files joined in name order, the shell one executable (F-332).
+        with open(os.path.join(self.out, 'aipod-install.sh')) as handle:
+            self.assertEqual('#!/bin/sh\nexit 0\n', handle.read())
+        self.assertTrue(os.stat(os.path.join(self.out, 'aipod-install.sh')).st_mode & stat.S_IXUSR)
 
     def test_a_channel_without_its_public_key_stops_before_anything_is_built(self):
         result = self.run_script(AGENT_UPDATE_CHANNEL='test')

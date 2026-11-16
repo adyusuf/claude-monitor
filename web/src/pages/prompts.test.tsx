@@ -57,7 +57,32 @@ describe("answering Claude's question and plan from the web", () => {
     await userEvent.type(screen.getAllByPlaceholderText("Or type another answer")[1]!, "Lint");
     expect(send).toBeEnabled();
     await userEvent.click(send);
-    await waitFor(() => expect(answered(calls)).toEqual({ decision: "allow", answers: { "Which way?": "Right", "Which extras?": "Tests, Lint" } }));
+    // Typed text goes apart from the chosen options (Q-2): the API takes only offered options as a choice, and the agent wraps the text.
+    await waitFor(() => expect(answered(calls)).toEqual({ decision: "allow", answers: { "Which way?": "Right", "Which extras?": "Tests" }, other: { "Which extras?": "Lint" } }));
+  });
+
+  it("sends a question answered only with typed text in other, not as a choice", async () => {
+    const calls = open(waiting("AskUserQuestion", { questions: [way, extras] }));
+    renderAt("/w/w1/sessions/s1", route);
+    const send = await screen.findByRole("button", { name: "Send answers" });
+    await userEvent.type(screen.getAllByPlaceholderText("Or type another answer")[0]!, "  Down  ");
+    await userEvent.click(screen.getByRole("button", { name: /Docs/ }));
+    await userEvent.click(send);
+    await waitFor(() => expect(answered(calls)).toEqual({ decision: "allow", answers: { "Which extras?": "Docs" }, other: { "Which way?": "Down" } }));
+  });
+
+  it("says in words when the API refuses an answer that is not an offered option", async () => {
+    mockApi({
+      "GET /me": { body: ME },
+      "GET /sessions/s1": { body: detail() },
+      "GET /sessions/s1/commands": { body: [] },
+      "GET /sessions/s1/events": { body: { items: [], next: null } },
+      "GET /sessions/s1/permission-requests": { body: [waiting("AskUserQuestion", { questions: [way] })] },
+      "POST /permission-requests/p1/answer": { status: 400, body: { title: "One or more validation errors occurred.", status: 400, errors: { answers: ["invalid_answer"] } } },
+    });
+    renderAt("/w/w1/sessions/s1", route);
+    await userEvent.click(within(await screen.findByRole("group", { name: "Which way?" })).getByRole("button", { name: /Left/ }));
+    expect(await screen.findByText("That answer is not one of the options offered.")).toBeInTheDocument();
   });
 
   it("can decline a question, and offers a viewer nothing to press", async () => {

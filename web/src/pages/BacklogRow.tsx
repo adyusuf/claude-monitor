@@ -12,6 +12,8 @@ interface Props {
   unit: EstimationUnit;
   canWrite: boolean;
   canMove: boolean;
+  /** The project's mirror is active (its connection is not disconnected): a mirrored issue is then archived in the tool only. */
+  mirrorActive: boolean;
   /** A move is on its way: the arrows wait for it. */
   moving: boolean;
   first: boolean;
@@ -22,7 +24,7 @@ interface Props {
 }
 
 /** One issue of the backlog: its facts on one line and the actions of the row. The buttons that change things show only to those who may. */
-export function BacklogRow({ ws, issue, unit, canWrite, canMove, moving, first, last, onMove, onArchive, onRestore }: Props) {
+export function BacklogRow({ ws, issue, unit, canWrite, canMove, mirrorActive, moving, first, last, onMove, onArchive, onRestore }: Props) {
   const { t } = useI18n();
   const priority = usePriorityText();
   const estimate = useEstimateText();
@@ -52,7 +54,7 @@ export function BacklogRow({ ws, issue, unit, canWrite, canMove, moving, first, 
             <Button variant="ghost" disabled={last || moving} aria-label={`${t("issues.moveDown")} ${mark}`} onClick={() => onMove(1)}>↓</Button>
           </>
         ) : null}
-        {canWrite && !issue.externalKey ? (
+        {canWrite && !(issue.externalKey && mirrorActive) ? (
           issue.archived
             ? <Button variant="ghost" aria-label={`${t("projects.restore")} ${mark}`} onClick={onRestore}>{t("projects.restore")}</Button>
             : <Button variant="ghost" aria-label={`${t("projects.archive")} ${mark}`} onClick={onArchive}>{t("projects.archive")}</Button>

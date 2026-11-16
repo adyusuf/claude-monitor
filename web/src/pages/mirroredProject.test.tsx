@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -69,28 +69,65 @@ describe("the project card", () => {
 });
 
 describe("the project page", () => {
-  const edit = async (sourceConnectionId: string | null) => {
-    mockApi({
-      "GET /me": { body: ME },
-      "GET /projects/p1": { body: project({ sourceConnectionId }) },
-      "GET /workspaces/w1/members": { body: workspaceMembers },
-      "GET /projects/p1/members": { body: [projectMember()] },
-      "GET /projects/p1/sprints": { body: { items: [], next: null } },
-      "GET /projects/p1/applications": { body: { items: [], next: null } },
-    });
-    renderAt("/w/w1/projects/p1?edit=1", [{ path: "/w/:ws/projects/:id", element: <ProjectPage /> }]);
+  const route = [{ path: "/w/:ws/projects/:id", element: <ProjectPage /> }];
+  const serve = (over: Parameters<typeof project>[0], extra: Parameters<typeof mockApi>[0] = {}) => mockApi({
+    "GET /me": { body: ME },
+    "GET /projects/p1": { body: project(over) },
+    "GET /workspaces/w1/members": { body: workspaceMembers },
+    "GET /projects/p1/members": { body: [projectMember()] },
+    "GET /projects/p1/sprints": { body: { items: [], next: null } },
+    "GET /projects/p1/applications": { body: { items: [], next: null } },
+    ...extra,
+  });
+  const edit = async (over: Parameters<typeof project>[0]) => {
+    serve(over);
+    renderAt("/w/w1/projects/p1?edit=1", route);
     await screen.findByLabelText("Sponsor");
   };
 
-  it("locks the name and the purpose of a project that came from a connection", async () => {
-    await edit("c1");
+  it("locks the name and the purpose of a project that came from a connection that is still there", async () => {
+    await edit({ sourceConnectionId: "c1", mirrorActive: true });
     expect(screen.getByLabelText("Name")).toBeDisabled();
     expect(screen.getByLabelText("Purpose")).toBeDisabled();
   });
 
-  it("leaves them open for a project made in Podium", async () => {
-    await edit(null);
+  it("leaves them open for a project whose connection is gone", async () => {
+    await edit({ sourceConnectionId: "c1", mirrorActive: false });
     expect(screen.getByLabelText("Name")).toBeEnabled();
     expect(screen.getByLabelText("Purpose")).toBeEnabled();
+  });
+
+  it("leaves them open for a project made in Podium", async () => {
+    await edit({ sourceConnectionId: null });
+    expect(screen.getByLabelText("Name")).toBeEnabled();
+    expect(screen.getByLabelText("Purpose")).toBeEnabled();
+  });
+
+  it("detaches a project whose connection is gone after a confirmation, and reloads it", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const calls = serve({ sourceConnectionId: "c1", mirrorActive: false }, { "POST /projects/p1/detach": { status: 204 } });
+    renderAt("/w/w1/projects/p1", route);
+    await userEvent.click(await screen.findByRole("button", { name: "Detach from Jira" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/projects/p1/detach"))).toBe(true));
+    expect(calls.filter((c) => c.method === "GET" && c.path.endsWith("/projects/p1")).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("does not detach when the confirmation is declined", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const calls = serve({ sourceConnectionId: "c1", mirrorActive: false }, { "POST /projects/p1/detach": { status: 204 } });
+    renderAt("/w/w1/projects/p1", route);
+    await userEvent.click(await screen.findByRole("button", { name: "Detach from Jira" }));
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it.each([
+    ["a connection that is still there", { sourceConnectionId: "c1", mirrorActive: true }],
+    ["a project made in Podium", { sourceConnectionId: null }],
+    ["a person who may not archive", { sourceConnectionId: "c1", mirrorActive: false, access: { canEdit: true, canArchive: false, canEditApplications: true } }],
+  ])("offers no Detach button for %s", async (_name, over) => {
+    serve(over);
+    renderAt("/w/w1/projects/p1", route);
+    await screen.findByRole("heading", { level: 1, name: /Checkout/ });
+    expect(screen.queryByRole("button", { name: "Detach from Jira" })).not.toBeInTheDocument();
   });
 });

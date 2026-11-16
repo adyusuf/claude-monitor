@@ -31,6 +31,8 @@ export interface SpaceView {
   description: string | null;
   imported: boolean;
   projectId: string | null;
+  /** The caller may edit the imported project, which importing its sprints needs (UX only: the API checks again). */
+  canEdit: boolean;
 }
 
 export type SprintState = "planned" | "active" | "closed";

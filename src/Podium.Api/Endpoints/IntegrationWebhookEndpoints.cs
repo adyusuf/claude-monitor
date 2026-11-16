@@ -10,16 +10,23 @@ namespace Podium.Api.Endpoints;
 
 /// <summary>
 /// The address Jira calls (ADR-0015 §6). No session: the signed token is the only credential. The body is never trusted; it only says which issue
-/// or sprint to read again, and that is queued. Always answers quickly, and 200 for a repeated delivery.
+/// or sprint to read again, and that is queued. Always answers quickly, and 200 for a repeated delivery. A token without <c>exp</c> is still
+/// accepted (the claims Atlassian sends are unverified, F-075), so new deliveries are capped per connection per hour: past the cap a delivery is
+/// answered 429, leaves no receipt and queues nothing; the reconciliation pass still reads what it would have.
 /// </summary>
 public static class IntegrationWebhookEndpoints
 {
     public const int BodyMax = 256 * 1024;
     private const string DeliveryHeader = "X-Atlassian-Webhook-Identifier";
 
+    /// <summary>New deliveries (receipts) one connection may leave in <see cref="ReceiptWindow"/> (F-075).</summary>
+    public const int ReceiptsPerHour = 3000;
+    public static readonly TimeSpan ReceiptWindow = TimeSpan.FromHours(1);
+
     public static void Map(RouteGroupBuilder api) => api.MapPost("/integrations/jira/webhook/{id:guid}", Receive).AllowAnonymous();
 
-    private static async Task<IResult> Receive(Guid id, HttpContext http, PodiumDb db, IntegrationSettings settings, TimeProvider clock, SyncInbox inbox)
+    private static async Task<IResult> Receive(Guid id, HttpContext http, PodiumDb db, IntegrationSettings settings, TimeProvider clock, SyncInbox inbox,
+        ILoggerFactory logs)
     {
         var ct = http.RequestAborted;
         if (!settings.JiraAvailable || settings.Jira is not { } app) return Results.NotFound();
@@ -31,7 +38,16 @@ public static class IntegrationWebhookEndpoints
         if (body is null) return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
         var delivery = http.Request.Headers[DeliveryHeader].ToString() is { Length: > 0 and <= 100 } header ? header : Convert.ToHexStringLower(SHA256.HashData(body));
         if (await db.IntegrationWebhookReceipts.AnyAsync(r => r.ConnectionId == id && r.DeliveryId == delivery, ct)) return Results.Ok();
-        db.IntegrationWebhookReceipts.Add(new IntegrationWebhookReceipt { ConnectionId = id, DeliveryId = delivery, ReceivedAt = clock.GetUtcNow() });
+        var now = clock.GetUtcNow();
+        var since = now - ReceiptWindow;
+        // A soft cap: deliveries arriving at the same moment may pass it by a few.
+        if (await db.IntegrationWebhookReceipts.CountAsync(r => r.ConnectionId == id && r.ReceivedAt > since, ct) >= ReceiptsPerHour)
+        {
+            logs.CreateLogger(typeof(IntegrationWebhookEndpoints)).LogWarning("Webhook delivery for integration {Connection} refused: over {Cap} an hour", id, ReceiptsPerHour);
+            return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+        }
+
+        db.IntegrationWebhookReceipts.Add(new IntegrationWebhookReceipt { ConnectionId = id, DeliveryId = delivery, ReceivedAt = now });
         try
         {
             await db.SaveChangesAsync(ct);

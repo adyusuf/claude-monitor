@@ -11,10 +11,14 @@ export const PLAN_TOOL = "ExitPlanMode";
 
 /**
  * Claude's question with its options as buttons: clicking one answers it in the session. One single-choice question is
- * answered by the click itself; otherwise the choices are collected and sent together. The answer is only ever one of
- * the options (or short typed text); the agent puts it into the question the session itself asked.
+ * answered by the click itself; otherwise the choices are collected and sent together. A chosen answer is only ever the
+ * options (joined for a multiple choice); short typed text goes apart from it, as `other` (the API refuses anything but offered options as a
+ * choice, and the agent wraps typed text as a message from the web; Q-2). The agent puts both into the question the session itself asked.
  */
-export function QuestionPrompt({ input, onAnswer }: { input: Record<string, unknown>; onAnswer: (answers: Record<string, string>) => void }) {
+export function QuestionPrompt({ input, onAnswer }: {
+  input: Record<string, unknown>;
+  onAnswer: (answers: Record<string, string>, other?: Record<string, string>) => void;
+}) {
   const { t } = useI18n();
   const questions = questionsOf(input);
   const [picked, setPicked] = useState<Record<string, string[]>>({});
@@ -27,7 +31,11 @@ export function QuestionPrompt({ input, onAnswer }: { input: Record<string, unkn
     const now = p[q.question] ?? [];
     return { ...p, [q.question]: q.multiSelect ? (now.includes(label) ? now.filter((l) => l !== label) : [...now, label]) : [label] };
   });
-  const send = () => onAnswer(Object.fromEntries(questions.map((q) => [q.question, chosen(q).join(", ")])));
+  const send = () => {
+    const typed = Object.fromEntries(questions.flatMap((q) => (other[q.question]?.trim() ? [[q.question, other[q.question]!.trim()]] : [])));
+    onAnswer(Object.fromEntries(questions.flatMap((q) => (picked[q.question]?.length ? [[q.question, picked[q.question]!.join(", ")]] : []))),
+      Object.keys(typed).length > 0 ? typed : undefined);
+  };
 
   return (
     <div className="prompt-question">

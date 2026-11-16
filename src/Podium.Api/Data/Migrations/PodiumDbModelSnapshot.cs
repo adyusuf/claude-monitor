@@ -1162,6 +1162,10 @@ namespace Podium.Api.Data.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_integration_accounts_user_id");
 
+                    b.HasIndex("ConnectionId", "ExternalAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_integration_accounts_account");
+
                     b.HasIndex("ConnectionId", "UserId")
                         .IsUnique()
                         .HasDatabaseName("ix_integration_accounts_connection_id_user_id");
@@ -1298,6 +1302,10 @@ namespace Podium.Api.Data.Migrations
                     b.Property<Guid>("LocalId")
                         .HasColumnType("uuid")
                         .HasColumnName("local_id");
+
+                    b.Property<int>("MissedPasses")
+                        .HasColumnType("integer")
+                        .HasColumnName("missed_passes");
 
                     b.Property<DateTimeOffset>("SyncedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1442,6 +1450,11 @@ namespace Podium.Api.Data.Migrations
                     b.HasIndex("ConnectionId", "ExternalAccountId")
                         .IsUnique()
                         .HasDatabaseName("ix_integration_people_connection_id_external_account_id");
+
+                    b.HasIndex("ConnectionId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_integration_people_user")
+                        .HasFilter("user_id IS NOT NULL");
 
                     b.ToTable("integration_people");
                 });
@@ -3071,6 +3084,14 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("answered_by_rule");
 
+                    b.Property<string>("Answers")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answers");
+
+                    b.Property<string>("ClientKey")
+                        .HasColumnType("text")
+                        .HasColumnName("client_key");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -3117,6 +3138,11 @@ namespace Podium.Api.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_permission_requests");
 
+                    b.HasIndex("AgentId", "ClientKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_permission_requests_agent_id_client_key")
+                        .HasFilter("client_key IS NOT NULL");
+
                     b.HasIndex("SessionId", "Status")
                         .HasDatabaseName("ix_permission_requests_session_id_status");
 
@@ -3126,6 +3152,8 @@ namespace Podium.Api.Data.Migrations
                     b.ToTable("permission_requests", t =>
                         {
                             t.HasCheckConstraint("ck_permission_requests_access_scope", "access_scope IS NULL OR access_scope IN ('inside', 'outside', 'unknown')");
+
+                            t.HasCheckConstraint("ck_permission_requests_client_key", "client_key IS NULL OR length(client_key) BETWEEN 1 AND 100");
 
                             t.HasCheckConstraint("ck_permission_requests_decision", "decision IS NULL OR decision IN ('allow', 'deny')");
 
@@ -4033,7 +4061,7 @@ namespace Podium.Api.Data.Migrations
                     b.HasIndex("ApplicationId")
                         .IsUnique()
                         .HasDatabaseName("ux_sprints_active_application")
-                        .HasFilter("status = 'active' AND application_id IS NOT NULL AND source_connection_id IS NULL");
+                        .HasFilter("status = 'active' AND application_id IS NOT NULL AND source_connection_id IS NULL AND archived_at IS NULL");
 
                     b.HasIndex("CreatedBy")
                         .HasDatabaseName("ix_sprints_created_by");
@@ -4041,7 +4069,7 @@ namespace Podium.Api.Data.Migrations
                     b.HasIndex("ProjectId")
                         .IsUnique()
                         .HasDatabaseName("ux_sprints_active_project")
-                        .HasFilter("status = 'active' AND application_id IS NULL AND source_connection_id IS NULL");
+                        .HasFilter("status = 'active' AND application_id IS NULL AND source_connection_id IS NULL AND archived_at IS NULL");
 
                     b.HasIndex("ReleaseId")
                         .HasDatabaseName("ix_sprints_release_id");
@@ -4170,6 +4198,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("email");
 
+                    b.Property<string>("EmailKey")
+                        .HasColumnType("text")
+                        .HasColumnName("email_key");
+
                     b.Property<string>("EmailNormalized")
                         .HasColumnType("text")
                         .HasColumnName("email_normalized");
@@ -4219,8 +4251,11 @@ namespace Podium.Api.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_users");
 
-                    b.HasIndex("EmailNormalized")
+                    b.HasIndex("EmailKey")
                         .IsUnique()
+                        .HasDatabaseName("ix_users_email_key");
+
+                    b.HasIndex("EmailNormalized")
                         .HasDatabaseName("ix_users_email_normalized");
 
                     b.ToTable("users", t =>
@@ -4418,6 +4453,10 @@ namespace Podium.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text")
+                        .HasColumnName("email");
 
                     b.Property<string>("EmailNormalized")
                         .IsRequired()

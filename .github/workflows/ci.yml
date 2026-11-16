@@ -85,3 +85,31 @@ jobs:
       - name: Gate
         run: bash scripts/gate-core.sh dev
 
+
+  # The agent's Windows runtime (WindowsRunProcess with the Job Object, DpapiCredentialStore, WindowsCredentialManager, WindowsAclReader,
+  # PathIdentity.Windows, WindowsMetrics) is only ever run here: the gate above is ubuntu. Same SDK and the same test project the gate
+  # builds and runs; the agent tests write no secret and open no network. Starts only where the workflow starts (workflow_dispatch above).
+  agent-windows:
+    name: Agent tests (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Tool versions
+        run: dotnet --version
+
+      - name: Identity for the tests that make commits in temporary repositories
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@users.noreply.github.com"
+
+      - name: Build the agent tests
+        run: dotnet build tests/Podium.Agent.Tests -warnaserror --nologo
+
+      - name: Agent tests
+        run: dotnet test tests/Podium.Agent.Tests --no-build --nologo

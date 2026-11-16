@@ -219,6 +219,16 @@ public sealed class IngestTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task The_settings_tell_the_agent_how_many_events_a_batch_may_hold()
+    {
+        var agent = await (await api.NewClient().SignedUpAsync("batch-size")).ConnectAgentAsync();
+        var settings = await agent.Http.GetFromJsonAsync<AgentSettings>("/api/agent/settings", TestUser.Json);
+        Assert.Equal(500, settings!.MaxBatchEvents);
+        var over = Enumerable.Range(0, settings.MaxBatchEvents + 1).Select(i => TestAgent.Hook("s", "Stop", new { }, T(i))).ToArray();
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, (await agent.SendAsync(over)).StatusCode); // one more than it said is refused
+    }
+
+    [Fact]
     public async Task A_heartbeat_records_the_agent_version_and_time()
     {
         var user = await api.NewClient().SignedUpAsync("heartbeat");
@@ -227,6 +237,6 @@ public sealed class IngestTests(ApiFactory api)
         var row = (await user.GetJsonAsync($"/api/workspaces/{user.WorkspaceId}/agents"))[0];
         Assert.Equal("0.3.0", row.GetProperty("version").GetString());
         var settings = await agent.Http.GetFromJsonAsync<AgentSettings>("/api/agent/settings", TestUser.Json);
-        Assert.Equal(new AgentSettings(true, 262_144, user.WorkspaceId, UpdateModes.Off, false, new AlertThresholds(90, 90, 90, 300), ClaudeAutoMode: ClaudeAutoModes.Off), settings);
+        Assert.Equal(new AgentSettings(true, 262_144, user.WorkspaceId, UpdateModes.Off, false, new AlertThresholds(90, 90, 90, 300), ClaudeAutoMode: ClaudeAutoModes.Off, MaxBatchEvents: 500, ClaudeControl: false), settings);
     }
 }

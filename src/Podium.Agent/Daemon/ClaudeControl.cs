@@ -80,6 +80,10 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
     private const string NotTrusted = "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt, then try again";
     private readonly Lock gate = new();
     private readonly SemaphoreSlim startGate = new(1, 1);
+
+    /// <summary>A test seam: called with the lock while a start's record is between the read of the worker list and its save, so a test can force another writer into that window.</summary>
+    internal Action<Lock>? InRecordWindow { get; set; }
+
     private readonly Func<ClaudeInstall> locator = locate ?? (() => ClaudeLocator.Locate(config));
 
     [GeneratedRegex(@"backgrounded\s*·\s*(?<id>[0-9a-f]{8})", RegexOptions.CultureInvariant)]
@@ -134,7 +138,13 @@ public sealed partial class ClaudeControl(AgentConfig config, IClaudeCli cli, Ti
 
         if (Backgrounded().Match(run.Output) is not { Success: true } match) return new(false, $"claude --bg did not say which session it started: {FirstLine(run.Output)}");
         var id = match.Groups["id"].Value;
-        lock (gate) Save(Load().Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow(), null, reason)).ToList()); // the same lock as stop and reconcile: no record of theirs is overwritten
+        lock (gate) // the same lock as stop and reconcile: from the read of the list to its save, no record of theirs is overwritten
+        {
+            var workers = Load();
+            InRecordWindow?.Invoke(gate);
+            Save(workers.Append(new ClaudeWorker(id, projectKey, folder, mode, clock.GetUtcNow(), null, reason)).ToList());
+        }
+
         return new(true, $"started session {id} in the background ({mode} mode{(firstPrompt is null ? "" : ", with a first prompt")}); it appears in the session list", id);
     }
 

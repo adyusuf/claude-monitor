@@ -31,6 +31,8 @@ export interface ProjectInput {
   sprintLengthDays: number;
   definitionOfReady: string[];
   definitionOfDone: string[];
+  /** The updatedAt the form was loaded with; the API answers 409 stale_update when the project changed since. Left out when creating. */
+  expectedUpdatedAt?: string;
 }
 
 export interface ProjectAccess { canEdit: boolean; canArchive: boolean; canEditApplications: boolean }
@@ -74,6 +76,8 @@ export interface ProjectView {
   updatedAt: string;
   access: ProjectAccess;
   sourceConnectionId: string | null;
+  /** True while the project's connection is not disconnected: its name and purpose are then the tool's. False for a project made here and for an imported one whose connection is gone. */
+  mirrorActive: boolean;
 }
 
 export interface ProjectMemberView { userId: string; displayName: string; email: string | null; role: ProjectRole; addedAt: string }

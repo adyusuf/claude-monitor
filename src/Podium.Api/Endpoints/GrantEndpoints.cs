@@ -24,7 +24,7 @@ public static class GrantEndpoints
     }
 
     private static async Task<IResult> List(Guid id, DateTimeOffset? before, int? limit, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock)
+        TimeProvider clock, Guid? beforeId = null)
     {
         var userId = http.User.UserId();
         var agent = await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, http.RequestAborted);
@@ -34,7 +34,7 @@ public static class GrantEndpoints
         }
 
         return Results.Ok(await GrantQueries.ForWebAsync(db, id, userId, agent.UserId == userId, null, before, Http.Limit(limit, config),
-            clock.GetUtcNow(), http.RequestAborted));
+            clock.GetUtcNow(), http.RequestAborted, beforeId));
     }
 
     private static Task<IResult> Create(Guid id, WebGrantRequest req, HttpContext http, GrantService grants) =>

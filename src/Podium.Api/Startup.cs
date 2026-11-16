@@ -24,6 +24,7 @@ public static class Startup
         services.AddSingleton(config);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Broker>();
+        services.AddSingleton<StreamLimiter>();
         services.AddSingleton(new UpdateCatalog(config));
         if (config.DownloadsUrl is not null) services.AddHostedService<UpdateCatalogRefresher>();
         services.AddDbContext<PodiumDb>(o => o.UseNpgsql(config.DatabaseUrl));
@@ -84,6 +85,9 @@ public static class Startup
             o.AddPolicy(DeviceEndpoints.TokenRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = config.DeviceTokenRequestsPerMinute, Window = TimeSpan.FromMinutes(1) }));
+            o.AddPolicy(InvitationEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = config.InviteRequestsPerMinute, Window = TimeSpan.FromMinutes(1) }));
         });
         services.AddProblemDetails();
         services.Configure<ForwardedHeadersOptions>(o =>

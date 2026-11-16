@@ -80,6 +80,20 @@ public sealed class IssueRunTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_run_of_an_archived_issue_cannot_be_unlinked_until_the_issue_is_restored()
+    {
+        var (team, _, issue, run) = await SetUpAsync();
+        (await team.Admin.PostAsync($"/api/issues/{issue}/runs", new { runId = run })).EnsureSuccessStatusCode();
+        (await team.Admin.SendAsync(HttpMethod.Delete, $"/api/issues/{issue}")).EnsureSuccessStatusCode();
+
+        Assert.Equal(("status", "archived"), await ProjectKit.ProblemAsync(await team.Admin.SendAsync(HttpMethod.Delete, $"/api/issues/{issue}/runs/{run}")));
+        Assert.Single((await team.Admin.GetJsonAsync($"/api/issues/{issue}/runs")).EnumerateArray());
+
+        (await team.Admin.PostAsync($"/api/issues/{issue}/restore", new { })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NoContent, (await team.Admin.SendAsync(HttpMethod.Delete, $"/api/issues/{issue}/runs/{run}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Run_links_are_audited_by_issue_id_without_the_command()
     {
         var (team, _, issue, run) = await SetUpAsync();

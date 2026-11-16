@@ -77,6 +77,7 @@ public sealed class MirrorIssueActionTests(ApiFactory api)
         var id = await w.IdAsync("WRT-2");
         w.Site.Find("WRT-3")!.Deleted = true;
         await JiraKit.PassAsync(w.World);
+        await JiraKit.PassAsync(w.World); // an issue missing from the listing is archived on the second pass in a row (F-066)
         var gone = await w.RowAsync("WRT-3");
         Assert.NotNull(gone.ArchivedAt); // archived by the sync, as the ADR says
         var calls = w.Jira.Calls(w.Site).Count;

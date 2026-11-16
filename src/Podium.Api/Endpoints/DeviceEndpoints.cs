@@ -1,6 +1,8 @@
 using Podium.Api.Config;
 using Podium.Api.Data;
+using Podium.Api.Remote;
 using Podium.Api.Security;
+using Podium.Api.Streaming;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +17,9 @@ public static class DeviceEndpoints
 {
     /// <summary>The poll of <c>/device/token</c> has its own, looser per-IP budget (<see cref="ApiConfig.DeviceTokenRequestsPerMinute"/>).</summary>
     public const string TokenRateLimitPolicy = "device-token";
+
+    /// <summary>The audit detail's reason when a re-login of the same machine into another workspace revoked an agent (F-211).</summary>
+    public const string ReplacedByReloginReason = "relogin";
 
     public static void Map(RouteGroupBuilder api)
     {
@@ -68,7 +73,7 @@ public static class DeviceEndpoints
         Http.IsName(value, max) && !value!.Any(c => char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format);
 
     private static async Task<IResult> Token(DeviceTokenRequest req, HttpContext http, PodiumDb db, ApiConfig config,
-        TimeProvider clock)
+        TimeProvider clock, Broker broker)
     {
         var now = clock.GetUtcNow();
         var hash = Secrets.Hash(req.DeviceCode ?? "");
@@ -109,16 +114,24 @@ public static class DeviceEndpoints
         var claimed = await db.DeviceAuthorizations.Where(d => d.Id == device.Id && d.Status == DeviceStatuses.Approved)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, DeviceStatuses.Consumed), http.RequestAborted);
         if (claimed == 0) return Error(DeviceTokenErrors.Expired);
-        var agent = await EnrolAsync(db, device, now, http.RequestAborted);
+        var (agent, replaced) = await EnrolAsync(db, http, clock, device, now, http.RequestAborted);
         var tokens = AgentTokens.Issue(db, config, agent, now);
         await db.SaveChangesAsync(http.RequestAborted);
+        // The agents a re-login replaced in other workspaces end like a revoked one: their remote work ends with them (ADR-0005).
+        var notices = new List<Action>();
+        if (replaced.Count > 0) await RemoteCleanup.ForAgentsAsync(db, broker, replaced, agent.UserId, now, http.RequestAborted, notices);
         await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
+        replaced.ForEach(id => broker.Publish(Broker.Agent(id), new StreamMessage(AgentStreamEvents.Revoked, new { })));
         return Results.Ok(tokens);
     }
 
     /// <summary>The machine row (one per installation per workspace) and a fresh agent for the approving user.
-    /// An earlier agent of the same user on the same machine is revoked: one active agent per user per machine.</summary>
-    private static async Task<Agent> EnrolAsync(PodiumDb db, DeviceAuthorization device, DateTimeOffset now, CancellationToken ct)
+    /// An earlier agent of the same user on the same machine is revoked: one active agent per user per machine. So is one of the same
+    /// user and machine key in another workspace (F-211): its tokens end and its workspace's audit log names the agent that replaced it.
+    /// Returns the new agent and the ids of those other-workspace agents.</summary>
+    private static async Task<(Agent Agent, List<Guid> Replaced)> EnrolAsync(PodiumDb db, HttpContext http, TimeProvider clock,
+        DeviceAuthorization device, DateTimeOffset now, CancellationToken ct)
     {
         var workspaceId = device.WorkspaceId!.Value;
         var userId = device.ApprovedBy!.Value;
@@ -137,20 +150,12 @@ public static class DeviceEndpoints
 
         var previous = await db.Agents.Where(a => a.MachineId == machine.Id && a.UserId == userId && a.Status == AgentStatuses.Active)
             .ToListAsync(ct);
-        foreach (var old in previous)
-        {
-            old.Status = AgentStatuses.Revoked;
-            old.RevokedAt = now;
-            old.RevokedBy = userId;
-        }
-
-        // The old agent's standing approvals (ADR-0019) end with it.
-        var oldIds = previous.Select(a => a.Id).ToList();
-        await db.ApprovalRules.Where(r => oldIds.Contains(r.AgentId) && r.RevokedAt == null).ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, now), ct);
-
-        // The partial unique index (one active agent per machine and user) is checked per statement, so the
-        // revocations must reach the database before the new agent is inserted.
-        await db.SaveChangesAsync(ct);
+        // A machine row is per workspace, so the same installation's agents in the user's other workspaces are found by the key.
+        var elsewhere = await (from a in db.Agents
+                               join m in db.Machines on a.MachineId equals m.Id
+                               where a.UserId == userId && a.Status == AgentStatuses.Active
+                                     && m.MachineKeyHash == device.MachineKeyHash && m.WorkspaceId != workspaceId
+                               select a).ToListAsync(ct);
         var agent = new Agent
         {
             MachineId = machine.Id,
@@ -160,8 +165,33 @@ public static class DeviceEndpoints
             EnrolledAt = now,
             LastHeartbeatAt = now,
         };
+        foreach (var old in previous.Concat(elsewhere))
+        {
+            old.Status = AgentStatuses.Revoked;
+            old.RevokedAt = now;
+            old.RevokedBy = userId;
+        }
+
+        foreach (var old in elsewhere)
+        {
+            await AgentTokens.RevokeAllAsync(db, old.Id, now, ct);
+            Audit.Add(db, http, clock, AuditActions.AgentRevoked, old.WorkspaceId, userId, targetType: "agent", targetId: old.Id,
+                detail: new
+                {
+                    reason = ReplacedByReloginReason, oldAgentId = old.Id, oldWorkspaceId = old.WorkspaceId, newAgentId = agent.Id,
+                    newWorkspaceId = workspaceId,
+                });
+        }
+
+        // The old agent's standing approvals (ADR-0019) end with it.
+        var oldIds = previous.Select(a => a.Id).ToList();
+        await db.ApprovalRules.Where(r => oldIds.Contains(r.AgentId) && r.RevokedAt == null).ExecuteUpdateAsync(s => s.SetProperty(r => r.RevokedAt, now), ct);
+
+        // The partial unique index (one active agent per machine and user) is checked per statement, so the
+        // revocations must reach the database before the new agent is inserted.
+        await db.SaveChangesAsync(ct);
         db.Agents.Add(agent);
-        return agent;
+        return (agent, elsewhere.Select(a => a.Id).ToList());
     }
 
     private static async Task<IResult> Lookup(string userCode, HttpContext http, PodiumDb db, TimeProvider clock)

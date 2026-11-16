@@ -11,7 +11,7 @@ and command their sessions on the web. Design: `docs/adr-0002-agent-platform.md`
 - **The agent opens no network port:** hooks and daemon share a SQLite file in the user-only home; it talks to the API outbound.
 - **Workspace-scoped:** every API call checks membership; only a session's owner commands it.
 - **Messages from the web are untrusted input:** whatever reaches a session (hook context or channel push) is wrapped, labelled as coming from the web and capped; push is on after the first `aipod install`, through the session inbox (no start-up flag, works in the desktop app; `--push channel` is the other transport; maintainer, 17/10/2026), and `--push off` / `config push off` stay off (ADR-0003, ADR-0007).
-- **Captured content is sensitive:** never logged, masked for secrets by default, deleted after retention.
+- **Captured content is sensitive:** never logged, masked for secrets by default, blanked or archived after retention (data-model.md).
 - **Host names live in deployment configuration.**
 - **Tests never touch a real database, account or harness configuration.**
 - **Public repository.** No real project, company or personal names or addresses in code, tests,

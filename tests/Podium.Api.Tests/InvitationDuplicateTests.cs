@@ -39,6 +39,20 @@ public sealed class InvitationDuplicateTests(ApiFactory api)
         Assert.Equal(0, (await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/invitations")).GetArrayLength());
     }
 
+    [Theory]
+    [InlineData("admin", HttpStatusCode.Conflict)]
+    [InlineData("member", HttpStatusCode.Conflict)]
+    [InlineData("viewer", HttpStatusCode.Conflict)]
+    [InlineData("owner", HttpStatusCode.Created)]
+    public async Task An_active_admin_is_already_a_member_at_their_rank_and_below_and_invitable_only_above(string role, HttpStatusCode expected)
+    {
+        // F-048 pin: "already member" answers only at the same or a higher rank than the one invited.
+        var owner = await api.NewClient().SignedUpAsync("dup-rank-owner");
+        var admin = await RemoteKit.MemberAsync(api, owner, "dup-rank", "admin");
+
+        Assert.Equal(expected, (await InviteAsync(owner, admin.Email, role)).StatusCode);
+    }
+
     [Fact]
     public async Task Inviting_an_active_member_to_a_higher_role_is_still_an_invitation()
     {

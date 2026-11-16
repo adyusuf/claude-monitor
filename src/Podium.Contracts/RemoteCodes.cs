@@ -154,6 +154,12 @@ public static class JobStatuses
     public const string Denied = "denied";
     public const string Retired = "retired";
     public static readonly IReadOnlyList<string> All = [Proposed, Active, Denied, Retired];
+
+    /// <summary>The list filter's groups (<c>status=open</c>, <c>status=finished</c>): the jobs still waiting or in use, and the ones that ended.</summary>
+    public const string OpenGroup = "open";
+    public const string FinishedGroup = "finished";
+    public static readonly IReadOnlyList<string> Open = [Proposed, Active];
+    public static readonly IReadOnlyList<string> Finished = [Denied, Retired];
 }
 
 /// <summary>Why a remote request was refused, as the API answers it in a 409 body and the MCP tools show it.</summary>

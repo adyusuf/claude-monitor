@@ -58,6 +58,18 @@ public sealed partial class RelayTests
     }
 
     [Fact]
+    public async Task The_relay_sends_the_asks_local_id_as_its_key_so_a_resent_create_finds_the_request_it_made()
+    {
+        AskBash("l1");
+        fake.On("POST /api/agent/permission-requests", HttpStatusCode.OK, new PermissionRequestCreated(Guid.NewGuid(), clock.GetUtcNow().AddMinutes(2)));
+
+        await relay.PermissionsAsync(CancellationToken.None);
+
+        var sent = JsonSerializer.Deserialize<PermissionRequestCreate>(fake.Seen.Single(s => s.Path == "/api/agent/permission-requests").Body, ApiClient.Json)!;
+        Assert.Equal("l1", sent.ClientKey);
+    }
+
+    [Fact]
     public async Task A_request_created_with_no_inline_answer_waits_for_the_owner()
     {
         AskBash("l1");

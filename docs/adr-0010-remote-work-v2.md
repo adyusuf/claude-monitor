@@ -44,7 +44,7 @@ made by the implementer where the maintainer had not said; each is listed in §9
 
 ## 4. End-to-end signed approvals
 
-- **The key.** An owner's browser makes an ECDSA P-256 key pair with WebCrypto (no dependency), **non-extractable**, kept in IndexedDB; the account page lists the public key's fingerprint (SHA-256 of the SPKI, hex) and can retire it.
+- **The key.** An owner's browser makes an ECDSA P-256 key pair with WebCrypto (no dependency), **non-extractable**, kept in IndexedDB under the signed-in person's own slot (F-190, 16/11/2026: another account on the same browser never reads, offers or signs with it; a key from the older browser-wide slot moves to a person only when the API lists it as one of their live keys); the account page lists the public key's fingerprint (SHA-256 of the SPKI, hex) and can retire it.
   The API stores the public key per user and device name (`approval_keys`), so it can check a signature too, but **the API's copy is not what a target trusts**.
 - **Pinning.** A target trusts a key only after its **local admin** pinned it: `cm-agent approvers add <fingerprint> <public key>` (the person compares the fingerprint with the web page), stored in `approvers.json` in the agent's home,
   admin-owned (root-owned and not writable by the service on Unix, not writable by the service on Windows, as the exec policy file is). `cm-agent config approvals required|off` (same file, same ownership) sets the mode; the default is `off`, so nothing changes for anyone who does not opt in.

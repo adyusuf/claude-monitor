@@ -88,6 +88,8 @@ internal sealed unsafe partial class UnixRunProcess : RunProcessBase
         if (access(exe, XOk) != 0) throw new Win32Exception(Marshal.GetLastPInvokeError(), "Could not start the run (exec).");
     }
 
+    public override int? Pid => _pid;
+
     public override void Kill() => SendToTree(Sigterm);
 
     public override void KillNow() => SendToTree(Sigkill, freeze: true);
