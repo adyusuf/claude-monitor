@@ -23,7 +23,7 @@ export const integrationsView = (connections: ConnectionView[] = [connection()],
 });
 
 export const space = (over: Partial<SpaceView> = {}): SpaceView => ({
-  key: "SHOP", name: "Shop", description: null, imported: false, projectId: null, ...over,
+  key: "SHOP", name: "Shop", description: null, imported: false, projectId: null, canEdit: false, ...over,
 });
 
 export const sprintChoice = (over: Partial<SprintChoice> = {}): SprintChoice => ({

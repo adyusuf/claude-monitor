@@ -124,6 +124,7 @@ Errors are i18n keys. Audit rows (`integration.*`) name ids and counts, never Ji
 - A webhook delivery is checked by its HS256 token against the app's client secret and queued in memory (`SyncInbox`); the receipt table stops a repeat. Webhook registration needs
   a public `https` origin and is skipped (live updates off) otherwise.
 - Closing a mirrored sprint first moves its unfinished issues in Jira (to the chosen sprint or the backlog), then closes it. A failed step after another succeeded is repaired by the next webhook or pass.
+- Making a mirrored sprint writes to Jira first, then saves here. When the local save fails after Jira made the sprint, the one Jira made is deleted again (once; when that delete fails too it is logged with the tool's sprint id and the first error is still the answer). When Jira refuses the make, nothing was stored here.
 - A person who is assigned in Jira but is no Podium member shows as the assignee by name; the form cannot clear that assignment by sending "nobody".
 - Account deletion removes the person's Atlassian sign-ins and their links to Jira people; a connection they alone read with goes to "sign in again".
 

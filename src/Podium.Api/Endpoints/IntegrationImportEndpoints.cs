@@ -47,7 +47,8 @@ public static class IntegrationImportEndpoints
 
     private static async Task<IResult> Spaces(Guid id, int? skip, int? take, HttpContext http, PodiumDb db, IWorkTracker tracker, IntegrationTokens tokens)
     {
-        if ((await OfAsync(db, http, id, Roles.Viewer)).Connection is not { } c) return Http.NotFound();
+        var (connection, member) = await OfAsync(db, http, id, Roles.Viewer);
+        if (connection is not { } c || member is null) return Http.NotFound();
         if (Paging(skip, take, SpacesMax) is not { } page) return PagingRefused(skip);
         if (await tokens.ConnectorContextAsync(c, http.RequestAborted) is not { } ctx) return RemoteReauthorize();
         try
@@ -56,8 +57,9 @@ public static class IntegrationImportEndpoints
             var imported = await db.IntegrationLinks.AsNoTracking().Where(l => l.ConnectionId == id && l.Kind == LinkKinds.Project).ToListAsync(http.RequestAborted);
             var byExternal = imported.ToDictionary(l => l.ExternalId, l => l.LocalId);
             MarkTruncated(http, spaces.Count > page.Skip + page.Take);
-            return Results.Ok(spaces.Skip(page.Skip).Take(page.Take)
-                .Select(s => new SpaceView(s.Key, s.Name, s.Description, byExternal.ContainsKey(s.Id), byExternal.TryGetValue(s.Id, out var p) ? p : null)));
+            var editable = await EditableProjectsAsync(db, member, [.. byExternal.Values], http.RequestAborted);
+            return Results.Ok(spaces.Skip(page.Skip).Take(page.Take).Select(s => new SpaceView(s.Key, s.Name, s.Description, byExternal.ContainsKey(s.Id), byExternal.TryGetValue(s.Id, out var p) ? p : null,
+                byExternal.TryGetValue(s.Id, out var local) && editable.Contains(local))));
         }
         catch (TrackerException e)
         {
@@ -90,6 +92,14 @@ public static class IntegrationImportEndpoints
         {
             return Failure(e);
         }
+    }
+
+    /// <summary>The projects of the list the caller may edit (the right <see cref="ProjectAccess"/> gives, read for all of them at once).</summary>
+    private static async Task<HashSet<Guid>> EditableProjectsAsync(PodiumDb db, WorkspaceMember member, List<Guid> projectIds, CancellationToken ct)
+    {
+        var projects = await db.Projects.AsNoTracking().Where(p => projectIds.Contains(p.Id) && p.WorkspaceId == member.WorkspaceId).ToListAsync(ct);
+        var roles = await db.ProjectMembers.AsNoTracking().Where(m => m.UserId == member.UserId && projectIds.Contains(m.ProjectId)).ToDictionaryAsync(m => m.ProjectId, m => m.Role, ct);
+        return [.. projects.Where(p => ProjectAccess.Decide(p, member, roles.GetValueOrDefault(p.Id)).CanEdit).Select(p => p.Id)];
     }
 
     private static async Task<IResult> ImportSprints(Guid id, string key, ImportSprintsRequest req, HttpContext http, PodiumDb db, ImportService import)
