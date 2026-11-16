@@ -4256,7 +4256,6 @@ namespace Podium.Api.Data.Migrations
                         .HasDatabaseName("ix_users_email_key");
 
                     b.HasIndex("EmailNormalized")
-                        .IsUnique()
                         .HasDatabaseName("ix_users_email_normalized");
 
                     b.ToTable("users", t =>

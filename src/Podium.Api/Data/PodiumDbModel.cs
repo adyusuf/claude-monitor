@@ -30,7 +30,8 @@ internal static class PodiumDbModel
         });
         b.Entity<User>(e =>
         {
-            e.HasIndex(x => x.EmailNormalized).IsUnique();
+            // A search index only: identity is email_key (F-180), and two mailboxes may fold to one value.
+            e.HasIndex(x => x.EmailNormalized);
             e.HasIndex(x => x.EmailKey).IsUnique();
             e.Property(x => x.Language).HasMaxLength(2);
             e.ToTable(t =>
