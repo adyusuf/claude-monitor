@@ -107,6 +107,28 @@ public sealed class ContentRetentionTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task The_chosen_answers_of_an_old_request_are_cleared_with_its_input_and_a_young_ones_are_kept()
+    {
+        var team = await TeamAsync(1);
+        var old = await SessionKit.AskPermissionAsync(team);
+        var young = await SessionKit.AskPermissionAsync(team);
+        await using (var db = api.Db())
+        {
+            await db.PermissionRequests.Where(p => p.Id == old || p.Id == young)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Answers, "{\"which\":\"typed answer\"}"));
+        }
+
+        await AgePermissionAsync(old, TimeSpan.FromDays(2), PermissionStatuses.Answered);
+        await AgePermissionAsync(young, TimeSpan.FromHours(12), PermissionStatuses.Answered);
+
+        await PassAsync();
+
+        await using var read = api.Db();
+        Assert.Null(await read.PermissionRequests.Where(p => p.Id == old).Select(p => p.Answers).SingleAsync());
+        Assert.Contains("typed answer", await read.PermissionRequests.Where(p => p.Id == young).Select(p => p.Answers).SingleAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Another_workspace_keeps_its_content_for_its_own_retention()
     {
         var team = await TeamAsync(1);

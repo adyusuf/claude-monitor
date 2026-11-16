@@ -52,13 +52,13 @@ public static class ContentRetention
         // jsonb equality is not in EF's translation: the "not blank yet" test is SQL (the blank is the empty object, as account deletion writes it).
         var due = await db.Database.SqlQuery<Guid>($$"""
             SELECT p.id AS "Value" FROM permission_requests p JOIN workspace_settings s ON s.workspace_id = p.workspace_id
-            WHERE p.status <> {{PermissionStatuses.Open}} AND p.created_at < {{now}} - make_interval(days => s.retention_days) AND p.tool_input <> '{}'::jsonb
+            WHERE p.status <> {{PermissionStatuses.Open}} AND p.created_at < {{now}} - make_interval(days => s.retention_days) AND (p.tool_input <> '{}'::jsonb OR p.answers IS NOT NULL)
             LIMIT {{batch}}
             """).ToListAsync(ct);
         if (due.Count == 0) return 0;
         using var blank = JsonDocument.Parse(BlankInput);
         return await db.PermissionRequests.Where(p => due.Contains(p.Id) && p.Status != PermissionStatuses.Open)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.ToolInput, blank), ct);
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.ToolInput, blank).SetProperty(p => p.Answers, (string?)null), ct);
     }
 
     private static async Task<int> ArchiveFilesAsync(PodiumDb db, DateTimeOffset now, int batch, CancellationToken ct)
