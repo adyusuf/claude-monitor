@@ -187,6 +187,33 @@ public sealed class RunRelayAdoptTests : IDisposable
         Assert.True(Row().Reported);
     }
 
+    [Fact]
+    public async Task When_the_lead_of_a_picked_up_run_ends_its_group_is_killed_once_so_no_child_outlives_the_run()
+    {
+        Left();
+        relay.Recover();
+
+        processes.Alive.TryRemove(FakePid, out _); // the lead is gone; children it left in the group are not in the table
+        Assert.True(await Finished());
+
+        Assert.Equal((RunStatuses.Failed, RunFailures.ExitUnknown), (Row().FinalStatus, Row().Error));
+        Assert.Equal([(FakePid, true)], processes.Signals.ToArray());
+    }
+
+    [Fact]
+    public async Task A_group_kill_that_fails_after_the_lead_ended_is_logged_and_the_run_still_ends()
+    {
+        processes.SignalError = new IOException("kill failed (errno 1)");
+        Left();
+        relay.Recover();
+
+        processes.Alive.TryRemove(FakePid, out _);
+        Assert.True(await Finished());
+
+        Assert.Equal((RunStatuses.Failed, RunFailures.ExitUnknown), (Row().FinalStatus, Row().Error));
+        Assert.Equal([(FakePid, true)], processes.Signals.ToArray());
+    }
+
     private sealed class FakeAdoption : IRunAdoption
     {
         public ConcurrentDictionary<int, DateTimeOffset> Alive { get; } = new();
@@ -195,12 +222,16 @@ public sealed class RunRelayAdoptTests : IDisposable
         /// <summary>Whether the polite stop ends the process (false: only the hard one does).</summary>
         public bool TermEnds { get; set; } = true;
 
+        /// <summary>What a signal fails with after it is recorded (null: it does not fail; a group already gone is no failure, as ESRCH).</summary>
+        public Exception? SignalError { get; set; }
+
         public DateTimeOffset? StartOf(int pid) => Alive.TryGetValue(pid, out var at) ? at : null;
 
         public void Signal(int pid, bool force)
         {
             Signals.Enqueue((pid, force));
             if (force || TermEnds) Alive.TryRemove(pid, out _);
+            if (SignalError is { } error) throw error;
         }
     }
 }
