@@ -110,6 +110,12 @@ public sealed class IntegrationLink
     /// <summary>The tool's own change value (Jira's <c>updated</c>), compared to skip what has not changed.</summary>
     public string? ExternalUpdated { get; set; }
     public DateTimeOffset SyncedAt { get; set; }
+
+    /// <summary>
+    /// Reconcile passes in a row that did not see the linked space, sprint or issue (F-066): it is archived only after the second, and a
+    /// pass that sees it again sets this back to 0.
+    /// </summary>
+    public int MissedPasses { get; set; }
 }
 
 public sealed class IntegrationPerson

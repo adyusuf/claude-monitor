@@ -1299,6 +1299,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("local_id");
 
+                    b.Property<int>("MissedPasses")
+                        .HasColumnType("integer")
+                        .HasColumnName("missed_passes");
+
                     b.Property<DateTimeOffset>("SyncedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("synced_at");
