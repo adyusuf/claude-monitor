@@ -134,6 +134,11 @@ attacker controls. A test run on a test machine is such a job: an admin-owned sc
 Approving a job freezes its command; changing it means retiring it and proposing a new one. **No schedules in v1:**
 a job runs only when asked (a schedule would be an autonomous action and needs its own decision, global #20; ADR-0010 decided it).
 
+**Who reads a job (decided 16/11/2026, F-151).** A job is a shared, named command: its argv and working folder are shown to every member of the
+workspace, viewers included, and to the workspace's agents, while its reason goes only to the machine's owner and the proposer. A grant is
+different: it is shown only to the machine's owner and its grantee. So an argv is never a place for a secret (a token, a password): the web
+and the agents' job list show it as it is. Pinned by `JobVisibilityTests` and `JobTests`.
+
 ### The executor on the target
 
 - Runs as the service's own account, **never root or SYSTEM** (checked at install and before every run; with
