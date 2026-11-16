@@ -26,16 +26,20 @@ public static class AccessReports
         return JsonSerializer.Serialize(clean, AccessPolicyStore.Json);
     }
 
-    /// <summary>The stored report, or null when there is none; a stored value the API cannot read is treated as none (the view says "not reported").</summary>
-    public static AccessReport? Read(string? json)
+    /// <summary>
+    /// The stored report, or null when there is none; a stored value the API cannot read is treated as none (the view says "not reported") and, when a
+    /// logger is given, logged as a warning with the agent's id and the kind of error only (the stored text came from a machine and is never logged).
+    /// </summary>
+    public static AccessReport? Read(string? json, ILogger? log = null, Guid? agentId = null)
     {
         if (json is null) return null;
         try
         {
             return JsonSerializer.Deserialize<AccessReport>(json, AccessPolicyStore.Json);
         }
-        catch (JsonException)
+        catch (JsonException e)
         {
+            log?.LogWarning("Stored access report of agent {AgentId} cannot be read and counts as none ({Type})", agentId, e.GetType().Name);
             return null;
         }
     }

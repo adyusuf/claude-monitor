@@ -15,7 +15,7 @@ namespace Podium.Api.Approvals;
 /// already judged). Bash and searches without a path are not affected. Policies and machine OSes are read once per instance, so a page of requests
 /// asks the database once for each.
 /// </summary>
-public sealed class ApprovalRuleAccess(PodiumDb db)
+public sealed class ApprovalRuleAccess(PodiumDb db, ILogger? log = null)
 {
     private readonly Dictionary<(Guid Workspace, Guid Repo), ProjectAccessPolicy?> policies = [];
     private readonly Dictionary<Guid, string?> oses = [];
@@ -51,8 +51,8 @@ public sealed class ApprovalRuleAccess(PodiumDb db)
     }
 
     /// <summary>True when the agent's last access report shows this policy's current version applied (not kept from before, not ignored).</summary>
-    private static bool Applied(Agent agent, ProjectAccessPolicy row) =>
-        AccessReports.Read(agent.AccessReport)?.Policies is { } reported
+    private bool Applied(Agent agent, ProjectAccessPolicy row) =>
+        AccessReports.Read(agent.AccessReport, log, agent.Id)?.Policies is { } reported
         && reported.Any(p => p.ProjectId == row.ProjectId && p.Version == row.Version && p.State == AccessPolicyStates.Applied);
 
     /// <summary>The live (not cleared) policy that covers the repository's key in the workspace (keys compared as RepoKeys.Same does), or null.</summary>

@@ -123,7 +123,8 @@ public static class CommandEndpoints
         return Results.Ok(rows);
     }
 
-    private static async Task<IResult> Answer(Guid id, AnswerRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, Broker broker)
+    private static async Task<IResult> Answer(Guid id, AnswerRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, Broker broker,
+        ILoggerFactory logs)
     {
         var userId = http.User.UserId();
         var request = await db.PermissionRequests.FirstOrDefaultAsync(p => p.Id == id, http.RequestAborted);
@@ -146,7 +147,8 @@ public static class CommandEndpoints
         Guid? existing = null;
         if (remember != ApprovalDurations.Once)
         {
-            var (refused, asked, standing) = await ApprovalRuleCreation.RememberAsync(db, http, config, clock, userId, request, remember, req.Code, now);
+            var (refused, asked, standing) = await ApprovalRuleCreation.RememberAsync(db, http, config, clock, userId, request, remember, req.Code, now,
+                logs.CreateLogger(typeof(ApprovalRuleCreation)));
             if (refused is not null) return refused;
             ask = asked;
             existing = standing;

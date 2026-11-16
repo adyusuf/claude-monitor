@@ -180,12 +180,12 @@ public static class ApprovalRules
     /// project's access (<see cref="ApprovalRuleAccess"/>).
     /// </summary>
     public static async Task<ApprovalRule?> MatchAsync(PodiumDb db, Agent agent, Guid? repoId, string toolName, JsonElement input, string? accessScope,
-        DateTimeOffset now, CancellationToken ct)
+        DateTimeOffset now, CancellationToken ct, ILogger? log = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(agent);
         if (agent.Status != AgentStatuses.Active || Strict(agent) || ScopeOf(toolName, input) is not { } scope) return null;
-        if (!await new ApprovalRuleAccess(db).AllowsAsync(agent, repoId, toolName, input, accessScope, ct)) return null;
+        if (!await new ApprovalRuleAccess(db, log).AllowsAsync(agent, repoId, toolName, input, accessScope, ct)) return null;
         return await db.ApprovalRules
             .Where(r => r.AgentId == agent.Id && r.UserId == agent.UserId && r.WorkspaceId == agent.WorkspaceId && r.RepoId == repoId
                 && r.ToolName == scope.Tool && r.Command == scope.Command && r.RevokedAt == null && (r.ExpiresAt == null || r.ExpiresAt > now))
