@@ -52,6 +52,7 @@ export const en = {
     provider_email_unverified: "The provider did not confirm your e-mail address.",
     link_required: "An account with this address exists. Sign in with your password, then link the provider in Account.",
     sign_in_first: "Sign in first, then link the provider.", provider_in_use: "That provider account is linked to another user.",
+    link_reauth_required: "Linking a sign-in method needs a sign-in from the last few minutes: sign out, sign in again, and link it right after.", last_sign_in_method: "This is the only way to sign in to this account. Set a password or link another provider first.",
     account_disabled: "This account is disabled.", not_a_member: "You are not a member of that workspace.",
     invalid_code: "That code is not valid or has expired.", last_owner: "A workspace needs at least one owner.",
     invalid_answers: "That answer does not match the question.", invalid_decision: "Pick allow or deny.", invalid_duration: "Pick how long the answer is remembered from the list.",
@@ -235,6 +236,7 @@ export const en = {
   },
   account: {
     title: "Account", providers: "Sign-in methods", linked: "Linked", link: "Link {provider}", password: "Password",
+    unlink: "Unlink {provider}", unlinked: "{provider} is unlinked.", providerFreshSignIn: "Unlinking a sign-in method needs a sign-in from the last few minutes: sign out, sign in again, and unlink it right after.",
     hasPassword: "Set", noPassword: "Not set (sign in with a provider, or reset to set one)",
     data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
     deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",

@@ -53,6 +53,7 @@ export const de: Dictionary = {
     provider_email_unverified: "Der Anbieter hat Ihre E-Mail-Adresse nicht bestätigt.",
     link_required: "Zu dieser Adresse gibt es ein Konto. Melden Sie sich mit Ihrem Passwort an und verknüpfen Sie den Anbieter dann unter Konto.",
     sign_in_first: "Melden Sie sich zuerst an und verknüpfen Sie den Anbieter dann.", provider_in_use: "Dieses Anbieterkonto ist mit einem anderen Benutzer verknüpft.",
+    link_reauth_required: "Zum Verknüpfen einer Anmeldemethode braucht es eine Anmeldung aus den letzten Minuten: Abmelden, erneut anmelden und gleich danach verknüpfen.", last_sign_in_method: "Das ist die einzige Anmeldemethode dieses Kontos. Legen Sie zuerst ein Passwort fest oder verknüpfen Sie einen anderen Anbieter.",
     account_disabled: "Dieses Konto ist deaktiviert.", not_a_member: "Sie sind kein Mitglied dieses Arbeitsbereichs.",
     invalid_code: "Dieser Code ist ungültig oder abgelaufen.", last_owner: "Ein Arbeitsbereich braucht mindestens einen Eigentümer.",
     invalid_answers: "Diese Antwort passt nicht zur Frage.", invalid_decision: "Wählen Sie Erlauben oder Ablehnen.", invalid_duration: "Wählen Sie aus der Liste, wie lange die Antwort gilt.",
@@ -236,6 +237,7 @@ export const de: Dictionary = {
   },
   account: {
     title: "Konto", providers: "Anmeldemethoden", linked: "Verknüpft", link: "{provider} verknüpfen", password: "Passwort",
+    unlink: "{provider} trennen", unlinked: "{provider} ist getrennt.", providerFreshSignIn: "Zum Trennen einer Anmeldemethode braucht es eine Anmeldung aus den letzten Minuten: Abmelden, erneut anmelden und gleich danach trennen.",
     hasPassword: "Gesetzt", noPassword: "Nicht gesetzt (mit einem Anbieter anmelden oder zurücksetzen, um eines zu setzen)",
     data: "Ihre Daten", exportHint: "Alles über Sie und Ihre Sitzungen als eine JSON-Datei.", export: "Meine Daten herunterladen",
     deleteTitle: "Konto löschen", deleteHint: "Ihr Name, Ihre Adresse, Ihre Anmeldemethoden und alles, was Ihre Maschinen erfasst haben, werden gelöscht; Ihre Maschinen werden getrennt. Das lässt sich nicht rückgängig machen.",

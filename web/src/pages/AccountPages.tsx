@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from "react-router";
 import { api, providerUrl } from "../api/endpoints";
 import { useSession } from "../auth/session";
 import { SettingsSection } from "../components/SettingsSection";
-import { Card, CopyText, Notice } from "../components/ui";
+import { Button, Card, CopyText, Notice } from "../components/ui";
 import { config } from "../config";
 import { useErrorText, useI18n, useKnownErrorText } from "../i18n";
 import { AccountDataCards } from "./AccountData";
@@ -18,9 +18,22 @@ const PROVIDERS = [{ id: "github", name: "GitHub" }, { id: "google", name: "Goog
 export function AccountPage() {
   const { t } = useI18n();
   const knownErrorText = useKnownErrorText();
-  const { me } = useSession();
+  const errorText = useErrorText();
+  const { me, refresh } = useSession();
   const [params] = useSearchParams();
   const error = knownErrorText(params.get("error"));
+  const [providerNotice, setProviderNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const unlink = async (provider: { id: string; name: string }) => {
+    setProviderNotice(null);
+    try {
+      await api.unlinkProvider(provider.id);
+      await refresh();
+      setProviderNotice({ kind: "success", text: t("account.unlinked", { provider: provider.name }) });
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code;
+      setProviderNotice({ kind: "error", text: code === "reauth_required" ? t("account.providerFreshSignIn") : errorText(err) });
+    }
+  };
   return (
     <div className="page">
       <h1>{t("account.title")}</h1>
@@ -33,13 +46,15 @@ export function AccountPage() {
       </SettingsSection>
       <SettingsSection title={t("account.providers")} hint={t("account.providersHint")}>
         <Card>
+          {providerNotice ? <Notice kind={providerNotice.kind}>{providerNotice.text}</Notice> : null}
           <ul className="plain">
             <li className="spread"><span>{t("account.password")}</span><span className="muted">{me?.hasPassword ? t("account.hasPassword") : t("account.noPassword")}</span></li>
             {PROVIDERS.map((p) => (
               <li key={p.id} className="spread">
                 <span>{p.name}</span>
                 {me?.providers.includes(p.id)
-                  ? <span className="badge ok">{t("account.linked")}</span>
+                  ? <span><span className="badge ok">{t("account.linked")}</span>{" "}
+                    <Button variant="ghost" onClick={() => void unlink(p)}>{t("account.unlink", { provider: p.name })}</Button></span>
                   : <a className="btn btn-ghost" href={providerUrl(p.id, "link")}>{t("account.link", { provider: p.name })}</a>}
               </li>
             ))}
