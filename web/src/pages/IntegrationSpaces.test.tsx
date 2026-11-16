@@ -7,7 +7,7 @@ import { IntegrationSpaces } from "./IntegrationSpaces";
 
 const spacesPath = "GET /integrations/c1/spaces";
 const importPath = "POST /integrations/c1/spaces/import";
-const twoSpaces = () => [space(), space({ key: "OPS", name: "Operations", imported: true, projectId: "p7" })];
+const twoSpaces = () => [space(), space({ key: "OPS", name: "Operations", imported: true, projectId: "p7", canEdit: true })];
 
 /** Every route this part calls, plus the sign-in check the providers make. */
 const serve = (routes: Parameters<typeof mockApi>[0]) => mockApi({ "GET /me": { body: ME }, ...routes });
@@ -160,6 +160,26 @@ describe("the spaces of a connection", () => {
     expect(await screen.findByRole("checkbox", { name: "Select Sprint 10" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^Import selected sprints/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Import selected \(/ })).toBeInTheDocument();
+  });
+
+  it("offers the sprint import only for a project the person may edit: a member without the right sees the chooser read-only", async () => {
+    const readOnly = () => [space(), space({ key: "OPS", name: "Operations", imported: true, projectId: "p7", canEdit: false })];
+    serve({ [spacesPath]: { body: readOnly() }, "GET /integrations/c1/spaces/OPS/sprints": { body: [sprintChoice()] } });
+    open(true, true);
+    await show();
+    await userEvent.click(await screen.findByRole("button", { name: "Sprints…" }));
+    expect(await screen.findByRole("checkbox", { name: "Select Sprint 10" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^Import selected sprints/ })).not.toBeInTheDocument();
+  });
+
+  it("lets an editor of the project tick a sprint and import it", async () => {
+    serve({ [spacesPath]: { body: twoSpaces() }, "GET /integrations/c1/spaces/OPS/sprints": { body: [sprintChoice()] } });
+    open(true, true);
+    await show();
+    await userEvent.click(await screen.findByRole("button", { name: "Sprints…" }));
+    expect(await screen.findByRole("checkbox", { name: "Select Sprint 10" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Sprint 10" }));
+    expect(screen.getByRole("button", { name: /^Import selected sprints/ })).toBeEnabled();
   });
 
   it("goes to the project from the link", async () => {

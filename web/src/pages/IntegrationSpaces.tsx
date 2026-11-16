@@ -79,7 +79,7 @@ export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImpor
       )}
       {spaces && canImport && picked.size >= IMPORT_MAX ? <p className="muted">{t("integrations.spacesLimit", { n: IMPORT_MAX })}</p> : null}
       {spaces && canImport ? <Button busy={busy} disabled={picked.size === 0} onClick={() => void run()}>{t("integrations.importSelected", { n: picked.size })}</Button> : null}
-      {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} canImport={canImportSprints} onClose={() => setSprintsOf(null)} /> : null}
+      {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} canImport={canImportSprints && sprintsOf.canEdit} onClose={() => setSprintsOf(null)} /> : null}
     </div>
   );
 }
