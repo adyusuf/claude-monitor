@@ -136,7 +136,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     const oldest = grants[grants.length - 1];
     if (!oldest) return;
     try {
-      const page = await api.grants(agentId, { before: oldest.createdAt, limit: config.remotePageSize });
+      const page = await api.grants(agentId, { before: oldest.createdAt, beforeId: oldest.id, limit: config.remotePageSize });
       pagedGrants.current = true;
       setGrants((previous) => [...previous, ...page.filter((g) => !previous.some((p) => p.id === g.id))]);
       setHasMoreGrants(page.length >= config.remotePageSize);
@@ -150,7 +150,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     const oldest = jobs[jobs.length - 1];
     if (!oldest) return;
     try {
-      const page = await api.jobs(agentId, { before: oldest.createdAt, limit: config.remotePageSize });
+      const page = await api.jobs(agentId, { before: oldest.createdAt, beforeId: oldest.id, limit: config.remotePageSize });
       pagedJobs.current = true;
       setJobs((previous) => [...previous, ...page.filter((j) => !previous.some((p) => p.id === j.id))]);
       setHasMoreJobs(page.length >= config.remotePageSize);

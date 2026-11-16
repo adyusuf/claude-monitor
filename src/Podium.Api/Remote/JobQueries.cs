@@ -34,16 +34,20 @@ public static class JobQueries
         return rows.Select(View).ToList();
     }
 
-    /// <summary>The jobs of one target for the web, newest first, key-paged.</summary>
+    /// <summary>
+    /// The jobs of one target for the web, newest first, key-paged by (created time, id) as the run list is (F-341; the id is optional: with the
+    /// time alone only strictly older jobs follow).
+    /// </summary>
     public static async Task<List<WebJobView>> ForWebAsync(PodiumDb db, Guid targetAgentId, Guid userId, Guid? jobId,
-        DateTimeOffset? before, int limit, CancellationToken ct)
+        DateTimeOffset? before, int limit, CancellationToken ct, Guid? beforeId = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         var rows = await (from j in db.MachineJobs.AsNoTracking()
                           join u in db.Users.AsNoTracking() on j.ProposedByUserId equals u.Id
                           where j.TargetAgentId == targetAgentId
                                 && (jobId == null || j.Id == jobId)
-                                && (before == null || j.CreatedAt < before)
+                                && (before == null || j.CreatedAt < before
+                                    || (beforeId != null && j.CreatedAt == before && j.Id.CompareTo(beforeId.Value) < 0)) // (time, id) cursor: ties are not skipped
                           orderby j.CreatedAt descending, j.Id descending
                           select new
                           {
