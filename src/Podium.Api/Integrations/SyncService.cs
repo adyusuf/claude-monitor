@@ -125,8 +125,13 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
         foreach (var link in links.Where(l => l.ExternalKey is not null))
         {
             var space = await tracker.GetContainerAsync(ctx, link.ExternalKey!, ct);
-            if (space is null) await ArchiveSpaceAsync(link, counts, ct);
-            else spaces.Add((link, space));
+            // A space the connector cannot see on one pass may be a passing permission or Jira hiccup (F-066): only a second pass in a row
+            // that misses it archives the project, and a pass that sees it again starts the count over.
+            var missed = space is null ? link.MissedPasses + 1 : 0;
+            if (missed != link.MissedPasses)
+                await db.IntegrationLinks.Where(l => l.Id == link.Id).ExecuteUpdateAsync(u => u.SetProperty(l => l.MissedPasses, missed), ct);
+            if (space is not null) spaces.Add((link, space));
+            else if (missed >= IssueMirror.PassesBeforeArchive) await ArchiveSpaceAsync(link, counts, ct);
         }
 
         var since = (connection.LastPassAt ?? connection.CreatedAt) - config.IntegrationPassOverlap;
@@ -150,7 +155,7 @@ public sealed class SyncService(PodiumDb db, ApiConfig config, IWorkTracker trac
             foreach (var g in gone) sprints.Archive(state, g);
             foreach (var item in ImportService.EpicsFirst(epics.Concat(changed))) issues.Upsert(state, item, persons, connection.SiteHost, counts);
             // An empty or cut listing is no proof that the issues are gone (the connector may have lost the permission to see them, F-066):
-            // nothing is archived on it.
+            // nothing is archived on it, and an issue is archived only when a second whole listing in a row misses it.
             if (alive is { Count: > 0 }) counts.Archived += issues.ArchiveMissing(state, alive.ToHashSet(StringComparer.Ordinal));
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);

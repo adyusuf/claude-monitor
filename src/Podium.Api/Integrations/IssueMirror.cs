@@ -10,6 +10,9 @@ public sealed class IssueMirror(PodiumDb db, TimeProvider clock)
 {
     private const string SubtaskNote = "Sub-task of ";
 
+    /// <summary>Reconcile passes in a row that must miss a mirrored space or issue before it is archived (F-066).</summary>
+    public const int PassesBeforeArchive = 2;
+
     /// <summary>Makes the Podium issue match <paramref name="item"/>. Returns it, or null when nothing changed since the last sync.</summary>
     public Issue? Upsert(MirrorState state, ExternalItem item, IReadOnlyDictionary<string, IntegrationPerson> people, string siteHost, MirrorCounts counts)
     {
@@ -50,17 +53,30 @@ public sealed class IssueMirror(PodiumDb db, TimeProvider clock)
         link.ExternalKey = item.Key;
         link.ExternalUpdated = item.UpdatedStamp;
         link.SyncedAt = now;
+        link.MissedPasses = 0; // seen: a later miss starts counting from the start (F-066)
         return issue;
     }
 
-    /// <summary>The issues of the tool that are gone (or no longer visible) are archived, never deleted.</summary>
+    /// <summary>
+    /// The issues of the tool that are gone (or no longer visible) are archived, never deleted: only once <see cref="PassesBeforeArchive"/>
+    /// whole listings in a row have missed them (F-066). An issue the listing holds starts its count over.
+    /// </summary>
     public int ArchiveMissing(MirrorState state, ISet<string> stillThere)
     {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(stillThere);
         var now = clock.GetUtcNow();
         var archived = 0;
         foreach (var (externalId, link) in state.IssueLinks)
         {
-            if (stillThere.Contains(externalId) || !state.Issues.TryGetValue(link.LocalId, out var issue) || issue.ArchivedAt is not null) continue;
+            if (stillThere.Contains(externalId))
+            {
+                link.MissedPasses = 0;
+                continue;
+            }
+
+            if (!state.Issues.TryGetValue(link.LocalId, out var issue) || issue.ArchivedAt is not null) continue;
+            if (++link.MissedPasses < PassesBeforeArchive) continue;
             issue.ArchivedAt = now;
             issue.UpdatedAt = now;
             archived++;
