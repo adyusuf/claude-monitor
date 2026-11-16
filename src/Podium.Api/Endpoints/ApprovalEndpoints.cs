@@ -33,7 +33,7 @@ public static class ApprovalEndpoints
     }
 
     /// <summary>Open requests (oldest first) and, with <c>status=answered</c>, the latest answered ones; only on the caller's sessions.</summary>
-    private static async Task<IResult> Requests(Guid id, string? status, HttpContext http, PodiumDb db, TimeProvider clock)
+    private static async Task<IResult> Requests(Guid id, string? status, HttpContext http, PodiumDb db, TimeProvider clock, ILoggerFactory logs)
     {
         var userId = http.User.UserId();
         var ct = http.RequestAborted;
@@ -54,7 +54,7 @@ public static class ApprovalEndpoints
         var repos = await db.Repos.AsNoTracking().Where(r => repoIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.DisplayName, ct);
         var userIds = rows.Where(r => r.p.AnsweredBy != null).Select(r => r.p.AnsweredBy!.Value).Distinct().ToList();
         var names = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
-        var access = new ApprovalRuleAccess(db);
+        var access = new ApprovalRuleAccess(db, logs.CreateLogger<ApprovalRuleAccess>());
         var result = new List<ApprovalRequestRow>(rows.Count);
         foreach (var r in rows)
         {

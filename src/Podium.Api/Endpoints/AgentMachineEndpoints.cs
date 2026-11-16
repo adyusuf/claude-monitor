@@ -54,13 +54,14 @@ public static class AgentMachineEndpoints
         return Results.Ok(await MachineQueries.MachinesAsync(db, config, ws, clock.GetUtcNow(), http.RequestAborted));
     }
 
-    private static async Task<IResult> Detail(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
+    private static async Task<IResult> Detail(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, ILoggerFactory logs)
     {
         var ws = http.User.AgentWorkspaceId();
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, ws, Roles.Member, http.RequestAborted) is null) return Http.NotFound();
         var admin = await Access.MemberAsync(db, userId, ws, Roles.Admin, http.RequestAborted) is not null;
-        return await MachineDetails.GetAsync(db, config, ws, id, userId, admin, clock.GetUtcNow(), http.RequestAborted) is { } detail
+        return await MachineDetails.GetAsync(db, config, ws, id, userId, admin, clock.GetUtcNow(), http.RequestAborted,
+                logs.CreateLogger(typeof(MachineDetails))) is { } detail
             ? Results.Ok(detail)
             : Http.NotFound();
     }

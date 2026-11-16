@@ -10,7 +10,10 @@ public static partial class RepoKeys
 {
     public const string GitPrefix = "git:";
 
-    /// <summary>"git@GitHub.com:Org/Repo.git" and "https://user:pw@github.com/Org/Repo" both become "github.com/Org/Repo".</summary>
+    /// <summary>
+    /// "git@GitHub.com:Org/Repo.git" and "https://user:pw@github.com/Org/Repo" both become "github.com/Org/Repo". The port and the scheme are left out on purpose
+    /// (ADR-0020 §4, F-295): one repository reached over ssh and over https is one key, and so is the same path on two ports of one host.
+    /// </summary>
     public static string? NormalizeRemote(string url)
     {
         var m = ScpLike().Match(url);

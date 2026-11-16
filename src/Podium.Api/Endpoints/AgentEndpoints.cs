@@ -183,7 +183,7 @@ public static class AgentEndpoints
         reported is { } at && at >= created - skew ? (at < now ? at : now) : now;
 
     private static async Task<IResult> CreatePermission(PermissionRequestCreate req, HttpContext http, PodiumDb db,
-        ApiConfig config, TimeProvider clock, Broker broker)
+        ApiConfig config, TimeProvider clock, Broker broker, ILoggerFactory logs)
     {
         var agentId = http.User.AgentId();
         var session = await db.HarnessSessions.FirstOrDefaultAsync(
@@ -215,7 +215,8 @@ public static class AgentEndpoints
         // An approval rule answers at once, but only to an agent that reads the answer in this response (ADR-0019 §7, §8).
         var agent = req.InlineAnswer ? await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted) : null;
         var rule = agent is null ? null
-            : await ApprovalRules.MatchAsync(db, agent, request.RepoId, req.ToolName, req.ToolInput, request.AccessScope, now, http.RequestAborted);
+            : await ApprovalRules.MatchAsync(db, agent, request.RepoId, req.ToolName, req.ToolInput, request.AccessScope, now, http.RequestAborted,
+                logs.CreateLogger(typeof(ApprovalRules)));
         // The use is a conditional write on a rule still live (as a grant's is), so a rule revoked or ended a moment ago allows nothing and
         // requests at the same moment all count; a request it does not allow waits for the owner like any other.
         if (rule is not null && !await ApprovalRules.CountUseAsync(db, rule.Id, now, http.RequestAborted)) rule = null;
