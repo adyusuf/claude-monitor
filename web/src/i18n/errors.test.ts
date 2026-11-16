@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { dictionaries } from "./index";
 
 /**
+ * Not listed on purpose: invalid_os, invalid_arch, invalid_status, invalid_count and invalid_chunk. Only an agent, the device sign-in or another
+ * machine-to-API call receives them (AgentEndpoints, RunReports, AskReports, AgentActions, DeviceEndpoints); no page shows them (F-089 reachability check).
+ *
  * Codes the API answers to a web page with (Http.Invalid and refusals of the session routes). The page shows `errors.<code>`, so a code
  * without a text would show the raw key. When an endpoint gets a new code, add it here and give it a text in every language.
  */
@@ -14,6 +17,8 @@ const webCodes = [
   "invalid_mode",
   // answering a permission request (CommandEndpoints)
   "invalid_answers", "invalid_decision", "invalid_duration", "rule_not_allowed",
+  // the account menu and the approval-key form (MeEndpoints, ApprovalKeyEndpoints); "invalid" is also the client's fallback for a field error without a code (client.ts, toError)
+  "invalid_language", "invalid",
 ] as const;
 
 describe("the error texts", () => {

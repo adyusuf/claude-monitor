@@ -57,7 +57,7 @@ export const tr: Dictionary = {
     invalid_code: "Bu kod geçersiz ya da süresi dolmuş.", last_owner: "Bir çalışma alanında en az bir sahip olmalı.",
     invalid_answers: "Bu yanıt soruyla uyuşmuyor.", invalid_decision: "İzin ver ya da reddet seçin.", invalid_duration: "Yanıtın ne kadar hatırlanacağını listeden seçin.",
     session_ended: "Oturum sona erdi.", session_not_ended: "Yalnızca biten bir oturum listeden kaldırılabilir.", invalid_body: "Gönderilecek mesajı yazın.", too_long: "Bu çok uzun.",
-    too_many_decimals: "En fazla iki ondalık basamak kullanın.", out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", invalid_mode: "Listeden bir mod seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
+    too_many_decimals: "En fazla iki ondalık basamak kullanın.", out_of_range: "Bu değer aralık dışında.", invalid_role: "Bir rol seçin.", invalid: "Bu değer geçerli değil.", invalid_language: "Listeden bir dil seçin.", invalid_mode: "Listeden bir mod seçin.", unauthorized: "Oturumunuz sona erdi. Yeniden giriş yapın.",
     forbidden: "Bunu yapma izniniz yok.", csrf: "Sunucu bu değişikliği, bu sitenin kendi sayfasından gelmediği için reddetti. Sayfayı yenileyip tekrar deneyin.", owner_only: "Bunu yalnızca makinenin sahibi yapabilir.", not_found: "Bulunamadı.", conflict: "Bu arada değişmiş. Yenileyip tekrar deneyin.",
     too_many_requests: "Çok fazla deneme. Bir dakika bekleyin.", server_error: "Sunucuda bir sorun oldu.",
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
