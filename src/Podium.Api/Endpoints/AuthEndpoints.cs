@@ -37,10 +37,20 @@ public static class AuthEndpoints
         if (!Secrets.PasswordAcceptable(req.Password)) return Http.Invalid("password", "weak_password");
         if (!Http.IsName(req.DisplayName)) return Http.Invalid("displayName", "invalid_name");
 
-        var key = EmailIdentity.Key(req.Email);
-        if (await db.Users.AnyAsync(u => u.EmailKey == key, http.RequestAborted))
+        var existing = await FindAsync(db, req.Email, http.RequestAborted);
+        if (existing is not null)
         {
             Secrets.HashPassword(new User(), req.Password!); // the hash a new account costs, so timing does not tell a registered address apart
+            // An unverified account may be someone else's squat on this address (F-031): the mailbox gets a reset link, never a verification,
+            // so verifying hands the account to whoever proves the mailbox with their own password, not to the squatter's.
+            if (existing.EmailVerifiedAt is null && existing.Status == UserStatuses.Active)
+            {
+                // ...and a verification link mailed before dies with it: it would confirm the squatter's password.
+                await db.UserTokens.Where(t => t.UserId == existing.Id && t.Purpose == TokenPurposes.VerifyEmail && t.UsedAt == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, clock.GetUtcNow()), http.RequestAborted);
+                await MailResetLinkAsync(db, existing, http, config, clock, mailer, logs);
+            }
+
             return Results.Accepted();
         }
 
@@ -163,20 +173,29 @@ public static class AuthEndpoints
         TimeProvider clock, IMailer mailer, ILoggerFactory logs)
     {
         var user = await FindAsync(db, req.Email, http.RequestAborted);
-        if (user?.Status != UserStatuses.Active) user = null;
+        if (user?.Status == UserStatuses.Active) await MailResetLinkAsync(db, user, http, config, clock, mailer, logs);
+        return Results.Accepted();
+    }
+
+    /// <summary>
+    /// Mails a new reset link to the user's address (Forgot, and a second registration of an unverified address). One mail per address per
+    /// window, whatever the number of callers or their addresses: the link already mailed keeps working.
+    /// </summary>
+    private static async Task MailResetLinkAsync(PodiumDb db, User user, HttpContext http, ApiConfig config, TimeProvider clock, IMailer mailer,
+        ILoggerFactory logs)
+    {
         var since = clock.GetUtcNow() - config.ResetMailEvery;
-        // One mail per address per window, whatever the number of callers or their addresses: the link already mailed keeps working.
-        if (user?.Email is not null && !await db.UserTokens.AnyAsync(
+        if (user.Email is null || await db.UserTokens.AnyAsync(
                 t => t.UserId == user.Id && t.Purpose == TokenPurposes.ResetPassword && t.CreatedAt > since, http.RequestAborted))
         {
-            await EndResetLinksAsync(db, user.Id, clock.GetUtcNow(), http.RequestAborted);
-            var token = AddUserToken(db, user.Id, TokenPurposes.ResetPassword, clock.GetUtcNow(), config.EmailTokenLifetime);
-            await db.SaveChangesAsync(http.RequestAborted);
-            SendOffRequest(mailer, MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
-                Http.Link(config, "/reset-password", token)), logs);
+            return;
         }
 
-        return Results.Accepted();
+        await EndResetLinksAsync(db, user.Id, clock.GetUtcNow(), http.RequestAborted);
+        var token = AddUserToken(db, user.Id, TokenPurposes.ResetPassword, clock.GetUtcNow(), config.EmailTokenLifetime);
+        await db.SaveChangesAsync(http.RequestAborted);
+        SendOffRequest(mailer, MailTemplates.Build(MailTemplates.Language(http, user.Language), "reset", user.Email,
+            Http.Link(config, "/reset-password", token)), logs);
     }
 
     private static async Task<IResult> Reset(ResetRequest req, HttpContext http, PodiumDb db, TimeProvider clock)
