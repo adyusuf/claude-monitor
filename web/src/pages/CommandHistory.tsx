@@ -32,7 +32,7 @@ export function CommandItem({ command: c, sessionId, ended, now, canCancel, onCa
   return (
     <li>
       <span className={`badge status-${c.status}`}>{t(`commandStatus.${c.status}` as never)}</span>
-      <span>{c.kind === "stop" ? t("session.stop") : c.body}</span>
+      <span>{c.kind === "stop" ? t("session.stop") : c.contentRemoved ? <span className="muted">{t("session.removedAfterRetention")}</span> : c.body}</span>
       <span className="muted small">{dateTime(c.createdAt)}</span>
       {canCancel && c.status === "queued" ? <button type="button" className="link" onClick={() => onCancel(c.id)}>{t("session.cancel")}</button> : null}
       {how ? <div className="muted small command-hint">{how}</div> : null}

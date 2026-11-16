@@ -146,6 +146,7 @@ export const de: Dictionary = {
     send: "Senden", stop: "Sitzung stoppen", stopConfirm: "Diese Sitzung bei ihrem nächsten Schritt stoppen?", sent: "Gesendet.",
     onlyOwner: "Nur die Person, auf deren Maschine diese Sitzung läuft, kann ihr Befehle senden.",
     history: "Vom Web gesendet", cancel: "Abbrechen", noCommands: "Noch nichts gesendet.",
+    removedAfterRetention: "Nach Ablauf der Aufbewahrungsfrist des Arbeitsbereichs entfernt.",
     permissions: "Wartet auf Berechtigung", noPermissions: "Nichts wartet auf eine Berechtigung.", allow: "Erlauben", deny: "Ablehnen",
     reason: "Begründung (optional)", answered: "Beantwortet", expired: "Abgelaufen", expires: "Läuft ab",
     expiresIn: "läuft in {time} ab",

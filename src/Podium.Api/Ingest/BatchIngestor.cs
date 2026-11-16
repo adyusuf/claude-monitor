@@ -7,6 +7,7 @@ using Podium.Api.Streaming;
 using Podium.Api.Text;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Podium.Api.Ingest;
 
@@ -15,15 +16,25 @@ public enum IngestOutcome
     Stored,
     Duplicate,
     TooLarge,
+
+    /// <summary>PostgreSQL refused the batch's content as data (F-240) although each event passed the checks: nothing of it was stored.</summary>
+    Unstorable,
 }
 
 /// <summary>
 /// Stores one batch from an agent in one transaction: the batch number first (a number already stored means a retry,
 /// and nothing else is written), then each event and its projections. An event that is not valid (or holds text PostgreSQL cannot store) is
-/// skipped and counted, never guessed at; an event larger than the workspace's limit is stored as a truncation marker.
+/// skipped and counted, never guessed at; an event larger than the workspace's limit is stored as a truncation marker. An event of a session
+/// recorded in another workspace than the agent's current one (the agent was moved since, F-244) is skipped too: nothing is written across workspaces.
 /// </summary>
-public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, TimeProvider clock)
+public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, TimeProvider clock, ILogger<BatchIngestor> log)
 {
+    /// <summary>The problem title of a batch PostgreSQL refused as data (422).</summary>
+    public const string Unstorable = "batch_unstorable";
+
+    /// <summary>SQLSTATE class 22, "data exception": the content itself cannot be stored (a NUL, a bad byte sequence, a value out of range).</summary>
+    private const string DataExceptionClass = "22";
+
     public const int KindMax = 100;
     public const int ExternalIdMax = 200;
     public const int ProjectKeyMax = 300;
@@ -51,7 +62,7 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
         var settings = await db.WorkspaceSettings.AsNoTracking().FirstAsync(s => s.WorkspaceId == workspaceId, ct);
         var harnesses = await db.HarnessKinds.AsNoTracking().Select(h => h.Code).ToListAsync(ct);
         var projector = new EventProjector(db, config);
-        var sessions = new Dictionary<(string, string), HarnessSession>();
+        var sessions = new Dictionary<(string, string), HarnessSession?>();
         var stored = 0;
         long bytes = 0;
         foreach (var captured in batch.Events)
@@ -71,7 +82,11 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
                 continue;
             }
 
-            var session = await SessionAsync(sessions, agentId, workspaceId, e, ct);
+            if (await SessionAsync(sessions, agentId, workspaceId, e, ct) is not { } session)
+            {
+                continue;
+            }
+
             var size = Encoding.UTF8.GetByteCount(raw);
             bytes += size;
             var truncated = e.Truncated || size > settings.EventMaxBytes;
@@ -89,12 +104,24 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
             stored++;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException pg && pg.SqlState.StartsWith(DataExceptionClass, StringComparison.Ordinal))
+        {
+            // What the per-event checks let through and PostgreSQL still refuses fails the whole batch: it is answered as the client's, not a 500.
+            // The transaction is rolled back with the batch number, so a fixed agent can send it again. Only the code is logged: a data error's text can quote the content.
+            log.LogWarning("batch {BatchSeq} of agent {AgentId} refused by the database as data ({SqlState})", batch.BatchSeq, agentId, pg.SqlState);
+            await tx.RollbackAsync(ct);
+            return (IngestOutcome.Unstorable, 0);
+        }
+
         await db.AgentBatches.Where(b => b.AgentId == agentId && b.BatchSeq == batch.BatchSeq)
             .ExecuteUpdateAsync(s => s.SetProperty(b => b.Bytes, bytes).SetProperty(b => b.EventCount, stored), ct);
         await tx.CommitAsync(ct);
 
-        foreach (var s in sessions.Values)
+        foreach (var s in sessions.Values.OfType<HarnessSession>())
         {
             broker.Publish(Broker.Workspace(workspaceId), new StreamMessage("session", new { sessionId = s.Id, status = s.Status }));
         }
@@ -115,7 +142,8 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
     private static JsonDocument Marker(string raw, int size) =>
         JsonSerializer.SerializeToDocument(new { truncated = true, bytes = size, preview = raw[..Math.Min(raw.Length, PreviewChars)] });
 
-    private async Task<HarnessSession> SessionAsync(Dictionary<(string, string), HarnessSession> cache, Guid agentId,
+    /// <summary>The event's session, created on its first event; null when it was recorded in another workspace than <paramref name="workspaceId"/>.</summary>
+    private async Task<HarnessSession?> SessionAsync(Dictionary<(string, string), HarnessSession?> cache, Guid agentId,
         Guid workspaceId, CapturedEvent e, CancellationToken ct)
     {
         var key = (e.HarnessKind, e.SessionExternalId);
@@ -126,6 +154,13 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
 
         session = await db.HarnessSessions.FirstOrDefaultAsync(
             s => s.AgentId == agentId && s.HarnessKind == e.HarnessKind && s.ExternalId == e.SessionExternalId, ct);
+        if (session is not null && session.WorkspaceId != workspaceId)
+        {
+            // The agent moved to another workspace after this session began: it stays where it was recorded, unchanged (F-244).
+            cache[key] = null;
+            return null;
+        }
+
         if (session is null)
         {
             session = new HarnessSession

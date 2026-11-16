@@ -145,6 +145,7 @@ export const en = {
     send: "Send", stop: "Stop the session", stopConfirm: "Stop this session at its next step?", sent: "Sent.",
     onlyOwner: "Only the person whose machine runs this session can send it commands.",
     history: "Sent from the web", cancel: "Cancel", noCommands: "Nothing sent yet.",
+    removedAfterRetention: "Removed after the workspace's retention period.",
     permissions: "Waiting for permission", noPermissions: "Nothing waits for permission.", allow: "Allow", deny: "Deny",
     reason: "Reason (optional)", answered: "Answered", expired: "Expired", expires: "Expires",
     expiresIn: "expires in {time}",

@@ -44,7 +44,7 @@ public sealed class IngestUnstorableTests(ApiFactory api)
         ], escaped);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(new BatchAck(1_000_000, false, 2), await response.Content.ReadFromJsonAsync<BatchAck>(TestUser.Json));
+        Assert.Equal(new BatchAck(1_000_000, false, 2, 2), await response.Content.ReadFromJsonAsync<BatchAck>(TestUser.Json));
         var row = (await user.GetJsonAsync($"/api/workspaces/{user.WorkspaceId}/sessions")).GetProperty("items")[0];
         Assert.Equal("idle", row.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, row.GetProperty("title").ValueKind);

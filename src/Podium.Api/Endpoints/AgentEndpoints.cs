@@ -88,8 +88,9 @@ public static class AgentEndpoints
         return outcome switch
         {
             IngestOutcome.TooLarge => Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "batch_too_large"),
+            IngestOutcome.Unstorable => Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: BatchIngestor.Unstorable),
             IngestOutcome.Duplicate => Results.Ok(new BatchAck(batch.BatchSeq, true, 0)),
-            IngestOutcome.Stored => Results.Ok(new BatchAck(batch.BatchSeq, false, stored)),
+            IngestOutcome.Stored => Results.Ok(new BatchAck(batch.BatchSeq, false, stored, batch.Events.Count - stored)),
             _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError),
         };
     }

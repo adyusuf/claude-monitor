@@ -79,7 +79,7 @@ public static class MachineEndpoints
     }
 
     /// <summary>Only the agent's own user moves it, and only into a workspace where they may contribute.
-    /// Sessions already captured stay where they were recorded; a move into its current workspace changes nothing.</summary>
+    /// Sessions already captured stay where they were recorded (their later events are skipped at ingest, F-244); a move into its current workspace changes nothing.</summary>
     private static async Task<IResult> Move(Guid id, MoveRequest req, HttpContext http, PodiumDb db, TimeProvider clock, Broker broker)
     {
         var userId = http.User.UserId();

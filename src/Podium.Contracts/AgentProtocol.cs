@@ -26,7 +26,9 @@ public sealed record CapturedEvent(
     string? ProjectName = null,
     string? GitBranch = null);
 
-public sealed record BatchAck(long BatchSeq, bool Duplicate, int Stored);
+/// <param name="Skipped">The events of the batch that were not stored: not valid, not storable, or of a session recorded in another workspace than
+/// the agent's current one (F-244). Optional: an older API sends none and an older agent ignores it.</param>
+public sealed record BatchAck(long BatchSeq, bool Duplicate, int Stored, int Skipped = 0);
 
 public sealed record DeviceCodeRequest(string MachineKey, string Hostname, string Os, string Arch, string AgentVersion);
 
