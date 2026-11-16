@@ -20,6 +20,12 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
 {
     public static readonly TimeSpan ActiveWindow = TimeSpan.FromDays(1);
 
+    /// <summary>How often the idle transcripts are looked at for forgetting (their files are asked for, so not on every pass).</summary>
+    public static readonly TimeSpan PruneEvery = TimeSpan.FromHours(1);
+
+    /// <summary>When the idle transcripts were last looked at.</summary>
+    private DateTimeOffset prunedAt = DateTimeOffset.MinValue;
+
     /// <summary>Ids of prompts pushed into a session and not yet seen in a transcript: the first line that holds one confirms it (ADR-0003).</summary>
     private List<string> pending = [];
 
@@ -40,7 +46,30 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
             }
         }
 
+        Prune();
         return taken;
+    }
+
+    /// <summary>
+    /// A transcript no hook has mentioned for the retention (a session that finished) whose file is gone (Claude Code deleted it) is forgotten with its
+    /// usage ids. One whose file still exists is kept: a later hook of that session would start its row at offset 0 and send the whole file again.
+    /// </summary>
+    private void Prune()
+    {
+        var now = clock.GetUtcNow();
+        if (now - prunedAt < PruneEvery) return;
+        prunedAt = now;
+        try
+        {
+            foreach (var (session, path) in store.TranscriptsIdleSince(now - (config.RemoteLocalRetention > ActiveWindow ? config.RemoteLocalRetention : ActiveWindow)))
+            {
+                if (!File.Exists(path)) store.ForgetTranscript(session);
+            }
+        }
+        catch (DbException e)
+        {
+            log.Write($"idle transcripts not forgotten: {e.GetType().Name}"); // tried again at the next pass of the hour
+        }
     }
 
     private int Follow(TranscriptCursor t)
