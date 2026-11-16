@@ -78,7 +78,7 @@ public static class AgentEndpoints
         {
             IngestOutcome.TooLarge => Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "batch_too_large"),
             IngestOutcome.Duplicate => Results.Ok(new BatchAck(batch.BatchSeq, true, 0)),
-            IngestOutcome.Stored => Results.Ok(new BatchAck(batch.BatchSeq, false, stored)),
+            IngestOutcome.Stored => Results.Ok(new BatchAck(batch.BatchSeq, false, stored, batch.Events.Count - stored)),
             _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError),
         };
     }

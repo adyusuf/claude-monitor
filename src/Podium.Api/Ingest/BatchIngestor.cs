@@ -20,7 +20,8 @@ public enum IngestOutcome
 /// <summary>
 /// Stores one batch from an agent in one transaction: the batch number first (a number already stored means a retry,
 /// and nothing else is written), then each event and its projections. An event that is not valid (or holds text PostgreSQL cannot store) is
-/// skipped and counted, never guessed at; an event larger than the workspace's limit is stored as a truncation marker.
+/// skipped and counted, never guessed at; an event larger than the workspace's limit is stored as a truncation marker. An event of a session
+/// recorded in another workspace than the agent's current one (the agent was moved since, F-244) is skipped too: nothing is written across workspaces.
 /// </summary>
 public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, TimeProvider clock)
 {
@@ -51,7 +52,7 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
         var settings = await db.WorkspaceSettings.AsNoTracking().FirstAsync(s => s.WorkspaceId == workspaceId, ct);
         var harnesses = await db.HarnessKinds.AsNoTracking().Select(h => h.Code).ToListAsync(ct);
         var projector = new EventProjector(db, config);
-        var sessions = new Dictionary<(string, string), HarnessSession>();
+        var sessions = new Dictionary<(string, string), HarnessSession?>();
         var stored = 0;
         long bytes = 0;
         foreach (var captured in batch.Events)
@@ -71,7 +72,11 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
                 continue;
             }
 
-            var session = await SessionAsync(sessions, agentId, workspaceId, e, ct);
+            if (await SessionAsync(sessions, agentId, workspaceId, e, ct) is not { } session)
+            {
+                continue;
+            }
+
             var size = Encoding.UTF8.GetByteCount(raw);
             bytes += size;
             var truncated = e.Truncated || size > settings.EventMaxBytes;
@@ -94,7 +99,7 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
             .ExecuteUpdateAsync(s => s.SetProperty(b => b.Bytes, bytes).SetProperty(b => b.EventCount, stored), ct);
         await tx.CommitAsync(ct);
 
-        foreach (var s in sessions.Values)
+        foreach (var s in sessions.Values.OfType<HarnessSession>())
         {
             broker.Publish(Broker.Workspace(workspaceId), new StreamMessage("session", new { sessionId = s.Id, status = s.Status }));
         }
@@ -115,7 +120,8 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
     private static JsonDocument Marker(string raw, int size) =>
         JsonSerializer.SerializeToDocument(new { truncated = true, bytes = size, preview = raw[..Math.Min(raw.Length, PreviewChars)] });
 
-    private async Task<HarnessSession> SessionAsync(Dictionary<(string, string), HarnessSession> cache, Guid agentId,
+    /// <summary>The event's session, created on its first event; null when it was recorded in another workspace than <paramref name="workspaceId"/>.</summary>
+    private async Task<HarnessSession?> SessionAsync(Dictionary<(string, string), HarnessSession?> cache, Guid agentId,
         Guid workspaceId, CapturedEvent e, CancellationToken ct)
     {
         var key = (e.HarnessKind, e.SessionExternalId);
@@ -126,6 +132,13 @@ public sealed class BatchIngestor(PodiumDb db, ApiConfig config, Broker broker, 
 
         session = await db.HarnessSessions.FirstOrDefaultAsync(
             s => s.AgentId == agentId && s.HarnessKind == e.HarnessKind && s.ExternalId == e.SessionExternalId, ct);
+        if (session is not null && session.WorkspaceId != workspaceId)
+        {
+            // The agent moved to another workspace after this session began: it stays where it was recorded, unchanged (F-244).
+            cache[key] = null;
+            return null;
+        }
+
         if (session is null)
         {
             session = new HarnessSession
