@@ -84,6 +84,26 @@ public sealed class PermissionRequestKeyTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task The_same_key_from_another_session_returns_the_stored_requests_own_session_in_its_answer()
+    {
+        var w = await ApprovalRuleKit.WorldAsync(api, "pk-session");
+        var first = await CreatedAsync(await PostAsync(w, "local-1"));
+        await using (var db = api.Db())
+        {
+            await db.PermissionRequests.Where(p => p.Id == first.Id).ExecuteUpdateAsync(s => s.SetProperty(p => p.Decision, "allow"));
+        }
+
+        var elsewhere = await ApprovalRuleKit.StartSessionAsync(api, w.Agent);
+        var response = await w.Agent.Http.PostAsJsonAsync("/api/agent/permission-requests", new PermissionRequestCreate(HarnessKinds.ClaudeCode, elsewhere, "Bash",
+            JsonSerializer.SerializeToElement(new { command = "make build" }), 120, InlineAnswer: true, ClientKey: "local-1"), TestUser.Json);
+
+        var again = await CreatedAsync(response);
+        Assert.Equal(first.Id, again.Id);
+        Assert.Equal(w.Session, again.Answer!.SessionExternalId);
+        Assert.NotEqual(elsewhere, again.Answer.SessionExternalId);
+    }
+
+    [Fact]
     public async Task The_same_key_at_the_same_moment_makes_one_request_and_both_get_its_id()
     {
         var w = await ApprovalRuleKit.WorldAsync(api, "pk-race");

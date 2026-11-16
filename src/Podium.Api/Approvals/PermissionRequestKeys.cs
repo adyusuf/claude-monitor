@@ -20,12 +20,17 @@ public static class PermissionRequestKeys
     /// The request this agent already made with this key, answered as a create is (the same id, its expiry, and its answer when the agent reads
     /// one inline); null without a key or when there is none yet.
     /// </summary>
-    public static async Task<PermissionRequestCreated?> FindAsync(PodiumDb db, Guid agentId, string? clientKey, string externalId, bool inline, CancellationToken ct)
+    public static async Task<PermissionRequestCreated?> FindAsync(PodiumDb db, Guid agentId, string? clientKey, bool inline, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         if (clientKey is null) return null;
         var row = await db.PermissionRequests.AsNoTracking().FirstOrDefaultAsync(p => p.AgentId == agentId && p.ClientKey == clientKey, ct);
-        return row is null ? null : new PermissionRequestCreated(row.Id, row.ExpiresAt, inline ? AnswerOf(row, externalId) : null);
+        if (row is null) return null;
+        // The found request's own session names its answer, not the session of the call that found it (the same key may come from another session).
+        var externalId = inline && row.Decision is not null
+            ? await db.HarnessSessions.AsNoTracking().Where(s => s.Id == row.SessionId).Select(s => s.ExternalId).FirstAsync(ct)
+            : "";
+        return new PermissionRequestCreated(row.Id, row.ExpiresAt, inline ? AnswerOf(row, externalId) : null);
     }
 
     /// <summary>The request's answer as the agent takes it; null while nobody has answered.</summary>
