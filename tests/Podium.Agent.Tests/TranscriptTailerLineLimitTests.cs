@@ -47,6 +47,27 @@ public sealed class TranscriptTailerLineLimitTests : IDisposable
         Assert.Equal(3, events[2].Payload.GetProperty("n").GetInt32()); // the lines after it are still read
     }
 
+    [Fact]
+    public void A_line_of_exactly_the_limit_is_taken_whole_and_one_byte_more_becomes_a_marker_keeping_the_first_limit_bytes()
+    {
+        // F-255 (N3): the limit is inclusive; of a longer line only the first TranscriptLineMax bytes are kept for the preview.
+        const int limit = 40;
+        var config = home.Config with { TranscriptLineMax = limit };
+        var atLimit = "{\"type\":\"user\",\"t\":\"" + new string('a', limit - 22) + "\"}";
+        var overLimit = "{\"type\":\"user\",\"t\":\"" + new string('b', limit - 21) + "\"}";
+        Assert.Equal((limit, limit + 1), (atLimit.Length, overLimit.Length));
+        Track("s1", atLimit + "\n" + overLimit + "\n");
+
+        Assert.Equal(2, new TranscriptTailer(config, store, clock, new AgentLog(config, clock)).RunOnce());
+
+        var events = Queued();
+        Assert.False(events[0].Truncated);
+        Assert.Equal(atLimit, events[0].Payload.GetRawText());
+        Assert.True(events[1].Truncated);
+        Assert.Equal(limit + 1, events[1].Payload.GetProperty("bytes").GetInt32());
+        Assert.Equal(overLimit[..limit], events[1].Payload.GetProperty("preview").GetString());
+    }
+
     [Theory]
     [InlineData("\\\"password\\\":\\\"hunterhunterhunter\\\"", "hunterhunterhunter")]
     [InlineData("\\\"api_key\\\": \\\"plainwordplainword\\\"", "plainwordplainword")]
