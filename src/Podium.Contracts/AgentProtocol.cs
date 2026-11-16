@@ -72,9 +72,10 @@ public static class DeviceTokenErrors
 /// <summary>A tool call waiting for a person's answer, sent the moment the harness asks.</summary>
 /// <param name="InlineAnswer">True when the agent reads <see cref="PermissionRequestCreated.Answer"/>; only then may an approval rule answer at once (ADR-0019 §8).</param>
 /// <param name="AccessScope">For a path tool, where its path lies against the session's project access layers (<see cref="AccessScopes"/>); null from an older agent.</param>
+/// <param name="ClientKey">The agent's own id for the ask (its local id; F-188): the same key sent again gets the request it made, not a second one. Null from an older agent.</param>
 public sealed record PermissionRequestCreate(
     string HarnessKind, string SessionExternalId, string ToolName, JsonElement ToolInput, int WaitSeconds, bool InlineAnswer = false,
-    string? AccessScope = null);
+    string? AccessScope = null, string? ClientKey = null);
 
 /// <param name="Answer">The answer when an approval rule allowed the request at once (ADR-0019 §7); null when the owner is asked.</param>
 public sealed record PermissionRequestCreated(Guid Id, DateTimeOffset ExpiresAt, PermissionAnswerMessage? Answer = null);
