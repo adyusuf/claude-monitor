@@ -84,6 +84,23 @@ public sealed class ReleaseCapTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_planned_release_switched_to_released_counts_against_the_released_cap_the_1000th_goes_out_the_1001st_is_refused()
+    {
+        var t = await IssueKit.TeamAsync(api); // one planned release, 1.0.0
+        await SeedAsync(t.Owner.WorkspaceId, t.Application, ReleasedMax - 1, ReleaseStatuses.Released, "out", new DateOnly(2020, 1, 1)); // 999 out
+        var second = (await IssueKit.Created(await AddAsync(t.Owner, t.Application, "2.0.0"))).GetProperty("id").GetGuid();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{t.Release}", new { name = "1.0.0", status = "released" })).StatusCode);
+        var refused = await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{second}", new { name = "2.0.0", status = "released" });
+        Assert.Equal(("name", "limit_reached"), await ProjectKit.ProblemAsync(refused));
+        // A released one is still edited at the cap (it adds nothing), and the refused one is still planned.
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{t.Release}", new { name = "1.0.0 final", status = "released" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{second}", new { name = "2.0.0 renamed" })).StatusCode);
+        await using var db = api.Db();
+        Assert.Equal(ReleaseStatuses.Planned, (await db.ApplicationReleases.FindAsync(second))!.Status);
+    }
+
+    [Fact]
     public async Task The_list_keeps_every_planned_release_when_the_history_is_longer_than_the_cap()
     {
         var t = await IssueKit.TeamAsync(api); // one planned release, 1.0.0, without a date

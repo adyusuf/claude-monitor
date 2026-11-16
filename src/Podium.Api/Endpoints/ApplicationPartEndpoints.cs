@@ -139,6 +139,13 @@ public static class ApplicationPartEndpoints
         if (row.Status == ReleaseStatuses.Cancelled) return Http.Invalid("status", "cancelled");
         if (Invalid(req) is { } invalid) return invalid;
         if (row.Status == ReleaseStatuses.Released && (req.Status ?? row.Status) != ReleaseStatuses.Released) return Http.Invalid("status", "released");
+        // A planned release that goes out joins the history, so it counts against the cap of those that went out, as a new one would (S-4).
+        if (row.Status != ReleaseStatuses.Released && req.Status == ReleaseStatuses.Released
+            && await db.ApplicationReleases.CountAsync(r => r.ApplicationId == row.ApplicationId && r.Status == ReleaseStatuses.Released, http.RequestAborted) >= ReleasedMax)
+        {
+            return Http.Invalid("name", "limit_reached");
+        }
+
         Fill(row, req);
         Audit.Add(db, http, clock, AuditActions.ReleaseChanged, row.WorkspaceId, userId, targetType: "application", targetId: row.ApplicationId);
         if (await ProjectEndpoints.SaveUniqueAsync(db, http.RequestAborted) is { } taken) return taken;
