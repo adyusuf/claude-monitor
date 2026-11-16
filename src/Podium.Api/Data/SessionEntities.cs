@@ -179,6 +179,9 @@ public sealed class PermissionRequest
     /// lost response finds the request it made. Null from an older agent and on requests from before this column.
     /// </summary>
     public string? ClientKey { get; set; }
+
+    /// <summary>The options the owner chose for the question tool (JSON object, question text to answer; F-196); null for every other answer and before this column.</summary>
+    public string? Answers { get; set; }
 }
 
 /// <summary>

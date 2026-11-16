@@ -3084,6 +3084,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("answered_by_rule");
 
+                    b.Property<string>("Answers")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answers");
+
                     b.Property<string>("ClientKey")
                         .HasColumnType("text")
                         .HasColumnName("client_key");

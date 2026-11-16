@@ -168,6 +168,7 @@ internal static class PodiumDbModel
             e.HasIndex(x => new { x.WorkspaceId, x.Status, x.CreatedAt });
             e.HasIndex(x => new { x.AgentId, x.ClientKey }).IsUnique().HasFilter("client_key IS NOT NULL");
             e.Property(x => x.ToolInput).HasColumnType("jsonb");
+            e.Property(x => x.Answers).HasColumnType("jsonb");
             e.ToTable(t =>
             {
                 t.HasCheckConstraint("ck_permission_requests_status", In("status",
