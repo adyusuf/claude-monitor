@@ -13,7 +13,7 @@ const webCodes = [
   // workspace settings (WorkspaceEndpoints)
   "invalid_mode",
   // answering a permission request (CommandEndpoints)
-  "invalid_answers", "invalid_decision", "invalid_duration", "rule_not_allowed",
+  "invalid_answers", "invalid_answer", "invalid_decision", "invalid_duration", "rule_not_allowed",
 ] as const;
 
 describe("the error texts", () => {

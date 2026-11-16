@@ -207,7 +207,12 @@ with the note as the reason). The protocol grew only additively: `answers` on th
 `PermissionAnswerMessage`, an `answers` column in the agent's local database (added in place when missing). The API
 accepts `answers` only for `AskUserQuestion`, only with an allow, only for questions the request carries, each at most
 500 characters; the agent builds `updatedInput` from the input the hook received, never from anything the web sent, so
-the web can choose among options but cannot change a call. **Fail-safe:** the buttons exist only while an open
+the web can choose among options but cannot change a call. **Since 16/11/2026 (Q-2, F-335):** a chosen answer must be an
+option the question offered (for a multiple choice, offered options joined by ", "), else `invalid_answer`; typed text comes
+apart as `other` (question text -> text) and goes after the chosen options; the agent hands offered options over as they are
+and wraps anything else, labelled, as a message from the web (`ChannelEnvelopes`), like the deny reason. A question that
+offered no options takes its answer as typed text, as before. The answers are stored with the request (`answers` column),
+so the obsolete poll returns them too (F-196). An older agent copies what it gets unwrapped. **Fail-safe:** the buttons exist only while an open
 permission request for that tool exists. If Claude Code does not raise `PermissionRequest` for these tools, nothing is
 reported, no buttons appear, and the question stays readable in the conversation and answerable on the machine.
 **Not confirmed on a live interactive session (decided 05/10/2026):** whether Claude Code raises the hook for these tools

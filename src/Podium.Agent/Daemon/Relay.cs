@@ -90,7 +90,8 @@ public sealed class Relay(AgentConfig config, LocalStore store, ApiClient api, T
                 new PermissionRequestCreate(p.Harness, p.Session, p.ToolName, input.RootElement.Clone(), left, InlineAnswer: true, AccessScope: Access.AccessScopes.For(config, store, p.Session, p.ToolName, input.RootElement), ClientKey: p.LocalId), ct);
             if (created is null) continue;
             store.PermissionSent(p.LocalId, created.Id.ToString());
-            if (created.Answer is { } a && a.Id == created.Id) store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason);
+            // A create sent again (F-188) may find its request answered by the owner already: the chosen options come with that answer.
+            if (created.Answer is { } a && a.Id == created.Id) store.PermissionAnswered(a.Id.ToString(), a.Decision, a.Reason, a.Answers is null ? null : JsonSerializer.Serialize(a.Answers));
         }
     }
 

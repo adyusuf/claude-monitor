@@ -69,10 +69,13 @@ export const api = {
   sendCommand: (id: string, kind: "prompt" | "stop", body?: string) => request<{ id: string }>("POST", `/sessions/${id}/commands`, { kind, body }),
   cancelCommand: (commandId: string) => request<void>("POST", `/commands/${commandId}/cancel`),
   permissions: (id: string, status?: string) => request<PermissionRow[]>("GET", `/sessions/${id}/permission-requests${q({ status })}`),
-  /** `answers` (question text -> the option chosen) is only for the question tool's request, with an allow. */
+  /**
+   * `answers` (question text -> the options chosen, only offered labels) and `other` (question text -> the text typed instead) are only for the
+   * question tool's request, with an allow; the API refuses a chosen answer that is not an offered option (Q-2).
+   */
   answer: (permissionId: string, decision: "allow" | "deny", reason?: string, answers?: Record<string, string>,
-    opts?: { remember?: ApprovalDuration; code?: string }) =>
-    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason, answers, remember: opts?.remember, code: opts?.code }),
+    opts?: { remember?: ApprovalDuration; code?: string; other?: Record<string, string> }) =>
+    request<void>("POST", `/permission-requests/${permissionId}/answer`, { decision, reason, answers, remember: opts?.remember, code: opts?.code, other: opts?.other }),
   /** The requests on the viewer's own sessions: open ones oldest first, or with "answered" the latest answers (ADR-0019). */
   workspacePermissions: (id: string, status?: "answered") =>
     request<ApprovalRequestRow[]>("GET", `/workspaces/${id}/permission-requests${q({ status })}`),

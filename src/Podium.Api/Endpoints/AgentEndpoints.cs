@@ -262,8 +262,8 @@ public static class AgentEndpoints
 
     /// <summary>
     /// OBSOLETE (F-196): nothing in the product calls this any more, the answer reaches the agent on its stream. It stays, and keeps returning real
-    /// values, for older agents (rule 4); every answer carries <c>Deprecation: true</c>. It does not return an answer's chosen options (they are
-    /// not stored), so a poller can lose them: another reason to read the stream.
+    /// values, for older agents (rule 4); every answer carries <c>Deprecation: true</c>. The answer carries the question tool's chosen options too
+    /// (stored with it since F-196), so a poller loses nothing; an answer from before the column has none.
     /// </summary>
     private static async Task<IResult> GetPermission(Guid id, HttpContext http, PodiumDb db)
     {
@@ -275,7 +275,7 @@ public static class AgentEndpoints
                          select new { p, s.ExternalId }).FirstOrDefaultAsync(http.RequestAborted);
         return row is null
             ? Http.NotFound()
-            : Results.Ok(new { row.p.Status, answer = row.p.Decision is null ? null : new PermissionAnswerMessage(row.p.Id, row.ExternalId, row.p.Decision, row.p.Reason) });
+            : Results.Ok(new { row.p.Status, answer = PermissionRequestKeys.AnswerOf(row.p, row.ExternalId) });
     }
 }
 

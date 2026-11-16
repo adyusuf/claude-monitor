@@ -9,7 +9,7 @@ import { trApprovalRulesErrors } from "./tr.approvalRules";
  * RemoteChecks.ReauthRefused, ApprovalEndpoints), plus the status codes the client falls back to: each must read as words, never as the raw key.
  */
 const APPROVAL_CODES = [
-  "invalid_decision", "too_long", "invalid_answers", "invalid_duration", "rule_not_allowed", "rule_limit", "rule_outside_access",
+  "invalid_decision", "too_long", "invalid_answers", "invalid_answer", "invalid_duration", "rule_not_allowed", "rule_limit", "rule_outside_access",
   "reauth_required", "invalid_code", "account_locked", "not_pending", "not_found", "forbidden", "conflict",
 ] as const;
 

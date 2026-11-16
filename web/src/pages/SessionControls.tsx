@@ -37,9 +37,9 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
 
   // A list that could not be read still shows why; only a read empty list draws nothing.
   if (rows.length === 0 && !error) return null;
-  const answer = async (id: string, decision: "allow" | "deny", answers?: Record<string, string>) => {
+  const answer = async (id: string, decision: "allow" | "deny", answers?: Record<string, string>, other?: Record<string, string>) => {
     try {
-      await api.answer(id, decision, reasons[id]?.trim() || undefined, answers);
+      await api.answer(id, decision, reasons[id]?.trim() || undefined, answers, other ? { other } : undefined);
       setRows((r) => r.filter((p) => p.id !== id));
       onChange();
     } catch (e) {
@@ -57,7 +57,7 @@ export function PermissionsCard({ sessionId, canAnswer, version, onChange, inlin
             <span className="muted small">{t("session.expires")}: {time(p.expiresAt)}</span>
           </div>
           {p.toolName === PLAN_TOOL ? <PlanPrompt input={p.toolInput} /> : p.toolName === QUESTION_TOOL ? null : <Json value={p.toolInput} />}
-          {canAnswer && p.toolName === QUESTION_TOOL ? <QuestionPrompt input={p.toolInput} onAnswer={(answers) => void answer(p.id, "allow", answers)} /> : null}
+          {canAnswer && p.toolName === QUESTION_TOOL ? <QuestionPrompt input={p.toolInput} onAnswer={(answers, other) => void answer(p.id, "allow", answers, other)} /> : null}
           {canAnswer ? (
             <div className="permission-actions">
               <input className="input" placeholder={t("session.reason")} maxLength={config.reasonMax} value={reasons[p.id] ?? ""}

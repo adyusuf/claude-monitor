@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Podium.Api.Data;
 using Podium.Api.Remote;
 using Podium.Contracts;
@@ -31,6 +32,10 @@ public static class PermissionRequestKeys
     public static PermissionAnswerMessage? AnswerOf(PermissionRequest row, string externalId)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return row.Decision is null ? null : new PermissionAnswerMessage(row.Id, externalId, row.Decision, row.Reason);
+        return row.Decision is null ? null : new PermissionAnswerMessage(row.Id, externalId, row.Decision, row.Reason, ReadAnswers(row.Answers));
     }
+
+    /// <summary>The stored chosen options (question text to answer); null when none were stored.</summary>
+    public static Dictionary<string, string>? ReadAnswers(string? stored) =>
+        stored is null ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(stored);
 }
