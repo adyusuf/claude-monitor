@@ -120,7 +120,7 @@ public sealed class HookRunner(AgentConfig config, LocalStore store, TimeProvide
     {
         if (!CanHearTheWeb()) return null;
         var localId = Guid.NewGuid().ToString("N");
-        var input = Masker.Mask(payload["tool_input"]?.DeepClone() ?? new JsonObject())!.ToJsonString();
+        var input = PermissionToolInputs.Capped(Masker.Mask(payload["tool_input"]?.DeepClone() ?? new JsonObject())!.ToJsonString());
         store.AddPermission(new PermissionAsk(localId, HarnessKinds.ClaudeCode, session, payload["tool_name"]?.GetValue<string>() ?? "unknown",
             input, (int)config.PermissionWait.TotalSeconds, clock.GetUtcNow(), null, null, null, PermissionStates.New));
         var deadline = clock.GetUtcNow() + config.PermissionWait;

@@ -195,11 +195,7 @@ public static class AgentEndpoints
             return Http.Invalid("toolName", "invalid");
         }
 
-        if (req.ClientKey is not null && (req.ClientKey is not { Length: >= 1 and <= RunRules.ClientKeyMax } || req.ClientKey.Any(char.IsControl)))
-        {
-            return Http.Invalid("clientKey", RunRules.BadClientKey);
-        }
-
+        if (!PermissionRequestKeys.Valid(req.ClientKey)) return Http.Invalid("clientKey", RunRules.BadClientKey);
         // The same ask sent again after a lost response (F-188) gets the request it made, never a second open one.
         if (await PermissionRequestKeys.FindAsync(db, agentId, req.ClientKey, session.ExternalId, req.InlineAnswer, http.RequestAborted) is { } again) return Results.Ok(again);
         var now = clock.GetUtcNow();
@@ -210,7 +206,7 @@ public static class AgentEndpoints
             SessionId = session.Id,
             AgentId = agentId,
             ToolName = req.ToolName,
-            ToolInput = JsonDocument.Parse(req.ToolInput.GetRawText()),
+            ToolInput = JsonDocument.Parse(PermissionToolInputs.Capped(req.ToolInput.GetRawText())), // an older agent sends it whole (F-189)
             CreatedAt = now,
             ExpiresAt = now.AddSeconds(wait),
             RepoId = session.RepoId,

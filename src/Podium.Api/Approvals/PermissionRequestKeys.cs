@@ -1,4 +1,5 @@
 using Podium.Api.Data;
+using Podium.Api.Remote;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,10 @@ namespace Podium.Api.Approvals;
 /// </summary>
 public static class PermissionRequestKeys
 {
+    /// <summary>No key (an older agent), or one shaped as a run's key is: 1 to 100 characters, none a control character.</summary>
+    public static bool Valid(string? clientKey) =>
+        clientKey is null || (clientKey is { Length: >= 1 and <= RunRules.ClientKeyMax } && !clientKey.Any(char.IsControl));
+
     /// <summary>
     /// The request this agent already made with this key, answered as a create is (the same id, its expiry, and its answer when the agent reads
     /// one inline); null without a key or when there is none yet.
