@@ -100,7 +100,8 @@ public static class IssueEndpoints
         var issue = f.Issue;
         var project = f.Grant.Project;
         if (issue.ArchivedAt is not null) return Http.Invalid("status", "archived");
-        if (IssueRules.Check(req, project) is { } invalid) return invalid;
+        var stored = IssueStored.Of(issue);
+        if (IssueRules.Check(req, project, stored) is { } invalid) return invalid;
         var type = req.Type ?? issue.Type;
         if (IssueRules.CheckBugFields(req, type) is { } bug) return bug;
         if (type != WorkItemTypes.Epic && issue.Type == WorkItemTypes.Epic && await db.Issues.AnyAsync(i => i.ParentId == id, http.RequestAborted))
@@ -110,7 +111,7 @@ public static class IssueEndpoints
 
         var before = IssueFacts.Of(issue);
         Fill(issue, req, project, type, userId, clock.GetUtcNow());
-        if (await IssueRules.CheckReferencesAsync(db, project, issue, type, http.RequestAborted) is { } bad) return bad;
+        if (await IssueRules.CheckReferencesAsync(db, project, issue, type, http.RequestAborted, stored) is { } bad) return bad;
         if (await writes.UpdateAsync(userId, project, before, issue, http.RequestAborted) is { } refused) return refused;
 
         Audit.Add(db, http, clock, AuditActions.IssueUpdated, issue.WorkspaceId, userId, targetType: "issue", targetId: id);
@@ -207,7 +208,7 @@ public static class IssueEndpoints
         i.TitleSearch = SearchText.Normalize(i.Title);
         i.Type = type;
         if (r.Priority is not null) i.Priority = IssueRules.Clean(r.Priority);
-        if (r.Estimate is not null) i.Estimate = string.IsNullOrWhiteSpace(r.Estimate) ? null : IssueRules.Estimate(r.Estimate, project.EstimationUnit);
+        if (r.Estimate is not null) i.Estimate = string.IsNullOrWhiteSpace(r.Estimate) ? null : r.Estimate.Trim() == i.Estimate ? i.Estimate : IssueRules.Estimate(r.Estimate, project.EstimationUnit);
         i.Status = r.Status ?? i.Status;
         i.AssigneeUserId = r.AssigneeUserId;
         i.ParentId = r.ParentId;
