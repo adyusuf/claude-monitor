@@ -105,6 +105,8 @@ public static class ProjectEndpoints
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
         await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
         await db.Entry(project).ReloadAsync(http.RequestAborted);
+        // An archive that committed while this request waited for the lock is seen here (F-104).
+        if (project.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (ProjectRules.IsStale(req.ExpectedUpdatedAt, project.UpdatedAt)) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ProjectRules.StaleUpdate);
         // A mirrored project's name and purpose are the tool's while its connection lives (ADR-0015 §7); everything else about it is Podium's to edit.
         if (project.SourceConnectionId is not null && (req.Name?.Trim() != project.Name || ProjectRules.Clean(req.Purpose) != project.Purpose)
