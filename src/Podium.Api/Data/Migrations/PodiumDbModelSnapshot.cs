@@ -3084,6 +3084,10 @@ namespace Podium.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("answered_by_rule");
 
+                    b.Property<string>("ClientKey")
+                        .HasColumnType("text")
+                        .HasColumnName("client_key");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -3129,6 +3133,11 @@ namespace Podium.Api.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_permission_requests");
+
+                    b.HasIndex("AgentId", "ClientKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_permission_requests_agent_id_client_key")
+                        .HasFilter("client_key IS NOT NULL");
 
                     b.HasIndex("SessionId", "Status")
                         .HasDatabaseName("ix_permission_requests_session_id_status");

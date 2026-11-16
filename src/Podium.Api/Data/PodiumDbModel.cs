@@ -166,6 +166,7 @@ internal static class PodiumDbModel
         {
             e.HasIndex(x => new { x.SessionId, x.Status });
             e.HasIndex(x => new { x.WorkspaceId, x.Status, x.CreatedAt });
+            e.HasIndex(x => new { x.AgentId, x.ClientKey }).IsUnique().HasFilter("client_key IS NOT NULL");
             e.Property(x => x.ToolInput).HasColumnType("jsonb");
             e.ToTable(t =>
             {
