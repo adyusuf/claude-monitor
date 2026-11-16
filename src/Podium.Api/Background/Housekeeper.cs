@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.Background;
 
 /// <summary>
-/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens, device codes and account tokens,
+/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens, device codes, account tokens and web sign-ins,
 /// keep the monthly partitions of session_events created ahead of need (the default partition catches anything else), and blank captured content past retention
 /// (<see cref="ContentRetention"/>).
 /// </summary>
@@ -21,6 +21,10 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
 
     /// <summary>How long an expired or spent account mail or sign-in token (user_tokens: verification, reset, two-step pending) is kept before it is deleted (F-185).</summary>
     public static readonly TimeSpan KeepEndedUserTokens = TimeSpan.FromDays(7);
+
+    /// <summary>How long a web sign-in (login_sessions) that expired or was revoked is kept before it is deleted (F-185). Such a row
+    /// can no longer sign anyone in; a live one is never touched.</summary>
+    public static readonly TimeSpan KeepEndedLoginSessions = TimeSpan.FromDays(30);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -62,6 +66,7 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
         var ruleCutoff = now - ApprovalRuleLimits.KeepEnded;
         var credentialCutoff = now - KeepEndedCredentials;
         var userTokenCutoff = now - KeepEndedUserTokens;
+        var loginSessionCutoff = now - KeepEndedLoginSessions;
         await Chores.RunAsync(db, ct,
             () => SessionExpiry.CommandsAsync(db, now, broker, ct),
             () => SessionExpiry.PermissionsAsync(db, now, broker, ct),
@@ -76,6 +81,9 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
                 .ExecuteDeleteAsync(ct),
             () => db.DeviceAuthorizations.Where(d => d.ExpiresAt <= credentialCutoff).ExecuteDeleteAsync(ct),
             () => db.UserTokens.Where(t => t.ExpiresAt <= userTokenCutoff || (t.UsedAt != null && t.UsedAt <= userTokenCutoff)).ExecuteDeleteAsync(ct),
+            // A web sign-in that expired or was revoked a month ago signs nobody in (AuthHandlers); its browser line goes with it.
+            () => db.LoginSessions.Where(s => s.ExpiresAt <= loginSessionCutoff || (s.RevokedAt != null && s.RevokedAt <= loginSessionCutoff))
+                .ExecuteDeleteAsync(ct),
             () => EnsurePartitionsAsync(db, now, ct));
     }
 

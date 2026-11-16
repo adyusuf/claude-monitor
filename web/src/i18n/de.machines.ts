@@ -4,6 +4,7 @@ import type { Dictionary } from "./en";
 export const deMachines: Dictionary["machines"] = {
   title: "Maschinen", empty: "Noch ist keine Maschine verbunden.", connect: "Eine Maschine verbinden", revoke: "Trennen",
   revokeConfirm: "Diese Maschine trennen? Ihr Agent hört auf zu melden.", revoked: "Getrennt", lastSeen: "Zuletzt gesehen",
+  truncated: "Nur die ersten {n} Maschinen werden angezeigt; der Arbeitsbereich hat mehr.",
   version: "Agent", user: "Benutzer", moveTo: "In Arbeitsbereich verschieben", enrolled: "Verbunden",
   updateAvailable: "Update verfügbar: {version}",
   updateHint: "Führen Sie auf der Maschine „aipod update“ aus oder lassen Sie sie sich selbst aktualisieren (aipod config auto-update on, wenn der Arbeitsbereich es erlaubt).",

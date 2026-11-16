@@ -18,10 +18,14 @@ public static class MachineMetricsEndpoints
         g.MapGet("/agents/{id:guid}/detail", Detail);
     }
 
-    private static async Task<IResult> Machines(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
+    /// <summary>At most <see cref="MachineQueries.ListMax"/> machines; a cut list says so in the header the other lists use, and <c>skip</c> fetches the rest (F-024).</summary>
+    private static async Task<IResult> Machines(Guid id, int? skip, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
-        return Results.Ok(await MachineQueries.MachinesAsync(db, config, id, clock.GetUtcNow(), http.RequestAborted));
+        if (skip is < 0) return Http.Invalid("skip", IntegrationImportEndpoints.InvalidPaging);
+        var (rows, truncated) = await MachineQueries.MachinesPageAsync(db, config, id, clock.GetUtcNow(), skip ?? 0, http.RequestAborted);
+        IntegrationImportEndpoints.MarkTruncated(http, truncated);
+        return Results.Ok(rows);
     }
 
     private static async Task<IResult> Detail(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock, ILoggerFactory logs)

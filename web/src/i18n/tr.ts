@@ -199,6 +199,7 @@ export const tr: Dictionary = {
     pending: "Açık davetler", noPending: "Açık davet yok.", remove: "Çıkar", leave: "Çalışma alanından ayrıl",
     removeConfirm: "Bu üye çalışma alanından çıkarılsın mı?", leaveConfirm: "Bu çalışma alanından ayrılınsın mı?",
     mailNotSent: "Davet kaydedildi ama e-postası gönderilemedi. Açık davetlerden yeniden gönderin.", resend: "Yeniden gönder", resent: "Davet yeniden gönderildi.",
+    truncated: "Yalnızca ilk {n} üye gösteriliyor; çalışma alanında daha fazlası var.", invitationsTruncated: "Yalnızca ilk {n} açık davet gösteriliyor; daha fazlası var.",
   },
   roles: { owner: "Sahip", admin: "Yönetici", member: "Üye", viewer: "İzleyici" },
   workspace: {
@@ -262,7 +263,7 @@ export const tr: Dictionary = {
     status: "Durum", allMachines: "Tüm makineler", machine: "Makine", command: "Komut", requestedBy: "İsteyen", when: "Ne zaman", decidedBy: "Karar veren",
     byGrant: "bir izin", byJob: "bir iş", undecided: "henüz yok", details: "Ayrıntılar", detailsOf: "Çalıştırma ayrıntıları", empty: "Bu çalışma alanında henüz hiçbir şey çalışmadı.",
   },
-  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı", copyFailed: "Kopyalanamadı. Seçip elle kopyalayın." },
+  common: { loading: "Yükleniyor…", retry: "Tekrar dene", save: "Kaydet", cancel: "Vazgeç", close: "Kapat", yes: "Evet", no: "Hayır", copy: "Kopyala", copied: "Kopyalandı", copyFailed: "Kopyalanamadı. Seçip elle kopyalayın.", loadMore: "Daha fazla yükle" },
   remote: trRemote,
   approvals: {
     title: "Onay anahtarları", intro: "Bu tarayıcıda üretilen bir anahtar, izin verdiğiniz çalıştırmaları imzalar. Yöneticisi anahtarı sabitlemiş ve imzalı onayı açmış bir makine, bu anahtarla imzalanmamış hiçbir şeyi çalıştırmaz; ele geçirilmiş bir sunucu bile sizin adınıza çalıştırma başlatamaz. Özel yarı bu tarayıcıdan hiç çıkmaz.",

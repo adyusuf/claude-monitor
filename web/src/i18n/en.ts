@@ -198,6 +198,7 @@ export const en = {
     pending: "Open invitations", noPending: "No open invitations.", remove: "Remove", leave: "Leave workspace",
     removeConfirm: "Remove this member from the workspace?", leaveConfirm: "Leave this workspace?",
     mailNotSent: "The invitation is saved, but its mail could not be sent. Send it again from the open invitations.", resend: "Send again", resent: "The invitation was sent again.",
+    truncated: "Only the first {n} members are shown; the workspace has more.", invitationsTruncated: "Only the first {n} open invitations are shown; there are more.",
   },
   roles: { owner: "Owner", admin: "Admin", member: "Member", viewer: "Viewer" },
   workspace: {
@@ -261,7 +262,7 @@ export const en = {
     status: "Status", allMachines: "All machines", machine: "Machine", command: "Command", requestedBy: "Requested by", when: "When", decidedBy: "Decided by",
     byGrant: "a grant", byJob: "a job", undecided: "not yet", details: "Details", detailsOf: "Run details", empty: "Nothing has run in this workspace yet.",
   },
-  common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied", copyFailed: "It could not be copied. Select it and copy it by hand." },
+  common: { loading: "Loading…", retry: "Retry", save: "Save", cancel: "Cancel", close: "Close", yes: "Yes", no: "No", copy: "Copy", copied: "Copied", copyFailed: "It could not be copied. Select it and copy it by hand.", loadMore: "Load more" },
   remote: enRemote,
   approvals: {
     title: "Approval keys", intro: "A key made in this browser signs the runs you allow. A machine whose admin pinned the key and switched on signed approvals runs nothing that was not signed with it, so even a compromised server cannot start a run in your name. The private half never leaves this browser.",

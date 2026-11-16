@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using Podium.Agent.Config;
 using Podium.Agent.Daemon;
 using Podium.Agent.Net;
+using Podium.Agent.Push;
 using Podium.Agent.Storage;
 using Podium.Contracts;
 
@@ -113,6 +115,26 @@ public sealed partial class RelayTests
         Assert.Equal(1, store.ForgetQuarantined(clock.GetUtcNow() - TimeSpan.FromDays(7)));
         Assert.Equal(0, store.QuarantineCount());
         Assert.Equal(1, store.Count(LocalStore.QuarantinedKey)); // the count is the total moved, not what is still held
+    }
+
+    private string Status() => string.Join('\n', PushStatus.Describe(home.Config, store, clock.GetUtcNow(), null, daemonRunning: false));
+
+    [Fact]
+    public async Task The_status_says_how_many_events_are_held_back_only_while_some_are()
+    {
+        Queue("s", 3);
+        RefuseEventZero(HttpStatusCode.BadRequest);
+        for (var i = 0; i < 2; i++) await Assert.ThrowsAsync<ApiException>(() => relay.UploadAsync(CancellationToken.None));
+        Assert.DoesNotContain("Held back", Status(), StringComparison.Ordinal); // refused, but nothing moved aside yet
+
+        await relay.UploadAsync(CancellationToken.None);
+        Assert.Contains("Held back: 1 event(s) the server refused for good are kept here and not uploaded.", Status(), StringComparison.Ordinal);
+        using (Strings.Scope("tr")) Assert.Contains("Geri tutulan: sunucunun kalıcı olarak reddettiği 1 olay", Status(), StringComparison.Ordinal);
+        using (Strings.Scope("de")) Assert.Contains("Zurückgehalten: 1 Ereignis(se)", Status(), StringComparison.Ordinal);
+
+        clock.Advance(TimeSpan.FromDays(8));
+        store.ForgetQuarantined(clock.GetUtcNow() - TimeSpan.FromDays(7));
+        Assert.DoesNotContain("Held back", Status(), StringComparison.Ordinal); // what is still held, not the total ever moved
     }
 
     [Fact]

@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api/endpoints";
 import type { SpaceView } from "../api/typesIntegrations";
+import { MoreRows } from "../components/MoreRows";
 import { Button, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
+import { appendNew } from "../lib/listPages";
 import { IntegrationSprints } from "./IntegrationSprints";
 
 /** What the API takes in one import (it refuses more with invalid_list). */
@@ -17,6 +19,7 @@ export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImpor
   const [spaces, setSpaces] = useState<SpaceView[] | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [sprintsOf, setSprintsOf] = useState<SpaceView | null>(null);
@@ -32,6 +35,21 @@ export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImpor
       setNotices([{ kind: "error", text: errorText(e) }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** The spaces after those shown (the API cut the list at its maximum, F-077), added once each. */
+  const loadMore = async () => {
+    if (!spaces) return;
+    setLoadingMore(true);
+    try {
+      const list = await api.integrationSpaces(id, spaces.length);
+      setSpaces(appendNew(spaces, list.items, (s) => s.key));
+      setTruncated(list.truncated);
+    } catch (e) {
+      setNotices([{ kind: "error", text: errorText(e) }]);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -80,7 +98,7 @@ export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImpor
           ))}
         </ul>
       )}
-      {spaces && truncated ? <p className="muted">{t("integrations.spacesTruncated", { n: spaces.length })}</p> : null}
+      {spaces && truncated ? <MoreRows note={t("integrations.spacesTruncated", { n: spaces.length })} busy={loadingMore} onMore={() => void loadMore()} /> : null}
       {spaces && canImport && picked.size >= IMPORT_MAX ? <p className="muted">{t("integrations.spacesLimit", { n: IMPORT_MAX })}</p> : null}
       {spaces && canImport ? <Button busy={busy} disabled={picked.size === 0} onClick={() => void run()}>{t("integrations.importSelected", { n: picked.size })}</Button> : null}
       {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} canImport={canImportSprints && sprintsOf.canEdit} onClose={() => setSprintsOf(null)} /> : null}

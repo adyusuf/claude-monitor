@@ -11,9 +11,16 @@ public static class MachineQueries
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Active agents of the workspace, service agents first, then by host name.</summary>
+    /// <summary>At most this many rows in one answer of the agents and the machines list; a <c>skip</c> fetches the rest (F-024).</summary>
+    public const int ListMax = 500;
+
+    /// <summary>Active agents of the workspace, service agents first, then by host name: the first <see cref="ListMax"/>.</summary>
     public static async Task<List<MachineView>> MachinesAsync(PodiumDb db, ApiConfig config, Guid workspaceId, DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct) => (await MachinesPageAsync(db, config, workspaceId, now, 0, ct)).Rows;
+
+    /// <summary>The same list from row <paramref name="skip"/> on, at most <see cref="ListMax"/> rows, and whether rows after them were left out.</summary>
+    public static async Task<(List<MachineView> Rows, bool Truncated)> MachinesPageAsync(PodiumDb db, ApiConfig config, Guid workspaceId, DateTimeOffset now,
+        int skip, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(config);
@@ -53,7 +60,9 @@ public static class MachineQueries
                               a.ClaudeAutoMode,
                               a.PluginId,
                               a.ClaudeAutoProject,
-                          }).Take(500).ToListAsync(ct);
+                          }).Skip(skip).Take(ListMax + 1).ToListAsync(ct); // one more than shown tells whether rows were left out
+        var truncated = rows.Count > ListMax;
+        if (truncated) rows.RemoveRange(ListMax, rows.Count - ListMax);
         var ids = rows.Select(r => r.Id).ToList();
         var since = now - config.MetricsReportWindow;
         var latest = await db.MachineMetrics.AsNoTracking()
@@ -61,13 +70,13 @@ public static class MachineQueries
             .GroupBy(x => x.AgentId)
             .Select(g => g.OrderByDescending(x => x.SampledAt).First())
             .ToListAsync(ct);
-        return rows.Select(r => new MachineView(r.Id, r.Hostname, r.Os, r.DisplayName, r.ExecLevel, r.ServiceMode,
+        return (rows.Select(r => new MachineView(r.Id, r.Hostname, r.Os, r.DisplayName, r.ExecLevel, r.ServiceMode,
             r.LastHeartbeatAt > online, r.LastHeartbeatAt, latest.FirstOrDefault(x => x.AgentId == r.Id) is { } s ? Sample(s) : null,
             r.Alerts, r.RoleEnvironment, r.RoleFunction, r.ClaimedEnvironment, r.ClaimedFunction,
             MachineRoles.EffectiveEnvironment(r.RoleEnvironment, r.ClaimedEnvironment), MachineRoles.EffectiveFunction(r.RoleFunction, r.ClaimedFunction),
             r.ClaudeKind, r.ClaudeVersion, r.ClaudeSessionsIdle, MachineFacts.Tools(r.Interpreters), MachineFacts.Tools(r.Tools),
             r.Capabilities, r.PresenceAt, MachineFacts.TagsFrom(r.Tags), r.AcceptsAsks, r.AcceptsClaudeControl, r.ClaudeAutoMode, r.PluginId, r.ClaudeAutoProject, r.ClaudeSessionsLive,
-            MachineRoles.SetOf(r.RoleEnvironments, r.RoleEnvironment, MachineRoles.EnvironmentOrder), MachineRoles.SetOf(r.RoleFunctions, r.RoleFunction, MachineRoles.FunctionOrder))).ToList();
+            MachineRoles.SetOf(r.RoleEnvironments, r.RoleEnvironment, MachineRoles.EnvironmentOrder), MachineRoles.SetOf(r.RoleFunctions, r.RoleFunction, MachineRoles.FunctionOrder))).ToList(), truncated);
     }
 
     public static async Task<List<MetricSample>> MetricsAsync(PodiumDb db, ApiConfig config, Guid workspaceId, Guid agentId,
