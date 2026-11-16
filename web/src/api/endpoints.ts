@@ -48,7 +48,9 @@ export const api = {
   createWorkspace: (name: string) => request<{ id: string }>("POST", "/workspaces", { name }),
   workspace: (id: string) => request<WorkspaceInfo>("GET", `/workspaces/${id}`),
   renameWorkspace: (id: string, name: string) => request<void>("PATCH", `/workspaces/${id}`, { name }),
-  saveSettings: (id: string, settings: Partial<Settings>) => request<void>("PUT", `/workspaces/${id}/settings`, settings),
+  /** The code is the two-step code a recent sign-in may be replaced by (lowering the retention, turning masking off). */
+  saveSettings: (id: string, settings: Partial<Settings>, code?: string) =>
+    request<void>("PUT", `/workspaces/${id}/settings`, code ? { ...settings, code } : settings),
   members: (id: string) => request<Member[]>("GET", `/workspaces/${id}/members`),
   changeRole: (id: string, userId: string, role: Role) => request<void>("PATCH", `/workspaces/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => request<void>("DELETE", `/workspaces/${id}/members/${userId}`),

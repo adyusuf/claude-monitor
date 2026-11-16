@@ -14,7 +14,7 @@ public sealed record WorkspaceResponse(Guid Id, string Name, string Role, Settin
 public sealed record SettingsResponse(bool MaskSecrets, int RetentionDays, int EventMaxBytes, string AgentUpdate = UpdateModes.Off,
     bool ClaudeUpdate = false, bool EnforceAccessPolicies = false);
 
-/// <param name="Code">The two-step code re-authentication may need when EnforceAccessPolicies changes.</param>
+/// <param name="Code">The two-step code re-authentication may need when EnforceAccessPolicies changes, the retention days are lowered or masking is turned off.</param>
 public sealed record SettingsRequest(bool? MaskSecrets, int? RetentionDays, int? EventMaxBytes, string? AgentUpdate = null,
     bool? ClaudeUpdate = null, bool? EnforceAccessPolicies = null, string? Code = null);
 public sealed record MemberResponse(Guid UserId, string DisplayName, string? Email, string Role, DateTimeOffset JoinedAt);
@@ -74,7 +74,10 @@ public static class WorkspaceEndpoints
     private static SettingsResponse View(WorkspaceSettings s) =>
         new(s.MaskSecrets, s.RetentionDays, s.EventMaxBytes, s.AgentUpdate, s.ClaudeUpdate, s.EnforceAccessPolicies);
 
-    /// <summary>Admins change the settings; turning access policy enforcement on or off also needs re-authentication and has its own audit row.</summary>
+    /// <summary>
+    /// Admins change the settings; turning access policy enforcement on or off, lowering the retention days or turning secret masking off also
+    /// needs re-authentication (enforcement has its own audit row).
+    /// </summary>
     private static async Task<IResult> PutSettings(Guid id, SettingsRequest req, HttpContext http, PodiumDb db, Config.ApiConfig config, TimeProvider clock)
     {
         var userId = http.User.UserId();
@@ -86,7 +89,11 @@ public static class WorkspaceEndpoints
         var s = await db.WorkspaceSettings.FirstAsync(x => x.WorkspaceId == id, http.RequestAborted);
         var before = View(s);
         var enforce = req.EnforceAccessPolicies is { } wanted && wanted != s.EnforceAccessPolicies ? wanted : (bool?)null;
-        if (enforce is not null && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code)) return RemoteChecks.ReauthRefused(http);
+        if ((enforce is not null || WorkspaceSettingsRules.NeedsReauth(s, req)) && !await RemoteChecks.ReauthAsync(http, db, config, clock, userId, req.Code))
+        {
+            return RemoteChecks.ReauthRefused(http);
+        }
+
         s.MaskSecrets = req.MaskSecrets ?? s.MaskSecrets;
         s.RetentionDays = req.RetentionDays ?? s.RetentionDays;
         s.EventMaxBytes = req.EventMaxBytes ?? s.EventMaxBytes;
