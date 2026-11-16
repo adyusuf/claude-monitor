@@ -45,6 +45,8 @@ Claude's own tools (Read, Edit, Bash in a session) stay under Claude Code's own 
 The web shows each machine's effective policy (web policy ∩ ceiling, the state of each policy on the machine and whether it is signed) read-only on the machine page; the ceiling's paths only to the machine's owner and admins. A machine admin changes the ceiling with `aipod config access show | allow <folder> | deny <folder> | app <exe> [--sha256 <hex>] | remove <path> | clear`, never by editing a file.
 
 Decisions confirmed by the maintainer on 09/11/2026: the workspace switch (rule 4), the project page with an explicit repository list (rule 1), and signing the repository with the run (rule 6).
+**The repository key leaves out the port (maintainer, 16/11/2026: kept as intended).** `RepoKeys.NormalizeRemote` keeps the lower-cased host, the path without `.git` and no credentials, and drops the port and the scheme: `ssh://git@git.example.invalid:2222/team/shop.git` and `https://git.example.invalid:8443/team/shop` are one key, `git:git.example.invalid/team/shop`. So two services on one host that serve the same path on different ports share one repository, hence one policy. That is the intended trade: the same repository reached over ssh and over https (different ports) must be held to one policy, and a clone URL differs from an application's URL in exactly this way. Two different repositories that collide on host and path are not told apart; give them different paths. Pinned by `RepoKeysPortTests`.
+
 ## 5. Not covered
 
 - Blocking Claude's own tools in a session (rule above).
