@@ -10,6 +10,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [people, setPeople] = useState<PersonView[] | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [email, setEmail] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +18,8 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
   const load = useCallback(async () => {
     try {
       const [list, all] = await Promise.all([api.integrationPeople(id), api.members(ws)]);
-      setPeople(list);
+      setPeople(list.items);
+      setTruncated(list.truncated);
       setMembers(all);
     } catch (e) {
       setError(errorText(e));
@@ -67,6 +69,7 @@ export function IntegrationPeople({ id, ws }: { id: string; ws: string }) {
           </li>
         ))}
       </ul>
+      {truncated ? <p className="muted">{t("integrations.peopleTruncated", { n: people.length })}</p> : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { request } from "./client";
+import { request, requestList } from "./client";
 import type {
   ExecLevelChangeInput, ExecLevelView, AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
@@ -199,12 +199,12 @@ export const api = {
   setIntegration: (id: string, autoInvite: boolean) => request<void>("PUT", `/integrations/${id}`, { autoInvite }),
   /** Disconnecting needs a recent sign-in or a two-step code (F-081): the code goes in the body of the POST address. */
   disconnectIntegration: (id: string, code?: string) => request<void>("POST", `/integrations/${id}/disconnect`, { code }),
-  integrationSpaces: (id: string) => request<SpaceView[]>("GET", `/integrations/${id}/spaces`),
+  integrationSpaces: (id: string) => requestList<SpaceView>(`/integrations/${id}/spaces`),
   importSpaces: (id: string, keys: string[]) => request<SpaceImportResult[]>("POST", `/integrations/${id}/spaces/import`, { keys }),
   integrationSprints: (id: string, key: string) => request<SprintChoice[]>("GET", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints`),
   importSprints: (id: string, key: string, sprintIds: string[]) =>
     request<SprintImportResult[]>("POST", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints/import`, { sprintIds }),
-  integrationPeople: (id: string) => request<PersonView[]>("GET", `/integrations/${id}/people`),
+  integrationPeople: (id: string) => requestList<PersonView>(`/integrations/${id}/people`),
   setIntegrationPerson: (personId: string, input: { email?: string; userId?: string; unlink?: boolean }) => request<void>("PUT", `/integrations/people/${personId}`, input),
   syncIntegration: (id: string) => request<SyncRunView>("POST", `/integrations/${id}/sync`),
   integrationRuns: (id: string) => request<SyncRunView[]>("GET", `/integrations/${id}/runs`),

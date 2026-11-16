@@ -15,6 +15,7 @@ export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImpor
   const { t, tx } = useI18n();
   const errorText = useErrorText();
   const [spaces, setSpaces] = useState<SpaceView[] | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -24,7 +25,9 @@ export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImpor
   const load = async () => {
     setLoading(true);
     try {
-      setSpaces(await api.integrationSpaces(id));
+      const list = await api.integrationSpaces(id);
+      setSpaces(list.items);
+      setTruncated(list.truncated);
     } catch (e) {
       setNotices([{ kind: "error", text: errorText(e) }]);
     } finally {
@@ -77,6 +80,7 @@ export function IntegrationSpaces({ id, ws, canImport, canImportSprints, onImpor
           ))}
         </ul>
       )}
+      {spaces && truncated ? <p className="muted">{t("integrations.spacesTruncated", { n: spaces.length })}</p> : null}
       {spaces && canImport && picked.size >= IMPORT_MAX ? <p className="muted">{t("integrations.spacesLimit", { n: IMPORT_MAX })}</p> : null}
       {spaces && canImport ? <Button busy={busy} disabled={picked.size === 0} onClick={() => void run()}>{t("integrations.importSelected", { n: picked.size })}</Button> : null}
       {sprintsOf ? <IntegrationSprints id={id} spaceKey={sprintsOf.key} name={sprintsOf.name} ws={ws} projectId={sprintsOf.projectId} canImport={canImportSprints} onClose={() => setSprintsOf(null)} /> : null}

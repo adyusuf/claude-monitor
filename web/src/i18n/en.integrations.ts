@@ -24,6 +24,7 @@ export const enIntegrations = {
   disconnectSignIn: "Disconnecting a site needs a recent sign-in. Sign out, sign in again, and disconnect within 10 minutes.",
   spacesTitle: "Spaces", spacesHint: "Choose the Jira spaces to bring in as projects, with their backlog, epics and people.",
   loadSpaces: "Show Jira spaces", noSpaces: "This account sees no spaces.", imported: "Imported", importSelected: "Import selected ({n})",
+  spacesTruncated: "Only the first {n} spaces are shown; the site has more.", peopleTruncated: "Only the first {n} people are shown; the connection has more.",
   openProject: "Open project", sprintsOf: "Sprints…", selectSpace: "Select {name}", spacesLimit: "At most {n} spaces can be imported at once.",
   importResult: "{key}: {created} new, {updated} updated", importProblem: "{key}: {error}",
   sprintsTitle: "Sprints of {name}", sprintsHint: "Choose sprints to import with their issues. New Jira sprints appear here; they are only imported when you choose them.",

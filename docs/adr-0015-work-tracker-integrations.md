@@ -104,11 +104,11 @@ A change in Podium to a mirrored row is sent to Jira with the acting user's own 
 | `DELETE /api/integrations/{id}` (disconnect: tokens and webhook go; imported rows stay, marked detached) | admin, recent sign-in or code window (F-081) |
 | `POST /api/integrations/{id}/disconnect` `{ code }` (the same disconnect, with the two-step code when the sign-in is not recent; the web uses it) | admin, recent sign-in or two-step code (F-081) |
 | `PUT /api/integrations/{id}` `{ autoInvite }` | admin |
-| `GET /api/integrations/{id}/spaces` (live list, with "imported" flags) | any member |
+| `GET /api/integrations/{id}/spaces?skip&take` (live list, with "imported" flags; at most 500, `X-Truncated: true` when rows were left out, F-077) | any member |
 | `POST /api/integrations/{id}/spaces/import { keys[] }` | admin or owner |
 | `GET /api/integrations/{id}/spaces/{key}/sprints` | any member |
 | `POST /api/integrations/{id}/spaces/{key}/sprints/import { sprintIds[] }` | project manager |
-| `GET /api/integrations/{id}/people`, `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |
+| `GET /api/integrations/{id}/people?skip&take` (at most 1000, `X-Truncated: true` when rows were left out, F-077), `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |
 | `POST /api/integrations/{id}/sync` (a pass now) | admin |
 | `GET /api/integrations/{id}/runs` | any member |
 | `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |

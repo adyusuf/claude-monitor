@@ -26,6 +26,7 @@ export const trIntegrations: Dictionary["integrations"] = {
   disconnectSignIn: "Bir sitenin bağlantısını kesmek için yakın zamanda oturum açmış olmanız gerekir. Oturumu kapatın, yeniden açın ve 10 dakika içinde bağlantıyı kesin.",
   spacesTitle: "Alanlar", spacesHint: "Proje olarak almak istediğiniz Jira alanlarını seçin; backlog'u, epic'leri ve kişileri de gelir.",
   loadSpaces: "Jira alanlarını göster", noSpaces: "Bu hesap hiç alan görmüyor.", imported: "İçe alındı", importSelected: "Seçilenleri içe al ({n})",
+  spacesTruncated: "Yalnızca ilk {n} alan gösteriliyor; sitede daha fazlası var.", peopleTruncated: "Yalnızca ilk {n} kişi gösteriliyor; bağlantıda daha fazlası var.",
   openProject: "Projeyi aç", sprintsOf: "Sprintler…", spacesLimit: "Bir seferde en fazla {n} alan içe alınabilir.", selectSpace: "{name} seç",
   importResult: "{key}: {created} yeni, {updated} güncellendi", importProblem: "{key}: {error}",
   sprintsTitle: "{name} sprintleri", sprintsHint: "İssue'larıyla birlikte almak istediğiniz sprintleri seçin. Jira'da açılan yeni sprintler burada görünür; siz seçmeden alınmaz.",
