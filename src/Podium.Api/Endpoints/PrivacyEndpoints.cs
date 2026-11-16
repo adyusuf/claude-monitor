@@ -183,6 +183,7 @@ public static class PrivacyEndpoints
 
         user.Email = null;
         user.EmailNormalized = null;
+        user.EmailKey = null;
         user.DisplayName = DeletedName;
         user.DisplayNameSearch = "";
         user.PasswordHash = null;

@@ -28,6 +28,8 @@ internal static class PodiumDbModelIntegrations
         b.Entity<IntegrationAccount>(e =>
         {
             e.HasIndex(x => new { x.ConnectionId, x.UserId }).IsUnique();
+            // One Atlassian account stands for one person of a connection (F-080, F-337): the check in code, made race-proof.
+            e.HasIndex(x => new { x.ConnectionId, x.ExternalAccountId }).IsUnique().HasDatabaseName("ux_integration_accounts_account");
             e.HasIndex(x => x.UserId);
             e.Property(x => x.Status).HasDefaultValue(AccountStatuses.Active);
             e.ToTable(t => t.HasCheckConstraint("ck_integration_accounts_status", PodiumDbModel.In("status", [.. AccountStatuses.All])));
@@ -56,6 +58,8 @@ internal static class PodiumDbModelIntegrations
         b.Entity<IntegrationPerson>(e =>
         {
             e.HasIndex(x => new { x.ConnectionId, x.ExternalAccountId }).IsUnique();
+            // A member stands for one person of a connection (F-068): the check in code, made race-proof.
+            e.HasIndex(x => new { x.ConnectionId, x.UserId }).IsUnique().HasFilter("user_id IS NOT NULL").HasDatabaseName("ux_integration_people_user");
             e.HasIndex(x => x.UserId);
             e.HasIndex(x => x.EmailNormalized);
             e.HasOne<IntegrationConnection>().WithMany().HasForeignKey(x => x.ConnectionId).OnDelete(DeleteBehavior.Restrict);

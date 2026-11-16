@@ -35,7 +35,7 @@ try {
 
   $su = Read-Host "PostgreSQL superuser (postgres) password" -AsSecureString
   $env:PGPASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($su))
-  & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $scratch;" -c "CREATE DATABASE $scratch;" | Out-Null
+  & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $scratch;" -c "CREATE DATABASE $scratch ENCODING 'UTF8' TEMPLATE template0;" | Out-Null
   & "$PgBin\pg_restore.exe" -h 127.0.0.1 -U postgres -d $scratch --no-owner "$work\database.dump"
   if ($LASTEXITCODE -ne 0) { throw "pg_restore failed ($LASTEXITCODE)" }
   $counts = & "$PgBin\psql.exe" -h 127.0.0.1 -U postgres -d $scratch -At -c "SELECT (SELECT count(*) FROM users) || ' users, ' || (SELECT count(*) FROM workspaces) || ' workspaces, ' || (SELECT count(*) FROM harness_sessions) || ' sessions, ' || (SELECT count(*) FROM session_events) || ' events';"
