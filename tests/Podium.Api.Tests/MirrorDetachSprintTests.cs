@@ -42,6 +42,20 @@ public sealed class MirrorDetachSprintTests(ApiFactory api)
         return await db.Sprints.AsNoTracking().Where(s => s.ProjectId == project && s.Name == name).Select(s => s.Id).SingleAsync();
     }
 
+    /// <summary>A sprint that exists only here, planned, in the mirrored project.</summary>
+    private async Task<Guid> LocalSprintAsync(World s, string name)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var sprint = new Sprint
+        {
+            WorkspaceId = s.W.World.WorkspaceId, ProjectId = s.W.Project, Number = 99, Name = name, CreatedBy = s.W.World.Admin.Id, UpdatedBy = s.W.World.Admin.Id, CreatedAt = now, UpdatedAt = now,
+        };
+        await using var db = api.Db();
+        db.Sprints.Add(sprint);
+        await db.SaveChangesAsync();
+        return sprint.Id;
+    }
+
     [Fact]
     public async Task Before_the_detach_a_sprint_of_a_disconnected_project_is_still_refused_as_detached_and_nothing_is_called()
     {
@@ -76,6 +90,25 @@ public sealed class MirrorDetachSprintTests(ApiFactory api)
             new[] { edited.StatusCode, closed.StatusCode, added.StatusCode, archived.StatusCode });
         Assert.Equal(calls, s.W.Jira.Calls(s.W.Site).Count);
         Assert.Equal(("Ours", "closed"), ((await JiraWriteSprintKit.ViewAsync(s.W.Member, plan)).GetProperty("name").GetString(), await SprintKit.StatusAsync(s.W.Member, now)));
+    }
+
+    [Fact]
+    public async Task An_imported_issue_goes_into_a_new_local_sprint_only_once_the_project_is_no_longer_mirrored_and_no_call_is_made()
+    {
+        var s = await OpenAsync();
+        var imported = (await JiraKit.IssueAsync(s.W.World, "WRT-2")).Id;
+        var local = await LocalSprintAsync(s, "Local one");
+        await JiraWriteKit.AssertRefusedAsync(await SprintKit.AddAsync(s.W.Member, local, imported), HttpStatusCode.Conflict, "mirrored_scope");
+        await DisconnectAsync(s);
+        (await s.W.World.Admin.PostAsync($"/api/projects/{s.W.Project}/detach")).EnsureSuccessStatusCode();
+        var calls = s.W.Jira.Calls(s.W.Site).Count;
+
+        var made = await SprintKit.SprintAsync(s.W.Member, s.W.Project, new { name = "Local two" });
+        var added = await SprintKit.AddAsync(s.W.Member, made, imported);
+
+        Assert.Equal(HttpStatusCode.NoContent, added.StatusCode);
+        Assert.Equal(made, await SprintKit.IssueSprintAsync(s.W.Member, imported));
+        Assert.Equal(calls, s.W.Jira.Calls(s.W.Site).Count);
     }
 
     [Fact]
