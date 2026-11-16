@@ -103,7 +103,7 @@ describe("i18n", () => {
     "exec_level_invalid", "exec_level_changed", "access_policy_changed", "bad_template", "totp_required", "settings_conflict",
     "jira_account_required", "jira_changed", "jira_no_board", "jira_transition_unavailable", "mirrored_no_archive", "mirrored_scope",
     "mirrored_type_locked", "mirrored_field_locked", "tracker_changed", "tracker_unavailable", "tracker_forbidden", "tracker_rejected",
-    "tracker_not_found", "tracker_rate_limited",
+    "tracker_not_found", "tracker_rate_limited", "stale_update",
   ];
 
   it.each(problemTitles)("every problem title the API sends has an errors text: %s", (title) => {

@@ -98,6 +98,11 @@ public static class ProjectEndpoints
         if (grant.Project.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (ProjectRules.Check(req) is { } invalid) return invalid;
         var project = grant.Project;
+        // The lock makes "compare the version, then save" one step, so two forms opened on the same version cannot both win.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
+        await db.Entry(project).ReloadAsync(http.RequestAborted);
+        if (ProjectRules.IsStale(req.ExpectedUpdatedAt, project.UpdatedAt)) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ProjectRules.StaleUpdate);
         // A mirrored project's name and purpose are the tool's (ADR-0015 §7); everything else about it is Podium's to edit.
         if (project.SourceConnectionId is not null && (req.Name?.Trim() != project.Name || ProjectRules.Clean(req.Purpose) != project.Purpose))
         {
@@ -114,6 +119,7 @@ public static class ProjectEndpoints
         Fill(project, req, userId, clock.GetUtcNow());
         Audit.Add(db, http, clock, AuditActions.ProjectUpdated, project.WorkspaceId, userId, targetType: "project", targetId: id);
         if (await SaveUniqueAsync(db, http.RequestAborted) is { } taken) return taken;
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 

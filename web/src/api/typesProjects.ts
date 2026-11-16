@@ -31,6 +31,8 @@ export interface ProjectInput {
   sprintLengthDays: number;
   definitionOfReady: string[];
   definitionOfDone: string[];
+  /** The updatedAt the form was loaded with; the API answers 409 stale_update when the project changed since. Left out when creating. */
+  expectedUpdatedAt?: string;
 }
 
 export interface ProjectAccess { canEdit: boolean; canArchive: boolean; canEditApplications: boolean }

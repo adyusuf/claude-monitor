@@ -61,7 +61,7 @@ Text a person types (names, purposes, notes, links) is shown as text only and ne
 | Call | Needs |
 |---|---|
 | `GET /api/workspaces/{ws}/projects`, `POST` | read / member |
-| `GET /api/projects/{id}`, `PUT` (replaces the definition), `DELETE` (archive), `POST /restore` | read / project edit / archive |
+| `GET /api/projects/{id}`, `PUT` (replaces the definition; an optional `expectedUpdatedAt` makes a project that changed since answer 409 `stale_update`, without it the last write wins), `DELETE` (archive), `POST /restore` | read / project edit / archive |
 | `GET /api/projects/{id}/members`, `PUT /{userId}`, `DELETE /{userId}` | read / project edit |
 | `GET /api/projects/{id}/applications`, `POST` | read / application edit |
 | `GET /api/applications/{id}`, `PUT`, `DELETE` (archive), `POST /restore` | read / application edit |

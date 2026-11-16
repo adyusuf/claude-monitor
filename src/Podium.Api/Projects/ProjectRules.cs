@@ -18,6 +18,12 @@ internal static class ProjectRules
     /// <summary>The largest amount the <c>numeric(14,2)</c> column holds.</summary>
     public const decimal BudgetMax = 999_999_999_999.99m;
     public const int BudgetDecimals = 2;
+    /// <summary>The 409 title of a project change made from a form that is older than the stored project.</summary>
+    public const string StaleUpdate = "stale_update";
+
+    /// <summary>True when the caller says which version it edited and the stored project has moved on; compared to the microsecond the database keeps.</summary>
+    public static bool IsStale(DateTimeOffset? expected, DateTimeOffset stored) =>
+        expected is { } e && e.UtcTicks / TimeSpan.TicksPerMicrosecond != stored.UtcTicks / TimeSpan.TicksPerMicrosecond;
 
     /// <summary>Checks a project definition; the first failure is the answer, null means it is valid.</summary>
     public static IResult? Check(ProjectInput i)

@@ -4,13 +4,15 @@ namespace Podium.Api.Projects;
 
 // The wire shapes of managed projects and applications (ADR-0011). A PUT replaces the whole definition: an optional text, a date, the
 // budget and a list that is missing are cleared; the four settings with a default (item types, priority scale, estimation unit and
-// sprint length) keep their current value when missing.
+// sprint length) keep their current value when missing. A PUT that carries expectedUpdatedAt (the updatedAt the form was loaded with) is
+// refused with 409 stale_update when the project changed since; one that omits it is last-write-wins, as before.
 
 public sealed record Stakeholder(string? Name, string? Role);
 
 public sealed record ProjectInput(string? Name, string? Purpose, Guid? OwnerUserId, string? Sponsor, List<Stakeholder>? Stakeholders,
     decimal? BudgetAmount, string? BudgetCurrency, DateOnly? StartDate, DateOnly? EndDate, List<string>? ItemTypes, string? PriorityScale,
-    string? EstimationUnit, int? SprintLengthDays, List<string>? DefinitionOfReady, List<string>? DefinitionOfDone);
+    string? EstimationUnit, int? SprintLengthDays, List<string>? DefinitionOfReady, List<string>? DefinitionOfDone,
+    DateTimeOffset? ExpectedUpdatedAt = null);
 
 public sealed record ProjectAccessView(bool CanEdit, bool CanArchive, bool CanEditApplications);
 
