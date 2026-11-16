@@ -11,6 +11,7 @@ import { enDashboard } from "./en.dashboard";
 import { enInstallOptions } from "./en.installOptions";
 import { enRemote } from "./en.remote";
 import { enAccess, enAccessErrors } from "./en.access";
+import { enErrorsMore } from "./en.errorsMore";
 
 // English, the primary locale. Every user-facing string of the web is a key here; tr.ts has the same keys.
 export const en = {
@@ -97,35 +98,7 @@ export const en = {
     ask_rate: "Too many asks for now. Wait a while.",
     asks_not_accepted: "That machine does not accept asks.",
     invalid_question: "The question must be 1 to 8000 characters.",
-    invalid_tag: "Tags are key=value pairs: at most 10, letters, digits, dot, underscore and dash, 1 to 32 characters each.",
-    invalid_note: "The note is at most 2000 characters and may not contain control characters.",
-    invalid_kind: "Pick a kind: test, build, deploy or other.",
-    claude_control_not_accepted: "The owner of this machine has not switched on starting Claude from the web.", claude_control_environment: "Claude is started from the web only on development and test machines that an admin has set up.",
-    claude_control_service_mode: "A service agent cannot start Claude.", claude_not_installed: "No Claude Code was found on this machine.", invalid_permission_mode: "Pick a permission mode from the list.",
-    invalid_session_ref: "That is not a session id.", claude_not_started_here: "Only a session started from here can be stopped from here.",
-    invalid_project: "The project key is 1 to 200 characters without control characters.",
-    no_test_command: "The machine reports no test command for that project (or not recently). Set one at the machine with aipod config projects test.",
-    invalid_plugin: "A plugin is written name@marketplace, with letters, digits, dot, underscore and dash only.", invalid_setting: "Pick a setting and a value from the lists.", action_busy: "The agent is still busy with another change of this kind. Wait for it to finish.",
-    name_taken: "That name is already used here. Pick another.", invalid_list: "Check the list: an entry is empty, too long, repeated or not allowed, or there are too many.",
-    amount_and_currency: "Give the budget amount and its currency together, or neither.", invalid_currency: "Use three capital letters, such as EUR.",
-    before_start: "The end date cannot be before the start date.", invalid_date: "Enter a real date as dd/mm/yyyy.", invalid_value: "Pick a value from the list.", invalid_url: "That address is not allowed here. Use an https, ssh or git address for the repository and an http or https address for an environment, without a password and with a user name only in an ssh address.",
-    limit_reached: "The most that fits here has been reached.", archived: "This is archived. Restore it first.",
-    invalid_parent: "The parent must be an epic of this project.", invalid_application: "Pick an application of this project.", invalid_component: "Pick a component of the chosen application.", invalid_release: "Pick a release of the chosen application.", bug_only: "Only a bug carries the bug details.", invalid_issue: "Pick another issue of this project.", self_link: "An issue cannot be linked to itself.", cycle: "That link would make the issues block each other in a loop.", duplicate_link: "These two issues are already linked.",
-    released: "A release that went out cannot be cancelled.", cancelled: "A cancelled release cannot be changed.",
-    sprint_active: "Another sprint of this scope is already active. Close it first.", dates_required: "Set the start and end dates before starting the sprint.", active_dates_required: "An active sprint keeps its start and end dates.",
-    invalid_sprint: "Pick a planned sprint of the same scope.", wrong_scope: "This sprint belongs to an application: it takes only that application's issues.",
-    closed: "This sprint is closed.", not_planned: "Only a planned sprint can be deleted.", not_active: "This sprint is no longer active. Reload the page.",
-    invalid_run: "Pick a run of this workspace.",
-    invalid_auto_mode: "The automatic mode is on_message or off.",
-    invalid_auto_project: "Pick a project this machine has reported and Claude Code trusts.",
-    invalid_first_prompt: "The first prompt is 1 to 2000 characters of text.", claude_folder_not_trusted: "Claude Code does not trust that folder yet: open Claude there once at the machine and accept the trust prompt.",
-    claude_start_pending: "Another start on this machine is still waiting: try again when it has finished.",
-    set_on_server: "This value is set on the server itself and cannot be changed here.", integration_key_missing: "The integration key is missing on the server, so this cannot be saved.",
-    item_type_in_use: "Issues of this project still use a work item type you removed. Change their type first.",
-    priority_scale_in_use: "Issues of this project still hold a priority that the new scale does not have. Clear or change those priorities first.",
-    estimation_unit_in_use: "Issues of this project still hold an estimate that does not fit the new unit. Clear or change those estimates first.",
-    stale_update: "Someone else changed this after you opened it. Reload the page to see the change, then make yours again.",
-    settings_conflict: "Someone else saved this at the same moment. Reload the page and try again.", mail_failed: "The test mail could not be sent. Check the mail server settings.", no_email: "Your account has no e-mail address to send the test mail to.",
+    ...enErrorsMore,
   },
   status: { active: "Working", idle: "Idle", waiting: "Needs you", ended: "Ended" },
   time: { now: "now", s: "s", m: "m", h: "h", d: "d" },
