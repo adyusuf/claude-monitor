@@ -165,6 +165,7 @@ public sealed class UnitTests
             ["AIPOD_BACKGROUND_JOBS"] = "off",
             ["AIPOD_AUTH_RATE_PER_MINUTE"] = "5",
             ["AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE"] = "7",
+            ["AIPOD_INVITE_RATE_PER_MINUTE"] = "9",
             ["AIPOD_MFA_KEY"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         }).Build(), development: false);
         Assert.Equal("https://aipod.invalid", prod.PublicOrigin);
@@ -175,6 +176,7 @@ public sealed class UnitTests
         Assert.False(prod.BackgroundJobs);
         Assert.Equal(5, prod.AuthRequestsPerMinute);
         Assert.Equal(7, prod.DeviceTokenRequestsPerMinute);
+        Assert.Equal(9, prod.InviteRequestsPerMinute);
         Assert.Equal("id", prod.Google!.ClientId);
 
         IConfiguration With(string origin, string mfaKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

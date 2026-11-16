@@ -29,7 +29,7 @@ public static class WorkspaceEndpoints
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("/workspaces").RequireAuthorization(Schemes.Session);
-        g.MapPost("/", Create).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+        g.MapPost("/", Create).RequireRateLimiting(InvitationEndpoints.RateLimitPolicy);
         g.MapGet("/{id:guid}", Get);
         g.MapPatch("/{id:guid}", Rename);
         g.MapPut("/{id:guid}/settings", PutSettings);

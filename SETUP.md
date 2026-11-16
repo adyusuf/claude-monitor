@@ -444,6 +444,10 @@ release, backups, restore drill, rollback) is [docs/deploy-windows.md](docs/depl
 The agent and the tray speak the operating system's language when it is English, Turkish or German, and English otherwise. `AP_LANG=en|tr|de` overrides
 that for one run or one machine (for example `AP_LANG=de aipod status`); it is read by the agent and the tray only, never by the API (ADR-0014, Part A).
 
+`AIPOD_INVITE_RATE_PER_MINUTE` (default 60) is how many workspace invitations (send and resend) and workspace creations one client IP may make per
+minute. It is a budget of its own, apart from `AIPOD_AUTH_RATE_PER_MINUTE` (sign-in, sign-up, reset), so inviting a team does not use up the sign-in
+budget of everyone behind the same address. A missing, non-numeric or non-positive value means the default.
+
 `AIPOD_ADMIN_WORKSPACE` names the one workspace whose owners and admins manage the server-wide integration settings on Settings → Integrations
 (ADR-0017): SMTP, GitHub and Google sign-in and the Jira app. Set it to the workspace id; empty means nobody can open the page. A value saved on the
 page is kept in the database (secrets sealed with `AIPOD_INTEGRATION_KEY`); a value in this file always wins and cannot be changed on the page.

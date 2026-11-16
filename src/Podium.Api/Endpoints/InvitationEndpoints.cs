@@ -18,10 +18,13 @@ public static class InvitationEndpoints
     /// <summary>409 title: the address has an open invitation to this workspace (revoke it to send a new one).</summary>
     public const string InvitationPending = "invitation_pending";
 
+    /// <summary>Inviting and creating a workspace have their own per-IP budget (<see cref="ApiConfig.InviteRequestsPerMinute"/>), apart from the sign-in one.</summary>
+    public const string RateLimitPolicy = "invite";
+
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("").RequireAuthorization(Schemes.Session);
-        g.MapPost("/workspaces/{id:guid}/invitations", Invite).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
+        g.MapPost("/workspaces/{id:guid}/invitations", Invite).RequireRateLimiting(RateLimitPolicy);
         g.MapGet("/workspaces/{id:guid}/invitations", List);
         g.MapDelete("/workspaces/{id:guid}/invitations/{invitationId:guid}", Revoke);
         g.MapPost("/invitations/accept", Accept);
