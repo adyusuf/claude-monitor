@@ -449,6 +449,11 @@ that for one run or one machine (for example `AP_LANG=de aipod status`); it is r
 page is kept in the database (secrets sealed with `AIPOD_INTEGRATION_KEY`); a value in this file always wins and cannot be changed on the page.
 SMTP host, port and sender stay required in this file outside development.
 
+`AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE` (default 120) is how many device-code polls (`/api/device/token`) one client IP may send per minute. An agent
+polls every few seconds while it waits for approval, so a fleet behind one address shares this budget: raise it when many machines are connected
+at once from behind one NAT or proxy. A missing, non-numeric or non-positive value means the default. `AIPOD_AUTH_RATE_PER_MINUTE` (default 20) is the
+separate budget for sign-in, sign-up, reset, device-code and token-refresh requests.
+
 ## Secret and token inventory
 
 The repository holds **no secrets**. The API's live in the server's environment (a root-only environment file

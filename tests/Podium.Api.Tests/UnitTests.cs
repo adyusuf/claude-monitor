@@ -149,6 +149,15 @@ public sealed class UnitTests
         Assert.Equal("http://localhost:5173", dev.PublicOrigin);
         Assert.Null(dev.GitHub);
         Assert.False(dev.SecureCookies);
+        Assert.Equal(120, dev.DeviceTokenRequestsPerMinute); // F-215: the poll budget's default
+        foreach (var bad in new[] { "0", "-5", "many" })
+        {
+            var fallback = ApiConfig.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE"] = bad,
+            }).Build(), development: true);
+            Assert.Equal(120, fallback.DeviceTokenRequestsPerMinute);
+        }
 
         var prod = ApiConfig.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
