@@ -11,7 +11,7 @@ namespace Podium.Api.Tests;
 
 /// <summary>
 /// F-206: a refresh answer lost after the server committed leaves the agent holding the replaced token. Within
-/// <see cref="ApiConfig.AgentRefreshGrace"/> of the replace, and while its successor was never used, the replaced token is honoured
+/// <see cref="ApiConfig.AgentRefreshGrace"/> of the replace, and while its successor refresh token was never replaced, the replaced token is honoured
 /// once; the unused successor then counts as replaced. Anything else stays a reuse that revokes the agent.
 /// </summary>
 [Collection(ApiGroup.Name)]
@@ -93,6 +93,22 @@ public sealed class RefreshGraceTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(agent.Tokens.RefreshToken)).StatusCode);
         Assert.Equal(AgentStatuses.Revoked, await AgentStatusAsync(agent.Tokens.AgentId));
         Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(onward.RefreshToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_used_successor_access_token_does_not_end_the_window_a_replay_gets_one_pair_and_the_real_agents_refresh_revokes_all()
+    {
+        var user = await api.NewClient().SignedUpAsync("grace-replay");
+        var agent = await user.ConnectAgentAsync();
+        var real = await RotatedAsync(agent.Tokens.RefreshToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await AgentHttp(real).PostAsync("/api/agent/heartbeat", null)).StatusCode); // only the access token was used
+
+        var stolen = await RotatedAsync(agent.Tokens.RefreshToken); // the documented bounded risk (docs/security.md): one valid pair
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await AgentHttp(real).PostAsync("/api/agent/heartbeat", null)).StatusCode); // the real agent's next call fails
+        Assert.Equal(HttpStatusCode.Unauthorized, (await RefreshAsync(real.RefreshToken)).StatusCode); // and its refresh is a reuse
+        Assert.Equal(AgentStatuses.Revoked, await AgentStatusAsync(agent.Tokens.AgentId));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await AgentHttp(stolen).PostAsync("/api/agent/heartbeat", null)).StatusCode); // the replayed pair ends too
     }
 
     [Fact]

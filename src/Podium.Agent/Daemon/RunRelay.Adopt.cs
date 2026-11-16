@@ -8,7 +8,7 @@ namespace Podium.Agent.Daemon;
 /// <summary>
 /// A run that outlived the agent that started it, picked up by the next one (F-323, ADR-0005). The old agent's pipes are gone, so the new one
 /// cannot read the rest of the output and cannot learn the exit code: it keeps the run "running", enforces the run's original timeout, answers a
-/// cancel, and when the process ends reports the run failed with <see cref="RunFailures.ExitUnknown"/>. Windows runs never get here
+/// cancel, and when the process ends kills what is left of its group and reports the run failed with <see cref="RunFailures.ExitUnknown"/>. Windows runs never get here
 /// (the Job Object ends them with the agent), and neither does a run the process table cannot vouch for.
 /// </summary>
 public sealed partial class RunRelay
@@ -114,7 +114,13 @@ public sealed partial class RunRelay
                 return (RunStatuses.TimedOut, null);
             }
 
-            if (!Alive(r.RunId, pid, start)) return (RunStatuses.Failed, RunFailures.ExitUnknown);
+            if (!Alive(r.RunId, pid, start))
+            {
+                // The lead is gone but children it left in its group may not be: they must not outlive the run (the id was checked at the
+                // pick-up, is above 1, and a group already gone is no error).
+                TrySignal(r.RunId, pid, force: true);
+                return (RunStatuses.Failed, RunFailures.ExitUnknown);
+            }
 
             try
             {

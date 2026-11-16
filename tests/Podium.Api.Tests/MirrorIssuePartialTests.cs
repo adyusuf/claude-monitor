@@ -1,5 +1,7 @@
 using System.Net;
+using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Tests;
 
@@ -25,6 +27,26 @@ public sealed class MirrorIssuePartialTests(ApiFactory api)
         Assert.Equal("In Progress", w.Site.Find("WRT-2")!.Status);
         var row = await w.RowAsync("WRT-2");
         Assert.Equal(("Story one", "in_progress"), (row.Title, row.Status)); // the status Jira took, not the title it did not
+    }
+
+    [Fact]
+    public async Task The_status_a_partial_write_stores_here_is_audited_with_the_status_and_the_failure_code_only()
+    {
+        var w = await JiraWriteKit.OpenAsync(api);
+        var id = await w.IdAsync("WRT-2");
+        w.Site.Refuse(HttpMethod.Put, Issue, HttpStatusCode.Forbidden, times: 3);
+
+        await JiraWriteKit.AssertRefusedAsync(await JiraWriteKit.EditAsync(w.Member, id, new { status = "in_progress", title = "Started" }), HttpStatusCode.Conflict, "jira_partly_applied");
+
+        await using var db = api.Db();
+        var audit = Assert.Single(await db.AuditEvents.AsNoTracking().Where(a => a.Action == AuditActions.IssueUpdated && a.TargetId == id.ToString()).ToListAsync());
+        Assert.Equal(w.Member.Id, audit.ActorUserId);
+        var detail = audit.Detail!.RootElement;
+        Assert.True(detail.GetProperty("partlyApplied").GetBoolean());
+        Assert.Equal("in_progress", detail.GetProperty("status").GetString());
+        Assert.Equal("tracker_forbidden", detail.GetProperty("code").GetString());
+        Assert.DoesNotContain("Started", detail.GetRawText(), StringComparison.Ordinal); // no text of the edit
+        Assert.Equal("Story one", (await w.RowAsync("WRT-2")).Title); // the audit's save carries none of the other fields
     }
 
     [Fact]

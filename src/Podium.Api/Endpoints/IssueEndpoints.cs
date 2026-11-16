@@ -112,7 +112,7 @@ public static class IssueEndpoints
         var before = IssueFacts.Of(issue);
         Fill(issue, req, project, type, userId, clock.GetUtcNow());
         if (await IssueRules.CheckReferencesAsync(db, project, issue, type, http.RequestAborted, stored) is { } bad) return bad;
-        if (await writes.UpdateAsync(userId, project, before, issue, http.RequestAborted) is { } refused) return refused;
+        if (await writes.UpdateAsync(userId, project, before, issue, http, http.RequestAborted) is { } refused) return refused;
 
         Audit.Add(db, http, clock, AuditActions.IssueUpdated, issue.WorkspaceId, userId, targetType: "issue", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);

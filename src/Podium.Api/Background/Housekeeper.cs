@@ -40,7 +40,7 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    /// <summary>One pass of every chore, these and the remote ones, in one scope.</summary>
+    /// <summary>One pass of every chore, these, the remote ones and content retention (which needs the archive folder), in one scope.</summary>
     public static async Task PassAsync(IServiceProvider services, TimeProvider clock, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -48,7 +48,10 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
         var db = services.GetRequiredService<PodiumDb>();
         await Chores.RunAsync(db, ct,
             () => RunOnceAsync(db, clock.GetUtcNow(), ct, services.GetRequiredService<Broker>()),
-            () => RemoteHousekeeping.RunOnceAsync(db, services.GetRequiredService<ApiConfig>(), services.GetRequiredService<Broker>(), clock.GetUtcNow(), ct));
+            () => RemoteHousekeeping.RunOnceAsync(db, services.GetRequiredService<ApiConfig>(), services.GetRequiredService<Broker>(), clock.GetUtcNow(), ct),
+            // Prompt texts, permission inputs and archive files past the workspace's retention (F-119); the archive files only under the archive folder.
+            () => ContentRetention.RunOnceAsync(db, services.GetRequiredService<ApiConfig>().ArchiveDir, services.GetRequiredService<ILogger<Housekeeper>>(),
+                clock.GetUtcNow(), ct));
     }
 
     /// <summary>Each chore runs even when one before it fails (<see cref="Chores"/>).</summary>
@@ -73,9 +76,7 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
                 .ExecuteDeleteAsync(ct),
             () => db.DeviceAuthorizations.Where(d => d.ExpiresAt <= credentialCutoff).ExecuteDeleteAsync(ct),
             () => db.UserTokens.Where(t => t.ExpiresAt <= userTokenCutoff || (t.UsedAt != null && t.UsedAt <= userTokenCutoff)).ExecuteDeleteAsync(ct),
-            () => EnsurePartitionsAsync(db, now, ct),
-            // Prompt texts, permission inputs and archive files past the workspace's retention (F-119).
-            () => ContentRetention.RunOnceAsync(db, now, ct));
+            () => EnsurePartitionsAsync(db, now, ct));
     }
 
     /// <summary>session_events_yYYYYmMM for this month and the next ones. Idempotent.</summary>
