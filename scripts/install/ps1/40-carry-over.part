@@ -1,0 +1,23 @@
+# ---------------------------------------------------------------- carrying the settings and the login over
+
+function Get-IdentityHome { foreach ($h in @($NewHome) + $OldHomes) { if (Test-Path -LiteralPath (Join-Path $h 'agent.json')) { return $h } } }
+
+function Copy-Carry {
+    $src = Get-IdentityHome
+    if (-not $src) { return }
+    Say "Carrying the old settings and login over from $src"
+    if ($DryRun) { Say "  [dry run] agent.json and the tokens would be copied into $NewHome"; return }
+    New-Item -ItemType Directory -Force -Path $NewHome | Out-Null
+    if ($src -ne $NewHome -and -not (Test-Path -LiteralPath (Join-Path $NewHome 'agent.json'))) {
+        Copy-Item -LiteralPath (Join-Path $src 'agent.json') -Destination (Join-Path $NewHome 'agent.json')
+        Say '  copied agent.json (server, machine identity, saved settings)'
+    }
+    foreach ($account in $Accounts) {
+        if ($null -ne [ApCred]::Read("$NewService/$account")) { continue } # one already there is never overwritten
+        $secret = [ApCred]::Read("$OldService/$account")
+        if ($null -eq $secret) { continue }
+        if ([ApCred]::Write("$NewService/$account", $secret)) { Say "  carried the $account over to Credential Manager" }
+        $secret = $null
+    }
+}
+

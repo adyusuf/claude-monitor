@@ -92,7 +92,7 @@ If aipod is already installed the script only offers the update (default yes) an
 | `--remove-old` / `-RemoveOld` | Only remove the old agent; install nothing. Keeps the old data folder; `--purge` / `-Purge` deletes it too, after copying the settings. |
 | `--no-plugin`, `--no-login` / `-NoPlugin`, `-NoLogin` | Skip the plugin / the connection step. |
 
-The scripts are [`scripts/install/`](scripts/install). A boot-service agent (for servers) is a different install: the script only names the
+The scripts are [`scripts/install/`](scripts/install): each is split by step into `sh/*.part` and `ps1/*.part`, and `scripts/install/assemble.sh <folder>` joins them into the one `aipod-install.sh` / `aipod-install.ps1` that `scripts/build-agent.sh` puts beside the zips (a downloaded installer cannot source a sibling file). A boot-service agent (for servers) is a different install: the script only names the
 command to remove it ([SETUP.md](SETUP.md)). The Linux path is covered by the same script and its tests only on macOS so far (the token-file branch is exercised by the test's file store, not on a Linux host), and the Windows script has not been run on a real host yet.
 
 ## Layout

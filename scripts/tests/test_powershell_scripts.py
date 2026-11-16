@@ -2,6 +2,7 @@
 Windows, so a syntax error would otherwise first show there. Skipped (not passed) where pwsh is not installed."""
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import subprocess
 import unittest
@@ -9,7 +10,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FOLDER = ROOT / "deploy" / "windows"
-INSTALL = ROOT / "scripts" / "install" / "aipod-install.ps1"
+_spec = importlib.util.spec_from_file_location("install_support", Path(__file__).resolve().parent / "install_support.py")
+install_support = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(install_support)
+INSTALL = Path(install_support.assembled(install_support.PS1))  # the file the download host serves, joined from the step files (F-332)
 PWSH = shutil.which("pwsh")
 
 

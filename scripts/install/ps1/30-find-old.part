@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------- finding an older agent
+
+function Get-OldBinaries {
+    $found = @()
+    foreach ($h in $OldHomes + $NewHome) { $found += Join-Path $h 'bin\cm-agent.exe'; $found += Join-Path $h 'bin\cm-agentw.exe' }
+    foreach ($pattern in 'monitor-agent-*', 'aipod-*') {
+        $found += Get-ChildItem -Path (Join-Path $ClaudeDir "plugins\data\$pattern\bin") -Filter 'cm-agent*.exe' -ErrorAction SilentlyContinue | ForEach-Object FullName
+    }
+    return @($found | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -Unique)
+}
+function Get-OldPluginIds {
+    if (-not (Have-Claude)) { return @() }
+    try { return @((claude plugin list --json 2>$null | ConvertFrom-Json) | ForEach-Object id | Where-Object { $_ -like 'monitor-agent@*' }) } catch { return @() }
+}
+function Get-OldMarketplaces {
+    if (-not (Have-Claude)) { return @() }
+    try { return @((claude plugin marketplace list --json 2>$null | ConvertFrom-Json) | ForEach-Object name | Where-Object { $_ -like 'monitor-agent-*' }) } catch { return @() }
+}
+function Get-OldTask { return @(Get-ScheduledTask -TaskName 'ClaudeMonitorAgent' -ErrorAction SilentlyContinue) }
+function Get-OldService { return @(Get-Service -Name 'cm-agent' -ErrorAction SilentlyContinue) }
+function Get-OldDaemons {
+    $binaries = Get-OldBinaries
+    return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.ExecutablePath -and ($binaries -contains $_.ExecutablePath) -and $_.CommandLine -match '\sdaemon\s*$' })
+}
+function Test-FoundOld { return ((Get-OldBinaries).Count + (Get-OldPluginIds).Count + (Get-OldMarketplaces).Count + (Get-OldTask).Count + (Get-OldDaemons).Count) -gt 0 }
+function Show-Old {
+    Get-OldBinaries | ForEach-Object { Say "  binary: $_" }
+    Get-OldPluginIds | ForEach-Object { Say "  Claude Code plugin: $_" }
+    Get-OldMarketplaces | ForEach-Object { Say "  marketplace: $_" }
+    Get-OldTask | ForEach-Object { Say "  autostart task: $($_.TaskName)" }
+    Get-OldDaemons | ForEach-Object { Say "  running daemon, pid $($_.ProcessId)" }
+}
+

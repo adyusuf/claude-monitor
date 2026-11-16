@@ -1,0 +1,34 @@
+<#
+.SYNOPSIS
+Installs or updates the aipod agent and its Claude Code plugin on Windows, and removes an older agent (cm-agent) on request.
+
+.DESCRIPTION
+The same steps as aipod-install.sh:
+  1. looks at the download host (the server's /downloads, which is the R2 bucket; -From names another base) for the newest build;
+  2. finds an older agent (cm-agent, the old Claude Code plugin, an old autostart task) and asks before removing it; "no" changes nothing;
+  3. carries the old settings and login over (agent.json and the two tokens in Credential Manager);
+  4. installs the build into %USERPROFILE%\.aipod\bin, checked against the manifest's SHA-256;
+  5. adds or updates the Claude Code plugin (aipod@aipod-releases); when the machine is not connected yet, logs in (a code to approve on the web).
+-RemoveOld only removes the old agent (the removal script). -Purge also deletes the old data folders and the old Credential Manager entries,
+after the carry-over. Tokens are copied between the user's own Credential Manager entries and are never printed. Nothing here needs
+administrator rights; an old Windows service (service mode) does, and is only named, with the command to run.
+The Windows build is not code-signed yet, so the check is the manifest's SHA-256 over https.
+
+.EXAMPLE
+.\aipod-install.ps1 -Server https://<your server>
+.\aipod-install.ps1 -RemoveOld
+#>
+[CmdletBinding()]
+param(
+    [string]$Server = $env:AIPOD_SERVER,
+    [string]$From = '',
+    [switch]$Yes,
+    [switch]$DryRun,
+    [switch]$NoPlugin,
+    [switch]$NoLogin,
+    [switch]$RemoveOld,
+    [switch]$Purge
+)
+$ErrorActionPreference = 'Stop'
+if ($env:OS -ne 'Windows_NT') { throw 'aipod-install.ps1 is for Windows; on macOS and Linux run aipod-install.sh' }
+

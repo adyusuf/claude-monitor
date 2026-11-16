@@ -78,6 +78,7 @@ if [ -n "${AGENT_DOWNLOADS_URL:-}" ]; then
 else
   echo "! no AGENT_DOWNLOADS_URL: no marketplace.json and no plugin zip for the download host (the plugin comes from the repository's marketplace)"
 fi
-# The installers (README, "Install aipod"): the same two files for every build, served from the download host beside the zips.
-cp "$root/scripts/install/aipod-install.sh" "$root/scripts/install/aipod-install.ps1" "$out/"
+# The installers (README, "Install aipod"): the same two files for every build, served from the download host beside the zips. Each is ONE
+# file, joined from its step files (F-332): a downloaded installer cannot source a sibling.
+bash "$root/scripts/install/assemble.sh" "$out"
 echo "✓ $(find "$out" -type f | wc -l | tr -d ' ') files in $out"
