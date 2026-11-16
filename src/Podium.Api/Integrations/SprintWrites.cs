@@ -8,7 +8,7 @@ namespace Podium.Api.Integrations;
 /// Writes a Podium change of a mirrored sprint, or of the issues in one, to the tool first (ADR-0015 §7). Same contract as <see cref="IssueWrites"/>:
 /// null means go on with the local change, anything else is the refusal. A sprint and the issues in it must come from the same connection.
 /// </summary>
-public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate)
+public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gate, ILogger<SprintWrites> log)
 {
     public async Task<IResult?> CreateAsync(Guid user, ManagedProject project, Sprint sprint, CancellationToken ct)
     {
@@ -32,6 +32,28 @@ public sealed class SprintWrites(PodiumDb db, IWorkWriter writer, MirrorGate gat
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Undoes <see cref="CreateAsync"/> when the local save that follows it failed: the sprint the tool made would otherwise stay there with no
+    /// sprint here (a later sync pass would import it as a stranger). The tool's delete is tried once; when that fails too the loss is logged (the
+    /// tool's id only, never the sprint's text) and the caller goes on with the first error.
+    /// </summary>
+    public async Task CompensateCreateAsync(Guid user, Sprint sprint)
+    {
+        ArgumentNullException.ThrowIfNull(sprint);
+        var link = db.IntegrationLinks.Local.FirstOrDefault(l => l.Kind == LinkKinds.Sprint && l.LocalId == sprint.Id);
+        if (link is null) return;
+        try
+        {
+            var (open, _) = await gate.OpenAsync(link.ConnectionId, user, CancellationToken.None);
+            if (open is null) throw new TrackerException(TrackerException.Codes.Unauthorized);
+            await writer.DeleteIterationAsync(open.Ctx, link.ExternalId, CancellationToken.None);
+        }
+        catch (Exception e)
+        {
+            log.LogWarning("A sprint made in the tool could not be deleted after the local save failed (tool sprint {ExternalId}, connection {Connection}): {Type}", link.ExternalId, link.ConnectionId, e.GetType().Name);
+        }
     }
 
     public async Task<IResult?> UpdateAsync(Guid user, Sprint sprint, string? name, string? goal, DateOnly? start, DateOnly? end, CancellationToken ct)
