@@ -18,6 +18,12 @@ public interface IRunProcess : IAsyncDisposable
     Task<RunExit> Exited { get; }
 
     /// <summary>
+    /// The lead process's id when a run can outlive the agent (Unix: the lead is its own process group, so the id is the group's too);
+    /// null on Windows, where the Job Object ends the run with the agent.
+    /// </summary>
+    int? Pid => null;
+
+    /// <summary>
     /// The polite stop of the whole tree: SIGTERM to the process group on Unix. Windows has no such signal for a process
     /// without a console window, so there it ends the whole Job Object at once, exactly like <see cref="KillNow"/>.
     /// The caller waits its grace period and then calls <see cref="KillNow"/>, whether or not the lead process left:
@@ -157,6 +163,7 @@ internal abstract class RunProcessBase(Stream stdout, Stream stderr, Action<stri
     public Stream Stdout { get; } = stdout;
     public Stream Stderr { get; } = stderr;
     public Task<RunExit> Exited => _exited.Task;
+    public virtual int? Pid => null;
 
     public abstract void Kill();
     public abstract void KillNow();

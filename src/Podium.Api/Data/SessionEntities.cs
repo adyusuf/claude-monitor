@@ -173,6 +173,15 @@ public sealed class PermissionRequest
 
     /// <summary>For a path tool, where the agent found its path against the session's project access layers (<see cref="Podium.Contracts.AccessScopes"/>); null from an older agent (ADR-0020 §4).</summary>
     public string? AccessScope { get; set; }
+
+    /// <summary>
+    /// The agent's own key for the ask (its local id; F-188), as runs carry <c>ClientKey</c>: unique per agent, so a create sent again after a
+    /// lost response finds the request it made. Null from an older agent and on requests from before this column.
+    /// </summary>
+    public string? ClientKey { get; set; }
+
+    /// <summary>The options the owner chose for the question tool (JSON object, question text to answer; F-196); null for every other answer and before this column.</summary>
+    public string? Answers { get; set; }
 }
 
 /// <summary>

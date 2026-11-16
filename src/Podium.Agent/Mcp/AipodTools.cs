@@ -40,7 +40,7 @@ public sealed class AipodTools(AgentConfig config, TimeProvider clock)
         [Description("The note, at most 2000 characters.")] string text)
     {
         if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(text)) return "Nothing posted: the session id and the text are required.";
-        var note = text.Length > NoteMax ? text[..NoteMax] : text;
+        var note = SafeText.Cut(text, NoteMax);
         using var store = new LocalStore(config.DatabasePath);
         new Recorder(config, store).Record(EventKinds.Note, sessionId, new JsonObject { ["text"] = note },
             ProjectInfo.Resolve(Environment.CurrentDirectory), clock.GetUtcNow());

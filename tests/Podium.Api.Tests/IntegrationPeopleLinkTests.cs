@@ -4,6 +4,7 @@ using Podium.Api.Integrations;
 using Podium.Api.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace Podium.Api.Tests;
 
@@ -146,16 +147,17 @@ public sealed class IntegrationPeopleLinkTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task The_tool_account_of_a_member_with_two_person_rows_from_before_is_always_the_first_seen()
+    public async Task A_second_person_row_of_one_member_is_refused_by_the_database_and_the_tool_account_is_the_one_linked()
     {
         var (w, hidden, other) = await WorldAsync();
         var member = await RemoteKit.MemberAsync(api, w.Admin, "lnk-order");
-        var now = api.Clock.GetUtcNow();
         await using (var db = api.Db())
         {
-            // Two rows of one member, as the people table could hold them before a member stood for one person: the later created row was seen first.
-            await db.IntegrationPeople.Where(p => p.Id == hidden).ExecuteUpdateAsync(p => p.SetProperty(x => x.UserId, member.Id).SetProperty(x => x.FirstSeenAt, now));
-            await db.IntegrationPeople.Where(p => p.Id == other).ExecuteUpdateAsync(p => p.SetProperty(x => x.UserId, member.Id).SetProperty(x => x.FirstSeenAt, now.AddDays(-1)));
+            // Two rows of one member could exist before a member stood for one person; the index ux_integration_people_user makes it impossible.
+            await db.IntegrationPeople.Where(p => p.Id == other).ExecuteUpdateAsync(p => p.SetProperty(x => x.UserId, member.Id));
+            var refused = await Assert.ThrowsAsync<PostgresException>(() =>
+                db.IntegrationPeople.Where(p => p.Id == hidden).ExecuteUpdateAsync(p => p.SetProperty(x => x.UserId, member.Id)));
+            Assert.Equal("ux_integration_people_user", refused.ConstraintName);
         }
 
         using var scope = api.Services.CreateScope();

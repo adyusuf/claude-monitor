@@ -149,8 +149,16 @@ describe("the project page: editing", () => {
     expect(calls.find((c) => c.method === "PUT")?.body).toEqual({
       name: "Checkout 2", purpose: "Sell things", ownerUserId: "u1", sponsor: "Acme board", stakeholders: [], budgetAmount: null, budgetCurrency: null,
       startDate: "2026-01-05", endDate: "2026-12-31", itemTypes: ["epic", "story", "bug"], priorityScale: "moscow", estimationUnit: "hours",
-      sprintLengthDays: 10, definitionOfReady: ["Has criteria"], definitionOfDone: ["Reviewed", "Tested"],
+      sprintLengthDays: 10, definitionOfReady: ["Has criteria"], definitionOfDone: ["Reviewed", "Tested"], expectedUpdatedAt: "2026-01-02T10:00:00Z",
     });
+  });
+
+  it("answers a stale save with a reload-and-retry message and keeps the form", async () => {
+    serve({ "PUT /projects/p1": { status: 409, body: { title: "stale_update" } } });
+    open("/w/w1/projects/p1?edit=1");
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Someone else changed this after you opened it. Reload the page to see the change, then make yours again.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
   });
 
   it("opens in edit mode from the card's Edit link, and Cancel closes it", async () => {

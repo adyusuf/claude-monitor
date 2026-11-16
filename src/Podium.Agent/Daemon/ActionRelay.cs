@@ -14,7 +14,7 @@ namespace Podium.Agent.Daemon;
 /// Because those two end this daemon, their outcome is reported BEFORE the verb starts and says "started". Nothing here throws into the stream.
 /// </summary>
 public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> status, Func<CancellationToken, Task<UpdateCheck>> check,
-    Func<string, bool> spawn, bool serviceMode = false, ClaudeControl? claude = null, ClaudeConfigControl? claudeConfig = null)
+    Func<string, bool> spawn, bool serviceMode = false, ClaudeControl? claude = null, ClaudeConfigControl? claudeConfig = null, Func<string?>? localRefusal = null)
 {
     private readonly ConcurrentDictionary<Guid, byte> taken = new();
 
@@ -70,6 +70,8 @@ public sealed class ActionRelay(ApiClient api, AgentLog log, Func<Task<string>> 
     /// <summary>What to do for a kind: whether it worked, the text to show, and the `aipod` verb to start once that is reported (null for none).</summary>
     private async Task<(bool Succeeded, string Text, string? Then, string? SessionRef)> DoAsync(AgentActionMessage action, CancellationToken ct)
     {
+        // What the API checked is checked again here, from what this agent last read of its own workspace and owner (F-201), before Claude is started or its setup changed.
+        if ((action.Kind == AgentActionKinds.ClaudeStart || AgentActionKinds.IsConfig(action.Kind)) && localRefusal?.Invoke() is { } refused) return (false, refused, null, null);
         switch (action.Kind)
         {
             case AgentActionKinds.ClaudeStart when claude is not null:

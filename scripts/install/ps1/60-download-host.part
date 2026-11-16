@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------- the server and the download host
+
+function Test-Url([string]$url) { return $url -match '^(https://[A-Za-z0-9._:/@%~+-]+|file:///[A-Za-z0-9._/%~+ :-]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/[A-Za-z0-9._/%~+-]*)?)$' }
+function Get-Remote([string]$url, [string]$out) {
+    if ($url -like 'file:///*') { Copy-Item -LiteralPath ([Uri]$url).LocalPath -Destination $out; return }
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $out -TimeoutSec 300
+}
+
+if (-not $Server) {
+    $h = Get-IdentityHome
+    if ($h) { try { $Server = (Get-Content -LiteralPath (Join-Path $h 'agent.json') -Raw | ConvertFrom-Json).server } catch { $Server = '' } }
+}
+if (-not $Server -and -not $From) {
+    if ([Console]::IsInputRedirected) { Die 'the server address is needed: -Server https://<your server> (or AIPOD_SERVER)' }
+    $Server = Read-Host 'Server address (https://...)'
+}
+$Server = "$Server".TrimEnd('/')
+if (-not $From) { $From = "$Server/downloads" }
+$From = $From.TrimEnd('/')
+if ($Server -and -not (Test-Url $Server)) { Die 'the server address must be https://<host>' }
+if (-not (Test-Url $From)) { Die 'the download address must be https://<host>/...' }
+
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ("aipod-install-" + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmp | Out-Null
+try {
+    Say "Looking for the newest build at $From"
+    Get-Remote "$From/manifest.json" (Join-Path $tmp 'manifest.json')
+    $entries = @((Get-Content -LiteralPath (Join-Path $tmp 'manifest.json') -Raw | ConvertFrom-Json).entries |
+            Where-Object { $_.os -eq 'windows' -and $_.arch -eq $arch })
+    $best = $null
+    foreach ($e in $entries) { if ($e.version -and ($null -eq $best -or (Newer $e.version $best.version))) { $best = $e } }
+    if (-not $best -or -not $best.file -or -not $best.sha256) { Die "the download host has no build for windows-$arch" }
+    if ($best.file -notmatch '^aipod-windows-(arm64|x64)\.zip$') { Die "refused: $($best.file) is not a build file name" }
+    $version = $best.version
+    Say "  newest build: aipod $version (windows-$arch)"
+

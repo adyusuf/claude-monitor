@@ -20,7 +20,7 @@ public static class MachineDetails
     public static readonly TimeSpan ErrorWindow = TimeSpan.FromDays(7);
 
     public static async Task<MachineDetail?> GetAsync(PodiumDb db, ApiConfig config, Guid workspaceId, Guid agentId, Guid callerUserId,
-        bool callerIsAdmin, DateTimeOffset now, CancellationToken ct)
+        bool callerIsAdmin, DateTimeOffset now, CancellationToken ct, ILogger? log = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(config);
@@ -32,7 +32,7 @@ public static class MachineDetails
             servicesAllowed ? MachineFacts.ServicesFrom(agent.Services) : null, servicesAllowed ? agent.ServicesAt : null,
             await ProjectsAsync(db, workspaceId, agentId, agent.UserId == callerUserId, now, ct),
             agent.ShareInventory && (callerIsAdmin || agent.UserId == callerUserId) ? ClaudeInventoryFacts.From(agent.ClaudeInventory, agent.ClaudeInventoryAt) : null,
-            agent.ShareInventory, await AccessEffective.ViewAsync(db, agent, machine.Os, callerIsAdmin || agent.UserId == callerUserId, ct));
+            agent.ShareInventory, await AccessEffective.ViewAsync(db, agent, machine.Os, callerIsAdmin || agent.UserId == callerUserId, ct, log));
     }
 
     private static async Task<IReadOnlyList<MachineProjectView>> ProjectsAsync(PodiumDb db, Guid workspaceId, Guid agentId, bool owner, DateTimeOffset now,

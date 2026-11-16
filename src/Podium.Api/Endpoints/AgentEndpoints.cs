@@ -10,11 +10,12 @@ using Podium.Api.Streaming;
 using Podium.Api.Update;
 using Podium.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Podium.Api.Endpoints;
 
 /// <summary>What an agent calls. Every call except the refresh carries the agent's access token.</summary>
-public static class AgentEndpoints
+public static partial class AgentEndpoints
 {
     public static void Map(RouteGroupBuilder api)
     {
@@ -54,17 +55,28 @@ public static class AgentEndpoints
     {
         // One transaction: the replaced mark on the old token and its successor are stored together (AgentTokens.RefreshAsync).
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, clock.GetUtcNow(), http.RequestAborted);
+        var now = clock.GetUtcNow();
+        var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, now, http.RequestAborted);
+        var notices = new List<Action>();
         if (outcome == AgentTokens.RefreshOutcome.Reused)
         {
             // The row goes to the agent's workspace: the audit log is read per workspace, and a copied token is what its admins must see.
-            var workspaceId = await db.Agents.Where(a => a.Id == agentId).Select(a => (Guid?)a.WorkspaceId).FirstOrDefaultAsync(http.RequestAborted);
-            Audit.Add(db, http, clock, AuditActions.RefreshReuse, workspaceId, agentId: agentId);
-            broker.Publish(Broker.Agent(agentId!.Value), new StreamMessage(AgentStreamEvents.Revoked, new { }));
+            var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted);
+            Audit.Add(db, http, clock, AuditActions.RefreshReuse, agent?.WorkspaceId, agentId: agentId);
+            // Its tokens are dead, so the agent is revoked too (no person did it: RevokedBy stays empty), and its remote work ends with it.
+            if (agent is { Status: AgentStatuses.Active })
+            {
+                agent.Status = AgentStatuses.Revoked;
+                agent.RevokedAt = now;
+                await db.SaveChangesAsync(http.RequestAborted);
+                await RemoteCleanup.ForAgentAsync(db, broker, agent.Id, null, now, http.RequestAborted, notices);
+            }
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
         await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
+        if (outcome == AgentTokens.RefreshOutcome.Reused) broker.Publish(Broker.Agent(agentId!.Value), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         return outcome == AgentTokens.RefreshOutcome.Issued
             ? Results.Ok(tokens)
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_refresh_token",
@@ -77,8 +89,9 @@ public static class AgentEndpoints
         return outcome switch
         {
             IngestOutcome.TooLarge => Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "batch_too_large"),
+            IngestOutcome.Unstorable => Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: BatchIngestor.Unstorable),
             IngestOutcome.Duplicate => Results.Ok(new BatchAck(batch.BatchSeq, true, 0)),
-            IngestOutcome.Stored => Results.Ok(new BatchAck(batch.BatchSeq, false, stored)),
+            IngestOutcome.Stored => Results.Ok(new BatchAck(batch.BatchSeq, false, stored, batch.Events.Count - stored)),
             _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError),
         };
     }
@@ -96,7 +109,7 @@ public static class AgentEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Settings(HttpContext http, PodiumDb db)
+    private static async Task<IResult> Settings(HttpContext http, PodiumDb db, ApiConfig config)
     {
         var workspaceId = http.User.AgentWorkspaceId();
         var s = await db.WorkspaceSettings.AsNoTracking().FirstAsync(x => x.WorkspaceId == workspaceId, http.RequestAborted);
@@ -106,7 +119,8 @@ public static class AgentEndpoints
         var stamp = await AccessPolicyDelivery.StampAsync(db, workspaceId, http.RequestAborted);
         return Results.Ok(new AgentSettings(s.MaskSecrets, s.EventMaxBytes, workspaceId, s.AgentUpdate, s.RemoteRunsEnabled,
             new AlertThresholds(s.AlertCpuPct, s.AlertMemoryPct, s.AlertDiskPct, s.AlertSustainSeconds), s.ClaudeUpdate, mine?.ShareServices ?? false, auto, auto == ClaudeAutoModes.Always ? mine!.ClaudeAutoProject : null,
-            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies, ExecLevelChanges.Read<ExecLevelRequest>(mine?.ExecLevelRequest)));
+            mine?.ShareInventory ?? false, stamp, s.EnforceAccessPolicies, ExecLevelChanges.Read<ExecLevelRequest>(mine?.ExecLevelRequest), config.MaxBatchEvents,
+            mine?.AcceptsClaudeControl ?? false));
     }
 
     /// <summary>The agent's own stream: a ready message, then every command and approved run still waiting for it, then new ones as they come.</summary>
@@ -182,88 +196,4 @@ public static class AgentEndpoints
     internal static DateTimeOffset AppliedMoment(DateTimeOffset? reported, DateTimeOffset created, DateTimeOffset now, TimeSpan skew) =>
         reported is { } at && at >= created - skew ? (at < now ? at : now) : now;
 
-    private static async Task<IResult> CreatePermission(PermissionRequestCreate req, HttpContext http, PodiumDb db,
-        ApiConfig config, TimeProvider clock, Broker broker)
-    {
-        var agentId = http.User.AgentId();
-        var session = await db.HarnessSessions.FirstOrDefaultAsync(
-            s => s.AgentId == agentId && s.HarnessKind == req.HarnessKind && s.ExternalId == req.SessionExternalId, http.RequestAborted);
-        if (session is null) return Http.NotFound();
-        if (req.ToolName is not { Length: > 0 and <= 200 } || req.ToolInput.ValueKind != JsonValueKind.Object)
-        {
-            return Http.Invalid("toolName", "invalid");
-        }
-
-        var now = clock.GetUtcNow();
-        var wait = Math.Clamp(req.WaitSeconds, 1, config.PermissionWaitMaxSeconds);
-        var request = new PermissionRequest
-        {
-            WorkspaceId = session.WorkspaceId,
-            SessionId = session.Id,
-            AgentId = agentId,
-            ToolName = req.ToolName,
-            ToolInput = JsonDocument.Parse(req.ToolInput.GetRawText()),
-            CreatedAt = now,
-            ExpiresAt = now.AddSeconds(wait),
-            RepoId = session.RepoId,
-            AccessScope = AccessScopes.All.Contains(req.AccessScope ?? "") ? req.AccessScope : null, // an unknown value is dropped, so no path rule
-        };
-        db.PermissionRequests.Add(request);
-
-        // The rule's use is counted in the same transaction as the request it answers (F-162).
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        // An approval rule answers at once, but only to an agent that reads the answer in this response (ADR-0019 §7, §8).
-        var agent = req.InlineAnswer ? await db.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted) : null;
-        var rule = agent is null ? null
-            : await ApprovalRules.MatchAsync(db, agent, request.RepoId, req.ToolName, req.ToolInput, request.AccessScope, now, http.RequestAborted);
-        // The use is a conditional write on a rule still live (as a grant's is), so a rule revoked or ended a moment ago allows nothing and
-        // requests at the same moment all count; a request it does not allow waits for the owner like any other.
-        if (rule is not null && !await ApprovalRules.CountUseAsync(db, rule.Id, now, http.RequestAborted)) rule = null;
-        PermissionAnswerMessage? answer = null;
-        if (rule is not null)
-        {
-            request.Status = PermissionStatuses.Answered;
-            request.Decision = PermissionDecisions.Allow;
-            request.AnsweredBy = rule.UserId;
-            request.AnsweredAt = now;
-            request.AnsweredByRule = rule.Id;
-            Audit.Add(db, http, clock, AuditActions.PermissionAutoAllowed, session.WorkspaceId, rule.UserId, targetType: "permission_request",
-                targetId: request.Id, detail: new { rule = rule.Id, request.ToolName });
-            answer = new PermissionAnswerMessage(request.Id, session.ExternalId, PermissionDecisions.Allow, null);
-        }
-        else if (session.Status != SessionStatuses.Ended)
-        {
-            session.Status = SessionStatuses.Waiting; // an ended session stays ended, as in the event projector
-        }
-
-        await db.SaveChangesAsync(http.RequestAborted);
-        await tx.CommitAsync(http.RequestAborted);
-        broker.Publish(Broker.Workspace(session.WorkspaceId),
-            new StreamMessage("permission", new { sessionId = session.Id, id = request.Id, status = request.Status }));
-        return Results.Ok(new PermissionRequestCreated(request.Id, request.ExpiresAt, answer));
-    }
-
-    /// <summary>
-    /// OBSOLETE (F-196): nothing in the product calls this any more, the answer reaches the agent on its stream. It stays, and keeps returning real
-    /// values, for older agents (rule 4); every answer carries <c>Deprecation: true</c>. It does not return an answer's chosen options (they are
-    /// not stored), so a poller can lose them: another reason to read the stream.
-    /// </summary>
-    private static async Task<IResult> GetPermission(Guid id, HttpContext http, PodiumDb db)
-    {
-        http.Response.Headers["Deprecation"] = "true";
-        var agentId = http.User.AgentId();
-        var row = await (from p in db.PermissionRequests.AsNoTracking()
-                         join s in db.HarnessSessions.AsNoTracking() on p.SessionId equals s.Id
-                         where p.Id == id && p.AgentId == agentId
-                         select new { p, s.ExternalId }).FirstOrDefaultAsync(http.RequestAborted);
-        return row is null
-            ? Http.NotFound()
-            : Results.Ok(new { row.p.Status, answer = row.p.Decision is null ? null : new PermissionAnswerMessage(row.p.Id, row.ExternalId, row.p.Decision, row.p.Reason) });
-    }
-}
-
-/// <summary>Batches may be larger than the default request limit; the ingestor enforces its own event count.</summary>
-public sealed class RequestSizeLimitAttributeShim : Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata
-{
-    public long? MaxRequestBodySize => ApiConfig.BatchBodyLimit;
 }

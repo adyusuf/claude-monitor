@@ -105,6 +105,18 @@ internal sealed unsafe partial class UnixRunProcess
         if (errno != Esrch) throw new IOException($"kill failed (errno {errno})"); // ESRCH: already gone
     }
 
+    /// <summary>
+    /// The stop of a run's process group by its stored id, after the agent that started it restarted (no handle, no descendant tracker).
+    /// An id of 1 or less is refused: kill(-1) would signal every process the agent may signal.
+    /// </summary>
+    internal static void SignalGroup(int pgid, bool force)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(pgid, 1);
+        if (kill(-pgid, force ? Sigkill : Sigterm) == 0) return;
+        var errno = Marshal.GetLastPInvokeError();
+        if (errno != Esrch) throw new IOException($"kill failed (errno {errno})"); // ESRCH: the group is already gone
+    }
+
     private void SendToGroup(int signal)
     {
         if (kill(-_pid, signal) == 0) return;

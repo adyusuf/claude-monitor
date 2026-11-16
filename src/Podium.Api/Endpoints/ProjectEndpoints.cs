@@ -1,5 +1,6 @@
 using Podium.Api.Config;
 using Podium.Api.Data;
+using Podium.Api.Integrations;
 using Podium.Api.Projects;
 using Podium.Api.Security;
 using Podium.Api.Text;
@@ -26,6 +27,7 @@ public static class ProjectEndpoints
         g.MapPut("/projects/{id:guid}", Update);
         g.MapDelete("/projects/{id:guid}", Archive);
         g.MapPost("/projects/{id:guid}/restore", Restore);
+        g.MapPost("/projects/{id:guid}/detach", Detach);
         g.MapGet("/projects/{id:guid}/members", Members);
         g.MapPut("/projects/{id:guid}/members/{userId:guid}", PutMember);
         g.MapDelete("/projects/{id:guid}/members/{userId:guid}", RemoveMember);
@@ -85,7 +87,8 @@ public static class ProjectEndpoints
         var grant = await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
         var owner = grant.Project.OwnerUserId;
-        return Results.Ok(ProjectViews.View(grant.Project, (await Names(db, [owner], http.RequestAborted)).GetValueOrDefault(owner), grant.View));
+        var mirrored = await MirrorGate.StillMirroredAsync(db, grant.Project.SourceConnectionId, http.RequestAborted);
+        return Results.Ok(ProjectViews.View(grant.Project, (await Names(db, [owner], http.RequestAborted)).GetValueOrDefault(owner), grant.View, mirrored));
     }
 
     /// <summary>Replaces the definition (see the note in ProjectModels). Changing the owner is for the owner and workspace admins.</summary>
@@ -98,11 +101,21 @@ public static class ProjectEndpoints
         if (grant.Project.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
         if (ProjectRules.Check(req) is { } invalid) return invalid;
         var project = grant.Project;
-        // A mirrored project's name and purpose are the tool's (ADR-0015 §7); everything else about it is Podium's to edit.
-        if (project.SourceConnectionId is not null && (req.Name?.Trim() != project.Name || ProjectRules.Clean(req.Purpose) != project.Purpose))
+        // The lock makes "compare the version, then save" one step, so two forms opened on the same version cannot both win.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
+        await db.Entry(project).ReloadAsync(http.RequestAborted);
+        // An archive that committed while this request waited for the lock is seen here (F-104).
+        if (project.Status != ManagedStatuses.Active) return Http.Invalid("status", "archived");
+        if (ProjectRules.IsStale(req.ExpectedUpdatedAt, project.UpdatedAt)) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ProjectRules.StaleUpdate);
+        // A mirrored project's name and purpose are the tool's while its connection lives (ADR-0015 §7); everything else about it is Podium's to edit.
+        if (project.SourceConnectionId is not null && (req.Name?.Trim() != project.Name || ProjectRules.Clean(req.Purpose) != project.Purpose)
+            && await MirrorGate.StillMirroredAsync(db, project.SourceConnectionId, http.RequestAborted))
         {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: Podium.Api.Integrations.MirrorGate.FieldLocked);
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: MirrorGate.FieldLocked);
         }
+
+        if (await ProjectSettingsInUse.CheckAsync(db, project, req, http.RequestAborted) is { } inUse) return inUse;
 
         if (req.OwnerUserId is { } owner && owner != project.OwnerUserId)
         {
@@ -114,6 +127,7 @@ public static class ProjectEndpoints
         Fill(project, req, userId, clock.GetUtcNow());
         Audit.Add(db, http, clock, AuditActions.ProjectUpdated, project.WorkspaceId, userId, targetType: "project", targetId: id);
         if (await SaveUniqueAsync(db, http.RequestAborted) is { } taken) return taken;
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 
@@ -137,17 +151,48 @@ public static class ProjectEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>Cuts an imported project loose from its disconnected connection for good: no source, no link, so no sync can take it back. Owner and admins only.</summary>
+    private static async Task<IResult> Detach(Guid id, HttpContext http, PodiumDb db, TimeProvider clock)
+    {
+        var userId = http.User.UserId();
+        var grant = await ProjectAccess.OfAsync(db, userId, id, http.RequestAborted);
+        if (grant is null) return Http.NotFound();
+        if (!grant.CanArchive) return Results.Forbid();
+        if (grant.Archived) return ProjectGrant.ReadOnly;
+        var project = grant.Project;
+        if (project.SourceConnectionId is not { } connectionId) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.NotMirrored);
+        if (await MirrorGate.StillMirroredAsync(db, connectionId, http.RequestAborted)) return MirrorGate.Problem(StatusCodes.Status409Conflict, MirrorGate.StillConnected);
+        // The sprints that mirror the connection are cut loose with the project, in one step with the project lock the sprint writes take: otherwise
+        // they stay refused as detached for good. The count goes into the audit.
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
+        var sprints = await db.Sprints.Where(s => s.ProjectId == id && s.SourceConnectionId != null).ToListAsync(http.RequestAborted);
+        var sprintIds = sprints.Select(s => s.Id).ToList();
+        foreach (var sprint in sprints) sprint.SourceConnectionId = null;
+        project.SourceConnectionId = null;
+        project.UpdatedAt = clock.GetUtcNow();
+        project.UpdatedBy = userId;
+        db.IntegrationLinks.RemoveRange(await db.IntegrationLinks
+            .Where(l => (l.Kind == LinkKinds.Project && l.LocalId == id) || (l.Kind == LinkKinds.Sprint && sprintIds.Contains(l.LocalId))).ToListAsync(http.RequestAborted));
+        Audit.Add(db, http, clock, AuditActions.ProjectDetached, project.WorkspaceId, userId, targetType: "project", targetId: id, detail: new { connectionId, sprints = sprints.Count });
+        await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
+        return Results.NoContent();
+    }
+
     private static async Task<IResult> Members(Guid id, HttpContext http, PodiumDb db)
     {
         var grant = await ProjectAccess.OfAsync(db, http.User.UserId(), id, http.RequestAborted);
         if (grant is null) return Http.NotFound();
+        // Admins and owners of the workspace see each address; everyone else gets null in its place (F-225, as the workspace member list).
+        var seesEmail = Roles.Rank(grant.Member.Role) >= Roles.Rank(Roles.Admin);
         // Only people still in the workspace: a removed member is no longer listed, with or without a project row.
         var rows = await (from m in db.ProjectMembers.AsNoTracking()
                           join u in db.Users.AsNoTracking() on m.UserId equals u.Id
                           join w in db.WorkspaceMembers.AsNoTracking() on new { m.UserId, grant.Project.WorkspaceId } equals new { w.UserId, w.WorkspaceId }
                           where m.ProjectId == id && w.RemovedAt == null
                           orderby u.DisplayName
-                          select new ProjectMemberView(u.Id, u.DisplayName, u.Email, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
+                          select new ProjectMemberView(u.Id, u.DisplayName, seesEmail ? u.Email : null, m.Role, m.AddedAt)).Take(MembersMax).ToListAsync(http.RequestAborted);
         return Results.Ok(rows);
     }
 

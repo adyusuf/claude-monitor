@@ -1,4 +1,5 @@
 using System.Text;
+using Podium.Agent.Capture;
 using Podium.Agent.Push;
 
 namespace Podium.Agent.Mcp;
@@ -53,6 +54,6 @@ public static class RemoteEnvelope
     public static string Attr(string value)
     {
         var clean = new string((value ?? "").Where(c => !char.IsControl(c) && c is not ('"' or '<' or '>')).ToArray());
-        return clean.Length > 200 ? clean[..200] : clean;
+        return SafeText.Cut(clean, 200);
     }
 }

@@ -36,7 +36,7 @@ describe("the integrations page: what it shows", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const calls = serve({
       "GET /workspaces/w1/integrations": { body: integrationsView([connection()], { available: false }) },
-      "DELETE /integrations/c1": { status: 204 },
+      "POST /integrations/c1/disconnect": { status: 204 },
     });
     open();
     expect(await screen.findByText(/Jira is not set up on this server yet/)).toBeInTheDocument();
@@ -45,7 +45,7 @@ describe("the integrations page: what it shows", () => {
     expect(screen.queryByLabelText("Jira address")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Check now" })).not.toBeInTheDocument(); // a check cannot reach Jira now
     await userEvent.click(screen.getByRole("button", { name: "Disconnect" }));
-    await waitFor(() => expect(calls.filter((c) => c.method === "DELETE").map((c) => c.path)).toEqual(["/integrations/c1"]));
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/integrations/c1/disconnect"]));
     vi.restoreAllMocks();
   });
 

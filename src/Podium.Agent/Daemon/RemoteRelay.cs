@@ -33,6 +33,7 @@ public sealed class RemoteRelay(AgentConfig config, LocalStore store, ApiClient 
         store.ForgetRuns(clock.GetUtcNow() - config.RemoteLocalRetention);
         store.ForgetCommandBodies(clock.GetUtcNow() - config.RemoteLocalRetention); // captured content is deleted after the retention
         store.ForgetPermissions(clock.GetUtcNow() - config.RemoteLocalRetention); // a permission request holds the tool's input
+        store.ForgetQuarantined(clock.GetUtcNow() - config.RemoteLocalRetention); // events the API refused for good were moved aside, and are captured content too
     }
 
     public async Task SendRequestsAsync(CancellationToken ct)

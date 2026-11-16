@@ -20,6 +20,12 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
 {
     public static readonly TimeSpan ActiveWindow = TimeSpan.FromDays(1);
 
+    /// <summary>How often the idle transcripts are looked at for forgetting (their files are asked for, so not on every pass).</summary>
+    public static readonly TimeSpan PruneEvery = TimeSpan.FromHours(1);
+
+    /// <summary>When the idle transcripts were last looked at.</summary>
+    private DateTimeOffset prunedAt = DateTimeOffset.MinValue;
+
     /// <summary>Ids of prompts pushed into a session and not yet seen in a transcript: the first line that holds one confirms it (ADR-0003).</summary>
     private List<string> pending = [];
 
@@ -40,7 +46,30 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
             }
         }
 
+        Prune();
         return taken;
+    }
+
+    /// <summary>
+    /// A transcript no hook has mentioned for the retention (a session that finished) whose file is gone (Claude Code deleted it) is forgotten with its
+    /// usage ids. One whose file still exists is kept: a later hook of that session would start its row at offset 0 and send the whole file again.
+    /// </summary>
+    private void Prune()
+    {
+        var now = clock.GetUtcNow();
+        if (now - prunedAt < PruneEvery) return;
+        prunedAt = now;
+        try
+        {
+            foreach (var (session, path) in store.TranscriptsIdleSince(now - (config.RemoteLocalRetention > ActiveWindow ? config.RemoteLocalRetention : ActiveWindow)))
+            {
+                if (!File.Exists(path)) store.ForgetTranscript(session);
+            }
+        }
+        catch (DbException e)
+        {
+            log.Write($"idle transcripts not forgotten: {e.GetType().Name}"); // tried again at the next pass of the hour
+        }
     }
 
     private int Follow(TranscriptCursor t)
@@ -133,17 +162,26 @@ public sealed class TranscriptTailer(AgentConfig config, LocalStore store, TimeP
         return true;
     }
 
-    /// <summary>How many times the JSON escapes of a kept fragment are undone: content nested in content (a tool result that holds a transcript) is escaped once per level.</summary>
-    private const int UnescapeLevels = 3;
+    /// <summary>The most passes spent undoing the JSON escapes of a kept fragment: content nested in content (a tool result that holds a transcript) is escaped once per level.</summary>
+    internal const int UnescapeLevelsMax = 32;
 
-    /// <summary>A line over the limit: its size and a preview cut on a character boundary. The kept part is raw JSONL text, whose escaped quotes (\"api_key\": \"...\") hide a secret from the masker: the escapes are undone before it is masked.</summary>
+    /// <summary>The preview of a fragment still changing after <see cref="UnescapeLevelsMax"/> passes: text that cannot be unescaped cannot be masked, so none of it is kept.</summary>
+    internal const string NestedTooDeepMark = "[nested too deep to mask]";
+
+    /// <summary>A line over the limit: its size and a preview cut on a character boundary. The kept part is raw JSONL text, whose escaped quotes (\"api_key\": \"...\") hide a secret from the masker: the escapes are undone, until the text stops changing, before it is masked.</summary>
     private static JsonObject Oversized(string kept, long bytes)
     {
         var text = kept;
-        for (var level = 0; level < UnescapeLevels && text.Contains('\\', StringComparison.Ordinal); level++) text = UnescapeJson(text);
-        var n = Math.Min(text.Length, Recorder.PreviewChars);
-        if (n < text.Length && char.IsHighSurrogate(text[n - 1])) n--;
-        return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = text[..n] };
+        var settled = false;
+        for (var level = 0; level < UnescapeLevelsMax && !settled; level++)
+        {
+            var next = text.Contains('\\', StringComparison.Ordinal) ? UnescapeJson(text) : text;
+            settled = next == text;
+            text = next;
+        }
+
+        if (!settled) return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = NestedTooDeepMark };
+        return new JsonObject { ["truncated"] = true, ["bytes"] = bytes, ["preview"] = SafeText.Cut(text, Recorder.PreviewChars) };
     }
 
     /// <summary>Undoes one level of JSON string escapes in a fragment that may end in the middle of one; a backslash that starts no known escape stays as it is.</summary>

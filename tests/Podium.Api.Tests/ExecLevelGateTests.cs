@@ -64,6 +64,50 @@ public sealed class ExecLevelGateTests(ApiFactory api)
         Assert.Equal(1L, (await ExecLevelKit.DeliveredAsync(team.Target))!.Sequence);
     }
 
+    // F-139: lowering a strict machine's level is the safe direction and needs only a recent sign-in, not the two-step step-up code.
+    [Theory]
+    [InlineData("production", "application")]
+    [InlineData("test", "database")]
+    public async Task A_lowering_on_a_strict_machine_needs_only_a_recent_sign_in_even_without_two_step_sign_in(string environment, string function)
+    {
+        var team = await ScriptKit.TeamAsync(api, environment, function, ExecLevels.Argv);
+
+        var response = await ExecLevelKit.PutAsync(team.Owner, team.TargetId, ExecLevelKit.Change(team.TargetId, ExecLevels.Off, 1, ExecLevelKit.Deadline(api)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var delivered = (await ExecLevelKit.DeliveredAsync(team.Target))!;
+        Assert.Equal((ExecLevels.Off, 1L), (delivered.Level, delivered.Sequence));
+    }
+
+    [Fact]
+    public async Task A_lowering_on_a_strict_machine_with_two_step_sign_in_on_does_not_ask_for_a_code_after_a_recent_sign_in()
+    {
+        var team = await ScriptKit.TeamAsync(api, "production", "application", ExecLevels.Argv);
+        await RemoteKit.EnableTotpAsync(api, team.Owner);
+
+        var response = await ExecLevelKit.PutAsync(team.Owner, team.TargetId, ExecLevelKit.Change(team.TargetId, ExecLevels.Off, 1, ExecLevelKit.Deadline(api)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_lowering_on_a_strict_machine_after_an_old_sign_in_needs_a_valid_code_and_is_otherwise_refused()
+    {
+        var team = await ScriptKit.TeamAsync(api, "production", "application", ExecLevels.Argv);
+        var secret = await RemoteKit.EnableTotpAsync(api, team.Owner);
+        api.Clock.Advance(TimeSpan.FromMinutes(11));
+
+        var without = await ExecLevelKit.PutAsync(team.Owner, team.TargetId, ExecLevelKit.Change(team.TargetId, ExecLevels.Off, 1, ExecLevelKit.Deadline(api)));
+        var wrong = await ExecLevelKit.PutAsync(team.Owner, team.TargetId, ExecLevelKit.Change(team.TargetId, ExecLevels.Off, 1, ExecLevelKit.Deadline(api), code: "000000"));
+        await RemoteKit.AssertProblemAsync(without, HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
+        await RemoteKit.AssertProblemAsync(wrong, HttpStatusCode.Forbidden, RemoteChecks.ReauthRequired);
+        Assert.Null(await ExecLevelKit.DeliveredAsync(team.Target));
+
+        var with = await ExecLevelKit.PutAsync(team.Owner, team.TargetId,
+            ExecLevelKit.Change(team.TargetId, ExecLevels.Off, 1, ExecLevelKit.Deadline(api), code: RemoteKit.TotpNow(api, secret)));
+        Assert.Equal(HttpStatusCode.OK, with.StatusCode);
+    }
+
     // ---- an ordinary machine ---------------------------------------------------------------------------------------------------
 
     [Fact]

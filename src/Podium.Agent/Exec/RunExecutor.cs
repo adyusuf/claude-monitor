@@ -21,6 +21,9 @@ public static class RunFailures
     public const string SignalPrefix = "signal_";
 }
 
+/// <summary>What the executor tells right after a run's process started: its id and the timeout it enforces (clamped), so a restarted agent can pick the run up.</summary>
+public sealed record RunSpawn(int Pid, TimeSpan Timeout);
+
 /// <summary>The one final answer on a run. Duration is on the monotonic clock; BytesRead is raw output including what was dropped.</summary>
 public sealed record RunResult(string Status, int? ExitCode, string? Error, bool OutputTruncated, string? ResolvedExe, long BytesRead,
     TimeSpan Duration, long BytesDropped = 0, int Chunks = 0, string? RefusedBy = null, int? AccessVersion = null)
@@ -69,7 +72,7 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
     private static string? ScriptOutputKey(RunMessage run) => run.Mode == RunModes.Script ? run.ScriptInterpreter : null;
 
     public async Task<RunResult> ExecuteAsync(RunMessage run, Func<RunOutputChunk, Task> onChunk, Func<RunStatusUpdate, Task> onStatus,
-        CancellationToken cancel)
+        CancellationToken cancel, Action<RunSpawn>? onSpawned = null)
     {
         var began = clock.GetTimestamp();
         if (runningAsRoot()) return await RefuseAsync(run, RunFailures.RunningAsRoot, null, began, onStatus);
@@ -82,7 +85,7 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
 
         try
         {
-            return await RunAsync(run, onChunk, onStatus, began, cancel);
+            return await RunAsync(run, onChunk, onStatus, began, onSpawned, cancel);
         }
         finally
         {
@@ -91,7 +94,7 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
     }
 
     private async Task<RunResult> RunAsync(RunMessage run, Func<RunOutputChunk, Task> onChunk, Func<RunStatusUpdate, Task> onStatus,
-        long began, CancellationToken cancel)
+        long began, Action<RunSpawn>? onSpawned, CancellationToken cancel)
     {
         ExecDecision decision;
         try
@@ -138,6 +141,7 @@ public sealed partial class RunExecutor(AgentConfig config, TimeProvider clock, 
 
         await using (process)
         {
+            if (process.Pid is { } pid) onSpawned?.Invoke(new RunSpawn(pid, timeout));
             await onStatus(new RunStatusUpdate(RunStatuses.Running, ResolvedExe: decision.ResolvedExe, At: clock.GetUtcNow()));
             return await SuperviseAsync(run, process, decision.ResolvedExe, timeout, began, onChunk, onStatus, cancel);
         }

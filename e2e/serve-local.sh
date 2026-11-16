@@ -19,6 +19,7 @@ export AIPOD_WEB_ROOT="$root/web/dist"
 AIPOD_COMMIT="$(git -C "$root" rev-parse HEAD)"
 export AIPOD_COMMIT
 export AIPOD_AUTH_RATE_PER_MINUTE=1000
+export AIPOD_INVITE_RATE_PER_MINUTE=1000
 AIPOD_MFA_KEY="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')"
 export AIPOD_MFA_KEY
 dotnet build "$root/src/Podium.Api" -c Release --nologo -v q >/dev/null

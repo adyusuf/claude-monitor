@@ -14,6 +14,7 @@ public sealed class LimitedFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.UseSetting("AIPOD_AUTH_RATE_PER_MINUTE", "3");
         builder.UseSetting("AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE", "5");
+        builder.UseSetting("AIPOD_INVITE_RATE_PER_MINUTE", "3");
     }
 }
 

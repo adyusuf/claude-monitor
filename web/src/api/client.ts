@@ -45,6 +45,23 @@ export function onSessionEnded(listener: () => void): () => void {
 
 /** One call to the API on our own origin. Cookies go along; changes carry the CSRF header the API demands. */
 export async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  const response = await send(method, path, body);
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/** The header a list answer carries when the API left rows out (F-077). */
+const TRUNCATED_HEADER = "X-Truncated";
+
+/** A list read, and whether the API cut it (the X-Truncated header). */
+export async function requestList<T>(path: string): Promise<{ items: T[]; truncated: boolean }> {
+  const response = await send("GET", path);
+  const text = await response.text();
+  return { items: (text ? JSON.parse(text) : []) as T[], truncated: response.headers.get(TRUNCATED_HEADER) === "true" };
+}
+
+/** Sends the call and gives back a successful answer; a failed one is thrown as an ApiError. */
+async function send(method: Method, path: string, body?: unknown): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (method !== "GET") headers[config.csrfHeader] = "1";
@@ -56,10 +73,7 @@ export async function request<T>(method: Method, path: string, body?: unknown): 
     credentials: "same-origin",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (response.ok) {
-    const text = await response.text();
-    return (text ? JSON.parse(text) : undefined) as T;
-  }
+  if (response.ok) return response;
   if (response.status === 401 && path !== sessionReadPath && !path.startsWith(signInPrefix)) {
     for (const listener of sessionEndedListeners) listener();
   }

@@ -120,7 +120,7 @@ export interface WebJobView {
   canRetire: boolean;
 }
 
-export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number; scriptOutputMaxBytes?: number; remoteSchedulesEnabled?: boolean }
+export interface RemoteSettings { remoteRunsEnabled: boolean; alertCpuPct: number; alertMemoryPct: number; alertDiskPct: number; alertSustainSeconds: number; scriptOutputMaxBytes?: number; remoteSchedulesEnabled?: boolean; updatedAt?: string }
 
 /** Why a schedule stopped (ScheduleReasons in src/Podium.Contracts/ScheduleProtocol.cs); each has a text in every language. Only grows, like the contracts. */
 export const SCHEDULE_REASONS = ["owner", "failures", "strict", "exec_level", "job_retired", "disabled", "target_gone", "approvals"] as const;

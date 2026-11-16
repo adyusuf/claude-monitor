@@ -13,7 +13,7 @@ import { useCodeGate } from "./useCodeGate";
  */
 export function MachineAsks({ agentId, view, owned, version = 0, onChanged }: {
   agentId: string; view: MachineView; owned: boolean;
-  /** Goes up on every live re-read of the page: asks have no event of their own, so the list is read again then. */
+  /** Goes up on every live re-read of the page (the `ask` event reaches only the asker and the machine's owner): the list is read again then. */
   version?: number;
   onChanged: () => void;
 }) {

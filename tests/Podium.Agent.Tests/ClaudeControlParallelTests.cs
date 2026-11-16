@@ -67,4 +67,25 @@ public sealed class ClaudeControlParallelTests : IDisposable
         Assert.All(outcomes, o => Assert.True(o.Succeeded, o.Text));
         Assert.Equal(12, control.Running().Select(w => w.Id).Distinct().Count());
     }
+
+    [Fact]
+    public async Task While_a_start_writes_its_record_no_other_writer_can_take_the_worker_lock()
+    {
+        // Forces the interleaving that lost a record: between the start's read of the worker list and its save, another thread (stop, reconcile)
+        // tries the lock the three of them share. Held, it cannot read the list and save a copy the start's save would then overwrite.
+        var control = Control(home.Config with { ClaudeWorkersMax = 50 });
+        var probes = new List<bool>();
+        control.InRecordWindow = gate => probes.Add(Task.Run(() =>
+        {
+            if (!gate.TryEnter()) return true;
+            gate.Exit();
+            return false;
+        }).Result);
+
+        var outcome = await control.StartAsync(Project, null, CancellationToken.None);
+
+        Assert.True(outcome.Succeeded, outcome.Text);
+        Assert.Equal([true], probes); // the other thread was kept out, once, in the window
+        Assert.Equal(outcome.SessionRef, Assert.Single(control.Running()).Id);
+    }
 }

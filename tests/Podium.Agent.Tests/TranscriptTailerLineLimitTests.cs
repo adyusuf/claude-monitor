@@ -65,6 +65,42 @@ public sealed class TranscriptTailerLineLimitTests : IDisposable
         Assert.Contains("[masked:", preview, StringComparison.Ordinal);
     }
 
+    private static string EscapeOnce(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(9)]
+    public void A_secret_nested_four_or_more_levels_deep_is_masked_too(int levels)
+    {
+        // Content inside content is escaped once per level (Q-1 follow-up, F-345): the preview unescapes until the text stops changing.
+        var inner = "{\"api_key\": \"plainwordplainword\"}";
+        for (var i = 0; i < levels; i++) inner = EscapeOnce(inner);
+        var config = home.Config with { TranscriptLineMax = 2000 };
+        Track("s1", "{\"type\":\"user\",\"text\":\"" + inner + new string('x', 4000) + "\"}\n");
+
+        Assert.Equal(1, new TranscriptTailer(config, store, clock, new AgentLog(config, clock)).RunOnce());
+
+        var preview = Queued()[0].Payload.GetProperty("preview").GetString()!;
+        Assert.DoesNotContain("plainwordplainword", preview, StringComparison.Ordinal);
+        Assert.Contains("[masked:", preview, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Nesting_beyond_the_cap_keeps_no_preview_text_at_all()
+    {
+        // "\\u005c" followed by n-1 times "u005c" needs n passes to settle: each pass undoes one escape of a backslash.
+        var deep = "\\u005c" + string.Concat(Enumerable.Repeat("u005c", TranscriptTailer.UnescapeLevelsMax + 8));
+        var config = home.Config with { TranscriptLineMax = 1000 };
+        Track("s1", "{\"text\":\"api_key=plainwordplainword " + deep + new string('x', 2000) + "\"}\n");
+
+        Assert.Equal(1, new TranscriptTailer(config, store, clock, new AgentLog(config, clock)).RunOnce());
+
+        var preview = Queued()[0].Payload.GetProperty("preview").GetString()!;
+        Assert.DoesNotContain("plainwordplainword", preview, StringComparison.Ordinal);
+        Assert.Equal(TranscriptTailer.NestedTooDeepMark, preview);
+    }
+
     [Fact]
     public void Unescaping_a_fragment_undoes_the_json_escapes_and_leaves_a_cut_or_unknown_escape_alone()
     {

@@ -11,6 +11,9 @@ IIS site, app pool, PostgreSQL database and folder under `C:\iis\Podium\<env>`. 
    - The **.NET 10 ASP.NET Core Hosting Bundle** (dotnet.microsoft.com, ".NET 10", "Hosting Bundle"); restart IIS after it.
    - **PostgreSQL 18** for Windows (postgresql.org, Windows installer), listening on 127.0.0.1:5432 only. Keep the
      `postgres` superuser password in the password manager; the scripts ask for it, never store it.
+     **PostgreSQL 17 or later and a UTF8 database are required**: the migration `EmailKey` uses the built-in
+     `pg_c_utf8` collation (`docs/data-model.md`). `setup-server.ps1` creates the database with `ENCODING 'UTF8'
+     TEMPLATE template0` (on Windows UTF8 works with any locale).
 2. **Cloudflare**
    - DNS: an A record for each host name to the server, proxied (orange cloud). SSL/TLS mode **Full (strict)**.
    - SSL/TLS, Origin Server: create an Origin Certificate for both host names (15 years), download certificate and key,
@@ -94,6 +97,13 @@ Deploy, test first (Windows PowerShell 5.1 again, elevated):
 
 ```powershell
 .\deploy.ps1 -Environment test -Package C:\Temp\ap-test\podium-<commit>.zip -LoopbackPort 8081
+```
+
+Before the first deploy that carries the migration `EmailKey`, check the database (with `psql -d aipod_<env>`): both
+columns must be true and `UTF8`, else the migration fails and the deploy stops.
+
+```sql
+SELECT current_setting('server_version_num')::int >= 170000, pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database();
 ```
 
 The script applies the migrations, switches the site, and checks `/api/version` reports the commit; if not, it

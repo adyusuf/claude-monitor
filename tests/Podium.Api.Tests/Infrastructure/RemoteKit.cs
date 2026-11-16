@@ -178,7 +178,7 @@ public static class RemoteKit
     public static Task<JsonElement> RunEventAsync(StreamReader reader, string name, Guid runId) =>
         NextEventAsync(reader, name, e => e.GetProperty("id").GetGuid() == runId);
 
-    private static byte[] FromBase32(string text)
+    public static byte[] FromBase32(string text)
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
         var bytes = new List<byte>();
@@ -202,7 +202,7 @@ public static class RemoteKit
     {
         var setup = await (await user.PostAsync("/api/me/mfa/setup")).Content.ReadFromJsonAsync<JsonElement>();
         var secret = FromBase32(setup.GetProperty("secret").GetString()!);
-        (await user.PostAsync("/api/me/mfa/enable", new { code = TotpNow(api, secret, -1) })).EnsureSuccessStatusCode();
+        (await user.PostAsync("/api/me/mfa/enable", new { code = TotpNow(api, secret, -1), password = TestUser.Password })).EnsureSuccessStatusCode();
         return secret;
     }
 

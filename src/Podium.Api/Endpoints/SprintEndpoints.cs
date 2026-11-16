@@ -62,14 +62,24 @@ public static class SprintEndpoints
         var sprint = new Sprint { WorkspaceId = project.WorkspaceId, ProjectId = id, ApplicationId = req.ApplicationId, CreatedBy = userId, CreatedAt = now };
         Fill(sprint, req, userId, now);
         if (await writes.CreateAsync(userId, project, sprint, http.RequestAborted) is { } refused) return refused;
-        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
-        sprint.Number = (await db.Sprints.Where(s => s.ProjectId == id).MaxAsync(s => (int?)s.Number, http.RequestAborted) ?? 0) + 1;
-        db.Sprints.Add(sprint);
-        SetTeam(db, sprint.Id, [], req.TeamUserIds, now);
-        Audit.Add(db, http, clock, AuditActions.SprintCreated, project.WorkspaceId, userId, targetType: "sprint", targetId: sprint.Id);
-        await db.SaveChangesAsync(http.RequestAborted);
-        await tx.CommitAsync(http.RequestAborted);
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+            await IssueEndpoints.LockProjectAsync(db, id, http.RequestAborted);
+            sprint.Number = (await db.Sprints.Where(s => s.ProjectId == id).MaxAsync(s => (int?)s.Number, http.RequestAborted) ?? 0) + 1;
+            db.Sprints.Add(sprint);
+            SetTeam(db, sprint.Id, [], req.TeamUserIds, now);
+            Audit.Add(db, http, clock, AuditActions.SprintCreated, project.WorkspaceId, userId, targetType: "sprint", targetId: sprint.Id);
+            await db.SaveChangesAsync(http.RequestAborted);
+            await tx.CommitAsync(http.RequestAborted);
+        }
+        catch (Exception) when (sprint.SourceConnectionId is not null)
+        {
+            // The tool made the sprint before this save: take it out again, then let the error go on (the host logs it and answers 500).
+            await writes.CompensateCreateAsync(userId, sprint);
+            throw;
+        }
+
         return Results.Created($"/api/sprints/{sprint.Id}", await SprintViews.ViewAsync(db, sprint, true, http.RequestAborted));
     }
 

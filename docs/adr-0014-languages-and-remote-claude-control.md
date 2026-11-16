@@ -146,6 +146,13 @@ What shipped, on the branch with the rest of this work (not released: the agent 
 - **Web.** A Claude card on the machine page (owner only): the switch (with the code field when asked), a project and a mode (three choices) and a Start button, the
   sessions started from the page with a Stop button each, and the recent Claude actions as text. It shows no start on a machine that is not dev or test, and says why;
   the actions card no longer lists the Claude actions a second time. In Turkish, English and German.
+- **The agent checks again (F-201, decided 16/11/2026).** Before a start from the web, a plugin change or a project setting, the agent checks from what its own
+  settings pass last stored that the workspace's remote-work switch and the owner's opt-in are on (`AgentSettings.ClaudeControl`, additive; stored as
+  `settings.claude_control`, forgotten with the other workspace switches at login and logout), and answers "refused on this machine" otherwise: an action queued
+  before the owner turned the opt-in off, or a workspace that switched remote work off, no longer starts anything. A value never read, or read for another workspace,
+  refuses; a server that does not say the opt-in (an older API) leaves that one to the API. A stop is never held back. This is not a signed approval like the exec
+  level (ADR-0021): a compromised API could tell the agent both switches are on, so a locally pinned approval and the admin-set environment (still known only to the API)
+  stay open. `ClaudeStartGuard`, tested in `ClaudeStartGuardTests`.
 - **Decisions applied.** Environment = the machine's class; no repositories; no start on production or database machines. The workspace-level switch is the existing
   remote-work switch (`remote_runs_enabled`), not a new one.
 

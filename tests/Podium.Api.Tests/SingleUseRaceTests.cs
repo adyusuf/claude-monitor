@@ -27,7 +27,7 @@ public sealed class SingleUseRaceTests(ApiFactory api)
         var user = await api.NewClient().SignedUpAsync(tag);
         var setup = await (await user.PostAsync("/api/me/mfa/setup")).Content.ReadFromJsonAsync<JsonElement>();
         var secret = Base32(setup.GetProperty("secret").GetString()!);
-        var enabled = await user.PostAsync("/api/me/mfa/enable", new { code = RemoteKit.TotpNow(api, secret, -1) });
+        var enabled = await user.PostAsync("/api/me/mfa/enable", new { code = RemoteKit.TotpNow(api, secret, -1), password = TestUser.Password });
         var recovery = (await enabled.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("recoveryCodes").EnumerateArray().Select(c => c.GetString()!).ToList();
         return (user, secret, recovery);
     }

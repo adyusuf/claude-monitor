@@ -28,6 +28,24 @@ const open = (path = "/w/w1/projects/p1/backlog") => renderAt(path, route);
 const rows = () => screen.getAllByRole("listitem").map((li) => li.querySelector(".issue-title")?.textContent);
 const lastIssueQuery = (calls: { method: string; path: string }[]) => calls.filter((c) => c.path.startsWith("/projects/p1/issues")).at(-1)!.path;
 
+describe("the backlog: archiving a mirrored issue", () => {
+  const mirrored = () => page([issueSummary({ externalKey: "SHOP-12", externalUrl: "https://acme.atlassian.net/browse/SHOP-12" })]);
+
+  it("hides Archive while the project's connection is active", async () => {
+    serve({ "GET /projects/p1": { body: project({ sourceConnectionId: "c1", mirrorActive: true }) }, "GET /projects/p1/issues": mirrored() });
+    open();
+    await screen.findByText("SHOP-12 ↗");
+    expect(screen.queryByRole("button", { name: "Archive #1" })).not.toBeInTheDocument();
+  });
+
+  it("shows Archive once the project's mirror is no longer active, as the issue page does", async () => {
+    serve({ "GET /projects/p1": { body: project({ sourceConnectionId: null, mirrorActive: false }) }, "GET /projects/p1/issues": mirrored() });
+    open();
+    await screen.findByText("SHOP-12 ↗");
+    expect(screen.getByRole("button", { name: "Archive #1" })).toBeInTheDocument();
+  });
+});
+
 describe("the backlog: moving, archiving and restoring", () => {
   it("moves an issue down after its lower neighbour and up after the issue two places above, or to the top", async () => {
     const calls = serve({ "PUT /issues/i1/position": { status: 204 }, "PUT /issues/i3/position": { status: 204 }, "PUT /issues/i2/position": { status: 204 } });

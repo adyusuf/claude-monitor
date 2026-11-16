@@ -69,7 +69,7 @@ public static class SessionEndpoints
     public const string SessionNotEnded = "session_not_ended";
 
     private static async Task<IResult> List(Guid id, string? q, string? status, string? cursor, int? limit, HttpContext http,
-        PodiumDb db, ApiConfig config)
+        PodiumDb db, ApiConfig config, TimeProvider clock)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
         var take = Http.Limit(limit, config);
@@ -81,7 +81,8 @@ public static class SessionEndpoints
                 || db.Repos.Any(p => p.Id == s.RepoId && EF.Functions.Like(p.DisplayNameSearch, pattern, "\\")));
         }
 
-        if (status is { Length: > 0 }) query = query.Where(s => s.Status == status);
+        var online = clock.GetUtcNow() - config.OnlineWindow;
+        if (status is { Length: > 0 }) query = WhereShown(query, db, status, online);
         if (Cursor.Parse(cursor) is { } after)
         {
             query = query.Where(s => s.LastEventAt < after.At || (s.LastEventAt == after.At && s.Id.CompareTo(after.Id) < 0));
@@ -89,12 +90,30 @@ public static class SessionEndpoints
 
         var page = await query.OrderByDescending(s => s.LastEventAt).ThenByDescending(s => s.Id).Take(take + 1)
             .ToListAsync(http.RequestAborted);
-        var rows = await RowsAsync(db, page.Take(take).ToList(), http.RequestAborted);
+        var rows = await RowsAsync(db, page.Take(take).ToList(), online, http.RequestAborted);
         var next = page.Count > take ? Cursor.Of(page[take - 1].LastEventAt, page[take - 1].Id) : null;
         return Results.Ok(new Page<SessionRow>(rows, next));
     }
 
-    internal static async Task<List<SessionRow>> RowsAsync(PodiumDb db, List<HarnessSession> sessions, CancellationToken ct)
+    /// <summary>
+    /// The status a reader is shown (F-123): a session can only be running or waiting while its machine is online, so an "active" or "waiting"
+    /// session whose agent has not reported within the online window reads as "idle". Read-time only: the stored status stays as the hooks left it.
+    /// </summary>
+    private static string Shown(string stored, bool machineOnline) =>
+        !machineOnline && stored is SessionStatuses.Active or SessionStatuses.Waiting ? SessionStatuses.Idle : stored;
+
+    /// <summary>The status filter, by the status shown (<see cref="Shown"/>), so a filter never lists a row under a status it does not show.</summary>
+    private static IQueryable<HarnessSession> WhereShown(IQueryable<HarnessSession> query, PodiumDb db, string status, DateTimeOffset online) => status switch
+    {
+        SessionStatuses.Active or SessionStatuses.Waiting => query.Where(s => s.Status == status
+            && db.Agents.Any(a => a.Id == s.AgentId && a.Status == AgentStatuses.Active && a.LastHeartbeatAt > online)),
+        SessionStatuses.Idle => query.Where(s => s.Status == SessionStatuses.Idle
+            || ((s.Status == SessionStatuses.Active || s.Status == SessionStatuses.Waiting)
+                && !db.Agents.Any(a => a.Id == s.AgentId && a.Status == AgentStatuses.Active && a.LastHeartbeatAt > online))),
+        _ => query.Where(s => s.Status == status),
+    };
+
+    internal static async Task<List<SessionRow>> RowsAsync(PodiumDb db, List<HarnessSession> sessions, DateTimeOffset online, CancellationToken ct)
     {
         var ids = sessions.Select(s => s.Id).ToList();
         var agentIds = sessions.Select(s => s.AgentId).Distinct().ToList();
@@ -103,7 +122,8 @@ public static class SessionEndpoints
                             join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
                             join u in db.Users.AsNoTracking() on a.UserId equals u.Id
                             where agentIds.Contains(a.Id)
-                            select new { a.Id, m.Hostname, a.UserId, u.DisplayName, a.PushTransport }).ToDictionaryAsync(x => x.Id, ct);
+                            select new { a.Id, m.Hostname, a.UserId, u.DisplayName, a.PushTransport, Online = a.Status == AgentStatuses.Active && a.LastHeartbeatAt > online })
+            .ToDictionaryAsync(x => x.Id, ct);
         var projects = await db.Repos.AsNoTracking().Where(p => projectIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => new { p.DisplayName, p.Key }, ct);
         var usage = await db.SessionUsage.AsNoTracking().Where(u => ids.Contains(u.SessionId)).ToListAsync(ct);
@@ -122,18 +142,18 @@ public static class SessionEndpoints
             var mine = usage.Where(u => u.SessionId == s.Id).ToList();
             decimal? cost = mine.Count == 0 ? 0m : mine.Any(u => u.CostUsd is null) ? null : mine.Sum(u => u.CostUsd!.Value);
             var webRef = webStarts.FirstOrDefault(w => w.AgentId == s.AgentId && s.ExternalId.StartsWith(w.SessionRef!, StringComparison.Ordinal))?.SessionRef;
-            return new SessionRow(s.Id, s.HarnessKind, s.Title, s.Model, s.GitBranch, s.Status, s.StartedAt, s.LastEventAt,
+            return new SessionRow(s.Id, s.HarnessKind, s.Title, s.Model, s.GitBranch, Shown(s.Status, a.Online), s.StartedAt, s.LastEventAt,
                 s.EndedAt, s.RepoId, s.RepoId is { } pid ? projects.GetValueOrDefault(pid)?.DisplayName : null, s.AgentId, a.Hostname,
                 a.UserId, a.DisplayName, cost, open.GetValueOrDefault(s.Id), a.PushTransport, webRef is not null, webRef,
                 s.RepoId is { } rid ? projects.GetValueOrDefault(rid)?.Key : null); // the repo key, for the session's access line (ADR-0020 §4)
         }).ToList();
     }
 
-    private static async Task<IResult> Detail(Guid id, HttpContext http, PodiumDb db)
+    private static async Task<IResult> Detail(Guid id, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
     {
         var userId = http.User.UserId();
         if (await Access.SessionAsync(db, userId, id, http.RequestAborted) is not { } found) return Http.NotFound();
-        var row = (await RowsAsync(db, [found.Session], http.RequestAborted))[0];
+        var row = (await RowsAsync(db, [found.Session], clock.GetUtcNow() - config.OnlineWindow, http.RequestAborted))[0];
         var tasks = await db.SessionTasks.AsNoTracking().Where(t => t.SessionId == id && t.Status != "deleted")
             .OrderBy(t => t.CreatedAt).Select(t => new TaskRow(t.Id, t.ExternalId, t.Subject, t.Status, t.UpdatedAt))
             .ToListAsync(http.RequestAborted);
@@ -168,13 +188,33 @@ public static class SessionEndpoints
         return Results.Ok(new Page<EventRow>(rows.Take(take).ToList(), next));
     }
 
-    /// <summary>The workspace's live stream: opened by a member only, and ended at a ping once the reader is no longer a member or signed in.</summary>
-    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker, ApiConfig config, TimeProvider clock)
+    /// <summary>
+    /// The workspace's live stream: opened by a member only, at most <see cref="StreamLimiter.MaxPerMember"/> at once per member (429 beyond),
+    /// and ended at a ping once the reader is no longer a member or signed in.
+    /// </summary>
+    private static async Task<IResult> Stream(Guid id, HttpContext http, PodiumDb db, Broker broker, StreamLimiter limiter, ApiConfig config, TimeProvider clock)
     {
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
+        if (limiter.TryOpen(userId) is not { } lease)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status429TooManyRequests, title: StreamLimiter.TooManyStreams);
+        }
+
+        // The place goes back when the stream ends, and also when the response ends without the stream having started.
+        http.Response.OnCompleted(() =>
+        {
+            lease.Dispose();
+            return Task.CompletedTask;
+        });
+        var inner = broker.Subscribe([Broker.Workspace(id), Broker.WorkspaceMember(id, userId)]);
+        var subscription = new Subscription(inner.Reader, () =>
+        {
+            inner.Dispose();
+            lease.Dispose();
+        });
         var login = http.User.LoginSessionId();
-        return Sse.Stream(broker.Subscribe(Broker.Workspace(id)), [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
+        return Sse.Stream(subscription, [new StreamMessage("ready", new { workspaceId = id })], config.StreamPingEvery,
             http.RequestAborted, ct => Access.StillReadsAsync(db, clock, userId, login, id, ct));
     }
 }

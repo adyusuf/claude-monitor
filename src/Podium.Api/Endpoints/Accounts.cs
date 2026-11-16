@@ -15,6 +15,7 @@ public static class Accounts
         {
             Email = email.Trim(),
             EmailNormalized = SearchText.Email(email),
+            EmailKey = EmailIdentity.Key(email),
             DisplayName = name,
             DisplayNameSearch = SearchText.Normalize(name),
             EmailVerifiedAt = verified ? now : null,

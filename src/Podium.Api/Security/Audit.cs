@@ -17,6 +17,7 @@ public static class AuditActions
     public const string SignOut = "user.sign_out";
     public const string PasswordReset = "user.password_reset";
     public const string ProviderLinked = "user.provider_linked";
+    public const string ProviderUnlinked = "user.provider_unlinked";
     public const string AccountDeleted = "user.account_deleted";
     public const string DataExported = "user.data_exported";
     public const string WorkspaceCreated = "workspace.created";
@@ -24,6 +25,7 @@ public static class AuditActions
     public const string InvitationCreated = "workspace.invitation_created";
     public const string InvitationAccepted = "workspace.invitation_accepted";
     public const string InvitationRevoked = "workspace.invitation_revoked";
+    public const string InvitationResent = "workspace.invitation_resent";
     public const string RoleChanged = "workspace.role_changed";
     public const string MemberRemoved = "workspace.member_removed";
     public const string SettingsChanged = "workspace.settings_changed";
@@ -75,6 +77,7 @@ public static class AuditActions
     public const string ProjectUpdated = "project.updated";
     public const string ProjectArchived = "project.archived";
     public const string ProjectRestored = "project.restored";
+    public const string ProjectDetached = "project.detached";
     public const string ProjectMemberChanged = "project.member_changed";
     public const string ProjectMemberRemoved = "project.member_removed";
     public const string ApplicationCreated = "application.created";

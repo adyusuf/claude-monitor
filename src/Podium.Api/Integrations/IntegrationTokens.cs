@@ -9,7 +9,8 @@ namespace Podium.Api.Integrations;
 
 /// <summary>
 /// Holds the sealed Atlassian tokens: gives a valid access token (refreshing under a lock, because a refresh token rotates and a second
-/// parallel refresh would burn the new one) and marks an account for sign-in again when Atlassian refuses it (ADR-0015 §5).
+/// parallel refresh would burn the new one) and marks an account for sign-in again when Atlassian refuses it (ADR-0015 §5). The lock is two
+/// layers: a semaphore per account inside this instance, and the account row's lock in the database across instances (F-234).
 /// </summary>
 public sealed class IntegrationTokens(PodiumDb db, IServiceScopeFactory scopes, ApiConfig config, JiraOAuth oauth, TimeProvider clock)
 {
@@ -42,6 +43,10 @@ public sealed class IntegrationTokens(PodiumDb db, IServiceScopeFactory scopes, 
             // has changed and not yet decided to keep (an edit that the tool is about to refuse).
             await using var scope = scopes.CreateAsyncScope();
             var own = scope.ServiceProvider.GetRequiredService<PodiumDb>();
+            // Another API instance shares no semaphore with this one: the account row's lock makes it wait here until the first instance
+            // has saved its refresh (or released the row), and then read the token that one saved (F-234). Held until commit or dispose.
+            await using var tx = await own.Database.BeginTransactionAsync(ct);
+            await LockAccountAsync(own, accountId, ct);
             // Read again under the lock: another request may have refreshed while this one waited.
             var account = await own.IntegrationAccounts.FirstOrDefaultAsync(a => a.Id == accountId, ct)
                           ?? throw new TrackerException(TrackerException.Codes.Unauthorized);
@@ -57,6 +62,7 @@ public sealed class IntegrationTokens(PodiumDb db, IServiceScopeFactory scopes, 
             {
                 // Sealed under an integration key that was rotated since, or damaged: only a new sign-in seals it again.
                 await MarkReauthorizeAsync(own, account, now, ct);
+                await tx.CommitAsync(ct);
                 throw new TrackerException(TrackerException.Codes.Unauthorized);
             }
 
@@ -68,11 +74,13 @@ public sealed class IntegrationTokens(PodiumDb db, IServiceScopeFactory scopes, 
                 account.AccessExpiresAt = now.AddSeconds(tokens.ExpiresInSeconds);
                 account.UpdatedAt = now;
                 await own.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
                 return tokens.Access;
             }
             catch (TrackerException e) when (e.Code == TrackerException.Codes.Unauthorized)
             {
                 await MarkReauthorizeAsync(own, account, now, ct);
+                await tx.CommitAsync(ct);
                 throw;
             }
         }
@@ -81,6 +89,9 @@ public sealed class IntegrationTokens(PodiumDb db, IServiceScopeFactory scopes, 
             gate.Release();
         }
     }
+
+    private static Task<int> LockAccountAsync(PodiumDb db, Guid accountId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM integration_accounts WHERE id = {accountId} FOR UPDATE", ct);
 
     private static async Task MarkReauthorizeAsync(PodiumDb db, IntegrationAccount account, DateTimeOffset now, CancellationToken ct)
     {

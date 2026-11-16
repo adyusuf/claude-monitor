@@ -52,7 +52,7 @@ public sealed class LimitReachedTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task The_201st_release_of_an_application_that_is_not_cancelled_is_refused()
+    public async Task The_201st_planned_release_of_an_application_is_refused()
     {
         var t = await IssueKit.TeamAsync(api); // the team's application already has one
         await FillAsync(ReleasesMax - 1, i => t.Owner.PostAsync($"/api/applications/{t.Application}/releases", new { name = "r" + i }));

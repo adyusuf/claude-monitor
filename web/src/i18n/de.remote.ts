@@ -37,6 +37,7 @@ export const deRemote: Dictionary["remote"] = {
   grantNew: "Eine Freigabe erteilen", grantTemplate: "Befehlsvorlage", grantTemplateHint: "Ein Element pro Zeile; das erste ist der vollständige Pfad des Programms.",
   days: "Tage", grantCreate: "Freigabe erteilen", grantIncomplete: "Geben Sie die Vorlage und den Arbeitsordner ein.",
   jobs: "Aufträge", noJobs: "Keine Aufträge.", jobStatus: { proposed: "Vorgeschlagen", active: "Aktiv", denied: "Abgelehnt", retired: "Entfernt" },
+  jobFilter: { label: "Anzeigen", all: "Alle Aufträge", open: "Offen (vorgeschlagen und aktiv)", finished: "Beendet (abgelehnt und entfernt)" },
   proposedBy: "vorgeschlagen von {user}", retire: "Entfernen",
   settingsHint: "Ausführung auf Maschinen, Maschinenwarnungen und Zeitpläne.",
   settingsTitle: "Fernarbeit", settingsReadOnly: "Nur ein Administrator kann das ändern.", enabled: "Fernarbeit in diesem Arbeitsbereich erlauben",

@@ -6,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.Endpoints;
 
 public sealed record CodeRequest(string? Code);
+
+/// <summary>Turning two-step sign-in on: the first code, and the account password (F-028; an account without one needs a fresh sign-in).</summary>
+public sealed record MfaEnableRequest(string? Code, string? Password = null);
 public sealed record MfaSignInRequest(string? Token, string? Code);
 public sealed record MfaSetupResponse(string Secret, string Uri);
 public sealed record RecoveryCodesResponse(IReadOnlyList<string> RecoveryCodes);
@@ -29,7 +32,7 @@ public static class MfaEndpoints
     {
         var me = api.MapGroup("/me/mfa").RequireAuthorization(Schemes.Session);
         me.MapPost("/setup", Setup);
-        me.MapPost("/enable", Enable);
+        me.MapPost("/enable", Enable).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         me.MapPost("/disable", Disable).RequireRateLimiting(AuthEndpoints.RateLimitPolicy);
         api.MapPost("/auth/mfa", SignIn).RequireRateLimiting(AuthEndpoints.RateLimitPolicy).AllowAnonymous();
     }
@@ -156,11 +159,34 @@ public static class MfaEndpoints
         return Results.Ok(new MfaSetupResponse(Totp.Base32(secret), Totp.Uri(ApiConfig.MfaIssuer, user.Email ?? user.DisplayName, secret)));
     }
 
-    private static async Task<IResult> Enable(CodeRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
+    /// <summary>400 code: turning two-step sign-in on needs the account password in the same request (F-028).</summary>
+    public const string PasswordRequired = "password_required";
+
+    private static async Task<IResult> Enable(MfaEnableRequest req, HttpContext http, PodiumDb db, ApiConfig config, TimeProvider clock)
     {
         var user = await db.Users.FirstAsync(u => u.Id == http.User.UserId(), http.RequestAborted);
         if (user.TotpEnabledAt is not null || user.TotpSecret is null) return Results.Conflict();
         var now = clock.GetUtcNow();
+        // A session cookie alone cannot turn it on (F-028): a stolen session would lock the owner out. The password, counted towards the lock
+        // like every password asked outside sign-in; an account without one (GitHub or Google only) needs a fresh sign-in instead.
+        if (user.PasswordHash is not null)
+        {
+            if (string.IsNullOrEmpty(req.Password)) return Http.Invalid("password", PasswordRequired);
+            switch (await PasswordStepUpAsync(http, config, clock, user, req.Password, now))
+            {
+                case StepUpOutcome.Accepted:
+                    break;
+                case StepUpOutcome.Locked:
+                    return AuthEndpoints.Locked();
+                default:
+                    return Http.Invalid("password", "invalid_credentials");
+            }
+        }
+        else if (!await PrivacyEndpoints.RecentSignInAsync(http, db, config, clock))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: Remote.RemoteChecks.ReauthRequired);
+        }
+
         var step = Totp.Verify(SecretBox.Open(config.MfaKey, user.TotpSecret), req.Code, now, null);
         if (step is null) return Http.Invalid("code", "invalid_code");
 

@@ -54,6 +54,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("AIPOD_WEB_ROOT", WebRoot);
         Environment.SetEnvironmentVariable("AIPOD_AUTH_RATE_PER_MINUTE", "100000");
         Environment.SetEnvironmentVariable("AIPOD_DEVICE_TOKEN_RATE_PER_MINUTE", "100000");
+        Environment.SetEnvironmentVariable("AIPOD_INVITE_RATE_PER_MINUTE", "100000");
         Environment.SetEnvironmentVariable("AIPOD_MIN_AGENT_VERSION", "0.2.0");
         Environment.SetEnvironmentVariable("AIPOD_GITHUB_CLIENT_ID", "gh-id");
         Environment.SetEnvironmentVariable("AIPOD_GITHUB_CLIENT_SECRET", "gh-secret");

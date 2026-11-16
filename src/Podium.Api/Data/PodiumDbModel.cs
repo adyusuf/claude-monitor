@@ -30,7 +30,9 @@ internal static class PodiumDbModel
         });
         b.Entity<User>(e =>
         {
-            e.HasIndex(x => x.EmailNormalized).IsUnique();
+            // A search index only: identity is email_key (F-180), and two mailboxes may fold to one value.
+            e.HasIndex(x => x.EmailNormalized);
+            e.HasIndex(x => x.EmailKey).IsUnique();
             e.Property(x => x.Language).HasMaxLength(2);
             e.ToTable(t =>
             {
@@ -165,12 +167,16 @@ internal static class PodiumDbModel
         {
             e.HasIndex(x => new { x.SessionId, x.Status });
             e.HasIndex(x => new { x.WorkspaceId, x.Status, x.CreatedAt });
+            e.HasIndex(x => new { x.AgentId, x.ClientKey }).IsUnique().HasFilter("client_key IS NOT NULL");
             e.Property(x => x.ToolInput).HasColumnType("jsonb");
+            e.Property(x => x.Answers).HasColumnType("jsonb");
             e.ToTable(t =>
             {
                 t.HasCheckConstraint("ck_permission_requests_status", In("status",
                     PermissionStatuses.Open, PermissionStatuses.Answered, PermissionStatuses.Expired));
                 t.HasCheckConstraint("ck_permission_requests_decision", "decision IS NULL OR decision IN ('allow', 'deny')");
+                // The same cap as the run and ask keys (F-188).
+                t.HasCheckConstraint("ck_permission_requests_client_key", "client_key IS NULL OR length(client_key) BETWEEN 1 AND 100");
             });
         });
         b.Entity<ApprovalRule>(e =>

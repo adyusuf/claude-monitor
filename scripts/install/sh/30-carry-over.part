@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------- carrying the settings and the login over
+
+identity_home() { # the folder whose agent.json is the one to keep: the new home when it has one, else the old home
+  for h in "$new_home" "$old_home"; do
+    [ -f "$h/agent.json" ] && { printf '%s\n' "$h"; return; }
+  done
+}
+
+copy_token() { # <account>
+  if [ "$os" = macos ]; then
+    command -v security > /dev/null 2>&1 || return 0
+    security find-generic-password -s "$new_service" -a "$1" > /dev/null 2>&1 && return 0 # one already there is never overwritten
+    secret="$(security find-generic-password -s "$old_service" -a "$1" -w 2> /dev/null)" || return 0
+    [ -n "$secret" ] || return 0
+    case "$secret" in *'"'* | *\\*) warn "  the $1 token has a character this script will not pass on; log in again"; secret=""; return 0 ;; esac
+    # Through the interactive mode on standard input, so the token is never on a command line.
+    if printf 'add-generic-password -U -s %s -a %s -w "%s"\n' "$new_service" "$1" "$secret" | security -i > /dev/null 2>&1; then
+      say "  carried the $1 over to the keychain"
+    fi
+    secret=""
+  else
+    [ -f "$old_home/cred-$1" ] && [ ! -e "$new_home/cred-$1" ] || return 0
+    cp -p "$old_home/cred-$1" "$new_home/cred-$1" && chmod 600 "$new_home/cred-$1" && say "  carried the $1 over"
+  fi
+}
+
+carry_over() {
+  src="$(identity_home)"
+  [ -n "$src" ] || return 0
+  say "Carrying the old settings and login over from $src"
+  if [ "$dry" = 1 ]; then say "  [dry run] agent.json and the tokens would be copied into $new_home"; return 0; fi
+  mkdir -p "$new_home" && chmod 700 "$new_home"
+  if [ "$src" != "$new_home" ] && [ ! -f "$new_home/agent.json" ]; then
+    cp -p "$src/agent.json" "$new_home/agent.json" && chmod 600 "$new_home/agent.json" && say "  copied agent.json (server, machine identity, saved settings)"
+  fi
+  for a in $accounts; do copy_token "$a"; done
+}
+
