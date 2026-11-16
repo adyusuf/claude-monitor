@@ -109,6 +109,8 @@ public static class ProjectEndpoints
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: Podium.Api.Integrations.MirrorGate.FieldLocked);
         }
 
+        if (await ProjectSettingsInUse.CheckAsync(db, project, req, http.RequestAborted) is { } inUse) return inUse;
+
         if (req.OwnerUserId is { } owner && owner != project.OwnerUserId)
         {
             if (!grant.CanArchive) return Results.Forbid();
