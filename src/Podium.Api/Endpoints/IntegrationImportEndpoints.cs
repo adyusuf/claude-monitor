@@ -17,6 +17,14 @@ public static class IntegrationImportEndpoints
     public const string AlreadyLinked = "already_linked";
     public const string InvalidLink = "invalid_link";
 
+    /// <summary>The most spaces and people one call returns (and what it returns without <c>take</c>, as before paging, F-077).</summary>
+    public const int SpacesMax = 500;
+    public const int PeopleMax = 1000;
+
+    /// <summary>Set to "true" on a list answer that left rows out (more after this page); absent otherwise.</summary>
+    public const string TruncatedHeader = "X-Truncated";
+    public const string InvalidPaging = "invalid_paging";
+
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("/integrations/{id:guid}").RequireAuthorization(Schemes.Session);
@@ -37,16 +45,19 @@ public static class IntegrationImportEndpoints
         return member is null ? (null, null) : (connection, member);
     }
 
-    private static async Task<IResult> Spaces(Guid id, HttpContext http, PodiumDb db, IWorkTracker tracker, IntegrationTokens tokens)
+    private static async Task<IResult> Spaces(Guid id, int? skip, int? take, HttpContext http, PodiumDb db, IWorkTracker tracker, IntegrationTokens tokens)
     {
         if ((await OfAsync(db, http, id, Roles.Viewer)).Connection is not { } c) return Http.NotFound();
+        if (Paging(skip, take, SpacesMax) is not { } page) return PagingRefused(skip);
         if (await tokens.ConnectorContextAsync(c, http.RequestAborted) is not { } ctx) return RemoteReauthorize();
         try
         {
             var spaces = await tracker.ListContainersAsync(ctx, http.RequestAborted);
             var imported = await db.IntegrationLinks.AsNoTracking().Where(l => l.ConnectionId == id && l.Kind == LinkKinds.Project).ToListAsync(http.RequestAborted);
             var byExternal = imported.ToDictionary(l => l.ExternalId, l => l.LocalId);
-            return Results.Ok(spaces.Take(500).Select(s => new SpaceView(s.Key, s.Name, s.Description, byExternal.ContainsKey(s.Id), byExternal.TryGetValue(s.Id, out var p) ? p : null)));
+            MarkTruncated(http, spaces.Count > page.Skip + page.Take);
+            return Results.Ok(spaces.Skip(page.Skip).Take(page.Take)
+                .Select(s => new SpaceView(s.Key, s.Name, s.Description, byExternal.ContainsKey(s.Id), byExternal.TryGetValue(s.Id, out var p) ? p : null)));
         }
         catch (TrackerException e)
         {
@@ -95,17 +106,30 @@ public static class IntegrationImportEndpoints
         return Results.Ok(await import.ImportSprintsAsync(c, key, ids, http.RequestAborted));
     }
 
-    private static async Task<IResult> People(Guid id, HttpContext http, PodiumDb db)
+    private static async Task<IResult> People(Guid id, int? skip, int? take, HttpContext http, PodiumDb db)
     {
         if ((await OfAsync(db, http, id, Roles.Admin)).Connection is null) return Http.NotFound();
+        if (Paging(skip, take, PeopleMax) is not { } page) return PagingRefused(skip);
         var rows = await (from p in db.IntegrationPeople.AsNoTracking()
                           join u in db.Users.AsNoTracking() on p.UserId equals u.Id into users
                           from u in users.DefaultIfEmpty()
                           where p.ConnectionId == id
-                          orderby p.DisplayName
+                          orderby p.DisplayName, p.Id
                           select new PersonView(p.Id, p.DisplayName, p.Email, p.UserId, u == null ? null : u.DisplayName, p.InvitedAt != null, p.Active))
-            .Take(1000).ToListAsync(http.RequestAborted);
-        return Results.Ok(rows);
+            .Skip(page.Skip).Take(page.Take + 1).ToListAsync(http.RequestAborted); // one more than asked tells whether rows were left out
+        MarkTruncated(http, rows.Count > page.Take);
+        return Results.Ok(rows.Take(page.Take));
+    }
+
+    /// <summary>The page asked for: no <c>skip</c> is 0, no <c>take</c> (or one over <paramref name="max"/>) is <paramref name="max"/>; null for a negative skip or a take under 1.</summary>
+    private static (int Skip, int Take)? Paging(int? skip, int? take, int max) =>
+        skip is < 0 || take is < 1 ? null : (skip ?? 0, Math.Min(take ?? max, max));
+
+    private static IResult PagingRefused(int? skip) => Http.Invalid(skip is < 0 ? "skip" : "take", InvalidPaging);
+
+    private static void MarkTruncated(HttpContext http, bool truncated)
+    {
+        if (truncated) http.Response.Headers[TruncatedHeader] = "true";
     }
 
     private static async Task<IResult> PutPerson(Guid personId, PersonInput req, HttpContext http, PodiumDb db, TimeProvider clock)
@@ -149,7 +173,17 @@ public static class IntegrationImportEndpoints
                 detail: new { userId = person.UserId, previousUserId = previousUser, emailChanged });
         }
 
-        await db.SaveChangesAsync(http.RequestAborted);
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e, PeopleMirror.PersonUserIndex))
+        {
+            // The member was linked to another person of the connection meanwhile (another admin, or a pass matching by e-mail): the same
+            // answer as the check above gives.
+            return Http.Invalid("userId", AlreadyLinked);
+        }
+
         return Results.NoContent();
     }
 

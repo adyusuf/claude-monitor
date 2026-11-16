@@ -42,6 +42,21 @@ describe("the spaces of a connection", () => {
     expect(screen.getAllByRole("button", { name: "Sprints…" })).toHaveLength(1);
   });
 
+  it("says only the first spaces are shown when the API cut the list (X-Truncated), and nothing of the kind otherwise (F-077)", async () => {
+    serve({ [spacesPath]: { body: twoSpaces(), headers: { "X-Truncated": "true" } } });
+    open();
+    await show();
+    expect(await screen.findByText("Only the first 2 spaces are shown; the site has more.")).toBeInTheDocument();
+  });
+
+  it("shows no cut note for a whole list", async () => {
+    serve({ [spacesPath]: { body: twoSpaces() } });
+    open();
+    await show();
+    await screen.findByText("Shop");
+    expect(screen.queryByText(/Only the first/)).not.toBeInTheDocument();
+  });
+
   it("shows the empty text when the account sees no spaces, with nothing to import", async () => {
     serve({ [spacesPath]: { body: [] } });
     open();

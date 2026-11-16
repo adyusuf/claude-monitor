@@ -2,6 +2,7 @@ using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Endpoints;
 using Podium.Api.Mail;
+using Podium.Api.Projects;
 using Podium.Api.Security;
 using Podium.Api.Text;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,9 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
 {
     public const int InviteCap = 50;
 
+    /// <summary>The unique index on (connection, member) of <c>integration_people</c>: a member stands for one person of a connection (F-068).</summary>
+    public const string PersonUserIndex = "ux_integration_people_user";
+
     public async Task<Dictionary<string, IntegrationPerson>> UpsertAsync(IntegrationConnection connection, IEnumerable<ExternalPerson> people,
         MirrorCounts counts, CancellationToken ct)
     {
@@ -26,15 +30,17 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
             .ToDictionaryAsync(p => p.ExternalAccountId, ct);
         var now = clock.GetUtcNow();
         // The addresses Jira shows, and those an admin typed for people Jira shows none for (kept on the row): a person invited by a typed
-        // address is linked once they accept (F-069).
-        var emails = wanted.Where(p => p.Email is not null).Select(p => SearchText.Email(p.Email!))
-            .Concat(known.Values.Where(r => r.UserId is null && r.EmailNormalized is not null).Select(r => r.EmailNormalized!)).Distinct().ToList();
+        // address is linked once they accept (F-069). Matched by the identity key, never the search form: a look-alike address (an accent,
+        // a dotless i) is another mailbox and must not link to the member (F-180).
+        var emails = wanted.Select(p => EmailIdentity.Key(p.Email))
+            .Concat(known.Values.Where(r => r.UserId is null).Select(r => EmailIdentity.Key(r.Email))).OfType<string>().Distinct().ToList();
         var members = await (from u in db.Users.AsNoTracking()
                              join m in db.WorkspaceMembers.AsNoTracking() on u.Id equals m.UserId
-                             where m.WorkspaceId == connection.WorkspaceId && m.RemovedAt == null && u.EmailNormalized != null && emails.Contains(u.EmailNormalized)
-                             select new { u.Id, Email = u.EmailNormalized! }).ToDictionaryAsync(x => x.Email, x => x.Id, ct);
+                             where m.WorkspaceId == connection.WorkspaceId && m.RemovedAt == null && u.EmailKey != null && emails.Contains(u.EmailKey)
+                             select new { u.Id, Key = u.EmailKey! }).ToDictionaryAsync(x => x.Key, x => x.Id, ct);
         // A member stands for one person of a connection: one already linked (by hand or earlier) gets no second person by e-mail.
         var linked = (await db.IntegrationPeople.Where(p => p.ConnectionId == connection.Id && p.UserId != null).Select(p => p.UserId!.Value).ToListAsync(ct)).ToHashSet();
+        var automatic = new List<IntegrationPerson>();
         foreach (var p in wanted)
         {
             if (!known.TryGetValue(p.Id, out var row))
@@ -54,17 +60,52 @@ public sealed class PeopleMirror(PodiumDb db, ApiConfig config, IMailer mailer, 
                 row.EmailNormalized = SearchText.Email(p.Email);
             }
 
-            if (row.UserId is null && row.EmailNormalized is { } normalized && members.TryGetValue(normalized, out var user) && linked.Add(user))
+            if (row.UserId is null && EmailIdentity.Key(row.Email) is { } key && members.TryGetValue(key, out var user) && linked.Add(user))
             {
                 row.UserId = user;
+                automatic.Add(row);
                 // Matched by an address the tool supplied, without anyone confirming: audited, so an admin can see and undo it (F-070).
                 Audit.Add(db, null, clock, AuditActions.IntegrationPersonLinked, connection.WorkspaceId, connection.ConnectorUserId, targetType: "integration_person",
                     targetId: row.Id, detail: new { userId = user, automatic = true });
             }
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException e) when (UniqueViolation.Is(e, PersonUserIndex) && automatic.Count > 0)
+        {
+            // A member was linked to another person meanwhile (by an admin, or by another run): only the automatic links that now collide are
+            // left out, the rest of the batch is stored (a pass must not lose every person for one link).
+            var undone = await UndoTakenLinksAsync(connection, automatic, ct);
+            log.LogWarning("Integration {Connection}: {Count} automatic person link(s) met a member linked meanwhile and were left out", connection.Id, undone);
+            await db.SaveChangesAsync(ct);
+        }
+
         return known;
+    }
+
+    /// <summary>Unlinks the rows of <paramref name="automatic"/> whose member another person of the connection now stands for, with their audit rows. Returns how many.</summary>
+    private async Task<int> UndoTakenLinksAsync(IntegrationConnection connection, List<IntegrationPerson> automatic, CancellationToken ct)
+    {
+        var taken = await db.IntegrationPeople.AsNoTracking().Where(p => p.ConnectionId == connection.Id && p.UserId != null)
+            .Select(p => new { p.Id, User = p.UserId!.Value }).ToListAsync(ct);
+        var undone = 0;
+        foreach (var row in automatic.Where(r => taken.Any(t => t.User == r.UserId && t.Id != r.Id)))
+        {
+            row.UserId = null;
+            var target = row.Id.ToString();
+            foreach (var audit in db.ChangeTracker.Entries<AuditEvent>().Where(a => a.State == EntityState.Added && a.Entity.Action == AuditActions.IntegrationPersonLinked
+                         && a.Entity.TargetId == target).ToList())
+            {
+                audit.State = EntityState.Detached;
+            }
+
+            undone++;
+        }
+
+        return undone;
     }
 
     /// <summary>Invites the people of this connection who have a visible address, are not members, and were not invited. Returns how many mails went out.</summary>

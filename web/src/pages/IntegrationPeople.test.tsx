@@ -16,6 +16,19 @@ const rowOf = async (name: string) => (await screen.findByText(name, { exact: fa
 const saves = (calls: Call[]) => calls.filter((c) => c.method === "PUT");
 
 describe("the people of a connection", () => {
+  it("says only the first people are shown when the API cut the list (X-Truncated), and not for a whole list (F-077)", async () => {
+    serve({ [peoplePath]: { body: [person({ id: "pe1", displayName: "Mia Jira" })], headers: { "X-Truncated": "true" } } });
+    open();
+    expect(await screen.findByText("Only the first 1 people are shown; the connection has more.")).toBeInTheDocument();
+  });
+
+  it("shows no cut note for a whole list of people", async () => {
+    serve({ [peoplePath]: { body: [person({ id: "pe1", displayName: "Mia Jira" })] } });
+    open();
+    await rowOf("Mia Jira");
+    expect(screen.queryByText(/Only the first/)).not.toBeInTheDocument();
+  });
+
   it("shows every person with the badges that tell where they stand", async () => {
     serve({
       [peoplePath]: {

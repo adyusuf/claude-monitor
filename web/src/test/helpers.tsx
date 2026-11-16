@@ -8,7 +8,8 @@ import { SessionProvider } from "../auth/session";
 import { I18nProvider } from "../i18n";
 
 export interface Call { method: string; path: string; body: unknown }
-type Answer = { status?: number; body?: unknown } | ((call: Call) => { status?: number; body?: unknown });
+type Reply = { status?: number; body?: unknown; headers?: Record<string, string> };
+type Answer = Reply | ((call: Call) => Reply);
 
 /** Replaces fetch with a table of "METHOD /path" answers (the path without /api and without the query) and records calls. */
 export function mockApi(routes: Record<string, Answer>) {
@@ -20,9 +21,9 @@ export function mockApi(routes: Record<string, Answer>) {
     const call = { method, path: path + url.search, body: init?.body ? JSON.parse(String(init.body)) : undefined };
     calls.push(call);
     const answer = routes[`${method} ${path}`] ?? routes[`${method} ${path}${url.search}`];
-    const { status = 200, body } = typeof answer === "function" ? answer(call) : answer ?? { status: 404, body: { title: "not_found" } };
+    const { status = 200, body, headers = {} } = typeof answer === "function" ? answer(call) : answer ?? { status: 404, body: { title: "not_found" } };
     const empty = body === undefined || status === 204;
-    return new Response(empty ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+    return new Response(empty ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
   });
   return calls;
 }

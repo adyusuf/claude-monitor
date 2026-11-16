@@ -74,10 +74,11 @@ A refresh token rotates on every use; the new one is stored in the same transact
 ## 6. Keeping up to date
 
 1. **Webhook** `POST /api/integrations/jira/webhook/{connectionId}`: no session; the JWT is verified with the client secret (constant time, `exp` checked), the body is capped at 256 KiB, the
-   delivery id is recorded once, and the answer is 200 at once. The handler reads only *which* issue key or sprint id changed and queues "read it again" in memory (`SyncQueue`); the
+   delivery id is recorded once, and the answer is 200 at once (a token without `exp` is accepted, F-075, so a connection may leave at most 3000 new receipts an hour; past that a
+   delivery is answered 429, recorded and queued nowhere, and the pass reads what it named). The handler reads only *which* issue key or sprint id changed and queues "read it again" in memory (`SyncQueue`); the
    worker fetches the record with the connector's token and applies it. A lost queue (restart) costs nothing: pass 2 finds it.
 2. **Reconciliation** every 10 minutes per active connection (and once at start): issues of imported spaces with `updated >= last pass − 5 minutes`, the sprints of imported sprints' boards, the space list
-   (a vanished space is archived), the people of imported spaces. It is the only update path on a machine that Jira cannot reach (development) and the net under pass 1.
+   (a vanished space, like a vanished issue, is archived on the second pass in a row that misses it, F-066; an empty or cut issue listing archives nothing), the people of imported spaces. It is the only update path on a machine that Jira cannot reach (development) and the net under pass 1.
 3. **Webhook upkeep:** the pass registers the webhook when the first space is imported (two registrations: issue events filtered by `project in (...)`, and sprint events), re-registers when the
    set of spaces changes, and extends it every 10 days (30-day expiry). A site that refuses webhooks keeps working on pass 2 alone; the page shows "webhook: off".
 4. **Echo:** a write Podium made (Part 2) records the Jira `updated` value it got back; the webhook or pass that reads the same value changes nothing.
@@ -101,14 +102,15 @@ A change in Podium to a mirrored row is sent to Jira with the acting user's own 
 | `POST /api/workspaces/{ws}/integrations/jira/connect { subdomain }` → `{ authorizeUrl }` | workspace admin or owner, recent sign-in |
 | `GET /api/integrations/jira/callback?code&state` | the user who started it (state) → redirects to the web |
 | `POST /api/integrations/{id}/account/connect` → `{ authorizeUrl }` (link my own account) | member of the workspace |
-| `DELETE /api/integrations/{id}` (disconnect: tokens and webhook go; imported rows stay, marked detached) | admin |
+| `DELETE /api/integrations/{id}` (disconnect: tokens and webhook go; imported rows stay, marked detached) | admin, recent sign-in or code window (F-081) |
+| `POST /api/integrations/{id}/disconnect` `{ code }` (the same disconnect, with the two-step code when the sign-in is not recent; the web uses it) | admin, recent sign-in or two-step code (F-081) |
 | `POST /api/projects/{id}/detach` (cut an imported project of a disconnected connection loose for good) | project owner or workspace admin |
 | `PUT /api/integrations/{id}` `{ autoInvite }` | admin |
-| `GET /api/integrations/{id}/spaces` (live list, with "imported" flags) | any member |
+| `GET /api/integrations/{id}/spaces?skip&take` (live list, with "imported" flags; at most 500, `X-Truncated: true` when rows were left out, F-077) | any member |
 | `POST /api/integrations/{id}/spaces/import { keys[] }` | admin or owner |
 | `GET /api/integrations/{id}/spaces/{key}/sprints` | any member |
 | `POST /api/integrations/{id}/spaces/{key}/sprints/import { sprintIds[] }` | project manager |
-| `GET /api/integrations/{id}/people`, `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |
+| `GET /api/integrations/{id}/people?skip&take` (at most 1000, `X-Truncated: true` when rows were left out, F-077), `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |
 | `POST /api/integrations/{id}/sync` (a pass now) | admin |
 | `GET /api/integrations/{id}/runs` | any member |
 | `PUT /api/integrations/people/{personId} { email?, userId? }` | admin |

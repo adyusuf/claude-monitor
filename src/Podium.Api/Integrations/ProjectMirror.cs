@@ -50,6 +50,7 @@ public sealed class ProjectMirror(PodiumDb db, TimeProvider clock)
         project.UpdatedAt = now;
         link!.ExternalKey = space.Key;
         link.SyncedAt = now;
+        link.MissedPasses = 0; // seen: a later miss starts counting from the start (F-066)
         await db.SaveChangesAsync(ct);
         return project;
     }

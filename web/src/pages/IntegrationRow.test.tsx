@@ -2,7 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionView } from "../api/typesIntegrations";
-import { renderAt, type Call } from "../test/helpers";
+import { en } from "../i18n/en";
+import { ME, renderAt, type Call } from "../test/helpers";
 import { connection, localIso, serveIntegrations as serve } from "../test/integrations-fixtures";
 import { IntegrationRow } from "./IntegrationRow";
 
@@ -100,17 +101,59 @@ describe("a connection row: the admin actions", () => {
 
   it("disconnects after the person says yes, naming the site in the question", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    const calls = serve({ "DELETE /integrations/c1": { status: 204 } });
+    const calls = serve({ "POST /integrations/c1/disconnect": { status: 204 } });
     const { onChange } = open();
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
     await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
     expect(confirm).toHaveBeenCalledWith("Disconnect acme.atlassian.net? What was imported stays, but stops updating.");
-    expect(writes(calls)).toEqual([{ method: "DELETE", path: "/integrations/c1", body: undefined }]);
+    // F-081: the address that carries the code; on a recent sign-in it goes without one.
+    expect(writes(calls)).toEqual([{ method: "POST", path: "/integrations/c1/disconnect", body: {} }]);
+  });
+
+  it("asks a person with two-step sign-in for the code when the API wants a recent sign-in, and sends it on the second click", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    let attempt = 0;
+    const calls = serve({
+      "GET /me": { body: { ...ME, mfaEnabled: true } },
+      "POST /integrations/c1/disconnect": () => ++attempt === 1 ? { status: 403, body: { title: "reauth_required" } } : { status: 204 },
+    });
+    const { onChange } = open();
+    await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    const field = await screen.findByLabelText("Code from your authenticator app");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Disconnect" })).toBeDisabled(); // waits for the code
+    await userEvent.type(field, " 123456 ");
+    await userEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+    expect(confirm).toHaveBeenCalledTimes(1); // the question is not asked again
+    expect(writes(calls)).toEqual([
+      { method: "POST", path: "/integrations/c1/disconnect", body: {} },
+      { method: "POST", path: "/integrations/c1/disconnect", body: { code: "123456" } },
+    ]);
+  });
+
+  it("tells a person without two-step sign-in to sign in again, with no code field", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    serve({ "GET /me": { body: { ...ME, mfaEnabled: false } }, "POST /integrations/c1/disconnect": { status: 403, body: { title: "reauth_required" } } });
+    const { onChange } = open();
+    await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByText(en.integrations.disconnectSignIn)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Code from your authenticator app")).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("shows the translated problem when disconnecting fails for another reason", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    serve({ "POST /integrations/c1/disconnect": { status: 409, body: { title: "reauthorize" } } });
+    const { onChange } = open();
+    await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByText("The connection needs a new sign-in at Atlassian.")).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("does nothing when the person says no", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const calls = serve({ "DELETE /integrations/c1": { status: 204 } });
+    const calls = serve({ "POST /integrations/c1/disconnect": { status: 204 } });
     const { onChange } = open();
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
     expect(confirm).toHaveBeenCalledTimes(1);
