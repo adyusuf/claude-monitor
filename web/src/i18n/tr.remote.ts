@@ -37,6 +37,7 @@ export const trRemote: Dictionary["remote"] = {
   grantNew: "İzin ver", grantTemplate: "Komut şablonu", grantTemplateHint: "Her satırda bir öğe; ilki programın tam yolu.",
   days: "Gün", grantCreate: "İzni ver", grantIncomplete: "Şablonu ve çalışma klasörünü girin.",
   jobs: "İşler", noJobs: "İş yok.", jobStatus: { proposed: "Önerildi", active: "Etkin", denied: "Reddedildi", retired: "Emekli edildi" },
+  jobFilter: { label: "Göster", all: "Tüm işler", open: "Açık (önerilen ve etkin)", finished: "Biten (reddedilen ve emekli edilen)" },
   proposedBy: "{user} önerdi", retire: "Emekli et",
   settingsHint: "Makinelerde çalıştırma, makine uyarıları ve zamanlamalar.",
   settingsTitle: "Uzaktan çalışma", settingsReadOnly: "Bunları yalnızca bir yönetici değiştirebilir.", enabled: "Bu çalışma alanında uzaktan çalışmaya izin ver",

@@ -19,6 +19,8 @@ export interface MachineData {
   runs: WebRunView[];
   grants: WebGrantView[];
   jobs: WebJobView[];
+  /** The machine's active jobs, however old: what a schedule can be made from, whatever the job list is filtered to. */
+  activeJobs: WebJobView[];
   schedules: ScheduleView[];
   hasMoreRuns: boolean;
   hasMoreGrants: boolean;
@@ -35,6 +37,9 @@ export interface MachineData {
   moreJobs: () => Promise<void>;
 }
 
+/** The job status a schedule is made from (the API's `active`). */
+const JOB_ACTIVE = "active";
+
 /** The answers of an API that has no such endpoint yet (an older server), as opposed to a failure. */
 const NO_ENDPOINT: readonly number[] = [404, 405, 501];
 const noEndpoint = (e: unknown): boolean => e instanceof ApiError && NO_ENDPOINT.includes(e.status);
@@ -47,7 +52,7 @@ function mergePage<T extends { id: string; createdAt: string }>(first: T[], prev
 }
 
 /** Everything the machine page shows, read from the API; the metrics also refresh on their own (the agent reports every minute). */
-export function useMachineData(ws: string, agentId: string, userId: string | undefined, showResolved: boolean): MachineData {
+export function useMachineData(ws: string, agentId: string, userId: string | undefined, showResolved: boolean, jobFilter = ""): MachineData {
   const [machine, setMachine] = useState<MachineView | null>(null);
   const [detail, setDetail] = useState<MachineDetail | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -58,6 +63,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const [runs, setRuns] = useState<WebRunView[]>([]);
   const [grants, setGrants] = useState<WebGrantView[]>([]);
   const [jobs, setJobs] = useState<WebJobView[]>([]);
+  const [activeJobs, setActiveJobs] = useState<WebJobView[]>([]);
   const [schedules, setSchedules] = useState<ScheduleView[]>([]);
   const [hasMoreRuns, setHasMoreRuns] = useState(false);
   const [hasMoreGrants, setHasMoreGrants] = useState(false);
@@ -69,6 +75,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const pagedOlder = useRef(false);
   const pagedGrants = useRef(false);
   const pagedJobs = useRef(false);
+  const jobsFilterRead = useRef(jobFilter);
 
   const reload = useCallback(async () => {
     // Only the newest read counts: an older one that answers late (another filter, another sign-in state) must not overwrite what the newer one showed.
@@ -81,9 +88,10 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
         partial = e;
         return undefined;
       });
-      const [machines, agents, alertRows, runRows, grantRows, jobRows, detailRow, scheduleRows] = await Promise.all([
+      const [machines, agents, alertRows, runRows, grantRows, jobRows, activeRows, detailRow, scheduleRows] = await Promise.all([
         api.machines(ws), api.agents(ws), api.alerts(ws, agentId, showResolved),
-        api.runs(ws, { agent: agentId, limit: config.runPageSize }), api.grants(agentId, { limit: config.remotePageSize }), api.jobs(agentId, { limit: config.remotePageSize }),
+        api.runs(ws, { agent: agentId, limit: config.runPageSize }), api.grants(agentId, { limit: config.remotePageSize }), api.jobs(agentId, { limit: config.remotePageSize, status: jobFilter }),
+        api.jobs(agentId, { limit: config.remotePageSize, status: JOB_ACTIVE }),
         optional<MachineDetail | null>(api.machineDetail(agentId), null),
         optional<ScheduleView[]>(api.schedules(agentId), []),
       ]);
@@ -97,8 +105,13 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
       if (!pagedOlder.current) setHasMoreRuns(runRows.length >= config.runPageSize);
       setGrants((previous) => mergePage(grantRows, previous));
       if (!pagedGrants.current) setHasMoreGrants(grantRows.length >= config.remotePageSize);
-      setJobs((previous) => mergePage(jobRows, previous));
+      // Another filter starts the list over: rows read under the old one must not stay in it.
+      const refiltered = jobsFilterRead.current !== jobFilter;
+      jobsFilterRead.current = jobFilter;
+      if (refiltered) pagedJobs.current = false;
+      setJobs((previous) => (refiltered ? jobRows : mergePage(jobRows, previous)));
       if (!pagedJobs.current) setHasMoreJobs(jobRows.length >= config.remotePageSize);
+      setActiveJobs(activeRows.filter((j) => j.status === JOB_ACTIVE));
       if (scheduleRows !== undefined) setSchedules(scheduleRows);
       setError(partial);
       setMoreError(null);
@@ -107,7 +120,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     } finally {
       if (mine === latestReload.current) setLoaded(true);
     }
-  }, [ws, agentId, userId, showResolved]);
+  }, [ws, agentId, userId, showResolved, jobFilter]);
 
   const loadMetrics = useCallback(async () => {
     try {
@@ -150,7 +163,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     const oldest = jobs[jobs.length - 1];
     if (!oldest) return;
     try {
-      const page = await api.jobs(agentId, { before: oldest.createdAt, limit: config.remotePageSize });
+      const page = await api.jobs(agentId, { before: oldest.createdAt, limit: config.remotePageSize, status: jobFilter });
       pagedJobs.current = true;
       setJobs((previous) => [...previous, ...page.filter((j) => !previous.some((p) => p.id === j.id))]);
       setHasMoreJobs(page.length >= config.remotePageSize);
@@ -158,7 +171,7 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     } catch (e) {
       setMoreError(e);
     }
-  }, [agentId, jobs]);
+  }, [agentId, jobs, jobFilter]);
 
   useEffect(() => {
     void reload();
@@ -170,5 +183,5 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
     return () => clearInterval(timer);
   }, [loadMetrics]);
 
-  return { machine, detail, loaded, owned, agentVersion, metrics, alerts, runs, grants, jobs, schedules, hasMoreRuns, hasMoreGrants, hasMoreJobs, error, metricsError, moreError, reload, moreRuns, moreGrants, moreJobs };
+  return { machine, detail, loaded, owned, agentVersion, metrics, alerts, runs, grants, jobs, activeJobs, schedules, hasMoreRuns, hasMoreGrants, hasMoreJobs, error, metricsError, moreError, reload, moreRuns, moreGrants, moreJobs };
 }

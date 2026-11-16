@@ -35,6 +35,7 @@ export const enRemote = {
   grantNew: "Give a grant", grantTemplate: "Command template", grantTemplateHint: "One element per line; the first is the program's full path.",
   days: "Days", grantCreate: "Give the grant", grantIncomplete: "Enter the template and the working folder.",
   jobs: "Jobs", noJobs: "No jobs.", jobStatus: { proposed: "Proposed", active: "Active", denied: "Denied", retired: "Retired" },
+  jobFilter: { label: "Show", all: "All jobs", open: "Open (proposed and active)", finished: "Finished (denied and retired)" },
   proposedBy: "proposed by {user}", retire: "Retire",
   settingsHint: "Runs on your machines, machine alerts and schedules.",
   settingsTitle: "Remote work", settingsReadOnly: "Only an admin can change these.", enabled: "Allow remote work in this workspace",

@@ -120,7 +120,7 @@ export const api = {
   approveGrant: (grantId: string, code?: string) => request<void>("POST", `/grants/${grantId}/approve`, { code }),
   denyGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/deny`),
   revokeGrant: (grantId: string) => request<void>("POST", `/grants/${grantId}/revoke`),
-  jobs: (agentId: string, page: { before?: string | null; limit?: number } = {}) => request<WebJobView[]>("GET", `/agents/${agentId}/jobs${q(page)}`),
+  jobs: (agentId: string, page: { before?: string | null; limit?: number; status?: string } = {}) => request<WebJobView[]>("GET", `/agents/${agentId}/jobs${q(page)}`),
   approveJob: (jobId: string, code?: string) => request<void>("POST", `/jobs/${jobId}/approve`, { code }),
   denyJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/deny`),
   retireJob: (jobId: string) => request<void>("POST", `/jobs/${jobId}/retire`),
