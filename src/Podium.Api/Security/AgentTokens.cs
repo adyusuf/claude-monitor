@@ -106,9 +106,10 @@ public static class AgentTokens
 
     /// <summary>
     /// A refresh answer lost after the commit leaves the agent with the replaced token (F-206). Within
-    /// <see cref="ApiConfig.AgentRefreshGrace"/> of the replace, and only while the successor was never used, the replaced token is
-    /// honoured once: the unused successor is marked replaced by a new pair (so whoever shows it later is judged a reuse) and its
-    /// access token ends. A second try, a used successor, a late try or a revoked agent get null: the caller treats it as a reuse.
+    /// <see cref="ApiConfig.AgentRefreshGrace"/> of the replace, and only while the successor refresh token was never replaced (the use of
+    /// its access token is not tracked), the replaced token is honoured once: the successor is marked replaced by a new pair (so whoever
+    /// shows it later is judged a reuse) and its access token ends. A second try, a replaced successor, a late try or a revoked agent get
+    /// null: the caller treats it as a reuse.
     /// The successor's mark is a compare-and-set, so of two tries at once one gets the pair and the other is a reuse.
     /// </summary>
     private static async Task<TokenResponse?> GraceAsync(PodiumDb db, ApiConfig config, AgentToken row, Guid successorId,
