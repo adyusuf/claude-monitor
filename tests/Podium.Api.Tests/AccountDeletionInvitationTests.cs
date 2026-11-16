@@ -12,20 +12,25 @@ namespace Podium.Api.Tests;
 public sealed class AccountDeletionInvitationTests(ApiFactory api)
 {
     [Fact]
-    public async Task The_typed_address_leaves_the_invitations_to_the_deleted_person_and_stays_on_the_others()
+    public async Task Only_the_invitations_to_the_deleted_mailbox_are_revoked_and_lose_the_typed_address_a_look_alike_keeps_its_own()
     {
         var owner = await api.NewClient().SignedUpAsync("delinv-owner");
         var invitee = await api.NewClient().SignedUpAsync("delinv");
-        // The inviter typed a capitalised, accented spelling of the invitee's address: it folds to the invitee's normalised address.
-        var typed = invitee.Email.Replace("+delinv", "+Délinv", StringComparison.Ordinal);
+        // The inviter typed a capitalised spelling of the invitee's address: the same mailbox. An accented look-alike folds to the same normalised
+        // address but is another mailbox (F-180): its invitation is not the deleted person's.
+        var typed = invitee.Email.Replace("+delinv", "+Delinv", StringComparison.Ordinal);
+        var lookAlike = invitee.Email.Replace("+delinv", "+délinv", StringComparison.Ordinal);
         var unrelated = Emails.New("Délinv-unrelated");
-        Assert.Equal(SearchText.Email(invitee.Email), SearchText.Email(typed));
+        Assert.NotEqual(invitee.Email, typed);
+        Assert.Equal(SearchText.Email(invitee.Email), SearchText.Email(lookAlike));
         (await owner.PostAsync($"/api/workspaces/{owner.WorkspaceId}/invitations", new { email = typed, role = "member" })).EnsureSuccessStatusCode();
+        (await owner.PostAsync($"/api/workspaces/{owner.WorkspaceId}/invitations", new { email = lookAlike, role = "member" })).EnsureSuccessStatusCode();
         (await owner.PostAsync($"/api/workspaces/{owner.WorkspaceId}/invitations", new { email = unrelated, role = "member" })).EnsureSuccessStatusCode();
         await using (var before = api.Db())
         {
             var addresses = await before.WorkspaceInvitations.AsNoTracking().Where(i => i.WorkspaceId == owner.WorkspaceId).Select(i => i.Email).ToListAsync();
             Assert.Contains(typed, addresses);
+            Assert.Contains(lookAlike, addresses);
             Assert.Contains(unrelated, addresses);
         }
 
@@ -33,13 +38,15 @@ public sealed class AccountDeletionInvitationTests(ApiFactory api)
 
         await using var db = api.Db();
         var rows = await db.WorkspaceInvitations.AsNoTracking().Where(i => i.WorkspaceId == owner.WorkspaceId).ToListAsync();
-        Assert.Equal(2, rows.Count);
+        Assert.Equal(3, rows.Count);
         Assert.DoesNotContain(rows, i => i.Email == typed);
-        var deleted = Assert.Single(rows, i => i.EmailNormalized == SearchText.Email(typed));
-        Assert.Null(deleted.Email);
+        var deleted = Assert.Single(rows, i => i.Email is null);
+        Assert.Equal(SearchText.Email(typed), deleted.EmailNormalized);
         Assert.NotNull(deleted.RevokedAt);
-        var kept = Assert.Single(rows, i => i.EmailNormalized == SearchText.Email(unrelated));
-        Assert.Equal(unrelated, kept.Email);
-        Assert.Null(kept.RevokedAt);
+        foreach (var address in new[] { lookAlike, unrelated })
+        {
+            var kept = Assert.Single(rows, i => i.Email == address);
+            Assert.Null(kept.RevokedAt);
+        }
     }
 }
