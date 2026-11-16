@@ -27,13 +27,15 @@ public static class MachineEndpoints
         g.MapGet("/workspaces/{id:guid}/audit", AuditLog);
     }
 
-    private static async Task<IResult> List(Guid id, HttpContext http, PodiumDb db, UpdateCatalog catalog)
+    /// <summary>The workspace's agents; one revoked longer ago than <see cref="Config.ApiConfig.RevokedAgentsListedFor"/> is left out (its row stays).</summary>
+    private static async Task<IResult> List(Guid id, HttpContext http, PodiumDb db, UpdateCatalog catalog, Config.ApiConfig config, TimeProvider clock)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
+        var revokedSince = clock.GetUtcNow() - config.RevokedAgentsListedFor;
         var rows = await (from a in db.Agents.AsNoTracking()
                           join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
                           join u in db.Users.AsNoTracking() on a.UserId equals u.Id
-                          where a.WorkspaceId == id
+                          where a.WorkspaceId == id && (a.Status != AgentStatuses.Revoked || a.RevokedAt == null || a.RevokedAt >= revokedSince)
                           orderby a.Status, m.Hostname, a.EnrolledAt descending
                           select new AgentRow(a.Id, m.Id, m.Hostname, m.Os, m.Arch, a.Version, a.Status, u.Id, u.DisplayName,
                               a.EnrolledAt, a.LastHeartbeatAt, a.RevokedAt)).Take(500).ToListAsync(http.RequestAborted);

@@ -99,6 +99,12 @@ public sealed record ApiConfig
     public int DevicePollSeconds { get; init; } = 5;
     public TimeSpan AgentAccessLifetime { get; init; } = TimeSpan.FromMinutes(30);
     public TimeSpan AgentRefreshLifetime { get; init; } = TimeSpan.FromDays(30);
+
+    /// <summary>How long after a refresh the replaced token is honoured once more while its successor is unused: an answer lost after the commit (F-206).</summary>
+    public TimeSpan AgentRefreshGrace { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>How long a revoked agent stays in a workspace's agents list after its revocation (F-024); the row itself is kept.</summary>
+    public TimeSpan RevokedAgentsListedFor { get; init; } = TimeSpan.FromDays(30);
     public TimeSpan CommandLifetime { get; init; } = TimeSpan.FromMinutes(30);
     public int PermissionWaitMaxSeconds { get; init; } = 600;
     public int MaxBatchEvents { get; init; } = 500;
