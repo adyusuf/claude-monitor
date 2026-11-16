@@ -13,6 +13,16 @@ public static class SafeText
     /// <summary>What a character the database cannot store becomes: visible, so the event still shows something was there.</summary>
     public const char Replacement = '�';
 
+    /// <summary>The text cut to at most <paramref name="max"/> characters, one fewer when the cut would fall between the two halves of a pair (an emoji).</summary>
+    public static string Cut(string text, int max)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (text.Length <= max) return text;
+        var end = Math.Max(max, 0);
+        if (end is > 0 && char.IsHighSurrogate(text[end - 1]) && char.IsLowSurrogate(text[end])) end--;
+        return text[..end];
+    }
+
     /// <summary>The text with every NUL and every lone half of a surrogate pair replaced; the same instance when there is none.</summary>
     public static string Clean(string text)
     {

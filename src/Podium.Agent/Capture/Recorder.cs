@@ -45,7 +45,7 @@ public sealed class Recorder(AgentConfig config, LocalStore store)
                 ["bytes"] = bytes,
                 ["hook_event_name"] = cleaned["hook_event_name"]?.DeepClone(),
                 ["tool_name"] = cleaned["tool_name"]?.DeepClone(),
-                ["preview"] = json[..Math.Min(json.Length, PreviewChars)],
+                ["preview"] = SafeText.Cut(json, PreviewChars),
             }.ToJsonString();
         }
 
