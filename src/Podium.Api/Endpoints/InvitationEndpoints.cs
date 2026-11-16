@@ -148,9 +148,18 @@ public static class InvitationEndpoints
 
         if (member is null)
         {
-            db.WorkspaceMembers.Add(new WorkspaceMember { WorkspaceId = invitation.WorkspaceId, UserId = userId, Role = invitation.Role, JoinedAt = now });
+            // Two invitations of this person to the workspace accepted at once both read no row: the insert that meets the other's key
+            // does nothing (a plain Add would end the request, and its transaction, in a 500), and the row it lost to is the membership.
+            var added = await db.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO workspace_members (workspace_id, user_id, role, joined_at) VALUES ({invitation.WorkspaceId}, {userId}, {invitation.Role}, {now}) ON CONFLICT DO NOTHING",
+                http.RequestAborted);
+            if (added == 0)
+            {
+                member = await db.WorkspaceMembers.FirstAsync(m => m.WorkspaceId == invitation.WorkspaceId && m.UserId == userId, http.RequestAborted);
+            }
         }
-        else if (member.RemovedAt is not null || Roles.Rank(invitation.Role) > Roles.Rank(member.Role))
+
+        if (member is not null && (member.RemovedAt is not null || Roles.Rank(invitation.Role) > Roles.Rank(member.Role)))
         {
             // A member who comes back starts again; an active one moved up keeps the date they first joined.
             if (member.RemovedAt is not null) member.JoinedAt = now;
