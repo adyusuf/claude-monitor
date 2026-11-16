@@ -54,17 +54,28 @@ public static class AgentEndpoints
     {
         // One transaction: the replaced mark on the old token and its successor are stored together (AgentTokens.RefreshAsync).
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
-        var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, clock.GetUtcNow(), http.RequestAborted);
+        var now = clock.GetUtcNow();
+        var (outcome, tokens, agentId, reason) = await AgentTokens.RefreshAsync(db, config, req.RefreshToken, now, http.RequestAborted);
+        var notices = new List<Action>();
         if (outcome == AgentTokens.RefreshOutcome.Reused)
         {
             // The row goes to the agent's workspace: the audit log is read per workspace, and a copied token is what its admins must see.
-            var workspaceId = await db.Agents.Where(a => a.Id == agentId).Select(a => (Guid?)a.WorkspaceId).FirstOrDefaultAsync(http.RequestAborted);
-            Audit.Add(db, http, clock, AuditActions.RefreshReuse, workspaceId, agentId: agentId);
-            broker.Publish(Broker.Agent(agentId!.Value), new StreamMessage(AgentStreamEvents.Revoked, new { }));
+            var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == agentId, http.RequestAborted);
+            Audit.Add(db, http, clock, AuditActions.RefreshReuse, agent?.WorkspaceId, agentId: agentId);
+            // Its tokens are dead, so the agent is revoked too (no person did it: RevokedBy stays empty), and its remote work ends with it.
+            if (agent is { Status: AgentStatuses.Active })
+            {
+                agent.Status = AgentStatuses.Revoked;
+                agent.RevokedAt = now;
+                await db.SaveChangesAsync(http.RequestAborted);
+                await RemoteCleanup.ForAgentAsync(db, broker, agent.Id, null, now, http.RequestAborted, notices);
+            }
         }
 
         await db.SaveChangesAsync(http.RequestAborted);
         await tx.CommitAsync(http.RequestAborted);
+        notices.ForEach(n => n());
+        if (outcome == AgentTokens.RefreshOutcome.Reused) broker.Publish(Broker.Agent(agentId!.Value), new StreamMessage(AgentStreamEvents.Revoked, new { }));
         return outcome == AgentTokens.RefreshOutcome.Issued
             ? Results.Ok(tokens)
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "invalid_refresh_token",

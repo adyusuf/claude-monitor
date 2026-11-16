@@ -1,12 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Podium.Api.Data;
 using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
 using Podium.Contracts;
 
 namespace Podium.Api.Tests;
 
-/// <summary>A copied refresh token is the signal an admin must see: its audit row lands in the agent's workspace, and the agent's stream is told.</summary>
+/// <summary>A copied refresh token is the signal an admin must see: its audit row lands in the agent's workspace, the agent's stream is told and
+/// the agent is revoked.</summary>
 [Collection(ApiGroup.Name)]
 public sealed class RefreshReuseAuditTests(ApiFactory api)
 {
@@ -27,5 +30,14 @@ public sealed class RefreshReuseAuditTests(ApiFactory api)
         var audit = await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/audit");
         var row = Assert.Single(audit.GetProperty("items").EnumerateArray(), a => a.GetProperty("action").GetString() == AuditActions.RefreshReuse);
         Assert.Equal(agent.Tokens.AgentId, row.GetProperty("actorAgentId").GetGuid());
+
+        // F-207: the agent itself is revoked, so the machines list stops showing it as active with dead tokens.
+        var listed = Assert.Single((await owner.GetJsonAsync($"/api/workspaces/{owner.WorkspaceId}/agents")).EnumerateArray());
+        Assert.Equal(AgentStatuses.Revoked, listed.GetProperty("status").GetString());
+        await using var db = api.Db();
+        var stored = await db.Agents.AsNoTracking().FirstAsync(a => a.Id == agent.Tokens.AgentId);
+        Assert.Equal(AgentStatuses.Revoked, stored.Status);
+        Assert.NotNull(stored.RevokedAt);
+        Assert.Null(stored.RevokedBy); // no person revoked it: the reuse did
     }
 }

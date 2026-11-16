@@ -216,7 +216,15 @@ public sealed class DeviceTests(ApiFactory api)
         var reused = await user.ConnectAgentAsync();
         var rotated = await (await Refresh(reused.Tokens.RefreshToken)).Content.ReadFromJsonAsync<TokenResponse>(TestUser.Json);
         Assert.Equal(RefreshReasons.Reused, await ReasonAsync(await Refresh(reused.Tokens.RefreshToken)));
-        Assert.Equal(RefreshReasons.Revoked, await ReasonAsync(await Refresh(rotated!.RefreshToken))); // the reuse revoked every token of the agent
+        Assert.Equal(RefreshReasons.AgentRevoked, await ReasonAsync(await Refresh(rotated!.RefreshToken))); // the reuse revoked the agent (F-207)
+
+        var tokenRevoked = await user.ConnectAgentAsync(machineKey: "token-revoked-" + Guid.NewGuid());
+        await using (var db = api.Db())
+        {
+            await db.AgentTokens.Where(t => t.AgentId == tokenRevoked.Tokens.AgentId).ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTimeOffset.UtcNow));
+        }
+
+        Assert.Equal(RefreshReasons.Revoked, await ReasonAsync(await Refresh(tokenRevoked.Tokens.RefreshToken))); // the token, not the agent
 
         var expired = await user.ConnectAgentAsync(machineKey: "expired-" + Guid.NewGuid());
         await using (var db = api.Db())
