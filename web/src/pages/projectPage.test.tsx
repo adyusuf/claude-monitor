@@ -157,7 +157,7 @@ describe("the project page: editing", () => {
     serve({ "PUT /projects/p1": { status: 409, body: { title: "stale_update" } } });
     open("/w/w1/projects/p1?edit=1");
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));
-    expect(await screen.findByText("This project changed since you opened the form. Reload the page and make your change again.")).toBeInTheDocument();
+    expect(await screen.findByText("Someone else changed this after you opened it. Reload the page to see the change, then make yours again.")).toBeInTheDocument();
     expect(screen.getByLabelText("Name")).toBeInTheDocument();
   });
 

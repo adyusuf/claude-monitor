@@ -112,6 +112,11 @@ public sealed class SprintRaceTests(ApiFactory api)
         Assert.Equal("active", await SprintKit.StatusAsync(t.Owner, next));
         var third = await SprintKit.SprintAsync(t.Owner, t.Project);
         Assert.Equal(("status", "sprint_active"), await ProjectKit.ProblemAsync(await SprintKit.StartAsync(t.Owner, third)));
+
+        // The stuck row is only here for this test: the shared database must not keep an archived active sprint (the rollback of the index
+        // migration refuses to run past one).
+        await using var cleanup = api.Db();
+        await cleanup.Sprints.Where(s => s.Id == stuck).ExecuteDeleteAsync();
     }
 
     [Fact]
