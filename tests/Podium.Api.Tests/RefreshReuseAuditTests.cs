@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Podium.Api.Config;
 using Podium.Api.Data;
 using Podium.Api.Security;
 using Podium.Api.Tests.Infrastructure;
@@ -24,6 +26,7 @@ public sealed class RefreshReuseAuditTests(ApiFactory api)
         Task<HttpResponseMessage> Refresh() => http.PostAsJsonAsync("/api/agent/token/refresh", new RefreshRequest(agent.Tokens.RefreshToken), TestUser.Json);
 
         Assert.Equal(HttpStatusCode.OK, (await Refresh()).StatusCode);
+        api.Clock.Advance(api.Services.GetRequiredService<ApiConfig>().AgentRefreshGrace + TimeSpan.FromSeconds(1)); // past the lost-answer grace (F-206)
         Assert.Equal(HttpStatusCode.Unauthorized, (await Refresh()).StatusCode);
 
         await RemoteKit.NextEventAsync(stream, AgentStreamEvents.Revoked);

@@ -187,6 +187,7 @@ public sealed class DeviceTests(ApiFactory api)
         var rotated = await first.Content.ReadFromJsonAsync<TokenResponse>(TestUser.Json);
         Assert.NotEqual(agent.Tokens.RefreshToken, rotated!.RefreshToken);
 
+        api.Clock.Advance(Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Podium.Api.Config.ApiConfig>(api.Services).AgentRefreshGrace + TimeSpan.FromSeconds(1)); // past the lost-answer grace (F-206)
         var reuse = await http.PostAsJsonAsync("/api/agent/token/refresh", new RefreshRequest(agent.Tokens.RefreshToken), TestUser.Json);
         Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
         var afterReuse = await http.PostAsJsonAsync("/api/agent/token/refresh", new RefreshRequest(rotated.RefreshToken), TestUser.Json);
@@ -215,6 +216,7 @@ public sealed class DeviceTests(ApiFactory api)
 
         var reused = await user.ConnectAgentAsync();
         var rotated = await (await Refresh(reused.Tokens.RefreshToken)).Content.ReadFromJsonAsync<TokenResponse>(TestUser.Json);
+        api.Clock.Advance(Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Podium.Api.Config.ApiConfig>(api.Services).AgentRefreshGrace + TimeSpan.FromSeconds(1)); // past the lost-answer grace (F-206)
         Assert.Equal(RefreshReasons.Reused, await ReasonAsync(await Refresh(reused.Tokens.RefreshToken)));
         Assert.Equal(RefreshReasons.AgentRevoked, await ReasonAsync(await Refresh(rotated!.RefreshToken))); // the reuse revoked the agent (F-207)
 

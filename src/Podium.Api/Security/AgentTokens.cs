@@ -8,7 +8,7 @@ namespace Podium.Api.Security;
 /// <summary>
 /// An agent's tokens: a short access token and a single-use refresh token, both opaque and stored hashed.
 /// Presenting a refresh token that was already replaced means it was copied: every token of that agent is
-/// revoked and the agent must be connected again.
+/// revoked and the agent must be connected again. One exception, a lost answer (F-206): see <see cref="GraceAsync"/>.
 /// </summary>
 public static class AgentTokens
 {
@@ -61,8 +61,13 @@ public static class AgentTokens
             return (RefreshOutcome.Invalid, null, null, RefreshReasons.Unknown);
         }
 
-        if (row.ReplacedBy is not null)
+        if (row.ReplacedBy is { } replacedBy)
         {
+            if (await GraceAsync(db, config, row, replacedBy, now, ct) is { } again)
+            {
+                return (RefreshOutcome.Issued, again, row.AgentId, null);
+            }
+
             await RevokeAllAsync(db, row.AgentId, now, ct);
             return (RefreshOutcome.Reused, null, row.AgentId, RefreshReasons.Reused);
         }
@@ -89,6 +94,36 @@ public static class AgentTokens
         }
 
         return (RefreshOutcome.Issued, Issue(db, config, agent, now, successor), agent.Id, null);
+    }
+
+    /// <summary>
+    /// A refresh answer lost after the commit leaves the agent with the replaced token (F-206). Within
+    /// <see cref="ApiConfig.AgentRefreshGrace"/> of the replace, and only while the successor was never used, the replaced token is
+    /// honoured once: the unused successor is marked replaced by a new pair (so whoever shows it later is judged a reuse) and its
+    /// access token ends. A second try, a used successor, a late try or a revoked agent get null: the caller treats it as a reuse.
+    /// The successor's mark is a compare-and-set, so of two tries at once one gets the pair and the other is a reuse.
+    /// </summary>
+    private static async Task<TokenResponse?> GraceAsync(PodiumDb db, ApiConfig config, AgentToken row, Guid successorId,
+        DateTimeOffset now, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (row.RevokedAt is not null || row.ExpiresAt <= now || row.LastUsedAt is not { } replacedAt || now - replacedAt > config.AgentRefreshGrace)
+        {
+            return null;
+        }
+
+        var agent = await db.Agents.FirstOrDefaultAsync(a => a.Id == row.AgentId && a.Status == AgentStatuses.Active, ct);
+        var successor = await db.AgentTokens.AsNoTracking().FirstOrDefaultAsync(t => t.Id == successorId, ct);
+        if (agent is null || successor is null) return null;
+        var next = Guid.CreateVersion7();
+        var claimed = await db.AgentTokens.Where(t => t.Id == successorId && t.ReplacedBy == null && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.ReplacedBy, next), ct);
+        if (claimed == 0) return null;
+        // The lost pair's access token was issued with its refresh token, at the same instant.
+        await db.AgentTokens.Where(t => t.AgentId == row.AgentId && t.Kind == AgentTokenKinds.Access && t.CreatedAt == successor.CreatedAt
+                && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
+        return Issue(db, config, agent, now, next);
     }
 
     public static Task RevokeAllAsync(PodiumDb db, Guid agentId, DateTimeOffset now, CancellationToken ct) =>
