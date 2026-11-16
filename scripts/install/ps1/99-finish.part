@@ -1,0 +1,7 @@
+    Say ''
+    Say 'Done. Restart Claude Code (or open a new session) so it loads the plugin; /aipod:status shows how it is doing.'
+    if ($oldPresent) { Say 'A session that was open during the removal may report a hook error once; a new session does not.' }
+}
+finally {
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}

@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------- the server and the download host
+
+if [ -z "$server" ]; then
+  h="$(identity_home)"
+  [ -n "$h" ] && server="$(json_field server < "$h/agent.json")" # a machine that was connected before already knows its server
+fi
+if [ -z "$server" ] && [ -z "$from" ]; then
+  can_prompt || die "the server address is needed: --server https://<your server> (or AIPOD_SERVER)"
+  printf 'Server address (https://...): ' > /dev/tty
+  read -r server < /dev/tty || server=""
+fi
+server="${server%/}"
+[ -n "$from" ] || from="$server/downloads"
+from="${from%/}"
+[ -z "$server" ] || valid_url "$server" || die "the server address must be https://<host>"
+valid_url "$from" || die "the download address must be https://<host>/..."
+command -v curl > /dev/null 2>&1 || die "curl is needed"
+
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/aipod-install.XXXXXX")" || die "no temporary folder"
+trap 'rm -rf "$tmp"' EXIT INT TERM
+
+say "Looking for the newest build at $from"
+curl -fsSL --max-time 60 --max-filesize 1048576 -o "$tmp/manifest.json" "$from/manifest.json" || die "could not read $from/manifest.json"
+file="" version="" sha=""
+tr -d '\n\r' < "$tmp/manifest.json" | tr '}' '\n' | grep "\"os\": *\"$os\"" | grep "\"arch\": *\"$arch\"" > "$tmp/records"
+while IFS= read -r rec; do
+  v="$(printf '%s' "$rec" | json_field version)"
+  if [ -n "$v" ] && { [ -z "$version" ] || newer "$v" "$version"; }; then
+    version="$v"
+    file="$(printf '%s' "$rec" | json_field file)"
+    sha="$(printf '%s' "$rec" | json_field sha256)"
+  fi
+done < "$tmp/records"
+{ [ -n "$version" ] && [ -n "$file" ] && [ -n "$sha" ]; } || die "the download host has no build for $os-$arch"
+printf '%s' "$file" | grep -Eq '^aipod-(macos|linux)-(arm64|x64)\.zip$' || die "refused: $file is not a build file name"
+say "  newest build: aipod $version ($os-$arch)"
+

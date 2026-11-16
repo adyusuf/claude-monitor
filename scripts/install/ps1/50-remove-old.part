@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------- removing an older agent
+
+function Stop-OldDaemons {
+    if ((Get-OldDaemons).Count -eq 0) { return }
+    foreach ($h in $OldHomes + $NewHome) {
+        if (Test-Path -LiteralPath (Join-Path $h 'daemon.pid')) { Set-Content -LiteralPath (Join-Path $h 'daemon.stop') -Value ([DateTime]::UtcNow.ToString('o')) -NoNewline }
+    }
+    for ($n = 0; $n -lt 12 -and (Get-OldDaemons).Count -gt 0; $n++) { Start-Sleep -Seconds 1 }
+    Get-OldDaemons | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    foreach ($h in $OldHomes + $NewHome) { Remove-Item -LiteralPath (Join-Path $h 'daemon.stop') -Force -ErrorAction SilentlyContinue }
+}
+
+function Remove-OldAgent {
+    Say 'Removing the old agent'
+    $first = Get-OldBinaries | Select-Object -First 1
+    if ((Get-OldService).Count -gt 0) {
+        Warn "  an old Windows service (cm-agent) is installed; that needs an administrator: & '$first' uninstall --service"
+    }
+    if ((Get-OldTask).Count -gt 0) {
+        if ($first) { if (Act 'run: cm-agent uninstall --standalone' { Run-Native $first @('uninstall', '--standalone') }) { Did '  removed the old autostart' } }
+        else { Warn '  an old autostart task is registered and no old binary is left to remove it with' }
+    }
+    if (Have-Claude) {
+        foreach ($id in Get-OldPluginIds) {
+            if (Act "claude plugin uninstall $id" { Run-Native 'claude' @('plugin', 'uninstall', $id) }) { Did "  uninstalled the Claude Code plugin $id" }
+        }
+        foreach ($m in Get-OldMarketplaces) {
+            if (Act "claude plugin marketplace remove $m" { Run-Native 'claude' @('plugin', 'marketplace', 'remove', $m) }) { Did "  removed the marketplace $m" }
+        }
+    }
+    if ($DryRun) { Say '  [dry run] the old daemon would be stopped and the old binaries deleted' }
+    else {
+        Stop-OldDaemons
+        foreach ($f in Get-OldBinaries) { Remove-Item -LiteralPath $f -Force; Say "  deleted $f" }
+    }
+    if ($Purge) {
+        if (-not $DryRun -and -not (Test-Path -LiteralPath (Join-Path $NewHome 'agent.json'))) {
+            Warn '  -Purge skipped: the new home has no agent.json yet, so the old data would be the only copy'
+        }
+        else {
+            foreach ($h in $OldHomes) { if (Test-Path -LiteralPath $h) { if (Act "delete $h" { Remove-Item -LiteralPath $h -Recurse -Force; $true }) { Did "  deleted $h" } } }
+            foreach ($account in $Accounts) { Act "delete Credential Manager entry $OldService/$account" { [ApCred]::Delete("$OldService/$account"); $true } | Out-Null }
+        }
+    }
+    else {
+        foreach ($h in $OldHomes) { if (Test-Path -LiteralPath $h) { Say "  kept the old data folder $h (delete it when you are happy; -Purge does it)" } }
+    }
+}
+
+# ---------------------------------------------------------------- the removal script
+
+if ($RemoveOld) {
+    if (-not (Test-FoundOld)) { Say 'No old agent found.'; return }
+    Say 'An old agent was found:'
+    Show-Old
+    if (-not (Confirm-Step 'Remove the old agent?' $false)) { Say 'Nothing was changed.'; return }
+    if ($Purge) { Copy-Carry }
+    Remove-OldAgent
+    return
+}
+

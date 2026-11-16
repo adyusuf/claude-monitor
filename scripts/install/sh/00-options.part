@@ -1,0 +1,48 @@
+#!/bin/sh
+# Installs or updates the aipod agent and its Claude Code plugin on macOS and Linux, and removes an older agent (cm-agent) on request.
+#
+#   aipod-install.sh [--server <https address>] [--from <download base>] [--yes] [--dry-run]
+#                    [--no-plugin] [--no-login] [--remove-old] [--purge]
+#
+# In order:
+#   1. looks at the download host (the server's /downloads, which is the R2 bucket; --from names another base) for the newest signed build;
+#   2. finds an older agent (cm-agent, the old Claude Code plugin, an old autostart) and asks before removing it; "no" changes nothing;
+#   3. carries the old settings and login over (agent.json and the two tokens), so the machine stays the same machine on the web;
+#   4. installs the build into the agent home, checked against the manifest's SHA-256 (and, on macOS, its code signature);
+#   5. adds or updates the Claude Code plugin (aipod@aipod-releases); when the machine is not connected yet, logs in (a code to approve on the web).
+# --remove-old only removes the old agent (the removal script). --purge also deletes the old data folder and the old keychain entries,
+# after the carry-over. Tokens are copied between the user's own keychain entries or files and are never printed. Nothing here needs root;
+# an old boot service (service mode) needs an administrator and is only named, with the command to run.
+set -u
+
+server="${AIPOD_SERVER:-}"
+from=""
+yes=0
+dry=0
+want_plugin=1
+want_login=1
+only_remove=0
+purge=0
+
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
+say() { printf '%s\n' "$*"; }
+warn() { printf '%s\n' "$*" >&2; }
+die() { warn "aipod install: $*"; exit 1; }
+did() { [ "$dry" = 1 ] || say "$*"; } # a message about something that happened: silent in a dry run, where act already said what would
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --server) [ $# -ge 2 ] || die "--server needs an address"; server="$2"; shift ;;
+    --from) [ $# -ge 2 ] || die "--from needs an address"; from="$2"; shift ;;
+    --yes | -y) yes=1 ;;
+    --dry-run) dry=1 ;;
+    --no-plugin) want_plugin=0 ;;
+    --no-login) want_login=0 ;;
+    --remove-old) only_remove=1 ;;
+    --purge) purge=1 ;;
+    -h | --help) usage; exit 0 ;;
+    *) die "unknown option $1 (see --help)" ;;
+  esac
+  shift
+done
+

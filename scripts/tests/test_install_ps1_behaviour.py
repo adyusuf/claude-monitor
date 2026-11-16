@@ -6,6 +6,7 @@ Credential Manager copy and the unpacking (Windows paths), which need a Windows 
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -17,8 +18,10 @@ import unittest
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-INSTALL = ROOT / "scripts" / "install" / "aipod-install.ps1"
+_spec = importlib.util.spec_from_file_location("install_support", Path(__file__).resolve().parent / "install_support.py")
+install_support = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(install_support)
+INSTALL = Path(install_support.assembled(install_support.PS1))  # the file the download host serves, joined from the step files (F-332)
 PWSH = shutil.which("pwsh")
 SERVER = "https://aipod.invalid"
 PLAIN = "$PSStyle.OutputRendering = 'PlainText'; $ErrorView = 'ConciseView'; "

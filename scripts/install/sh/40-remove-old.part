@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------- removing an older agent
+
+stop_old_daemons() {
+  [ -n "$(old_daemon_pids)" ] || return 0
+  for h in "$old_home" "$new_home"; do
+    [ -f "$h/daemon.pid" ] && printf '%s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$h/daemon.stop" # the daemon's own way to stop: it reads this file every few seconds
+  done
+  n=0
+  while [ "$n" -lt 12 ] && [ -n "$(old_daemon_pids)" ]; do
+    sleep 1
+    n=$((n + 1))
+  done
+  for pid in $(old_daemon_pids); do kill -TERM "$pid" 2> /dev/null; done
+  sleep 1
+  for pid in $(old_daemon_pids); do kill -KILL "$pid" 2> /dev/null; done
+  rm -f "$old_home/daemon.stop" "$new_home/daemon.stop"
+}
+
+remove_old() {
+  say "Removing the old agent"
+  first="$(old_binaries | head -n 1)"
+  if [ -n "$(old_boot_service)" ]; then
+    warn "  an old boot service is installed ($(old_boot_service | head -n 1)); that needs an administrator:"
+    warn "    sudo '${first:-cm-agent}' uninstall --service"
+  fi
+  if [ -n "$(old_autostart)" ]; then
+    if [ -n "$first" ]; then
+      act "run: cm-agent uninstall --standalone" "$first" uninstall --standalone && did "  removed the old autostart"
+    else
+      warn "  an old autostart is still registered ($(old_autostart | head -n 1)) and no old binary is left to remove it with"
+    fi
+  fi
+  if have_claude; then
+    for id in $(old_plugin_ids); do
+      act "claude plugin uninstall $id" claude plugin uninstall "$id" && did "  uninstalled the Claude Code plugin $id"
+    done
+    for m in $(old_marketplaces); do
+      act "claude plugin marketplace remove $m" claude plugin marketplace remove "$m" && did "  removed the marketplace $m"
+    done
+  fi
+  if [ "$dry" = 1 ]; then
+    say "  [dry run] the old daemon would be stopped and the old binaries deleted"
+  else
+    stop_old_daemons
+    old_binaries | while IFS= read -r f; do
+      rm -f "$f" "${f%cm-agent}cm-agentw" && say "  deleted $f"
+    done
+  fi
+  if [ "$purge" = 1 ]; then
+    if [ "$dry" = 0 ] && [ ! -f "$new_home/agent.json" ]; then
+      warn "  --purge skipped: the new home has no agent.json yet, so the old data would be the only copy"
+    else
+      if [ "$old_home" != "$new_home" ] && [ -d "$old_home" ]; then act "delete $old_home" rm -rf "$old_home" && did "  deleted $old_home"; fi
+      for a in $accounts; do
+        if [ "$os" = macos ] && command -v security > /dev/null 2>&1; then
+          act "delete keychain entry $old_service/$a" security delete-generic-password -s "$old_service" -a "$a"
+        elif [ "$old_home" != "$new_home" ]; then
+          act "delete $old_home/cred-$a" rm -f "$old_home/cred-$a"
+        fi
+      done
+    fi
+  elif [ -d "$old_home" ] && [ "$old_home" != "$new_home" ]; then
+    say "  kept the old data folder $old_home (delete it when you are happy; --purge does it)"
+  fi
+}
+
+# ---------------------------------------------------------------- the removal script
+
+if [ "$only_remove" = 1 ]; then
+  found_old || { say "No old agent found."; exit 0; }
+  say "An old agent was found:"
+  list_old
+  confirm "Remove the old agent?" n || { say "Nothing was changed."; exit 0; }
+  if [ "$purge" = 1 ]; then carry_over; fi
+  remove_old
+  exit 0
+fi
+

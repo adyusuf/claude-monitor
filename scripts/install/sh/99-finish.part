@@ -1,0 +1,4 @@
+say ""
+say "Done. Restart Claude Code (or open a new session) so it loads the plugin; /aipod:status shows how it is doing."
+if [ "$old_present" = 1 ]; then say "A session that was open during the removal may report a hook error once; a new session does not."; fi
+exit 0

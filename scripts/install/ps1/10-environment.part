@@ -1,0 +1,34 @@
+$arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+$arch = switch -Regex ($arch) { 'ARM64' { 'arm64' } 'AMD64|x64' { 'x64' } default { throw "no build for the CPU $arch" } }
+
+$NewHome = if ($env:AP_AGENT_HOME) { $env:AP_AGENT_HOME } else { Join-Path $env:USERPROFILE '.aipod' }
+$OldHomes = @($(if ($env:CM_AGENT_HOME) { $env:CM_AGENT_HOME }), (Join-Path $env:USERPROFILE '.claude-monitor'), (Join-Path $env:LOCALAPPDATA 'ClaudeMonitor')) |
+    Where-Object { $_ -and $_ -ne $NewHome }
+$ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
+$NewBin = Join-Path $NewHome 'bin\aipod.exe'
+$OldService = 'claude-monitor-agent' # the Credential Manager prefix the old agent kept its two tokens under
+$NewService = 'aipod'
+$Accounts = 'access-token', 'refresh-token'
+
+function Say([string]$text) { Write-Host $text }
+function Warn([string]$text) { Write-Warning $text }
+function Die([string]$text) { throw "aipod install: $text" }
+function Did([string]$text) { if (-not $DryRun) { Say $text } }
+function Act([string]$what, [scriptblock]$do) { if ($DryRun) { Say "  [dry run] $what"; return $true }; & $do }
+function Run-Native([string]$exe, [string[]]$arguments) { & $exe @arguments *> $null; return ($LASTEXITCODE -eq 0) }
+function Have-Claude { return [bool](Get-Command claude -ErrorAction SilentlyContinue) }
+function Newer([string]$a, [string]$b) { try { return ([version]$a) -gt ([version]$b) } catch { return $false } }
+
+function Confirm-Step([string]$question, [bool]$default) {
+    if ($Yes) { return $true }
+    if (-not [Environment]::UserInteractive -or [Console]::IsInputRedirected) {
+        Warn "$question (no terminal to ask on: answered '$(if ($default) { 'y' } else { 'n' })'; use -Yes to answer yes)"
+        return $default
+    }
+    $hint = if ($default) { '[Y/n]' } else { '[y/N]' }
+    $answer = Read-Host "$question $hint"
+    if ($answer -match '^(y|yes)$') { return $true }
+    if ($answer -match '^(n|no)$') { return $false }
+    return $default
+}
+

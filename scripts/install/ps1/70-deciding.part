@@ -1,0 +1,28 @@
+    # ------------------------------------------------------------ deciding
+    $oldPresent = $false
+    $installed = ''
+    if (Test-Path -LiteralPath $NewBin) { try { $installed = ((& $NewBin version 2>$null) | Select-Object -First 1).Trim() } catch { $installed = '' } }
+    if (Test-FoundOld) {
+        $oldPresent = $true
+        Say 'An older agent is installed:'
+        Show-Old
+        $ov = ''
+        $firstOld = Get-OldBinaries | Select-Object -First 1
+        if ($firstOld) { try { $ov = ((& $firstOld version 2>$null) | Select-Object -First 1).Trim() } catch { $ov = '' } }
+        $label = if ($ov) { " (cm-agent $ov)" } else { '' }
+        if (-not (Confirm-Step "Remove the old agent$label and install aipod ${version}? Your settings and login are kept." $false)) {
+            Say 'Nothing was changed. The old agent stays; run this again when you are ready.'
+            return
+        }
+    }
+    elseif ($installed) {
+        if (Newer $version $installed) {
+            if (-not (Confirm-Step "aipod $installed is installed; update to ${version}?" $true)) { Say 'Nothing was changed.'; return }
+        }
+        else { Say "aipod $installed is installed and is the newest build." }
+    }
+
+    $fresh = -not (Get-IdentityHome)
+    Copy-Carry
+    if ($oldPresent) { Remove-OldAgent }
+
