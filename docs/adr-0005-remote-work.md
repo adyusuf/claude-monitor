@@ -37,8 +37,14 @@ target daemon --executes, masks, caps--> API --> requester's daemon --> local SQ
   database (as ADR-0002 already does): refresh tokens are single-use, so a second API caller would revoke the agent.
 - **Exactly once.** The requester sends a `clientKey`, unique per requester agent. Output chunks are unique per
   `(run, seq)`. The target writes the run into its local `exec_runs` before starting it; a replayed run it already
-  knows is reported, never started again, and a run that was alive when the daemon restarted is reported
-  `failed: agent restarted`.
+  knows is reported, never started again. A run that was alive when the daemon restarted is never started again
+  either: the target also keeps the run's process id, that process's start time and the end of its timeout in
+  `exec_runs` (Linux and macOS; additive local columns), and a restarted daemon whose process table still shows that
+  same process (same start time, so not a recycled id) picks the run up. The run stays `running`, keeps its original
+  timeout, and answers a cancel by stopping its process group. The old pipes are gone, so the output printed after
+  the restart is lost and the exit code is not known: when the process ends the run is reported `failed` with
+  `exit_unknown`. A run whose process is gone or not vouched for, and one on Windows (the Job Object ends the run
+  with the agent), is reported `failed: agent_restarted`.
 - **Statuses:** `pending_approval → approved → delivered → running → succeeded | failed | timed_out`, or `denied`,
   `expired` (a pending run unanswered in 15 minutes), `cancelled`. Every transition is a compare-and-set in the
   database; the API publishes after commit. A run's command never changes after it is created.

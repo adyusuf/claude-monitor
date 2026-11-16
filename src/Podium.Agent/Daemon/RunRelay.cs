@@ -10,28 +10,19 @@ namespace Podium.Agent.Daemon;
 /// <summary>
 /// The target's side of remote work (ADR-0005). A run arriving on the stream is written to exec_runs before anything
 /// starts (a replay of a known run is never started again), executed by <see cref="RunExecutor"/>, and its output and
-/// outcome go through the local database to the API, output first. A run that was alive when the daemon stopped is
-/// reported failed, never restarted. The executor's callbacks come from other threads, so the store is used under a lock.
+/// outcome go through the local database to the API, output first. A run that was alive when the daemon stopped is never
+/// restarted: when its process is still the one that was started, the new daemon picks it up (<c>Recover</c>), else it is reported
+/// failed. The executor's callbacks come from other threads, so the store is used under a lock.
 /// </summary>
-public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, RunExecutor executor,
-    AgentLog log) : IDisposable
+public sealed partial class RunRelay(AgentConfig config, LocalStore store, ApiClient api, TimeProvider clock, RunExecutor executor,
+    AgentLog log, IRunAdoption? adoption = null, TimeSpan? adoptPoll = null) : IDisposable
 {
     public const string Restarted = "agent_restarted";
     private const int ChunksPerCall = 16;
     private readonly Lock gate = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> running = new();
-
-    /// <summary>Runs left "running" by a daemon that stopped: they are failed, their processes are gone with it.</summary>
-    public void Recover()
-    {
-        lock (gate)
-        {
-            foreach (var r in store.ExecRunsIn(LocalStore.ExecStates.Running).Where(r => !running.ContainsKey(r.RunId)))
-            {
-                store.ExecEnd(r.RunId, RunStatuses.Failed, null, Restarted, r.Truncated, r.ResolvedExe);
-            }
-        }
-    }
+    private readonly IRunAdoption adopter = adoption ?? new SystemRunAdoption();
+    private volatile bool disposing;
 
     /// <summary>Takes a run from the stream; it executes in the background. False when it was already known.</summary>
     public bool Accept(RunMessage run, CancellationToken stop)
@@ -121,7 +112,8 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
                 update => update.Status == RunStatuses.Running
                     ? Quietly(() => api.RunStatusAsync(run.Id, update, cts.Token))
                     : Task.CompletedTask,
-                cts.Token);
+                cts.Token,
+                spawn => KeepProcess(id, spawn));
             lock (gate) store.ExecEnd(id, result.Status, result.ExitCode, result.Error, result.OutputTruncated, result.ResolvedExe, result.RefusedBy, result.AccessVersion);
         }
         catch (Exception e)
@@ -157,6 +149,7 @@ public sealed class RunRelay(AgentConfig config, LocalStore store, ApiClient api
 
     public void Dispose()
     {
+        disposing = true; // a run picked up after a restart stays alive: its watcher only stops looking
         foreach (var cts in running.Values) cts.Cancel();
     }
 
