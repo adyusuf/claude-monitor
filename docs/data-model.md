@@ -27,7 +27,7 @@ the EF Core migrations of phase 1 implement it and this file follows them.
 | `users` | `id`, `email`, `email_normalized`, `display_name`, `display_name_search`, `password_hash` (null when only a provider is used), `email_verified_at`, `status` (`active`, `disabled`, `deleted`), `created_at`, `updated_at` | (`email_normalized`), UNIQUE until `EmailNormalizedNonUnique`; UNIQUE `email_key` (migration `EmailKey`) |
 | `user_logins` | `id`, `user_id`, `provider` (`github`, `google`), `provider_subject`, `provider_email`, `linked_at` | UNIQUE (`provider`, `provider_subject`) |
 | `user_tokens` | `id`, `user_id`, `purpose` (`verify_email`, `reset_password`), `token_hash`, `created_at`, `expires_at`, `used_at`; deleted by housekeeping 7 days after expiry or use (F-185) | UNIQUE `token_hash` |
-| `login_sessions` | `id`, `user_id`, `token_hash`, `created_at`, `expires_at`, `last_seen_at`, `revoked_at`, `user_agent`, `code_checked_at` (last accepted two-step code; ADR-0008 §9.13a) | UNIQUE `token_hash`; (`user_id`) |
+| `login_sessions` | `id`, `user_id`, `token_hash`, `created_at`, `expires_at`, `last_seen_at`, `revoked_at`, `user_agent`, `code_checked_at` (last accepted two-step code; ADR-0008 §9.13a); deleted by housekeeping 30 days after expiry or revocation (F-185) | UNIQUE `token_hash`; (`user_id`) |
 
 ## 2. Workspaces
 
@@ -222,7 +222,7 @@ An `issue_runs` row attaches a remote run to an issue (ADR-0011 §6); it is a li
 - **Deletion** (`POST /api/me/delete`, with the password when there is one and the word `DELETE`): refused (409
   `sole_owner`) while the user is the only owner of a workspace that has other members. Otherwise, in one transaction:
   the personal fields are cleared (`users.email`, name, password hash; status `deleted`), provider links deleted,
-  login sessions, mail tokens, agents and agent tokens revoked, open invitations to the address revoked, memberships
+  login sessions (their `user_agent` cleared), mail tokens, agents and agent tokens revoked, open invitations to the address revoked, memberships
   ended, workspaces with no other member archived; the captured content of the user's sessions is deleted (events,
   tasks) or emptied (titles, subagent descriptions, command bodies, permission inputs). Ids, times, usage and audit
   rows stay, so other people's records still make sense. The address is free for a new sign-up.
