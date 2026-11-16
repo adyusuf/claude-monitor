@@ -177,6 +177,10 @@ public static class PrivacyEndpoints
         {
             await db.WorkspaceInvitations.Where(i => i.EmailNormalized == email && i.AcceptedAt == null && i.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(i => i.RevokedAt, now), ct);
+            // The address as the inviter typed it is the person's address too: gone from every invitation to it, whatever its state
+            // (the ones they sent name no address of theirs, and an invitation to anyone else keeps its own).
+            await db.WorkspaceInvitations.Where(i => i.EmailNormalized == email && i.Email != null)
+                .ExecuteUpdateAsync(s => s.SetProperty(i => i.Email, (string?)null), ct);
         }
 
         foreach (var m in memberships) m.RemovedAt = now;
