@@ -78,6 +78,9 @@ export function useMachineData(ws: string, agentId: string, userId: string | und
   const jobsFilterRead = useRef(jobFilter);
 
   const reload = useCallback(async () => {
+    // Nothing is read until the signed-in user is known (F-097): every card of every tab stays mounted, so a read before it and another after it would
+    // fire each request twice and the first answer would say the machine is not the user's.
+    if (userId === undefined) return;
     // Only the newest read counts: an older one that answers late (another filter, another sign-in state) must not overwrite what the newer one showed.
     const mine = ++latestReload.current;
     try {
