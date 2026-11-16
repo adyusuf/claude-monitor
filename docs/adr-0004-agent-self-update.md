@@ -115,6 +115,19 @@ not, and is tracked separately.
 fragment, a plain file name, no redirect, no IP literal or local name). The address was never the trust anchor: the build is installed only if its SHA-256 equals the signed one and the signature verifies against the channel
 key built into the agent. A compromised API could at most make an agent download a file that is then refused. `scripts/publish_agent_downloads.sh` publishes a build; `docs/release.md`, "Download host".
 
+### Accepted risk (16/11/2026): the installer is not signed
+
+The first install is not an update: `aipod-install.sh` and `.ps1` are downloaded from the same host that serves `manifest.json`, so a signature or a
+checksum carried inside the installer would be produced by whoever controls that host and protects nothing against a compromise of it. A person who runs
+an installer fetched from a compromised host runs what that host chose. The maintainer accepted this risk rather than ship a signature that only looks
+like protection (finding F-208, option c).
+What limits it: HTTPS to the host; the installer checks the build against the manifest's SHA-256 (from the same host, so this catches a damaged
+download, not a compromised host) and, on macOS, its code signature; and from then on the agent's own updater installs only a build whose manifest
+signature verifies against the channel key pinned in the agent, so a compromised host cannot push an unsigned build to an installed agent. The
+installer itself does not check the manifest signature.
+What would close it: the installer, or its SHA-256, published from a separate trust anchor (a release page of the repository, say) that the person
+compares against before running it. Until then, install from an address you got from the maintainer's own channel.
+
 ## Consequences
 
 - With everything at its default nothing changes: no update call, no new behaviour. A person can run `cm-agent update --check` and `cm-agent update` at any time.
