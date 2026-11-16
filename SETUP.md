@@ -71,6 +71,8 @@ run is recorded on the merge commit as `Gate-Waived: <gates> (neden: <reason>)`.
 `scripts/waived-gates.sh <source> <target>` (the waived gates between two refs, exit 1 when any). Details:
 [docs/release.md](docs/release.md#promotion). Third-party actions are pinned to a commit SHA and gitleaks is
 checksum-verified. To change a version, change it there and in the Prerequisites table above.
+The same workflow has a second job, `agent-windows` (`windows-latest`): it builds and runs `tests/Podium.Agent.Tests`, the only place the
+agent's Windows runtime (Job Object, DPAPI, Credential Manager, ACL reader) is exercised; it needs no secret and starts with the workflow.
 
 A gate run collects coverage while the unit tests run and the coverage step judges those files, so no test runs twice
 (`scripts/merge-gate.conf`, `tests/coverage.props`, `web/vite.config.ts`); `bash scripts/coverage.sh` on its own still runs
