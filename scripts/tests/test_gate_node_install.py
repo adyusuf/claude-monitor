@@ -15,7 +15,7 @@ import tempfile
 import unittest
 
 SCRIPTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-GATE_FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh', 'merge-gate.sh')
+GATE_FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-panel.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh', 'merge-gate.sh')
 PACKAGE = '{"scripts": {"lint": "eslint .", "build": "vite build", "test": "vitest"}}'
 
 FAKE_NPM = """#!/bin/sh

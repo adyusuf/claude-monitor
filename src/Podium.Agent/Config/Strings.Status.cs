@@ -9,6 +9,7 @@ public static partial class Msg
     public const string StNever = "st.never";
     public const string StAgeHours = "st.age.hours";
     public const string StUploadFailure = "st.uploadfailure";
+    public const string StQuarantined = "st.quarantined";
     public const string StConnection = "st.connection";
     public const string StDaemonDown = "st.daemondown";
     public const string StLastMessage = "st.lastmessage";
@@ -64,6 +65,7 @@ public static partial class Strings
         E(Msg.StNever, "never", "hiç", "nie"),
         E(Msg.StAgeHours, "{0} h", "{0} sa", "{0} Std."),
         E(Msg.StUploadFailure, "Last upload failure: {0} at {1}.", "Son yükleme hatası: {0}, saat {1}.", "Letzter Upload-Fehler: {0} um {1}."),
+        E(Msg.StQuarantined, "Held back: {0} event(s) the server refused for good are kept here and not uploaded.", "Geri tutulan: sunucunun kalıcı olarak reddettiği {0} olay burada tutuluyor ve yüklenmiyor.", "Zurückgehalten: {0} Ereignis(se), die der Server endgültig abgelehnt hat, bleiben hier und werden nicht hochgeladen."),
         E(Msg.StConnection, "Connection: {0} (refused at {1})", "Bağlantı: {0} (reddedildiği saat {1})", "Verbindung: {0} (abgelehnt um {1})"),
         E(Msg.StDaemonDown, "Web stream: the agent daemon is not running.", "Web akışı: ajan arka plan süreci çalışmıyor.", "Web-Datenstrom: der Agent-Daemon läuft nicht."),
         E(Msg.StLastMessage, "; last message id {0} ({1} ago)", "; son ileti kimliği {0} ({1} önce)", "; letzte Nachrichten-ID {0} (vor {1})"),

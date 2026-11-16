@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "../api/endpoints";
 import type { Invitation, Member, Role } from "../api/types";
 import { useSession } from "../auth/session";
 import { Drawer } from "../components/Drawer";
+import { MoreRows } from "../components/MoreRows";
 import { Tabs } from "../components/Tabs";
 import { Button, Card, Field, Notice, Spinner } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { date } from "../lib/format";
+import { nextByCursor, readByCursorUpTo, type CursorState } from "../lib/listPages";
 
 const ROLES: Role[] = ["owner", "admin", "member", "viewer"];
 
 type NoticeState = { kind: "error" | "success"; text: string };
+
+/** A list read whole: nothing left to load. */
+const WHOLE: CursorState = { truncated: false, cursor: null };
 
 /** Members and invitations as two tabs. Everyone sees the members; admins see the invitations, invite (from a drawer), change roles and remove. */
 export function MembersPage() {
@@ -22,6 +27,12 @@ export function MembersPage() {
   const navigate = useNavigate();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [membersLeft, setMembersLeft] = useState<CursorState>(WHOLE);
+  const [invitationsLeft, setInvitationsLeft] = useState<CursorState>(WHOLE);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  // How many of each are shown: a reload after a change reads as far again, so a row Load more added stays.
+  const shown = useRef({ members: 0, invitations: 0 });
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [inviting, setInviting] = useState(false);
@@ -29,20 +40,62 @@ export function MembersPage() {
   const myRole = me?.workspaces.find((w) => w.id === ws)?.role;
   const admin = myRole === "owner" || myRole === "admin";
 
+  const showMembers = (rows: Member[], left: CursorState) => {
+    shown.current.members = rows.length;
+    setMembers(rows);
+    setMembersLeft(left);
+  };
+  const showInvitations = (rows: Invitation[], left: CursorState) => {
+    shown.current.invitations = rows.length;
+    setInvitations(rows);
+    setInvitationsLeft(left);
+  };
+
   const load = useCallback(async () => {
     try {
-      setMembers(await api.members(ws));
-      if (admin) setInvitations(await api.invitations(ws));
+      // The first rows come as the plain list, which says when the API cut it (X-Truncated, F-060); "Load more" reads the rest by cursor.
+      const list = await readByCursorUpTo(await api.memberList(ws), (cursor) => api.memberPage(ws, cursor), shown.current.members, (m) => m.userId);
+      showMembers(list.rows, list.state);
+      if (admin) {
+        const open = await readByCursorUpTo(await api.invitationList(ws), (cursor) => api.invitationPage(ws, cursor), shown.current.invitations, (i) => i.id);
+        showInvitations(open.rows, open.state);
+      }
     } catch (e) {
       setNotice({ kind: "error", text: errorText(e) });
     }
   }, [ws, admin, errorText]);
 
   useEffect(() => {
+    shown.current = { members: 0, invitations: 0 }; // another workspace starts at its first page
     void load();
     // errorText is a fresh function each render; loading again for it would loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws, admin]);
+
+  const moreMembers = async () => {
+    if (!members) return;
+    setLoadingMembers(true);
+    try {
+      const next = await nextByCursor((cursor) => api.memberPage(ws, cursor), membersLeft, members, (m) => m.userId);
+      showMembers(next.rows, next.state);
+    } catch (e) {
+      setNotice({ kind: "error", text: errorText(e) });
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const moreInvitations = async () => {
+    setLoadingInvitations(true);
+    try {
+      const next = await nextByCursor((cursor) => api.invitationPage(ws, cursor), invitationsLeft, invitations, (i) => i.id);
+      showInvitations(next.rows, next.state);
+    } catch (e) {
+      setNotice({ kind: "error", text: errorText(e) });
+    } finally {
+      setLoadingInvitations(false);
+    }
+  };
 
   /** Runs one change and reloads; false when the server refused it (the reason is shown). The notice may depend on what the call answered. */
   const act = async (work: () => Promise<unknown>, success?: string | (() => NoticeState)) => {
@@ -124,6 +177,7 @@ export function MembersPage() {
                   ))}
                 </tbody>
               </table>
+              {membersLeft.truncated ? <MoreRows note={t("members.truncated", { n: members.length })} busy={loadingMembers} onMore={() => void moreMembers()} /> : null}
             </Card>
           ),
         },
@@ -155,6 +209,9 @@ export function MembersPage() {
                   </tbody>
                 </table>
               )}
+              {invitationsLeft.truncated ? (
+                <MoreRows note={t("members.invitationsTruncated", { n: invitations.length })} busy={loadingInvitations} onMore={() => void moreInvitations()} />
+              ) : null}
             </Card>
           ),
         },

@@ -15,6 +15,10 @@ public static class ApplicationPartEndpoints
     public const int ComponentsMax = 200;
     public const int ReleasesMax = 200;
 
+    /// <summary>Releases recorded as already out are history and are not counted by <see cref="ReleasesMax"/>; this cap of their own, far above real use,
+    /// stops repeated requests from adding them without end (S-4).</summary>
+    public const int ReleasedMax = 1000;
+
     public static void Map(RouteGroupBuilder api)
     {
         var g = api.MapGroup("").RequireAuthorization(Schemes.Session);
@@ -108,8 +112,10 @@ public static class ApplicationPartEndpoints
         if (Invalid(req) is { } invalid) return invalid;
         if (req.Status == ReleaseStatuses.Cancelled) return Http.Invalid("status", "invalid_value"); // a release is cancelled after it was planned, never born so
         // Only planned releases fill the calendar: one that went out is history and cannot be deleted, so counting it would end the calendar for good (F-259).
-        if ((req.Status ?? ReleaseStatuses.Planned) == ReleaseStatuses.Planned
-            && await db.ApplicationReleases.CountAsync(r => r.ApplicationId == id && r.Status == ReleaseStatuses.Planned, http.RequestAborted) >= ReleasesMax)
+        // Those that went out are counted against a cap of their own (S-4).
+        var status = req.Status ?? ReleaseStatuses.Planned;
+        var cap = status == ReleaseStatuses.Planned ? ReleasesMax : ReleasedMax;
+        if (await db.ApplicationReleases.CountAsync(r => r.ApplicationId == id && r.Status == status, http.RequestAborted) >= cap)
         {
             return Http.Invalid("name", "limit_reached");
         }
@@ -133,6 +139,13 @@ public static class ApplicationPartEndpoints
         if (row.Status == ReleaseStatuses.Cancelled) return Http.Invalid("status", "cancelled");
         if (Invalid(req) is { } invalid) return invalid;
         if (row.Status == ReleaseStatuses.Released && (req.Status ?? row.Status) != ReleaseStatuses.Released) return Http.Invalid("status", "released");
+        // A planned release that goes out joins the history, so it counts against the cap of those that went out, as a new one would (S-4).
+        if (row.Status != ReleaseStatuses.Released && req.Status == ReleaseStatuses.Released
+            && await db.ApplicationReleases.CountAsync(r => r.ApplicationId == row.ApplicationId && r.Status == ReleaseStatuses.Released, http.RequestAborted) >= ReleasedMax)
+        {
+            return Http.Invalid("name", "limit_reached");
+        }
+
         Fill(row, req);
         Audit.Add(db, http, clock, AuditActions.ReleaseChanged, row.WorkspaceId, userId, targetType: "application", targetId: row.ApplicationId);
         if (await ProjectEndpoints.SaveUniqueAsync(db, http.RequestAborted) is { } taken) return taken;

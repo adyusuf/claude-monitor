@@ -163,8 +163,9 @@ public static class PrivacyEndpoints
             s => s.SetProperty(a => a.Status, AgentStatuses.Revoked).SetProperty(a => a.RevokedAt, now).SetProperty(a => a.RevokedBy, userId), ct);
         await db.AgentTokens.Where(t => agentIds.Contains(t.AgentId) && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
-        await db.LoginSessions.Where(s => s.UserId == userId && s.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
+        // Every web sign-in is revoked (one revoked earlier keeps its time) and loses the browser line that names the person's device (F-185).
+        await db.LoginSessions.Where(s => s.UserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, x => x.RevokedAt ?? now).SetProperty(x => x.UserAgent, (string?)null), ct);
         await db.UserTokens.Where(t => t.UserId == userId && t.UsedAt == null).ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
         await db.UserLogins.Where(l => l.UserId == userId).ExecuteDeleteAsync(ct);
         await db.UserRecoveryCodes.Where(r => r.UserId == userId).ExecuteDeleteAsync(ct);
