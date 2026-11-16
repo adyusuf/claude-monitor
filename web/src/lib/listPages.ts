@@ -45,3 +45,18 @@ export async function nextByCursor<T>(read: (cursor: string | null) => Promise<C
     cursor = page.nextCursor;
   }
 }
+
+/**
+ * A plain capped list read again as far as it was shown: after the plain `first` read, the cursor pages are walked while the API says
+ * rows are left and fewer than `shown` are read, so a change and its reload do not take away the rows "Load more" added.
+ */
+export async function readByCursorUpTo<T>(first: ListRead<T>, read: (cursor: string | null) => Promise<CursorPage<T>>, shown: number,
+  key: (row: T) => string): Promise<{ rows: T[]; state: CursorState }> {
+  let rows = first.items;
+  let state: CursorState = { truncated: first.truncated, cursor: null };
+  // nextByCursor ends with new rows or with nothing left (truncated false), so this loop always ends.
+  while (state.truncated && rows.length < shown) {
+    ({ rows, state } = await nextByCursor(read, state, rows, key));
+  }
+  return { rows, state };
+}

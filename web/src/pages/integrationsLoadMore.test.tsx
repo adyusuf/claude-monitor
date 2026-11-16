@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ME, mockApi, renderAt, type Call } from "../test/helpers";
@@ -101,5 +101,24 @@ describe("Load more on the people of a connection the API cut (F-077)", () => {
     expect(await screen.findByText("Something went wrong on the server.")).toBeInTheDocument();
     expect(screen.getByText("Mia Jira", { exact: false })).toBeInTheDocument();
     expect(more()).toBeInTheDocument();
+  });
+});
+
+describe("a save keeps the people Load more added (F-077)", () => {
+  it("still shows a person added by Load more after a save reads the people again", async () => {
+    const calls = mockApi({
+      "GET /me": { body: ME }, "GET /workspaces/w1/members": { body: workspaceMembers },
+      "GET /integrations/c1/people": (call) => (call.path.includes("skip=1") ? { body: [person({ id: "pe2", displayName: "Ines Invited" })] }
+        : { body: [person()], headers: cut }),
+      "PUT /integrations/people/pe2": { status: 204 },
+    });
+    openPeople();
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    const row = (await screen.findByText("Ines Invited", { exact: false })).closest("li")!;
+    await userEvent.type(within(row as HTMLElement).getByRole("textbox"), "ines+test@gmail.com");
+    await userEvent.click(within(row as HTMLElement).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.path.startsWith("/integrations/c1/people"))).toHaveLength(4));
+    expect(screen.getByText("Ines Invited", { exact: false })).toBeInTheDocument();
+    expect(more()).not.toBeInTheDocument();
   });
 });

@@ -61,6 +61,8 @@ export function MachinesPage() {
   const [machinesCut, setMachinesCut] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const shown = useRef({ agents: 0, machines: 0 });
+  // A refresh and Load more can overlap: each read takes a number and only the newest one is shown, so an older answer never wins.
+  const generation = useRef(0);
   const role = me?.workspaces.find((w) => w.id === ws)?.role;
 
   const show = (agents: ListRead<AgentRow>, machines: ListRead<MachineView>) => {
@@ -73,6 +75,7 @@ export function MachinesPage() {
 
   // An API without remote work answers 404 to the machines list: the page then shows the plain list, as before.
   const load = useCallback(async () => {
+    const mine = ++generation.current;
     try {
       const [agents, machines] = await Promise.all([
         readUpTo((skip) => api.agentList(ws, skip), shown.current.agents, (a) => a.id),
@@ -81,10 +84,11 @@ export function MachinesPage() {
           throw e;
         }),
       ]);
+      if (mine !== generation.current) return;
       show(agents, machines);
       setError(null);
     } catch (e) {
-      setError(e);
+      if (mine === generation.current) setError(e);
     }
   }, [ws]);
   useEffect(() => {
@@ -103,19 +107,27 @@ export function MachinesPage() {
     if (m.event === "alert" || m.event === "run" || m.event === "session" || m.event === "machine" || isCatchUp(m)) reload();
   });
 
-  /** The agents and machines after those shown, each list only while the API says it cut it; a row is added once. */
+  /**
+   * The agents and machines after those shown, each list only while the API says it cut it; a row is added once. The rows wanted are
+   * raised first, so a refresh that starts meanwhile reads as far itself (and wins, being newer).
+   */
   const loadMore = async () => {
     if (!rows) return;
+    const machines = [...views.values()];
+    const mine = ++generation.current;
+    shown.current = { agents: rows.length + (agentsCut ? 1 : 0), machines: machines.length + (machinesCut ? 1 : 0) };
     setLoadingMore(true);
     try {
-      const machines = [...views.values()];
       const [agentPage, machinePage] = await Promise.all([
         agentsCut ? api.agentList(ws, rows.length) : { items: [], truncated: false },
         machinesCut ? api.machineList(ws, machines.length) : NONE,
       ]);
+      if (mine !== generation.current) return;
       show({ items: appendNew(rows, agentPage.items, (a) => a.id), truncated: agentPage.truncated },
         { items: appendNew(machines, machinePage.items, (m) => m.agentId), truncated: machinePage.truncated });
     } catch (e) {
+      if (mine !== generation.current) return;
+      shown.current = { agents: rows.length, machines: machines.length }; // nothing was added
       setError(e);
     } finally {
       setLoadingMore(false);

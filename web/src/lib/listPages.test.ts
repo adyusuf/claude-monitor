@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CursorPage } from "../api/types";
-import { appendNew, nextByCursor, readUpTo } from "./listPages";
+import { appendNew, nextByCursor, readByCursorUpTo, readUpTo } from "./listPages";
 
 type Row = { id: string };
 const rows = (...ids: string[]): Row[] => ids.map((id) => ({ id }));
@@ -67,5 +67,27 @@ describe("readUpTo", () => {
     const read = vi.fn(async (skip?: number) => (skip === undefined ? list(["a"], true) : list(["a"], true)));
     expect((await readUpTo(read, 5, key)).items.map(key)).toEqual(["a"]);
     expect(read).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("readByCursorUpTo", () => {
+  it("keeps the plain read when nothing more was shown", async () => {
+    const read = vi.fn(async () => page(["x"], null));
+    expect(await readByCursorUpTo({ items: rows("a"), truncated: true }, read, 1, key)).toEqual({ rows: rows("a"), state: { truncated: true, cursor: null } });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("walks the cursor pages until as many rows as were shown are read again", async () => {
+    const read = vi.fn(async (cursor: string | null) => (cursor === null ? page(["a"], "k1") : cursor === "k1" ? page(["b"], "k2") : page(["c"], null)));
+    const again = await readByCursorUpTo({ items: rows("a"), truncated: true }, read, 3, key);
+    expect(again.rows.map(key)).toEqual(["a", "b", "c"]);
+    expect(again.state).toEqual({ truncated: false, cursor: null });
+  });
+
+  it("stops when a walk brings no new row", async () => {
+    const read = vi.fn(async () => page(["a"], null));
+    const again = await readByCursorUpTo({ items: rows("a"), truncated: true }, read, 5, key);
+    expect(again.rows.map(key)).toEqual(["a"]);
+    expect(read).toHaveBeenCalledTimes(1);
   });
 });
