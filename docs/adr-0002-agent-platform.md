@@ -214,7 +214,7 @@ option the question offered (for a multiple choice, offered options joined by ",
 apart as `other` (question text -> text) and goes after the chosen options; the agent hands offered options over as they are
 and wraps anything else, labelled, as a message from the web (`ChannelEnvelopes`), like the deny reason. A question that
 offered no options takes its answer as typed text, as before. The answers are stored with the request (`answers` column),
-so the obsolete poll returns them too (F-196). An older agent copies what it gets unwrapped. **Fail-safe:** the buttons exist only while an open
+so the obsolete poll returns them too (F-196). An older agent copies what it gets unwrapped. Known limit: an agent from before Q-2 does not wrap the typed `other` text either, so it reaches the session unlabelled. **Fail-safe:** the buttons exist only while an open
 permission request for that tool exists. If Claude Code does not raise `PermissionRequest` for these tools, nothing is
 reported, no buttons appear, and the question stays readable in the conversation and answerable on the machine.
 **Not confirmed on a live interactive session (decided 05/10/2026):** whether Claude Code raises the hook for these tools
