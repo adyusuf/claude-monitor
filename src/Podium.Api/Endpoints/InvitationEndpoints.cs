@@ -133,7 +133,12 @@ public static class InvitationEndpoints
         var page = await query.OrderByDescending(i => i.CreatedAt).ThenByDescending(i => i.Id).Take(take + 1).ToListAsync(http.RequestAborted);
         var shown = page.Take(take).ToList();
         var rows = shown.Select(i => new InvitationResponse(i.Id, i.Email ?? i.EmailNormalized, i.Role, i.CreatedAt, i.ExpiresAt)).ToList();
-        if (!paged) return Results.Ok(rows);
+        if (!paged)
+        {
+            IntegrationImportEndpoints.MarkTruncated(http, page.Count > take);
+            return Results.Ok(rows);
+        }
+
         return Results.Ok(new CursorPage<InvitationResponse>(rows, page.Count > take ? Cursor.Of(shown[^1].CreatedAt, shown[^1].Id) : null));
     }
 
