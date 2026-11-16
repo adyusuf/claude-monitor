@@ -9,6 +9,7 @@ namespace Podium.Api.Tests;
 public sealed class ReleaseCapTests(ApiFactory api)
 {
     private const int ReleasesMax = 200; // the contract of ADR-0011, written out so that changing it fails a test on purpose
+    private const int ReleasedMax = 1000; // S-4: releases recorded as already out have a cap of their own, far above real use
 
     private async Task SeedAsync(Guid workspace, Guid app, int count, string status, string prefix, DateOnly first)
     {
@@ -68,6 +69,35 @@ public sealed class ReleaseCapTests(ApiFactory api)
         var response = await AddAsync(t.Owner, t.Application, "shipped long ago", ReleaseStatuses.Released);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Releases_recorded_as_out_have_their_own_cap_the_1000th_is_taken_the_1001st_is_refused()
+    {
+        var t = await IssueKit.TeamAsync(api);
+        await SeedAsync(t.Owner.WorkspaceId, t.Application, ReleasedMax - 1, ReleaseStatuses.Released, "out", new DateOnly(2020, 1, 1)); // 999 out
+
+        Assert.Equal(HttpStatusCode.Created, (await AddAsync(t.Owner, t.Application, "the 1000th", ReleaseStatuses.Released)).StatusCode);
+        Assert.Equal(("name", "limit_reached"), await ProjectKit.ProblemAsync(await AddAsync(t.Owner, t.Application, "the 1001st", ReleaseStatuses.Released)));
+        // The calendar of planned releases is counted on its own: a full history still leaves room for the next planned one.
+        Assert.Equal(HttpStatusCode.Created, (await AddAsync(t.Owner, t.Application, "next planned")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_planned_release_switched_to_released_counts_against_the_released_cap_the_1000th_goes_out_the_1001st_is_refused()
+    {
+        var t = await IssueKit.TeamAsync(api); // one planned release, 1.0.0
+        await SeedAsync(t.Owner.WorkspaceId, t.Application, ReleasedMax - 1, ReleaseStatuses.Released, "out", new DateOnly(2020, 1, 1)); // 999 out
+        var second = (await IssueKit.Created(await AddAsync(t.Owner, t.Application, "2.0.0"))).GetProperty("id").GetGuid();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{t.Release}", new { name = "1.0.0", status = "released" })).StatusCode);
+        var refused = await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{second}", new { name = "2.0.0", status = "released" });
+        Assert.Equal(("name", "limit_reached"), await ProjectKit.ProblemAsync(refused));
+        // A released one is still edited at the cap (it adds nothing), and the refused one is still planned.
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{t.Release}", new { name = "1.0.0 final", status = "released" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await t.Owner.SendAsync(HttpMethod.Put, $"/api/releases/{second}", new { name = "2.0.0 renamed" })).StatusCode);
+        await using var db = api.Db();
+        Assert.Equal(ReleaseStatuses.Planned, (await db.ApplicationReleases.FindAsync(second))!.Status);
     }
 
     [Fact]
