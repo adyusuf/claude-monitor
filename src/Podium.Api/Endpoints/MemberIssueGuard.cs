@@ -1,4 +1,5 @@
 using Podium.Api.Data;
+using Podium.Api.Projects;
 using Microsoft.EntityFrameworkCore;
 
 namespace Podium.Api.Endpoints;
@@ -22,6 +23,18 @@ public static class MemberIssueGuard
         if (open == 0 && archived == 0) return null;
         return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: HasIssues,
             extensions: new Dictionary<string, object?> { ["count"] = open, ["archivedCount"] = archived });
+    }
+
+    /// <summary>
+    /// For an assign: holds the person's membership row (FOR SHARE) until the caller's transaction ends, then judges them again. A removal or a
+    /// demotion locks that row before it counts the person's issues, so the two serialise: the assign waits for one that went first and then sees
+    /// the person gone, or the removal waits for the assign and then counts its issue. True when the person is still a worker.
+    /// </summary>
+    public static async Task<bool> HoldAssigneeAsync(PodiumDb db, Guid workspaceId, Guid userId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM workspace_members WHERE workspace_id = {workspaceId} AND user_id = {userId} FOR SHARE", ct);
+        return await ProjectRules.IsWorkerAsync(db, userId, workspaceId, ct);
     }
 
     /// <summary>True when a change from <paramref name="from"/> to <paramref name="to"/> takes the member below Member (a viewer is never an assignee).</summary>
