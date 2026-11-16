@@ -1,6 +1,7 @@
+import { config } from "../config";
 import { request, requestList } from "./client";
 import type {
-  ExecLevelChangeInput, ExecLevelView, AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
+  ExecLevelChangeInput, ExecLevelView, AgentActionKind, AgentActionView, AgentAsksView, AgentInventoryView, AgentClaudeView, ClaudeAutoMode, ClaudePermissionMode, ApprovalDuration, ApprovalKeyView, ApprovalRequestRow, ApprovalRuleRow, AgentRoleInput, AgentRoleView, AgentRow, AgentServicesView, AskView, AlertView, AuditRow, CommandRow, CursorPage, DashboardView, DeviceLookup, EventRow, GrantInput, Invitation, MachineDetail, MachineView, Me, Member, MetricSample, Page, PermissionRow, RemoteSettings, Role, RunOutputPage, ScheduleCreate, ScheduleView, SessionDetail, SessionRow, Settings, WebGrantView, WebJobView, WebRunView, WorkspaceInfo,
 } from "./types";
 import type {
   ApplicationInput, ApplicationSummary, ApplicationView, ComponentInput, ComponentView, ProjectInput, ProjectMemberView, ProjectRole,
@@ -55,9 +56,17 @@ export const api = {
   saveSettings: (id: string, settings: Partial<Settings>, opts: { code?: string; expectedUpdatedAt?: string } = {}) =>
     request<void>("PUT", `/workspaces/${id}/settings`, { ...settings, updatedAt: undefined, code: opts.code, expectedUpdatedAt: opts.expectedUpdatedAt }),
   members: (id: string) => request<Member[]>("GET", `/workspaces/${id}/members`),
+  /** The first members and whether the API cut the list (X-Truncated, F-060); the next ones come from memberPage. */
+  memberList: (id: string) => requestList<Member>(`/workspaces/${id}/members`),
+  memberPage: (id: string, cursor: string | null) =>
+    request<CursorPage<Member>>("GET", `/workspaces/${id}/members${q({ limit: config.cursorPageMax, cursor })}`),
   changeRole: (id: string, userId: string, role: Role) => request<void>("PATCH", `/workspaces/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => request<void>("DELETE", `/workspaces/${id}/members/${userId}`),
   invitations: (id: string) => request<Invitation[]>("GET", `/workspaces/${id}/invitations`),
+  /** The first open invitations and whether the API cut the list (X-Truncated, F-060); the next ones come from invitationPage. */
+  invitationList: (id: string) => requestList<Invitation>(`/workspaces/${id}/invitations`),
+  invitationPage: (id: string, cursor: string | null) =>
+    request<CursorPage<Invitation>>("GET", `/workspaces/${id}/invitations${q({ limit: config.cursorPageMax, cursor })}`),
   /** `mailSent` is false when the invitation is saved but its mail could not go out; an older server leaves it out (read as sent). */
   invite: (id: string, email: string, role: Role) => request<{ id: string; mailSent?: boolean }>("POST", `/workspaces/${id}/invitations`, { email, role }),
   resendInvitation: (id: string, invitationId: string) => request<{ mailSent: boolean }>("POST", `/workspaces/${id}/invitations/${invitationId}/resend`),
@@ -94,6 +103,9 @@ export const api = {
   revokeAgent: (agentId: string) => request<void>("POST", `/agents/${agentId}/revoke`),
   moveAgent: (agentId: string, workspaceId: string) => request<void>("PATCH", `/agents/${agentId}`, { workspaceId }),
   machines: (id: string) => request<MachineView[]>("GET", `/workspaces/${id}/machines`),
+  /** The agents and the machines of the machines page, from the first or after the `skip` already shown, and whether the API cut them (F-024). */
+  agentList: (id: string, skip?: number) => requestList<AgentRow>(`/workspaces/${id}/agents${q({ skip })}`),
+  machineList: (id: string, skip?: number) => requestList<MachineView>(`/workspaces/${id}/machines${q({ skip })}`),
   agentRole: (agentId: string) => request<AgentRoleView>("GET", `/agents/${agentId}/role`),
   setAgentRole: (agentId: string, input: AgentRoleInput) => request<AgentRoleView>("PUT", `/agents/${agentId}/role`, input),
   machineDetail: (agentId: string) => request<MachineDetail>("GET", `/agents/${agentId}/detail`),
@@ -211,12 +223,14 @@ export const api = {
   setIntegration: (id: string, autoInvite: boolean) => request<void>("PUT", `/integrations/${id}`, { autoInvite }),
   /** Disconnecting needs a recent sign-in or a two-step code (F-081): the code goes in the body of the POST address. */
   disconnectIntegration: (id: string, code?: string) => request<void>("POST", `/integrations/${id}/disconnect`, { code }),
-  integrationSpaces: (id: string) => requestList<SpaceView>(`/integrations/${id}/spaces`),
+  /** From the first space, or after the `skip` already shown (F-077). */
+  integrationSpaces: (id: string, skip?: number) => requestList<SpaceView>(`/integrations/${id}/spaces${q({ skip })}`),
   importSpaces: (id: string, keys: string[]) => request<SpaceImportResult[]>("POST", `/integrations/${id}/spaces/import`, { keys }),
   integrationSprints: (id: string, key: string) => request<SprintChoice[]>("GET", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints`),
   importSprints: (id: string, key: string, sprintIds: string[]) =>
     request<SprintImportResult[]>("POST", `/integrations/${id}/spaces/${encodeURIComponent(key)}/sprints/import`, { sprintIds }),
-  integrationPeople: (id: string) => requestList<PersonView>(`/integrations/${id}/people`),
+  /** From the first person, or after the `skip` already shown (F-077). */
+  integrationPeople: (id: string, skip?: number) => requestList<PersonView>(`/integrations/${id}/people${q({ skip })}`),
   setIntegrationPerson: (personId: string, input: { email?: string; userId?: string; unlink?: boolean }) => request<void>("PUT", `/integrations/people/${personId}`, input),
   syncIntegration: (id: string) => request<SyncRunView>("POST", `/integrations/${id}/sync`),
   integrationRuns: (id: string) => request<SyncRunView[]>("GET", `/integrations/${id}/runs`),

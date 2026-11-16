@@ -36,7 +36,7 @@ def run(channel, folder, env=None, extra=()):
 
 
 class PublishTests(unittest.TestCase):
-    def test_dry_run_lists_the_kept_copy_then_the_current_one_with_the_manifest_last(self):
+    def test_dry_run_lists_the_kept_copy_then_the_current_one_with_the_manifest_then_the_version_list_last(self):
         with tempfile.TemporaryDirectory() as folder:
             build(folder)
             result = run('prod', folder, {'AGENT_R2_BUCKET': 'b'}, ['--dry-run'])
@@ -47,7 +47,7 @@ class PublishTests(unittest.TestCase):
             'b/daemons/0.4.0/prod/aipod-macos-arm64.zip', 'b/daemons/0.4.0/prod/aipod-windows-x64.zip',
             'b/daemons/0.4.0/prod/SHA256SUMS', 'b/daemons/0.4.0/prod/manifest.json',
             'b/daemons/prod/aipod-macos-arm64.zip', 'b/daemons/prod/aipod-windows-x64.zip',
-            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
+            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json', 'b/daemons/prod/versions.json'])
 
     def test_the_plugin_files_go_up_before_the_checksums_and_the_manifest_when_the_build_has_them(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -61,7 +61,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(keys, [
             'b/daemons/prod/aipod-macos-arm64.zip', 'b/daemons/prod/aipod-windows-x64.zip',
             'b/daemons/prod/aipod-plugin.zip', 'b/daemons/prod/aipod-marketplace.json',
-            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
+            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json', 'b/daemons/prod/versions.json'])
 
     def test_the_installers_go_up_beside_the_zips_when_the_build_has_them(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -75,7 +75,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(keys, [
             'b/daemons/prod/aipod-macos-arm64.zip', 'b/daemons/prod/aipod-windows-x64.zip',
             'b/daemons/prod/aipod-install.sh', 'b/daemons/prod/aipod-install.ps1',
-            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json'])
+            'b/daemons/prod/SHA256SUMS', 'b/daemons/prod/manifest.json', 'b/daemons/prod/versions.json'])
 
     def test_the_prefix_can_be_changed(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -27,19 +27,22 @@ public static class MachineEndpoints
         g.MapGet("/workspaces/{id:guid}/audit", AuditLog);
     }
 
-    /// <summary>The workspace's agents; one revoked longer ago than <see cref="Config.ApiConfig.RevokedAgentsListedFor"/> is left out (its row stays).</summary>
-    private static async Task<IResult> List(Guid id, HttpContext http, PodiumDb db, UpdateCatalog catalog, Config.ApiConfig config, TimeProvider clock)
+    /// <summary>The workspace's agents; one revoked longer ago than <see cref="Config.ApiConfig.RevokedAgentsListedFor"/> is left out (its row stays).
+    /// At most <see cref="MachineQueries.ListMax"/>; a cut list says so in the header the other lists use, and <c>skip</c> fetches the rest (F-024).</summary>
+    private static async Task<IResult> List(Guid id, int? skip, HttpContext http, PodiumDb db, UpdateCatalog catalog, Config.ApiConfig config, TimeProvider clock)
     {
         if (await Access.MemberAsync(db, http.User.UserId(), id, Roles.Viewer, http.RequestAborted) is null) return Http.NotFound();
+        if (skip is < 0) return Http.Invalid("skip", IntegrationImportEndpoints.InvalidPaging);
         var revokedSince = clock.GetUtcNow() - config.RevokedAgentsListedFor;
         var rows = await (from a in db.Agents.AsNoTracking()
                           join m in db.Machines.AsNoTracking() on a.MachineId equals m.Id
                           join u in db.Users.AsNoTracking() on a.UserId equals u.Id
                           where a.WorkspaceId == id && (a.Status != AgentStatuses.Revoked || a.RevokedAt == null || a.RevokedAt >= revokedSince)
-                          orderby a.Status, m.Hostname, a.EnrolledAt descending
+                          orderby a.Status, m.Hostname, a.EnrolledAt descending, a.Id // the id makes the order total, so skip pages are consistent
                           select new AgentRow(a.Id, m.Id, m.Hostname, m.Os, m.Arch, a.Version, a.Status, u.Id, u.DisplayName,
-                              a.EnrolledAt, a.LastHeartbeatAt, a.RevokedAt)).Take(500).ToListAsync(http.RequestAborted);
-        return Results.Ok(rows.Select(r => WithUpdate(r, catalog)));
+                              a.EnrolledAt, a.LastHeartbeatAt, a.RevokedAt)).Skip(skip ?? 0).Take(MachineQueries.ListMax + 1).ToListAsync(http.RequestAborted);
+        IntegrationImportEndpoints.MarkTruncated(http, rows.Count > MachineQueries.ListMax); // one more than shown tells whether rows were left out
+        return Results.Ok(rows.Take(MachineQueries.ListMax).Select(r => WithUpdate(r, catalog)));
     }
 
     /// <summary>Whether the newest build this server hands out is newer than the one the agent runs (decided here, never in the browser).</summary>

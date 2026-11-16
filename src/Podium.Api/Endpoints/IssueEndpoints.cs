@@ -74,6 +74,12 @@ public static class IssueEndpoints
         if (await writes.CreateAsync(userId, project, issue, http.RequestAborted) is { } refused) return refused;
 
         await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        // The assignee's membership row first (the order a removal takes the rows in): a removal or demotion in flight is waited for (F-102).
+        if (issue.AssigneeUserId is { } assignee && !await MemberIssueGuard.HoldAssigneeAsync(db, project.WorkspaceId, assignee, http.RequestAborted))
+        {
+            return Http.Invalid("assigneeUserId", "not_a_member");
+        }
+
         await LockProjectAsync(db, id, http.RequestAborted);
         issue.Number = (await db.Issues.Where(i => i.ProjectId == id).MaxAsync(i => (int?)i.Number, http.RequestAborted) ?? 0) + 1;
         issue.Position = (await db.Issues.Where(i => i.ProjectId == id).MaxAsync(i => (double?)i.Position, http.RequestAborted) ?? 0) + Step;
@@ -114,8 +120,17 @@ public static class IssueEndpoints
         if (await IssueRules.CheckReferencesAsync(db, project, issue, type, http.RequestAborted, stored) is { } bad) return bad;
         if (await writes.UpdateAsync(userId, project, before, issue, http, http.RequestAborted) is { } refused) return refused;
 
+        // A new assignee is held until the save commits, so a removal or demotion in flight cannot leave them an issue (F-102).
+        await using var tx = await db.Database.BeginTransactionAsync(http.RequestAborted);
+        if (issue.AssigneeUserId is { } assignee && assignee != stored.AssigneeUserId
+            && !await MemberIssueGuard.HoldAssigneeAsync(db, project.WorkspaceId, assignee, http.RequestAborted))
+        {
+            return Http.Invalid("assigneeUserId", "not_a_member");
+        }
+
         Audit.Add(db, http, clock, AuditActions.IssueUpdated, issue.WorkspaceId, userId, targetType: "issue", targetId: id);
         await db.SaveChangesAsync(http.RequestAborted);
+        await tx.CommitAsync(http.RequestAborted);
         return Results.NoContent();
     }
 

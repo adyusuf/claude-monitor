@@ -4,6 +4,7 @@ import type { Dictionary } from "./en";
 export const trMachines: Dictionary["machines"] = {
   title: "Makineler", empty: "Henüz bağlı makine yok.", connect: "Makine bağla", revoke: "Bağlantıyı kes",
   revokeConfirm: "Bu makinenin bağlantısı kesilsin mi? Ajanı raporlamayı bırakır.", revoked: "Bağlantı kesildi", lastSeen: "Son görülme",
+  truncated: "Yalnızca ilk {n} makine gösteriliyor; çalışma alanında daha fazlası var.",
   version: "Ajan", user: "Kullanıcı", moveTo: "Çalışma alanına taşı", enrolled: "Bağlandı",
   updateAvailable: "Güncelleme var: {version}",
   updateHint: "Makinede \"aipod update\" çalıştırın ya da kendini güncellemesine izin verin (çalışma alanı izin veriyorsa: aipod config auto-update on).",
