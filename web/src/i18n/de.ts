@@ -74,6 +74,7 @@ export const de: Dictionary = {
     bad_template: "Diese Befehlsvorlage ist für diese Maschine nicht gültig: Das Programm muss ein vollständiger Pfad sein, und manche Programme können nie freigegeben werden.",
     grant_conflict: "Für diese Vorlage gibt es schon eine Freigabe.", invalid_reason: "Diese Begründung ist zu lang.", not_member: "Diese Person ist kein Mitglied dieses Arbeitsbereichs.",
     already_member: "Diese Person ist schon Mitglied mit dieser oder einer höheren Rolle.", invitation_pending: "Für diese Adresse gibt es schon eine offene Einladung. Widerrufen Sie sie, um eine neue zu senden.",
+    invitation_address_unknown: "Diese Einladung wurde gespeichert, bevor die genaue Adresse behalten wurde, und kann deshalb nicht erneut gesendet werden. Widerrufen Sie sie und laden Sie die Person neu ein.",
     member_has_issues: "Dieser Person sind noch Vorgänge zugewiesen, auch archivierte. Weisen Sie sie zuerst anderen zu.",
     invalid_machine_role: "Wählen Sie eine Umgebung und eine Funktion aus den Listen.",
     totp_required: "Diese Maschine ist ein Produktions- oder Datenbankrechner: Dafür brauchen Sie die Anmeldung in zwei Schritten.",

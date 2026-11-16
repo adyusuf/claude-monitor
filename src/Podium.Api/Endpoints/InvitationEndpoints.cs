@@ -17,6 +17,8 @@ public static class InvitationEndpoints
     public const string AlreadyMember = "already_member";
     /// <summary>409 title: the address has an open invitation to this workspace (revoke it to send a new one).</summary>
     public const string InvitationPending = "invitation_pending";
+    /// <summary>409 title: an invitation from before the typed address was kept cannot be sent again; a fresh one is needed.</summary>
+    public const string InvitationAddressUnknown = "invitation_address_unknown";
 
     /// <summary>Inviting and creating a workspace have their own per-IP budget (<see cref="ApiConfig.InviteRequestsPerMinute"/>), apart from the sign-in one.</summary>
     public const string RateLimitPolicy = "invite";
@@ -91,6 +93,11 @@ public static class InvitationEndpoints
         var userId = http.User.UserId();
         if (await Access.MemberAsync(db, userId, id, Roles.Admin, http.RequestAborted) is null) return Http.NotFound();
         var now = clock.GetUtcNow();
+        // A row from before the typed address was kept has only the folded one, which may be another mailbox than the person's (F-180): no mail goes there.
+        var open = await db.WorkspaceInvitations.AsNoTracking().Where(i => i.Id == invitationId && i.WorkspaceId == id && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now)
+            .Select(i => new { i.Email }).FirstOrDefaultAsync(http.RequestAborted);
+        if (open is null) return Http.NotFound();
+        if (open.Email is null) return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: InvitationAddressUnknown);
         var token = Secrets.NewToken();
         var hash = Secrets.Hash(token);
         // Compare-and-set on the still-open invitation: one that was accepted, revoked or has expired since cannot be given a new link.
