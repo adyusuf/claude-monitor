@@ -174,6 +174,8 @@ internal static class PodiumDbModel
                 t.HasCheckConstraint("ck_permission_requests_status", In("status",
                     PermissionStatuses.Open, PermissionStatuses.Answered, PermissionStatuses.Expired));
                 t.HasCheckConstraint("ck_permission_requests_decision", "decision IS NULL OR decision IN ('allow', 'deny')");
+                // The same cap as the run and ask keys (F-188).
+                t.HasCheckConstraint("ck_permission_requests_client_key", "client_key IS NULL OR length(client_key) BETWEEN 1 AND 100");
             });
         });
         b.Entity<ApprovalRule>(e =>

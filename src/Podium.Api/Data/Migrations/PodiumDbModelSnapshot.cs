@@ -3153,6 +3153,8 @@ namespace Podium.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_permission_requests_access_scope", "access_scope IS NULL OR access_scope IN ('inside', 'outside', 'unknown')");
 
+                            t.HasCheckConstraint("ck_permission_requests_client_key", "client_key IS NULL OR length(client_key) BETWEEN 1 AND 100");
+
                             t.HasCheckConstraint("ck_permission_requests_decision", "decision IS NULL OR decision IN ('allow', 'deny')");
 
                             t.HasCheckConstraint("ck_permission_requests_status", "status IN ('open', 'answered', 'expired')");
