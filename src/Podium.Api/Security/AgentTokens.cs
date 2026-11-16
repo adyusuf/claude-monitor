@@ -83,12 +83,20 @@ public static class AgentTokens
         }
 
         // Single use under a race: the replace is a compare-and-set on ReplacedBy IS NULL. The caller's transaction holds the row
-        // until the successor is stored, so a second refresh with the same token waits, changes nothing and is judged a reuse.
+        // until the successor is stored, so a second refresh with the same token waits and changes nothing. It read the token before
+        // the first one committed, which is just what a lost-answer retry does (S-2): the committed row gets the same grace as above,
+        // and only when that refuses is it a reuse.
         var successor = Guid.CreateVersion7();
         var claimed = await db.AgentTokens.Where(t => t.Id == row.Id && t.ReplacedBy == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.ReplacedBy, successor).SetProperty(t => t.LastUsedAt, now), ct);
         if (claimed == 0)
         {
+            var committed = await db.AgentTokens.AsNoTracking().FirstOrDefaultAsync(t => t.Id == row.Id, ct);
+            if (committed?.ReplacedBy is { } winner && await GraceAsync(db, config, committed, winner, now, ct) is { } again)
+            {
+                return (RefreshOutcome.Issued, again, row.AgentId, null);
+            }
+
             await RevokeAllAsync(db, row.AgentId, now, ct);
             return (RefreshOutcome.Reused, null, row.AgentId, RefreshReasons.Reused);
         }
