@@ -130,6 +130,42 @@ public sealed class MachineTagsTests(ApiFactory api)
         Assert.DoesNotContain("Restart order", audit.Detail.RootElement.GetRawText());
     }
 
+    // F-148, pinned and documented (ADR-0008 §3a′): admin edits carry no version, so two admins' writes are last-write-wins and each leaves its own audit row.
+    [Fact]
+    public async Task Two_admins_tag_edits_are_last_write_wins_the_second_replaces_the_whole_set_and_each_is_audited()
+    {
+        var team = await RemoteKit.TeamAsync(api);
+        var second = await RemoteKit.MemberAsync(api, team.Admin, "mt-admin2", "admin");
+
+        Assert.Equal(HttpStatusCode.OK, (await PutTagsAsync(team.Admin, team.TargetId, new() { ["project"] = "shop", ["region"] = "eu" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PutTagsAsync(second, team.TargetId, new() { ["owner"] = "ops" })).StatusCode);
+
+        var tags = (await MachineAsync(team.Admin, team)).GetProperty("tags");
+        Assert.Equal(["owner"], tags.EnumerateObject().Select(p => p.Name).ToList());
+        await using var db = api.Db();
+        Assert.Equal(second.Id, (await db.Agents.AsNoTracking().SingleAsync(a => a.Id == team.TargetId)).TagsSetBy);
+        var rows = await db.AuditEvents.AsNoTracking().Where(a => a.Action == "agent.tags_changed" && a.TargetId == team.TargetId.ToString()).OrderBy(a => a.Id).ToListAsync();
+        Assert.Equal([team.Admin.Id, second.Id], rows.Select(r => r.ActorUserId).ToList());
+    }
+
+    [Fact]
+    public async Task Two_admins_writing_at_once_both_succeed_one_set_wins_and_each_leaves_an_audit_row_and_the_note_follows_the_same_rule()
+    {
+        var team = await RemoteKit.TeamAsync(api);
+        var second = await RemoteKit.MemberAsync(api, team.Admin, "mt-admin2", "admin");
+
+        var tagResponses = await Task.WhenAll(PutTagsAsync(team.Admin, team.TargetId, new() { ["a"] = "1" }), PutTagsAsync(second, team.TargetId, new() { ["b"] = "2" }));
+        var noteResponses = await Task.WhenAll(PutNoteAsync(team.Admin, team.TargetId, "first"), PutNoteAsync(second, team.TargetId, "second"));
+
+        Assert.All(tagResponses.Concat(noteResponses), r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        var tags = (await MachineAsync(team.Admin, team)).GetProperty("tags").EnumerateObject().Select(p => p.Name).ToList();
+        Assert.True(tags is ["a"] or ["b"]);
+        await using var db = api.Db();
+        Assert.Contains((await db.Agents.AsNoTracking().SingleAsync(a => a.Id == team.TargetId)).AdminNote, new[] { "first", "second" });
+        Assert.Equal(2, await db.AuditEvents.CountAsync(a => a.Action == "agent.tags_changed" && a.TargetId == team.TargetId.ToString()));
+        Assert.Equal(2, await db.AuditEvents.CountAsync(a => a.Action == "agent.note_changed" && a.TargetId == team.TargetId.ToString()));
+    }
+
     [Fact]
     public async Task The_note_never_reaches_the_machine_list()
     {

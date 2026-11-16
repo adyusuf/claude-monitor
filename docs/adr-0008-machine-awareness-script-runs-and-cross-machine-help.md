@@ -81,6 +81,12 @@ from the set. The request takes `environments`/`functions` next to the old singl
 
 ### 3a′. Facts, tags, note, services and projects (request 1a)
 
+- **Admin edits are last-write-wins (decided 16/11/2026, F-148).** Tags, the note and the role carry no version token: a write replaces the
+  whole stored value (the tags as one set), two admins writing at once both succeed and the later one stays, and each write leaves its own
+  audit row (the before and after; the note by length only), so nothing is lost silently. In the web, the note and role editors reset to the stored value when it changes under them
+  (live refresh), which drops unsaved typing, and a saved edit overwrites whatever was stored. A version token (`If-Match`) is not added: the
+  writers are few and trusted admins and the audit trail names who overwrote what. Pinned by `MachineTagsTests`.
+
 - **Tool inventory (report only, not an execution path).** The agent probes a fixed candidate list by absolute path,
   per OS and per tool, **including user-owned locations** (Homebrew, `~/.local/bin`, the `nvm` and `volta` folders,
   `%LOCALAPPDATA%\Programs`), never a PATH lookup: `git`, `dotnet`, `node`, `npm`, `python3`, `pwsh`/`powershell`,
