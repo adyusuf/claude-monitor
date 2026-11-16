@@ -1,8 +1,9 @@
-import { Fragment, useId, useState } from "react";
+import { Fragment, useEffect, useId, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api/endpoints";
 import type { AgentRow, MachineView, SessionRow } from "../api/types";
 import { Icon } from "../components/icons";
+import { config } from "../config";
 import { Button, Notice, StatusPill } from "../components/ui";
 import { useErrorText, useI18n } from "../i18n";
 import { age, dateTime, usd } from "../lib/format";
@@ -20,6 +21,12 @@ function SessionItem({ ws, s, now, mine, onChanged }: { ws: string; s: SessionRo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [stopSent, setStopSent] = useState(false);
+  // A sent stop the machine never takes is expired by the API after the action queue's lifetime: the button comes back then, so the person can try again.
+  useEffect(() => {
+    if (!stopSent) return;
+    const timer = setTimeout(() => setStopSent(false), config.agentActionQueueMs);
+    return () => clearTimeout(timer);
+  }, [stopSent]);
   const act = async (call: () => Promise<unknown>, then?: () => void) => {
     setBusy(true);
     setError(null);
