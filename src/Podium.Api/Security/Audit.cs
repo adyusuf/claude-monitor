@@ -17,6 +17,7 @@ public static class AuditActions
     public const string SignOut = "user.sign_out";
     public const string PasswordReset = "user.password_reset";
     public const string ProviderLinked = "user.provider_linked";
+    public const string ProviderUnlinked = "user.provider_unlinked";
     public const string AccountDeleted = "user.account_deleted";
     public const string DataExported = "user.data_exported";
     public const string WorkspaceCreated = "workspace.created";

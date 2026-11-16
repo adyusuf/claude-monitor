@@ -55,6 +55,7 @@ export const de: Dictionary = {
     provider_email_unverified: "Der Anbieter hat Ihre E-Mail-Adresse nicht bestätigt.",
     link_required: "Zu dieser Adresse gibt es ein Konto. Melden Sie sich mit Ihrem Passwort an und verknüpfen Sie den Anbieter dann unter Konto.",
     sign_in_first: "Melden Sie sich zuerst an und verknüpfen Sie den Anbieter dann.", provider_in_use: "Dieses Anbieterkonto ist mit einem anderen Benutzer verknüpft.",
+    link_reauth_required: "Zum Verknüpfen einer Anmeldemethode braucht es eine Anmeldung aus den letzten Minuten: Abmelden, erneut anmelden und gleich danach verknüpfen.", last_sign_in_method: "Das ist die einzige Anmeldemethode dieses Kontos. Legen Sie zuerst ein Passwort fest oder verknüpfen Sie einen anderen Anbieter.",
     account_disabled: "Dieses Konto ist deaktiviert.", not_a_member: "Sie sind kein Mitglied dieses Arbeitsbereichs.",
     invalid_code: "Dieser Code ist ungültig oder abgelaufen.", last_owner: "Ein Arbeitsbereich braucht mindestens einen Eigentümer.",
     invalid_answers: "Diese Antwort passt nicht zur Frage.", invalid_decision: "Wählen Sie Erlauben oder Ablehnen.", invalid_duration: "Wählen Sie aus der Liste, wie lange die Antwort gilt.",
@@ -65,6 +66,7 @@ export const de: Dictionary = {
     request_failed: "Die Anfrage ist fehlgeschlagen.", network: "Der Server ist nicht erreichbar.",
     account_locked: "Zu viele falsche Versuche bei diesem Konto. Versuchen Sie es in 15 Minuten erneut.",
     reauth_required: "Um ein Konto ohne Passwort zu löschen, melden Sie sich erneut an: Abmelden, mit GitHub oder Google anmelden und das Konto innerhalb weniger Minuten löschen.",
+    password_required: "Geben Sie Ihr Passwort ein, um die Anmeldung in zwei Schritten einzuschalten.",
     confirm_required: "Geben Sie das Bestätigungswort genau ein.", sole_owner: "Sie sind der einzige Eigentümer eines gemeinsamen Arbeitsbereichs: Machen Sie zuerst jemand anderen zum Eigentümer.",
     mfa_required: "Dieser Shell-Befehl braucht den Code aus Ihrer Authenticator-App.", run_mismatch: "Die Ausführung hat sich geändert, seit sie angezeigt wurde. Laden Sie neu und sehen Sie sie sich noch einmal an.",
     not_pending: "Diese Anfrage wurde schon beantwortet oder ist abgelaufen.", remote_runs_disabled: "Die Fernarbeit ist in diesem Arbeitsbereich ausgeschaltet.",
@@ -242,6 +244,7 @@ export const de: Dictionary = {
   },
   account: {
     title: "Konto", providers: "Anmeldemethoden", linked: "Verknüpft", link: "{provider} verknüpfen", password: "Passwort",
+    unlink: "{provider} trennen", unlinked: "{provider} ist getrennt.", providerFreshSignIn: "Zum Trennen einer Anmeldemethode braucht es eine Anmeldung aus den letzten Minuten: Abmelden, erneut anmelden und gleich danach trennen.",
     hasPassword: "Gesetzt", noPassword: "Nicht gesetzt (mit einem Anbieter anmelden oder zurücksetzen, um eines zu setzen)",
     data: "Ihre Daten", exportHint: "Alles über Sie und Ihre Sitzungen als eine JSON-Datei.", export: "Meine Daten herunterladen",
     deleteTitle: "Konto löschen", deleteHint: "Ihr Name, Ihre Adresse, Ihre Anmeldemethoden und alles, was Ihre Maschinen erfasst haben, werden gelöscht; Ihre Maschinen werden getrennt. Das lässt sich nicht rückgängig machen.",
@@ -252,6 +255,7 @@ export const de: Dictionary = {
 
     mfaOpen: "In Authenticator öffnen", mfaEnable: "Einschalten", mfaRecovery: "Wiederherstellungscodes. Bewahren Sie sie sicher auf: Mit jedem melden Sie sich einmal ohne die App an. Sie werden nur jetzt angezeigt.",
     mfaDisable: "Ausschalten", mfaDisabled: "Die Anmeldung in zwei Schritten ist aus.",
+    mfaPassword: "Ihr Kontopasswort", mfaFreshSignIn: "Ihr Konto hat kein Passwort, daher braucht das Einschalten eine Anmeldung aus den letzten Minuten: Abmelden, mit GitHub oder Google anmelden und gleich danach einschalten.",
     deleteConfirm: "Geben Sie {word} zur Bestätigung ein", deleteButton: "Mein Konto löschen", deleted: "Ihr Konto wurde gelöscht.",
   },
   invitation: { accepting: "Sie treten dem Arbeitsbereich bei…", accepted: "Sie sind dem Arbeitsbereich beigetreten." },

@@ -54,6 +54,7 @@ export const en = {
     provider_email_unverified: "The provider did not confirm your e-mail address.",
     link_required: "An account with this address exists. Sign in with your password, then link the provider in Account.",
     sign_in_first: "Sign in first, then link the provider.", provider_in_use: "That provider account is linked to another user.",
+    link_reauth_required: "Linking a sign-in method needs a sign-in from the last few minutes: sign out, sign in again, and link it right after.", last_sign_in_method: "This is the only way to sign in to this account. Set a password or link another provider first.",
     account_disabled: "This account is disabled.", not_a_member: "You are not a member of that workspace.",
     invalid_code: "That code is not valid or has expired.", last_owner: "A workspace needs at least one owner.",
     invalid_answers: "That answer does not match the question.", invalid_decision: "Pick allow or deny.", invalid_duration: "Pick how long the answer is remembered from the list.",
@@ -64,6 +65,7 @@ export const en = {
     request_failed: "The request failed.", network: "The server cannot be reached.",
     account_locked: "Too many wrong attempts on this account. Try again in 15 minutes.",
     reauth_required: "To delete an account without a password, sign in again: sign out, sign in with GitHub or Google, and delete the account within a few minutes.",
+    password_required: "Enter your password to turn two-step sign-in on.",
     confirm_required: "Type the confirmation word exactly.", sole_owner: "You are the only owner of a shared workspace: make someone else owner first.",
     mfa_required: "This shell command needs the code from your authenticator app.", run_mismatch: "The run changed since it was shown. Reload and look at it again.",
     not_pending: "This request has already been answered or has expired.", remote_runs_disabled: "Remote work is switched off in this workspace.",
@@ -241,6 +243,7 @@ export const en = {
   },
   account: {
     title: "Account", providers: "Sign-in methods", linked: "Linked", link: "Link {provider}", password: "Password",
+    unlink: "Unlink {provider}", unlinked: "{provider} is unlinked.", providerFreshSignIn: "Unlinking a sign-in method needs a sign-in from the last few minutes: sign out, sign in again, and unlink it right after.",
     hasPassword: "Set", noPassword: "Not set (sign in with a provider, or reset to set one)",
     data: "Your data", exportHint: "Everything about you and your sessions, as one JSON file.", export: "Download my data",
     deleteTitle: "Delete the account", deleteHint: "Your name, address, sign-in methods and everything your machines captured are deleted; your machines are disconnected. This cannot be undone.",
@@ -251,6 +254,7 @@ export const en = {
 
     mfaOpen: "Open in authenticator", mfaEnable: "Turn on", mfaRecovery: "Recovery codes. Keep them somewhere safe: each signs in once without the app. They are shown only now.",
     mfaDisable: "Turn off", mfaDisabled: "Two-step sign-in is off.",
+    mfaPassword: "Your account password", mfaFreshSignIn: "Your account has no password, so turning this on needs a sign-in from the last few minutes: sign out, sign in with GitHub or Google, and turn it on right after.",
     deleteConfirm: "Type {word} to confirm", deleteButton: "Delete my account", deleted: "Your account is deleted.",
   },
   invitation: { accepting: "Joining the workspace…", accepted: "You joined the workspace." },

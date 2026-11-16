@@ -55,6 +55,7 @@ export const tr: Dictionary = {
     provider_email_unverified: "Sağlayıcı e-posta adresinizi doğrulamadı.",
     link_required: "Bu adresle bir hesap var. Parolanızla giriş yapın, sonra sağlayıcıyı Hesap sayfasından bağlayın.",
     sign_in_first: "Önce giriş yapın, sonra sağlayıcıyı bağlayın.", provider_in_use: "Bu sağlayıcı hesabı başka bir kullanıcıya bağlı.",
+    link_reauth_required: "Bir giriş yöntemini bağlamak için son birkaç dakika içinde giriş yapmış olmanız gerekir: çıkış yapın, yeniden girin ve hemen ardından bağlayın.", last_sign_in_method: "Bu hesaba girmenin tek yolu bu. Önce bir parola belirleyin ya da başka bir sağlayıcı bağlayın.",
     account_disabled: "Bu hesap devre dışı.", not_a_member: "O çalışma alanının üyesi değilsiniz.",
     invalid_code: "Bu kod geçersiz ya da süresi dolmuş.", last_owner: "Bir çalışma alanında en az bir sahip olmalı.",
     invalid_answers: "Bu yanıt soruyla uyuşmuyor.", invalid_decision: "İzin ver ya da reddet seçin.", invalid_duration: "Yanıtın ne kadar hatırlanacağını listeden seçin.",
@@ -65,6 +66,7 @@ export const tr: Dictionary = {
     request_failed: "İstek başarısız oldu.", network: "Sunucuya ulaşılamıyor.",
     account_locked: "Bu hesapta çok fazla hatalı deneme oldu. 15 dakika sonra tekrar deneyin.",
     reauth_required: "Parolası olmayan bir hesabı silmek için yeniden oturum açın: çıkış yapın, GitHub ya da Google ile girin ve hesabı birkaç dakika içinde silin.",
+    password_required: "İki adımlı girişi açmak için parolanızı girin.",
     confirm_required: "Onay kelimesini tam olarak yazın.", sole_owner: "Paylaşılan bir çalışma alanının tek sahibisiniz: önce başka birini sahip yapın.",
     mfa_required: "Bu kabuk komutu için doğrulama uygulamasındaki kod gerekli.", run_mismatch: "Çalıştırma, gösterildiğinden sonra değişti. Yenileyip tekrar bakın.",
     not_pending: "Bu istek zaten yanıtlandı ya da süresi doldu.", remote_runs_disabled: "Bu çalışma alanında uzaktan çalışma kapalı.",
@@ -242,6 +244,7 @@ export const tr: Dictionary = {
   },
   account: {
     title: "Hesap", providers: "Giriş yöntemleri", linked: "Bağlı", link: "{provider} bağla", password: "Parola",
+    unlink: "{provider} bağlantısını kaldır", unlinked: "{provider} bağlantısı kaldırıldı.", providerFreshSignIn: "Bir giriş yönteminin bağlantısını kaldırmak için son birkaç dakika içinde giriş yapmış olmanız gerekir: çıkış yapın, yeniden girin ve hemen ardından kaldırın.",
     hasPassword: "Ayarlı", noPassword: "Ayarlı değil (bir sağlayıcıyla giriş yapın ya da sıfırlayarak ayarlayın)",
     data: "Verileriniz", exportHint: "Sizinle ve oturumlarınızla ilgili her şey, tek bir JSON dosyası olarak.", export: "Verilerimi indir",
     deleteTitle: "Hesabı sil", deleteHint: "Adınız, adresiniz, giriş yöntemleriniz ve makinelerinizin yakaladığı her şey silinir; makinelerinizin bağlantısı kesilir. Geri alınamaz.",
@@ -252,6 +255,7 @@ export const tr: Dictionary = {
 
     mfaOpen: "Doğrulama uygulamasında aç", mfaEnable: "Aç", mfaRecovery: "Kurtarma kodları. Güvenli bir yerde saklayın: her biri uygulama olmadan bir kez giriş yapar. Yalnızca şimdi gösteriliyor.",
     mfaDisable: "Kapat", mfaDisabled: "İki adımlı giriş kapalı.",
+    mfaPassword: "Hesap parolanız", mfaFreshSignIn: "Hesabınızın parolası yok; bunu açmak için son birkaç dakika içinde giriş yapmış olmanız gerekir: çıkış yapın, GitHub ya da Google ile girin ve hemen ardından açın.",
     deleteConfirm: "Onaylamak için {word} yazın", deleteButton: "Hesabımı sil", deleted: "Hesabınız silindi.",
   },
   invitation: { accepting: "Çalışma alanına katılınıyor…", accepted: "Çalışma alanına katıldınız." },

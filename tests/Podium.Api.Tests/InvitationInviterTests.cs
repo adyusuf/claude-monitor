@@ -63,6 +63,26 @@ public sealed class InvitationInviterTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task An_inviter_demoted_to_member_voids_even_a_viewer_invitation_below_their_new_rank()
+    {
+        // F-032 pin: the inviter must still be an admin or owner, not only of at least the invited rank.
+        var (owner, admin, invitee, token) = await InvitedByAdminAsync("inv-viewer", "viewer");
+        (await owner.SendAsync(HttpMethod.Patch, $"/api/workspaces/{owner.WorkspaceId}/members/{admin.Id}", new { role = "member" })).EnsureSuccessStatusCode();
+
+        await AssertRefusedAsync(owner, invitee, token);
+    }
+
+    [Fact]
+    public async Task An_owner_invitation_of_an_owner_who_is_still_owner_is_accepted()
+    {
+        var owner = await api.NewClient().SignedUpAsync("inv-owner-owner");
+        var invitee = await api.NewClient().SignedUpAsync("inv-owner-invitee");
+        (await owner.PostAsync($"/api/workspaces/{owner.WorkspaceId}/invitations", new { email = invitee.Email, role = "owner" })).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.OK, (await invitee.PostAsync("/api/invitations/accept", new { token = api.Mail.TokenFor(invitee.Email) })).StatusCode);
+    }
+
+    [Fact]
     public async Task An_invitation_into_an_archived_workspace_cannot_be_accepted_and_stays_open()
     {
         var (owner, _, invitee, token) = await InvitedByAdminAsync("inv-archived", "member");

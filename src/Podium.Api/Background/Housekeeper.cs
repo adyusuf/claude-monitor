@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Podium.Api.Background;
 
 /// <summary>
-/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens and device codes, keep the
-/// monthly partitions of session_events created ahead of need (the default partition catches anything else), and blank captured content past retention
+/// Small periodic chores: expire commands, permission requests and device codes that ran out of time, delete ended agent tokens, device codes and account tokens,
+/// keep the monthly partitions of session_events created ahead of need (the default partition catches anything else), and blank captured content past retention
 /// (<see cref="ContentRetention"/>).
 /// </summary>
 public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock, ILogger<Housekeeper> log) : BackgroundService
@@ -18,6 +18,9 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
 
     /// <summary>How long an ended agent token or device code is kept (for the log of what happened) before it is deleted.</summary>
     public static readonly TimeSpan KeepEndedCredentials = TimeSpan.FromDays(7);
+
+    /// <summary>How long an expired or spent account mail or sign-in token (user_tokens: verification, reset, two-step pending) is kept before it is deleted (F-185).</summary>
+    public static readonly TimeSpan KeepEndedUserTokens = TimeSpan.FromDays(7);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -55,6 +58,7 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
         // An approval rule holds a command the session ran: a week after it ended (revoked or expired) it is gone (ADR-0019).
         var ruleCutoff = now - ApprovalRuleLimits.KeepEnded;
         var credentialCutoff = now - KeepEndedCredentials;
+        var userTokenCutoff = now - KeepEndedUserTokens;
         await Chores.RunAsync(db, ct,
             () => SessionExpiry.CommandsAsync(db, now, broker, ct),
             () => SessionExpiry.PermissionsAsync(db, now, broker, ct),
@@ -68,6 +72,7 @@ public sealed class Housekeeper(IServiceScopeFactory scopes, TimeProvider clock,
             () => db.AgentTokens.Where(t => t.ExpiresAt <= credentialCutoff || (t.RevokedAt != null && t.RevokedAt <= credentialCutoff))
                 .ExecuteDeleteAsync(ct),
             () => db.DeviceAuthorizations.Where(d => d.ExpiresAt <= credentialCutoff).ExecuteDeleteAsync(ct),
+            () => db.UserTokens.Where(t => t.ExpiresAt <= userTokenCutoff || (t.UsedAt != null && t.UsedAt <= userTokenCutoff)).ExecuteDeleteAsync(ct),
             () => EnsurePartitionsAsync(db, now, ct),
             // Prompt texts, permission inputs and archive files past the workspace's retention (F-119).
             () => ContentRetention.RunOnceAsync(db, now, ct));
